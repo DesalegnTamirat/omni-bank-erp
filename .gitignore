@@ -1,0 +1,48 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+build/
+dist/
+
+# ---- Odoo ----
+*.pyc
+.odoo/
+odoo.log
+odoo-server.log
+filestore/
+sessions/
+*.pot~
+
+# pgdata/
+
+# ---- Docker ----
+*.env
+.env
+.env.local
+
+# ---- VSCode ----
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.history/
+
+# Dev Containers generates these locally, don't commit them
+.devcontainer/
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Editor swap/backup files ----
+*.swp
+*.swo
+*~
+
+# ---- Secrets — never commit these ----
+config/odoo.conf.local
+*.pem
+*.key
