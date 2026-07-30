@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_planning_work_unit_manpower_list" model="ir.ui.view">
+        <field name="name">planning.work.unit.manpower.list</field>
+        <field name="model">planning.work.unit.manpower</field>
+        <field name="arch" type="xml">
+            <list string="Work Unit Man Power"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-info="state == 'initiated'"
+                  decoration-muted="state == 'draft'"
+                  decoration-bf="state == 'deleted'">
+                <field name="work_unit_id"/>
+                <field name="fiscal_year_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="approver_id"/>
+                <field name="total_headcount" sum="Total"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_planning_work_unit_manpower_form" model="ir.ui.view">
+        <field name="name">planning.work.unit.manpower.form</field>
+        <field name="model">planning.work.unit.manpower</field>
+        <field name="arch" type="xml">
+            <form string="Work Unit Man Power">
+                <header>
+                    <button name="action_initiate" type="object" string="Initiate"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" type="object" string="Approve"
+                            class="oe_highlight" invisible="state != 'initiated'"/>
+                    <button name="action_reject" type="object" string="Reject"
+                            invisible="state != 'initiated'"/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft"
+                            invisible="state not in ('initiated','rejected')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,initiated,approved,rejected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="work_unit_id" readonly="1"/>
+                            <field name="available_fiscal_year_ids" invisible="1"/>
+                            <field name="fiscal_year_id"
+                                   readonly="state != 'draft'"
+                                   domain="[('id', 'in', available_fiscal_year_ids)]"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="date_start" readonly="1"/>
+                            <field name="date_end" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="approver_id" readonly="1"/>
+                            <field name="initiator_id" readonly="1"/>
+                            <field name="total_headcount"/>
+                            <!--                            <field name="company_id" groups="base.group_multi_company"/>-->
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Man Power Details" name="manpower_details">
+                            <field name="manpower_line_ids" readonly="state not in ('draft',)">
+    <list editable="bottom">
+        <field name="job_id"/>
+        <field name="grade_id"/>
+        <field name="employee_category"/>
+        <field name="hc_jul" string="Jul"/>
+        <field name="hc_aug" string="Aug"/>
+        <field name="hc_sep" string="Sep"/>
+        <field name="hc_oct" string="Oct"/>
+        <field name="hc_nov" string="Nov"/>
+        <field name="hc_dec" string="Dec"/>
+        <field name="hc_jan" string="Jan"/>
+        <field name="hc_feb" string="Feb"/>
+        <field name="hc_mar" string="Mar"/>
+        <field name="hc_apr" string="Apr"/>
+        <field name="hc_may" string="May"/>
+        <field name="hc_jun" string="Jun"/>
+        <field name="total_headcount" sum="Total" readonly="1"/>
+        <field name="currency_id" column_invisible="1"/>
+        <field name="unit_cost"/>
+        <field name="total_cost" sum="Total"/>
+        <field name="remarks" optional="show"/>
+    </list>
+</field>
+                        </page>
+                    </notebook>
+                </sheet>
+<!--                <chatter/>-->
+            </form>
+        </field>
+    </record>
+
+    <record id="view_planning_work_unit_manpower_search" model="ir.ui.view">
+        <field name="name">planning.work.unit.manpower.search</field>
+        <field name="model">planning.work.unit.manpower</field>
+        <field name="arch" type="xml">
+            <search string="Work Unit Man Power">
+                <field name="work_unit_id"/>
+                <field name="fiscal_year_id"/>
+                <filter string="Draft" name="filter_draft" domain="[('state','=','draft')]"/>
+                <filter string="Initiated" name="filter_initiated" domain="[('state','=','initiated')]"/>
+                <filter string="Approved" name="filter_approved" domain="[('state','=','approved')]"/>
+                <filter string="Rejected" name="filter_rejected" domain="[('state','=','rejected')]"/>
+                <group name="group_by">
+                    <filter string="Work Unit" name="group_wu" context="{'group_by':'work_unit_id'}"/>
+                    <filter string="Fiscal Year" name="group_fy" context="{'group_by':'fiscal_year_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_planning_work_unit_manpower" model="ir.actions.act_window">
+        <field name="name">Work Unit Man Power</field>
+        <field name="res_model">planning.work.unit.manpower</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('del_flg', '!=', 'Y')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Work Unit Man Power plan
+            </p>
+        </field>
+    </record>
+</odoo>

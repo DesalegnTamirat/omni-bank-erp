@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root: visible to anyone in either Planning group (Manager implies
+         User, so this single group covers both). Without this, any
+         authenticated user in the system could currently see the whole
+         Planning app. -->
+    <menuitem id="menu_planning_root" name="Planning"
+              groups="custom_planning.group_planning_user"
+              sequence="55"/>
+
+    <!-- Dashboard -->
+    <menuitem id="menu_planning_dashboard" name="Dashboard" parent="menu_planning_root"
+              action="action_planning_dashboard"
+              groups="custom_planning.group_planning_user"
+              sequence="10"/>
+
+    <!-- Configuration - Admin/Manager only -->
+    <menuitem id="menu_planning_configuration" name="Configuration" parent="menu_planning_root"
+              groups="custom_planning.group_planning_manager"
+              sequence="90"/>
+    <menuitem id="menu_planning_fiscal_year" name="Fiscal Year" parent="menu_planning_configuration"
+              action="action_planning_fiscal_year"
+              groups="custom_planning.group_planning_manager"
+              sequence="10"/>
+
+<!--    <menuitem id="menu_planning_work_unit" name="Work Units" parent="menu_planning_configuration"-->
+<!--              action="action_planning_work_unit" sequence="30"/>-->
+
+    <!-- Planning -->
+    <menuitem id="menu_planning_planning" name="Planning" parent="menu_planning_root"
+              groups="custom_planning.group_planning_user"
+              sequence="20"/>
+    <menuitem id="menu_planning_manpower" name="Man Power" parent="menu_planning_planning"
+              groups="custom_planning.group_planning_user"
+              sequence="10"/>
+<!--    <menuitem id="menu_planning_company_manpower" name="Company Man Power" parent="menu_planning_manpower"-->
+<!--              action="action_planning_company_manpower" sequence="10"/>-->
+    <menuitem id="menu_planning_work_unit_manpower" name="Work Unit Man Power" parent="menu_planning_manpower"
+              action="action_planning_work_unit_manpower"
+              groups="custom_planning.group_planning_user"
+              sequence="20"/>
+</odoo>

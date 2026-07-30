@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Singleton placeholder record so the Dashboard menu opens directly on a form -->
+    <record id="planning_dashboard_main" model="planning.dashboard">
+        <field name="name">Planning Dashboard</field>
+    </record>
+
+    <record id="view_planning_dashboard_form" model="ir.ui.view">
+        <field name="name">planning.dashboard.form</field>
+        <field name="model">planning.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Planning Dashboard" create="false" delete="false">
+                <sheet>
+                    <div class="o_planning_dashboard">
+
+                        <style>
+                            .o_planning_dashboard .o_dashboard_card {
+                                border-radius: 10px !important;
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.12) !important;
+                                opacity: 1 !important;
+                                filter: none !important;
+                                pointer-events: auto !important;
+                                display: block !important;
+                            }
+                            .o_planning_dashboard .o_dashboard_card .fa,
+                            .o_planning_dashboard .o_dashboard_card .o_card_label {
+                                color: rgba(255,255,255,0.75) !important;
+                            }
+                            .o_planning_dashboard .o_dashboard_card .fa { font-size: 1.3em; }
+                            .o_planning_dashboard .o_dashboard_card .o_card_label { font-size: 0.85em; }
+                            .o_planning_dashboard .o_dashboard_card .o_card_value,
+                            .o_planning_dashboard .o_dashboard_card .o_card_value input,
+                            .o_planning_dashboard .o_dashboard_card .o_card_value span {
+                                color: #ffffff !important;
+                                background: transparent !important;
+                                border: none !important;
+                                font-size: 1.8em !important;
+                                font-weight: 700 !important;
+                                pointer-events: none;
+                            }
+                            .o_planning_dashboard .o_card_total    { background: linear-gradient(135deg, #4b5fd6 0%, #3346b3 100%) !important; }
+                            .o_planning_dashboard .o_card_draft     { background: linear-gradient(135deg, #8a94a6 0%, #6c7688 100%) !important; }
+                            .o_planning_dashboard .o_card_initiated { background: linear-gradient(135deg, #3aa0e8 0%, #1f7fc4 100%) !important; }
+                            .o_planning_dashboard .o_card_approved  { background: linear-gradient(135deg, #4caf7d 0%, #2e8b57 100%) !important; }
+                            .o_planning_dashboard .o_card_rejected  { background: linear-gradient(135deg, #e2665f 0%, #c0392b 100%) !important; }
+                            .o_planning_dashboard .o_card_workunit  { background: linear-gradient(135deg, #b07fd6 0%, #8a5cc7 100%) !important; }
+                            .o_planning_dashboard .o_card_headcount { background: linear-gradient(135deg, #f0a94e 0%, #d98e2e 100%) !important; }
+                        </style>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h2 class="text-muted mb-0">Manpower Planning Summary</h2>
+                            <div class="d-flex align-items-end gap-3">
+                                <div style="min-width: 260px;">
+                                    <label for="fiscal_year_id" class="text-muted small d-block">Fiscal Year</label>
+                                    <field name="fiscal_year_id"
+                                           placeholder="All Fiscal Years"
+                                           options="{'no_create': True, 'no_open': True}"/>
+                                </div>
+                                <button name="action_open_full_analysis" type="object"
+                                        string="Full Analysis" class="btn btn-secondary"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-6 col-lg-2">
+                                <button name="action_open_all" type="object"
+                                        class="btn o_dashboard_card o_card_total w-100 h-100 text-start p-3 border-0">
+                                    <i class="fa fa-list-alt mb-2"/>
+                                    <div class="o_card_label">Total Plans</div>
+                                    <field name="total_plans" nolabel="1" class="o_card_value"/>
+                                </button>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <button name="action_open_draft" type="object"
+                                        class="btn o_dashboard_card o_card_draft w-100 h-100 text-start p-3 border-0">
+                                    <i class="fa fa-pencil mb-2"/>
+                                    <div class="o_card_label">Draft</div>
+                                    <field name="draft_count" nolabel="1" class="o_card_value"/>
+                                </button>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <button name="action_open_initiated" type="object"
+                                        class="btn o_dashboard_card o_card_initiated w-100 h-100 text-start p-3 border-0">
+                                    <i class="fa fa-clock-o mb-2"/>
+                                    <div class="o_card_label">Initiated</div>
+                                    <field name="initiated_count" nolabel="1" class="o_card_value"/>
+                                </button>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <button name="action_open_approved" type="object"
+                                        class="btn o_dashboard_card o_card_approved w-100 h-100 text-start p-3 border-0">
+                                    <i class="fa fa-check-circle mb-2"/>
+                                    <div class="o_card_label">Approved</div>
+                                    <field name="approved_count" nolabel="1" class="o_card_value"/>
+                                </button>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <button name="action_open_rejected" type="object"
+                                        class="btn o_dashboard_card o_card_rejected w-100 h-100 text-start p-3 border-0">
+                                    <i class="fa fa-times-circle mb-2"/>
+                                    <div class="o_card_label">Rejected</div>
+                                    <field name="rejected_count" nolabel="1" class="o_card_value"/>
+                                </button>
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <div class="o_dashboard_card o_card_workunit w-100 h-100 p-3">
+                                    <i class="fa fa-sitemap mb-2"/>
+                                    <div class="o_card_label">Work Units</div>
+                                    <field name="work_unit_count" nolabel="1" class="o_card_value"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1">
+                            <div class="col-6 col-lg-3">
+                                <div class="o_dashboard_card o_card_headcount w-100 p-3">
+                                    <i class="fa fa-users mb-2"/>
+                                    <div class="o_card_label">Approved Head Count</div>
+                                    <field name="total_headcount" nolabel="1" class="o_card_value"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analysis shortcuts -->
+                        <h5 class="text-muted mt-4 mb-2">Analysis</h5>
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-6">
+                                <button name="action_open_status_analysis" type="object"
+                                        class="btn btn-light w-100 text-start p-4 shadow-sm d-flex justify-content-between align-items-center"
+                                        style="border-radius: 10px;">
+                                    <div>
+                                        <div class="fw-bold">Plans by Status</div>
+                                        <div class="text-muted small">Bar chart of plan counts grouped by status</div>
+                                    </div>
+                                    <i class="fa fa-bar-chart fa-2x text-primary"/>
+                                </button>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <button name="action_open_workunit_analysis" type="object"
+                                        class="btn btn-light w-100 text-start p-4 shadow-sm d-flex justify-content-between align-items-center"
+                                        style="border-radius: 10px;">
+                                    <div>
+                                        <div class="fw-bold">Head Count by Work Unit</div>
+                                        <div class="text-muted small">Bar chart of head count grouped by work unit</div>
+                                    </div>
+                                    <i class="fa fa-users fa-2x text-primary"/>
+                                </button>
+                            </div>
+                        </div>
+
+                        <field name="note" readonly="1" nolabel="1" class="mt-4"/>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_planning_dashboard" model="ir.actions.act_window">
+        <field name="name">Dashboard</field>
+        <field name="res_model">planning.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="res_id" ref="planning_dashboard_main"/>
+        <field name="context">{'create': False}</field>
+    </record>
+</odoo>
