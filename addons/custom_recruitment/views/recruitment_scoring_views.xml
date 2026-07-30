@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Candidate Score: List ─────────────────────────────────────── -->
+    <record id="recruitment_candidate_score_list" model="ir.ui.view">
+        <field name="name">recruitment.candidate.score.list</field>
+        <field name="model">recruitment.candidate.score</field>
+        <field name="arch" type="xml">
+            <list string="Candidate Scores" multi_edit="1"
+                  decoration-danger="disqualified"
+                  decoration-success="selection_status == 'selected'"
+                  decoration-warning="selection_status == 'reserve'">
+
+                <!-- Mass-action toolbar with AUTO-SELECT button -->
+                <header>
+                    <!-- AUTOMATIC SELECTION: Select top N candidates -->
+                    <button name="action_auto_select_candidates"
+                            type="object"
+                            string="Auto-Select Candidates (by Rank)"
+                            class="btn-primary"
+                            help="Automatically select top N candidates based on vacancy slots. No manual override."/>
+
+                    <!-- Ranking button (runs first) -->
+                    <button name="action_rank_candidates"
+                            type="object"
+                            string="Rank Selected Candidates"
+                            class="btn-secondary"
+                            help="Rank candidates by score before auto-selecting"/>
+
+                    <!-- Disqualification check -->
+                    <button name="action_apply_disqualification_check"
+                            type="object"
+                            string="Check Disqualification (50% Gate)"
+                            class="btn-secondary"/>
+                </header>
+<!--                <div class="alert alert-info" role="alert"-->
+<!--                     invisible="selection_status != 'selected'">-->
+<!--                    <strong>✓ Auto-Selected:</strong>-->
+<!--                    This candidate was automatically selected based on ranking.-->
+<!--                    Manual changes are restricted.-->
+<!--                </div>-->
+                <field name="rank" readonly="selection_status != 'pending'"/>
+                <field name="vacancy_id" readonly="selection_status != 'pending'"/>
+                <field name="candidate_name" readonly="selection_status != 'pending'"/>
+                <field name="recruitment_type" readonly="selection_status != 'pending'"/>
+                <field name="vacancy_employee_category" readonly="selection_status != 'pending'"/>
+                <field name="job_level" readonly="selection_status != 'pending'"/>
+                <field name="gender" readonly="selection_status != 'pending'"/>
+                <field name="pms_score" readonly="selection_status != 'pending'"/>
+                <field name="written_score" readonly="selection_status != 'pending'"/>
+                <field name="interview_score" readonly="selection_status != 'pending'"/>
+                <field name="final_score" readonly="selection_status != 'pending'"/>
+                <field name="disqualified" readonly="selection_status != 'pending'"/>
+                <field name="vacancy_no_of_vacancies" string="Vacancy Slots" readonly="selection_status != 'pending'"/>
+
+
+                <field name="selection_status" widget="badge"
+                       decoration-success="selection_status == 'selected'"
+                       decoration-danger="selection_status in ('rejected','disqualified')"
+                       decoration-warning="selection_status == 'reserve'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Candidate Score: Form ─────────────────────────────────────── -->
+    <record id="recruitment_candidate_score_form" model="ir.ui.view">
+        <field name="name">recruitment.candidate.score.form</field>
+        <field name="model">recruitment.candidate.score</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Score">
+                <header>
+                    <!-- Auto-Select and Check Disqualification moved to the
+                         list view (header buttons + ⚙ Actions menu) — not
+                         duplicated here anymore. -->
+                    <field name="selection_status" widget="statusbar"
+                           statusbar_visible="pending,selected,reserve,rejected"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert" invisible="not disqualified">
+                        <strong>Disqualified:</strong>
+                        <field name="disqualification_reason" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <!-- INFO BOX: Show auto-selection status -->
+                    <!--                    <div class="alert alert-info" role="alert"-->
+                    <!--                         invisible="selection_status != 'selected'">-->
+                    <!--                        <strong>✓ Auto-Selected:</strong>-->
+                    <!--                        This candidate was automatically selected based on ranking.-->
+                    <!--                        Manual changes are restricted.-->
+                    <!--                    </div>-->
+
+                    <group>
+                        <group string="Candidate">
+                            <field name="vacancy_id" readonly="selection_status != 'pending'"/>
+                            <field name="recruitment_type" readonly="selection_status != 'pending'"/>
+                            <field name="vacancy_employee_category" readonly="1"/>
+                            <field name="job_level" readonly="selection_status != 'pending'"
+                                   invisible="vacancy_employee_category == 'Managerial'"/>
+                            <field name="applicant_id" readonly="selection_status != 'pending'"
+                                   invisible="recruitment_type != 'external'"/>
+                            <field name="employee_id" readonly="selection_status != 'pending'"
+                                   invisible="recruitment_type != 'internal'"/>
+                            <field name="candidate_name" readonly="1"/>
+                            <field name="gender" readonly="selection_status != 'pending'"/>
+                            <field name="rank" readonly="1"/>
+                        </group>
+                        <group string="Scores">
+                            <field name="pms_score" readonly="selection_status != 'pending'"
+                                   invisible="recruitment_type != 'internal'"/>
+                            <field name="pms_weight" readonly="selection_status != 'pending'"
+                                   invisible="recruitment_type != 'internal'"/>
+                            <field name="written_score" readonly="selection_status != 'pending'"/>
+                            <field name="written_weight" readonly="selection_status != 'pending'"/>
+                            <field name="interview_score" readonly="selection_status != 'pending'"/>
+                            <field name="interview_weight" readonly="selection_status != 'pending'"/>
+                            <field name="final_score" readonly="1"/>
+                        </group>
+                    </group>
+
+
+                    <group string="Selection Status">
+                        <field name="vacancy_no_of_vacancies" string="Vacancy Slots" readonly="1"/>
+                        <field name="selection_status" readonly="1"/>
+                    </group>
+
+                    <group string="Reserve Pool" invisible="selection_status != 'reserve'">
+                        <field name="reserve_expiry" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+
+    <record id="action_server_rank_candidates_menu" model="ir.actions.server">
+        <field name="name">Rank Candidates</field>
+        <field name="model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_rank_candidates_menu()</field>
+    </record>
+
+    <!-- Disqualification check (50% gate) -->
+    <record id="action_server_disqualification_check_menu" model="ir.actions.server">
+        <field name="name">Check Disqualification (50% Gate)</field>
+        <field name="model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_apply_disqualification_check_menu()</field>
+    </record>
+
+    <!-- Rank + Auto-Select in one click -->
+    <record id="action_server_rank_and_auto_select" model="ir.actions.server">
+        <field name="name">Rank &amp; Auto-Select Candidates (by Vacancy Slots)</field>
+        <field name="model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_rank_and_auto_select()</field>
+    </record>
+
+    <record id="action_recruitment_candidate_score" model="ir.actions.act_window">
+        <field name="name">Candidate Scores</field>
+        <field name="res_model">recruitment.candidate.score</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                <b>Workflow:</b>
+                <br/>
+                1. Add candidate scores
+                <br/>
+                2. Check disqualification (50% gate)
+                <br/>
+                3. Rank candidates
+                <br/>
+                4. Click "Auto-Select Candidates" to automatically fill vacancy slots
+                <br/>
+                <b>Note:</b>
+                Manual selection is disabled. Use Auto-Select for all selections.
+            </p>
+        </field>
+    </record>
+
+    <!-- ── Offer Letter: List ────────────────────────────────────────── -->
+    <record id="recruitment_offer_letter_list" model="ir.ui.view">
+        <field name="name">recruitment.offer.letter.list</field>
+        <field name="model">recruitment.offer.letter</field>
+        <field name="arch" type="xml">
+            <list string="Offer Letters"
+                  decoration-success="state == 'accepted'"
+                  decoration-danger="state in ('declined','expired')"
+                  decoration-warning="state == 'sent'">
+                <field name="reference" readonly="response != 'pending'"/>
+                <field name="vacancy_id" readonly="response != 'pending'"/>
+                <field name="candidate_name" readonly="response != 'pending'"/>
+                <field name="offer_date" readonly="response != 'pending'"/>
+                <field name="response_deadline" readonly="response != 'pending'"/>
+                <field name="response" readonly="response != 'pending'"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'accepted'"
+                       decoration-danger="state in ('declined','expired')"/>
+                <field name="employment_letter_generated"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Offer Letter: Form ────────────────────────────────────────── -->
+    <record id="recruitment_offer_letter_form" model="ir.ui.view">
+        <field name="name">recruitment.offer.letter.form</field>
+        <field name="model">recruitment.offer.letter</field>
+        <field name="arch" type="xml">
+            <form string="Job Offer Letter">
+                <header>
+                    <button name="action_send_offer" string="Send Offer" type="object"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_accept" string="Mark Accepted" type="object"
+                            class="btn-primary" invisible="state != 'sent'"/>
+                    <button name="action_decline" string="Mark Declined" type="object"
+                            invisible="state != 'sent'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,sent,accepted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Offer Details">
+                            <field name="vacancy_id" readonly="response != 'pending'"/>
+                            <field name="candidate_score_id" readonly="response != 'pending'"/>
+                            <field name="candidate_name" readonly="1"/>
+                            <field name="offer_date" readonly="response != 'pending'"/>
+                            <field name="response_deadline" readonly="1"/>
+                        </group>
+                        <group string="Response">
+                            <field name="response" readonly="response != 'pending'"/>
+                            <field name="response_date" readonly="1"/>
+                            <field name="employment_letter_generated" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <!-- Chatter (Log/Messages/Followers) hidden per request -->
+            </form>
+        </field>
+    </record>
+
+    <record id="action_recruitment_offer_letter" model="ir.actions.act_window">
+        <field name="name">Offer Letters</field>
+        <field name="res_model">recruitment.offer.letter</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ── Application Window: List ─────────────────────────────────── -->
+    <record id="recruitment_application_window_list" model="ir.ui.view">
+        <field name="name">recruitment.application.window.list</field>
+        <field name="model">recruitment.application.window</field>
+        <field name="arch" type="xml">
+            <list string="Application Windows" decoration-muted="is_closed">
+                <field name="vacancy_id"/>
+                <field name="notification_date"/>
+                <field name="deadline"/>
+                <field name="is_closed"/>
+                <field name="late_inclusion_allowed"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_recruitment_application_window" model="ir.actions.act_window">
+        <field name="name">Application Windows</field>
+        <field name="res_model">recruitment.application.window</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ── Blacklist: add Check button to hr.applicant ──────────────── -->
+    <record id="hr_applicant_blacklist_check_inherit" model="ir.ui.view">
+        <field name="name">hr.applicant.blacklist.check</field>
+        <field name="model">hr.applicant</field>
+        <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_check_blacklist"
+                        string="Check Blacklist"
+                        type="object"
+                        class="btn-secondary"
+                        invisible="blacklist_checked"/>
+                <widget name="web_ribbon"
+                        title="BLACKLISTED"
+                        bg_color="text-bg-danger"
+                        invisible="blacklist_status != 'flagged'"/>
+            </xpath>
+            <xpath expr="//sheet//group[1]" position="after">
+                <group string="Compliance" invisible="not blacklist_checked">
+                    <field name="blacklist_checked" readonly="1"/>
+                    <field name="blacklist_status" widget="badge"
+                           decoration-success="blacklist_status == 'clear'"
+                           decoration-danger="blacklist_status == 'flagged'"
+                           decoration-warning="blacklist_status == 'not_checked'"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

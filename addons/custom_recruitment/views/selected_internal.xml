@@ -1,0 +1,199 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- ******************************************************************************************************************** -->
+	
+	 <record id="action_new_internal_recruit_select_cand" model="ir.actions.act_window">
+        <field name="name">Internal Recruitment Process Selected Candidates</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">new.internal.recruitment.selected.candidates</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="new_internal_recruit_select_cand_tree_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.candidates.tree</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="arch" type="xml">
+            <list string="Internal Recruitment Selected Candidates" editable="top" limit="500" multi_edit="1"> 
+                                    <field name="emp_name"/>
+									<field name="select_flag"/>
+<!--                                    <field name="emp_grade"/>-->
+                                    <field name="emp_position"/>
+<!--                                    <field name="emp_category"/>-->
+<!--                                    <field name="emp_type"/>-->
+<!--                                    <field name="emp_gender"/>-->
+                                    <field name="current_work_unit"/>
+                                    <field name="current_department"/>
+<!--                                    <field name="service_in_company"/>-->
+<!--                                    <field name="educational_qualification"/>-->
+<!--                                    <field name="cgpa"/>-->
+<!--                                    <field name="relevant_experience"/>-->
+<!--                                    <field name="supervisory_experience"/>-->
+<!--                                    <field name="last_promotion"/>-->
+<!--                                    <field name="pms_score"/>-->
+                                    <field name="preferred_location"/>
+<!--                                    <field name="written_warning"/>-->
+<!--                                    <field name="demoted"/>-->
+
+                                    <field name="written_exam_score"/>
+                                    <field name="interview_score"/>
+                                    <field name="pms_score"/>
+                                    <field name="weighted_score"/>
+                                    <field name="selection_type"/>
+                                    
+                                    <field name="remarks"/>
+            </list>
+        </field>
+    </record>
+
+<!-- ********************************************************************************************************************** -->
+    <record id="action_new_internal_recruitment_selected" model="ir.actions.act_window">
+        <field name="name">Internal Recruitment Process Selected Candidates</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">new.internal.recruitment.selected</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="new_internal_recruitment_selected_tree_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.tree</field>
+        <field name="model">new.internal.recruitment.selected</field>
+        <field name="arch" type="xml">
+            <list string="Internal Recruitment Selected Candidates">
+                <field name="vacancy_reference"/>
+				<field name="recruitment_reference"/>
+                <field name="job_position"/>
+                <field name="written_exam_date"/>
+                <field name="interview_date"/>
+<!--                <field name="promotion_revocation_days"/>-->
+            </list>
+        </field>
+    </record>
+
+    <record id="new_internal_recruitment_selected_form_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.form</field>
+        <field name="model">new.internal.recruitment.selected</field>
+        <field name="arch" type="xml">
+            <form string="Internal Recruitment Selected candidates">
+                <header>
+                    <field name="status" widget="statusbar"/>
+					<button name="notify" invisible="status in ('notify', 'evaluate')" string="Notify Approvers" type="object" class="oe_highlight"/>
+                    <button name="evaluate" invisible="status in 'evaluate'" string="Approve Selection" type="object" class="oe_highlight"/>
+                   <button name="notify_written_exam" string="Notify Written Exam" type="object" class="oe_highlight"/>
+                    <button name="fetch_exam_score" string="Fetch Exam Score" type="object" class="oe_highlight"/>
+                    <button name="notify_interview_panel" string="Notify Interview Panel" type="object" class="oe_highlight"/>
+                    <button name="notify_interview" string="Notify Interview" type="object" class="oe_highlight"/>
+                    <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="oe_highlight"/>
+                    <button name="compute_weighted_score" string="Compute Score" type="object" class="oe_highlight"/>
+                    <button name="notify_selection" string="Notify Selection" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="vacancy_reference"/>
+                            <field name="recruitment_reference"/>
+                            <field name="written_exam_date"/>
+                            <field name="exam_location"/>
+                            <field name="exam_scheduled"/>
+                            <field name="status" invisible="1"/>
+
+
+<!--                            <field name="job_location"/>-->
+<!--                            <field name="job_grade"/>-->
+<!--                            <field name="job_category"/>-->
+<!--                             <field name="emp_type"/>-->
+<!--                            <field name="vacancy_announced_on"/>-->
+<!--                            <field name="no_of_vacancies"/>-->
+                        </group>
+                        <group>
+                            <field name="job_position"/>
+							<field name="job_category"/>
+                            <field name="interview_date" widget="datetime"/>
+                             <field name="interview_location"/>
+                             <field name="interview_scheduled"/>
+<!--                            <field name="highest_cgpa"/>-->
+<!--                            <field name="relevant_experience"/>-->
+<!--                            <field name="minimum_number_years_in_company"/>-->
+<!--                            <field name="no_of_months_since_last_written_notice"/>-->
+<!--                            <field name="no_of_months_since_last_promotion"/>-->
+<!--                            <field name="minimum_pms_score"/>-->
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Selected Employees">
+                            <field name="new_int_rec_sel">
+                                <list string="Selected Employees" editable="bottom">
+                                    <field name="emp_name"/>
+									<field name="select_flag"/>
+<!--                                    <field name="emp_grade"/>-->
+                                    <field name="emp_position"/>
+<!--                                    <field name="emp_category"/>-->
+<!--                                    <field name="emp_type"/>-->
+<!--                                    <field name="emp_gender"/>-->
+                                    <field name="current_work_unit"/>
+                                    <field name="current_department"/>
+<!--                                    <field name="service_in_company"/>-->
+<!--                                    <field name="educational_qualification"/>-->
+<!--                                    <field name="cgpa"/>-->
+<!--                                    <field name="relevant_experience"/>-->
+<!--                                    <field name="supervisory_experience"/>-->
+<!--                                    <field name="last_promotion"/>-->
+<!--                                    <field name="pms_score"/>-->
+                                    <field name="preferred_location"/>
+<!--                                    <field name="written_warning"/>-->
+<!--                                    <field name="demoted"/>-->
+
+                                    <field name="written_exam_score"/>
+                                    <field name="interview_score"/>
+                                    <field name="pms_score"/>
+                                    <field name="weighted_score"/>
+                                    <field name="selection_type"/>
+                                    
+                                    <field name="remarks"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Panel Members">
+                            <field name="new_int_rec_panel">
+                                <list string="Panel Members" editable="bottom">
+                                    <field name="emp_name"/>
+<!--                                    <field name="emp_position"/>-->
+                                    <field name="selection_criteria"/>
+                                    <field name="accepted"/>
+                                </list>
+                            </field>
+                        </page>
+						
+                    </notebook>
+					<notebook>
+						<page string="Recruitment Approval Members">
+                            <field name="recr_selected_team_id">
+                                <list editable="bottom">
+                                        <field name="role" width="20%"/>
+                                        <field name="employee_name" width="20%"/>
+                                        <field name="operating_unit" width="20%"/>
+                                        <field name="status" width="20%"/>
+                                        <field name="alternate_committee_member" width="20%"/>
+                                        <field name="alter_operating_unit" width="20%"/>
+                                        <field name="approve" width="20%"/>
+                                </list>
+                            </field>
+                        </page>
+					</notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+</odoo>

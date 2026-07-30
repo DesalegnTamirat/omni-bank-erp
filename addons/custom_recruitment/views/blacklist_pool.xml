@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="blacklist_pool_tree" model="ir.ui.view">
+        <field name="name">blacklist.pool.form</field>
+        <field name="model">blacklist.pool</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Blacklist Pool">
+                <field name="candidate"/>
+                <field name="gender"/>
+                <field name="national_id"/>
+            </list>
+        </field>
+    </record>
+        <record id="blacklist_pool_form_tree" model="ir.actions.act_window">
+        <field name="name">Blacklist Pool</field>
+        <field name="res_model">blacklist.pool</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list</field>
+    </record>
+
+
+<!--        <menuitem-->
+<!--        id="menu_recruitment_qualification"-->
+<!--        name="Recruitment Qualifications"-->
+<!--        parent="menu_recruitment_criteria_configuration"-->
+<!--        action="recruitment_qualification_form_tree"-->
+<!--    />-->
+</odoo>

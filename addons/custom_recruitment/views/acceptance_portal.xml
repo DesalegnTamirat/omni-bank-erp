@@ -1,0 +1,108 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--This XML file does not appear to have any style information associated with it. The document tree is shown below.--><odoo>
+    <template id="portal_my_home_menu_bids" name="Portal layout : invoice menu entries" inherit_id="portal.portal_breadcrumbs" priority="30">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'bid'" t-attf-class="breadcrumb-item #{'active ' if not job else ''}">
+                <a t-if="job" t-attf-href="/my/job-acceptance?{{ keep_query() }}">Job Acceptance</a>
+                <t t-else="">Job</t>
+            </li>
+        </xpath>
+    </template>
+    <template id="portal_my_home_bid" name="Portal My Home : fee entries" inherit_id="portal.portal_my_home" priority="30">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Job Acceptance</t>
+                <t t-set="url" t-value="'/my/job-acceptance'"/>
+            </t>
+        </xpath>
+    </template>
+    <template id="job_acceptance_form" name="Job Acceptance">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Job Acceptance</t>
+            </t>
+            <div id="wrap">
+                <div class="row">
+                    <div class="col-lg-12 text-left mb16">
+                        <table>
+                            <tr>
+                                <td>Applicant Name:</td>
+                                <th style="color:#B8860B">
+                                    <span t-field="data[0].partner_name"/>
+                                </th>
+                            </tr>
+                            <tr>
+                                <td>Applied For:</td>
+                                <th style="color:#B8860B">
+                                    <span t-field="data[0].job_id"/>
+                                </th>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <div class="oe_structure">
+                    <div class="container">
+                        <form role="form" action="/submit/job_acceptance_status" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="partner_name" t-att-value="data[0].partner_name"/>
+                            <input type="hidden" name="job_id" t-att-value="data[0].job_id"/>
+                            <div class="form-group">
+                                <label for="partner_name" class="control-label">Applicant Name</label>
+                                <select class="form-control" name="partner_name">
+                                    <t t-foreach="data" t-as="record">
+                                        <option t-att-value="record.partner_name">
+                                            <span t-field="record.partner_name"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="job_id" class="control-label">Applied for</label>
+                                <select class="form-control" name="job_id">
+                                    <t t-foreach="data" t-as="record">
+                                        <option t-att-value="record.job_id">
+                                            <span t-field="record.job_id"/>
+                                        </option>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="job_offer_status" class="control-label">Job Accepatance Status</label><br/>
+                                <input type="radio" id="job_offer_status" name="job_offer_status" value="Accepted"/>
+                                <label for="job_offer_status">Accept</label>
+                                <br/>
+                                <input type="radio" id="job_offer_status" name="job_offer_status" value="Rejected"/>
+                                <label for="job_offer_status">Reject</label>
+                                <br/>
+                            </div>
+                            <div class="form-group">
+                                <label for="rejection_reason" class="control-label">Rejection Reason</label>
+                                <input type="text" name="rejection_reason" t-att-value="rejection_reason" id="rejection_reason" class="form-control"/>
+                            </div>
+                            <div class="clearfix oe_login_buttons">
+                                <button type="job_acceptance_submit" class="btn btn-primary pull-left">Submit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+    <template id="job_application_response" name="Job Acceptance Response">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="container">
+                    <h1>Thanks!</h1>
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="alert alert-success" role="status">Response has been Submitted Successfully.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

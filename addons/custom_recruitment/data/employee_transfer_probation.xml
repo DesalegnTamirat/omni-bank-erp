@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data noupdate="1">
+        <record id="sequence_hr_employee_probation" model="ir.sequence">
+            <field name="name">Employee Probation sequence</field>
+            <field name="code">hr.employee.probation</field>
+            <field name="prefix">BIB/PROB/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="sequence_employee_transfer_request" model="ir.sequence">
+            <field name="name">Employee Transfer Request sequence</field>
+            <field name="code">employee.transfer.request</field>
+            <field name="prefix">BB/TRF/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="sequence_transfer_committee_minutes" model="ir.sequence">
+            <field name="name">Transfer Committee Minutes sequence</field>
+            <field name="code">transfer.committee.minutes</field>
+            <field name="prefix">BB/TCM/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+
+    <data>
+        <!-- FR-REC-061: proactive notification, 5 days prior to probation end date -->
+        <record id="ir_cron_probation_notify_supervisor" model="ir.cron">
+            <field name="name">Recruitment: Notify Supervisors of Upcoming Probation End</field>
+            <field name="model_id" ref="model_hr_employee_probation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_notify_upcoming_probation_end()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

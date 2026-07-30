@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_internal_recruitment_eligible_employees" model="ir.actions.act_window">
+        <field name="name">Internal Recruitment Eligible Employees</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">internal.recruitment.eligible.employees</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="internal_recruitment_eligible_employees_tree_view" model="ir.ui.view">
+        <field name="name">internal.recruitment.eligible.employees.tree</field>
+        <field name="model">internal.recruitment.eligible.employees</field>
+        <field name="arch" type="xml">
+            <list string="Internal Recruitment Eligible Employees" editable="top" limit="500" multi_edit="1">
+                    <field name="emp_name"/>
+                    <field name="select_flag"/>
+                    <field name="app_date"/>
+					<field name="emp_grade"/>
+                    <field name="emp_position"/>
+                    <field name="emp_category"/>
+                    <field name="emp_type"/>
+                    <field name="emp_gender"/>
+                    <field name="current_work_unit"/>
+					<field name="educational_qualification"/>
+                    <field name="service_in_company"/>
+                    <field name="relevant_experience"/>
+                    <field name="employment_experience"/>
+                    <field name="total_experience"/>
+                    <field name="current_location_exp"/>
+                    <field name="current_position_exp"/>
+                    <field name="supervisory_experience"/>
+                    <field name="last_promotion"/>
+                    <field name="pms_score"/>
+                    <field name="recommendation"/>
+                    <field name="preferred_location"/>
+                    <field name="written_warning"/>
+                    <field name="demoted"/>
+            </list>
+        </field>
+    </record>
+
+<!--    <record id='internal_recruitment_eligible_employees_form_view' model='ir.ui.view'>-->
+<!--        <field name="name">internal.recruitment.eligible.employees.form</field>-->
+<!--        <field name="model">internal.recruitment.eligible.employees</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <form string="Internal Recruitment Eligible Employees">-->
+
+<!--                <sheet>-->
+<!--                    <group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_name"/>-->
+<!--                            <field name="emp_grade"/>-->
+<!--                            <field name="emp_position"/>-->
+<!--                        </group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_location"/>-->
+<!--                            <field name="emp_category"/>-->
+<!--                            <field name="employment_type"/>-->
+<!--                            <field name="select"/>-->
+<!--                        </group>-->
+<!--                    </group>-->
+
+
+<!--                </sheet>-->
+<!--            </form>-->
+<!--        </field>-->
+<!--    </record>-->
+
+</odoo>

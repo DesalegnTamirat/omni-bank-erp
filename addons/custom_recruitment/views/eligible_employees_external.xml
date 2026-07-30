@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_external_recruitment_eligible_employees" model="ir.actions.act_window">
+        <field name="name">External Recruitment Eligible Employees</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">external.recruitment.eligible.employees</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="external_recruitment_eligible_employees_tree_view" model="ir.ui.view">
+        <field name="name">external.recruitment.eligible.employees.tree</field>
+        <field name="model">external.recruitment.eligible.employees</field>
+        <field name="arch" type="xml">
+            <list string="External Recruitment Eligible Employees" editable="bottom">
+                <field name="applicant_name"/>
+                <field name="applicant_email"/>
+                <field name="applicant_phone"/>
+                <field name="date_of_birth"/>
+                <field name="gender"/>
+                <field name="working_status"/>
+                <field name="current_company"/>
+                <field name="join_immediately"/>
+                <field name="date_of_availability"/>
+                <field name="highest_cgpa"/>
+                <field name="relevant_experience"/>
+                <field name="banking_experience"/>
+                <field name="non_banking_experience"/>
+                <field name="preferred_location"/>
+                <field name="select_flag"/>
+            </list>
+        </field>
+    </record>
+
+<!--    <record id='external_recruitment_eligible_employees_form_view' model='ir.ui.view'>-->
+<!--        <field name="name">external.recruitment.eligible.employees.form</field>-->
+<!--        <field name="model">external.recruitment.eligible.employees</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <form string="External Recruitment Eligible Employees">-->
+
+<!--                <sheet>-->
+<!--                    <group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_name"/>-->
+<!--                            <field name="emp_grade"/>-->
+<!--                            <field name="emp_position"/>-->
+<!--                        </group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_location"/>-->
+<!--                            <field name="emp_category"/>-->
+<!--                            <field name="employment_type"/>-->
+<!--                            <field name="select"/>-->
+<!--                        </group>-->
+<!--                    </group>-->
+
+
+<!--                </sheet>-->
+<!--            </form>-->
+<!--        </field>-->
+<!--    </record>-->
+
+</odoo>

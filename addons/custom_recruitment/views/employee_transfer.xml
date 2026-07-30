@@ -1,0 +1,102 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_transfer_request_list_view" model="ir.ui.view">
+        <field name="name">employee.transfer.request.list</field>
+        <field name="model">employee.transfer.request</field>
+        <field name="arch" type="xml">
+            <list string="Employee Transfer Requests" decoration-danger="eligibility_status=='ineligible'" decoration-success="eligibility_status=='eligible'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="current_job_position_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="request_date"/>
+                <field name="disciplinary_status"/>
+                <field name="eligibility_status"/>
+                <field name="transfer_suitability_score"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="employee_transfer_request_form_view" model="ir.ui.view">
+        <field name="name">employee.transfer.request.form</field>
+        <field name="model">employee.transfer.request</field>
+        <field name="arch" type="xml">
+            <form string="Employee Transfer Request">
+                <header>
+                    <button name="action_submit" string="Submit" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_start_review" string="Start Review" type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                    <button name="action_approve" string="Approve" type="object" class="oe_highlight" invisible="state != 'under_review'"/>
+                    <button name="action_reject" string="Reject" type="object" invisible="state not in ('submitted', 'under_review')"/>
+                    <button name="action_withdraw" string="Withdraw" type="object" invisible="state not in ('draft', 'submitted', 'under_review')"/>
+                    <button name="action_refuse_transfer" string="Refuse Transfer" type="object" class="oe_highlight" invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="eligibility_status != 'ineligible'">
+                        <field name="ineligibility_reason" readonly="1"/>
+                    </div>
+                    <group>
+                        <group string="Requesting Employee">
+                            <field name="employee_id"/>
+                            <field name="request_date"/>
+                            <field name="current_job_position_id" readonly="1"/>
+                            <field name="current_job_grade_id" readonly="1"/>
+                            <field name="current_operating_unit_id" readonly="1"/>
+                            <field name="date_in_current_position"/>
+                            <field name="date_in_current_location"/>
+                            <field name="service_years_current_position" readonly="1"/>
+                            <field name="service_years_current_location" readonly="1"/>
+                        </group>
+                        <group string="Target">
+                            <field name="target_vacancy_id"/>
+                            <field name="target_job_position_id" readonly="1"/>
+                            <field name="target_job_grade_id" readonly="1"/>
+                            <field name="grade_restriction_ok" readonly="1"/>
+                            <field name="service_rule_ok" readonly="1"/>
+                            <field name="eligibility_status" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Discipline">
+                        <group>
+                            <field name="disciplinary_status"/>
+                            <field name="discipline_deduction_percent" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="is_exchange_transfer"/>
+                            <field name="exchange_partner_employee_id" invisible="not is_exchange_transfer"/>
+                            <field name="exchange_partner_disciplinary_status" invisible="not is_exchange_transfer"/>
+                            <field name="exchange_transfer_ok" readonly="1" invisible="not is_exchange_transfer"/>
+                        </group>
+                    </group>
+                    <group string="Ranking Inputs">
+                        <field name="total_experience_years"/>
+                        <field name="pms_score"/>
+                        <field name="transfer_suitability_score" readonly="1"/>
+                    </group>
+                    <group string="Refusal" invisible="state != 'refused'">
+                        <field name="refusal_reason"/>
+                        <field name="is_flagged_for_hr" readonly="1"/>
+                        <field name="hr_notified_on_refusal" readonly="1"/>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_employee_transfer_request" model="ir.actions.act_window">
+        <field name="name">Employee Transfer Requests</field>
+        <field name="res_model">employee.transfer.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a Transfer Request!</p>
+        </field>
+    </record>
+</odoo>

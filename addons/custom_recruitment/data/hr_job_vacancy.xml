@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record id="sequence_job_vacancy_internal" model="ir.sequence">
+            <field name="name">Int Job Vacancy sequence</field>
+            <field name="code">job.vacancy.internal</field>
+            <field name="prefix">BB/INT/2026/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="sequence_job_vacancy_external" model="ir.sequence">
+            <field name="name">Ext Job Vacancy sequence</field>
+            <field name="code">job.vacancy.external</field>
+            <field name="prefix">BB/EXT/2026/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+	</data>
+</odoo>

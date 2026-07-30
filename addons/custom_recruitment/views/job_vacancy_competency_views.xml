@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="job_vacancy_competency_list" model="ir.ui.view">
+        <field name="name">job.vacancy.competency.list</field>
+        <field name="model">job.vacancy.competency</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" string="Vacancy Competencies">
+                <field name="competency_id"/>
+                <field name="required_level"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="job_vacancy_competency_form" model="ir.ui.view">
+        <field name="name">job.vacancy.competency.form</field>
+        <field name="model">job.vacancy.competency</field>
+        <field name="arch" type="xml">
+            <form string="Vacancy Competency">
+                <sheet>
+                    <group>
+                        <field name="vacancy_id"/>
+                        <field name="competency_id"/>
+                        <field name="required_level"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

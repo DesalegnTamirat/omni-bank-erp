@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── List View ─────────────────────────────────────────────────── -->
+    <record id="recruitment_request_list_view" model="ir.ui.view">
+        <field name="name">recruitment.request.list</field>
+        <field name="model">recruitment.request</field>
+        <field name="arch" type="xml">
+            <list string="Recruitment Requests"
+                  decoration-info="state == 'draft'"
+                  decoration-warning="state == 'submitted'"
+                  decoration-primary="state == 'under_review'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-muted="state == 'cancelled'">
+                <field name="reference"/>
+                <field name="request_date"/>
+                <field name="request_type" widget="badge"
+                       decoration-info="request_type == 'planned'"
+                       decoration-warning="request_type == 'unplanned'"/>
+                <field name="requested_by"/>
+                <field name="operating_unit_id"/>
+                <field name="job_position_id"/>
+                <field name="required_headcount"/>
+                <field name="employment_type"/>
+                <field name="sourcing_type"/>
+                <field name="is_replacement"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'submitted'"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form View ─────────────────────────────────────────────────── -->
+    <record id="recruitment_request_form_view" model="ir.ui.view">
+        <field name="name">recruitment.request.form</field>
+        <field name="model">recruitment.request</field>
+        <field name="arch" type="xml">
+            <form string="Recruitment Request">
+                <header>
+                    <button name="action_submit" string="Submit" type="object"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_start_review" string="Start Review" type="object"
+                            class="btn-primary" invisible="state != 'submitted'"
+                            groups="hr.group_hr_user"/>
+                    <button name="action_approve" string="Approve" type="object"
+                            class="btn-primary" invisible="state != 'under_review'"
+                            groups="hr.group_hr_manager"/>
+                    <button name="action_reject" string="Reject" type="object"
+                            invisible="state not in ('submitted', 'under_review')"
+                            groups="hr.group_hr_manager"/>
+                    <button name="action_create_vacancy" string="Create Vacancy" type="object"
+                            class="btn-primary"
+                            invisible="state != 'approved' or vacancy_id != False"/>
+                    <button name="action_cancel" string="Cancel" type="object"
+                            invisible="state in ('approved', 'cancelled')"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object"
+                            invisible="state not in ('rejected', 'cancelled')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,under_review,approved"/>
+                </header>
+
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_create_vacancy" type="object"
+                                class="oe_stat_button" icon="fa-briefcase"
+                                invisible="not vacancy_id">
+                            <field name="vacancy_id" widget="statinfo" string="Vacancy"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <h1><field name="reference" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Rejection reason banner -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="state != 'rejected' or not rejection_reason">
+                        <strong>Rejection Reason: </strong>
+                        <field name="rejection_reason" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <group>
+                        <!-- LEFT: Request Info -->
+                        <group string="Request Information">
+                            <field name="request_type" widget="radio"/>
+                            <field name="request_date"/>
+                            <!-- Auto-fetched from the logged-in user's own
+                                 employee record; locked once Submitted so
+                                 it can't be spoofed, but editable while
+                                 still Draft in case the default is wrong. -->
+                            <field name="requested_by" readonly="state != 'draft'"/>
+                            <field name="operating_unit_id" readonly="state != 'draft'"/>
+                            <!-- FR-REC-006/007: Planned -> link workforce plan.
+                                 Domain restricts the picker to Approved,
+                                 non-deleted plans for the same Work Unit. -->
+                            <field name="workforce_plan_id"
+                                   invisible="request_type != 'planned'"
+                                   required="request_type == 'planned'"/>
+                            <!-- Read-only plan availability, so the requester
+                                 sees whether they're within budget BEFORE
+                                 hitting the automated validation on Submit. -->
+                            <field name="plan_total_headcount"
+                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                            <field name="plan_consumed_headcount"
+                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                            <field name="plan_remaining_headcount"
+                                   invisible="request_type != 'planned' or not workforce_plan_id"/>
+                        </group>
+                        <!-- RIGHT: Job Information (FR-11) -->
+                        <group string="Job Information">
+                            <field name="job_position_id"/>
+                            <field name="job_grade_id"/>
+                            <!-- Auto-fetched from the logged-in user's own
+                                 department; locked once Submitted. -->
+                            <field name="department_id" readonly="state != 'draft'"/>
+                            <field name="employment_type"/>
+                            <field name="required_headcount"/>
+                            <field name="sourcing_type"/>
+                            <field name="last_date_to_apply"
+                                   help="Application deadline for the vacancy. Defaults to 30 days from vacancy creation if not set."/>
+                        </group>
+                    </group>
+
+                    <!-- FR-10: Justification (Unplanned) -->
+                    <group string="Business Justification"
+                           invisible="request_type != 'unplanned'">
+                        <field name="justification" nolabel="1"
+                               required="request_type == 'unplanned'"
+                               placeholder="Provide business justification for this unplanned recruitment request..."/>
+                    </group>
+
+                    <!-- FR-12: Replacement Hiring -->
+                    <group string="Replacement Hiring">
+                        <field name="is_replacement"/>
+                        <field name="replaced_employee_id"
+                               invisible="not is_replacement"/>
+                        <field name="replacement_reason"
+                               invisible="not is_replacement"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Job Details">
+                            <group>
+                                <field name="required_qualifications"
+                                       placeholder="Required qualifications, certifications, experience..."/>
+                                <field name="job_description"
+                                       placeholder="Detailed job description and responsibilities..."/>
+                            </group>
+                        </page>
+                        <page string="Approval History" groups="hr.group_hr_user">
+                            <group>
+                                <field name="submitted_on" readonly="1"/>
+                                <field name="reviewed_by" readonly="1"/>
+                                <field name="approved_by" readonly="1"/>
+                                <field name="approved_on" readonly="1"/>
+                            </group>
+                            <group invisible="state != 'rejected'">
+                                <field name="rejection_reason"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+
+                <!-- CHATTER/ACTIVITY SECTION - HIDDEN -->
+                <!-- Set invisible="1" to hide the activity log, followers, and message threads.
+                     This reduces visual clutter while preserving the audit trail in the database.
+                     Remove invisible="1" to re-enable if needed later. -->
+                <div class="oe_chatter" invisible="1">
+                    <field name="message_follower_ids" widget="mail_followers"/>
+                    <field name="activity_ids" widget="mail_activity"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Search View ───────────────────────────────────────────────── -->
+    <record id="recruitment_request_search_view" model="ir.ui.view">
+        <field name="name">recruitment.request.search</field>
+        <field name="model">recruitment.request</field>
+        <field name="arch" type="xml">
+            <search string="Search Recruitment Requests">
+                <field name="reference"/>
+                <field name="requested_by"/>
+                <field name="job_position_id"/>
+                <field name="operating_unit_id"/>
+                <field name="workforce_plan_id"/>
+                <separator/>
+                <filter name="planned"    string="Planned"   domain="[('request_type','=','planned')]"/>
+                <filter name="unplanned"  string="Unplanned" domain="[('request_type','=','unplanned')]"/>
+                <separator/>
+                <filter name="draft"      string="Draft"       domain="[('state','=','draft')]"/>
+                <filter name="submitted"  string="Submitted"   domain="[('state','=','submitted')]"/>
+                <filter name="review"     string="Under Review" domain="[('state','=','under_review')]"/>
+                <filter name="approved"   string="Approved"    domain="[('state','=','approved')]"/>
+                <filter name="rejected"   string="Rejected"    domain="[('state','=','rejected')]"/>
+                <separator/>
+                <filter name="replacement" string="Replacement Hiring" domain="[('is_replacement','=',True)]"/>
+                <group>
+                    <filter string="Request Type"  name="grp_type"  context="{'group_by':'request_type'}"/>
+                    <filter string="Status"        name="grp_state" context="{'group_by':'state'}"/>
+                    <filter string="Work Unit"     name="grp_unit"  context="{'group_by':'operating_unit_id'}"/>
+                    <filter string="Job Position"  name="grp_pos"   context="{'group_by':'job_position_id'}"/>
+                    <filter string="Workforce Plan" name="grp_plan" context="{'group_by':'workforce_plan_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Window Action ─────────────────────────────────────────────── -->
+    <record id="action_recruitment_request" model="ir.actions.act_window">
+        <field name="name">Recruitment Requests</field>
+        <field name="res_model">recruitment.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="recruitment_request_search_view"/>
+        <field name="context">{'search_default_submitted': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Recruitment Request!
+            </p>
+            <p>Use recruitment requests to initiate planned or unplanned hiring and track approvals.</p>
+        </field>
+    </record>
+
+</odoo>

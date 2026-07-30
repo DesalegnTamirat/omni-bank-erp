@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="candidate_shortlist_tree" model="ir.ui.view">
+        <field name="name">candidate.shortlist.form</field>
+        <field name="model">candidate.shortlist</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Employee Shortlist">
+                <field name="recruitment_reference"/>
+                <field name="job_position"/>
+                <field name="employee_id"/>
+                <field name="employee_number"/>
+                <field name="employee_gender"/>
+                <field name="current_position"/>
+                <field name="educational_qualification"/>
+                <field name="CGPA"/>
+                <field name="service_in_company"/>
+                <field name="relevant_experience"/>
+                <field name="supervisory_experience"/>
+                <field name="last_promotion"/>
+                <field name="pms_score"/>
+                <field name="written_warning"/>
+                <field name="demoted"/>
+                 <field name="job_category"/>
+                <field name="current_location"/>
+                <field name="current_work_unit"/>
+                <field name="applicant_id"/>
+                <field name="notify_candidate"/>
+
+            </list>
+        </field>
+    </record>
+        <record id="candidate_shortlist_form_tree" model="ir.actions.act_window">
+        <field name="name">Employee Shortlist</field>
+        <field name="res_model">candidate.shortlist</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list</field>
+    </record>
+<!--    <menuitem-->
+<!--        id="menu_candidate_shortlist_list"-->
+<!--        name="Employee Shortlist"-->
+<!--        parent="menu_internal_recruitment"-->
+<!--        action="candidate_shortlist_form_tree"-->
+<!--    />-->
+</odoo>

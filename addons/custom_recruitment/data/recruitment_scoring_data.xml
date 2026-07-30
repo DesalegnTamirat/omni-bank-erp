@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Offer letter sequence -->
+        <record id="sequence_recruitment_offer_letter" model="ir.sequence">
+            <field name="name">Recruitment Offer Letter</field>
+            <field name="code">recruitment.offer.letter</field>
+            <field name="prefix">BB/OFFER/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Cron: expire reserve pool after 6 months (Section 9.4.2) -->
+        <record id="cron_expire_reserve_pool" model="ir.cron">
+            <field name="name">Expire Reserve Pool Candidates (FRS 9.4.2)</field>
+            <field name="model_id" ref="model_recruitment_candidate_score"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_reserve_pool()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Cron: expire pending offers after 3 days (Section 11.2.2) -->
+        <record id="cron_expire_pending_offers" model="ir.cron">
+            <field name="name">Expire Pending Offer Letters (FRS 11.2.2)</field>
+            <field name="model_id" ref="model_recruitment_offer_letter"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_expire_pending_offers()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Cron: close internal application windows (Section 5.2.1) -->
+        <record id="cron_close_application_windows" model="ir.cron">
+            <field name="name">Close Expired Internal Application Windows (FRS 5.2.1)</field>
+            <field name="model_id" ref="model_recruitment_application_window"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_close_expired_windows()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>
