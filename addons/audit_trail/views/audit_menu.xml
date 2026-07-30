@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Top-level Audit Menu ──────────────────────────────────────── -->
+    <menuitem id="menu_audit_root"
+              name="Audit"
+              sequence="99"
+              groups="audit_trail.group_audit_user"/>
+
+    <!-- ── Audit Logs ────────────────────────────────────────────────── -->
+    <menuitem id="menu_audit_log"
+              name="Audit Logs"
+              parent="menu_audit_root"
+              action="action_audit_log"
+              sequence="10"
+              groups="audit_trail.group_audit_user"/>
+
+    <!-- ── Configuration sub-menu (Managers only) ────────────────────── -->
+    <menuitem id="menu_audit_config"
+              name="Configuration"
+              parent="menu_audit_root"
+              sequence="90"
+              groups="audit_trail.group_audit_manager"/>
+
+    <menuitem id="menu_audit_rules"
+              name="Audit Rules"
+              parent="menu_audit_config"
+              action="action_audit_rule"
+              sequence="10"
+              groups="audit_trail.group_audit_manager"/>
+
+</odoo>
