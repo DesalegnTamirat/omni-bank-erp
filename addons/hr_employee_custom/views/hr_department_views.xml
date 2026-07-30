@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="view_hr_department_form_inherit_operating_unit" model="ir.ui.view">
+
+        <field name="name">hr.department.form.operating.unit</field>
+        <field name="model">hr.department</field>
+        <field name="inherit_id" ref="hr.view_department_form"/>
+
+        <field name="arch" type="xml">
+
+            <!-- 1. HEADER -->
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="action_save_department" string="Save" type="object" class="btn-primary"/>
+                    <button name="action_toggle_active" string="Disable Department" type="object" invisible="not active" confirm="This will hide the department across the system. Continue?"/>
+                    <button name="action_toggle_active" string="Enable Department" type="object" class="btn-primary" invisible="active"/>
+                </header>
+            </xpath>
+
+            <!-- 2. BADGE after h1 -->
+            <xpath expr="//div[hasclass('oe_title')]/h1" position="after">
+                <div class="mt-1 mb-2">
+                    <span class="badge text-bg-success" invisible="not active">● Active</span>
+                    <span class="badge text-bg-danger" invisible="active">● Archived</span>
+                </div>
+            </xpath>
+
+            <!-- 3. REPLACE the broken col=12 group entirely with a clean layout -->
+            <xpath expr="//sheet/group[@col='12']" position="replace">
+                <div class="row mt-3">
+                    <!-- Left column: Department Info -->
+                    <div class="col-lg-6">
+                        <group>
+                            <field name="manager_id" widget="many2one_avatar_employee"/>
+                            <field name="parent_id"/>
+                            <field name="company_id" options="{'no_create': True}" groups="base.group_multi_company" placeholder="Visible to all"/>
+                            <field name="color" widget="color_picker" string="Color"/>
+                        </group>
+                    </div>
+                    <!-- Right column: Organization -->
+                    <div class="col-lg-6">
+                        <group>
+                            <field name="operating_unit_id" required="1" options="{'no_create': True, 'no_open': True}"/>
+                        </group>
+                    </div>
+                </div>
+            </xpath>
+
+            <!-- 4. REMOVE CHATTER -->
+            <xpath expr="//chatter" position="replace"/>
+
+        </field>
+    </record>
+
+</odoo>

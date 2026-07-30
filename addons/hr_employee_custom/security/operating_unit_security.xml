@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Merged from the standalone 'operating_unit' module (OCA/operating-unit)
+    so that hr_employee_custom no longer depends on a separate addon.
+    NOTE: In Odoo 19, res.groups no longer has category_id (ir.module.category).
+    Groups are now organised under res.groups.privilege via privilege_id.
+
+    ACCESS POLICY:
+    - HR Administrator (hr.group_hr_manager) → sees ALL operating units (no restriction)
+    - Other users with group_multi_operating_unit → sees only their assigned units
+-->
+<odoo>
+    <record model="res.groups.privilege" id="privilege_operating_units">
+        <field name="name">Operating Units</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="group_multi_operating_unit" model="res.groups">
+        <field name="name">Multiple Operating Unit</field>
+        <field name="privilege_id" ref="privilege_operating_units" />
+    </record>
+    <record id="group_manager_operating_unit" model="res.groups">
+        <field name="name">Manager of Operating Units</field>
+        <field name="implied_ids" eval="[(4, ref('group_multi_operating_unit'))]" />
+        <field
+            name="user_ids"
+            eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"
+        />
+        <field name="privilege_id" ref="privilege_operating_units" />
+    </record>
+
+    <!-- ── Company filter (global, applies to everyone) ── -->
+    <record id="operating_unit_comp_rule" model="ir.rule">
+        <field name="name">Operating Unit: Company Filter</field>
+        <field name="model_id" ref="model_operating_unit" />
+        <field name="global" eval="True" />
+        <field name="domain_force">
+            ['|',('company_id','=',False),('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <!-- ── Non-admin users: see only their assigned operating units ── -->
+    <record id="ir_rule_operating_unit_allowed_operating_units" model="ir.rule">
+        <field name="name">Operating Unit: Own Units Only</field>
+        <field name="model_id" ref="model_operating_unit" />
+        <field name="domain_force">[('id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_multi_operating_unit'))]"/>
+        <field eval="1" name="perm_read" />
+        <field eval="0" name="perm_write" />
+        <field eval="0" name="perm_create" />
+        <field eval="0" name="perm_unlink" />
+    </record>
+
+    <!-- ── HR Administrator: sees ALL operating units ── -->
+    <record id="ir_rule_operating_unit_manager_all" model="ir.rule">
+        <field name="name">Operating Unit: Manager Sees All</field>
+        <field name="model_id" ref="model_operating_unit" />
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+        <field eval="1" name="perm_read" />
+        <field eval="1" name="perm_write" />
+        <field eval="1" name="perm_create" />
+        <field eval="1" name="perm_unlink" />
+    </record>
+
+    <!-- ── HR Employee: Non-admin sees only employees in own operating unit ── -->
+    <record id="ir_rule_hr_employee_own_ou" model="ir.rule">
+        <field name="name">HR Employee: Own Operating Unit Only</field>
+        <field name="model_id" ref="hr.model_hr_employee" />
+        <field name="domain_force">[('default_operating_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+        <field eval="1" name="perm_read" />
+        <field eval="0" name="perm_write" />
+        <field eval="0" name="perm_create" />
+        <field eval="0" name="perm_unlink" />
+    </record>
+
+    <!-- ── HR Employee: Administrator sees ALL employees ── -->
+    <record id="ir_rule_hr_employee_manager_all" model="ir.rule">
+        <field name="name">HR Employee: Manager Sees All</field>
+        <field name="model_id" ref="hr.model_hr_employee" />
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+        <field eval="1" name="perm_read" />
+        <field eval="1" name="perm_write" />
+        <field eval="1" name="perm_create" />
+        <field eval="1" name="perm_unlink" />
+    </record>
+
+</odoo>

@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="Reset_login_form" model="ir.ui.view">
+        <field name="name">Reset User Login Wizard</field>
+        <field name="model">reset.login</field>
+        <field name="arch" type="xml">
+            <form string="Reset Login">
+
+                    <group>
+                        <field name="user_name"/>
+                        <field name="user_login"/>
+                    </group>
+
+
+                <footer>
+                    <button name="reset_login" string="Reset Employee Login" type="object" class="btn btn-primary"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+
+        </field>
+    </record>
+
+    <record id="action_reset_login_wizard" model="ir.actions.act_window">
+        <field name="name">Reset Employee Login Wizard</field>
+        <field name="res_model">reset.login</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="Reset_login_form"/>
+        <field name="target">new</field>
+    </record>
+
+<!--     <menuitem-->
+<!--           id="menu_Preprocessig_salary_Details_wizards"-->
+<!--           name="Preprocessing Salary Information Wizard"-->
+<!--           parent="menu_hr_wizards"-->
+<!--           action="action_Preprocessig_salary_details_wizard"-->
+
+<!-- />-->
+    net salary payment wizard
+    <menuitem id="menu_Reset_login_wizard" name="Reset Employee Login Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_reset_login_wizard"/>
+</odoo>

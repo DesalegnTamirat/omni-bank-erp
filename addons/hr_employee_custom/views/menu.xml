@@ -1,0 +1,138 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- ══════════════════════════════════════════════════════════
+             EMPLOYEES → Configuration
+             Keep only items that are purely employee-management related.
+        ══════════════════════════════════════════════════════════ -->
+        <menuitem id="menu_hr_config_departments" name="Departments" action="hr.hr_department_tree_action"
+                  parent="hr.menu_human_resources_configuration" sequence="5"/>
+        <menuitem id="menu_hr_config_contract_types" name="Contract Types" action="hr.hr_contract_type_action"
+                  parent="hr.menu_human_resources_configuration" sequence="6"/>
+        <menuitem id="menu_hr_operating_unit" name="Operating Units" action="action_hr_operating_unit"
+                  parent="hr.menu_human_resources_configuration" sequence="10"/>
+        <!-- COMMENTED OUT: Duplicate of Job Grade (both manage the employee.grade model)
+        <menuitem id="menu_hr_employee_grade"             name="Employee Grades"        action="action_hr_employee_grade"            parent="hr.menu_human_resources_configuration" sequence="11"/>
+        -->
+        <menuitem id="menu_employee_grades_list" name="Job Grade" action="employee_grade_tree_action"
+                  parent="hr.menu_human_resources_configuration" sequence="12"/>
+        <menuitem id="menu_employee_insurance" name="Insurance" action="action_hr_employee_insurance"
+                  parent="hr.menu_human_resources_configuration" sequence="13"/>
+        <menuitem id="menu_hr_report_code" name="Report Codes" action="action_hr_report_code"
+                  parent="hr.menu_human_resources_configuration" sequence="14"/>
+        <menuitem id="menu_service_award_list" name="Service Award" action="employee_service_award_tree"
+                  parent="hr.menu_human_resources_configuration" sequence="15"/>
+        <menuitem id="menu_service_request_type" name="Service Request Type" action="action_service_request_type"
+                  parent="hr.menu_human_resources_configuration" sequence="16"/>
+        <menuitem id="menu_manpower_plan_details" name="Manpower Plan" parent="hr.menu_human_resources_configuration"
+                  sequence="17"/>
+
+        <!-- Disciplinary Actions -->
+        <menuitem id="disciplinary_action" name="Disciplinary Actions" parent="hr.menu_human_resources_configuration"
+                  sequence="20"/>
+        <menuitem id="discipline_action" action="action_discipline" name="Disciplinary Actions"
+                  parent="disciplinary_action" groups="hr.group_hr_manager" sequence="1"/>
+        <menuitem id="disciplinary_category_view" action="action_disciplinary_category_view" name="Discipline Category"
+                  parent="hr_employee_custom.disciplinary_action" groups="hr.group_hr_manager" sequence="3"/>
+        <menuitem id="discipline_appeal_action" action="action_discipline_appeal" name="Discipline Appeal"
+                  parent="disciplinary_action" groups="hr.group_hr_manager" sequence="5"/>
+        <menuitem id="menu_disciplinary_outcome_view" action="action_disciplinary_outcome_view_tree"
+                  name="Disciplinary Outcome" parent="disciplinary_action" sequence="7"/>
+        <menuitem id="menu_bonus_penalty_list" action="action_bonus_penalty" name="Bonus Penalty"
+                  parent="disciplinary_action" sequence="9"/>
+
+
+        <!-- Job Positions (hr.job) -->
+        <menuitem id="menu_hr_recruitment_job_positions_custom"
+                  name="Job Positions"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="hr_recruitment.action_hr_job_config"
+                  sequence="5"/>
+
+        <!-- Employee Job categories -->
+        <menuitem id="menu_recruitment_employee_job"
+                  name="Employee Job"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="employee_jobs_form_tree"
+                  sequence="6"/>
+
+
+        <!-- Probation -->
+        <menuitem id="menu_recruitment_probation_criteria"
+                  name="Probation Criteria"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_new_emp_probation_criteria"
+                  sequence="11"/>
+        <menuitem id="menu_recruitment_probation_assessment"
+                  name="Probation Assessment"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_new_probation_assessment_form"
+                  sequence="12"/>
+
+        <!-- Recruitment Criteria sub-group -->
+        <menuitem id="menu_recruitment_criteria_configuration"
+                  name="Recruitment Criteria"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  sequence="13"/>
+        <menuitem id="menu_recruitment_qualification" name="Recruitment Qualifications"
+                  parent="menu_recruitment_criteria_configuration" action="recruitment_qualification_form_tree"/>
+        <menuitem id="menu_recruitment_experience" name="Recruitment Experience"
+                  parent="menu_recruitment_criteria_configuration" action="recruitment_experience_form_tree"/>
+        <menuitem id="menu_recruitment_competency" name="Recruitment Competency"
+                  parent="menu_recruitment_criteria_configuration" action="recruitment_competency_form_tree"/>
+
+        <!-- ══════════════════════════════════════════════════════════
+             EMPLOYEES → Payroll / Actions sub-menus
+        ══════════════════════════════════════════════════════════ -->
+        <menuitem id="menu_employee_service_request" name="Employee Service Request"
+                  parent="hr.menu_hr_employee_payroll" action="action_employee_service_request" sequence="12"/>
+        <menuitem id="menu_guarentees_details_list" name="Guarantees Details" parent="hr.menu_hr_employee_payroll"
+                  action="employee_guarentees_details_tree_action" sequence="13"/>
+        <menuitem id="menu_supplementary_role_list" name="Supplementary Role" parent="hr.menu_hr_employee_payroll"
+                  action="employee_supplementary_role_tree" sequence="14"/>
+        <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
+                  action="employee_re_instating_tree" sequence="15"/>
+        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
+                  action="employee_transfer_form_tree" sequence="16"/>
+        <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
+                  action="employee_demotion_action" sequence="18"/>
+        <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"
+                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="19"/>
+        <menuitem id="menu_job_form_list" name="Job History" parent="hr.menu_hr_employee_payroll"
+                  action="employee_job_form_tree" sequence="20"/>
+
+        <!-- ── Reporting ── -->
+        <record id="action_employee_presence_reporting" model="ir.actions.act_window">
+            <field name="name">Employee Presence</field>
+            <field name="res_model">hr.employee</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="context">{'search_default_group_hr_presence_state': 1}</field>
+            <field name="search_view_id" ref="hr.view_employee_filter"/>
+        </record>
+        <menuitem id="menu_print_employee_report" name="Print Employee Report" parent="hr.hr_menu_hr_reports"
+                  action="action_print_employee_report" sequence="2"/>
+        <menuitem id="menu_print_employee_experience_report" name="Print Employee Experience Report"
+                  parent="hr.hr_menu_hr_reports" action="action_print_employee_experience_report" sequence="3"/>
+        <menuitem id="menu_employee_presence_custom" name="Employee Presence" parent="hr.hr_menu_hr_reports"
+                  action="action_employee_presence_reporting" sequence="4"/>
+
+        <!-- ── Manpower Planning ── -->
+        <menuitem id="hr_employee_planning_menu" name="Planning" parent="hr.menu_hr_root" sequence="8"/>
+        <menuitem id="menu_hr_manpower_planning" name="Manpower Planning" parent="hr_employee_planning_menu"
+                  sequence="1"/>
+        <menuitem id="menu_hr_procurement_planning" name="Procurement Planning" parent="hr_employee_planning_menu"
+                  sequence="6"/>
+        <menuitem id="menu_hr_recurrent_budget_planning" name="Recurrent Budget" parent="hr_employee_planning_menu"
+                  sequence="11"/>
+        <menuitem id="menu_planning_approvers" name="Approval" parent="hr_employee_planning_menu" sequence="16"/>
+        <menuitem id="menu_company_manpower_plan" name="Company Manpower Plan" parent="menu_hr_manpower_planning"
+                  action="company_manpower_plan_form_tree" sequence="2"/>
+        <menuitem id="menu_manpower_plan" name="Work Unit Manpower Plan" parent="menu_hr_manpower_planning"
+                  action="manpower_plan_form_tree" sequence="1"/>
+        <menuitem id="menu_hr_payroll_structure_view"
+                  name="Salary Structures"
+                  action="action_hr_payroll_structure_view" parent="hr.menu_human_resources_configuration"
+                  sequence="20"/>
+    </data>
+</odoo>

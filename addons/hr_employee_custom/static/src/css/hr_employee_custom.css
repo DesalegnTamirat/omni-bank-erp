@@ -1,0 +1,54 @@
+/* ---------------------------------------------------------------------
+ * hr_employee_custom - Employee form header/tab tweaks
+ * ------------------------------------------------------------------- */
+
+/* Force the employee photo to behave as a normal flex item (next to the
+ * name/status row, right after "Absent") instead of any built-in
+ * absolute positioning that some themes apply to .o_employee_avatar.
+ * Because it's back in normal flow, it inherits the existing
+ * flex-column (mobile) / flex-sm-row (tablet+) responsive behaviour of
+ * its parent row automatically. */
+.o_form_view .o_employee_avatar {
+    position: static !important;
+    inset: auto !important;
+}
+
+/* The photo and the "Absent"/"Present" pill are moved into this shared
+ * wrapper (see hr_employee_view.xml), inserted right after the button
+ * box at the top of the sheet. Pin it to the top-right corner of the
+ * sheet so it sits above the title, in line with the button box - not
+ * further down the page next to the two-column field groups. */
+.o_form_view .o_form_sheet {
+    position: relative;
+}
+.o_form_view .o_hr_photo_status_row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    position: absolute !important;
+    top: 0;
+    right: 0;
+    z-index: 1;
+}
+.o_form_view .o_hr_photo_status_row .o_presence_status_pill_wrapper,
+.o_form_view .o_hr_photo_status_row .o_employee_avatar {
+    position: static !important;
+    float: none !important;
+    inset: auto !important;
+    margin: 0 !important;
+}
+.o_form_view .o_hr_photo_status_row .oe_avatar {
+    max-height: 90px;
+}
+
+/* Push the notebook's "more" overflow-tabs button (the icon that groups
+ * extra tabs that don't fit) all the way to the right edge of the tab
+ * bar, regardless of how many tabs are visible before it. Works at any
+ * screen width since it's just a flex margin, not a fixed offset. */
+.o_notebook_headers {
+    display: flex;
+    flex-wrap: wrap;
+}
+.o_notebook_headers .o_notebook_more {
+    margin-inline-start: auto !important;
+}

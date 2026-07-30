@@ -1,0 +1,1198 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="assets_frontend_hr_recruitment" model="ir.asset">
+        <field name="name">Website Hr Recruitment Assets Frontend</field>
+        <field name="bundle">web.assets_frontend</field>
+        <field name="path">/website_hr_recruitment/static/src/scss/website_hr_recruitment.scss</field>
+    </record>
+    <template id="job_positions_detail" name="Job positions Submit Detail" inherit_id="website_hr_recruitment.detail">
+        <xpath expr="//h1[@t-field='job.name']" position="after">
+            <div class="mb-2" t-if="job.recruitment_reference" t-field="job.recruitment_reference"/>
+        </xpath>
+        <xpath expr="//div[@id='wrap']//div[contains(@class,'col-md-3')]//div[contains(@class,'text-center')]" position="replace">
+            <div class="text-center d-flex flex-column gap-2">
+                <t t-if="request.session.uid">
+                    <a role="button" t-attf-href="/jobs/apply/#{job.id}" class="btn btn-primary btn-lg">Experienced</a>
+                    <a role="button" t-attf-href="/jobs/apply/new/#{job.id}" class="btn btn-secondary btn-lg">Non Experienced</a>
+                </t>
+                <t t-else="">
+                    <a role="button" t-attf-href="/web/login" class="btn btn-primary btn-lg">Sign In</a>
+                </t>
+            </div>
+        </xpath>
+        <xpath expr="//section[contains(@class,'o_job_bottom_bar')]//a[contains(@class,'btn-primary')]" position="replace">
+            <t t-if="request.session.uid">
+                <a role="button" t-attf-href="/jobs/apply/#{job.id}" class="btn btn-primary btn-lg me-2">Experienced</a>
+                <a role="button" t-attf-href="/jobs/apply/new/#{job.id}" class="btn btn-primary btn-lg">Non Experienced</a>
+            </t>
+            <t t-else="">
+                <a role="button" t-attf-href="/web/login" class="btn btn-primary btn-lg">Sign In</a>
+            </t>
+        </xpath>
+    </template>
+    <template id="new_job_positions_submit_applications" name="Job positions Submit New Application" inherit_id="website_hr_recruitment.new">
+        <xpath expr="//form" position="attributes">
+            <attribute name="action">/jobs/application_submit/</attribute>
+            <!--             <attribute name="data-success_page">""</attribute> -->
+        </xpath>
+		
+        <xpath expr="//*[@id='hr_recruitment_form']/div/div[8]" position="before">
+            <div class="col-lg-7 col-md-8">
+                <input type="hidden" class="form-control o_website_form_input" name="job_id" t-field="job.id"/>
+            </div>
+            <div class="container">
+                <div class="form-group row">
+                    <div>
+                        <label class="col-form-label" for="Personal Information">
+                            <h2>Personal Information</h2>
+                        </label>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="date_of_birth">Date of Birth</label>
+                        <div class="col-lg-7 col-md-8">
+                            <input type="date" class="form-control o_website_form_input" name="date_of_birth" required="required" min="1920-01-01" max="2030-12-31"/>
+                        </div>
+                    </div>
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="place_of_birth">Place of Birth</label>
+                        <div class="col-lg-7 col-md-8">
+                            <input type="text" class="form-control o_website_form_input" name="place_of_birth" required=""/>
+                        </div>
+                    </div>
+                    <!-- <script> -->
+                                    <!-- function removeSpacesss(inputElement) { -->
+                                    <!-- // Get the input value and remove spaces -->
+                                    <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
+
+                                    <!-- // Check if the cleaned value contains only alphabets -->
+                                    <!-- if (/^[a-zA-Z]*$/.test(cleanedValue)) { -->
+                                    <!-- // Input is valid - set the cleaned value as the input value -->
+                                    <!-- inputElement.value = cleanedValue; -->
+                                    <!-- } else { -->
+                                    <!-- // Display an error message or take some other action to handle invalid input -->
+                                    <!-- alert("Please enter only alphabets."); -->
+                                    <!-- // Clear the input or take other actions as needed -->
+                                    <!-- inputElement.value = ''; -->
+                                    <!-- } -->
+                                    <!-- } -->
+                    <!-- </script> -->
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="gender">Gender</label>
+                        <div class="col-lg-7 col-md-8">
+                            <select name="gender" id="gender" required="">
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+				<div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="willing_to_join_immediately">Willing to Join
+                        Immediately
+                    </label>
+                    <div class="col-lg-7 col-md-8">
+                        <select name="willing_to_join_immediately" id="willing_to_join_immediately" required="">
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="date_of_availability">Date of Availability</label>
+                    <div class="col-lg-7 col-md-8">
+                        <input type="date" class="form-control o_website_form_input" name="date_of_availability" required="required" min="1920-01-01" max="2030-12-31"/>
+                    </div>
+                </div>
+            </div>
+            <!-- <div class="form-group row s_website_form_field s_website_form_required"> -->
+			<div>
+				<div>
+                    <label class="col-form-label" for="Educational Qualifications">
+                        <h2>Educational Qualifications</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Type Of Admission</th>
+                        <th>Type of Institution</th>
+						<th>Name Of College</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Specialization/Major</th>
+                        <th>CGPA</th>
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr required="">
+                            <td>
+                                <select name="admission" id="admission" required="">
+                                <option value="Regular">Regular</option>
+                                <option value="Distance">Distance</option>
+                                <option value="Extension">Extension</option>
+                                <option value="Summer">Summer</option>
+                            </select>
+                            </td>
+                            <td>
+                                <select name="institution" id="institution" required="">
+                                <option value="Private">Private</option>
+                                <option value="Government">Government</option>
+
+                            </select>
+                            </td>
+							<td>
+                                <input type="text" class="form-control o_website_form_input" name="edu1" oninput="removeSpaces(this)"/>
+								<!-- oninput="removeNumerics(this)"/> -->
+                            </td>
+                            <td>
+                                <input type="date" class="form-control o_website_form_input" name="start_date1" required="required"/>
+                            </td>
+                            <td>
+                                <input type="date" class="form-control o_website_form_input" name="end_date1" required="required"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="spec1" required="" oninput="removeSpaces(this)"/>
+								<!-- oninput="removeNumerics(this)" -->
+                                           
+                            </td>
+                            <td>
+                                <input type="number" class="form-control o_website_form_input" name="cgpa1" step="0.01" min="0" required=""/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <button id="addRowButton">Add Row</button>
+				
+            </div>
+	
+			<script>
+function removeSpaces(inputElement) {
+    // Get the input value and remove numbers
+    let cleanedValue = inputElement.value.replace(/[0-9]/g, '');
+
+    // Check if the cleaned value contains only alphabets and spaces
+    if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+        // Input is valid - set the cleaned value as the input value
+        inputElement.value = cleanedValue;
+    } else {
+        // Display an error message or take some other action to handle invalid input
+        alert("Please enter only alphabets and spaces.");
+        // Clear the input or take other actions as needed
+        inputElement.value = '';
+    }
+}
+</script>
+			<script>
+                    // Get a reference to the "Add Row" button and the table's tbody
+                    const addRowButton = document.getElementById("addRowButton");
+                    const tableBody = document.querySelector("table tbody");
+
+                    // Counter to keep track of added rows
+                    let rowCount = 1;
+
+                    // Function to add a new row to the table
+                    function addRow() {
+                    const newRow = document.createElement("tr");
+
+                    newRow.innerHTML = `
+					&lt;td&gt;
+                                &lt;select name="admission" id="admission${rowCount + 1}" required=""&gt;
+                                &lt;option value="regular"&gt;Regular&lt;/option&gt;
+                                &lt;option value="distance"&gt;Distance&lt;/option&gt;
+                                &lt;option value="extension"&gt;Extension&lt;/option&gt;
+                                &lt;option value="summer"&gt;Summer&lt;/option&gt;
+                            &lt;/select&gt;
+                            &lt;/td&gt;
+                            &lt;td&gt;
+                                &lt;select name="institution" id="institution${rowCount + 1}" required=""&gt;
+                                &lt;option value="private"&gt;Private&lt;/option&gt;
+                                &lt;option value="government"&gt;Government&lt;/option&gt;
+
+                            &lt;/select&gt;
+                            &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="text" class="form-control o_website_form_input" name="edu${rowCount + 1}"
+                               required="" oninput="validateInput(this)" /&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="start_date${rowCount + 1}"
+                               required/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="end_date${rowCount + 1}"
+                               required/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="text" class
+                        "form-control o_website_form_input" name="spec${rowCount + 1}" required="" oninput="validateInput(this)" /&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="text" class="form-control o_website_form_input" name="cgpa${rowCount + 1}"
+                               step="0.01" min="0" required/&gt;
+                    &lt;/td&gt;
+                    `;
+
+                    tableBody.appendChild(newRow);
+                    rowCount++;
+                    }
+
+                    // Attach the addRow function to the button's click event
+                    addRowButton.addEventListener("click", addRow);
+                </script>
+            
+			
+            <div class="form-group row">
+                <div>
+                    <label class="col-form-label" for="Languages">
+                        <h2>Languages</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Language</th>
+                        <th>Read</th>
+                        <th>Write</th>
+                        <th>Speak</th>
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="l1" oninput="removeSpaces(this)"/>
+								<!-- oninput="validateInput(this)"/> -->
+                            </td>
+                            <td>
+                                <select name="r1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="l2"/>
+                            </td>
+                            <td>
+                                <select name="r2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="l3"/>
+                            </td>
+                            <td>
+                                <select name="r3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="l4"/>
+                            </td>
+                            <td>
+                                <select name="r4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="l5"/>
+                            </td>
+                            <td>
+                                <select name="r5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </xpath>
+    </template>
+    <template id="job_positions_submit_applications" name="Job positions Submit Application" inherit_id="website_hr_recruitment.apply">
+	    <!-- <xpath expr="//input[@name='Short Introduction']" position="after">  -->
+           <!-- <div class="container"> -->
+                        <!-- <div class="form-group row s_website_form_field s_website_form_required"> -->
+                            <!-- <label class="col-form-label col-md-3" for="file_input1">Resume</label> -->
+                            <!-- <div class="col-lg-7 col-md-8"> -->
+                                <!-- <input type="file" class="form-control o_website_form_input" name="file_input1" -->
+                                       <!-- id="file_input1" accept=".pdf"/> -->
+                            <!-- </div> -->
+                        <!-- </div> -->
+                    <!-- </div> -->
+        <!-- </xpath> -->
+                    <!-- <script> -->
+                        <!-- document.getElementById("file_input1").addEventListener("change", function() { -->
+                        <!-- const fileInput1 = this; -->
+                        <!-- if (fileInput1.files.length > 0) { -->
+                        <!-- const selectedFile = fileInput1.files[0]; -->
+                        <!-- const fileType = selectedFile.type; -->
+                        <!-- if (fileType !== "application/pdf") { -->
+                        <!-- alert("Please select a PDF file."); -->
+                        <!-- fileInput1.value = ""; // Clear the file input -->
+                        <!-- } -->
+                        <!-- } -->
+                        <!-- }); -->
+                    <!-- </script>  -->
+        <xpath expr="//form" position="attributes">
+            <attribute name="action">/jobs/application_submit/</attribute>
+            <!--            <attribute name="data-success_page">""</attribute>-->
+        </xpath>
+        <!-- <xpath expr="//input[@name='Resume']" position="replace"> -->
+            <!-- <input type="file" name="attachment" multiple="true" accept="image/*,application/pdf,video/*"/> -->
+        <!-- </xpath> -->
+        <xpath expr="//*[@id='hr_recruitment_form']/div/div[8]" position="before">
+
+            <div class="col-lg-7 col-md-8">
+                <input type="hidden" class="form-control o_website_form_input" name="job_id" t-field="job.id"/>
+            </div>
+            <div class="container">
+                <div class="form-group row">
+                    <div>
+                        <label class="col-form-label" for="Personal Information">
+                            <h2>Personal Information</h2>
+                        </label>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="date_of_birth">Date of Birth</label>
+                        <div class="col-lg-7 col-md-8">
+                            <input type="date" class="form-control o_website_form_input" name="date_of_birth" required="required" min="1920-01-01" max="2030-12-31"/>
+                        </div>
+						
+						<!-- </script> -->
+
+                    </div>
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="place_of_birth">Place of Birth</label>
+                        <div class="col-lg-7 col-md-8">
+                            <input type="text" class="form-control o_website_form_input" name="place_of_birth" required="" oninput="removeNumerics(this)"/>
+                        </div>
+                    </div>
+					<script>
+                        function removeNumerics(inputElement) {
+						let cleanedValue = inputElement.value;
+
+						// Check if the cleaned value contains only alphabets and spaces
+						if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+							// Input is valid - set the cleaned value as the input value
+							inputElement.value = cleanedValue;
+						} else {
+							// Display an error message or take some other action to handle invalid input
+							alert("Please enter only alphabets and spaces.");
+							// Clear the input or take other actions as needed
+							inputElement.value = '';  // Optionally, clear the input
+						}
+						}
+
+                    </script>
+					<!-- <script> -->
+                                    <!-- function removeSpacess(inputElement) { -->
+                                    <!-- // Get the input value and remove spaces -->
+                                    <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
+
+                                    <!-- // Check if the cleaned value contains only alphabets -->
+                                    <!-- if (/^[a-zA-Z]*$/.test(cleanedValue)) { -->
+                                    <!-- // Input is valid - set the cleaned value as the input value -->
+                                    <!-- inputElement.value = cleanedValue; -->
+                                    <!-- } else { -->
+                                    <!-- // Display an error message or take some other action to handle invalid input -->
+                                    <!-- alert("Please enter only alphabets."); -->
+                                    <!-- // Clear the input or take other actions as needed -->
+                                    <!-- inputElement.value = ''; -->
+                                    <!-- } -->
+                                    <!-- } -->
+                    <!-- </script> -->
+                    <div class="form-group row s_website_form_field s_website_form_required">
+                        <label class="col-form-label col-md-3" for="gender">Gender</label>
+                        <div class="col-lg-7 col-md-8">
+                            <select name="gender" id="gender" required="">
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="worked_in_bunna_earlier">Worked in BUNNA earlier
+                    </label>
+                    <div class="col-md-1">
+                        <input type="checkbox" class="form-control o_website_form_input" name="worked_in_bunna_earlier"/>
+                    </div>
+                </div>
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="current_company">Current Company</label>
+                    <div class="col-lg-7 col-md-8">
+                        <input type="text" class="form-control o_website_form_input" name="current_company" required="" oninput="removeNumerics(this)"/>
+                    </div>
+                </div>
+				<script>
+                        function removeNumerics(inputElement) {
+						let cleanedValue = inputElement.value;
+
+						// Check if the cleaned value contains only alphabets and spaces
+						if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+							// Input is valid - set the cleaned value as the input value
+							inputElement.value = cleanedValue;
+						} else {
+							// Display an error message or take some other action to handle invalid input
+							alert("Please enter only alphabets and spaces.");
+							// Clear the input or take other actions as needed
+							inputElement.value = '';  // Optionally, clear the input
+						}
+						}
+
+                    </script>
+					
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="current_working_location">Current Working Location
+                    </label>
+                    <div class="col-lg-7 col-md-8">
+                        <input type="text" class="form-control o_website_form_input" name="current_working_location" required="" oninput="removeNumerics(this)"/>
+                    </div>
+
+                </div>
+				<script>
+                        function removeNumerics(inputElement) {
+						let cleanedValue = inputElement.value;
+
+						// Check if the cleaned value contains only alphabets and spaces
+						if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+							// Input is valid - set the cleaned value as the input value
+							inputElement.value = cleanedValue;
+						} else {
+							// Display an error message or take some other action to handle invalid input
+							alert("Please enter only alphabets and spaces.");
+							// Clear the input or take other actions as needed
+							inputElement.value = '';  // Optionally, clear the input
+						}
+						}
+
+                    </script>
+				
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="working_status">Working Status</label>
+                    <div class="col-lg-7 col-md-8">
+                        <select name="working_status" id="working_status" required="">
+                            <option value="active">Active</option>
+                            <option value="terminated">Terminated</option>
+                            <option value="resigned">Resigned</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="willing_to_join_immediately">Willing to Join
+                        Immediately
+                    </label>
+                    <div class="col-lg-1 col-md-1">
+                        <input type="checkbox" class="form-control o_website_form_input" name="willing_to_join_immediately"/>
+                    </div>
+                </div>
+                <div class="form-group row s_website_form_field s_website_form_required">
+                    <label class="col-form-label col-md-3" for="date_of_availability">Date of Availability</label>
+                    <div class="col-lg-7 col-md-8">
+                        <input type="date" class="form-control o_website_form_input" name="date_of_availability" required="required"/>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group row s_website_form_field s_website_form_required">
+                    <div>
+                        <label class="col-form-label" for="Qualifications">
+                            <h2>Qualifications</h2>
+                        </label>
+                    </div>
+                    <table class="table table-bordered">
+                        <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                            <th>Qualification</th>
+                            <th>Requirement</th>
+                            <th>Response(CGPA)</th>
+                        </thead>
+                        <tbody class="text-center" style="font-size:12px;">
+                            <tr t-foreach="job.qualification_id" t-as="o">
+                                <td>
+                                    <span t-field="o.qualification"/>
+                                </td>
+                                <td>
+                                    <span t-field="o.requirement"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="response" step="0.01" min="0" required=""/>
+                                </td>
+
+                            </tr>
+                        </tbody>
+                    </table>
+            </div>
+            <div class="form-group row s_website_form_field s_website_form_required">
+                <div>
+                    <label class="col-form-label" for="Experience">
+                        <h2>Experience</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Experience</th>
+                        <th>Requirement</th>
+                        <th>Response(Years)</th>
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr t-foreach="job.experiance_id" t-as="o">
+                            <td>
+                                <span t-field="o.experience"/>
+                            </td>
+                            <td>
+                                <span t-field="o.requirement"/>
+                            </td>
+                            <td>
+                                <input type="number" class="form-control o_website_form_input" name="response2" step="0.01" min="0" required=""/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-group row s_website_form_field s_website_form_required">
+                <div>
+                    <label class="col-form-label" for="Competencies">
+                        <h2>Competencies</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Competencies</th>
+                        <th>Requirement</th>
+                        <th>Response</th>
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr t-foreach="job.competencies_id" t-as="o">
+                            <td>
+                                <span t-field="o.competencies"/>
+                            </td>
+                            <td>
+                                <span t-field="o.requirement"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="response3" required=""/>
+                            </td>
+
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-group row">
+                <div>
+                    <label class="col-form-label" for="Vacancies">
+                        <h2>Vacancies</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Work Unit</th>
+                        <th>No of Vacancies</th>
+                        <th>Response</th>
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr t-foreach="vacancy.hiring_details" t-as="o">
+                            <td>
+                                <span t-field="o.work_unit"/>
+                            </td>
+                            <td>
+                                <span t-field="o.number_of_openings"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="response4" required="required"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-group row s_website_form_field s_website_form_required">
+                <div>
+                    <label class="col-form-label" for="Education">
+                        <h2>Educational Qualifications</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Type Of Admission</th>
+                        <th>Type of Institution</th>
+						<th>Name Of College</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Specialization/Major</th>
+                        <th>CGPA</th>
+
+                    </thead>
+                      <tbody class="text-center" id="tableBody1">
+                        <tr>
+						    <td>
+                                <select name="admission" id="admission" required="">
+                                <option value="Regular">Regular</option>
+                                <option value="Distance">Distance</option>
+                                <option value="Extension">Extension</option>
+                                <option value="Summer">Summer</option>
+                            </select>
+                            </td>
+                            <td>
+                                <select name="institution" id="institution" required="">
+                                <option value="Private">Private</option>
+                                <option value="Government">Government</option>
+
+                            </select>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="edu1" required="" oninput="removeSpaces1(this)"/>
+								<!-- oninput="validateInputs(this)"/> -->
+                            </td>
+                            <td>
+                                <input type="date" class="form-control o_website_form_input" name="start_date1" required="required"/>
+                            </td>
+                            <td>
+                                <input type="date" class="form-control o_website_form_input" name="end_date1" required="required"/>
+                            </td>
+                            <td>
+                                <input type="text" class="form-control o_website_form_input" name="spec1" required="" oninput="removeSpaces1(this)"/> 
+								<!-- oninput="validateInputs(this)"/> -->
+                            </td>
+                            <td>
+                                <input type="number" class="form-control o_website_form_input" name="cgpa1" step="0.01" min="0" required=""/>
+                            </td>
+                        </tr>
+                     </tbody>
+                </table>
+				<button id="addRowButton1">Add a Row</button>
+            </div>
+			
+			<script>
+function removeSpaces1(inputElement) {
+    // Get the input value and remove numbers
+    let cleanedValue = inputElement.value.replace(/[0-9]/g, '');
+
+    // Check if the cleaned value contains only alphabets and spaces
+    if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+        // Input is valid - set the cleaned value as the input value
+        inputElement.value = cleanedValue;
+    } else {
+        // Display an error message or take some other action to handle invalid input
+        alert("Please enter only alphabets and spaces.");
+        // Clear the input or take other actions as needed
+        inputElement.value = '';
+    }
+}
+</script>
+			<script>
+                    // Get a reference to the "Add Row" button and the table's tbody
+                    const addRowButton1 = document.getElementById("addRowButton1");
+                    const tableBody1 = document.getElementById("tableBody1");
+
+                    // Counter to keep track of added rows
+                    let rowCount1 = 1;
+
+                    // Function to add a new row to the table
+                    function addRow1() {
+                    const newRow1 = document.createElement("tr");
+
+                    newRow1.innerHTML = `
+					&lt;td&gt;
+                                &lt;select name="admission" id="admission" required=""&gt;
+                                &lt;option value="regular"&gt;Regular&lt;/option&gt;
+                                &lt;option value="distance"&gt;Distance&lt;/option&gt;
+                                &lt;option value="extension"&gt;Extension&lt;/option&gt;
+                                &lt;option value="summer"&gt;Summer&lt;/option&gt;
+                            &lt;/select&gt;
+                            &lt;/td&gt;
+                            &lt;td&gt;
+                                &lt;select name="institution" id="institution" required=""&gt;
+                                &lt;option value="private"&gt;Private&lt;/option&gt;
+                                &lt;option value="government"&gt;Government&lt;/option&gt;
+
+                            &lt;/select&gt;
+                            &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="text" class="form-control o_website_form_input" name="edu${rowCount1 + 1}"
+                               required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="start_date${rowCount1 + 1}"
+                               required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="end_date${rowCount1 + 1}"
+                               required=" "/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="text" class=
+                        "form-control o_website_form_input" name="spec${rowCount1 + 1}" required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                        &lt;input type="number" class="form-control o_website_form_input" name="cgpa${rowCount1 + 1}"
+                            step="0.01" min="0"  required/&gt;
+                    &lt;/td&gt;
+                    `;
+
+                    tableBody1.appendChild(newRow1);
+                    rowCount1++;
+                    }
+
+                    // Attach the addRow function to the button's click event
+                    addRowButton1.addEventListener("click", addRow1);
+                </script>
+				<script>
+                        function removeNumerics(inputElement) {
+						let cleanedValue = inputElement.value;
+
+						// Check if the cleaned value contains only alphabets and spaces
+						if (/^[a-zA-Z\s]*$/.test(cleanedValue)) {
+							// Input is valid - set the cleaned value as the input value
+							inputElement.value = cleanedValue;
+						} else {
+							// Display an error message or take some other action to handle invalid input
+							alert("Please enter only alphabets and spaces.");
+							// Clear the input or take other actions as needed
+							inputElement.value = '';  // Optionally, clear the input
+						}
+						}
+
+                </script>
+
+									<!-- <script> -->
+                                        <!-- function validateInputs(inputElement) { -->
+                                        <!-- // Get the input value and remove spaces -->
+                                        <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
+
+                                        <!-- // Check if the cleaned value contains only alphabets -->
+                                        <!-- if (/^[a-zA-Z\s]*$/.test(cleanedValue)) { -->
+                                        <!-- // Input is valid - set the cleaned value as the input value -->
+                                        <!-- inputElement.value = cleanedValue; -->
+                                        <!-- } else { -->
+                                        <!-- // Display an error message or take some other action to handle invalid input -->
+                                        <!-- alert("Please enter only alphabets and spaces."); -->
+                                        <!-- // Clear the input or take other actions as needed -->
+                                        <!-- inputElement.value = ''; -->
+                                        <!-- } -->
+                                        <!-- } -->
+                                    <!-- </script> -->
+			<style>
+                .horizontal-scroll-container {
+                overflow-x: auto;
+                white-space: nowrap;
+                }
+
+                .horizontal-table {
+                width: 100%;
+                table-layout: fixed;
+                }
+
+                .horizontal-table th {
+                min-width: 150px;
+                padding: 8px
+                }
+            </style>
+            <div class="form-group row s_website_form_field s_website_form_required">
+                <div class=".horizontal-scroll-container">
+                    <label class="col-form-label" for=" Work Experience">
+                        <h2>Work Experience</h2>
+                    </label>
+                    <table class="horizontal-table">
+                        <thead class="text-center" style="background-color: #eeeeee; font-size: 14px; font-weight: 600;">
+                            <th>Employer</th>
+                            <th>Role</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Reason for Leaving</th>
+                            <th>Salary Earned</th>
+                            <th>Banking Experience</th>
+                            <th>Tax Paid</th>
+                            <th>Reference Name</th>
+                            <th>Reference Position</th>
+                            <th>Reference Email</th>
+                            <th>Reference Telephone</th>
+                        </thead>
+                            <tbody class="text-center" id="workExperienceTable">
+                            <!-- Table rows will be added here dynamically -->
+                            <tr>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="emp1" required="" oninput="removeSpaces1(this)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="role1" required="" oninput="removeSpaces1(this)"/>
+                                </td>
+                                <td>
+                                    <input type="date" class="form-control o_website_form_input" name="start_datee1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="date" class="form-control o_website_form_input" name="end_datee1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="leaving1" required="" oninput="removeSpaces1(this)"/>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control o_website_form_input" name="earned1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="checkbox" class="form-control o_website_form_input" name="yes1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="checkbox" class="form-control o_website_form_input" name="paid1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="ref_name1" required="" oninput="removeSpaces1(this)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="ref_pos1" required="" oninput="removeSpaces1(this)"/>
+                                </td>
+                                <td>
+                                    <input type="text" class="form-control o_website_form_input" name="ref_email1" required=""/>
+                                </td>
+                                <td>
+                                    <input type="tel" class="form-control o_website_form_input" name="ref_tel1" required="" pattern="[0-9]{10}" title="Please enter a 10-digit phone number"/>
+                                </td>
+                            </tr>
+                        </tbody>
+						</table>
+                           <button id="addRowButton2">Add a Row</button>
+                    </div>
+                </div>
+                <script>
+                    // Get a reference to the "Add Row" button and the table's tbody
+                    const addRowButton2 = document.getElementById("addRowButton2");
+                    const workExperienceTable = document.getElementById("workExperienceTable");
+
+                    // Counter to keep track of added rows
+                    let rowCount2 = 1;
+
+                    // Function to add a new row to the table
+                    function addRow2() {
+                    const newRow2 = document.createElement("tr");
+
+                    newRow2.innerHTML = `
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="emp${rowCount2 + 1}"
+                    required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="role${rowCount2 + 1}"
+                    required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+					&lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="start_datee${rowCount2 + 1}"
+                               required=""/&gt;
+                    &lt;/td&gt;
+					&lt;td&gt;
+                        &lt;input type="date" class="form-control o_website_form_input" name="end_datee${rowCount2 + 1}"
+                               required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="leaving${rowCount2 + 1}"
+                    required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="number" class="form-control o_website_form_input" name="earned${rowCount2 + 1}"
+                    required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="checkbox" class="form-control o_website_form_input" name="yes${rowCount2 + 1}"
+                    required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="checkbox" class="form-control o_website_form_input" name="paid${rowCount2 + 1}"
+                    required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="ref_name${rowCount2 + 1}"
+                    required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="ref_pos${rowCount2 + 1}"
+                    required="" oninput="removeSpaces1(this)"/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="text" class="form-control o_website_form_input" name="ref_email${rowCount2 + 1}"
+                    required=""/&gt;
+                    &lt;/td&gt;
+                    &lt;td&gt;
+                    &lt;input type="tel" class="form-control o_website_form_input" name="ref_tel${rowCount2 + 1}"
+                    required pattern="[0-9]{10}" title="Please enter a 10-digit phone number"/&gt;
+                    &lt;/td&gt;
+                    `;
+
+                    workExperienceTable.appendChild(newRow2);
+                    rowCount2++;
+                    }
+
+                    // Attach the addRow function to the button's click event
+                    addRowButton2.addEventListener("click", addRow2);
+                </script>
+            <div class="form-group row">
+                <div>
+                    <label class="col-form-label" for="Languages">
+                        <h2>Languages</h2>
+                    </label>
+                </div>
+                <table class="table table-bordered">
+                    <thead class="text-center" style="background-color:#eeeeee; font-size:14px; font-weight:600;">
+                        <th>Language</th>
+                        <th>Read</th>
+                        <th>Write</th>
+                        <th>Speak</th>
+
+
+                    </thead>
+                    <tbody class="text-center" style="font-size:12px;">
+                        <tr>
+                            <td>
+
+                                <input type="text" class="form-control o_website_form_input" name="l1" oninput="removeSpaces1(this)"/>
+                            </td>
+                            <td>
+                                <select name="r1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s1">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+
+                                <input type="text" class="form-control o_website_form_input" name="l2"/>
+                            </td>
+                            <td>
+                                <select name="r2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s2">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+
+                                <input type="text" class="form-control o_website_form_input" name="l3"/>
+                            </td>
+                            <td>
+                                <select name="r3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s3">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+
+                                <input type="text" class="form-control o_website_form_input" name="l4"/>
+                            </td>
+                            <td>
+                                <select name="r4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s4">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+
+                                <input type="text" class="form-control o_website_form_input" name="l5"/>
+                            </td>
+                            <td>
+                                <select name="r5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="w5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                            <td>
+                                <select name="s5">
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="select">Select</option>
+                                    <option value="Excellent">Excellent</option>
+                                    <option value="Good">Good</option>
+                                    <option value="Poor">Poor</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </xpath>
+    </template>
+</odoo>

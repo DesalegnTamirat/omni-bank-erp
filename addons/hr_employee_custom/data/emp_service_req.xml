@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record id="emp_service_request_form" model="ir.sequence">
+            <field name="name">Employee Service Request Sequence</field>
+            <field name="code">emp.service.request</field>
+            <field name="prefix">SR-AR-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="emp_service_transfer_request_form" model="ir.sequence">
+            <field name="name">Employee Service Transfer Request Sequence</field>
+            <field name="code">emp.transfer.service.request</field>
+            <field name="prefix">SR-Tr-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

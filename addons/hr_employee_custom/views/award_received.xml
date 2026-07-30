@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="awards_received_form" model="ir.ui.view">
+        <field name="name">Awards Given Form</field>
+        <field name="model">hr.awards</field>
+        <field name="arch" type="xml">
+            <form string="Awards Given">
+                <group colspan="2">
+                    <group>
+                        <!-- <field name="ref_num"/> -->
+                        <field name="employee_id"/>
+
+                    </group>
+                    <group>
+                         <field name="award_name"/>
+                         <field name="award_type"/>
+                    </group>
+
+                    <group>
+                         <field name="fiscal_year"/>
+                        <field name="award_cost"/>
+
+                    </group>
+                    <group>
+                        <field name="date_awarded"/>
+                         <field name="comments"/>
+                    </group>
+                    <group>
+
+                        <button name="approve" string="Approve" type="object" class="btn-primary"/>
+                    </group>
+
+
+                </group>
+
+            </form>
+        </field>
+    </record>
+    <record id="awards_received_tree" model="ir.ui.view">
+        <field name="name">Awards Given Form</field>
+        <field name="model">hr.awards</field>
+        <field name="arch" type="xml">
+            <list string="Awards Given">
+                <field name="employee_id"/>
+                <!-- <field name="ref_num"/> -->
+                <field name="award_name"/>
+                <field name="award_type"/>
+                <field name="fiscal_year"/>
+                <field name="award_cost"/>
+                <field name="date_awarded"/>
+                <field name="comments"/>
+                <button name="approve" string="Approve" type="object" class="btn-primary"/>
+            </list>
+        </field>
+    </record>
+        <record id="employee_hr_award_tree" model="ir.actions.act_window">
+        <field name="name">Awards Given Details</field>
+        <field name="res_model">hr.awards</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_hr_award_list" name="Awards Given" parent="hr.menu_hr_employee_user" action="employee_hr_award_tree"/> -->
+</odoo>

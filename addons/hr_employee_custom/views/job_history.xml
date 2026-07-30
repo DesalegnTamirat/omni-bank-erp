@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="job_history_form" model="ir.ui.view">
+        <field name="name">job.form</field>
+        <field name="model">job.form</field>
+        <field name="arch" type="xml">
+            <form string="Job Form">
+                <header>
+                    <button name="approve" invisible="status in ['approved']" string="Approve" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group colspan="2">
+                        <group>
+                            <field name="ref_num"/>
+                            <field name="employee_name"/>
+                            <field name="job_name"/>
+                            <field name="job_grade"/>
+                        </group>
+                        <group>
+                            <field name="new_job_title"/>
+                            <field name="job_history_start_date"/>
+                            <field name="job_history_end_date"/>
+                            <field name="reason"/>
+                            <field name="status"/>
+                        </group>
+                    </group>
+                    <group>
+                        <notebook string="Salary Detail Changes">
+                            <page string="Salary Detail Changes">
+                                <field name="salary_details">
+                                    <list string="Salary Detail Changes">
+                                        <!-- PAYROLL MODULE NOT INSTALLED: <field name="salary_rule" width="20%"/> -->
+                                        <field name="value" width="20%"/>
+                                        <field name="end_date" width="20%"/>
+                                        <field name="revised_value" width="20%"/>
+                                        <field name="start_date" width="20%"/>
+                                        <field name="total_value" width="20%"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="job_history_tree" model="ir.ui.view">
+        <field name="name">job.form</field>
+        <field name="model">job.form</field>
+        <field name="arch" type="xml">
+            <list string="Job Form">
+                <field name="ref_num"/>
+                <field name="employee_name"/>
+                <field name="job_name"/>
+                <field name="job_grade"/>
+                <field name="new_job_title"/>
+                <field name="job_history_start_date"/>
+                <field name="job_history_end_date"/>
+                <field name="reason"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+    <record id="employee_job_form_tree" model="ir.actions.act_window">
+        <field name="name">Job History</field>
+        <field name="res_model">job.form</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_job_form_list" name="Job History" parent="hr.menu_hr_employee_user" action="employee_job_form_tree"/> -->
+</odoo>

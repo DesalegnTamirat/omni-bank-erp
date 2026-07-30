@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="action_new_emp_probation_criteria" model="ir.actions.act_window">
+        <field name="name">Probation Criteria</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">emp.probation.criteria</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="emp_probation_criteria_tree_view" model="ir.ui.view">
+        <field name="name">emp.probation.criteria.tree</field>
+        <field name="model">emp.probation.criteria</field>
+        <field name="arch" type="xml">
+            <list string="Employee Probation" editable="bottom">
+                <field name="emp_evaluation_criteria"/>
+                <field name="coefficient"/>
+            </list>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_minute_template">
+       <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h5 class="text-center"><strong>Committee Minute No. 001/23</strong></h5>
+                        <br/>
+                        <div class="row mt32">
+
+                             <div class="col-12">
+                                 <strong>Place of interview:</strong>
+                                <span t-field="o.operating_unit_id"/>
+                                <br/>
+                                <br/>
+                                  <strong>Date of interview:</strong>
+                                <span t-field="o.vacancy_announced_on"/>
+                                  <br />
+                                 <br/>
+                              </div>
+                        </div>
+                        <div class="row mt32">
+
+                             <div class="col-3">
+                                 <p>Time Begin:10:00Am</p>
+                              </div>
+                            <div class="col-3">
+                                 <p>Morning:10:00Am</p>
+                              </div>
+                            <div class="col-3">
+                                 <p>Afternoon:5:00Pm</p>
+                              </div>
+                            <div class="col-3">
+                                 <p>Time End:5:00Pm</p>
+                              </div>
+                        </div>
+                        <br/>
+                        <table class="table table-sm o_main_table" name="Separation Checklist">
+                            <h6 class="text-left"><u><strong>Place of Assignments </strong></u></h6>
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">
+                                            <span>Place of assignment</span>
+                                        </th>
+
+                                        <th class="text-left">
+                                            <span>Number  of Openings</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+<!--                                    <t t-foreach="o.hiring_details" t-as="link">-->
+<!--                                    <tr>-->
+<!--                                        <td><t t-esc="link.work_unit"/></td>-->
+<!--&lt;!&ndash;                                        <td>Chairperson</td>&ndash;&gt;-->
+<!--                                        <td><t t-esc="link.number_of_openings"/></td>-->
+<!--                                    </tr>-->
+<!--                                    </t>-->
+                                    <t t-foreach="o.hiring_details" t-as="line">
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
+
+                                    <tr>
+                                        <td>
+                                            <span t-field="line.work_unit"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.number_of_openings"/>
+                                        </td>
+
+                                    </tr>
+<!--                                    </t>-->
+                                </t>
+                                </tbody>
+                            </table>
+                        <br/>
+                        <table class="table table-sm o_main_table" name="Separation Checklist">
+                            <h6 class="text-left"><strong><u>Panel Members</u></strong> </h6>
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">
+                                            <span>Name</span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span></span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span>Signature</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.memb_panel_vac" t-as="line">
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
+
+                                    <tr>
+                                        <td>
+                                            <span t-field="line.panel_member_name"/>
+                                        </td>
+                                      <td></td>
+
+                                    </tr>
+<!--                                    </t>-->
+                                </t>
+                                </tbody>
+
+
+
+                            </table>
+                        <br/>
+                        <table class="table table-sm o_main_table" name="Separation Checklist">
+                            <h6 class="text-left"><strong><u>Agenda</u></strong> </h6>
+                                <tbody>
+                                     <tr>
+                                         <td>Total number of applicant </td>
+
+                                        <td><span t-field="o.total_number_of_applicant"/></td>
+
+                                    </tr>
+                                    <tr>
+                                        <td>Short listed applicant</td>
+
+                                        <td><span t-field="o.short_listed_applicant"/></td>
+
+                                    </tr>
+                                    <tr>
+                                        <td>Purpose of employment</td>
+                                        <td><span t-field="o.purpose_of_employment"/></td>
+
+                                    </tr>
+                                      <tr>
+                                        <td>Vacancy announcement No.</td>
+                                       <td><span t-field="o.vacancy_announcement_no"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Total Participants on the Assessment</td>
+                                        <td> <span t-field="o.total_participant_on_the_assessment"/> </td>
+
+                                    </tr>
+                                    <tr>
+                                        <td>Not Selected Applicants</td>
+                                        <td><span t-field="o.not_selected_applicants"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        <br/>
+                        <table class="table table-sm o_main_table" name="Separation Checklist">
+                            <h6 class="text-left"><strong><u>Result summery and Rank </u></strong> </h6>
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">
+                                            <span>No</span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span>Applicant name</span>
+                                        </th>
+                                         <th class="text-left">
+                                            <span>Result</span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span>Rank</span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span>Statues</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="o.hiring_rank_details" t-as="line">
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
+
+                                    <tr>
+                                        <td>
+                                            <span t-field="line.no"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.applicant_name"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.result"/>
+                                        </td>
+                                         <td>
+                                            <span t-field="line.rank"/>
+                                        </td>
+                                        <td>
+                                            <span t-field="line.statues"/>
+                                        </td>
+
+                                    </tr>
+<!--                                    </t>-->
+                                </t>
+                                </tbody>
+
+                            </table>
+
+                            <textarea>Comment</textarea>
+                       </div>
+
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

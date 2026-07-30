@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List View -->
+    <record id="view_hr_payroll_structure_list" model="ir.ui.view">
+        <field name="name">hr.payroll.structure.list</field>
+        <field name="model">hr.payroll.structure</field>
+        <field name="arch" type="xml">
+            <list string="Salary Structures">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="parent_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_hr_payroll_structure_form" model="ir.ui.view">
+        <field name="name">hr.payroll.structure.form</field>
+        <field name="model">hr.payroll.structure</field>
+        <field name="arch" type="xml">
+            <form string="Salary Structure">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Employee Salary Structure"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="parent_id"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="note" nolabel="1" placeholder="Add a description..."/>
+                    </group>
+                    <group string="Child Structures">
+                        <field name="children_ids" nolabel="1">
+                            <list>
+                                <field name="code"/>
+                                <field name="name"/>
+                            </list>
+                        </field>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_hr_payroll_structure_search" model="ir.ui.view">
+        <field name="name">hr.payroll.structure.search</field>
+        <field name="model">hr.payroll.structure</field>
+        <field name="arch" type="xml">
+            <search string="Salary Structures">
+                <field name="name" string="Name"/>
+                <field name="code" string="Code"/>
+                <field name="parent_id" string="Parent Structure"/>
+                <filter string="Top Level Structures" name="top_level" domain="[('parent_id', '=', False)]"/>
+                <separator/>
+                <filter string="Parent Structure" name="group_parent" context="{'group_by': 'parent_id'}"/>
+                <filter string="Company" name="group_company" context="{'group_by': 'company_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_hr_payroll_structure_view" model="ir.actions.act_window">
+        <field name="name">Salary Structures</field>
+        <field name="res_model">hr.payroll.structure</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_hr_payroll_structure_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create the first salary structure.
+            </p>
+        </field>
+    </record>
+
+</odoo>

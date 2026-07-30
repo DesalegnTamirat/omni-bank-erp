@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="report_promotion_letter">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                            <div class="col-4" style="float:left;">
+                                 <strong>Date.:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref. No.</strong>
+                                    <span t-field="o.app_reference"/>
+                                  <br />
+                                <strong>ID.No.:</strong>
+                                 <span t-field="o.employee_number"/>
+                                <br />
+                                  <br/>
+                            </div>
+                        </div>
+                         <div class="row mt32">
+                              <div class="col-12">
+                                <strong><span t-field="o.partner_name"/></strong>
+                                <br/>
+                                <strong>Dear <span t-field="o.partner_name"/>,</strong>
+                            </div>
+                             </div>
+                        <h6 class="text-center"><strong><u>Subject: - Promotion</u></strong></h6>
+                        <br/>
+                        <p>Considering your experience and remarkable contribution to the Bank, I am pleased to inform you that you are promoted to the post of <strong><span t-field="o.job_id"/></strong>  with Job Grade <strong><span t-field="o.job_grade_id"/> </strong> and assigned at <strong>o.assigned_work_unit</strong> effective the date you assume your new position.</p>
+                        <br/>
+                        <p>Commencing the date, you assume the new position, your monthly gross salary is raised to   <strong>Birr <span t-field="o.job_grade_id.base_salary"/></strong> and entitlement of other benefits attached for the job grade.</p>
+                        <br/>
+                        <p>Your assignment to this post is indeed a clear indication of the Bank’s confidence in you to carry out your duties and responsibilities to its entire satisfaction with the expected standard of the Bank. </p>
+                        <br/>
+                        <p>By copy of this letter, <strong><span t-field="o.preferred_location"/></strong> is advised to release <strong><span t-field="o.partner_name"/></strong> and forward Payroll related information, Outstanding loan Account details, Leave status, and any other necessary information to <strong>o.cc_workunits</strong></p>
+                        <br/>
+                        <p>I hope you will capitalize on your achievement to date and look forward to enhanced performance of the   <strong>-------</strong> in all the responsibility areas bestowed upon you.</p>
+                        <br/>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6" >
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+								 <t t-foreach="o.cc_workunits" t-as="related_record">
+                                    <li><t t-esc="related_record.name"/></li>
+                                    <!-- Add more fields as needed -->
+                                </t>
+								 
+                                 <!-- <ul> -->
+                                     <!-- <li>Debre Berhan Area Office</li> -->
+                                     <!-- <li>IT Security Management Directorate</li> -->
+                                     <!-- <li>Mehal Meda Branch</li> -->
+                                      <!-- <li>Bunna Bank S.C </li> -->
+                                 <!-- </ul> -->
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br />
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

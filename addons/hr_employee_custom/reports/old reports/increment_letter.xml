@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_increment_letter">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-7">
+
+                            </div>
+                             <div class="col-5" style="float:left;">
+                                 <strong>Date:</strong>
+                                <span t-esc="datetime.datetime.now().strftime('%m-%d-%Y')"/>
+                                <br/>
+                                 <strong>Ref:</strong>
+                                 <span t-field="o.reference"/>
+                                <br/>
+                                  <br/>
+                              </div>
+                        </div>
+                        <div class="row mt32">
+                              <div class="col-12" >
+                                  <strong><span t-field="o.employee_name"/></strong>
+<!--                                <span t-field="o.reference"/>-->
+                                <br/>
+                                  <strong>Bunna Bank S.C</strong>
+                                  <br/>
+
+                                  <br/>
+                                  <strong>Dear <span t-field="o.employee_name"/>,</strong>
+<!--                                  <strong>Dear <span t-field="o.employee_id"/>,</strong>-->
+                            </div>
+                         </div>
+                        <br/>
+                                   <h6 class="text-center"><strong><u>Re: - Salary Increment</u></strong></h6>
+
+                        <br/>
+
+                        <p>Congratulations on your salary increment! As you know, Bunna Bank S.C. had a remarkable achievement in the fiscal year ended <strong><span t-field="o.assessment_end_date"/></strong>. This success is due in large part to the hard work and dedication of our employees, including you.</p>
+<!--                        <t t-if="o.depreciation_line_ids">-->
+                        <br/>
+                        <p>In recognition of your contributions, we are pleased to announce that your basic salary is being increased by <strong> <span t-field="o.increment_factor"/> </strong>a step, effective<strong> <span t-field="o.increment_effective_date"/></strong>. This will bring your basic salary to Birr  <strong><span t-field="o.new_basic"/></strong>.</p>
+                        <br/>
+                            <p>We are confident that you will continue to exert maximum effort to discharge the duties and responsibilities bestowed upon you with dedication and commitment. Your contributions are essential to the continued success of our bank.</p>
+                        <br/>
+                        <p>Thank you for your continued service and for being a valued member of the Bunna Bank family.</p>
+
+
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6" >
+                                <p>Sincerely</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <ul>
+                                     <li>Finance Directorate</li>
+
+                                 </ul>
+
+
+                                  <br />
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

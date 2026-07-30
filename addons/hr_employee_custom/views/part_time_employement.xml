@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="part_time_employment_form" model="ir.ui.view">
+        <field name="name">part Time Employment Form</field>
+        <field name="model">part.time.employment</field>
+        <field name="arch" type="xml">
+            <form string="part Time Employment">
+                <group colspan="2">
+                    <group>
+
+                        <field name="employee_name"/>
+                         <field name="address"/>
+                    </group>
+                    <group>
+
+                         <field name="Job_title"/>
+                         <field name="other_info"/>
+                    </group>
+
+                    <group>
+                        <field name="start_date"/>
+                        <field name="end_date"/>
+                    </group>
+                    <group>
+                        <field name="employee_id" invisible="1"/>
+                        <button name="approve" string="Approve" type="object" class="btn-primary"/>
+                    </group>
+
+
+                </group>
+
+            </form>
+        </field>
+    </record>
+    <record id="part_time_employment_tree" model="ir.ui.view">
+        <field name="name">Part Time Employment Form</field>
+        <field name="model">part.time.employment</field>
+        <field name="arch" type="xml">
+            <list string="part Time Employment">
+                <field name="employee_id" invisible="1"/>
+                <field name="employee_name"/>
+                <field name="address"/>
+                <field name="Job_title"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="other_info"/>
+                <button name="approve" string="Approve" type="object" class="btn-primary"/>
+            </list>
+        </field>
+    </record>
+        <record id="employee_part_time_employment_tree" model="ir.actions.act_window">
+        <field name="name">Part Time Employment Details</field>
+        <field name="res_model">part.time.employment</field>
+            <field name="domain"> [("employee_id.user_id", "=", uid)]</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_part_time_employment_list" name="Part Time Employment" parent="hr.menu_hr_employee_user" action="employee_part_time_employment_tree"/> -->
+</odoo>

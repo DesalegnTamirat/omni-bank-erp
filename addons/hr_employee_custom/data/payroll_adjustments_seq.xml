@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record id="sequence_payroll_adjustment" model="ir.sequence">
+            <field name="name">Payroll Adjustment sequence</field>
+            <field name="code">hr.payroll.adjustments</field>
+            <field name="prefix">BB/Payroll-Adj/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+	</data>
+</odoo>

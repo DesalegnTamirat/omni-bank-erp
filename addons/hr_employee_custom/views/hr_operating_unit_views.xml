@@ -1,0 +1,137 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT — Form view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_operating_unit_form" model="ir.ui.view">
+        <field name="name">operating.unit.hr.form</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <form string="Operating Unit">
+                <header>
+                    <button name="action_save_operating_unit" string="Save" type="object" class="btn-primary" save="1"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g. Addis Ababa Branch" required="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="sol_id" placeholder="e.g. 1001" required="1"/>
+                            <field name="code" placeholder="e.g. 10001"/>
+                            <field name="old_code" placeholder="e.g. 9001"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group>
+                            <field name="work_unit_type" required="1"/>
+                            <field name="parent_unit"/>
+                            <field name="branch_grade"/>
+                        </group>
+                    </group>
+
+                    <group>
+                        <group>
+                            <field name="hardship_allowance"/>
+                        </group>
+                        <group>
+                            <field name="partner_id" context="{'res_partner_search_mode': 'customer'}"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Job Positions" name="job_positions">
+                            <field name="job_position_ids" context="{'default_operating_unit_id': id}">
+                                <list editable="bottom"
+                                      delete="0"
+                                      decoration-danger="vacant_position_count &gt; 0"
+                                      decoration-success="vacant_position_count == 0"
+                                      decoration-muted="not active">
+                                    <field name="job_position_id" string="Job Position" widget="many2one_avatar"/>
+                                    <field name="active" widget="boolean_toggle" string="Active" optional="show"/>
+                                    <field name="approved_plan_count" string="Approved Plan" sum="Total Approved"/>
+                                    <field name="active_employee_count"
+                                           string="Active Employees"
+                                           sum="Total Active"
+                                           readonly="1"
+                                           decoration-muted="active_employee_count == 0"/>
+                                    <field name="vacant_position_count"
+                                           string="Vacant"
+                                           sum="Total Vacant"
+                                           readonly="1"
+                                           decoration-danger="vacant_position_count &gt; 0"
+                                           decoration-success="vacant_position_count == 0"/>
+                                    <field name="lateral_count" string="Lateral" readonly="1" optional="hide"/>
+                                    <field name="promotion_count" string="Promotion" readonly="1" optional="hide"/>
+                                    <field name="replacement_count" string="Replacement" readonly="1" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT — List view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_operating_unit_list" model="ir.ui.view">
+        <field name="name">operating.unit.hr.list</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <list string="Operating Units" decoration-muted="not active" delete="0">
+                <field name="sol_id" string="Sol ID"/>
+                <field name="name" string="Name"/>
+                <field name="code" string="Code"/>
+                <field name="old_code" string="Old Code" optional="show"/>
+                <field name="work_unit_type" string="Type" widget="badge"/>
+                <field name="parent_unit" string="Parent Unit" optional="show"/>
+                <field name="branch_grade" string="Grade" optional="show"/>
+                <field name="hardship_allowance" string="Hardship %" optional="show"/>
+                <field name="active" string="Active" widget="boolean_toggle" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT — Search view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_operating_unit_search" model="ir.ui.view">
+        <field name="name">operating.unit.hr.search</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <search string="Search Operating Units">
+                <field name="name" string="Name"/>
+                <field name="sol_id" string="Sol ID"/>
+                <field name="code" string="Code"/>
+                <field name="old_code" string="Old Code"/>
+                <field name="work_unit_type" string="Work Unit Type"/>
+                <field name="parent_unit" string="Parent Unit"/>
+                <separator/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="group_by_work_unit_type" string="Work Unit Type" context="{'group_by': 'work_unit_type'}"/>
+                <filter name="group_by_parent" string="Parent Unit" context="{'group_by': 'parent_unit'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT — Action
+    ════════════════════════════════════════════ -->
+    <record id="action_hr_operating_unit" model="ir.actions.act_window">
+        <field name="name">Operating Units</field>
+        <field name="res_model">operating.unit</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,88 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_increment_form" model="ir.ui.view">
+        <field name="name">employee.increment.form</field>
+        <field name="model">employee.increment</field>
+        <field name="arch" type="xml">
+            <form string="Employee Increment">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                    <button name="populate_details" invisible="state in ('populated', 'computed')" string="Populate details" type="object" class="oe_highlight"/>
+                   <button name="compute_payout" invisible="state in ('draft', 'computed')" string="Compute Payout" type="object" class="oe_highlight"/>
+<!--                    <button name="approve"-->
+<!--                             invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;approve&apos;, &apos;closed&apos;)"-->
+<!--                            string="Approve" type="object" class="oe_highlight"/>-->
+<!--                    <button name="close_acting_role"-->
+<!--                             invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;closed&apos;)"-->
+<!--                            string="Close Acting Role" type="object" class="oe_highlight"/>-->
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                            <!-- Invoice draft header -->
+<!--                            <span class="o_form_label"><field name="move_type"  invisible="move_type == &apos;entry&apos;" readonly="1" nolabel="1"/></span>-->
+                            <h1>
+                                <field name="reference" required="1"/>
+                            </h1>
+                    </div>
+                    <group colspan="4">
+                        <group name="Employee">
+<!--                            <field name="reference" readonly="1"/>-->
+                            <field name="employee_name" required="1"/>
+                            <field name="increment_factor" required="1"/>
+                            <field name="increment_effective_date" required="1"/>
+							<!-- ACCOUNTING FISCAL YEAR MODULE NOT INSTALLED: <field name="fiscal_year"/> -->
+                            <field name="assessment_end_date"/>
+							<field name="job_position"/>
+                            <field name="work_unit"/>
+                            <field name="job_grade"/>
+                            <field name="job_category"/>
+                            <field name="salary_account"/>
+                            <field name="pf_account"/>
+                            <field name="pension_fund_gl_account"/>
+                            <field name="existing_basic"/>
+                            <field name="salary_factor"/>
+
+                        </group>
+                        <group name="Salary Details">
+
+                            <field name="new_basic"/>
+                            <field name="arrear_days"/>
+                            <field name="arrear_original_basic"/>
+                            <field name="arrear_new_basic"/>
+                            <field name="arrear_difference"/>
+                            <field name="tax_original_arrear"/>
+                            <field name="tax_revised_arrear"/>
+                            <field name="tax_difference"/>
+                            <field name="net_arrear_payout"/>
+                            <field name="pension_fund_payable_bank"/>
+							<field name="provident_fund"/>
+                            <field name="pension_fund_payable_emp"/>
+
+                        </group>
+
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="employee_increment_tree" model="ir.ui.view">
+        <field name="name">employee.increment.form</field>
+        <field name="model">employee.increment</field>
+        <field name="arch" type="xml">
+            <list string="Employee Increment">
+                <field name="reference"/>
+                <field name="employee_name"/>
+                <field name="job_position"/>
+                <field name="existing_basic"/>
+                <field name="new_basic"/>
+                <field name="net_arrear_payout"/>
+            </list>
+        </field>
+    </record>
+    <record id="employee_increment_form_tree" model="ir.actions.act_window">
+        <field name="name">Employee Increment</field>
+        <field name="res_model">employee.increment</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

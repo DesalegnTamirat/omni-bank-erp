@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Merged from the standalone 'operating_unit' module (OCA/operating-unit).
+    sol_id and work_unit_type are added here because hr_employee_custom's
+    hr_operating_unit.py makes both fields required on operating.unit.
+-->
+<odoo noupdate="1">
+    <!-- Basic Operating Unit  -->
+    <record id="main_operating_unit" model="operating.unit">
+        <field name="name">Main Operating Unit</field>
+        <field name="old_code">OU1</field>
+        <field name="sol_id">1</field>
+        <field name="work_unit_type">head_office</field>
+        <field name="partner_id" ref="base.main_partner" />
+    </record>
+    <record model="res.users" id="base.user_root">
+        <field name="default_operating_unit_id" ref="main_operating_unit" />
+        <field name="operating_unit_ids" eval="[(4, ref('main_operating_unit'))]" />
+    </record>
+    <record model="res.users" id="base.user_admin">
+        <field name="default_operating_unit_id" ref="main_operating_unit" />
+        <field name="operating_unit_ids" eval="[(4, ref('main_operating_unit'))]" />
+    </record>
+</odoo>

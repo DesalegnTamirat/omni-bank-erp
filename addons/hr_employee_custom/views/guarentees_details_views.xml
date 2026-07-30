@@ -1,0 +1,74 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- Form View: Guarantees Details -->
+    <record id="guarentees_details_form" model="ir.ui.view">
+        <field name="name">guarentees.details.form</field>
+        <field name="model">guarentees.details</field>
+        <field name="arch" type="xml">
+            <form string="Guarentees Details">
+                <sheet>
+                    <group colspan="2">
+                        <group>
+                            <field name="ref_num"/>
+                            <field name="type_guarantee"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="effective_date"/>
+                            <field name="name_of_staff"/>
+                        </group>
+                        <group>
+                            <field name="name_of_institution"/>
+                            <field name="type"/>
+                            <field name="state"/>
+                        </group>
+                        <group>
+                            <field name="status"/>
+                            <button name="approve" invisible="status == 'approved'" string="Approve" type="object" class="btn-primary"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- List View: Guarantees Details -->
+    <record id="guarentees_details_list" model="ir.ui.view">
+        <field name="name">guarentees.details.list</field>
+        <field name="model">guarentees.details</field>
+        <field name="arch" type="xml">
+            <list string="Guarantees Details">
+                <field name="employee_id" invisible="1"/>
+                <field name="ref_num"/>
+                <field name="type_guarantee"/>
+                <field name="effective_date"/>
+                <field name="name_of_staff"/>
+                <field name="name_of_institution"/>
+                <field name="type"/>
+                <field name="state"/>
+                <field name="status"/>
+                <button name="approve" string="Approve" type="object" class="btn-primary"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Guarantees Details -->
+    <record id="employee_guarentees_details_tree_action" model="ir.actions.act_window">
+        <field name="name">Guarantees Details</field>
+        <field name="res_model">guarentees.details</field>
+        <field name="domain">[("employee_id.user_id", "=", uid)]</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- Action: Guarantees Details (smart button — filtered by employee) -->
+    <record id="act_hr_employee_2_guarentees_details" model="ir.actions.act_window">
+        <field name="name">Guarantee Details</field>
+        <field name="res_model">guarentees.details</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id', '=', active_id)]</field>
+        <field name="context">{
+            'search_default_employee_id': active_id,
+            'default_employee_id': active_id
+        }</field>
+    </record>
+</odoo>

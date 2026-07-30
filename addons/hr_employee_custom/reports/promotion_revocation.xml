@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_promotion_revocation">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                              <div class="col-12">
+                                  <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref. No:</strong>
+                                <span t-field="o.app_reference"/>
+
+                                  <br/>
+                                   <strong>ID.No.:</strong>
+                                 <span t-field="o.employee_number"/>
+                                <br/>
+                                <br/>
+                                 <strong><span t-field="o.partner_name"/></strong>
+                                  <br/>
+                                  <br/>
+
+                                  <strong>Dear <span t-field="o.partner_name"/>,</strong>
+<!--                                <strong>Dear <span t-field="o.employee_name"/>,</strong>-->
+                                  <br/>
+                            </div>
+
+                             </div>
+                        <h6 class="text-center"><strong><u>Re: - Revocation of Promotion</u></strong></h6>
+                        <br/>
+                        <p>It is to be recalled that you have been promoted to the post of  <strong><span t-field="o.job_id"/> </strong>and assigned at <strong><span t-field="o.final_work_unit"/></strong> effective the date assuming to the new position, with a letter Ref.No.<span t-field="o.app_reference"/> dated <span t-field="o.promotion_date"/>. </p>
+                        <br/>
+                        <p>However, with your application letter dated ------- E.C, you have requested to revoke your Promotion. Consequently, please be informed that your promotion has been cancelled and the promotion letter has been revoked by this letter effective the date of promotion.</p>
+                        <br/>
+                        <p>This is, therefore, you are advised to continue working as  <strong><span t-field="o.employee_position"/> </strong> at<strong> <span t-field="o.employee_work_unit"/> </strong>effective the date of promotion. </p>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+
+
+
+                                 <strong>CC:</strong>
+								 <t t-foreach="o.cc_workunits" t-as="related_record">
+                                    <li><t t-esc="related_record.name"/></li>
+                                    <!-- Add more fields as needed -->
+                                </t>
+
+<!--                                 <t t-foreach="docs.operating_unit_tag" t-as="line">-->
+<!--                                    <ul>-->
+<!--                                        <li>-->
+<!--                                          <span t-field="line"/>-->
+<!--                                        </li>-->
+<!--                                    </ul>-->
+
+<!--\-->
+<!--                                </t>-->
+                                <!-- <span t-field="o.operating_unit_tag" /> -->
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

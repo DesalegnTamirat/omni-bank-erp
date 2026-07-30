@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_emp_allowance" model="ir.actions.act_window">
+        <field name="name">Allowance</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">emp.allowance</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Bid Here!</p>
+        </field>
+    </record>
+
+    <record id="emp_allowance_tree_view" model="ir.ui.view">
+        <field name="name">emp.allowance.tree</field>
+        <field name="model">emp.allowance</field>
+        <field name="arch" type="xml">
+            <list string="Employee Allowance">
+                <field name="employee_id"/>
+                <field name="allowance_amount"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="emp_allowance_form_view" model="ir.ui.view">
+        <field name="name">emp.allowance.form</field>
+        <field name="model">emp.allowance</field>
+        <field name="arch" type="xml">
+            <form string="Emp Allowance">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                <field name="allowance_amount"/>
+                        </group>
+                    <group>
+                        <field name="contract_id"/>
+                        <field name="structure_id"/>
+                        <field name="allowance_date"/>
+                        <field name="status"/>
+                    </group>
+                </group>
+            </sheet>
+<!--            <div class="oe_chatter">-->
+<!--                    <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>-->
+<!--                    <field name="message_ids" widget="mail_thread"/>-->
+<!--            </div>-->
+        </form>
+    </field>
+</record>
+    <menuitem id="hr_employee_allowance_menu" name="Allowances" parent="hr.menu_hr_root" action="action_emp_allowance"/>
+</odoo>

@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="re_instating_form" model="ir.ui.view">
+        <field name="name">Re.Instating.form</field>
+        <field name="model">re.instating</field>
+        <field name="arch" type="xml">
+            <form string="Re Instating">
+                <sheet>
+                    <group colspan="2">
+                        <group>
+                            <field name="ref_num"/>
+                            <field name="employee_name"/>
+                            <field name="new_job_title"/>
+                            <field name="new_job_grade"/>
+                        </group>
+                        <group>
+                            <field name="operating_unit"/>
+                            <field name="department"/>
+                            <field name="salary"/>
+                            <field name="date_re_instated"/>
+                        </group>
+                    </group>
+                    <group colspan="2">
+                        <group>
+                            <field name="responsible"/>
+                            <field name="reason"/>
+                        </group>
+                        <group>
+                            <field name="wage"/>
+                            <field name="trial_date_end" invisible="1"/>
+                            <field name="status" readonly="1"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="Approve" invisible="status == 'approved'" string="Approve" type="object" class="btn-primary"/>
+                        <button name="re_instate" string="Re Instate" type="object" class="btn-secondary" invisible="status == 'approved'"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="re_instating_tree" model="ir.ui.view">
+        <field name="name">Re.Instating.tree</field>
+        <field name="model">re.instating</field>
+        <field name="arch" type="xml">
+            <list string="Re Instating">
+                <field name="ref_num"/>
+                <field name="employee_name"/>
+                <field name="operating_unit"/>
+                <field name="department"/>
+                <field name="new_job_title"/>
+                <field name="new_job_grade"/>
+                <field name="salary"/>
+                <field name="date_re_instated"/>
+                <field name="responsible"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="employee_re_instating_tree" model="ir.actions.act_window">
+        <field name="name">Re Instating Details</field>
+        <field name="res_model">re.instating</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="guarentees_details_form" model="ir.ui.view">
+        <field name="name">Guarantees Details Form</field>
+        <field name="model">guarentees.details</field>
+        <field name="arch" type="xml">
+            <form string="Guarentees Details">
+                <group colspan="2">
+                    <group>
+
+                        <field name="ref_num"/>
+                         <field name="type_guarantee"/>
+                    </group>
+                    <group>
+
+                         <field name="effective_date"/>
+                         <field name="name_of_staff"/>
+                    </group>
+
+                    <group>
+                        <field name="name_of_institution"/>
+                        <field name="type"/>
+						<field name="state"/>
+                    </group>
+                    <group>
+                        <field name="status"/>
+                        <button name="approve" invisible="status in ['approved']" string="Approve" type="object" class="btn-primary"/>
+                    </group>
+
+
+                </group>
+
+            </form>
+        </field>
+    </record>
+    <record id="guarentees_details_tree" model="ir.ui.view">
+        <field name="name">Guarantees Details Form</field>
+        <field name="model">guarentees.details</field>
+        <field name="arch" type="xml">
+            <list string="Guarantees Details">
+                <field name="employee_id" invisible="1"/>
+                <field name="ref_num"/>
+                <field name="type_guarantee"/>
+                <field name="effective_date"/>
+                <field name="name_of_staff"/>
+                <field name="name_of_institution"/>
+                <field name="type"/>
+				<field name="state"/>
+                <field name="status"/>
+                <button name="approve" string="Approve" type="object" class="btn-primary"/>
+            </list>
+        </field>
+    </record>
+        <record id="employee_guarentees_details_tree" model="ir.actions.act_window">
+        <field name="name">Guarantees Details Details</field>
+        <field name="res_model">guarentees.details</field>
+            <field name="domain"> [("employee_id.user_id", "=", uid)]</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_guarentees_details_list" name="Guarantees Details" parent="hr.menu_hr_employee_user" action="employee_guarentees_details_tree"/> -->
+</odoo>

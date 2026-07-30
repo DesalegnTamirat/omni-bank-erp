@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_release_format">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                         <h6 class="text-center"><strong><u>Subject :-Staff Release</u></strong></h6>
+                        <div class="row mt32">
+                              <div class="col-12">
+                                  <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>To:-Olympia Branch</strong>
+<!--                                <span t-field="o.reference"/>-->
+                                  <br/>
+                                  <br/>
+                                   <strong>From: -Lemi Branch</strong>
+<!--                                 <span t-field="o.employee_id"/>-->
+                                <br/>
+
+                            </div>
+
+                             </div>
+
+                        <p>Ato Tsegaye Atsebha G/meskel Promoted to Olympia Branch as per letter from Talent Management Directorate ref.no-----------------------dated 7/10/2023 hence we have released Ato Tsegaye Atsebha of today, July 10 ,2023 and other detail Information has been summarized as Follows: -</p>
+                         <br/>
+                            <ol>
+                                <li>Date of Employment</li>
+                                <li>Id No</li>
+                                <li>Salary and allowance paid up to</li>
+                                <li>Gross Salary</li>
+                                <li>(Fuel) Transportation Allowance Birr </li>
+                                <li>Representation Allowance Birr</li>
+                                <li>Cellular Phone Allowance Birrr</li>
+                                <li>Salary Account </li>
+                                <li>Mortgage Account Number</li>
+                                <li>
+                                    <ul id="list">
+                                        <li>Loan Position Staff House Loan</li>
+                                        <li>Outstanding Balance </li>
+                                        <li>Emergency Staff Loan</li>
+                                    </ul>
+                                </li>
+                                <li>Leave status to July 09/2023</li>
+                                <li>Sick leave up to July 09/2023</li>
+                                <li>Outstanding OD loan</li>
+                            </ol>
+                    </div>
+                <p>Finally, We appreciate Ato Tsegaye Atsbiha for his best effort to serve the branch with goof integrity and we wish him the best in his Future Carrier.</p>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                 <strong>CC:</strong>
+                                 <ul>
+                                      <li>East AA District</li>
+                                 <li>Debre Berhan Area Office</li>
+                                 <li>Olympia Branch</li>
+                                 <li>Talent Management Directorate</li>
+                                     <li><strong>Bunna Bank S.C </strong></li>
+                                 </ul>
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br/>
+                             </div>
+
+                        </div>
+
+
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

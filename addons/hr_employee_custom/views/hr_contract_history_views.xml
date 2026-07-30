@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <record id="view_hr_employee_contract_history_list" model="ir.ui.view">
+            <field name="name">hr.employee.contract.history.list</field>
+            <field name="model">hr.employee.contract.history</field>
+            <field name="arch" type="xml">
+                <list string="Contract History">
+                    <field name="updated_on"/>
+                    <field name="changed_field"/>
+                    <field name="previous_value"/>
+                    <field name="new_value"/>
+                    <field name="current_contract_id"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_hr_employee_contract_history_form" model="ir.ui.view">
+            <field name="name">hr.employee.contract.history.form</field>
+            <field name="model">hr.employee.contract.history</field>
+            <field name="arch" type="xml">
+                <form string="Contract History">
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="updated_on"/>
+                            <field name="current_contract_id"/>
+                        </group>
+                        <group>
+                            <field name="changed_field"/>
+                            <field name="previous_value"/>
+                            <field name="new_value"/>
+                        </group>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_hr_employee_contract_history" model="ir.actions.act_window">
+            <field name="name">Contract History</field>
+            <field name="res_model">hr.employee.contract.history</field>
+            <field name="view_mode">list,form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

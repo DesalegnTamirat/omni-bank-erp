@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="view_service_request_completion_wizard_form" model="ir.ui.view">
+        <field name="name">service.request.completion.wizard.form</field>
+        <field name="model">service.request.completion.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Complete Guarantee Letter Request">
+                <group>
+                    <field name="request_id" invisible="1"/>
+                    <field name="ref_num" required="1"/>
+                    <field name="type_guarantee" required="1"/>
+                    <field name="effective_date" required="1"/>
+                    <field name="guarantee_amount" required="1"/>
+                </group>
+                <footer>
+                    <button string="Complete Request" name="action_confirm_completion" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

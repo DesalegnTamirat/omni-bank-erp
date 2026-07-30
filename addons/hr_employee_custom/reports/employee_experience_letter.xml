@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Report Action ───────────────────────────────────────────────── -->
+    <record id="action_report_employee_experience_letter" model="ir.actions.report">
+        <field name="name">Employee Experience Letter</field>
+        <field name="model">hr.employee</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_employee_experience_letter</field>
+        <field name="report_file">hr_employee_custom.report_employee_experience_letter</field>
+        <field name="print_report_name">'Experience Letter - ' + object.name</field>
+        <field name="binding_model_id" ref="hr.model_hr_employee"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- ── QWeb Template ──────────────────────────────────────────────── -->
+    <template id="report_employee_experience_letter">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="employee">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: Arial, sans-serif; font-size: 11pt; padding: 10mm 15mm;">
+
+                        <!-- Date and Reference -->
+                        <div style="text-align: right; margin-bottom: 20px;">
+                            <div>Date: <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d')"/></div>
+                            <div>Ref.No: <t t-esc="employee.identification_id or ''"/></div>
+                        </div>
+
+                        <!-- Title -->
+                        <div style="text-align: center; margin-bottom: 24px;">
+                            <strong><u>To Whom It May Concern</u></strong>
+                        </div>
+
+                        <!-- Opening paragraph -->
+                        <p>
+                            Our staff member <strong><t t-esc="employee.name"/></strong> has requested us to write
+                            him/her a letter of confirmation concerning his/her work experience.
+                        </p>
+
+                        <!-- Certification paragraph -->
+                        <p>
+                            Pursuant to his/her request, we hereby certify that
+                            <strong><t t-esc="employee.name"/></strong>
+                            is a permanent employee of Bunna Bank S.C. since
+                            <strong>
+                                <t t-if="employee.first_contract_date">
+                                    <t t-esc="employee.first_contract_date"/>
+                                </t>
+                                <t t-elif="employee.contract_id and employee.contract_id.date_start">
+                                    <t t-esc="employee.contract_id.date_start"/>
+                                </t>
+                            </strong>
+                            in the following capacities:
+                        </p>
+
+                        <!-- Job History Table -->
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+                            <thead>
+                                <tr style="background-color:#1d2632; color:white;">
+                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">Job Position</th>
+                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">Start Date</th>
+                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">End Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="employee.job_history_ids" t-as="jh">
+                                    <tr>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                            <t t-esc="jh.job_id.name or jh.position or ''"/>
+                                        </td>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                            <t t-esc="jh.job_history_start_date or ''"/>
+                                        </td>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                            <t t-if="not jh.job_history_end_date">To date.</t>
+                                            <t t-else=""><t t-esc="jh.job_history_end_date"/></t>
+                                        </td>
+                                    </tr>
+                                </t>
+                                <!-- Fallback if no job history -->
+                                <t t-if="not employee.job_history_ids">
+                                    <tr>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                            <t t-esc="employee.job_id.name or ''"/>
+                                        </td>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                            <t t-esc="employee.contract_id.date_start or ''"/>
+                                        </td>
+                                        <td style="padding:6px 10px; border:1px solid #ccc;">To date.</td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Salary paragraph -->
+                        <t t-if="employee.contract_id">
+                            <p>
+                                He/She is drawing a monthly gross salary of Birr
+                                <strong>
+                                    <t t-esc="'{:,.2f}'.format(employee.contract_id.wage or 0)"/>
+                                </strong>
+                                along with other benefits allowed for the position.
+                            </p>
+                        </t>
+
+                        <!-- Closing paragraph -->
+                        <p>
+                            This certificate is issued upon his/her request and does not serve as a release.
+                        </p>
+
+                        <!-- Signature block -->
+                        <div style="margin-top: 50px;">
+                            <p>Sincerely yours,</p>
+                            <br/><br/><br/>
+                            <p style="margin-bottom:2px;"><strong>__________________________</strong></p>
+                            <p style="margin-bottom:2px;">Manager- People Service and Reward</p>
+                            <p>Division</p>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

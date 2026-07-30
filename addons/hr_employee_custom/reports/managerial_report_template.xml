@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <report id="report_managerial" model="supplementary.role" string="Managerial Report" report_type="qweb-pdf" name="hr_employee_custom.report_managerial_template" file="hr_employee_custom.report_managerial_template"/>
+    <template id="report_managerial_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="page">
+                    <h2>Managerial Report for <span t-field="o.name"/></h2>
+                    <!-- Add your specific fields for the managerial report -->
+                    <p><span t-field="o.field_name"/></p>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

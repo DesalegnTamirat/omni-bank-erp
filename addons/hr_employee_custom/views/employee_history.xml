@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- Standalone "Employee History" tab disabled here: it duplicated the
+             Employee History pane already provided inside the master view's
+             "☰ ▾" dropdown (views/hr_employee_master_views.xml, pane_emp_history),
+             which uses action buttons instead of object-method buttons. -->
+    </data>
+</odoo>

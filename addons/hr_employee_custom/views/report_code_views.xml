@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════
+         REPORT CODE — Form view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_report_code_form" model="ir.ui.view">
+        <field name="name">hr.report.code.form</field>
+        <field name="model">hr.report.code</field>
+        <field name="arch" type="xml">
+            <form string="Report Code">
+                <header>
+                    <button name="action_save_report_code" string="Save" type="object" class="btn-primary" save="1"/>
+                    <button name="action_archive_report_code" string="Archive" type="object" class="btn-warning" invisible="not id or not active" confirm="Archive this Report Code?"/>
+                    <button name="action_archive_report_code" string="Unarchive" type="object" class="btn-secondary" invisible="not id or active"/>
+                </header>
+
+                <sheet>
+                    <div class="oe_title">
+                        <label for="code" string="Report Code"/>
+                        <h1>
+                            <field name="code" placeholder="e.g. 1001" required="1"/>
+                        </h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="name" placeholder="e.g. Monthly Payroll Report" required="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         REPORT CODE — List view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_report_code_list" model="ir.ui.view">
+        <field name="name">hr.report.code.list</field>
+        <field name="model">hr.report.code</field>
+        <field name="arch" type="xml">
+            <list string="Report Codes" decoration-muted="not active">
+                <field name="code" string="Code"/>
+                <field name="name" string="Name"/>
+                <field name="active" string="Active" widget="boolean_toggle" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         REPORT CODE — Search view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_report_code_search" model="ir.ui.view">
+        <field name="name">hr.report.code.search</field>
+        <field name="model">hr.report.code</field>
+        <field name="arch" type="xml">
+            <search string="Search Report Codes">
+                <field name="code" string="Code"/>
+                <field name="name" string="Name"/>
+                <separator/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_inactive" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         REPORT CODE — Action
+    ════════════════════════════════════════════ -->
+    <record id="action_hr_report_code" model="ir.actions.act_window">
+        <field name="name">Report Codes</field>
+        <field name="res_model">hr.report.code</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         REPORT CODE — Configuration Menu
+    ════════════════════════════════════════════ -->
+
+
+</odoo>

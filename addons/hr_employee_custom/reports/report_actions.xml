@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <!-- Action for Managerial Report -->
+        <record id="action_report_managerial" model="ir.actions.server">
+            <field name="name">Managerial Report</field>
+            <field name="model" ref="supplementary.role"/>
+            <field name="state">code</field>
+            <field name="code">action = self.env['report'].get_action(self, 'hr_employee_custom.report_managerial')</field>
+        </record>
+
+        <!-- Action for Non-Managerial Report -->
+        <record id="action_report_non_managerial" model="ir.actions.server">
+            <field name="name">Non-Managerial Report</field>
+            <field name="model" ref="supplementary.role"/>
+            <field name="state">code</field>
+            <field name="code">action = self.env['report'].get_action(self, 'hr_employee_custom.report_non_managerial')</field>
+        </record>
+    </data>
+</odoo>

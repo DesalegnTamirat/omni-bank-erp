@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- Wizard Form View -->
+    <record id="print_employee_report_form_view" model="ir.ui.view">
+        <field name="name">print.employee.report.form</field>
+        <field name="model">print.employee.report</field>
+        <field name="arch" type="xml">
+            <form string="Print Employee Report">
+                <group>
+                    <group>
+                        <field name="employee_id"/>
+                        <field name="report_type"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_print_report" string="Print" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for Print Employee Report -->
+    <record id="action_print_employee_report" model="ir.actions.act_window">
+        <field name="name">Print Employee Report</field>
+        <field name="res_model">print.employee.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="print_employee_report_form_view"/>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'standard'}</field>
+    </record>
+
+    <!-- Action for Print Employee Experience Report -->
+    <record id="action_print_employee_experience_report" model="ir.actions.act_window">
+        <field name="name">Print Employee Experience Report</field>
+        <field name="res_model">print.employee.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="print_employee_report_form_view"/>
+        <field name="target">new</field>
+        <field name="context">{'default_report_type': 'experience'}</field>
+    </record>
+</odoo>
