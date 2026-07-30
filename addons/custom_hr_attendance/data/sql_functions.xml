@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="function_generate_detail_employee_attendance_report" model="ir.actions.server">
+            <field name="name">Init SQL Function generate_detail_employee_attendance_report</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="state">code</field>
+            <field name="code"><![CDATA[
+# High performance PostgreSQL function for Bunna Bank attendance reporting
+sql = """
+CREATE OR REPLACE FUNCTION generate_detail_employee_attendance_report(
+    p_from DATE,
+    p_to DATE,
+    p_report_type VARCHAR
+) RETURNS VOID AS $$
+BEGIN
+    -- Clear previous results for clean report generation
+    TRUNCATE TABLE generate_employee_attendance_details;
+
+    IF p_report_type = 'attendance_summary' THEN
+        INSERT INTO generate_employee_attendance_details (
+            employee_id,
+            employee_identification,
+            employee_name,
+            place_of_assignment,
+            work_unit,
+            job_title,
+            worked_hours,
+            late_time_hour,
+            early_exit_hour,
+            over_time_hour,
+            pre_defined,
+            acknowledged_lateness,
+            pre_approved_early_checkout,
+            acknowledged_early_checkout,
+            force_checkout,
+            working_hours,
+            create_date,
+            write_date
+        )
+        SELECT 
+            emp.id AS employee_id,
+            COALESCE(emp.employee_identification, '') AS employee_identification,
+            COALESCE(emp.name, '') AS employee_name,
+            COALESCE(ou.name, '') AS place_of_assignment,
+            CASE 
+                WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
+                ELSE COALESCE(ou.name, '')
+            END AS work_unit,
+            COALESCE(job.name, '') AS job_title,
+            COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
+            COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
+            COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
+            COALESCE(SUM(att.over_time_hour), 0.0) AS over_time_hour,
+            COALESCE(SUM(att.pre_defined_lateness), 0.0) AS pre_defined,
+            COALESCE(SUM(att.acknowledged_late), 0.0) AS acknowledged_lateness,
+            COALESCE(SUM(att.pre_approved_early_checkout), 0.0) AS pre_approved_early_checkout,
+            COALESCE(SUM(att.acknowledged_exit), 0.0) AS acknowledged_early_checkout,
+            COUNT(CASE WHEN att.check_out_status = 'Force Checkout' OR att.is_force_checkout = TRUE THEN 1 END) AS force_checkout,
+            COALESCE(SUM(att.worked_hours), 0.0) AS working_hours,
+            NOW(),
+            NOW()
+        FROM hr_employee emp
+        LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
+        LEFT JOIN hr_job job ON emp.job_position = job.id
+        LEFT JOIN hr_attendance att ON att.employee_id = emp.id 
+            AND att.check_in >= p_from::timestamp 
+            AND att.check_in <= (p_to + interval '1 day')::timestamp
+            AND (att.active = TRUE OR att.active IS NULL)
+        WHERE emp.active = TRUE
+        GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.name;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+"""
+env.cr.execute(sql)
+]]></field>
+        </record>
+    </data>
+</odoo>

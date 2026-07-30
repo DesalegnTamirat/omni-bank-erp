@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- TREE VIEW -->
+    <record id="view_overtime_report_tree" model="ir.ui.view">
+        <field name="name">overtime.report.tree</field>
+        <field name="model">overtime.report</field>
+        <field name="arch" type="xml">
+            <list string="Over Time Report">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="place_of_assignment"/>
+                <field name="work_unit"/>
+                <field name="job_title"/>
+                <field name="manager_name"/>
+                <field name="over_time_hours"/>
+                <field name="used_hours"/>
+                <field name="remaining_hours"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH VIEW -->
+    <record id="view_overtime_report_search" model="ir.ui.view">
+        <field name="name">overtime.report.search</field>
+        <field name="model">overtime.report</field>
+        <field name="arch" type="xml">
+            <search string="Search Over Time Report">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="job_title"/>
+                <field name="place_of_assignment"/>
+
+                <filter string="Employee Name"
+                        name="group_by_employee_name"
+                        context="{'group_by':'employee_name'}"/>
+
+                <filter string="Job Title"
+                        name="group_by_job_title"
+                        context="{'group_by':'job_title'}"/>
+
+                <filter string="Place of Assignment"
+                        name="group_by_place_of_assignment"
+                        context="{'group_by':'place_of_assignment'}"/>
+            </search>
+        </field>
+    </record>
+
+
+    <!-- ACTION -->
+    <record id="action_overtime_report" model="ir.actions.act_window">
+        <field name="name">Over Time Report</field>
+        <field name="res_model">overtime.report</field>
+        <field name="view_mode">list,search</field>
+        <field name="search_view_id" ref="view_overtime_report_search"/>
+    </record>
+
+</odoo>

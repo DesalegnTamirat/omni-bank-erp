@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View -->
+    <record id="employee_attendance_details_tree" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.tree</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <list string="Employee Attendance Details" editable="bottom" create="1" delete="1">
+
+                <field name="employee_id" invisible="1"/>
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+
+                <field name="place_of_assignment"/>
+                <field name="work_unit"/>
+                <field name="job_title"/>
+
+                <field name="working_hours"/>
+		<field name="worked_hours"/>
+		<field name="attendance_percentage"/>
+		<field name="leave_hours"/>
+		<field name="absent_hours"/>
+			
+                <field name="late_time_hour"/>
+                <field name="early_exit_hour"/>
+                <field name="over_time_hour"/>
+
+                <field name="pre_defined"/>
+                <field name="acknowledged_lateness"/>
+                <!--field name="technical_issue"/-->
+                <field name="pre_approved_early_checkout"/>
+                <field name="acknowledged_early_checkout"/>
+                <field name="force_checkout"/>
+
+            </list>
+        </field>
+    </record>
+    <!-- Search View -->
+    <record id="employee_attendance_details_search" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.search</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <search string="Search Attendance Details">
+
+                <!-- Quick search -->
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="place_of_assignment"/>
+                <!-- Group By -->
+                <separator/>
+                <filter string="Place of Assignment"
+                        name="group_by_place_of_assignment"
+                        context="{'group_by':'place_of_assignment'}"/>
+                <filter string="Job Position"
+                        name="job_title"
+                        context="{'group_by':'job_title'}"/>
+            
+
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="generated_employee_attendance_details_action" model="ir.actions.act_window">
+        <field name="name">Employee Attendance Details</field>
+        <field name="res_model">generate.employee.attendance.details</field>
+        <field name="view_mode">list,search</field>
+    </record>
+
+
+</odoo>

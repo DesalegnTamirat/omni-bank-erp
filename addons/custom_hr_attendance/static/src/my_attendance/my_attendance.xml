@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="custom_hr_attendance.MyAttendance">
+    <div class="o_bunna_my_attendance d-flex flex-column align-items-center justify-content-center h-100 w-100 py-5">
+        <t t-if="!state.loading">
+            <t t-if="state.hasEmployee">
+                <div class="o_bunna_my_attendance_card card text-center p-4 shadow-sm">
+                    <div class="o_bunna_my_attendance_avatar mx-auto mb-3">
+                        <img t-if="state.employeeAvatar"
+                             t-att-src="state.employeeAvatar"
+                             class="rounded-circle o_bunna_my_attendance_avatar_img"
+                             alt="Employee photo"/>
+                        <i t-else="" class="fa fa-camera fa-3x text-muted"/>
+                    </div>
+                    <h3 class="mb-1" t-esc="state.employeeName"/>
+                    <h5 class="text-muted mb-4">
+                        <t t-if="state.checkedIn">Want to check out?</t>
+                        <t t-else="">Welcome!</t>
+                    </h5>
+                    <div t-if="state.checkedIn" class="text-muted mb-4">
+                        Today's work hours: <strong t-esc="state.hoursToday"/>
+                    </div>
+                    <button
+                        t-on-click="onClickToggle"
+                        t-att-disabled="state.inProgress"
+                        t-attf-class="btn btn-{{ state.checkedIn ? 'warning' : 'success' }} o_bunna_my_attendance_btn mx-auto">
+                        <i t-attf-class="fa fa-sign-{{ state.checkedIn ? 'out' : 'in' }} fa-2x"/>
+                    </button>
+                    <div class="text-muted mt-3 small">
+                        <t t-if="state.checkedIn">Click to check out</t>
+                        <t t-else="">Click to check in</t>
+                    </div>
+                </div>
+            </t>
+            <t t-else="">
+                <div class="alert alert-warning text-center" role="alert">
+                    No employee is linked to your user account. Please contact your
+                    administrator to set up your attendance.
+                </div>
+            </t>
+        </t>
+    </div>
+</t>
+
+</templates>

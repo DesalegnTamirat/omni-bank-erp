@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Scheduled Action for Off-Peak Automatic Force Checkout -->
+        <record id="ir_cron_automatic_force_checkout" model="ir.cron">
+            <field name="name">Attendance: Off-Peak Automatic Force Checkout</field>
+            <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_automatic_force_checkout()</field>
+            <field name="interval_number">4</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Scheduled Action for Daily Automatic Absence Detection -->
+        <record id="ir_cron_automatic_absence_detection" model="ir.cron">
+            <field name="name">Attendance: Daily Automatic Absence Detection</field>
+            <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_automatic_absence_detection()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

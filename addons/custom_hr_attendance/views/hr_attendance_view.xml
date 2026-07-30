@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!--    HR ATTENDANCE FORM VIEW -->
+    <record id="hr_attendance_view_inherit_form" model="ir.ui.view">
+        <field name="name">hr.attendance.form.inherit</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
+        <field name="priority">500</field>
+        <field name="arch" type="xml">
+            <!-- Attendance Reason -->
+            <sheet position="inside">
+                <group name="reason">
+                    <group>
+                        <field name="attendance_reason_ids" widget="many2many_tags"/>
+                        <field name="reason_type" readonly="1"/>
+                    </group>
+                </group>
+            </sheet>
+
+            <!-- Check-in related fields -->
+            <xpath expr="//field[@name='check_in']" position="after">
+                <field name="check_in_status" readonly="1"/>
+		        <field name="late_time_hour" readonly="1"/>
+		        <field name="acknowledged_late" readonly="1"/>
+                <field name="over_time_hour" readonly="1"/>
+            </xpath>
+
+            <!-- Lunch Break fields (shown between check_in and check_out group) -->
+            <xpath expr="//field[@name='check_out']" position="before">
+                <field name="lunch_out" readonly="1"/>
+                <field name="lunch_in" readonly="1"/>
+                <field name="lunch_break_hours" readonly="1"/>
+            </xpath>
+
+            <!-- Check-out related fields -->
+            <xpath expr="//field[@name='check_out']" position="after">
+                <field name="check_out_status" readonly="1"/>
+                <field name="is_force_checkout" readonly="1"/>
+		        <field name="early_exit_hour" readonly="1"/>
+		        <field name="acknowledged_exit" readonly="1"/>
+                <field name="active" readonly="1"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!--     HR ATTENDANCE TREE VIEW-->
+    <record id="hr_attendance_view_inherit_tree" model="ir.ui.view">
+        <field name="name">hr.attendance.tree.inherit</field>
+        <field name="model">hr.attendance</field>
+        <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
+        <field name="priority">500</field>
+        <field name="arch" type="xml">
+            <!-- Reason fields -->
+            <xpath expr="//field[@name='worked_hours']" position="after">
+                <field name="attendance_reason_ids" widget="many2many_tags" required="1"/>
+                <field name="reason_type" readonly="1"/>
+            </xpath>
+
+            <!-- Check-in related fields -->
+            <xpath expr="//field[@name='check_in']" position="after">
+                <field name="check_in_status" readonly="1"/>
+		        <field name="late_time_hour" readonly="1"/>
+		        <field name="acknowledged_late" readonly="1"/>
+                <field name="over_time_hour" readonly="1"/>
+            </xpath>
+
+            <!-- Lunch break columns in list -->
+            <xpath expr="//field[@name='check_out']" position="before">
+                <field name="lunch_out" readonly="1" optional="show"/>
+                <field name="lunch_in" readonly="1" optional="show"/>
+                <field name="lunch_break_hours" readonly="1" optional="show"/>
+            </xpath>
+
+            <!-- Check-out related fields -->
+            <xpath expr="//field[@name='check_out']" position="after">
+                <field name="check_out_status" readonly="1"/>
+		        <field name="early_exit_hour" readonly="1"/>
+		        <field name="acknowledged_exit" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

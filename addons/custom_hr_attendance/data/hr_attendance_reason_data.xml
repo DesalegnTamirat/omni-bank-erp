@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo noupdate="1">
+    <record id="reason_technical_difficulties" model="hr.attendance.reason">
+        <field name="name">Technical Difficulties</field>
+        <field name="code">Technical</field>
+    </record>
+    <record id="reason_bereavement" model="hr.attendance.reason">
+        <field name="name">Due to bereavement</field>
+        <field name="code">BEREAVEMENT</field>
+    </record>
+
+    <record id="reason_illness" model="hr.attendance.reason">
+        <field name="name">Due to illness or sickness</field>
+        <field name="code">ILLNESS</field>
+    </record>
+
+    <record id="reason_accident" model="hr.attendance.reason">
+        <field name="name">Due to an accident</field>
+        <field name="code">ACCIDENT</field>
+    </record>
+
+    <record id="reason_family_emergency" model="hr.attendance.reason">
+        <field name="name">Due to a family emergency or other family-related reasons</field>
+        <field name="code">FAMILY</field>
+    </record>
+
+    <record id="reason_community_death" model="hr.attendance.reason">
+        <field name="name">Due to the death of a close community member</field>
+        <field name="code">COMMUNITY</field>
+    </record>
+
+    <record id="reason_marketing" model="hr.attendance.reason">
+        <field name="name">Due to official marketing duties/assignments</field>
+        <field name="code">MARKETING</field>
+    </record>
+
+    <record id="reason_company_event" model="hr.attendance.reason">
+        <field name="name">Due to participation in company-approved events or activities</field>
+        <field name="code">EVENT</field>
+    </record>
+
+</odoo>

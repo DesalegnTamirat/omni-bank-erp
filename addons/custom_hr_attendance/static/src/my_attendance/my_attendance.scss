@@ -1,0 +1,24 @@
+.o_bunna_my_attendance {
+    min-height: 100%;
+
+    .o_bunna_my_attendance_card {
+        width: 100%;
+        max-width: 420px;
+        border-radius: 0.75rem;
+    }
+
+    .o_bunna_my_attendance_avatar_img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+    }
+
+    .o_bunna_my_attendance_btn {
+        width: 96px;
+        height: 96px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}

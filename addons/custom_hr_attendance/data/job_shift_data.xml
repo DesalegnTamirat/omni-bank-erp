@@ -1,0 +1,37 @@
+<odoo>
+    <record id="shift_morning_1" model="job.shift">
+        <field name="name">Morning Shift 1</field>
+        <field name="code">M1</field>
+        <field name="start_time">7.0</field>
+        <field name="end_time">14.0</field>
+    </record>
+
+    <record id="shift_morning_2" model="job.shift">
+        <field name="name">Morning Shift 2</field>
+        <field name="code">M2</field>
+        <field name="start_time">8.0</field>
+        <field name="end_time">15.0</field>
+    </record>
+
+    <record id="shift_afternoon" model="job.shift">
+        <field name="name">Afternoon Shift</field>
+        <field name="code">A1</field>
+        <field name="start_time">10.0</field>
+        <field name="end_time">18.0</field>
+    </record>
+
+    <record id="shift_evening" model="job.shift">
+        <field name="name">Evening Shift</field>
+        <field name="code">E1</field>
+        <field name="start_time">15.0</field>
+        <field name="end_time">23.0</field>
+    </record>
+
+    <record id="shift_night" model="job.shift">
+        <field name="name">Night Shift</field>
+        <field name="code">N1</field>
+        <field name="start_time">23.0</field>
+        <field name="end_time">7.0</field>
+        <field name="is_night_shift">True</field>
+    </record>
+</odoo>

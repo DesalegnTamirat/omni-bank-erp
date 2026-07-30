@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <!--        Tree View-->
+    <record id="view_attendance_preapproval_tree" model="ir.ui.view">
+        <field name="name">attendance.preapproval.report.tree</field>
+        <field name="model">attendance.preapproval.report</field>
+        <field name="arch" type="xml">
+            <list string="Predefined Attendance Report">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+		<field name="place_of_assignment"/>
+		<field name="work_unit"/>	
+                <!--<field name="manager_name"/>-->
+                <field name="exception_type"/>
+                <field name="approval_reason"/>
+                <field name="date"/>
+                <field name="start_time"/>
+                <field name="end_time"/>
+                <field name="status"/>
+                <field name="approved_by"/>
+            </list>
+        </field>
+    </record>
+
+    <!--Search View-->
+    <record id="view_attendance_preapproval_search" model="ir.ui.view">
+        <field name="name">attendance.preapproval.report.search</field>
+        <field name="model">attendance.preapproval.report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="place_of_assignment"/>
+                <field name="exception_type"/>
+
+                <separator/>
+                <filter string="Employee Name"
+                        name="group_by_employee_name"
+                        context="{'group_by':'employee_name'}"/>
+                <filter string="Place of Assignment"
+                        name="group_by_place_of_assignment"
+                        context="{'group_by':'place_of_assignment'}"/>
+                <filter string="Exception Type"
+                        name="group_by_exception_type"
+                        context="{'group_by':'exception_type'}"/>
+                <filter string="Date"
+                        name="group_by_date"
+                        context="{'group_by':'date'}"/>
+            
+            </search>
+        </field>
+    </record>
+
+    <!--    Action-->
+    <record id="action_attendance_preapproval_report" model="ir.actions.act_window">
+        <field name="name">PreDefined Attendance Report</field>
+        <field name="res_model">attendance.preapproval.report</field>
+        <field name="view_mode">list,search</field>
+    </record>
+
+
+</odoo>

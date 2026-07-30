@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ============================================================
+         Manager Daily Attendance Wizard
+         A simple date-range picker that opens LIVE hr.attendance
+         records filtered to the manager's own subordinate employees.
+         Different from: generate.detail.employee.attendance.report
+         which writes to the generate_employee_attendance_details table
+         for bank-level summary reporting.
+         ============================================================ -->
+    <record id="manager_daily_attendance_wizard_form" model="ir.ui.view">
+        <field name="name">manager.daily.attendance.wizard.form</field>
+        <field name="model">manager.daily.attendance.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Daily Attendance Report">
+                <group>
+                    <group string="Date Range">
+                        <field name="date_from" string="From"/>
+                        <field name="date_to" string="To"/>
+                    </group>
+                    <group string="Employees">
+                        <field name="include_all"
+                               string="All My Employees"/>
+                        <field name="employee_ids"
+                               widget="many2many_tags"
+                               string="Select Employees"
+                               invisible="include_all"/>
+                    </group>
+                </group>
+
+                <footer>
+                    <button name="action_view_attendance"
+                            string="View Attendance"
+                            type="object"
+                            class="btn btn-primary"/>
+                    <button string="Cancel"
+                            class="btn btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_manager_daily_attendance_wizard" model="ir.actions.act_window">
+        <field name="name">Daily Attendance Report</field>
+        <field name="res_model">manager.daily.attendance.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="manager_daily_attendance_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

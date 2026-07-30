@@ -1,0 +1,13 @@
+<odoo>
+    <record id="view_overtime_leave_request_form_inherit" model="ir.ui.view">
+        <field name="name">leave.request.form.inherit.over.time.leave</field>
+        <field name="model">leave.request</field>
+        <field name="inherit_id" ref="cortex_hr_addons.leave_request_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='accrued']" position="after">
+		    <field name="over_time" readonly="1"  invisible="leave_reason != 'over_time'"/>
+            </xpath>
+
+        </field>
+    </record>
+</odoo>
