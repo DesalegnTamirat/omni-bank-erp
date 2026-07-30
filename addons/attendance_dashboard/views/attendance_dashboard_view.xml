@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Client Action -->
+    <record id="attendance_dashboard_action" model="ir.actions.client">
+        <field name="name">Attendance Dashboard</field>
+        <field name="tag">attendance_dashboard.dashboard_action</field>
+    </record>
+
+    <!-- custom_hr_attendance already ships an "Attendance Dashboard" menu
+         item (menu_bunna_attendance_dashboard) that was left pointing at
+         the plain hr_attendance.hr_attendance_action as a placeholder.
+         Re-point it at the real dashboard here instead of declaring a
+         second menu item, so the top-menu layout is unaffected. -->
+    <record id="custom_hr_attendance.menu_bunna_attendance_dashboard" model="ir.ui.menu">
+        <field name="action" ref="attendance_dashboard_action"/>
+    </record>
+
+</odoo>

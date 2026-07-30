@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="attendance_dashboard.AttendanceDashboard">
+    <div class="o_attendance_dashboard">
+
+        <div class="o_ad_header">
+            <h1>Attendance Dashboard</h1>
+            <h4 class="o_ad_date" t-esc="state.today"/>
+        </div>
+
+        <div class="o_ad_filter">
+            <select class="o_ad_filter_select" t-on-change="onFilterChange">
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this_week">This Week</option>
+                <option value="this_month">This Month</option>
+                <option value="this_year">This Year</option>
+            </select>
+        </div>
+
+        <!-- KPI -->
+        <div class="o_ad_kpi">
+            <div class="o_ad_kpi_card">
+                Total Employees
+                <span class="o_ad_kpi_value o_ad_kpi_total" t-esc="state.kpi.total"/>
+            </div>
+            <div class="o_ad_kpi_card">
+                Present
+                <span class="o_ad_kpi_value o_ad_kpi_present" t-esc="state.kpi.present"/>
+            </div>
+            <div class="o_ad_kpi_card">
+                Late
+                <span class="o_ad_kpi_value o_ad_kpi_late" t-esc="state.kpi.late"/>
+            </div>
+            <div class="o_ad_kpi_card">
+                On Leave
+                <span class="o_ad_kpi_value o_ad_kpi_leave" t-esc="state.kpi.leave"/>
+            </div>
+            <div class="o_ad_kpi_card">
+                Absent
+                <span class="o_ad_kpi_value o_ad_kpi_absent" t-esc="state.kpi.absent"/>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="o_ad_charts">
+            <div class="o_ad_chart_box">
+                <h3>Status Distribution</h3>
+                <div class="o_ad_canvas_wrap">
+                    <canvas t-ref="pieChart"/>
+                </div>
+            </div>
+
+            <div class="o_ad_chart_box">
+                <h3>Attendance Progress</h3>
+                <div class="o_ad_canvas_wrap">
+                    <canvas t-ref="lineChart"/>
+                </div>
+            </div>
+
+            <div class="o_ad_chart_box o_ad_full_width">
+                <h3>Attendance by Operating Unit</h3>
+                <div class="o_ad_canvas_wrap">
+                    <canvas t-ref="barChart"/>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</t>
+
+</templates>
