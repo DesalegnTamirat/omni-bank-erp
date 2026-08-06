@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Annual L&amp;D Plan (FREDS020-026) ══════════════ -->
+
+        <record id="view_eds_annual_plan_list" model="ir.ui.view">
+            <field name="name">eds.annual.plan.list</field>
+            <field name="model">eds.annual.plan</field>
+            <field name="arch" type="xml">
+                <list string="Annual L&amp;D Plans">
+                    <field name="name"/>
+                    <field name="fiscal_year"/>
+                    <field name="line_count" string="Programs"/>
+                    <field name="delivered_count" string="Delivered"/>
+                    <field name="execution_rate" widget="progressbar"/>
+                    <field name="budget_total" sum="Budget"/>
+                    <field name="calendar_generation_date"/>
+                    <field name="sla_breached" decoration-danger="sla_breached"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_annual_plan_search" model="ir.ui.view">
+            <field name="name">eds.annual.plan.search</field>
+            <field name="model">eds.annual.plan</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="fiscal_year"/>
+                    <filter string="Draft" name="draft" domain="[('state','=','draft')]"/>
+                    <filter string="Published" name="published" domain="[('state','=','published')]"/>
+                    <filter string="SLA Breached" name="sla" domain="[('sla_breached','=',True)]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Fiscal Year" name="g_year" context="{'group_by':'fiscal_year'}"/>
+                        <filter string="Status" name="g_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_annual_plan_form" model="ir.ui.view">
+            <field name="name">eds.annual.plan.form</field>
+            <field name="model">eds.annual.plan</field>
+            <field name="arch" type="xml">
+                <form string="Annual L&amp;D Plan">
+                    <header>
+                        <button name="action_generate_calendar" string="Generate Calendar"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                confirm="Generate the draft calendar from the approved TNA and curricula? (FREDS020)"/>
+                        <button name="action_submit_director" string="Submit to Director PPDD"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_director_approve" string="Director PPDD Approve"
+                                type="object" invisible="state != 'director_review'"/>
+                        <button name="action_cpco_approve" string="CPCO Endorse"
+                                type="object" invisible="state != 'cpco_endorsement'"/>
+                        <button name="action_publish" string="SMC Approve &amp; Publish"
+                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"/>
+                        <button name="action_amend" string="Amend Plan" type="object"
+                                invisible="state != 'published'"/>
+                        <button name="action_re_publish" string="Re-Publish" type="object"
+                                class="oe_highlight" invisible="state != 'amended'"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box">
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_sessions" icon="fa-calendar-check-o">
+                                <div class="o_stat_info">
+                                    <field name="line_count" widget="statinfo" string="Programs"/>
+                                    <span class="o_stat_text">Sessions of this plan</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_sessions" icon="fa-bar-chart">
+                                <div class="o_stat_info">
+                                    <field name="execution_rate" widget="statinfo" string="Execution"/>
+                                    <span class="o_stat_text">Delivered <field name="delivered_count"/> of <field name="line_count"/></span>
+                                </div>
+                            </button>
+                            <div class="o_stat_info">
+                                <field name="budget_total" widget="statinfo" string="Budget"/>
+                                <span class="o_stat_text">Allocated across lines</span>
+                            </div>
+                            <div class="o_stat_info">
+                                <field name="amendment_count" widget="statinfo" string="Amendments"/>
+                                <span class="o_stat_text">Unscheduled addenda (FREDS026)</span>
+                            </div>
+                        </div>
+                        <group>
+                            <group string="Plan">
+                                <field name="name" readonly="1"/>
+                                <field name="fiscal_year"/>
+                                <field name="calendar_generation_date" readonly="1"/>
+                                <field name="calendar_sla_deadline" readonly="1"/>
+                                <field name="sla_breached"/>
+                            </group>
+                            <group string="Approval (FREDS024)">
+                                <field name="reviewer_id" readonly="state not in ('director_review','cpco_endorsement','smc_approval','published','amended')"/>
+                                <field name="endorser_id" readonly="state not in ('cpco_endorsement','smc_approval','published','amended')"/>
+                                <field name="approver_id" readonly="state not in ('smc_approval','published','amended')"/>
+                                <field name="approved_by_id" readonly="1"/>
+                                <field name="approval_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Plan Lines (Programs)" name="lines">
+                                <field name="line_ids" readonly="state in ('director_review','cpco_endorsement','smc_approval','published')">
+                                    <list editable="bottom">
+                                        <field name="course_id" options="{'no_create': True}"/>
+                                        <field name="program_name"/>
+                                        <field name="scheduled_month"/>
+                                        <field name="delivery_method"/>
+                                        <field name="target_employee_segment"/>
+                                        <field name="budget_allocated" sum="Budget"/>
+                                        <field name="session_count"/>
+                                        <field name="planned_vs_actual" widget="progressbar"/>
+                                        <field name="status" widget="badge"/>
+                                        <field name="is_addendum"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Amendments (Unscheduled Requests)" name="amendments">
+                                <field name="amendment_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="program_name"/>
+                                        <field name="reason"/>
+                                        <field name="justification"/>
+                                        <field name="estimated_cost"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Approval History" name="history">
+                                <field name="approval_history_ids" readonly="1">
+                                    <list>
+                                        <field name="timestamp"/>
+                                        <field name="state_from"/>
+                                        <field name="state_to"/>
+                                        <field name="user_id"/>
+                                        <field name="comment"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                        <group string="Notes">
+                            <field name="notes"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_annual_plan" model="ir.actions.act_window">
+            <field name="name">Annual L&amp;D Plan &amp; Calendar</field>
+            <field name="res_model">eds.annual.plan</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_annual_plan_search"/>
+        </record>
+
+    </data>
+</odoo>

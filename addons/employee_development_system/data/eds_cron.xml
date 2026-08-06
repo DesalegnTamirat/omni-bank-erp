@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- FREDS009: daily TNA approval-deadline reminder / escalation -->
+        <record id="cron_eds_tna_deadline_reminder" model="ir.cron">
+            <field name="name">EDS: TNA Approval Deadline Reminder</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_tna_deadline_reminder()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=0, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- FREDS014: daily course-development-request SLA breach check -->
+        <record id="cron_eds_course_sla_check" model="ir.cron">
+            <field name="name">EDS: Course Development Request SLA Check</field>
+            <field name="model_id" ref="employee_development_system.model_eds_course_development_request"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_course_sla_check()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=30, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- FR-EDS-028: hourly FIFO promotion of waitlisted enrollments -->
+        <record id="cron_eds_waitlist_promote" model="ir.cron">
+            <field name="name">EDS: Waitlist Promotion</field>
+            <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_waitlist_promote()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(hours=1)).replace(minute=5, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

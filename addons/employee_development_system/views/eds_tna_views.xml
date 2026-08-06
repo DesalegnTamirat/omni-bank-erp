@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ TNA Cycle ══════════════ -->
+
+        <record id="view_eds_tna_cycle_list" model="ir.ui.view">
+            <field name="name">eds.tna.cycle.list</field>
+            <field name="model">eds.tna.cycle</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="year"/>
+                    <field name="start_date"/>
+                    <field name="submission_end_date"/>
+                    <field name="approval_deadline"/>
+                    <field name="entry_count"/>
+                    <field name="days_until_deadline" decoration-danger="days_until_deadline &gt;= 0 and days_until_deadline &lt;= 7"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_cycle_form" model="ir.ui.view">
+            <field name="name">eds.tna.cycle.form</field>
+            <field name="model">eds.tna.cycle</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_start_collection" string="Start Collection"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_finish_collection" string="Finish Collection"
+                                type="object" class="oe_highlight" invisible="state != 'collecting'"/>
+                        <button name="action_submit_for_approval" string="Submit for Approval"
+                                type="object" class="oe_highlight" invisible="state != 'consolidating'"/>
+                        <button name="%(employee_development_system.action_eds_tna_consolidation_wizard)d"
+                                string="Consolidate Needs" type="action" class="oe_highlight"
+                                invisible="state not in ('collecting','consolidating','under_approval')"/>
+                        <button name="action_approve" string="Approve TNA"
+                                type="object" class="oe_highlight" invisible="state != 'under_approval'"/>
+                        <button name="action_lock" string="Lock Approved TNA"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_unlock" string="Unlock (Change Request)"
+                                type="object" invisible="state != 'locked'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,collecting,consolidating,under_approval,approved,locked"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" colspan="2">
+                            <button name="%(employee_development_system.action_eds_tna_consolidation)d"
+                                    type="action" class="oe_stat_button" icon="fa-archive"
+                                    groups="employee_development_system.group_eds_officer">
+                                <field name="consolidation_count" widget="statinfo" string="Consolidations"/>
+                            </button>
+                        </div>
+                        <group>
+                            <group string="Cycle">
+                                <field name="name" readonly="1"/>
+                                <field name="year"/>
+                                <field name="start_date"/>
+                                <field name="submission_end_date"/>
+                            </group>
+                            <group string="Deadlines &amp; Status">
+                                <field name="approval_deadline"/>
+                                <field name="days_until_deadline"/>
+                                <field name="entry_count"/>
+                                <field name="approved_by_id"/>
+                                <field name="approval_date"/>
+                                <field name="responsible_team_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Training Needs">
+                                <field name="entry_ids">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="work_unit_id"/>
+                                        <field name="competency_id"/>
+                                        <field name="delivery_mode"/>
+                                        <field name="priority_score"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Methodology &amp; Notes">
+                                <field name="methodology" placeholder="Describe the TNA methodology and responsible team..."/>
+                                <field name="notes"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_cycle_search" model="ir.ui.view">
+            <field name="name">eds.tna.cycle.search</field>
+            <field name="model">eds.tna.cycle</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="year"/>
+                    <filter string="Open for Collection" name="open_collection" domain="[('state','=','collecting')]"/>
+                    <filter string="Approved / Locked" name="approved_locked" domain="[('state','in',('approved','locked'))]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_tna_cycle" model="ir.actions.act_window">
+            <field name="name">TNA Cycles</field>
+            <field name="res_model">eds.tna.cycle</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_tna_cycle_search"/>
+        </record>
+
+        <!-- ══════════════ TNA Entry ══════════════ -->
+
+        <record id="view_eds_tna_entry_list" model="ir.ui.view">
+            <field name="name">eds.tna.entry.list</field>
+            <field name="model">eds.tna.entry</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="cycle_id"/>
+                    <field name="employee_id"/>
+                    <field name="work_unit_id"/>
+                    <field name="competency_id"/>
+                    <field name="gap_severity" widget="badge"/>
+                    <field name="delivery_mode" widget="badge"/>
+                    <field name="source"/>
+                    <field name="priority_score"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_entry_form" model="ir.ui.view">
+            <field name="name">eds.tna.entry.form</field>
+            <field name="model">eds.tna.entry</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit" string="Submit"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_validate" string="Validate"
+                                type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"/>
+                        <button name="action_exclude" string="Exclude (Duplicate / Invalid)"
+                                type="object" invisible="state not in ('submitted','validated')"/>
+                        <button name="action_reopen_draft" string="Reopen as Draft"
+                                type="object" invisible="state not in ('submitted','excluded')"/>
+                        <button name="action_create_development_request" string="Create Development Request"
+                                type="object" class="oe_highlight"
+                                invisible="state not in ('approved','converted')"
+                                groups="employee_development_system.group_eds_officer"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,validated,approved,converted,excluded"/>
+                    </header>
+                    <div class="alert alert-warning" role="alert" invisible="state == 'draft'">
+                        <i class="fa fa-arrow-right"/> Consolidated by <b>Priority Scoring</b> (FREDS006):
+                        scores below are weighted by the active priority rules.
+                    </div>
+                    <sheet>
+                        <group>
+                            <group string="Training Need">
+                                <field name="name" readonly="1"/>
+                                <field name="cycle_id" readonly="state != 'draft'"/>
+                                <field name="employee_id"/>
+                                <field name="work_unit_id"/>
+                                <field name="department_id"/>
+                                <field name="job_position_id"/>
+                            </group>
+                            <group string="Classification">
+                                <field name="competency_id"/>
+                                <field name="gap_severity"/>
+                                <field name="source"/>
+                                <field name="delivery_mode"/>
+                                <field name="priority_score" readonly="1"/>
+                                <field name="consolidation_id" readonly="1"
+                                       groups="employee_development_system.group_eds_officer"/>
+                                <field name="is_duplicate" readonly="1"/>
+                                <field name="duplicate_of_id" readonly="1" invisible="not is_duplicate"/>
+                                <field name="exclusion_type" invisible="state == 'draft'"/>
+                            </group>
+                        </group>
+                        <group string="Program Proposal">
+                            <field name="proposed_program"/>
+                            <field name="estimated_cost"/>
+                        </group>
+                        <group string="Justification">
+                            <field name="justification" placeholder="Why is this training needed? Link to competency gap, audit finding, regulation, strategy..."/>
+                            <field name="excluded_reason" invisible="state != 'excluded'"/>
+                            <field name="converted_course_ref" invisible="state != 'converted'"/>
+                        </group>
+                        <group string="Priority Scoring (FREDS006)"
+                               invisible="state in ('draft','excluded')">
+                            <group>
+                                <field name="score_strategic_alignment"/>
+                                <field name="score_tom_impact"/>
+                                <field name="score_gap_severity"/>
+                            </group>
+                            <group>
+                                <field name="score_risk_level"/>
+                                <field name="score_regulatory"/>
+                                <field name="score_future_capability"/>
+                            </group>
+                        </group>
+                        <group string="Audit" invisible="state == 'draft'">
+                            <field name="submitted_by"/>
+                            <field name="validated_by"/>
+                            <field name="validation_date"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_entry_search" model="ir.ui.view">
+            <field name="name">eds.tna.entry.search</field>
+            <field name="model">eds.tna.entry</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="cycle_id"/>
+                    <field name="employee_id"/>
+                    <field name="work_unit_id"/>
+                    <field name="competency_id"/>
+                    <field name="delivery_mode"/>
+                    <filter string="Submitted by Me" name="submitted_by_me" domain="[('submitted_by','=',uid)]"/>
+                    <filter string="Pending Validation" name="pending_validation" domain="[('state','=','submitted')]"/>
+                    <filter string="Validated" name="validated" domain="[('state','=','validated')]"/>
+                    <filter string="Excluded" name="excluded" domain="[('state','=','excluded')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Work Unit" name="group_work_unit" context="{'group_by':'work_unit_id'}"/>
+                        <filter string="Delivery Mode" name="group_delivery" context="{'group_by':'delivery_mode'}"/>
+                        <filter string="Source" name="group_source" context="{'group_by':'source'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_tna_entry" model="ir.actions.act_window">
+            <field name="name">Training Needs (TNA)</field>
+            <field name="res_model">eds.tna.entry</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
+        </record>
+
+        <!-- Action: My Team's Needs (Line Manager) -->
+        <record id="action_eds_tna_entry_team" model="ir.actions.act_window">
+            <field name="name">My Team's Training Needs</field>
+            <field name="res_model">eds.tna.entry</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
+            <field name="context">{'search_default_group_work_unit': 1}</field>
+        </record>
+
+        <!-- Action: My Submissions (Employee) -->
+        <record id="action_eds_tna_entry_own" model="ir.actions.act_window">
+            <field name="name">My Training Needs Submissions</field>
+            <field name="res_model">eds.tna.entry</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_tna_entry_search"/>
+            <field name="context">{'search_default_submitted_by_me': 1}</field>
+        </record>
+
+    </data>
+</odoo>

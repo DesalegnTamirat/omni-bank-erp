@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Course Catalog ══════════════ -->
+
+        <record id="view_eds_course_list" model="ir.ui.view">
+            <field name="name">eds.course.list</field>
+            <field name="model">eds.course</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="category" widget="badge"/>
+                    <field name="delivery_method"/>
+                    <field name="duration_days"/>
+                    <field name="version"/>
+                    <field name="current_curriculum_id"/>
+                    <field name="status" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_course_search" model="ir.ui.view">
+            <field name="name">eds.course.search</field>
+            <field name="model">eds.course</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="competency_line_ids"/>
+                    <filter string="Active" name="active_only" domain="[('status','=','active')]"/>
+                    <filter string="Draft" name="draft_only" domain="[('status','=','draft')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Category" name="group_category" context="{'group_by':'category'}"/>
+                        <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
+                        <filter string="Delivery Method" name="group_delivery" context="{'group_by':'delivery_method'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_course" model="ir.actions.act_window">
+            <field name="name">Course Catalog</field>
+            <field name="res_model">eds.course</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_course_search"/>
+        </record>
+
+        <record id="view_eds_course_development_request_search" model="ir.ui.view">
+            <field name="name">eds.course.development.request.search</field>
+            <field name="model">eds.course.development.request</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="assigned_officer_id"/>
+                    <field name="tna_entry_ids"/>
+                    <filter string="SLA Breached" name="breached" domain="[('sla_breached','=',True)]"/>
+                    <filter string="In Progress" name="in_progress"
+                            domain="[('state','in',('draft','in_development','submitted'))]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Assigned Officer" name="group_officer" context="{'group_by':'assigned_officer_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Declared before the course form which references it via %(xmlid)d -->
+        <record id="action_eds_course_development_request" model="ir.actions.act_window">
+            <field name="name">Course Development Requests</field>
+            <field name="res_model">eds.course.development.request</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_course_development_request_search"/>
+        </record>
+
+        <record id="view_eds_course_form" model="ir.ui.view">
+            <field name="name">eds.course.form</field>
+            <field name="model">eds.course</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_mark_active" string="Activate Course"
+                                type="object" class="oe_highlight" invisible="status != 'draft'"/>
+                        <button name="action_suspend" string="Suspend"
+                                type="object" invisible="status not in ('draft','active')"/>
+                        <button name="action_retire" string="Retire"
+                                type="object" invisible="status not in ('draft','active','suspended')"/>
+                        <field name="status" widget="statusbar"
+                               statusbar_visible="draft,active,suspended,retired"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" colspan="2">
+                            <button name="%(employee_development_system.action_eds_curriculum)d"
+                                    type="action" class="oe_stat_button" icon="fa-book"
+                                    groups="employee_development_system.group_eds_officer">
+                                <field name="curriculum_count" widget="statinfo" string="Curriculums"/>
+                            </button>
+                            <button name="%(employee_development_system.action_eds_course_development_request)d"
+                                    type="action" class="oe_stat_button" icon="fa-gears"
+                                    groups="employee_development_system.group_eds_officer">
+                                <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
+                            </button>
+                        </div>
+                        <group>
+                            <group string="Course">
+                                <field name="code" readonly="1"/>
+                                <field name="name"/>
+                                <field name="category"/>
+                                <field name="delivery_method"/>
+                                <field name="duration_days"/>
+                                <field name="version" readonly="1"/>
+                            </group>
+                            <group string="Target &amp; Prerequisites">
+                                <field name="target_audience_ids" widget="many2many_tags"/>
+                                <field name="prerequisite_course_ids" widget="many2many_tags"/>
+                                <field name="current_curriculum_id" readonly="1"/>
+                                <field name="schedule"/>
+                            </group>
+                        </group>
+                        <group string="Sourcing Recommendation (FREDS027)">
+                            <field name="recommended_source"/>
+                            <field name="sourcing_justification"/>
+                            <field name="sourcing_state" readonly="1"/>
+                            <field name="sourcing_decision"
+                                   invisible="sourcing_state != 'director_review'"/>
+                            <field name="sourcing_decision_date" readonly="1"/>
+                            <field name="sourcing_decided_by_id" readonly="1"/>
+                            <button name="action_submit_sourcing" string="Submit for Director PPDD Review"
+                                    type="object" class="oe_highlight"
+                                    invisible="sourcing_state != 'draft'"/>
+                            <button name="action_record_sourcing_decision" string="Record Director Decision"
+                                    type="object" invisible="sourcing_state != 'director_review'"
+                                    groups="employee_development_system.group_eds_manager"/>
+                        </group>
+                        <group string="Description">
+                            <field name="description"/>
+                        </group>
+                        <notebook>
+                            <page string="Competency Mapping (FREDS012)">
+                                <field name="competency_line_ids">
+                                    <list editable="bottom">
+                                        <field name="competency_id"/>
+                                        <field name="required_level"/>
+                                        <field name="notes"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ══════════════ Course Development Request ══════════════ -->
+
+        <record id="view_eds_course_development_request_kanban" model="ir.ui.view">
+            <field name="name">eds.course.development.request.kanban</field>
+            <field name="model">eds.course.development.request</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile">
+                    <field name="name"/>
+                    <field name="state"/>
+                    <field name="sla_deadline"/>
+                    <field name="assigned_officer_id"/>
+                    <field name="competency_gap_ids"/>
+                    <t t-call="kanban-box">
+                        <div class="o_kanban_record_top mb16">
+                            <div class="o_kanban_record_title">
+                                <strong t-esc="record.name.raw_value"/>
+                            </div>
+                            <span t-if="record.state.raw_value == 'done'"
+                                  class="o_kanban_record_badge badge text-bg-success">Done</span>
+                            <span t-elif="record.state.raw_value == 'approved'"
+                                  class="o_kanban_record_badge badge text-bg-info">Approved</span>
+                            <span t-elif="record.state.raw_value == 'submitted'"
+                                  class="o_kanban_record_badge badge text-bg-warning">Submitted</span>
+                            <span t-elif="record.state.raw_value == 'in_development'"
+                                  class="o_kanban_record_badge badge text-bg-primary">In Development</span>
+                            <span t-else="" class="o_kanban_record_badge badge text-bg-secondary">Draft</span>
+                        </div>
+                        <div class="mb8">
+                            <t t-foreach="record.competency_gap_ids.raw_value" t-as="gap">
+                                <span class="badge text-bg-light" t-esc="gap.display_name"/>
+                            </t>
+                        </div>
+                        <div class="text-muted">
+                            SLA Deadline: <span t-esc="record.sla_deadline.value or 'N/A'"/>
+                            <t t-if="record.sla_breached.raw_value">
+                                <span class="badge text-bg-danger">SLA Breached</span>
+                            </t>
+                        </div>
+                        <div class="text-muted">Assigned: <t t-esc="record.assigned_officer_id.value"/></div>
+                    </t>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="view_eds_course_development_request_list" model="ir.ui.view">
+            <field name="name">eds.course.development.request.list</field>
+            <field name="model">eds.course.development.request</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="assigned_officer_id"/>
+                    <field name="tna_entry_ids" widget="many2many_tags"/>
+                    <field name="sla_deadline"/>
+                    <field name="sla_breached" decoration-danger="sla_breached"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_course_development_request_form" model="ir.ui.view">
+            <field name="name">eds.course.development.request.form</field>
+            <field name="model">eds.course.development.request</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_start_development" string="Start Development"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_submit" string="Submit for Approval"
+                                type="object" class="oe_highlight" invisible="state != 'in_development'"/>
+                        <button name="action_approve" string="Approve"
+                                type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="action_convert_to_course" string="Convert to Course"
+                                type="object" class="oe_highlight"
+                                invisible="state not in ('approved','done')"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,in_development,submitted,approved,done"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Development Request">
+                                <field name="name" readonly="1"/>
+                                <field name="assigned_officer_id"/>
+                                <field name="course_id" readonly="1"/>
+                            </group>
+                            <group string="SLA (FREDS014)">
+                                <field name="sla_deadline" readonly="1"/>
+                                <field name="sla_breached"/>
+                            </group>
+                        </group>
+                        <group string="Source Training Needs">
+                            <field name="tna_entry_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Scope">
+                            <field name="competency_gap_ids" widget="many2many_tags"/>
+                            <field name="target_job_ids" widget="many2many_tags"/>
+                            <field name="required_proficiency"/>
+                        </group>
+                        <group string="Expected Learning Outcomes">
+                            <field name="expected_outcomes"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

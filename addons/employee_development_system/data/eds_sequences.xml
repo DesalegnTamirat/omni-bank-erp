@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Sequence for TNA Cycle -->
+        <record id="seq_eds_tna_cycle" model="ir.sequence">
+            <field name="name">TNA Cycle Sequence</field>
+            <field name="code">eds.tna.cycle</field>
+            <field name="prefix">TNA/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for TNA Entry -->
+        <record id="seq_eds_tna_entry" model="ir.sequence">
+            <field name="name">TNA Entry Sequence</field>
+            <field name="code">eds.tna.entry</field>
+            <field name="prefix">TNE/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for TNA Consolidation -->
+        <record id="seq_eds_tna_consolidation" model="ir.sequence">
+            <field name="name">TNA Consolidation Sequence</field>
+            <field name="code">eds.tna.consolidation</field>
+            <field name="prefix">CON/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 3: course catalog code -->
+        <record id="seq_eds_course" model="ir.sequence">
+            <field name="name">Course Code Sequence</field>
+            <field name="code">eds.course</field>
+            <field name="prefix">CRS/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 3: course development request reference -->
+        <record id="seq_eds_course_development_request" model="ir.sequence">
+            <field name="name">Course Development Request Sequence</field>
+            <field name="code">eds.course.development.request</field>
+            <field name="prefix">CDR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 3: curriculum reference -->
+        <record id="seq_eds_curriculum" model="ir.sequence">
+            <field name="name">Curriculum Sequence</field>
+            <field name="code">eds.curriculum</field>
+            <field name="prefix">CUR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: trainer register -->
+        <record id="seq_eds_trainer" model="ir.sequence">
+            <field name="name">Trainer Sequence</field>
+            <field name="code">eds.trainer</field>
+            <field name="prefix">TRN/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: external provider registry -->
+        <record id="seq_eds_external_provider" model="ir.sequence">
+            <field name="name">External Provider Sequence</field>
+            <field name="code">eds.external.provider</field>
+            <field name="prefix">PRV/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: venue requirement specification -->
+        <record id="seq_eds_venue_requirement" model="ir.sequence">
+            <field name="name">Venue Requirement Sequence</field>
+            <field name="code">eds.venue.requirement</field>
+            <field name="prefix">VRS/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: RFP -->
+        <record id="seq_eds_rfp" model="ir.sequence">
+            <field name="name">RFP Sequence</field>
+            <field name="code">eds.rfp</field>
+            <field name="prefix">RFP/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: vendor proposal (two-envelope registration) -->
+        <record id="seq_eds_vendor_proposal" model="ir.sequence">
+            <field name="name">Vendor Proposal Sequence</field>
+            <field name="code">eds.vendor.proposal</field>
+            <field name="prefix">PRO/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: vendor evaluation -->
+        <record id="seq_eds_vendor_evaluation" model="ir.sequence">
+            <field name="name">Vendor Evaluation Sequence</field>
+            <field name="code">eds.vendor.evaluation</field>
+            <field name="prefix">EVA/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 4: training contract -->
+        <record id="seq_eds_training_contract" model="ir.sequence">
+            <field name="name">Training Contract Sequence</field>
+            <field name="code">eds.training.contract</field>
+            <field name="prefix">CNT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 5: annual L&D plan -->
+        <record id="seq_eds_annual_plan" model="ir.sequence">
+            <field name="name">Annual L&amp;D Plan Sequence</field>
+            <field name="code">eds.annual.plan</field>
+            <field name="prefix">APL/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 5: training session -->
+        <record id="seq_eds_session" model="ir.sequence">
+            <field name="name">Session Sequence</field>
+            <field name="code">eds.session</field>
+            <field name="prefix">SES/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 5: training batch / cohort -->
+        <record id="seq_eds_batch" model="ir.sequence">
+            <field name="name">Batch Sequence</field>
+            <field name="code">eds.batch</field>
+            <field name="prefix">BAT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 5: venue booking -->
+        <record id="seq_eds_venue_booking" model="ir.sequence">
+            <field name="name">Venue Booking Sequence</field>
+            <field name="code">eds.venue.booking</field>
+            <field name="prefix">BKG/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 5: unscheduled training request -->
+        <record id="seq_eds_unscheduled_request" model="ir.sequence">
+            <field name="name">Unscheduled Training Request Sequence</field>
+            <field name="code">eds.unscheduled.request</field>
+            <field name="prefix">USR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 6: training nomination -->
+        <record id="seq_eds_nomination" model="ir.sequence">
+            <field name="name">Nomination Sequence</field>
+            <field name="code">eds.nomination</field>
+            <field name="prefix">NOM/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 6: enrollment -->
+        <record id="seq_eds_enrollment" model="ir.sequence">
+            <field name="name">Enrollment Sequence</field>
+            <field name="code">eds.enrollment</field>
+            <field name="prefix">ENR/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

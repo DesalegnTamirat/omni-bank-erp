@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Evaluation Criteria Templates (FREDS032/033) ══════════════ -->
+
+        <record id="view_eds_evaluation_criteria_list" model="ir.ui.view">
+            <field name="name">eds.evaluation.criteria.list</field>
+            <field name="model">eds.evaluation.criteria</field>
+            <field name="arch" type="xml">
+                <list string="Evaluation Criteria Templates">
+                    <field name="name"/>
+                    <field name="evaluation_type" widget="badge"/>
+                    <field name="weight"/>
+                    <field name="description"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_evaluation_criteria_form" model="ir.ui.view">
+            <field name="name">eds.evaluation.criteria.form</field>
+            <field name="model">eds.evaluation.criteria</field>
+            <field name="arch" type="xml">
+                <form string="Evaluation Criterion">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="evaluation_type"/>
+                                <field name="weight"/>
+                            </group>
+                            <group>
+                                <field name="description"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_evaluation_criteria" model="ir.actions.act_window">
+            <field name="name">Evaluation Criteria Templates</field>
+            <field name="res_model">eds.evaluation.criteria</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ Venue Requirement Specification (FREDS037) ══════════════ -->
+
+        <record id="view_eds_venue_requirement_list" model="ir.ui.view">
+            <field name="name">eds.venue.requirement.list</field>
+            <field name="model">eds.venue.requirement</field>
+            <field name="arch" type="xml">
+                <list string="Venue Requirement Specifications">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="capacity_required"/>
+                    <field name="location_preference"/>
+                    <field name="accommodation_required"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_requirement_form" model="ir.ui.view">
+            <field name="name">eds.venue.requirement.form</field>
+            <field name="model">eds.venue.requirement</field>
+            <field name="arch" type="xml">
+                <form string="Venue Requirement Specification">
+                    <header>
+                        <button name="action_submit" string="Submit for Approval" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_director_approve" string="Director PPDD Approve"
+                                type="object" class="oe_highlight" invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager"/>
+                        <button name="action_return_draft" string="Return to Draft" type="object"
+                                invisible="state != 'submitted'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,director_approved,rfp_initiated"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="VRS">
+                                <field name="name" readonly="1"/>
+                                <field name="course_id"/>
+                                <field name="capacity_required"/>
+                                <field name="location_preference"/>
+                            </group>
+                            <group string="Approval (FREDS037)">
+                                <field name="approved_by_id" readonly="1"/>
+                                <field name="approval_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Requirements">
+                            <field name="facilities_required"/>
+                            <field name="special_requirements"/>
+                            <field name="accommodation_required"/>
+                            <field name="catering_required"/>
+                        </group>
+                        <group string="VRS Document">
+                            <field name="vrs_document" filename="vrs_document_name"/>
+                            <field name="vrs_document_name" invisible="1"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_venue_requirement" model="ir.actions.act_window">
+            <field name="name">Venue Requirements</field>
+            <field name="res_model">eds.venue.requirement</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ Vendor Proposal (Two-Envelope, FREDS031) ══════════════ -->
+
+        <record id="view_eds_vendor_proposal_list" model="ir.ui.view">
+            <field name="name">eds.vendor.proposal.list</field>
+            <field name="model">eds.vendor.proposal</field>
+            <field name="arch" type="xml">
+                <list string="Vendor Proposals">
+                    <field name="name"/>
+                    <field name="rfp_id"/>
+                    <field name="provider_id"/>
+                    <field name="registration_date"/>
+                    <field name="technical_score"/>
+                    <field name="financial_score"/>
+                    <field name="combined_score"/>
+                    <field name="technical_threshold_met" decoration-danger="not technical_threshold_met"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_vendor_proposal_form" model="ir.ui.view">
+            <field name="name">eds.vendor.proposal.form</field>
+            <field name="model">eds.vendor.proposal</field>
+            <field name="arch" type="xml">
+                <form string="Vendor Proposal">
+                    <header>
+                        <button name="action_open_technical" string="Open Technical Envelope"
+                                type="object" class="oe_highlight" invisible="state != 'registered'"/>
+                        <button name="action_open_financial" string="Open Financial Envelope"
+                                type="object" class="oe_highlight" invisible="state != 'technical_opened'"/>
+                        <button name="action_mark_evaluated" string="Mark Evaluated" type="object"
+                                class="oe_highlight" invisible="state != 'financial_opened'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="registered,technical_opened,financial_opened,evaluated"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Registration (FREDS031)">
+                                <field name="name" readonly="1"/>
+                                <field name="rfp_id"/>
+                                <field name="provider_id"/>
+                                <field name="registration_date" readonly="1"/>
+                            </group>
+                            <group string="Envelopes">
+                                <field name="technical_envelope" filename="technical_envelope_name"/>
+                                <field name="technical_envelope_name" invisible="1"/>
+                                <field name="financial_envelope" filename="financial_envelope_name"
+                                       readonly="technical_threshold_met == False"/>
+                                <field name="financial_envelope_name" invisible="1"/>
+                            </group>
+                        </group>
+                        <group string="Evaluation Results (FREDS032/034)">
+                            <field name="technical_score_id"/>
+                            <field name="financial_score_id"/>
+                            <field name="technical_score"/>
+                            <field name="technical_threshold_met"/>
+                            <field name="financial_score"/>
+                            <field name="combined_score"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_vendor_proposal" model="ir.actions.act_window">
+            <field name="name">Vendor Proposals</field>
+            <field name="res_model">eds.vendor.proposal</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ Vendor Evaluation (FREDS032/033/034) ══════════════ -->
+
+        <record id="view_eds_vendor_evaluation_list" model="ir.ui.view">
+            <field name="name">eds.vendor.evaluation.list</field>
+            <field name="model">eds.vendor.evaluation</field>
+            <field name="arch" type="xml">
+                <list string="Vendor Evaluations">
+                    <field name="name"/>
+                    <field name="rfp_id"/>
+                    <field name="proposal_id"/>
+                    <field name="provider_id"/>
+                    <field name="evaluation_type" widget="badge"/>
+                    <field name="total_score"/>
+                    <field name="threshold_met" decoration-danger="not threshold_met"/>
+                    <field name="evaluator_id"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_vendor_evaluation_form" model="ir.ui.view">
+            <field name="name">eds.vendor.evaluation.form</field>
+            <field name="model">eds.vendor.evaluation</field>
+            <field name="arch" type="xml">
+                <form string="Vendor Evaluation">
+                    <header>
+                        <button name="action_apply_template" string="Apply Criteria Template"
+                                type="object" invisible="state != 'draft'"/>
+                        <button name="action_submit" string="Submit for Approval" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve" type="object"
+                                class="oe_highlight" invisible="state != 'submitted'"
+                                groups="employee_development_system.group_eds_manager"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,approved"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Evaluation">
+                                <field name="name" readonly="1"/>
+                                <field name="rfp_id"/>
+                                <field name="proposal_id"/>
+                                <field name="provider_id"/>
+                                <field name="evaluation_type"/>
+                            </group>
+                            <group string="Result">
+                                <field name="total_score"/>
+                                <field name="threshold_met"/>
+                                <field name="evaluator_id"/>
+                            </group>
+                        </group>
+                        <group string="Criteria Scores">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="criterion_id" column_invisible="True"/>
+                                    <field name="sequence"/>
+                                    <field name="name"/>
+                                    <field name="weight"/>
+                                    <field name="score"/>
+                                    <field name="contribution"/>
+                                </list>
+                            </field>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_vendor_evaluation" model="ir.actions.act_window">
+            <field name="name">Vendor Evaluations</field>
+            <field name="res_model">eds.vendor.evaluation</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ RFP (FREDS030/031) ══════════════ -->
+
+        <record id="view_eds_rfp_list" model="ir.ui.view">
+            <field name="name">eds.rfp.list</field>
+            <field name="model">eds.rfp</field>
+            <field name="arch" type="xml">
+                <list string="Requests for Proposal">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="venue_requirement_id"/>
+                    <field name="submission_deadline"/>
+                    <field name="proposal_count"/>
+                    <field name="min_providers_met" decoration-danger="not min_providers_met"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_rfp_search" model="ir.ui.view">
+            <field name="name">eds.rfp.search</field>
+            <field name="model">eds.rfp</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="provider_ids"/>
+                    <filter string="Open" name="open" domain="[('state','in',('issued','receiving','evaluation'))]"/>
+                    <filter string="Awarded" name="awarded" domain="[('state','=','awarded')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="g_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_rfp_form" model="ir.ui.view">
+            <field name="name">eds.rfp.form</field>
+            <field name="model">eds.rfp</field>
+            <field name="arch" type="xml">
+                <form string="Request for Proposal">
+                    <header>
+                        <button name="action_issue" string="Issue RFP" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_receive_proposals" string="Start Receiving Proposals"
+                                type="object" class="oe_highlight" invisible="state != 'issued'"/>
+                        <button name="action_close_receiving" string="Close Receiving &amp; Evaluate"
+                                type="object" class="oe_highlight" invisible="state != 'receiving'"/>
+                        <button name="action_back_to_receiving" string="Return to Receiving"
+                                type="object" invisible="state != 'evaluation'"/>
+                        <button name="action_award" string="Award &amp; Create Contract" type="object"
+                                class="oe_highlight" invisible="state != 'evaluation'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,issued,receiving,evaluation,awarded"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box">
+                            <button name="%(employee_development_system.action_eds_vendor_proposal)d"
+                                    type="action" class="oe_stat_button" icon="fa-envelope-open"
+                                    groups="employee_development_system.group_eds_officer">
+                                <field name="proposal_count" widget="statinfo" string="Proposals"/>
+                            </button>
+                        </div>
+                        <group>
+                            <group string="RFP">
+                                <field name="name" readonly="1"/>
+                                <field name="course_id"/>
+                                <field name="venue_requirement_id"/>
+                                <field name="submission_deadline"/>
+                            </group>
+                            <group string="Distribution (FREDS030)">
+                                <field name="provider_ids" widget="many2many_tags"/>
+                                <field name="min_providers" readonly="1"/>
+                                <field name="min_providers_met"/>
+                                <field name="issuance_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Scope &amp; Specifications" name="scope">
+                                <group>
+                                    <field name="objectives"/>
+                                    <field name="scope_of_work"/>
+                                    <field name="technical_specifications"/>
+                                    <field name="venue_accommodation_requirements"/>
+                                </group>
+                            </page>
+                            <page string="Evaluation Criteria" name="criteria">
+                                <field name="evaluation_criteria_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence"/>
+                                        <field name="name"/>
+                                        <field name="weight"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Proposals (Two-Envelope)" name="proposals">
+                                <field name="proposal_ids" context="{'default_rfp_id': id}">
+                                    <list editable="bottom">
+                                        <field name="name"/>
+                                        <field name="provider_id"/>
+                                        <field name="registration_date"/>
+                                        <field name="technical_score"/>
+                                        <field name="financial_score"/>
+                                        <field name="combined_score"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                        <group string="Award (FREDS034)" invisible="state != 'evaluation'">
+                            <field name="awarded_proposal_id"
+                                   domain="[('rfp_id', '=', id), ('state', '=', 'evaluated')]"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_rfp" model="ir.actions.act_window">
+            <field name="name">Requests for Proposal</field>
+            <field name="res_model">eds.rfp</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_rfp_search"/>
+        </record>
+
+        <!-- ══════════════ Training Contract (FREDS035) ══════════════ -->
+
+        <record id="view_eds_training_contract_list" model="ir.ui.view">
+            <field name="name">eds.training.contract.list</field>
+            <field name="model">eds.training.contract</field>
+            <field name="arch" type="xml">
+                <list string="Training Contracts">
+                    <field name="name"/>
+                    <field name="rfp_id"/>
+                    <field name="provider_id"/>
+                    <field name="course_id"/>
+                    <field name="contract_amount" widget="monetary"/>
+                    <field name="combined_score"/>
+                    <field name="version"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_training_contract_form" model="ir.ui.view">
+            <field name="name">eds.training.contract.form</field>
+            <field name="model">eds.training.contract</field>
+            <field name="arch" type="xml">
+                <form string="Training Contract">
+                    <header>
+                        <button name="action_send_legal" string="Send to Legal Review" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_legal_approve" string="Legal Approve" type="object"
+                                class="oe_highlight" invisible="state != 'legal_review'"
+                                groups="employee_development_system.group_eds_manager"/>
+                        <button name="action_request_revision" string="Return with Legal Comments"
+                                type="object" invisible="state != 'legal_review'"
+                                groups="employee_development_system.group_eds_manager"/>
+                        <button name="action_resubmit" string="Resubmit to Legal" type="object"
+                                invisible="state != 'revision'"/>
+                        <button name="action_record_signature" string="Record Signature" type="object"
+                                class="oe_highlight" invisible="state != 'approved'"/>
+                        <button name="action_activate" string="Activate Contract" type="object"
+                                invisible="state != 'signed'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,legal_review,revision,approved,signed,active"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Contract">
+                                <field name="name" readonly="1"/>
+                                <field name="rfp_id"/>
+                                <field name="proposal_id"/>
+                                <field name="provider_id"/>
+                                <field name="course_id"/>
+                            </group>
+                            <group string="Award &amp; Value">
+                                <field name="combined_score" readonly="1"/>
+                                <field name="contract_amount"/>
+                                <field name="currency_id" groups="base.group_multi_currency"/>
+                                <field name="start_date"/>
+                                <field name="end_date"/>
+                            </group>
+                        </group>
+                        <group string="Legal Review (FREDS035)">
+                            <field name="legal_comments"/>
+                            <field name="legal_reviewer_id" readonly="1"/>
+                            <field name="version" readonly="1"/>
+                        </group>
+                        <group string="Signatures">
+                            <field name="signature" filename="signature_name"/>
+                            <field name="signature_name" invisible="1"/>
+                            <field name="signed_by"/>
+                            <field name="signature_date" readonly="1"/>
+                        </group>
+                        <notebook>
+                            <page string="Version History" name="versions">
+                                <field name="version_ids">
+                                    <list editable="bottom">
+                                        <field name="version"/>
+                                        <field name="date"/>
+                                        <field name="created_by_id"/>
+                                        <field name="comment"/>
+                                        <field name="document" filename="document_name"/>
+                                        <field name="document_name" invisible="1"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_training_contract" model="ir.actions.act_window">
+            <field name="name">Training Contracts</field>
+            <field name="res_model">eds.training.contract</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

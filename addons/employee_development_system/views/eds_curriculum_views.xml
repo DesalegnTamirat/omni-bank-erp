@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Curriculum ══════════════ -->
+
+        <record id="view_eds_curriculum_list" model="ir.ui.view">
+            <field name="name">eds.curriculum.list</field>
+            <field name="model">eds.curriculum</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="version"/>
+                    <field name="module_ids" widget="many2many_tags"/>
+                    <field name="review_sla_deadline"/>
+                    <field name="sla_breached" decoration-danger="sla_breached"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_curriculum_form" model="ir.ui.view">
+            <field name="name">eds.curriculum.form</field>
+            <field name="model">eds.curriculum</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit_quality_review" string="Submit to Quality Review"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_quality_approve" string="L&amp;D Quality Approve"
+                                type="object" class="oe_highlight" invisible="state != 'quality_review'"/>
+                        <button name="action_director_validate" string="Director PPDD Validate"
+                                type="object" class="oe_highlight" invisible="state != 'director_validation'"/>
+                        <button name="action_cpco_approve" string="CPCO Approve"
+                                type="object" class="oe_highlight" invisible="state != 'cpco_approval'"/>
+                        <button name="action_request_revision" string="Request Revision"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_resubmit_revision" string="Resubmit After Revision"
+                                type="object" class="oe_highlight" invisible="state != 'revision'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,quality_review,director_validation,cpco_approval,approved,revision"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Curriculum">
+                                <field name="name" readonly="1"/>
+                                <field name="course_id" readonly="state != 'draft'"/>
+                                <field name="version" readonly="1"/>
+                            </group>
+                            <group string="Approval SLA (FREDS014)">
+                                <field name="review_sla_deadline" readonly="1"/>
+                                <field name="sla_breached"/>
+                                <field name="approved_by_id"/>
+                                <field name="approval_date"/>
+                            </group>
+                        </group>
+                        <group string="Design">
+                            <field name="learning_objectives"/>
+                            <field name="assessment_method"/>
+                            <field name="sme_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Revision" invisible="state != 'revision'">
+                            <field name="revision_comment"/>
+                        </group>
+                        <notebook>
+                            <page string="Modules">
+                                <field name="module_ids" readonly="state in ('quality_review','director_validation','cpco_approval','approved')">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name"/>
+                                        <field name="duration_hours"/>
+                                    </list>
+                                    <form>
+                                        <group>
+                                            <field name="sequence"/>
+                                            <field name="name"/>
+                                            <field name="duration_hours"/>
+                                        </group>
+                                        <group string="Content / Materials">
+                                            <field name="content_ids" widget="many2many_tags"
+                                                   options="{'create_text': 'Attach material...'}"/>
+                                        </group>
+                                    </form>
+                                </field>
+                            </page>
+                            <page string="Approval History">
+                                <field name="approval_history_ids" readonly="1">
+                                    <list>
+                                        <field name="state_from"/>
+                                        <field name="state_to"/>
+                                        <field name="user_id"/>
+                                        <field name="comment"/>
+                                        <field name="timestamp"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_curriculum_search" model="ir.ui.view">
+            <field name="name">eds.curriculum.search</field>
+            <field name="model">eds.curriculum</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="sme_ids"/>
+                    <filter string="In Approval Chain" name="in_approval"
+                            domain="[('state','in',('quality_review','director_validation','cpco_approval'))]"/>
+                    <filter string="Approved" name="approved" domain="[('state','=','approved')]"/>
+                    <filter string="SLA Breached" name="breached" domain="[('sla_breached','=',True)]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Course" name="group_course" context="{'group_by':'course_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_curriculum" model="ir.actions.act_window">
+            <field name="name">Curriculums</field>
+            <field name="res_model">eds.curriculum</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_curriculum_search"/>
+        </record>
+
+    </data>
+</odoo>

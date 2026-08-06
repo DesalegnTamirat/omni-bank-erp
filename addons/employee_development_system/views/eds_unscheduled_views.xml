@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Unscheduled Training Requests (FREDS075/076) ══════════════ -->
+
+        <record id="view_eds_unscheduled_request_list" model="ir.ui.view">
+            <field name="name">eds.unscheduled.request.list</field>
+            <field name="model">eds.unscheduled.request</field>
+            <field name="arch" type="xml">
+                <list string="Unscheduled Training Requests">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="course_id"/>
+                    <field name="program_name"/>
+                    <field name="reason" widget="badge"/>
+                    <field name="requested_date_start"/>
+                    <field name="estimated_cost" sum="Estimated"/>
+                    <field name="annual_plan_id"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_unscheduled_request_search" model="ir.ui.view">
+            <field name="name">eds.unscheduled.request.search</field>
+            <field name="model">eds.unscheduled.request</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="course_id"/>
+                    <field name="annual_plan_id"/>
+                    <filter string="Pending" name="pending"
+                            domain="[('state','in',('submitted','lnd_approved','director_approved'))]"/>
+                    <filter string="Approved" name="approved" domain="[('state','=','approved')]"/>
+                    <filter string="Rejected" name="rejected" domain="[('state','=','rejected')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Reason" name="g_reason" context="{'group_by':'reason'}"/>
+                        <filter string="Status" name="g_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_unscheduled_request_form" model="ir.ui.view">
+            <field name="name">eds.unscheduled.request.form</field>
+            <field name="model">eds.unscheduled.request</field>
+            <field name="arch" type="xml">
+                <form string="Unscheduled Training Request">
+                    <header>
+                        <button name="action_submit" string="Submit for Approval" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_lnd_approve" string="L&amp;D Approve" type="object"
+                                class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="action_director_approve" string="Director PPDD Approve"
+                                type="object" class="oe_highlight" invisible="state != 'lnd_approved'"/>
+                        <button name="action_approve" string="Final Approval" type="object"
+                                class="oe_highlight" invisible="state != 'director_approved'"/>
+                        <button name="action_reject" string="Reject" type="object"
+                                invisible="state not in ('submitted','lnd_approved','director_approved')"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Request">
+                                <field name="name" readonly="1"/>
+                                <field name="employee_id"/>
+                                <field name="work_unit_id"/>
+                                <field name="department_id"/>
+                            </group>
+                            <group string="Training">
+                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="program_name"/>
+                                <field name="delivery_mode"/>
+                                <field name="reason"/>
+                                <field name="requested_date_start"/>
+                                <field name="requested_date_end"/>
+                                <field name="estimated_cost"/>
+                            </group>
+                        </group>
+                        <group string="Justification (mandatory for ad-hoc requests - FREDS075)">
+                            <field name="justification"/>
+                        </group>
+                        <group string="Annual Plan Addendum">
+                            <field name="annual_plan_id" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Approval">
+                            <field name="rejected_reason" invisible="state != 'rejected'"/>
+                            <field name="approved_by_id" readonly="1"/>
+                            <field name="approval_date" readonly="1"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_unscheduled_request" model="ir.actions.act_window">
+            <field name="name">Unscheduled Training Requests</field>
+            <field name="res_model">eds.unscheduled.request</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_unscheduled_request_search"/>
+        </record>
+
+    </data>
+</odoo>

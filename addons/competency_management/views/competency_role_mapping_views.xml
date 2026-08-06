@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Role Mapping Tree -->
+        <record id="view_competency_role_mapping_list" model="ir.ui.view">
+            <field name="name">competency.role.mapping.list</field>
+            <field name="model">competency.role.mapping</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="mapping_name"/>
+                    <field name="job_position_id"/>
+                    <field name="grade_id"/>
+                    <field name="version"/>
+                    <field name="state" widget="badge"/>
+                    <field name="effective_date"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Role Mapping Form -->
+        <record id="view_competency_role_mapping_form" model="ir.ui.view">
+            <field name="name">competency.role.mapping.form</field>
+            <field name="model">competency.role.mapping</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit_for_approval" string="Submit for Approval"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve Mapping"
+                                type="object" class="oe_highlight" invisible="state != 'under_approval'"/>
+                        <button name="action_create_new_version" string="Create New Version"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_archive" string="Archive Mapping"
+                                type="object" invisible="state == 'archived'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,under_approval,approved,archived"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="job_position_id"/>
+                                <field name="grade_id"/>
+                                <field name="version"/>
+                                <field name="effective_date"/>
+                            </group>
+                            <group>
+                                <field name="last_review_date"/>
+                                <field name="next_review_date"/>
+                                <field name="approved_by_id"/>
+                                <field name="approval_date"/>
+                            </group>
+                        </group>
+                        <group string="Required Competencies">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="competency_id"/>
+                                    <field name="required_proficiency"/>
+                                    <field name="weight"/>
+                                </list>
+                            </field>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Role Mapping Search -->
+        <record id="view_competency_role_mapping_search" model="ir.ui.view">
+            <field name="name">competency.role.mapping.search</field>
+            <field name="model">competency.role.mapping</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="job_position_id"/>
+                    <field name="grade_id"/>
+                    <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
+                    <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_role_mapping" model="ir.actions.act_window">
+            <field name="name">Role-Competency Mapping</field>
+            <field name="res_model">competency.role.mapping</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="competency_management.view_competency_role_mapping_search"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_eds_tna_consolidation_wizard" model="ir.ui.view">
+            <field name="name">eds.tna.consolidation.wizard.form</field>
+            <field name="model">eds.tna.consolidation.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Consolidate TNA">
+                    <group>
+                        <field name="cycle_id"/>
+                        <field name="work_unit_id"
+                               help="Leave empty to consolidate the whole cycle bank-wide."/>
+                    </group>
+                    <footer>
+                        <button name="action_consolidate" string="Consolidate"
+                                type="object" class="oe_highlight"/>
+                        <button string="Cancel" class="btn-link" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_tna_consolidation_wizard" model="ir.actions.act_window">
+            <field name="name">Consolidate TNA</field>
+            <field name="res_model">eds.tna.consolidation.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

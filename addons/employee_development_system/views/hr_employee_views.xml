@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_hr_employee_eds_smart_buttons" model="ir.ui.view">
+            <field name="name">hr.employee.form.inherit.eds</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//header" position="inside">
+                    <button name="action_view_eds_tna_entries" type="object"
+                            class="btn-link" icon="fa-graduation-cap">
+                        <field name="eds_tna_entry_count" widget="statinfo"
+                               string="Training Needs (TNA)"/>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

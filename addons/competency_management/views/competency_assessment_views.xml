@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Assessment Cycle Tree -->
+        <record id="view_competency_assessment_cycle_list" model="ir.ui.view">
+            <field name="name">competency.assessment.cycle.list</field>
+            <field name="model">competency.assessment.cycle</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="period_start"/>
+                    <field name="period_end"/>
+                    <field name="assessment_deadline"/>
+                    <field name="assessment_count"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Assessment Cycle Form -->
+        <record id="view_competency_assessment_cycle_form" model="ir.ui.view">
+            <field name="name">competency.assessment.cycle.form</field>
+            <field name="model">competency.assessment.cycle</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_start" string="Start Cycle"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_start_review" string="Start Review"
+                                type="object" invisible="state != 'open'"/>
+                        <button name="action_close" string="Close Cycle"
+                                type="object" invisible="state not in ('open','in_review')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="period_start"/>
+                                <field name="period_end"/>
+                                <field name="assessment_deadline"/>
+                            </group>
+                            <group>
+                                <field name="assessment_count"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Assessments">
+                                <field name="assessment_ids">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="assessment_type"/>
+                                        <field name="assessor_id"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Notes">
+                                <field name="notes"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_assessment_cycle" model="ir.actions.act_window">
+            <field name="name">Assessment Cycles</field>
+            <field name="res_model">competency.assessment.cycle</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Assessment Tree -->
+        <record id="view_competency_assessment_list" model="ir.ui.view">
+            <field name="name">competency.assessment.list</field>
+            <field name="model">competency.assessment</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="cycle_id"/>
+                    <field name="assessment_type"/>
+                    <field name="assessor_id"/>
+                    <field name="average_gap"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Assessment Form -->
+        <record id="view_competency_assessment_form" model="ir.ui.view">
+            <field name="name">competency.assessment.form</field>
+            <field name="model">competency.assessment</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_auto_fill_lines" string="Auto-Fill from Role Mapping"
+                                type="object" invisible="line_ids or state != 'draft'"/>
+                        <button name="action_submit" string="Submit"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_supervisor_review" string="Supervisor Review"
+                                type="object" invisible="state != 'submitted'"/>
+                        <button name="action_hr_verify" string="HR Verify"
+                                type="object" invisible="state != 'supervisor_review'"/>
+                        <button name="action_approve" string="Approve"
+                                type="object" class="oe_highlight" invisible="state != 'hr_verified'"/>
+                        <button name="action_lock" string="Lock"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_unlock" string="Unlock"
+                                type="object" invisible="state != 'locked'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,supervisor_review,hr_verified,approved,locked"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name" readonly="1"/>
+                                <field name="employee_id" readonly="state in ('submitted','supervisor_review','hr_verified','approved','locked')"/>
+                                <field name="cycle_id" readonly="state != 'draft'"/>
+                            </group>
+                            <group>
+                                <field name="assessment_type" readonly="state != 'draft'"/>
+                                <field name="assessor_id"/>
+                                <field name="average_gap"/>
+                                <field name="is_locked"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Competency Ratings">
+                                <field name="line_ids">
+                                    <list editable="bottom">
+                                        <field name="competency_id"/>
+                                        <field name="current_level"/>
+                                        <field name="required_level"/>
+                                        <field name="gap"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_tags"/>
+                                        <field name="comments"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Notes">
+                                <field name="notes"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Assessment Search -->
+        <record id="view_competency_assessment_search" model="ir.ui.view">
+            <field name="name">competency.assessment.search</field>
+            <field name="model">competency.assessment</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="employee_id"/>
+                    <field name="cycle_id"/>
+                    <field name="assessment_type"/>
+                    <filter string="Open Assessments" name="open_assessments"
+                            domain="[('state','in',('draft','submitted','supervisor_review','hr_verified'))]"/>
+                    <filter string="Locked" name="locked" domain="[('state','=','locked')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Type" name="group_type" context="{'group_by':'assessment_type'}"/>
+                        <filter string="Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_assessment" model="ir.actions.act_window">
+            <field name="name">Competency Assessments</field>
+            <field name="res_model">competency.assessment</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
+        </record>
+
+    </data>
+</odoo>

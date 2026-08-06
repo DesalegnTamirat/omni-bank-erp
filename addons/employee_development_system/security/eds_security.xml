@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- Module Category -->
+        <record id="module_category_eds" model="ir.module.category">
+            <field name="name">Employee Development System</field>
+            <field name="description">Employee Development System Access Control</field>
+            <field name="sequence">27</field>
+        </record>
+
+        <!-- Privilege (Odoo 19) -->
+        <record id="res_groups_privilege_eds" model="res.groups.privilege">
+            <field name="name">Employee Development System</field>
+            <field name="sequence">10</field>
+            <field name="category_id" ref="employee_development_system.module_category_eds"/>
+        </record>
+
+        <!-- Group: Employee -->
+        <record id="group_eds_employee" model="res.groups">
+            <field name="name">User / Employee</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="comment">Can submit self training needs and view own learning history.</field>
+        </record>
+
+        <!-- Group: Line Manager -->
+        <record id="group_eds_line_manager" model="res.groups">
+            <field name="name">Line Manager</field>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="comment">Can nominate team members and approve their training needs (FR-EDS-004).</field>
+        </record>
+
+        <!-- Group: Trainer -->
+        <record id="group_eds_trainer" model="res.groups">
+            <field name="name">Trainer / Facilitator</field>
+            <field name="sequence">30</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="comment">Session delivery, attendance and assessment scoring (segregated from nomination/approval).</field>
+        </record>
+
+        <!-- Group: L&D Officer -->
+        <record id="group_eds_officer" model="res.groups">
+            <field name="name">L&amp;D Officer</field>
+            <field name="sequence">40</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+            <field name="comment">TNA capture, scheduling, venues, budget lines and RFP processing.</field>
+        </record>
+
+        <!-- Group: L&D Manager -->
+        <record id="group_eds_manager" model="res.groups">
+            <field name="name">L&amp;D Manager / Team Leader</field>
+            <field name="sequence">50</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+            <field name="comment">Curriculum approval, evaluations, reports and dashboard.</field>
+        </record>
+
+        <!-- Group: EDS Administrator -->
+        <record id="group_eds_admin" model="res.groups">
+            <field name="name">EDS Administrator</field>
+            <field name="sequence">60</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_manager'))]"/>
+            <field name="comment">Full access to EDS configuration, framework approval authority and integration jobs.</field>
+        </record>
+
+        <!-- Group: Executive (read-only dashboards/reports) -->
+        <record id="group_eds_executive" model="res.groups">
+            <field name="name">Executive (Read-Only)</field>
+            <field name="sequence">70</field>
+            <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
+            <field name="comment">Read-only executive dashboards and learning analytics (CPCO / SMC).</field>
+        </record>
+
+    </data>
+
+    <!-- Record Rules -->
+    <data noupdate="1">
+
+        <!-- TNA Entry: employee sees own submissions -->
+        <record id="rule_eds_tna_entry_employee_own" model="ir.rule">
+            <field name="name">Employee Own TNA Entries</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_entry"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('submitted_by', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- TNA Entry: line manager sees own team -->
+        <record id="rule_eds_tna_entry_line_manager_team" model="ir.rule">
+            <field name="name">Line Manager Team TNA Entries</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_entry"/>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('submitted_by', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+        </record>
+
+        <!-- TNA Cycle: employee can only read approved/locked cycles -->
+        <record id="rule_eds_tna_cycle_employee" model="ir.rule">
+            <field name="name">Employee Approved TNA Cycles</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="domain_force">[('state', 'in', ('approved', 'locked'))]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Multi-company rules -->
+        <record id="rule_eds_tna_cycle_multi_company" model="ir.rule">
+            <field name="name">TNA Cycle Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_tna_entry_multi_company" model="ir.rule">
+            <field name="name">TNA Entry Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_entry"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- TNA Consolidation: officers/managers see all consolidations of their companies -->
+        <record id="rule_eds_tna_consolidation_multi_company" model="ir.rule">
+            <field name="name">TNA Consolidation Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_consolidation"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Priority rules: visible to the L&D teams only (no rule for employees) -->
+        <record id="rule_eds_tna_priority_rule_staff" model="ir.rule">
+            <field name="name">Priority Rules L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_priority_rule"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+
+        <!-- Task 3: multi-company rules for course catalog, dev requests and curricula -->
+        <record id="rule_eds_course_multi_company" model="ir.rule">
+            <field name="name">Course Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_course"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_eds_course_dev_request_multi_company" model="ir.rule">
+            <field name="name">Course Development Request Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_course_development_request"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_curriculum_multi_company" model="ir.rule">
+            <field name="name">Curriculum Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_curriculum"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Task 4: trainer register + provider registry visible to the L&amp;D teams only -->
+        <record id="rule_eds_trainer_staff" model="ir.rule">
+            <field name="name">Trainer Register L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_trainer"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_external_provider_staff" model="ir.rule">
+            <field name="name">Provider Registry L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_external_provider"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+
+        <!-- Task 4: multi-company rules for procurement documents -->
+        <record id="rule_eds_venue_requirement_multi_company" model="ir.rule">
+            <field name="name">Venue Requirement Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_venue_requirement"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_rfp_multi_company" model="ir.rule">
+            <field name="name">RFP Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_rfp"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_vendor_proposal_rfp" model="ir.rule">
+            <field name="name">Vendor Proposal RFP Scoped</field>
+            <field name="model_id" ref="employee_development_system.model_eds_vendor_proposal"/>
+            <field name="domain_force">[('rfp_id', '!=', False)]</field>
+        </record>
+        <record id="rule_eds_vendor_evaluation_rfp" model="ir.rule">
+            <field name="name">Vendor Evaluation RFP Scoped</field>
+            <field name="model_id" ref="employee_development_system.model_eds_vendor_evaluation"/>
+            <field name="domain_force">[('rfp_id', '!=', False)]</field>
+        </record>
+        <record id="rule_eds_training_contract_provider" model="ir.rule">
+            <field name="name">Training Contract Provider Scoped</field>
+            <field name="model_id" ref="employee_development_system.model_eds_training_contract"/>
+            <field name="domain_force">[('provider_id', '!=', False)]</field>
+        </record>
+
+        <!-- Task 5: annual plan + sessions + venues are L&amp;D-team operational documents -->
+        <record id="rule_eds_annual_plan_staff" model="ir.rule">
+            <field name="name">Annual Plan L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_annual_plan"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_annual_plan_line_staff" model="ir.rule">
+            <field name="name">Annual Plan Line L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_annual_plan_line"/>
+            <field name="domain_force">[('plan_id', '!=', False)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_session_staff" model="ir.rule">
+            <field name="name">Sessions L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_batch_staff" model="ir.rule">
+            <field name="name">Batches L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_batch"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_venue_staff" model="ir.rule">
+            <field name="name">Venues L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_venue"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_venue_booking_staff" model="ir.rule">
+            <field name="name">Venue Bookings L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_venue_booking"/>
+            <field name="domain_force">[('venue_id', '!=', False)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_unscheduled_request_staff" model="ir.rule">
+            <field name="name">Unscheduled Requests L&amp;D Only</field>
+            <field name="model_id" ref="employee_development_system.model_eds_unscheduled_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+
+        <!-- Task 5: multi-company rules (module convention) -->
+        <record id="rule_eds_annual_plan_multi_company" model="ir.rule">
+            <field name="name">Annual Plan Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_annual_plan"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_annual_plan_line_multi_company" model="ir.rule">
+            <field name="name">Annual Plan Line Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_annual_plan_line"/>
+            <field name="domain_force">['|', ('plan_id.company_id', '=', False), ('plan_id.company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_session_multi_company" model="ir.rule">
+            <field name="name">Session Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_session"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_batch_multi_company" model="ir.rule">
+            <field name="name">Batch Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_batch"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_venue_multi_company" model="ir.rule">
+            <field name="name">Venue Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_venue"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+        </record>
+        <record id="rule_eds_venue_booking_multi_company" model="ir.rule">
+            <field name="name">Venue Booking Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_venue_booking"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_unscheduled_request_multi_company" model="ir.rule">
+            <field name="name">Unscheduled Request Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_unscheduled_request"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- Task 6: nominations - employees see their own, line managers their team -->
+        <record id="rule_eds_nomination_employee_own" model="ir.rule">
+            <field name="name">Employee Own Nominations</field>
+            <field name="model_id" ref="employee_development_system.model_eds_nomination"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_nomination_line_manager_team" model="ir.rule">
+            <field name="name">Line Manager Team Nominations</field>
+            <field name="model_id" ref="employee_development_system.model_eds_nomination"/>
+            <field name="domain_force">[('employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
+        </record>
+        <record id="rule_eds_nomination_staff" model="ir.rule">
+            <field name="name">Nominations L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_nomination"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_nomination_multi_company" model="ir.rule">
+            <field name="name">Nomination Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_nomination"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+        <record id="rule_eds_enrollment_employee_own" model="ir.rule">
+            <field name="name">Employee Own Enrollments</field>
+            <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+        <record id="rule_eds_enrollment_staff" model="ir.rule">
+            <field name="name">Enrollments L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+        <record id="rule_eds_enrollment_multi_company" model="ir.rule">
+            <field name="name">Enrollment Multi Company</field>
+            <field name="model_id" ref="employee_development_system.model_eds_enrollment"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+    </data>
+</odoo>
