@@ -53,20 +53,22 @@ class ResConfigSettings(models.TransientModel):
              "Roll out branch-by-branch after load testing."
     )
 
+    # Target HR User for Escalation 
     escalation_hr_user_id = fields.Many2one(
         'res.users',
         string='HR Escalation Target User',
         config_parameter="hr_attendance.escalation_hr_user_id",
-        help="User account to receive HR escalation activities when attendance violation thresholds are breached."
+        help="FR-ATT-029: User account to receive HR escalation activities when attendance violation thresholds are breached."
     )
 
+    #  Pluggable Authentication Method Framework
     checkin_auth_method = fields.Selection([
         ('session', 'Odoo Web Session (Standard)'),
         ('pin', 'Employee Security PIN'),
         ('qr', 'Branch Kiosk QR Code'),
     ], string='Check-in Authentication Method', default='session',
         config_parameter="hr_attendance.checkin_auth_method",
-        help="Configurable authentication method required before check-in is recorded.")
+        help="FR-ATT-034: Configurable authentication method required before check-in is recorded.")
 
 
     # ----------------------------------------------------------
@@ -112,8 +114,7 @@ class ResConfigSettings(models.TransientModel):
     # ----------------------------------------------------------
     # LUNCH BREAK SETTINGS
     # ----------------------------------------------------------
-    lunch_out_time =
-    fields.Float(
+    lunch_out_time = fields.Float(
         string='Lunch Break Start Time',
         default=12.00,
         config_parameter="hr_attendance.lunch_out_time",

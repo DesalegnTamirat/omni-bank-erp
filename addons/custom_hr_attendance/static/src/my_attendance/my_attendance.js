@@ -7,6 +7,7 @@ import { rpc } from "@web/core/network/rpc";
 import { ConnectionLostError } from "@web/core/network/rpc";
 import { deserializeDateTime } from "@web/core/l10n/dates";
 import { _t } from "@web/core/l10n/translation";
+import { session } from "@web/session";
 
 const { DateTime } = luxon;
 
@@ -150,6 +151,8 @@ export class MyAttendance extends Component {
         }
         this.state.hasEmployee = true;
         this.state.checkedIn = data.attendance_state === "checked_in";
+        // Dynamically sync Web Client session state for immediate ERP Gate enforcement
+        session.attendance_checked_in = this.state.checkedIn;
         this.state.employeeName = data.employee_name || "";
         this.state.employeeAvatar = data.employee_avatar || "";
         this.state.jobTitle = data.job_title || "Employee";
@@ -222,6 +225,46 @@ export class MyAttendance extends Component {
         } finally {
             this.state.settingsSaving = false;
         }
+    }
+
+    onInputMorningTime(ev) {
+        this.state.settings.morning_time = parseFloat(ev.target.value) || 0;
+    }
+    onInputExitTime(ev) {
+        this.state.settings.exit_time = parseFloat(ev.target.value) || 0;
+    }
+    onInputCheckinBuffer(ev) {
+        this.state.settings.checkin_buffer = parseFloat(ev.target.value) || 0;
+    }
+    onInputForceCheckoutHours(ev) {
+        this.state.settings.force_checkout_hours = parseFloat(ev.target.value) || 0;
+    }
+    onInputSaturdayExitTime(ev) {
+        this.state.settings.saturday_exit_time = parseFloat(ev.target.value) || 0;
+    }
+    onInputLatenessThreshold(ev) {
+        this.state.settings.lateness_violation_threshold = parseInt(ev.target.value, 10) || 0;
+    }
+    onInputForceCheckoutThreshold(ev) {
+        this.state.settings.force_checkout_violation_threshold = parseInt(ev.target.value, 10) || 0;
+    }
+    onToggleCheckinRestrict(ev) {
+        this.state.settings.enable_checkin_restriction = ev.target.checked;
+    }
+    onToggleCheckoutRestrict(ev) {
+        this.state.settings.enable_checkout_restriction = ev.target.checked;
+    }
+    onToggleSaturdayHalfday(ev) {
+        this.state.settings.enable_saturday_halfday = ev.target.checked;
+    }
+    onToggleLunchBreak(ev) {
+        this.state.settings.enable_lunch_break = ev.target.checked;
+    }
+    onToggleAutoAbsence(ev) {
+        this.state.settings.enable_auto_absence = ev.target.checked;
+    }
+    onToggleCheckinGate(ev) {
+        this.state.settings.enable_checkin_gate = ev.target.checked;
     }
 
     async onClickToggle() {

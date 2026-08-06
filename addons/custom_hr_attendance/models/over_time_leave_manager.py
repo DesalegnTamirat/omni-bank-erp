@@ -37,6 +37,9 @@ class OverTimeLeaveManager(models.Model):
 
         return user.employee_id
 
+    def fetch(self):
+        print("fetch")
+
     # =========================================================
     # SHOW OT BALANCE
     # =========================================================
@@ -48,8 +51,7 @@ class OverTimeLeaveManager(models.Model):
             if rec.leave_reason != 'over_time' or not rec.requester_user_id:
                 continue
 
-            user = self.env['res.users'].browse(rec.requester_user_id)
-            employee = user.employee_id
+            employee = rec.requester_user_id.employee_id
             if not employee:
                 continue
 

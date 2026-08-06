@@ -79,6 +79,7 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
             'name': _('Daily Employee Attendance Detail'),
             'res_model': 'generate.employee.attendance.details',
             'view_mode': 'list,search',
+            'views': [(self.env.ref('custom_hr_attendance.view_daily_employee_attendance_detail_tree').id, 'list')],
             'target': 'current',
         }
 

@@ -35,6 +35,8 @@ BEGIN
             acknowledged_early_checkout,
             force_checkout,
             working_hours,
+            attendance_percentage,
+            absent_hours,
             create_date,
             write_date
         )
@@ -47,7 +49,10 @@ BEGIN
                 WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
                 ELSE COALESCE(ou.name, '')
             END AS work_unit,
-            COALESCE(job.name, '') AS job_title,
+            CASE 
+                WHEN pg_typeof(job.name)::text = 'jsonb' THEN COALESCE(job.name->>'en_US', job.name::text, '')
+                ELSE COALESCE(job.name::text, '')
+            END AS job_title,
             COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
             COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
             COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
@@ -57,7 +62,13 @@ BEGIN
             COALESCE(SUM(att.pre_approved_early_checkout), 0.0) AS pre_approved_early_checkout,
             COALESCE(SUM(att.acknowledged_exit), 0.0) AS acknowledged_early_checkout,
             COUNT(CASE WHEN att.check_out_status = 'Force Checkout' OR att.is_force_checkout = TRUE THEN 1 END) AS force_checkout,
-            COALESCE(SUM(att.worked_hours), 0.0) AS working_hours,
+            COALESCE(exp_wh.total_wh, 0.0) AS working_hours,
+            CASE 
+                WHEN COALESCE(exp_wh.total_wh, 0.0) > 0 THEN 
+                    ROUND(CAST((COALESCE(SUM(att.worked_hours), 0.0) / exp_wh.total_wh) * 100 AS numeric), 2)
+                ELSE 0.0 
+            END AS attendance_percentage,
+            GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - COALESCE(SUM(att.worked_hours), 0.0)) AS absent_hours,
             NOW(),
             NOW()
         FROM hr_employee emp
@@ -67,8 +78,18 @@ BEGIN
             AND att.check_in >= p_from::timestamp 
             AND att.check_in <= (p_to + interval '1 day')::timestamp
             AND (att.active = TRUE OR att.active IS NULL)
+        LEFT JOIN LATERAL (
+            SELECT SUM(
+                CASE 
+                    WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
+                    WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type = 'head_office' THEN 4.0 ELSE 8.0 END)
+                    ELSE 0.0
+                END
+            ) AS total_wh
+            FROM generate_series(p_from, p_to, '1 day'::interval) d
+        ) exp_wh ON TRUE
         WHERE emp.active = TRUE
-        GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.name;
+        GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh;
     ELSE
         -- Daily Employee Attendance Detail mode (per-attendance row)
         INSERT INTO generate_employee_attendance_details (

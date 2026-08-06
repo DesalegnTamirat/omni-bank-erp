@@ -48,3 +48,20 @@ class ResUsers(models.Model):
                     "IT and Driver Officer role requires "
                     "Attendance Officer role."
                 )
+
+    def _get_default_home_action(self):
+        """
+        When ERP Access Gate is enabled, force non-checked-in employees to
+        open the Check In / Check Out Attendance Dashboard upon login.
+        """
+        self.ensure_one()
+        param = self.env['ir.config_parameter'].sudo().get_param('hr_attendance.enable_checkin_gate', 'False')
+        gate_enabled = param.lower() in ('true', '1')
+
+        if gate_enabled and not self.has_group('base.group_system') and self.employee_id:
+            if self.employee_id.attendance_state != 'checked_in':
+                my_att_action = self.env.ref('custom_hr_attendance.action_my_attendance', raise_if_not_found=False)
+                if my_att_action:
+                    return my_att_action
+
+        return super()._get_default_home_action()

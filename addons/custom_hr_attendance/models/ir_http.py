@@ -7,7 +7,7 @@ from odoo.http import request
 _logger = logging.getLogger(__name__)
 
 # Routes that must always be accessible regardless of check-in state.
-# Prevents employees from being fully locked out of the system.
+# Prevents employees from being fully locked out of the system or crashing web client metadata loads.
 # Prefix-matched: any route starting with these paths is exempt.
 _GATE_EXEMPT_PREFIXES = (
     '/web/login',
@@ -16,16 +16,22 @@ _GATE_EXEMPT_PREFIXES = (
     '/web/static',
     '/web/webclient',
     '/web/session',
+    '/web/image',
     '/web/action',
-    '/web#action=',
-    '/odoo',
-    '/odoo/settings',
     '/odoo/attendances',
-    '/odoo/action',
     '/discuss',
     '/mail',
     '/custom_hr_attendance',
     '/web/dataset/call_kw/res.config',
+    '/web/dataset/call_kw/res.users',
+    '/web/dataset/call_kw/res.company',
+    '/web/dataset/call_kw/ir.actions',
+    '/web/dataset/call_kw/ir.ui.menu',
+    '/web/dataset/call_kw/ir.model.data',
+    '/web/dataset/call_kw/hr.attendance',
+    '/web/dataset/call_kw/hr.employee',
+    '/web/dataset/call_kw/bus.bus',
+    '/bus/',
 )
 
 
@@ -34,30 +40,34 @@ class IrHttp(models.AbstractModel):
     Session-cached ERP access gate for attendance check-in enforcement.
 
     When enable_checkin_gate is True, employees who are not checked in cannot
-    access ERP application routes. The gate state is cached in the HTTP session
-    so the database is queried at most once per session, not once per request.
+    access ERP application routes.
 
-    Performance contract:
-    - Requests within an active session where the employee is checked in: zero DB queries.
-    - First request of a session or after check-out: one DB query (employee.attendance_state).
-    - All exempt routes: zero DB queries, always pass through.
-
-    This is the highest blast-radius change in the plan — enable only after
-    Phase 1 load testing passes at target scale (p95 < 300ms for 6,000 check-ins/15min).
+    System Administrators (base.group_system) and accounts without linked
+    employees are exempt from gate checks to prevent administrative lockouts.
     """
     _inherit = 'ir.http'
 
     @classmethod
     def _dispatch(cls, endpoint):
         if cls._attendance_gate_enabled() and cls._route_requires_gate():
-            if not cls._session_is_checked_in():
-                # Session not flagged: check live DB state and update session
-                employee = request.env.user.employee_id if request.env.user else None
-                if employee and employee.attendance_state == 'checked_in':
+            user = request.env.user if (request and request.env and request.env.user) else None
+            if not user or user._is_public():
+                return super()._dispatch(endpoint)
+
+            # System administrators & users without an employee profile are exempt
+            if user.has_group('base.group_system') or not user.employee_id:
+                return super()._dispatch(endpoint)
+
+            # Check live DB state for the employee
+            employee = user.employee_id
+            if employee and employee.attendance_state == 'checked_in':
+                if request and hasattr(request, 'session'):
                     request.session['attendance_checked_in'] = True
-                else:
-                    # Employee is not checked in — block access to restricted routes
-                    return cls._attendance_gate_blocked_response()
+            else:
+                if request and hasattr(request, 'session'):
+                    request.session['attendance_checked_in'] = False
+                # Employee is not checked in — block access to restricted routes
+                return cls._attendance_gate_blocked_response()
         return super()._dispatch(endpoint)
 
     @classmethod
@@ -112,4 +122,17 @@ class IrHttp(models.AbstractModel):
         # For regular HTTP routes, redirect to the attendance check-in screen
         from werkzeug.utils import redirect
         return redirect('/odoo/attendances', code=302)
+
+    def session_info(self):
+        res = super().session_info()
+        user = request.env.user if request and request.env else None
+        if user and not user._is_public():
+            gate_enabled = self._attendance_gate_enabled()
+            is_admin = user.has_group('base.group_system')
+            employee = user.employee_id
+            checked_in = bool(employee and employee.attendance_state == 'checked_in')
+            res['enable_checkin_gate'] = gate_enabled
+            res['is_system_admin'] = is_admin
+            res['attendance_checked_in'] = checked_in
+        return res
 

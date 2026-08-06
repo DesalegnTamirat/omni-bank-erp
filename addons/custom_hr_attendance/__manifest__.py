@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Custom HR Attendance Management",
-    
     "summary": "Centralized platform for recording, validating, and managing employee attendance across all work locations.",
-    
     "description": """
         HR Attendance Management System
 
@@ -15,7 +13,6 @@
         - Force checkout management
         - Seamless integration with Leave, Discipline, Payroll, and Employee Master Data
     """,
-    
     "author": "Abeza&Desalegn",
     "website": "https://bunnabanksc.com/",
     "license": "LGPL-3",
@@ -64,7 +61,7 @@
         "data/job_shift_data.xml",
         "data/hr_attendance_reason_data.xml",
         "data/sql_functions.xml",
-        # Discipline Offense Seeds 
+        # Discipline Offense Seeds
         "data/discipline_offense_attendance_data.xml",
         # Scheduled Actions
         "data/ir_cron_data.xml",
@@ -75,6 +72,7 @@
             "custom_hr_attendance/static/src/my_attendance/my_attendance.js",
             "custom_hr_attendance/static/src/my_attendance/my_attendance.xml",
             "custom_hr_attendance/static/src/my_attendance/my_attendance.scss",
+            "custom_hr_attendance/static/src/gate_guard/gate_guard.js",
         ],
     },
     "installable": True,

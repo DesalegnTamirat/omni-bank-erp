@@ -41,8 +41,11 @@
                                      help="Track IP address of device used when employee checks in and checks out.">
                                 <field name="enable_ip_tracking"/>
                             </setting>
+                            <setting string="ERP Access Gate (Requires Check-In)"
+                                     help="When enabled, employees must be checked in to access ERP modules.">
+                                <field name="enable_checkin_gate"/>
+                            </setting>
                         </block>
-
 
                         <!-- ========================================= -->
                         <!-- BLOCK 2: Check-in / Check-out Timing      -->
@@ -95,6 +98,20 @@
                             <setting string="Lunch Grace Time (Hours)"
                                      help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)">
                                 <field name="lunch_grace_time"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 4: Discipline Integration           -->
+                        <!-- ========================================= -->
+                        <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
+                            <setting string="Lateness Violation Threshold (Occurrences)"
+                                     help="Number of late check-ins that triggers an automatic discipline case.">
+                                <field name="lateness_violation_threshold"/>
+                            </setting>
+                            <setting string="Force Checkout Violation Threshold (Occurrences)"
+                                     help="Number of force checkouts that triggers an automatic discipline case.">
+                                <field name="force_checkout_violation_threshold"/>
                             </setting>
                         </block>
 

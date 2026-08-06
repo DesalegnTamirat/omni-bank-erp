@@ -136,7 +136,7 @@
             name="Report"
             parent="hr_attendance.menu_hr_attendance_reporting"
             groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
-            action="generated_employee_attendance_details_action"
+            action="action_reporting_employee_attendance_summary"
             sequence="5"/>
 
     <!-- 6.2 Generate Detail Employee Attendance Report Wizard -->
@@ -152,7 +152,7 @@
     <menuitem
             id="menu_generated_employee_attendance_details"
             name="Employee Attendance Summary"
-            action="generated_employee_attendance_details_action"
+            action="action_reporting_employee_attendance_summary"
             parent="hr_attendance.menu_hr_attendance_reporting"
             groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
             sequence="20"/>
@@ -183,6 +183,15 @@
             sequence="50"
             groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
 
+    <!-- 6.7 Over Time Report -->
+    <menuitem
+            id="menu_overtime_report"
+            name="Over Time Report"
+            parent="hr_attendance.menu_hr_attendance_reporting"
+            action="action_overtime_report"
+            sequence="60"
+            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
+
     <!-- 6.8 Force Checkout History (ATT-021) -->
     <menuitem
             id="menu_force_checkout_history"
@@ -199,7 +208,7 @@
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
             action="action_hr_attendance_manual_wizard"
             sequence="50"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
+            groups="custom_hr_attendance.group_hr_attendance_manual_user,hr_attendance.group_hr_attendance_manager"/>
 
 
     <!-- ====================================================

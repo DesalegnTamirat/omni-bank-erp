@@ -1,16 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="group_hr_attendance_job_position_user" model="res.groups">
-        <field name="name">Job Position Officer</field>
-	<field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-	<field name="implied_ids" eval="[(4, ref('hr.group_hr_user')), (4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+    <!-- Manual Attendance (Basic Attendance Check-In / Check-Out permission) -->
+    <record id="group_hr_attendance_manual_user" model="res.groups">
+        <field name="name">Manual Attendance</field>
+        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
     </record>
 
+    <!-- Job Position Officer (Can check-in/out + manage Job Position Exceptions & Job Shifts) -->
+    <record id="group_hr_attendance_job_position_user" model="res.groups">
+        <field name="name">Job Position Officer</field>
+        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
+        <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
+    </record>
+
+    <!-- IT and Driver Officer (Can check-in/out + manage Over Time) -->
     <record id="group_hr_attendance_it_driver_user" model="res.groups">
         <field name="name">IT and Driver Officer</field>
-	<field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-	<field name="implied_ids" eval="[(4, ref('hr.group_hr_user')), (4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
+        <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
     </record>
 
 </odoo>
