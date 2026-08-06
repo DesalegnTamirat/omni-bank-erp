@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- List (Tree) View -->
+    <record id="over_time_consumption_view_tree" model="ir.ui.view">
+        <field name="name">Over Time Consumption List</field>
+        <field name="model">over.time.consumption</field>
+        <field name="arch" type="xml">
+            <list string="Over Time Consumption" editable="bottom">
+                <field name="over_time_id"/>
+                <field name="leave_request_id"/>
+                <field name="hours" widget="float_time"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="over_time_consumption_view_form" model="ir.ui.view">
+        <field name="name">Over Time Consumption Form</field>
+        <field name="model">over.time.consumption</field>
+        <field name="arch" type="xml">
+            <form string="Over Time Consumption">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="over_time_id"/>
+                            <field name="leave_request_id"/>
+                        </group>
+                        <group>
+                            <field name="hours" widget="float_time"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_over_time_consumption" model="ir.actions.act_window">
+        <field name="name">Over Time Consumption</field>
+        <field name="res_model">over.time.consumption</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Menu item (placed next to Over Time under Attendance Configuration) -->
+    <menuitem id="menu_over_time_consumption"
+              name="Over Time Consumption"
+              parent="menu_bunna_attendance_configuration"
+              action="action_over_time_consumption"
+              sequence="35"
+              groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager,hr_attendance.group_hr_attendance_user"/>
+
+</odoo>

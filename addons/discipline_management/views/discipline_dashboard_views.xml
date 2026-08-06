@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Dashboard Client Action -->
+        <record id="action_discipline_dashboard" model="ir.actions.client">
+            <field name="name">Discipline Dashboard</field>
+            <field name="tag">discipline_management.discipline_dashboard</field>
+            <field name="target">main</field>
+        </record>
+
+    </data>
+</odoo>

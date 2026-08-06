@@ -36,9 +36,18 @@
                 <header>
                     <field name="status" widget="statusbar"/>
 <!--                    <button name="populate_criteria" string="Populate Criteria" type="object" class="oe_highlight"/>-->
+                    <button name="action_open_shortlist_wizard"
+                            string="Shortlist Candidates"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-filter"
+                            groups="hr.group_hr_user"
+                            invisible="shortlisting_done"
+                            help="Define shortlisting criteria and auto-populate the External Selected Candidates record"/>
                     <button name="notify" invisible="status in ['notify']" string="Notify Applicant" type="object" class="oe_highlight"/>
                 </header>
                 <sheet>
+                    <field name="shortlisting_done" invisible="1"/>
                     <group>
                         <group>
                             <field name="vacancy_reference"/>
@@ -62,37 +71,53 @@
                     <notebook>
                         <page string="Eligible Applicants">
                             <field name="eligible_emp_external">
-                                <list string="Eligible Applicants" editable="bottom">
-                                    <field name="applicant_name"/>
+                            <list string="Eligible Applicants">
+                                    <!-- Selection -->
                                     <field name="select_flag"/>
+                                    <field name="applicant_name"/>
+                                    <!-- Personal -->
                                     <field name="applicant_email"/>
                                     <field name="applicant_phone"/>
                                     <field name="date_of_birth"/>
-                                    <field name="applicant_age"/>
                                     <field name="gender"/>
+                                    <!-- Employment -->
                                     <field name="working_status"/>
                                     <field name="current_company"/>
                                     <field name="join_immediately"/>
                                     <field name="date_of_availability"/>
                                     <field name="preferred_location"/>
-									<field name="highest_cgpa"/>
+                                    <field name="ex_bunna"/>
+                                    <!-- Academic -->
+                                    <field name="educational_qualification"/>
+                                    <field name="field_of_study"/>
+                                     <field name="institution_name"/>
+                                     <field name="graduation_date"/>
+                                     <field name="highest_cgpa"/>
+                                    <!-- Experience -->
                                     <field name="relevant_experience"/>
-                                    <field name="supervisory_experience"/>
                                     <field name="banking_experience"/>
                                     <field name="non_banking_experience"/>
-									<field name="total_experience"/>
-                                    <field name="ex_bunna"/>
-<!--                                    <field name="preferred_location"/>-->
-
+                                    <field name="total_experience"/>
+                                    <field name="supervisory_experience"/>
+                                    <!-- Notes -->
+                                    <field name="recommendation"/>
+                                    <!-- Salary -->
+                                    <field name="current_salary" optional="show"/>
+                                    <field name="expected_salary" optional="show"/>
+                                    <!-- CV Attachment -->
+                                    <field name="cv_attachment_id" string="CV File" readonly="1"/>
+                                    <button name="action_download_cv" type="object"
+                                            string="Download CV" class="btn-secondary" icon="fa-download"
+                                            help="Download CV/Resume for this candidate"/>
+                                    <button name="action_transfer_to_talent_roster" type="object"
+                                            string="Add to Roster" class="btn-info" icon="fa-star"
+                                            help="Add this candidate to Talent Roster"/>
                                 </list>
                             </field>
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
-                    <field name="message_ids" widget="mail_thread"/>
-                </div>
+
             </form>
         </field>
     </record>

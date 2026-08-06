@@ -13,5 +13,5 @@ class projection_detail_acting_assignment(models.AbstractModel):
               'doc_model': "job.vacancy",
               'docs': docs,
               'data': data,
-              # 'compare_date':datetime.strptime(data["line_date"],"%Y-%m-%d").date(),
+              # 'compare_date':datetime.strptime(data["line_date"],"%Y-%m-%d").date,
         }

@@ -30,23 +30,8 @@
 <!--menu_hr_payroll_community_root-->
 
 
- <!-- Standalone top-level "Wizards" menu removed: its two items (Copy Manpower
-      Plan Wizard, Reset Employee Login Wizard) now live in the "Wizards" section
-      that's already nested under Configuration (menu_hr_payroll_community_wizards_stub),
-      alongside Bonus Transfer Wizard, Net Salary Payment Wizard, etc. -->
+    <!-- Nested Wizards section under Configuration (menu_hr_payroll_community_wizards_stub) -->
     <menuitem id="menu_hr_payroll_community_wizards_stub" name="Wizards" parent="hr.menu_human_resources_configuration" sequence="106"/>
-<!--     <menuitem-->
-<!--           id="menu_contract_wizards"-->
-<!--           name="Contract Wizard"-->
-<!--           parent="menu_hr_wizards"-->
-<!--           action="action_populate_salary_information_wizard"-->
-
-<!--    />-->
-<!--<menuitem id="disciplinary_action" name="Disciplinary Actions" parent="hr.menu_hr_root"-->
-<!--                  sequence="23"/>-->
-<!--        <menuitem id="disciplinary_action_create" action="action_disciplinary_action" groups="hr.group_hr_manager"-->
-<!--                  name="Disciplinary Action" parent="disciplinary_action"-->
-<!--                  sequence="1"/>-->
 <!--    <menuitem-->
 <!--        id="menu_employee_grades_list"-->
 <!--        name="Job Grade"-->

@@ -3,7 +3,7 @@
     <template id="portal_my_home_menu_bids" name="Portal layout : invoice menu entries" inherit_id="portal.portal_breadcrumbs" priority="30">
         <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
             <li t-if="page_name == 'bid'" t-attf-class="breadcrumb-item #{'active ' if not job else ''}">
-                <a t-if="job" t-attf-href="/my/job-acceptance?{{ keep_query() }}">Job Acceptance</a>
+                <a t-if="job" t-attf-href="/my/job-acceptance?{{ keep_query }}">Job Acceptance</a>
                 <t t-else="">Job</t>
             </li>
         </xpath>
@@ -44,7 +44,7 @@
                 <div class="oe_structure">
                     <div class="container">
                         <form role="form" action="/submit/job_acceptance_status" method="POST" enctype="multipart/form-data">
-                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token"/>
                             <input type="hidden" name="partner_name" t-att-value="data[0].partner_name"/>
                             <input type="hidden" name="job_id" t-att-value="data[0].job_id"/>
                             <div class="form-group">

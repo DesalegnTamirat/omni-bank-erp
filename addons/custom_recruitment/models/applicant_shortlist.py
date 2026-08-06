@@ -8,6 +8,12 @@ class ApplicantShortlist(models.Model):
     job_position = fields.Char(string="Job Applied For")
     applicant_id=fields.Many2one("hr.applicant", "Applicant Name")
     applicant_name = fields.Char(string="Applicant Name")
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     applicant_gender= fields.Char(string="Gender")
     educational_qualification = fields.Char(string="Educational Qualification")
     CGPA = fields.Float(string="CGPA")

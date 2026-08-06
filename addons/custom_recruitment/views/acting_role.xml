@@ -1,0 +1,138 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- ================================================================ -->
+    <!-- Acting Role Assignment – List View                                -->
+    <!-- ================================================================ -->
+    <record id="acting_role_assignment_list_view" model="ir.ui.view">
+        <field name="name">acting.role.assignment.list</field>
+        <field name="model">acting.role.assignment</field>
+        <field name="arch" type="xml">
+            <list string="Acting / Supplementary Role Assignments"
+                  decoration-success="state == 'active'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-muted="state == 'expired'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="target_job_position_id"/>
+                <field name="district_director_id"/>
+                <field name="acting_start_date"/>
+                <field name="acting_end_date"/>
+                <field name="acting_allowance_amount"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-danger="state == 'rejected'"
+                       decoration-info="state in ('submitted','approved')"
+                       decoration-muted="state in ('draft','expired')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Acting Role Assignment – Search View                              -->
+    <!-- ================================================================ -->
+    <record id="acting_role_assignment_search_view" model="ir.ui.view">
+        <field name="name">acting.role.assignment.search</field>
+        <field name="model">acting.role.assignment</field>
+        <field name="arch" type="xml">
+            <search string="Search Acting Role Assignments">
+                <field name="name" string="Reference"/>
+                <field name="employee_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="district_director_id"/>
+                <separator/>
+                <filter name="filter_submitted" string="Submitted" domain="[('state','=','submitted')]"/>
+                <filter name="filter_active" string="Active" domain="[('state','=','active')]"/>
+                <filter name="filter_expired" string="Expired/Terminated" domain="[('state','=','expired')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_by_vacancy" string="Vacant Post" context="{'group_by': 'target_vacancy_id'}"/>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Acting Role Assignment – Form View                                -->
+    <!-- ================================================================ -->
+    <record id="acting_role_assignment_form_view" model="ir.ui.view">
+        <field name="name">acting.role.assignment.form</field>
+        <field name="model">acting.role.assignment</field>
+        <field name="arch" type="xml">
+            <form string="Acting / Supplementary Role Assignment">
+                <header>
+                    <button name="action_submit" string="Submit for Approval" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"
+                            help=": route to the District Director."/>
+                    <button name="action_approve" string="Approve" type="object"
+                            class="oe_highlight" invisible="state != 'submitted'"
+                            help="/080: approve and auto-update employee profile and benefits."/>
+                    <button name="action_reject" string="Reject" type="object"
+                            invisible="state != 'submitted'"/>
+                    <button name="action_terminate" string="Terminate / Revert" type="object"
+                            invisible="state != 'active'"
+                            confirm="This will revert the employee's profile, benefits, and access rights to their substantive position. Proceed?"
+                            help=": finalize termination and revert to substantive position."/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,active,expired"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+
+                    <group>
+                        <group string="Request ">
+                            <field name="employee_id" readonly="state != 'draft'"/>
+                            <field name="requested_by" readonly="1"/>
+                            <field name="request_date" readonly="state != 'draft'"/>
+                            <field name="target_vacancy_id" readonly="state != 'draft'"/>
+                            <field name="target_job_position_id" readonly="1"/>
+                            <field name="target_operating_unit_id" readonly="1"/>
+                            <field name="district_director_id" readonly="state != 'draft'"/>
+                        </group>
+                        <group string="Benefit Adjustment ">
+                            <field name="acting_allowance_percent" readonly="state not in ('draft','submitted')"/>
+                            <field name="acting_allowance_amount" readonly="1"/>
+                            <field name="substantive_job_position_id" readonly="1"/>
+                            <field name="substantive_operating_unit_id" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Duration &amp; Expiry ">
+                        <group>
+                            <field name="acting_start_date" readonly="state == 'expired'"/>
+                            <field name="acting_end_date" readonly="state == 'expired'"/>
+                        </group>
+                        <group>
+                            <field name="permanent_candidate_assigned"/>
+                            <field name="expiry_notified" readonly="1"/>
+                            <field name="termination_date" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Rejection" invisible="state != 'rejected'">
+                        <field name="rejection_reason" nolabel="1"/>
+                    </group>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Action                                                            -->
+    <!-- ================================================================ -->
+    <record id="action_acting_role_assignment" model="ir.actions.act_window">
+        <field name="name">Acting / Supplementary Role</field>
+        <field name="res_model">acting.role.assignment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="acting_role_assignment_search_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create an Acting Role Assignment!</p>
+            <p>Temporarily assign an employee to a vacant post pending District Director approval.
+               The system automatically adjusts the employee's profile and Acting Allowance on
+               approval, and reverts them to their substantive position on expiry or termination
+               .</p>
+        </field>
+    </record>
+</odoo>

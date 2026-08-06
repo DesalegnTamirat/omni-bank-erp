@@ -1,0 +1,1203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Record Rules for hr.job -->
+        <record id="rule_hr_job_recruitment_officer" model="ir.rule">
+            <field name="name">Job Position: HR Officer</field>
+            <field name="model_id" ref="hr.model_hr_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_hr_job_recruitment_administrator" model="ir.rule">
+            <field name="name">Job Position: HR Administrator</field>
+            <field name="model_id" ref="hr.model_hr_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for hr.applicant -->
+        <record id="rule_hr_applicant_recruitment_officer" model="ir.rule">
+            <field name="name">Applicant: HR Officer</field>
+            <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_hr_applicant_recruitment_administrator" model="ir.rule">
+            <field name="name">Applicant: HR Administrator</field>
+            <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for applicant.assessment -->
+        <record id="rule_applicant_assessment_recruitment_officer" model="ir.rule">
+            <field name="name">Applicant Assessment: HR Officer</field>
+            <field name="model_id" ref="model_applicant_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_applicant_assessment_recruitment_administrator" model="ir.rule">
+            <field name="name">Applicant Assessment: HR Administrator</field>
+            <field name="model_id" ref="model_applicant_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for applicant.shortlist -->
+        <record id="rule_applicant_shortlist_recruitment_officer" model="ir.rule">
+            <field name="name">Applicant Shortlist: HR Officer</field>
+            <field name="model_id" ref="model_applicant_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_applicant_shortlist_recruitment_administrator" model="ir.rule">
+            <field name="name">Applicant Shortlist: HR Administrator</field>
+            <field name="model_id" ref="model_applicant_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for assessment.criteria -->
+        <record id="rule_assessment_criteria_recruitment_officer" model="ir.rule">
+            <field name="name">Assessment Criteria: HR Officer</field>
+            <field name="model_id" ref="model_assessment_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_assessment_criteria_recruitment_administrator" model="ir.rule">
+            <field name="name">Assessment Criteria: HR Administrator</field>
+            <field name="model_id" ref="model_assessment_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for bb.external -->
+        <record id="rule_bb_external_recruitment_officer" model="ir.rule">
+            <field name="name">Bb External: HR Officer</field>
+            <field name="model_id" ref="model_bb_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_bb_external_recruitment_administrator" model="ir.rule">
+            <field name="name">Bb External: HR Administrator</field>
+            <field name="model_id" ref="model_bb_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for bb.internal -->
+        <record id="rule_bb_internal_recruitment_officer" model="ir.rule">
+            <field name="name">Bb Internal: HR Officer</field>
+            <field name="model_id" ref="model_bb_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_bb_internal_recruitment_administrator" model="ir.rule">
+            <field name="name">Bb Internal: HR Administrator</field>
+            <field name="model_id" ref="model_bb_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for blacklist.pool -->
+        <record id="rule_blacklist_pool_recruitment_officer" model="ir.rule">
+            <field name="name">Blacklist Pool: HR Officer</field>
+            <field name="model_id" ref="model_blacklist_pool"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_blacklist_pool_recruitment_administrator" model="ir.rule">
+            <field name="name">Blacklist Pool: HR Administrator</field>
+            <field name="model_id" ref="model_blacklist_pool"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for candidate.shortlist -->
+        <record id="rule_candidate_shortlist_recruitment_officer" model="ir.rule">
+            <field name="name">Candidate Shortlist: HR Officer</field>
+            <field name="model_id" ref="model_candidate_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_candidate_shortlist_recruitment_administrator" model="ir.rule">
+            <field name="name">Candidate Shortlist: HR Administrator</field>
+            <field name="model_id" ref="model_candidate_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.education -->
+        <record id="rule_employee_education_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Education: HR Officer</field>
+            <field name="model_id" ref="model_employee_education"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_education_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Education: HR Administrator</field>
+            <field name="model_id" ref="model_employee_education"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.recruitment -->
+        <record id="rule_employee_recruitment_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Recruitment: HR Officer</field>
+            <field name="model_id" ref="model_employee_recruitment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_recruitment_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Recruitment: HR Administrator</field>
+            <field name="model_id" ref="model_employee_recruitment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.recruitment.available -->
+        <record id="rule_employee_recruitment_available_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Recruitment Available: HR Officer</field>
+            <field name="model_id" ref="model_employee_recruitment_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_recruitment_available_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Recruitment Available: HR Administrator</field>
+            <field name="model_id" ref="model_employee_recruitment_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.recruitment.external -->
+        <record id="rule_employee_recruitment_external_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Recruitment External: HR Officer</field>
+            <field name="model_id" ref="model_employee_recruitment_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_recruitment_external_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Recruitment External: HR Administrator</field>
+            <field name="model_id" ref="model_employee_recruitment_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.recruitment.internal -->
+        <record id="rule_employee_recruitment_internal_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Recruitment Internal: HR Officer</field>
+            <field name="model_id" ref="model_employee_recruitment_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_recruitment_internal_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Recruitment Internal: HR Administrator</field>
+            <field name="model_id" ref="model_employee_recruitment_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.recruitment.job -->
+        <record id="rule_employee_recruitment_job_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Recruitment Job: HR Officer</field>
+            <field name="model_id" ref="model_employee_recruitment_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_recruitment_job_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Recruitment Job: HR Administrator</field>
+            <field name="model_id" ref="model_employee_recruitment_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.transfer.request -->
+        <record id="rule_employee_transfer_request_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Transfer Request: HR Officer</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_transfer_request_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Transfer Request: HR Administrator</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for employee.vacancy.available -->
+        <record id="rule_employee_vacancy_available_recruitment_officer" model="ir.rule">
+            <field name="name">Employee Vacancy Available: HR Officer</field>
+            <field name="model_id" ref="model_employee_vacancy_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_employee_vacancy_available_recruitment_administrator" model="ir.rule">
+            <field name="name">Employee Vacancy Available: HR Administrator</field>
+            <field name="model_id" ref="model_employee_vacancy_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recrt.delegation.team -->
+        <record id="rule_external_recrt_delegation_team_recruitment_officer" model="ir.rule">
+            <field name="name">External Recrt Delegation Team: HR Officer</field>
+            <field name="model_id" ref="model_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recrt_delegation_team_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recrt Delegation Team: HR Administrator</field>
+            <field name="model_id" ref="model_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recruitment.eligible.employees -->
+        <record id="rule_external_recruitment_eligible_employees_recruitment_officer" model="ir.rule">
+            <field name="name">External Recruitment Eligible Employees: HR Officer</field>
+            <field name="model_id" ref="model_external_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recruitment_eligible_employees_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recruitment Eligible Employees: HR Administrator</field>
+            <field name="model_id" ref="model_external_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recruitment.panel -->
+        <record id="rule_external_recruitment_panel_recruitment_officer" model="ir.rule">
+            <field name="name">External Recruitment Panel: HR Officer</field>
+            <field name="model_id" ref="model_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recruitment_panel_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recruitment Panel: HR Administrator</field>
+            <field name="model_id" ref="model_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recruitment.selected -->
+        <record id="rule_external_recruitment_selected_recruitment_officer" model="ir.rule">
+            <field name="name">External Recruitment Selected: HR Officer</field>
+            <field name="model_id" ref="model_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recruitment_selected_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recruitment Selected: HR Administrator</field>
+            <field name="model_id" ref="model_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recruitment.selected.candidates -->
+        <record id="rule_external_recruitment_selected_candidates_recruitment_officer" model="ir.rule">
+            <field name="name">External Recruitment Selected Candidates: HR Officer</field>
+            <field name="model_id" ref="model_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recruitment_selected_candidates_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recruitment Selected Candidates: HR Administrator</field>
+            <field name="model_id" ref="model_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.recruitment.selected.employees -->
+        <record id="rule_external_recruitment_selected_employees_recruitment_officer" model="ir.rule">
+            <field name="name">External Recruitment Selected Employees: HR Officer</field>
+            <field name="model_id" ref="model_external_recruitment_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_recruitment_selected_employees_recruitment_administrator" model="ir.rule">
+            <field name="name">External Recruitment Selected Employees: HR Administrator</field>
+            <field name="model_id" ref="model_external_recruitment_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for external.selected -->
+        <record id="rule_external_selected_recruitment_officer" model="ir.rule">
+            <field name="name">External Selected: HR Officer</field>
+            <field name="model_id" ref="model_external_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_external_selected_recruitment_administrator" model="ir.rule">
+            <field name="name">External Selected: HR Administrator</field>
+            <field name="model_id" ref="model_external_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for hiring.status -->
+        <record id="rule_hiring_status_recruitment_officer" model="ir.rule">
+            <field name="name">Hiring Status: HR Officer</field>
+            <field name="model_id" ref="model_hiring_status"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_hiring_status_recruitment_administrator" model="ir.rule">
+            <field name="name">Hiring Status: HR Administrator</field>
+            <field name="model_id" ref="model_hiring_status"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for hr.employee.probation -->
+        <record id="rule_hr_employee_probation_recruitment_officer" model="ir.rule">
+            <field name="name">Hr Employee Probation: HR Officer</field>
+            <field name="model_id" ref="model_hr_employee_probation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_hr_employee_probation_recruitment_administrator" model="ir.rule">
+            <field name="name">Hr Employee Probation: HR Administrator</field>
+            <field name="model_id" ref="model_hr_employee_probation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+
+
+        <!-- Record Rules for internal.recruitment.eligible.employees -->
+        <record id="rule_internal_recruitment_eligible_employees_recruitment_officer" model="ir.rule">
+            <field name="name">Internal Recruitment Eligible Employees: HR Officer</field>
+            <field name="model_id" ref="model_internal_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_internal_recruitment_eligible_employees_recruitment_administrator" model="ir.rule">
+            <field name="name">Internal Recruitment Eligible Employees: HR Administrator</field>
+            <field name="model_id" ref="model_internal_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for internal.selected -->
+        <record id="rule_internal_selected_recruitment_officer" model="ir.rule">
+            <field name="name">Internal Selected: HR Officer</field>
+            <field name="model_id" ref="model_internal_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_internal_selected_recruitment_administrator" model="ir.rule">
+            <field name="name">Internal Selected: HR Administrator</field>
+            <field name="model_id" ref="model_internal_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for internal.selected.employees -->
+        <record id="rule_internal_selected_employees_recruitment_officer" model="ir.rule">
+            <field name="name">Internal Selected Employees: HR Officer</field>
+            <field name="model_id" ref="model_internal_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_internal_selected_employees_recruitment_administrator" model="ir.rule">
+            <field name="name">Internal Selected Employees: HR Administrator</field>
+            <field name="model_id" ref="model_internal_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for interview.assessment -->
+        <record id="rule_interview_assessment_recruitment_officer" model="ir.rule">
+            <field name="name">Interview Assessment: HR Officer</field>
+            <field name="model_id" ref="model_interview_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_interview_assessment_recruitment_administrator" model="ir.rule">
+            <field name="name">Interview Assessment: HR Administrator</field>
+            <field name="model_id" ref="model_interview_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for job.vacancy -->
+        <record id="rule_job_vacancy_recruitment_officer" model="ir.rule">
+            <field name="name">Job Vacancy: HR Officer</field>
+            <field name="model_id" ref="model_job_vacancy"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_job_vacancy_recruitment_administrator" model="ir.rule">
+            <field name="name">Job Vacancy: HR Administrator</field>
+            <field name="model_id" ref="model_job_vacancy"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for job.vacancy.competency -->
+        <record id="rule_job_vacancy_competency_recruitment_officer" model="ir.rule">
+            <field name="name">Job Vacancy Competency: HR Officer</field>
+            <field name="model_id" ref="model_job_vacancy_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_job_vacancy_competency_recruitment_administrator" model="ir.rule">
+            <field name="name">Job Vacancy Competency: HR Administrator</field>
+            <field name="model_id" ref="model_job_vacancy_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.external.recrt.delegation.team -->
+        <record id="rule_new_external_recrt_delegation_team_recruitment_officer" model="ir.rule">
+            <field name="name">New External Recrt Delegation Team: HR Officer</field>
+            <field name="model_id" ref="model_new_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_external_recrt_delegation_team_recruitment_administrator" model="ir.rule">
+            <field name="name">New External Recrt Delegation Team: HR Administrator</field>
+            <field name="model_id" ref="model_new_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.external.recruitment.panel -->
+        <record id="rule_new_external_recruitment_panel_recruitment_officer" model="ir.rule">
+            <field name="name">New External Recruitment Panel: HR Officer</field>
+            <field name="model_id" ref="model_new_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_external_recruitment_panel_recruitment_administrator" model="ir.rule">
+            <field name="name">New External Recruitment Panel: HR Administrator</field>
+            <field name="model_id" ref="model_new_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.external.recruitment.selected -->
+        <record id="rule_new_external_recruitment_selected_recruitment_officer" model="ir.rule">
+            <field name="name">New External Recruitment Selected: HR Officer</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_external_recruitment_selected_recruitment_administrator" model="ir.rule">
+            <field name="name">New External Recruitment Selected: HR Administrator</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.external.recruitment.selected.candidates -->
+        <record id="rule_new_external_recruitment_selected_candidates_recruitment_officer" model="ir.rule">
+            <field name="name">New External Recruitment Selected Candidates: HR Officer</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_external_recruitment_selected_candidates_recruitment_administrator" model="ir.rule">
+            <field name="name">New External Recruitment Selected Candidates: HR Administrator</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.internal.recruitment.panel -->
+        <record id="rule_new_internal_recruitment_panel_recruitment_officer" model="ir.rule">
+            <field name="name">New Internal Recruitment Panel: HR Officer</field>
+            <field name="model_id" ref="model_new_internal_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_internal_recruitment_panel_recruitment_administrator" model="ir.rule">
+            <field name="name">New Internal Recruitment Panel: HR Administrator</field>
+            <field name="model_id" ref="model_new_internal_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.internal.recruitment.selected -->
+        <record id="rule_new_internal_recruitment_selected_recruitment_officer" model="ir.rule">
+            <field name="name">New Internal Recruitment Selected: HR Officer</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_internal_recruitment_selected_recruitment_administrator" model="ir.rule">
+            <field name="name">New Internal Recruitment Selected: HR Administrator</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.internal.recruitment.selected.candidates -->
+        <record id="rule_new_internal_recruitment_selected_candidates_recruitment_officer" model="ir.rule">
+            <field name="name">New Internal Recruitment Selected Candidates: HR Officer</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_internal_recruitment_selected_candidates_recruitment_administrator" model="ir.rule">
+            <field name="name">New Internal Recruitment Selected Candidates: HR Administrator</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for new.recrt.delegation.team -->
+        <record id="rule_new_recrt_delegation_team_recruitment_officer" model="ir.rule">
+            <field name="name">New Recrt Delegation Team: HR Officer</field>
+            <field name="model_id" ref="model_new_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_new_recrt_delegation_team_recruitment_administrator" model="ir.rule">
+            <field name="name">New Recrt Delegation Team: HR Administrator</field>
+            <field name="model_id" ref="model_new_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for recruitment.application.window -->
+        <record id="rule_recruitment_application_window_recruitment_officer" model="ir.rule">
+            <field name="name">Recruitment Application Window: HR Officer</field>
+            <field name="model_id" ref="model_recruitment_application_window"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_recruitment_application_window_recruitment_administrator" model="ir.rule">
+            <field name="name">Recruitment Application Window: HR Administrator</field>
+            <field name="model_id" ref="model_recruitment_application_window"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for recruitment.candidate.score -->
+        <record id="rule_recruitment_candidate_score_recruitment_officer" model="ir.rule">
+            <field name="name">Recruitment Candidate Score: HR Officer</field>
+            <field name="model_id" ref="model_recruitment_candidate_score"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_recruitment_candidate_score_recruitment_administrator" model="ir.rule">
+            <field name="name">Recruitment Candidate Score: HR Administrator</field>
+            <field name="model_id" ref="model_recruitment_candidate_score"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for recruitment.offer.letter -->
+        <record id="rule_recruitment_offer_letter_recruitment_officer" model="ir.rule">
+            <field name="name">Recruitment Offer Letter: HR Officer</field>
+            <field name="model_id" ref="model_recruitment_offer_letter"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_recruitment_offer_letter_recruitment_administrator" model="ir.rule">
+            <field name="name">Recruitment Offer Letter: HR Administrator</field>
+            <field name="model_id" ref="model_recruitment_offer_letter"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for recruitment.request -->
+        <record id="rule_recruitment_request_recruitment_officer" model="ir.rule">
+            <field name="name">Recruitment Request: HR Officer</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_recruitment_request_recruitment_administrator" model="ir.rule">
+            <field name="name">Recruitment Request: HR Administrator</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for result.summary.rank -->
+        <record id="rule_result_summary_rank_recruitment_officer" model="ir.rule">
+            <field name="name">Result Summary Rank: HR Officer</field>
+            <field name="model_id" ref="model_result_summary_rank"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_result_summary_rank_recruitment_administrator" model="ir.rule">
+            <field name="name">Result Summary Rank: HR Administrator</field>
+            <field name="model_id" ref="model_result_summary_rank"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for transfer.committee.minutes -->
+        <record id="rule_transfer_committee_minutes_recruitment_officer" model="ir.rule">
+            <field name="name">Transfer Committee Minutes: HR Officer</field>
+            <field name="model_id" ref="model_transfer_committee_minutes"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_transfer_committee_minutes_recruitment_administrator" model="ir.rule">
+            <field name="name">Transfer Committee Minutes: HR Administrator</field>
+            <field name="model_id" ref="model_transfer_committee_minutes"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for transfer.committee.minutes.line -->
+        <record id="rule_transfer_committee_minutes_line_recruitment_officer" model="ir.rule">
+            <field name="name">Transfer Committee Minutes Line: HR Officer</field>
+            <field name="model_id" ref="model_transfer_committee_minutes_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_transfer_committee_minutes_line_recruitment_administrator" model="ir.rule">
+            <field name="name">Transfer Committee Minutes Line: HR Administrator</field>
+            <field name="model_id" ref="model_transfer_committee_minutes_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for vac.panel.members -->
+        <record id="rule_vac_panel_members_recruitment_officer" model="ir.rule">
+            <field name="name">Vac Panel Members: HR Officer</field>
+            <field name="model_id" ref="model_vac_panel_members"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_vac_panel_members_recruitment_administrator" model="ir.rule">
+            <field name="name">Vac Panel Members: HR Administrator</field>
+            <field name="model_id" ref="model_vac_panel_members"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for vacancy.delegation.team -->
+        <record id="rule_vacancy_delegation_team_recruitment_officer" model="ir.rule">
+            <field name="name">Vacancy Delegation Team: HR Officer</field>
+            <field name="model_id" ref="model_vacancy_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_vacancy_delegation_team_recruitment_administrator" model="ir.rule">
+            <field name="name">Vacancy Delegation Team: HR Administrator</field>
+            <field name="model_id" ref="model_vacancy_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for applicant.qualification.line -->
+        <record id="rule_applicant_qualification_line_officer" model="ir.rule">
+            <field name="name">Applicant Qualification Line: HR Officer</field>
+            <field name="model_id" ref="model_applicant_qualification_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_applicant_qualification_line_administrator" model="ir.rule">
+            <field name="name">Applicant Qualification Line: HR Administrator</field>
+            <field name="model_id" ref="model_applicant_qualification_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for applicant.experience.line -->
+        <record id="rule_applicant_experience_line_officer" model="ir.rule">
+            <field name="name">Applicant Experience Line: HR Officer</field>
+            <field name="model_id" ref="model_applicant_experience_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_applicant_experience_line_administrator" model="ir.rule">
+            <field name="name">Applicant Experience Line: HR Administrator</field>
+            <field name="model_id" ref="model_applicant_experience_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- Record Rules for applicant.competency.line -->
+        <record id="rule_applicant_competency_line_officer" model="ir.rule">
+            <field name="name">Applicant Competency Line: HR Officer</field>
+            <field name="model_id" ref="model_applicant_competency_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <record id="rule_applicant_competency_line_administrator" model="ir.rule">
+            <field name="name">Applicant Competency Line: HR Administrator</field>
+            <field name="model_id" ref="model_applicant_competency_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('hr_recruitment.group_hr_recruitment_manager'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

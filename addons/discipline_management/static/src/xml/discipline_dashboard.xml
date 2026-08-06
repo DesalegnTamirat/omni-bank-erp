@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="discipline_management.DisciplineDashboard">
+        <div class="o_discipline_dashboard">
+
+            <!-- Loading Overlay -->
+            <div t-if="state.isLoading" class="disc-loading-overlay">
+                <div class="disc-loader">
+                    <div class="disc-spinner"></div>
+                    <p>Loading Dashboard...</p>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="disc-header">
+                <div class="disc-header-left">
+                    <div class="disc-header-icon">
+                        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M24 4L8 10V24C8 33.4 15.3 42.2 24 44C32.7 42.2 40 33.4 40 24V10L24 4Z" fill="url(#shieldGrad)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                            <line x1="24" y1="16" x2="24" y2="32" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                            <circle cx="16" cy="22" r="3" fill="none" stroke="white" stroke-width="1.5"/>
+                            <circle cx="32" cy="22" r="3" fill="none" stroke="white" stroke-width="1.5"/>
+                            <line x1="19" y1="22" x2="29" y2="22" stroke="white" stroke-width="1.5"/>
+                            <line x1="14" y1="25" x2="18" y2="28" stroke="white" stroke-width="1.5"/>
+                            <line x1="34" y1="25" x2="30" y2="28" stroke="white" stroke-width="1.5"/>
+                            <defs>
+                                <linearGradient id="shieldGrad" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
+                                    <stop offset="0%" stop-color="#1e3a8a"/>
+                                    <stop offset="100%" stop-color="#1e40af"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <div class="disc-header-text">
+                        <h1>Discipline Management</h1>
+                        <p>Bunna Bank — HR Governance &amp; Compliance Dashboard</p>
+                    </div>
+                </div>
+                <div class="disc-header-actions">
+                    <button class="disc-btn disc-btn-secondary" t-on-click="refreshDashboard">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+                        Refresh
+                    </button>
+                    <button class="disc-btn disc-btn-primary" t-on-click="createNewCase">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                        New Case
+                    </button>
+                </div>
+            </div>
+
+            <!-- Critical Alert Banner (SLA Breached) -->
+            <div t-if="state.stats.sla_breached > 0" class="disc-alert-banner" t-on-click="openSlaBreached">
+                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span><strong><t t-esc="state.stats.sla_breached"/> SLA Breach Alert(s)</strong> — Immediate attention required for overdue disciplinary cases. Click to review.</span>
+                <svg class="disc-alert-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            </div>
+
+            <!-- KPI Cards Row 1 - Primary Metrics -->
+            <div class="disc-section-label">
+                <span>CASE OVERVIEW</span>
+            </div>
+            <div class="disc-kpi-grid disc-kpi-grid-4">
+
+                <div class="disc-kpi-card disc-kpi-total" t-on-click="openAllCases">
+                    <div class="disc-kpi-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value"><t t-esc="state.stats.total_cases"/></div>
+                        <div class="disc-kpi-label">Total Cases</div>
+                        <div class="disc-kpi-sub">All time records</div>
+                    </div>
+                    <div class="disc-kpi-trend">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-active" t-on-click="openActiveCases">
+                    <div class="disc-kpi-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value disc-kpi-warning"><t t-esc="state.stats.active_cases"/></div>
+                        <div class="disc-kpi-label">Active Cases</div>
+                        <div class="disc-kpi-sub">Require action</div>
+                    </div>
+                    <div class="disc-kpi-trend">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-pending" t-on-click="openPendingApproval">
+                    <div class="disc-kpi-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value disc-kpi-accent"><t t-esc="state.stats.pending_approval"/></div>
+                        <div class="disc-kpi-label">Pending Approval</div>
+                        <div class="disc-kpi-sub">Awaiting decision</div>
+                    </div>
+                    <div class="disc-kpi-trend">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-danger" t-on-click="openSlaBreached">
+                    <div class="disc-kpi-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value disc-kpi-red"><t t-esc="state.stats.sla_breached"/></div>
+                        <div class="disc-kpi-label">SLA Breached</div>
+                        <div class="disc-kpi-sub">Overdue resolution</div>
+                    </div>
+                    <div class="disc-kpi-trend disc-kpi-trend-alert" t-if="state.stats.sla_breached > 0">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                    </div>
+                    <div class="disc-kpi-trend" t-else="">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Cards Row 2 - Workflow Metrics -->
+            <div class="disc-section-label">
+                <span>WORKFLOW METRICS</span>
+            </div>
+            <div class="disc-kpi-grid disc-kpi-grid-5">
+
+                <div class="disc-kpi-card disc-kpi-sm disc-kpi-inv" t-on-click="openInvestigations">
+                    <div class="disc-kpi-icon-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.investigations"/></div>
+                        <div class="disc-kpi-label-sm">Investigations</div>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-sm disc-kpi-comm" t-on-click="openCommitteeMeetings">
+                    <div class="disc-kpi-icon-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.committee_meetings"/></div>
+                        <div class="disc-kpi-label-sm">Committee</div>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-sm disc-kpi-susp" t-on-click="openActiveSuspensions">
+                    <div class="disc-kpi-icon-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.active_suspensions"/></div>
+                        <div class="disc-kpi-label-sm">Suspensions</div>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-sm disc-kpi-app" t-on-click="openPendingAppeals">
+                    <div class="disc-kpi-icon-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.pending_appeals"/></div>
+                        <div class="disc-kpi-label-sm">Appeals</div>
+                    </div>
+                </div>
+
+                <div class="disc-kpi-card disc-kpi-sm disc-kpi-pay" t-on-click="openPayrollPenalties">
+                    <div class="disc-kpi-icon-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="disc-kpi-content">
+                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.payroll_penalties"/></div>
+                        <div class="disc-kpi-label-sm">Payroll Deductions</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content: Two Columns -->
+            <div class="disc-main-grid">
+
+                <!-- Left: Recent Cases Table -->
+                <div class="disc-card disc-recent-cases">
+                    <div class="disc-card-header">
+                        <div class="disc-card-title">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+                            Recent Cases
+                        </div>
+                        <button class="disc-link-btn" t-on-click="openAllCases">View All →</button>
+                    </div>
+                    <div class="disc-table-wrapper">
+                        <table class="disc-table">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Employee</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                    <th>SLA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="state.recent_cases.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="disc-table-empty">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                                            No cases found
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="state.recent_cases" t-as="c" t-key="c.id">
+                                    <tr class="disc-table-row" t-on-click="() => this.openCase(c.id)">
+                                        <td class="disc-table-ref"><t t-esc="c.name"/></td>
+                                        <td class="disc-table-emp"><t t-esc="c.employee_id[1]"/></td>
+                                        <td>
+                                            <span t-attf-class="disc-badge {{ getSeverityBadgeClass(c.severity_level) }}">
+                                                <t t-esc="getSeverityLabel(c.severity_level)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-attf-class="disc-state {{ getStateBadgeClass(c.state) }}">
+                                                <t t-esc="getStateLabel(c.state)"/>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span t-if="c.is_sla_exceeded" class="disc-sla-breached">
+                                                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/></svg>
+                                                Breached
+                                            </span>
+                                            <span t-else="" class="disc-sla-ok">
+                                                <t t-esc="c.sla_deadline or '—'"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right: Severity Breakdown + Quick Actions -->
+                <div class="disc-right-panel">
+
+                    <!-- Severity Breakdown Visual -->
+                    <div class="disc-card disc-severity-card">
+                        <div class="disc-card-header">
+                            <div class="disc-card-title">
+                                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                                Case Severity
+                            </div>
+                        </div>
+                        <div class="disc-severity-bars">
+                            <div class="disc-sev-item" t-on-click="openLevel1Cases">
+                                <div class="disc-sev-label">
+                                    <span class="disc-sev-dot disc-sev-l1"></span>
+                                    <span>Level 1 — Critical (Dismissal)</span>
+                                </div>
+                                <div class="disc-sev-right">
+                                    <div class="disc-sev-bar-wrap">
+                                        <div class="disc-sev-bar disc-sev-bar-l1" t-attf-style="width: {{ state.stats.total_cases > 0 ? Math.round((state.stats.level1_cases / state.stats.total_cases) * 100) : 0 }}%"></div>
+                                    </div>
+                                    <span class="disc-sev-count"><t t-esc="state.stats.level1_cases"/></span>
+                                </div>
+                            </div>
+                            <div class="disc-sev-item">
+                                <div class="disc-sev-label">
+                                    <span class="disc-sev-dot disc-sev-l2"></span>
+                                    <span>Level 2 — Final Warning</span>
+                                </div>
+                                <div class="disc-sev-right">
+                                    <div class="disc-sev-bar-wrap">
+                                        <div class="disc-sev-bar disc-sev-bar-l2" style="width: 0%"></div>
+                                    </div>
+                                    <span class="disc-sev-count">—</span>
+                                </div>
+                            </div>
+                            <div class="disc-sev-item">
+                                <div class="disc-sev-label">
+                                    <span class="disc-sev-dot disc-sev-l3"></span>
+                                    <span>Level 3 — Second Warning</span>
+                                </div>
+                                <div class="disc-sev-right">
+                                    <div class="disc-sev-bar-wrap">
+                                        <div class="disc-sev-bar disc-sev-bar-l3" style="width: 0%"></div>
+                                    </div>
+                                    <span class="disc-sev-count">—</span>
+                                </div>
+                            </div>
+                            <div class="disc-sev-item">
+                                <div class="disc-sev-label">
+                                    <span class="disc-sev-dot disc-sev-l4"></span>
+                                    <span>Level 4 — First Warning</span>
+                                </div>
+                                <div class="disc-sev-right">
+                                    <div class="disc-sev-bar-wrap">
+                                        <div class="disc-sev-bar disc-sev-bar-l4" style="width: 0%"></div>
+                                    </div>
+                                    <span class="disc-sev-count">—</span>
+                                </div>
+                            </div>
+                            <div class="disc-sev-item">
+                                <div class="disc-sev-label">
+                                    <span class="disc-sev-dot disc-sev-l5"></span>
+                                    <span>Level 5 — Verbal Warning</span>
+                                </div>
+                                <div class="disc-sev-right">
+                                    <div class="disc-sev-bar-wrap">
+                                        <div class="disc-sev-bar disc-sev-bar-l5" style="width: 0%"></div>
+                                    </div>
+                                    <span class="disc-sev-count">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="disc-card disc-quick-actions">
+                        <div class="disc-card-header">
+                            <div class="disc-card-title">
+                                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+                                Quick Actions
+                            </div>
+                        </div>
+                        <div class="disc-actions-grid">
+                            <button class="disc-action-btn" t-on-click="createNewCase">
+                                <div class="disc-action-icon disc-action-blue">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                                </div>
+                                <span>New Case</span>
+                            </button>
+                            <button class="disc-action-btn" t-on-click="openInvestigations">
+                                <div class="disc-action-icon disc-action-purple">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 00-3.446 6.032l-2.261 2.26a1 1 0 101.414 1.415l2.261-2.261A4 4 0 1011 5z" clip-rule="evenodd"/></svg>
+                                </div>
+                                <span>Investigations</span>
+                            </button>
+                            <button class="disc-action-btn" t-on-click="openCommitteeMeetings">
+                                <div class="disc-action-icon disc-action-amber">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+                                </div>
+                                <span>Committee</span>
+                            </button>
+                            <button class="disc-action-btn" t-on-click="openActiveSuspensions">
+                                <div class="disc-action-icon disc-action-orange">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                                </div>
+                                <span>Suspensions</span>
+                            </button>
+                            <button class="disc-action-btn" t-on-click="openPendingAppeals">
+                                <div class="disc-action-icon disc-action-teal">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/></svg>
+                                </div>
+                                <span>Appeals</span>
+                            </button>
+                            <button class="disc-action-btn" t-on-click="openPayrollPenalties">
+                                <div class="disc-action-icon disc-action-green">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/></svg>
+                                </div>
+                                <span>Payroll</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Summary Stats Card -->
+                    <div class="disc-card disc-summary-card">
+                        <div class="disc-card-header">
+                            <div class="disc-card-title">
+                                <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                                Case Summary
+                            </div>
+                        </div>
+                        <div class="disc-summary-stats">
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #ef4444;"></span>
+                                    Level 1 (Dismissal)
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.level1_cases"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #3b82f6;"></span>
+                                    Total Active
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.active_cases"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #8b5cf6;"></span>
+                                    Pending Approval
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.pending_approval"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #10b981;"></span>
+                                    Revoked Cases
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.revoked_cases"/></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </t>
+
+</templates>

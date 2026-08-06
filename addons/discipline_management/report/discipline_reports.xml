@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Warning Letter & Case Summary PDF Report Action -->
+        <record id="action_report_disciplinary_warning_letter" model="ir.actions.report">
+            <field name="name">Disciplinary Warning Letter / Decision Notice</field>
+            <field name="model">discipline.case</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">discipline_management.report_disciplinary_warning_letter_template</field>
+            <field name="report_file">Disciplinary_Notice</field>
+            <field name="print_report_name">'Disciplinary_Notice_%s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_discipline_case"/>
+            <field name="binding_type">report</field>
+        </record>
+
+    </data>
+</odoo>

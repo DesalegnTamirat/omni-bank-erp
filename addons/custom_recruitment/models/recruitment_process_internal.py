@@ -4,11 +4,23 @@ import logging
 # Initialize the logger
 _logger = logging.getLogger(__name__)
 
+
 class RecruitmentProcessInternal(models.Model):
     _name = "employee.recruitment.internal"
     _inherit = "mail.thread"
     _description = "Internal Recruitment process"
     _rec_name = "job_position"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.job_position.name or str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
@@ -18,7 +30,6 @@ class RecruitmentProcessInternal(models.Model):
     job_category = fields.Char(string="Category")
     emp_type = fields.Char(string="Employment Type")
     vacancy_reference = fields.Char(string="Vacancy Reference")
-    #vacancy_id = fields.Integer(string="Vacancy ID")
     vacancy_id = fields.Many2one("job.vacancy", string="Vacancy")
     recruitment_reference = fields.Char(string="Recruitment Reference")
     relevant_experience = fields.Integer(string="Relevant Experience (Years)")
@@ -37,23 +48,16 @@ class RecruitmentProcessInternal(models.Model):
 
     def populate_criteria(self):
         p_id = self.id
-        # print("Populating Selection criteria")
         self.env.cr.execute('SELECT internal_candidates_criteria(%s)', (p_id,))
-        # self.status = 'notify'
-        # return self.status
 
     def populate_promotion(self):
         p_id = self.id
-        # print("Populating Selection criteria")
         self.env.cr.execute('SELECT populate_months_since_promotion(%s)', (p_id,))
-        # self.status = 'notify'
-        # return self.status
 
     def notify(self):
         p_id = self.id
         _logger.info("Starting notification process for Internal Recruitment ID: %s", self.id)
         self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
-        # self.pop_work_unit()
         vac = self.env["job.vacancy"].search([("reference", "=", self.vacancy_reference)])
         work_units = []
         for rec in vac.hiring_details:
@@ -74,7 +78,6 @@ class RecruitmentProcessInternal(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = channel_id = channel
         message = """Hi This is a Message from Cortex Workflow<br><br>
                     You have been shortlisted for an Internal Recruitment position of <b><u>%s</u></b><br><br>
                     If you are interested, please apply before <b><u>%s</u></b> - The Vacancy is available in <b><u>%s</u></b><br><br>Thanks """ % (
@@ -91,6 +94,14 @@ class EligibleEmployees(models.Model):
     _description = "Eligible Employees"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
     emp_grade = fields.Char(string="Grade", compute="_compute_employee_details", store=True)
     emp_position = fields.Char(string="Position", compute="_compute_employee_details", store=True)
     emp_category = fields.Char(string="Category", compute="_compute_employee_details", store=True)
@@ -112,12 +123,10 @@ class EligibleEmployees(models.Model):
     employment_experience = fields.Float(string="Employment Experience", readonly=True,
                                          compute="_compute_employee_details", store=True)
 
-    # ── Fields from bunna_hr_addons ────────────────────────────────────────
     current_location_exp = fields.Float(string="Current Location Experience")
     current_position_exp = fields.Float(string="Current Position Experience")
     app_date = fields.Date(string="Application Date")
     recommendation = fields.Float(string="Recommendation")
-    # ───────────────────────────────────────────────────────────────────────
 
     grade_id = fields.Integer(string="Grade Id")
     position_id = fields.Integer(string="Position Id")
@@ -136,7 +145,6 @@ class EligibleEmployees(models.Model):
     def _compute_employee_details(self):
         for record in self:
             if not record.emp_name:
-                # Reset fields if employee is removed
                 record.update({
                     'emp_grade': False, 'emp_position': False, 'emp_category': False,
                     'emp_type': False, 'emp_gender': False, 'current_work_unit': False,
@@ -145,7 +153,6 @@ class EligibleEmployees(models.Model):
                 })
                 continue
 
-            # Your SQL Query logic
             query = """ SELECT 
                               eg.grade_code AS emp_grade,
                               hj.name AS emp_position,
@@ -169,7 +176,7 @@ class EligibleEmployees(models.Model):
                               WHERE he.id = %s"""
 
             self.env.cr.execute(query, (record.emp_name.id,))
-            res = self.env.cr.dictfetchone()
+            res = self.env.cr.dictfetchone
 
             if res:
                 record.update({
@@ -189,7 +196,6 @@ class EligibleEmployees(models.Model):
                     'educational_qualification': res.get('educational_qualification'),
                 })
             else:
-                # Fallback if no SQL record found
                 record.update({'emp_grade': False, 'emp_position': False})
 
 
@@ -198,6 +204,17 @@ class InternalSelectedCandidates(models.Model):
     _inherit = "mail.thread"
     _description = "Internal candidates Selection"
     _rec_name = "job_position"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.job_position.name or str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
@@ -231,6 +248,14 @@ class InternalEligibleEmployees(models.Model):
     _description = "Eligible Employees"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
     emp_grade = fields.Char(string="Grade")
     emp_position = fields.Char(string="Position")
     grade_id = fields.Integer(string="Grade Id")
@@ -252,65 +277,3 @@ class InternalEligibleEmployees(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     select_flag = fields.Boolean(string="Select")
     internal_selected_id = fields.Many2one("internal.selected", string="Internal Selected Candidates for Recruitment")
-
-
-class ExternalSelectedCandidates(models.Model):
-    _name = "external.selected"
-    _inherit = "mail.thread"
-    _description = "External candidates Selection"
-    _rec_name = "job_position"
-
-    job_position = fields.Many2one("hr.job", string="Job Position")
-    job_location = fields.Char(string="Work Unit")
-    job_grade = fields.Char(string="Grade")
-    workunit_id = fields.Integer(string="Work Unit Id")
-    job_grade_id = fields.Integer(string="Work Unit Id")
-    job_category = fields.Char(string="Category")
-    emp_type = fields.Char(string="Employment Type")
-    recruitment_reference = fields.Char(string="Recruitment Reference")
-    relevant_experience = fields.Integer(string="Relevant Experience")
-    highest_cgpa = fields.Integer(string="Highest CGPA")
-    vacancy_announced_on = fields.Date(string="Vacancy Announced On")
-    no_of_vacancies = fields.Integer(string="Number of Vacancies")
-    minimum_number_years_in_company = fields.Integer(string="Minimum Number of Years in the Company")
-    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice")
-    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion")
-    minimum_pms_score = fields.Float(string="Minimum PMS Score")
-    status = fields.Selection([('notify', 'Notified')], string="Status")
-    eligible_sel_emp_external = fields.One2many("external.recruitment.selected.employees", "external_emp_selected_id",
-                                                string="External Selected Candidates for Recruitment")
-
-    def notify(self):
-        p_id = self.job_position.id
-        self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
-        self.status = 'notify'
-        return self.status
-
-
-class ExternalEligibleEmployees(models.Model):
-    _name = "external.recruitment.selected.employees"
-    _description = "Eligible Employees"
-
-    emp_name = fields.Many2one("hr.employee", string="Name")
-    emp_grade = fields.Char(string="Grade")
-    emp_position = fields.Char(string="Position")
-    grade_id = fields.Integer(string="Grade Id")
-    position_id = fields.Integer(string="Position Id")
-    workunit_id = fields.Integer(string="Workunit Id")
-    emp_category = fields.Char(string="Category")
-    emp_type = fields.Char(string="Employment Type")
-    emp_gender = fields.Char(string="Gender")
-    current_work_unit = fields.Char(string="Current Location")
-    service_in_company = fields.Float(string="Service in Company")
-    educational_qualification = fields.Char(string="Educational Qualification")
-    cgpa = fields.Float(string="CGPA")
-    relevant_experience = fields.Float(string="Relevant Experience")
-    supervisory_experience = fields.Float(string="Supervisory Experience")
-    last_promotion = fields.Float(string="Months since last Promotion")
-    pms_score = fields.Float(string="PMS Score")
-    preferred_location = fields.Char(string="Preferred Location")
-    written_warning = fields.Float(string="Months since Written Warning")
-    demoted = fields.Boolean(string='Demoted Employee', default=False)
-    select_flag = fields.Boolean(string="Select")
-    external_emp_selected_id = fields.Many2one("external.selected",
-                                               string="External Selected Candidates for Recruitment")

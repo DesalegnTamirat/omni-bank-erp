@@ -18,5 +18,5 @@ class notify_internal_candidates(models.TransientModel):
         print ("Job ID : ", p_id)
         # cr = self.env.cr
         # self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
-        # cr.commit()
+        # cr.commit
         # print("Employees Notified")

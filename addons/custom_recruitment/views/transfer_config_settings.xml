@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Standalone Transfer Request Configuration Settings -->
+    <record id="transfer_config_settings_action" model="ir.actions.act_window">
+        <field name="name">Transfer Request Settings</field>
+        <field name="res_model">transfer.request.config</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="transfer_config_settings_form"/>
+    </record>
+
+    <record id="transfer_config_settings_form" model="ir.ui.view">
+        <field name="name">transfer.request.config.form</field>
+        <field name="model">transfer.request.config</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Request Configuration">
+                <header>
+                    <button string="Save Settings" type="object" name="action_save" class="btn-primary"/>
+                    <button string="Cancel" special="cancel" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Transfer Request Settings</h1>
+                        <p class="oe_subtitle">Configure transfer eligibility rules and ranking parameters</p>
+                    </div>
+                    <group string="Discipline Rules">
+                        <p class="oe_grey" colspan="4">
+                            Configure whether active disciplinary warnings should block transfer participation entirely 
+                            or allow participation with score deductions.
+                        </p>
+                        <field name="transfer_discipline_blocks_first_warning"/>
+                        <field name="transfer_discipline_blocks_second_warning"/>
+                    </group>
+                    <group string="Eligibility Thresholds">
+                        <field name="transfer_min_pms_score"/>
+                        <field name="transfer_min_service_years"/>
+                        <field name="transfer_refusal_penalty_months"/>
+                    </group>
+                    <group string="Pending Request Expiry">
+                        <field name="transfer_pending_expiry_days"/>
+                        <field name="transfer_pending_auto_withdraw_days"/>
+                    </group>
+                    <group string="Ranking Weights">
+                        <p class="oe_grey" colspan="4">
+                            Configure the weight percentages for each factor in the Transfer Suitability Score calculation.
+                            The total must equal 100%.
+                        </p>
+                        <field name="transfer_weight_pms"/>
+                        <field name="transfer_weight_application_date"/>
+                        <field name="transfer_weight_experience"/>
+                        <field name="transfer_weight_service_location"/>
+                        <field name="transfer_weight_recommendation"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Menu Item: Transfer Settings under Recruitment → Configuration -->
+    <menuitem id="menu_transfer_config_settings"
+              name="Transfer Settings"
+              parent="hr_recruitment.menu_hr_recruitment_configuration"
+              action="transfer_config_settings_action"
+              sequence="100"/>
+
+</odoo>

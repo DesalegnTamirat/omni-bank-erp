@@ -22,17 +22,17 @@ used to live inside `hr_employee_custom`:
 - Probation Management (hr.employee.probation): 60/75-day duration by
   employee category, 5-day-prior supervisor notification, and
   Satisfactory/Unsatisfactory/Discipline-Issue outcome recording
-  (BRD FR-REC-060 to FR-REC-062).
+  (BRD .
 - Employee-Initiated Transfer Process (employee.transfer.request): grade/
   position restriction, 1-year service rule, discipline-based eligibility
   and score deduction, Exchange Transfer support, employee withdrawal, and
-  post-approval refusal flagging to HR (BRD FR-REC-063 to FR-REC-068).
+  post-approval refusal flagging to HR (BRD .
 - Transfer Ranking Algorithm and Committee Minutes (employee.transfer.request
   scoring + transfer.committee.minutes / transfer.committee.minutes.line):
   weighted Transfer Suitability Score (Application Date 20%, Total
   Experience 20%, Service in Current Location 20%, PMS Score 40%), discipline
   deduction, ranked list, and a printable Transfer Committee Minutes report
-  (BRD FR-REC-069 to FR-REC-071).
+  (BRD .
 
 It depends on `hr_employee_custom` for shared HR master-data models such as
 Operating Unit, Employee Grade and the custom fields added on hr.employee.
@@ -57,9 +57,12 @@ dependency, so they were intentionally left in place.
         'portal',
         'website',
         'hr_employee_custom',
+        'discipline_management',
     ],
     'data': [
         'security/ir.model.access.csv',
+        'security/recruitment_security_rules.xml',
+        'views/recruitment_master_data.xml',
 
         # -- Data / Sequences --
         'data/bb_external.xml',
@@ -68,6 +71,7 @@ dependency, so they were intentionally left in place.
         'data/employee_transfer_probation.xml',
         'data/recruitment_request_sequence.xml',
         'data/recruitment_scoring_data.xml',
+        'data/recruitment_master_seed_data.xml',
 
         # -- Reports (must load before views referencing their actions) --
         'reports/minute_template.xml',
@@ -93,11 +97,12 @@ dependency, so they were intentionally left in place.
         'views/blacklist_pool.xml',
         'views/eligible_employees_external.xml',
         'views/eligible_employees_internal.xml',
-        'views/internal_job_position.xml',
         'views/internal_recruitment.xml',
+
         'views/interview_assessment.xml',
         'views/job_vacancy.xml',
         'views/recruitment_process_external.xml',
+        'views/external_default_criteria_views.xml',
         'views/recruitment_process_internal.xml',
         'views/selected_external.xml',
         'views/selected_internal.xml',
@@ -105,18 +110,22 @@ dependency, so they were intentionally left in place.
         'views/employee_probation.xml',
         'views/employee_transfer.xml',
         'views/transfer_ranking.xml',
+        'views/transfer_config_settings.xml',
         'views/job_vacancy_competency_views.xml',
         'views/employee_education_views.xml',
-        # -- Recruitment Request Management (FR-08 to FR-12) --
+        # -- Recruitment Request Management  --
         'views/recruitment_request.xml',
 
         # -- Scoring Engine, Offer Management, Application Window, Blacklist (FRS 5,6,9,11) --
         'views/recruitment_scoring_views.xml',
+        'views/talent_roster_views.xml',
+        'data/talent_roster_cron.xml',
 
         # -- Wizards (views + actions only; menu items are in menu_recruitment.xml) --
         'wizards/external_candidates.xml',
         'wizards/internal_candidates.xml',
         'wizards/notify_internal_candidates.xml',
+        'wizards/talent_roster_wizard.xml',
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',

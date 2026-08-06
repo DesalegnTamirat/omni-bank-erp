@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sequence for Disciplinary Case -->
+        <record id="seq_discipline_case" model="ir.sequence">
+            <field name="name">Disciplinary Case Sequence</field>
+            <field name="code">discipline.case</field>
+            <field name="prefix">DISC/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Committee Meeting -->
+        <record id="seq_discipline_committee_meeting" model="ir.sequence">
+            <field name="name">Disciplinary Committee Meeting Sequence</field>
+            <field name="code">discipline.committee.meeting</field>
+            <field name="prefix">DCM/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Suspension Request -->
+        <record id="seq_discipline_suspension" model="ir.sequence">
+            <field name="name">Disciplinary Suspension Sequence</field>
+            <field name="code">discipline.suspension</field>
+            <field name="prefix">SUSP/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Discipline Appeal -->
+        <record id="seq_discipline_appeal" model="ir.sequence">
+            <field name="name">Disciplinary Appeal Sequence</field>
+            <field name="code">discipline.appeal</field>
+            <field name="prefix">APP/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

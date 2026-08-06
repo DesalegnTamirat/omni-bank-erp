@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <template id="report_disciplinary_warning_letter_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; line-height: 1.6;">
+                            
+                            <div class="row text-center mb-4" style="border-bottom: 2px solid #800000; padding-bottom: 15px;">
+                                <div class="col-12">
+                                    <h2 style="color: #800000; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
+                                    <h4 style="color: #333; font-weight: 600;">HUMAN RESOURCES MANAGEMENT DIRECTORATE</h4>
+                                    <h5 style="color: #666; text-transform: uppercase; letter-spacing: 1px;">
+                                        OFFICIAL DISCIPLINARY NOTICE &amp; WARNING LETTER
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <strong>Ref No:</strong> <span t-field="doc.name"/><br/>
+                                    <strong>Date:</strong> <span t-field="doc.final_decision_date" t-options='{"widget": "date"}'/>
+                                </div>
+                                <div class="col-6 text-end">
+                                    <strong>Severity Level:</strong> <span t-field="doc.severity_level"/><br/>
+                                    <strong>SLA Status:</strong> 
+                                    <t t-if="doc.is_sla_exceeded">
+                                        <span class="badge bg-danger">SLA Breached</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="badge bg-success">Within SLA</span>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Employee Information Box -->
+                            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
+                                    EMPLOYEE PARTICULARS
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Employee Name:</strong> <span t-field="doc.employee_id.name"/><br/>
+                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.registration_number"/><br/>
+                                        <strong>Job Title:</strong> <span t-field="doc.job_id.name"/>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Department:</strong> <span t-field="doc.department_id.name"/><br/>
+                                        <strong>Work Location:</strong> <span t-field="doc.work_location_id.name"/><br/>
+                                        <strong>Company:</strong> <span t-field="doc.company_id.name"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Incident & Misconduct Summary -->
+                            <div class="mb-4">
+                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                    1. SUMMARY OF MISCONDUCT &amp; INCIDENT
+                                </h6>
+                                <p><strong>Incident Date:</strong> <span t-field="doc.incident_date"/></p>
+                                <p><strong>Offense Title:</strong> <span t-field="doc.offense_id.name"/> (<span t-field="doc.offense_category_id.name"/>)</p>
+                                <p style="text-align: justify; background: #fff; border-left: 3px solid #800000; padding: 10px; font-style: italic;">
+                                    <span t-field="doc.description"/>
+                                </p>
+                            </div>
+
+                            <!-- Enforcement & Penalty Action -->
+                            <div class="mb-4">
+                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                    2. DISCIPLINARY DECISION &amp; ENFORCED ACTION
+                                </h6>
+                                <table class="table table-bordered table-sm" style="margin-top: 10px;">
+                                    <thead style="background-color: #f2f2f2;">
+                                        <tr>
+                                            <th>Punishment Type</th>
+                                            <th>Salary Penalty (%)</th>
+                                            <th>Initiator</th>
+                                            <th>Reviewer</th>
+                                            <th>Final Approver</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span t-field="doc.punishment_type"/></td>
+                                            <td><span t-field="doc.penalty_percentage"/> %</td>
+                                            <td><span t-field="doc.initiator_id.name"/></td>
+                                            <td><span t-field="doc.reviewer_id.name"/></td>
+                                            <td><span t-field="doc.approver_id.name"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <t t-if="doc.penalty_percentage &gt; 0">
+                                    <p class="text-danger" style="font-weight: bold;">
+                                        Note: A salary deduction penalty of <span t-field="doc.penalty_percentage"/>% will be automatically applied via Payroll starting from effective date.
+                                    </p>
+                                </t>
+                            </div>
+
+                            <!-- Appeal Notice (FR-DIS-031) -->
+                            <div class="mb-4" style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 4px;">
+                                <h6 style="color: #856404; font-weight: bold; margin-bottom: 5px;">
+                                    3. NOTICE OF APPEAL RIGHTS (FR-DIS-031)
+                                </h6>
+                                <p style="color: #856404; margin-bottom: 0; font-size: 12px;">
+                                    Per Bunna Bank HR Disciplinary Policy, you have the right to submit a formal appeal against this decision within 
+                                    <strong>ten (10) calendar days</strong> from the date of this notice (Appeal Deadline: <strong><span t-field="doc.appeal_deadline"/></strong>). 
+                                    Appeals submitted after this window will be rejected.
+                                </p>
+                            </div>
+
+                            <!-- Signature Block -->
+                            <div class="row mt-5" style="page-break-inside: avoid;">
+                                <div class="col-6 text-center">
+                                    <p style="margin-bottom: 50px;"><strong>Issued By HR Directorate:</strong></p>
+                                    <p>___________________________<br/>
+                                    <strong><span t-field="doc.approver_id.name"/></strong><br/>
+                                    Authorized HR Approver</p>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <p style="margin-bottom: 50px;"><strong>Employee Acknowledgment:</strong></p>
+                                    <p>___________________________<br/>
+                                    <strong><span t-field="doc.employee_id.name"/></strong><br/>
+                                    Signature &amp; Date</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+    </data>
+</odoo>

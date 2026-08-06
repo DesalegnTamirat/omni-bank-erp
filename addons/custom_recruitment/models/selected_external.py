@@ -17,8 +17,20 @@ from odoo.exceptions import ValidationError
 
 class ExternalRecruitmentSelected(models.Model):
     _name = "external.recruitment.selected"
+    _description = "External Recruitment Selected"
     _inherit = "mail.thread"
     _rec_name = "job_position"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.job_position.name or str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
@@ -96,7 +108,7 @@ class ExternalRecruitmentSelected(models.Model):
         for val in self.recr_exter_selected_team_id:
             if val.status=="unavailable":
                 if usr==val.employee_name:
-                    raise ValidationError("Sorry!! you can not evaluate this bid")
+                    raise ValidationError("Sorry!! you can not evaluate this Vacancy")
                 else:
                     n=n+1
                     val.approve=True
@@ -124,11 +136,11 @@ class ExternalRecruitmentSelected(models.Model):
         mail_content = comments
 
         # The mail addresses and password
-        sender_address = 'cortex.workflow@gmail.com'
+        sender_address = 'bunnatest.workflow@gmail.com'
         sender_pass = 'zktuxyepwxpkzbtv'
         receiver_address = email
         # Setup the MIME
-        message = MIMEMultipart()
+        message = MIMEMultipart
         message['From'] = sender_address
         message['To'] = receiver_address
         message['Subject'] = Header(subject_column, 'utf-8')
@@ -136,12 +148,12 @@ class ExternalRecruitmentSelected(models.Model):
         message.attach(MIMEText(mail_content, 'plain'))
         # Create SMTP session for sending the mail
         session = smtplib.SMTP('smtp.gmail.com', 587)  # use gmail with port
-        session.starttls()  # enable security
+        session.starttls  # enable security
         session.login(sender_address, sender_pass)  # login with mail_id and password
-        text = message.as_string()
+        text = message.as_string
 
         session.sendmail(sender_address, receiver_address, text)
-        session.quit()
+        session.quit
 
     def notify_written_exam(self):
         p_id = self.id
@@ -250,6 +262,13 @@ class ExternalRecruitmentSelectedCandidates(models.Model):
     applicant_name = fields.Many2one("hr.applicant", string="Applicant Name")
     applicant_email = fields.Char(string="Email")
     emp_name = fields.Char(string="emp name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     emp_grade = fields.Char(string="Grade")
     emp_position = fields.Char(string="Position")
     grade_id = fields.Integer(string="Grade Id")
@@ -287,8 +306,16 @@ class ExternalRecruitmentSelectedCandidates(models.Model):
 
 class InternalRecruitmentPanel(models.Model):
     _name = "external.recruitment.panel"
+    _description = "External Recruitment Panel"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     emp_position = fields.Char(string="Position")
     position_id = fields.Integer(string="Position Id")
     workunit_id = fields.Integer(string="Workunit Id")
@@ -303,10 +330,18 @@ class InternalRecruitmentPanel(models.Model):
 
 class ExternalRecruitmentSelectedDelegation(models.Model):
     _name = "external.recrt.delegation.team"
+    _description = "External Recrt Delegation Team"
 
     role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
                              ("member_secretary", "Member & Secretary")], string="Role")
     employee_name = fields.Many2one("res.users", string="Employee Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
     status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="status")
     alternate_committee_member = fields.Many2one("res.users", string="Alternate Approver")
@@ -318,20 +353,51 @@ class ExternalRecruitmentSelectedDelegation(models.Model):
 
 class NewExternalRecruitmentSelected(models.Model):
     _name = "new.external.recruitment.selected"
+    _description = "New External Recruitment Selected"
 
     emp_name = fields.Char(string="Emp Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
 
 class NewExternalRecruitmentSelectedDelegation(models.Model):
     _name = "new.external.recrt.delegation.team"
+    _description = "New External Recrt Delegation Team"
 	
     emp_name = fields.Char(string="Emp Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
 	
 class NewInternalRecruitmentPanel(models.Model):
     _name = "new.external.recruitment.panel"
+    _description = "New External Recruitment Panel"
 	
     emp_name = fields.Char(string="Emp Name")
-	
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
 class NewExternalRecruitmentSelectedCandidates(models.Model):
     _name = "new.external.recruitment.selected.candidates"
+    _description = "New External Recruitment Selected Candidates"
 	
     emp_name = fields.Char(string="Emp Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True

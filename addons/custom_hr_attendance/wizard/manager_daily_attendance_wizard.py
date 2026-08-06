@@ -60,31 +60,28 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
         # Fallback: all active employees (for top-level managers / HR)
         return self.env['hr.employee'].search([('active', '=', True)]).ids
 
-    def action_view_attendance(self):
+    def action_generate_report(self):
         """
-        Open a live filtered list of hr.attendance records for the selected
-        date range and employees. No data is written to any table.
+        Generates daily attendance report for the selected date range by calling the
+        generate_detail_employee_attendance_report stored procedure to populate the
+        generate_employee_attendance_details table, then opens the Daily Employee Attendance Detail view.
         """
         self.ensure_one()
 
-        if self.include_all or not self.employee_ids:
-            employee_ids = self._get_subordinate_employee_ids()
-        else:
-            employee_ids = self.employee_ids.ids
-
-        domain = [
-            ('employee_id', 'in', employee_ids),
-            ('check_in', '>=', fields.Datetime.from_string(str(self.date_from) + ' 00:00:00')),
-            ('check_in', '<=', fields.Datetime.from_string(str(self.date_to) + ' 23:59:59')),
-        ]
+        # Execute stored procedure to populate generate_employee_attendance_details table
+        self.env.cr.execute(
+            "SELECT generate_daily_employee_attendance_detail_report(%s, %s, %s)",
+            (self.date_from, self.date_to, 'daily_detail')
+        )
 
         return {
             'type': 'ir.actions.act_window',
-            'name': _('Daily Attendance — %s to %s') % (self.date_from, self.date_to),
-            'res_model': 'hr.attendance',
-            'view_mode': 'list,form',
-            'domain': domain,
-            'context': {
-                'search_default_group_by_employee': 1,
-            },
+            'name': _('Daily Employee Attendance Detail'),
+            'res_model': 'generate.employee.attendance.details',
+            'view_mode': 'list,search',
+            'target': 'current',
         }
+
+    # Backward-compatibility alias
+    action_view_attendance = action_generate_report
+

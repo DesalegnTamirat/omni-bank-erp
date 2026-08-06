@@ -8,7 +8,7 @@
             <field name="code"><![CDATA[
 # High performance PostgreSQL function for Bunna Bank attendance reporting
 sql = """
-CREATE OR REPLACE FUNCTION generate_detail_employee_attendance_report(
+CREATE OR REPLACE FUNCTION generate_daily_employee_attendance_detail_report(
     p_from DATE,
     p_to DATE,
     p_report_type VARCHAR
@@ -69,6 +69,73 @@ BEGIN
             AND (att.active = TRUE OR att.active IS NULL)
         WHERE emp.active = TRUE
         GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.name;
+    ELSE
+        -- Daily Employee Attendance Detail mode (per-attendance row)
+        INSERT INTO generate_employee_attendance_details (
+            employee_id,
+            employee_identification,
+            employee_name,
+            job_title,
+            job_grade,
+            place_of_assignment,
+            work_unit,
+            manager_name,
+            attendance_month,
+            checkin_date,
+            checkin_time,
+            checkout_time,
+            remarks,
+            worked_hours,
+            late_time_hour,
+            early_exit_hour,
+            over_time_hour,
+            pre_defined,
+            acknowledged_lateness,
+            pre_approved_early_checkout,
+            acknowledged_early_checkout,
+            force_checkout,
+            working_hours,
+            create_date,
+            write_date
+        )
+        SELECT 
+            emp.id AS employee_id,
+            COALESCE(emp.employee_identification, '') AS employee_identification,
+            COALESCE(emp.name, '') AS employee_name,
+            COALESCE(job.name, '') AS job_title,
+            COALESCE(CAST(emp.job_position AS VARCHAR), 'XIV') AS job_grade,
+            COALESCE(ou.name, '') AS place_of_assignment,
+            CASE 
+                WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
+                ELSE COALESCE(ou.name, '')
+            END AS work_unit,
+            COALESCE(mgr.name, '') AS manager_name,
+            TO_CHAR(att.check_in, 'Mon-YYYY') AS attendance_month,
+            att.check_in::date AS checkin_date,
+            att.check_in AS checkin_time,
+            att.check_out AS checkout_time,
+            COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
+            COALESCE(att.worked_hours, 0.0) AS worked_hours,
+            COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
+            COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
+            COALESCE(att.over_time_hour, 0.0) AS over_time_hour,
+            COALESCE(att.pre_defined_lateness, 0.0) AS pre_defined,
+            COALESCE(att.acknowledged_late, 0.0) AS acknowledged_lateness,
+            COALESCE(att.pre_approved_early_checkout, 0.0) AS pre_approved_early_checkout,
+            COALESCE(att.acknowledged_exit, 0.0) AS acknowledged_early_checkout,
+            CASE WHEN att.check_out_status = 'Force Checkout' OR att.is_force_checkout = TRUE THEN 1 ELSE 0 END AS force_checkout,
+            COALESCE(att.worked_hours, 0.0) AS working_hours,
+            NOW(),
+            NOW()
+        FROM hr_attendance att
+        JOIN hr_employee emp ON att.employee_id = emp.id
+        LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
+        LEFT JOIN hr_job job ON emp.job_position = job.id
+        LEFT JOIN hr_employee mgr ON emp.parent_id = mgr.id
+        WHERE att.check_in >= p_from::timestamp 
+          AND att.check_in <= (p_to + interval '1 day')::timestamp
+          AND (att.active = TRUE OR att.active IS NULL)
+          AND emp.active = TRUE;
     END IF;
 END;
 $$ LANGUAGE plpgsql;

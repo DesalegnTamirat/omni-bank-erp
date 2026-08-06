@@ -86,20 +86,21 @@
                     <group>
                         <!-- LEFT: Request Info -->
                         <group string="Request Information">
-                            <field name="request_type" widget="radio"/>
-                            <field name="request_date"/>
+                            <field name="request_type" widget="radio" readonly="state != 'draft'"/>
+                            <field name="request_date" readonly="state != 'draft'"/>
                             <!-- Auto-fetched from the logged-in user's own
                                  employee record; locked once Submitted so
                                  it can't be spoofed, but editable while
                                  still Draft in case the default is wrong. -->
                             <field name="requested_by" readonly="state != 'draft'"/>
                             <field name="operating_unit_id" readonly="state != 'draft'"/>
-                            <!-- FR-REC-006/007: Planned -> link workforce plan.
+                            <!-- /007: Planned -> link workforce plan.
                                  Domain restricts the picker to Approved,
                                  non-deleted plans for the same Work Unit. -->
                             <field name="workforce_plan_id"
                                    invisible="request_type != 'planned'"
-                                   required="request_type == 'planned'"/>
+                                   required="request_type == 'planned'"
+                                   readonly="state != 'draft'"/>
                             <!-- Read-only plan availability, so the requester
                                  sees whether they're within budget BEFORE
                                  hitting the automated validation on Submit. -->
@@ -110,44 +111,49 @@
                             <field name="plan_remaining_headcount"
                                    invisible="request_type != 'planned' or not workforce_plan_id"/>
                         </group>
-                        <!-- RIGHT: Job Information (FR-11) -->
+                        <!-- RIGHT: Job Information  -->
                         <group string="Job Information">
-                            <field name="job_position_id"/>
-                            <field name="job_grade_id"/>
+                            <field name="job_position_id" readonly="state != 'draft'"/>
+                            <field name="job_grade_id" readonly="state != 'draft'"/>
                             <!-- Auto-fetched from the logged-in user's own
                                  department; locked once Submitted. -->
                             <field name="department_id" readonly="state != 'draft'"/>
-                            <field name="employment_type"/>
-                            <field name="required_headcount"/>
-                            <field name="sourcing_type"/>
-                            <field name="last_date_to_apply"
+                            <field name="employment_type" readonly="state != 'draft'"/>
+                            <field name="required_headcount" readonly="state != 'draft'"/>
+                            <field name="sourcing_type" readonly="state != 'draft'"/>
+                            <field name="last_date_to_apply" readonly="state != 'draft'"
                                    help="Application deadline for the vacancy. Defaults to 30 days from vacancy creation if not set."/>
                         </group>
                     </group>
 
-                    <!-- FR-10: Justification (Unplanned) -->
+                    <!-- : Justification (Unplanned) -->
                     <group string="Business Justification"
                            invisible="request_type != 'unplanned'">
                         <field name="justification" nolabel="1"
                                required="request_type == 'unplanned'"
+                               readonly="state != 'draft'"
                                placeholder="Provide business justification for this unplanned recruitment request..."/>
                     </group>
 
-                    <!-- FR-12: Replacement Hiring -->
+                    <!-- : Replacement Hiring -->
                     <group string="Replacement Hiring">
-                        <field name="is_replacement"/>
+                        <field name="is_replacement" readonly="state != 'draft'"/>
                         <field name="replaced_employee_id"
-                               invisible="not is_replacement"/>
+                               invisible="not is_replacement"
+                               readonly="state != 'draft'"/>
                         <field name="replacement_reason"
-                               invisible="not is_replacement"/>
+                               invisible="not is_replacement"
+                               readonly="state != 'draft'"/>
                     </group>
 
                     <notebook>
                         <page string="Job Details">
                             <group>
                                 <field name="required_qualifications"
+                                       readonly="state != 'draft'"
                                        placeholder="Required qualifications, certifications, experience..."/>
                                 <field name="job_description"
+                                       readonly="state != 'draft'"
                                        placeholder="Detailed job description and responsibilities..."/>
                             </group>
                         </page>
@@ -169,11 +175,7 @@
                 <!-- Set invisible="1" to hide the activity log, followers, and message threads.
                      This reduces visual clutter while preserving the audit trail in the database.
                      Remove invisible="1" to re-enable if needed later. -->
-                <div class="oe_chatter" invisible="1">
-                    <field name="message_follower_ids" widget="mail_followers"/>
-                    <field name="activity_ids" widget="mail_activity"/>
-                    <field name="message_ids" widget="mail_thread"/>
-                </div>
+
             </form>
         </field>
     </record>

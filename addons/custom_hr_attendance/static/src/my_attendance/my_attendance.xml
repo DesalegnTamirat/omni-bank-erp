@@ -2,43 +2,326 @@
 <templates xml:space="preserve">
 
 <t t-name="custom_hr_attendance.MyAttendance">
-    <div class="o_bunna_my_attendance d-flex flex-column align-items-center justify-content-center h-100 w-100 py-5">
+    <div class="o_smart_attendance_wrapper p-3 p-md-5">
         <t t-if="!state.loading">
             <t t-if="state.hasEmployee">
-                <div class="o_bunna_my_attendance_card card text-center p-4 shadow-sm">
-                    <div class="o_bunna_my_attendance_avatar mx-auto mb-3">
-                        <img t-if="state.employeeAvatar"
-                             t-att-src="state.employeeAvatar"
-                             class="rounded-circle o_bunna_my_attendance_avatar_img"
-                             alt="Employee photo"/>
-                        <i t-else="" class="fa fa-camera fa-3x text-muted"/>
+                <!-- TOP HEADER BAR -->
+                <div class="o_smart_header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div>
+                        <h4 class="mb-1">
+                            Welcome Back, <span t-esc="state.employeeName"/> 👋
+                        </h4>
+                        <div class="text-muted" style="font-weight: 500;">Smart Attendance Dashboard</div>
                     </div>
-                    <h3 class="mb-1" t-esc="state.employeeName"/>
-                    <h5 class="text-muted mb-4">
-                        <t t-if="state.checkedIn">Want to check out?</t>
-                        <t t-else="">Welcome!</t>
-                    </h5>
-                    <div t-if="state.checkedIn" class="text-muted mb-4">
-                        Today's work hours: <strong t-esc="state.hoursToday"/>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="o_live_clock_pill d-inline-flex align-items-center">
+                            <i class="fa fa-clock-o fa-lg me-2"/>
+                            <span class="time-text me-2" t-esc="state.currentClockTime"/>
+                            <span class="date-text" t-esc="state.currentClockDate"/>
+                        </div>
+                        <!-- Settings Gear - Admin Only -->
+                        <button t-if="state.isAdmin"
+                                t-on-click="toggleSettings"
+                                t-attf-class="btn o_settings_gear_btn {{ state.showSettings ? 'active' : '' }}"
+                                title="Attendance Settings">
+                            <i class="fa fa-cog fa-lg"/>
+                        </button>
                     </div>
-                    <button
-                        t-on-click="onClickToggle"
-                        t-att-disabled="state.inProgress"
-                        t-attf-class="btn btn-{{ state.checkedIn ? 'warning' : 'success' }} o_bunna_my_attendance_btn mx-auto">
-                        <i t-attf-class="fa fa-sign-{{ state.checkedIn ? 'out' : 'in' }} fa-2x"/>
-                    </button>
-                    <div class="text-muted mt-3 small">
-                        <t t-if="state.checkedIn">Click to check out</t>
-                        <t t-else="">Click to check in</t>
+                </div>
+
+                <!-- MAIN DASHBOARD CONTENT -->
+                <div class="row g-4 mt-2">
+                    <!-- LEFT COLUMN: HERO ACTION CARD -->
+                    <div class="col-12 col-lg-5 col-xl-4">
+                        <div class="o_smart_hero_card premium-card p-4 p-xl-5 h-100">
+                            <!-- AVATAR CONTAINER -->
+                            <div class="o_smart_avatar_wrapper">
+                                <img t-if="state.employeeAvatar"
+                                     t-att-src="state.employeeAvatar"
+                                     class="o_smart_avatar_img"
+                                     alt="Employee photo"/>
+                                <div t-else="" class="o_smart_avatar_placeholder d-flex align-items-center justify-content-center bg-light text-muted">
+                                    <i class="fa fa-user fa-4x"/>
+                                </div>
+
+                                <span t-attf-class="o_status_indicator_dot {{ state.checkedIn ? 'bg-success' : 'bg-secondary' }}"
+                                      t-att-title="state.checkedIn ? 'Checked In' : 'Checked Out'"/>
+                            </div>
+
+                            <h4 class="mb-1" t-esc="state.employeeName"/>
+                            <p class="text-muted mb-3" t-esc="state.jobTitle"/>
+                            <div t-if="state.departmentName" class="dept-badge mb-4">
+                                <t t-esc="state.departmentName"/>
+                            </div>
+
+                            <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
+                            <div class="w-100 mt-2 mb-4">
+                                <button t-on-click="onClickToggle"
+                                        t-att-disabled="state.inProgress"
+                                        t-attf-class="btn o_smart_action_btn w-100 d-flex align-items-center justify-content-center gap-2 {{ state.checkedIn ? 'o_btn_checked_in' : 'o_btn_checked_out' }}">
+                                    <i t-attf-class="fa {{ state.checkedIn ? 'fa-sign-out' : 'fa-sign-in' }} fa-lg"/>
+                                    <span>
+                                        <t t-if="state.checkedIn">CHECK OUT</t>
+                                        <t t-else="">CHECK IN</t>
+                                    </span>
+                                </button>
+                            </div>
+
+                            <!-- LIVE WORKED TIMER BADGE -->
+                            <div class="w-100 mt-auto">
+                                <t t-if="state.checkedIn">
+                                    <div class="o_timer_box active-timer p-4 text-center">
+                                        <div class="timer-title small fw-bold mb-2">
+                                            <i class="fa fa-circle me-1 pulse-dot"/> ACTIVE SESSION TIME
+                                        </div>
+                                        <div class="h2 mb-1" t-esc="state.liveWorkedTimer"/>
+                                        <div class="text-muted small mt-1" style="font-weight: 500; font-size: 0.75rem;">Current session only (starts from 0)</div>
+                                        <div t-if="state.checkInTimeStr" class="text-muted small mt-2" style="font-weight: 500;">
+                                            Checked in at <span class="text-dark fw-bold" t-esc="state.checkInTimeStr"/>
+                                            <span t-if="state.checkInStatus"
+                                                  t-attf-class="badge rounded-pill ms-2 {{ state.checkInStatus === 'Late' ? 'bg-warning text-dark' : 'bg-success text-white' }}"
+                                                  t-esc="state.checkInStatus"/>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div class="o_timer_box p-4 text-center">
+                                        <div class="text-muted small fw-bold mb-2 text-uppercase">
+                                            <i class="fa fa-history me-1"/> Total Worked Today
+                                        </div>
+                                        <div class="h2 mb-1" t-esc="state.hoursToday"/>
+                                        <div class="text-muted small mt-2" style="font-weight: 500;">Ready to start your day</div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: METRICS & DAILY BREAKDOWN -->
+                    <div class="col-12 col-lg-7 col-xl-8">
+                        <!-- STAT CARDS ROW -->
+                        <div class="row g-4 mb-4">
+                            <div class="col-12 col-sm-6">
+                                <div class="premium-card o_stat_card h-100">
+                                    <div class="o_stat_icon icon-daily">
+                                        <i class="fa fa-clock-o fa-2x"/>
+                                    </div>
+                                    <div>
+                                        <div class="stat-label">TODAY'S WORKED HOURS</div>
+                                        <div class="stat-value">
+                                            <t t-esc="state.todayTotalFormatted"/>
+                                        </div>
+                                        <div class="stat-sub">
+                                            <t t-if="state.checkedIn">Completed + live session</t>
+                                            <t t-else="">Recorded today</t>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-sm-6">
+                                <div class="premium-card o_stat_card h-100">
+                                    <div class="o_stat_icon icon-weekly">
+                                        <i class="fa fa-calendar-check-o fa-2x"/>
+                                    </div>
+                                    <div>
+                                        <div class="stat-label">THIS WEEK'S TOTAL</div>
+                                        <div class="stat-value" t-esc="state.weeklyHoursFormatted"/>
+                                        <div class="stat-sub">Mon - Sun accumulation</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DAILY ATTENDANCE BREAKDOWN CHART CARD -->
+                        <div class="premium-card p-4 p-xl-5">
+                            <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.05) !important;">
+                                <h5 class="fw-bold mb-0" style="color: #0f172a; font-size: 1.15rem;">
+                                    <i class="fa fa-bar-chart text-primary me-2"/> Weekly Attendance Breakdown
+                                </h5>
+                                <span class="badge rounded-pill px-3 py-2" style="background: #f1f5f9; color: #334155; font-weight: 600; border: 1px solid #e2e8f0;">
+                                    Weekly Total: <t t-esc="state.weeklyHoursFormatted"/>
+                                </span>
+                            </div>
+
+                            <div class="o_daily_breakdown_list">
+                                <t t-foreach="state.dailyBreakdown" t-as="day" t-key="day.day_name">
+                                    <div t-attf-class="o_daily_row d-flex align-items-center gap-3 {{ day.is_today ? 'is-today' : '' }}">
+                                        <!-- DAY & DATE -->
+                                        <div style="width: 80px;">
+                                            <div class="day-name" t-esc="day.day_name"/>
+                                            <div class="day-date" t-esc="day.date_str"/>
+                                        </div>
+
+                                        <!-- PROGRESS BAR -->
+                                        <div class="flex-grow-1">
+                                            <div class="progress">
+                                                <div t-attf-class="progress-bar {{ day.is_today ? 'bar-today' : (day.hours > 0 ? 'bar-past' : 'bar-empty') }}"
+                                                     role="progressbar"
+                                                     t-att-style="'width: ' + day.percentage + '%;'"
+                                                     t-att-aria-valuenow="day.percentage"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"/>
+                                            </div>
+                                        </div>
+
+                                        <!-- HOURS VALUE -->
+                                        <div style="width: 80px;" class="text-end hours-val">
+                                            <t t-esc="day.hours_formatted"/>
+                                        </div>
+
+                                        <!-- TODAY BADGE -->
+                                        <div style="width: 80px;" class="text-end">
+                                            <span t-if="day.is_today &amp;&amp; day.checkedIn" class="onduty-badge">On Duty</span>
+                                            <span t-elif="day.is_today" class="today-badge">Today</span>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </t>
             <t t-else="">
-                <div class="alert alert-warning text-center" role="alert">
-                    No employee is linked to your user account. Please contact your
-                    administrator to set up your attendance.
+                <div class="premium-card p-5 text-center mt-5 mx-auto" style="max-width: 500px;">
+                    <i class="fa fa-exclamation-triangle fa-3x text-warning mb-3 d-block"/>
+                    <h4 class="fw-bold text-dark mb-2">No Employee Record Found</h4>
+                    <p class="text-muted">No employee record is linked to your user account. Please contact your system administrator.</p>
                 </div>
             </t>
+        </t>
+        <t t-else="">
+            <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 60vh;">
+                <i class="fa fa-circle-o-notch fa-spin fa-3x text-primary mb-3"/>
+                <div class="text-muted fw-bold fs-5">Loading Dashboard...</div>
+            </div>
+        </t>
+        <!-- SETTINGS SLIDE-IN PANEL (Admin Only) -->
+        <t t-if="state.showSettings and state.isAdmin">
+            <div class="o_settings_overlay" t-on-click="toggleSettings"/>
+            <div class="o_settings_panel premium-card">
+                <div class="o_settings_panel_header d-flex align-items-center justify-content-between mb-4">
+                    <h5 class="fw-bold mb-0" style="color: #0f172a;">
+                        <i class="fa fa-cog me-2" style="color: #c17540;"/> Attendance Settings
+                    </h5>
+                    <button class="btn btn-sm" t-on-click="toggleSettings" style="color: #94a3b8;">
+                        <i class="fa fa-times fa-lg"/>
+                    </button>
+                </div>
+
+                <!-- FEATURE TOGGLES -->
+                <div class="settings-section mb-4">
+                    <div class="settings-section-title">Feature Toggles</div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">Check-In Time Restriction</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_checkin_restrict"
+                                   t-att-checked="state.settings.enable_checkin_restriction"
+                                   t-on-change="(e) => state.settings.enable_checkin_restriction = e.target.checked"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">Check-Out Time Restriction</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_checkout_restrict"
+                                   t-att-checked="state.settings.enable_checkout_restriction"
+                                   t-on-change="(e) => state.settings.enable_checkout_restriction = e.target.checked"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">Saturday Half-Day</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_saturday"
+                                   t-att-checked="state.settings.enable_saturday_halfday"
+                                   t-on-change="(e) => state.settings.enable_saturday_halfday = e.target.checked"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">Lunch Break Flow</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_lunch"
+                                   t-att-checked="state.settings.enable_lunch_break"
+                                   t-on-change="(e) => state.settings.enable_lunch_break = e.target.checked"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">Auto Absence Detection</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_absence"
+                                   t-att-checked="state.settings.enable_auto_absence"
+                                   t-on-change="(e) => state.settings.enable_auto_absence = e.target.checked"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row">
+                        <div class="settings-toggle-label">ERP Access Gate</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_gate"
+                                   t-att-checked="state.settings.enable_checkin_gate"
+                                   t-on-change="(e) => state.settings.enable_checkin_gate = e.target.checked"/>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TIME PARAMETERS -->
+                <div class="settings-section mb-4">
+                    <div class="settings-section-title">Shift Time Parameters</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Morning Start (h)</label>
+                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
+                               t-att-value="state.settings.morning_time"
+                               t-on-change="(e) => state.settings.morning_time = parseFloat(e.target.value)"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Exit Time (h)</label>
+                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
+                               t-att-value="state.settings.exit_time"
+                               t-on-change="(e) => state.settings.exit_time = parseFloat(e.target.value)"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Check-In Buffer (h)</label>
+                        <input type="number" class="settings-input" min="0" max="2" step="0.25"
+                               t-att-value="state.settings.checkin_buffer"
+                               t-on-change="(e) => state.settings.checkin_buffer = parseFloat(e.target.value)"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Force Checkout After (h)</label>
+                        <input type="number" class="settings-input" min="8" max="24" step="0.5"
+                               t-att-value="state.settings.force_checkout_hours"
+                               t-on-change="(e) => state.settings.force_checkout_hours = parseFloat(e.target.value)"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Saturday Exit (h)</label>
+                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
+                               t-att-value="state.settings.saturday_exit_time"
+                               t-on-change="(e) => state.settings.saturday_exit_time = parseFloat(e.target.value)"/>
+                    </div>
+                </div>
+
+                <!-- DISCIPLINE THRESHOLDS -->
+                <div class="settings-section mb-4">
+                    <div class="settings-section-title">Discipline Thresholds</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Late Arrivals Before Case</label>
+                        <input type="number" class="settings-input" min="1" max="30" step="1"
+                               t-att-value="state.settings.lateness_violation_threshold"
+                               t-on-change="(e) => state.settings.lateness_violation_threshold = parseInt(e.target.value)"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Force Checkouts Before Case</label>
+                        <input type="number" class="settings-input" min="1" max="30" step="1"
+                               t-att-value="state.settings.force_checkout_violation_threshold"
+                               t-on-change="(e) => state.settings.force_checkout_violation_threshold = parseInt(e.target.value)"/>
+                    </div>
+                </div>
+
+                <!-- SAVE BUTTON -->
+                <button class="btn w-100 o_settings_save_btn"
+                        t-att-disabled="state.settingsSaving"
+                        t-on-click="saveSettings">
+                    <i t-attf-class="fa {{ state.settingsSaving ? 'fa-circle-o-notch fa-spin' : 'fa-save' }} me-2"/>
+                    <t t-if="state.settingsSaving">Saving...</t>
+                    <t t-else="">Save Settings</t>
+                </button>
+            </div>
         </t>
     </div>
 </t>

@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
+    ports:
+      - '5434:5432'
     restart: unless-stopped
 
   odoo:
@@ -16,8 +18,8 @@ services:
     depends_on:
       - db
     ports:
-      - "8069:8069"
-      - "8072:8072"   
+      - '8069:8069'
+      - '8072:8072'
     environment:
       HOST: db
       USER: odoo

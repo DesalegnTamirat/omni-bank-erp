@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from odoo.exceptions import ValidationError
+from psycopg2 import errors as pg_errors
 
 from odoo import models, fields, api
 from odoo.http import request
@@ -136,7 +137,7 @@ class LeaveRequest(models.Model):
         self.job_position = self.requester_name.job_position.id
         self.operating_unit = self.requester_name.default_operating_unit_id.id
 
-    def fetch(self):
+    def action_fetch_leave(self):
         p_id = self.env.user.id
         n_id = self.id
         _logger.info("User ID: %s | Request ID: %s", p_id, n_id)
@@ -150,15 +151,22 @@ class LeaveRequest(models.Model):
         n_id = record.id
 
         if record.leave_reason in ["annual_leave","wedding_leave","paternity_leave","schedule_leave","mourning_leave"]:
-            # Call stored procedure for annual leave
-            self.env.cr.execute('SELECT populate_computed_actual_leaves(%s)', (n_id,))
+            try:
+                # Call stored procedure for annual leave (savepoint so a
+                # missing function does not abort the whole transaction).
+                with self.env.cr.savepoint():
+                    self.env.cr.execute('SELECT populate_computed_actual_leaves(%s)', (n_id,))
+                record.invalidate_recordset(['computed_leave'])
+                continue
+            except pg_errors.UndefinedFunction:
+                # Stored procedure not installed - fall back to manual count.
+                pass
+        # Calculate total leave days manually (including weekends)
+        if record.start_date and record.end_date:
+            total_days = (record.end_date - record.start_date).days + 1
+            record.computed_leave = total_days
         else:
-            # Calculate total leave days manually (including weekends)
-            if record.start_date and record.end_date:
-                total_days = (record.end_date - record.start_date).days + 1
-                record.computed_leave = total_days
-            else:
-                record.computed_leave = 0
+            record.computed_leave = 0
 
 
        

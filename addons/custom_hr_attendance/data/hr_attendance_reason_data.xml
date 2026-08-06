@@ -37,6 +37,15 @@
     <record id="reason_company_event" model="hr.attendance.reason">
         <field name="name">Due to participation in company-approved events or activities</field>
         <field name="code">EVENT</field>
+    </record>  
+    <record id="reason_operational_disruption" model="hr.attendance.reason">
+        <field name="name">Operational Disruption (Branch-Wide Event)</field>
+        <field name="code">OPERATIONAL_DISRUPTION</field>
+    </record>
+
+    <record id="reason_system_technical_failure" model="hr.attendance.reason">
+        <field name="name">Technical Failure (Device / Network / System Down)</field>
+        <field name="code">TECHNICAL_FAILURE</field>
     </record>
 
 </odoo>

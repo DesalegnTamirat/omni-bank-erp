@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_discipline_revocation_wizard_form" model="ir.ui.view">
+            <field name="name">discipline.revocation.wizard.form</field>
+            <field name="model">discipline.revocation.wizard</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group string="Case Information">
+                            <field name="case_id" readonly="1"/>
+                            <field name="employee_id" readonly="1"/>
+                        </group>
+                        <group string="Revocation Authority &amp; Justification">
+                            <field name="revocation_reason" placeholder="Enter mandatory legal / administrative justification for revoking this record..." required="1"/>
+                            <field name="approval_notes" placeholder="Specify HR Executive / Senior Management approval memo details..." required="1"/>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <button string="Confirm Formal Revocation" name="action_confirm_revocation" type="object" class="btn-danger"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

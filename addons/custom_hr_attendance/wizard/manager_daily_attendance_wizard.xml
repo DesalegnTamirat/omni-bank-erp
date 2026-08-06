@@ -12,29 +12,19 @@
         <field name="name">manager.daily.attendance.wizard.form</field>
         <field name="model">manager.daily.attendance.wizard</field>
         <field name="arch" type="xml">
-            <form string="Daily Attendance Report">
+            <form string="Generate Employee Attendance Report Wizard">
                 <group>
-                    <group string="Date Range">
-                        <field name="date_from" string="From"/>
-                        <field name="date_to" string="To"/>
-                    </group>
-                    <group string="Employees">
-                        <field name="include_all"
-                               string="All My Employees"/>
-                        <field name="employee_ids"
-                               widget="many2many_tags"
-                               string="Select Employees"
-                               invisible="include_all"/>
-                    </group>
+                    <field name="date_from" string="Date From"/>
+                    <field name="date_to" string="Date To"/>
                 </group>
 
                 <footer>
-                    <button name="action_view_attendance"
-                            string="View Attendance"
+                    <button name="action_generate_report"
+                            string="Generate"
                             type="object"
-                            class="btn btn-primary"/>
+                            class="btn-primary"/>
                     <button string="Cancel"
-                            class="btn btn-secondary"
+                            class="btn-secondary"
                             special="cancel"/>
                 </footer>
             </form>
@@ -43,7 +33,7 @@
 
     <!-- Window Action -->
     <record id="action_manager_daily_attendance_wizard" model="ir.actions.act_window">
-        <field name="name">Daily Attendance Report</field>
+        <field name="name">Generate Employee Attendance Report Wizard</field>
         <field name="res_model">manager.daily.attendance.wizard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="manager_daily_attendance_wizard_form"/>

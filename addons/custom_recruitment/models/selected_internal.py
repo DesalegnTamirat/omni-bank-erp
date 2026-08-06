@@ -7,8 +7,20 @@ _logger = logging.getLogger(__name__)
 
 class NewInternalRecruitmentSelected(models.Model):
     _name = "new.internal.recruitment.selected"
+    _description = "New Internal Recruitment Selected"
     _inherit = "mail.thread"
     _rec_name = "job_position"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.job_position.name or str(rec.id)
 
     job_position = fields.Many2one("hr.job", string="Job Position")
     job_location = fields.Char(string="Work Unit")
@@ -288,10 +300,18 @@ class NewInternalRecruitmentSelected(models.Model):
 		
 class NewInternalRecruitmentSelectedDelegation(models.Model):
     _name = "new.recrt.delegation.team"
+    _description = "New Recrt Delegation Team"
 
     role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
                              ("member_secretary", "Member & Secretary")], string="Role")
     employee_name = fields.Many2one("res.users", string="Employee Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
     status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="status")
     alternate_committee_member = fields.Many2one("res.users", string="Alternate Approver")
@@ -304,8 +324,16 @@ class NewInternalRecruitmentSelectedDelegation(models.Model):
 
 class InternalRecruitmentSelectedCandidates(models.Model):
     _name = "new.internal.recruitment.selected.candidates"
+    _description = "New Internal Recruitment Selected Candidates"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     emp_grade = fields.Char(string="Grade")
     emp_position = fields.Char(string="Position",compute="_compute_employee_details", 
                     store=True)
@@ -364,8 +392,16 @@ class InternalRecruitmentSelectedCandidates(models.Model):
                 record.current_work_unit = False
 class InternalRecruitmentPanel(models.Model):
     _name = "new.internal.recruitment.panel"
+    _description = "New Internal Recruitment Panel"
 
     emp_name = fields.Many2one("hr.employee", string="Name")
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     emp_position = fields.Char(string="Position")
     position_id = fields.Integer(string="Position Id")
     vacancy_id = fields.Integer(string="Vacancy ID")

@@ -4,15 +4,7 @@ from . import archive_mixin
 from . import upgrade_mail_patch
 from . import hr_employee_no_track
 from . import acting_position_rule
-# from . import applicant_assessment  # moved to custom_recruitment
-# from . import applicant_shortlist  # moved to custom_recruitment
-# from . import assessment_criteria  # moved to custom_recruitment
-# from . import blacklist_pool  # moved to custom_recruitment
-# from . import candidate_shortlist  # moved to custom_recruitment
-from . import company_manpower_plan
-from . import disciplinary_action
-from . import disciplinary_outcome
-from . import discipline_action
+
 from . import employee_acting_service_request
 # from . import employee_attendance_details  # disabled: attendance feature not active
 from . import employee_demotion
@@ -48,6 +40,8 @@ from . import hr_employee_transfer_history
 from . import hr_job
 from . import hr_job_history
 from . import hr_leave
+from . import hr_leave_allocation
+from . import hr_leave_allocation_accruement
 # operating_unit must load before hr_operating_unit, since hr_operating_unit.py
 # does `_inherit = 'operating.unit'` on the model defined (via `_name`) here —
 # merged in from the standalone 'operating_unit' module.
@@ -64,14 +58,9 @@ from . import hr_reinstated_history
 from . import hr_training_history
 from . import increment
 from . import inherit2
-# from . import internal_job_position  # moved to custom_recruitment
-# from . import internal_recruitment  # moved to custom_recruitment
-# from . import interview_assessment  # moved to custom_recruitment
 from . import job_history
-# from . import job_vacancy  # moved to custom_recruitment
 from . import leave_request
 from . import leave_request_managr
-from . import penalty_and_allowances
 from . import re_instating
 from . import recruitment_competency
 from . import recruitment_experience
@@ -89,5 +78,5 @@ from . import service_request_type
 from . import supplementary
 from . import transfer_form
 from . import vacancy_workunit
-from . import work_unit_manpower_plan
+from . import employee_category
 

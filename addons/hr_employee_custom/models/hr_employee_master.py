@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-
+from datetime import datetime, time, timedelta
+from math import fabs
+from dateutil.relativedelta import relativedelta
 from odoo import models, fields, api, _
 
 
@@ -29,7 +31,14 @@ class HrEmployee(models.Model):
     alternative_mobile = fields.Char(string='Alternate Mobile')
     emergency_contact_2_name = fields.Char(string="Emergency Contact 2 Name", help="Emergency Contact 2 Name")
     emergency_contact_2_phone = fields.Char(string="Emergency Contact 2 Phone", help="Emergency Contact 2 Phone")
-
+    gender = fields.Selection(
+        selection=[
+            ('male', 'Male'),
+            ('female', 'Female'),
+        ],
+        string='Gender',
+        store=True,
+    )
     # ------------------------------------------------------------------
     # Address / locality
     # ------------------------------------------------------------------
@@ -73,9 +82,7 @@ class HrEmployee(models.Model):
     language_ids = fields.Many2many('res.lang', string="Languages")
     languages_ids = fields.One2many('hr.languages', 'employee_id', string='HR Languages', help='Languages Information')
 
-    # ------------------------------------------------------------------
-    # Employment / job info
-    # ------------------------------------------------------------------
+
     current_company = fields.Char("Current Company")
     working_status = fields.Char("Working Status")
     willing_to_join_immediately = fields.Selection(
@@ -85,9 +92,7 @@ class HrEmployee(models.Model):
     first_contract_date = fields.Date(string='First Contract Date')
     job_name = fields.Char(string="Job Name", help="Job Name")
     job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
-    # CONFLICT RESOLVED: hr_employee.py / hr_employee_master.py had
-    # job_grade as a plain Char; hr_employee_hrMaster.py had it as a
-    # Many2one to employee.grade. Kept the Many2one version.
+
     job_grade = fields.Many2one("employee.grade", string="Job Grade", help="Job Grade")
     department_id = fields.Many2one('hr.department', string='Department')
     operating_unit_ids = fields.Many2many('operating.unit', string="Operating Units")
@@ -101,10 +106,90 @@ class HrEmployee(models.Model):
     # ------------------------------------------------------------------
     # Probation
     # ------------------------------------------------------------------
-    probation_start_date = fields.Date(string="Probation Start date", help="Probation Start date")
-    probation_end_date = fields.Date(string="Probation End Date", help="Probation End Date")
-    probation_period = fields.Integer(string="Probation Period")
-    probationary_details = fields.Text(string='Probationary Details')
+    probation_start_date = fields.Date(
+        string="Probation Start date",
+        help="Probation Start date",
+        compute="_compute_probation_start_date",
+        store=True,
+        readonly=True,
+    )
+    probation_end_date = fields.Date(
+        string="Probation End Date",
+        help="Probation End Date",
+        compute="_compute_probation_end_date",
+        store=True,
+        readonly=True,
+    )
+
+    probation_period = fields.Integer(
+        string="Probation Period",
+        compute="_compute_probation_period",
+        store=True,
+        readonly=True,
+    )
+    probationary_details = fields.Text(
+        string='Probationary Details',
+        compute="_compute_probationary_details",
+        store=True,
+        readonly=True,
+    )
+
+    # Category-based probation periods (in days), keyed by the technical
+    # value of hr.job.employee_category ('Managerial' / 'Non Managerial').
+    _PROBATION_DAYS_BY_CATEGORY = {
+        'Managerial': 75,
+        'Non Managerial': 60,
+    }
+
+    @api.depends("job_position.employee_category", "job_position.probation_period")
+    def _compute_probation_period(self):
+        for employee in self:
+            job = employee.job_position
+            category = job.employee_category if job else False
+            if category in self._PROBATION_DAYS_BY_CATEGORY:
+                employee.probation_period = self._PROBATION_DAYS_BY_CATEGORY[category]
+            else:
+                # Fallback: no/unrecognized category on the job, use
+                # whatever probation_period is set directly on hr.job.
+                employee.probation_period = job.probation_period or 0
+
+    @api.depends("service_hire_date")
+    def _compute_probation_start_date(self):
+        for employee in self:
+            employee.probation_start_date = employee.service_hire_date
+
+    @api.depends("probation_start_date", "probation_period")
+    def _compute_probation_end_date(self):
+        for employee in self:
+            if employee.probation_start_date and employee.probation_period:
+                employee.probation_end_date = (
+                    employee.probation_start_date + timedelta(days=employee.probation_period)
+                )
+            else:
+                employee.probation_end_date = False
+
+    @api.depends("probation_start_date", "probation_end_date", "probation_period")
+    def _compute_probationary_details(self):
+        for employee in self:
+            if employee.probation_start_date and employee.probation_end_date:
+                duration = relativedelta(
+                    employee.probation_end_date, employee.probation_start_date
+                )
+                parts = []
+                if duration.years:
+                    parts.append(_("%s year(s)") % duration.years)
+                if duration.months:
+                    parts.append(_("%s month(s)") % duration.months)
+                if duration.days:
+                    parts.append(_("%s day(s)") % duration.days)
+                duration_str = ", ".join(parts) if parts else _("0 days")
+                employee.probationary_details = _("Probation period: %s, from %s to %s") % (
+                    duration_str,
+                    employee.probation_start_date.strftime("%b %d, %Y"),
+                    employee.probation_end_date.strftime("%b %d, %Y"),
+                )
+            else:
+                employee.probationary_details = False
 
     # ------------------------------------------------------------------
     # Pension
@@ -112,12 +197,7 @@ class HrEmployee(models.Model):
     pension_number = fields.Char(string="Pension Number", help="Pension Number")
     pension_no = fields.Char("Pension No")
 
-    # ------------------------------------------------------------------
-    # Payroll / status
-    # ------------------------------------------------------------------
-    # CONFLICT RESOLVED: hr_employee.py / hr_employee_master.py had
-    # payroll_status as Char; hr_employee_hrMaster.py had it as Integer.
-    # Kept the Integer version.
+
     payroll_status = fields.Integer(string="Payroll Status")
     info_section = fields.Selection([
         ('insurance', 'Insurance'),
@@ -138,10 +218,7 @@ class HrEmployee(models.Model):
     alternate_parent = fields.Integer(string="Incharge Manager Partner ID")
     alternate_manager = fields.Integer(string="Incharge Manager")
     planning_parent_partner_id = fields.Integer()
-    # CONFLICT RESOLVED: hr_employee.py / hr_employee_master.py had
-    # planning_parent_id as a plain Many2one; hr_employee_hrMaster.py had it
-    # as a computed, stored, editable Many2one with a domain. Kept the
-    # richer hr_employee_hrMaster.py version, along with its compute method.
+
     planning_parent_id = fields.Many2one(
         'hr.employee',
         string="Planning Parent",
@@ -178,9 +255,7 @@ class HrEmployee(models.Model):
     due_ids = fields.One2many('hr.due', 'employee_id', string='Third Party Dues', help='Dues Information')
     gurentee_ids = fields.One2many('guarentees.details', 'employee_id', string='Guarantee',
                                    help='gurentees Role Information')
-    # CONFLICT RESOLVED: hr_employee.py used string='Awards', hr_employee_master.py
-    # used string='Employee Rewards & Badges'; kept hr_employee_hrMaster.py's
-    # label/help text.
+
     award_ids = fields.One2many('hr.awards', 'employee_id', string='Awards Received',
                                 help='Awards Received Information')
     award_count = fields.Integer(string='Award Count', compute='_compute_award_count')
@@ -191,23 +266,13 @@ class HrEmployee(models.Model):
                                        string=" Education Fee Sponsorship", help=' Education Fee Sponsorship')
     commitment_info = fields.One2many("training.commitment", 'commitment_id', string="Training Commitment",
                                       help=' Training Commitment')
-    # CONFLICT RESOLVED: hr_employee_master.py pointed this field at
-    # discipline.action/employee_name, while hr_employee_hrMaster.py pointed
-    # it at emp.discipline.action.record/disc_rec_id. The
-    # hr_employee_master_views.xml list view (reference/breach_count/breach/
-    # penalty_effective_date/fine_imposed/status) and discipline_action.py's
-    # notify() method both match emp.discipline.action.record, so that
-    # version was kept; the discipline.action version was dropped as dead/
-    # superseded.
-    emp_disc_records_id = fields.One2many("emp.discipline.action.record", "disc_rec_id",
-                                          string="Employee Disciplinary action Records")
 
     qualification_id = fields.One2many('hr.qualification.info.employee', 'employee_id', 'Education Qualification')
     experiance_id = fields.One2many('hr.experience.info.employee', 'employee_id', 'Experiance')
     competencies_id = fields.One2many('hr.competencies.info.employee', 'employee_id', 'Competencies')
 
     # From employee_fields_application (hr_employee_hrMaster.py)
-    responsible_user_id  = fields.Many2one('res.users', "Responsible",  default=lambda self: self.env.uid)
+    responsible_user_id = fields.Many2one('res.users', "Responsible", default=lambda self: self.env.uid)
 
     # ------------------------------------------------------------------
     # Compute methods
@@ -254,3 +319,112 @@ class HrEmployee(models.Model):
                 },
             }
         }
+
+
+class HrEmployee(models.Model):
+    _inherit = "hr.employee"
+
+
+    service_hire_date = fields.Date(
+        string="Hire Date",
+        groups="hr.group_hr_user",
+        tracking=True,
+        compute="_compute_service_hire_date",
+        store=True,
+        readonly=True,
+        help=(
+            "Hire date is normally the date an employee completes new hire paperwork"
+        ),
+    )
+    service_start_date = fields.Date(
+        string="Start Date",
+        groups="hr.group_hr_user",
+        tracking=True,readonly=True,
+        help=(
+            "Start date is the first day the employee actually works and"
+            " this date is used for accrual leave allocations calculation"
+        ),
+    )
+    service_termination_date = fields.Date(
+        string="Termination Date",
+        related="departure_date",readonly=True,
+        help=(
+            "Termination date is the last day the employee actually works and"
+            " this date is used for accrual leave allocations calculation"
+        ),
+    )
+    service_duration = fields.Integer(
+        string="Service Duration",
+        groups="hr.group_hr_user",
+        readonly=True,
+        compute="_compute_service_duration",
+        help="Service duration in days",
+    )
+    service_duration_years = fields.Integer(
+        string="Service Duration (years)",
+        groups="hr.group_hr_user",
+        readonly=True,
+        compute="_compute_service_duration_display",
+    )
+    service_duration_months = fields.Integer(
+        string="Service Duration (months)",
+        groups="hr.group_hr_user",
+        readonly=True,
+        compute="_compute_service_duration_display",
+    )
+    service_duration_days = fields.Integer(
+        string="Service Duration (days)",
+        groups="hr.group_hr_user",
+        readonly=True,
+        compute="_compute_service_duration_display",
+    )
+
+    @api.depends("contract_ids.date_start", "start_date")
+    def _compute_service_hire_date(self):
+        for employee in self:
+            contracts = employee.contract_ids.filtered("date_start").sorted("date_start")
+            if contracts:
+                employee.service_hire_date = contracts[0].date_start
+            else:
+                employee.service_hire_date = employee.start_date
+
+    @api.depends("service_start_date", "service_termination_date")
+    def _compute_service_duration(self):
+        for record in self:
+            service_until = record.service_termination_date or fields.Date.today()
+            if record.service_start_date and service_until > record.service_start_date:
+                service_since = record.service_start_date
+                service_duration = fabs(
+                    (service_until - service_since) / timedelta(days=1)
+                )
+                record.service_duration = int(service_duration)
+            else:
+                record.service_duration = 0
+
+    @api.depends("service_start_date", "service_termination_date")
+    def _compute_service_duration_display(self):
+        for record in self:
+            service_until = record.service_termination_date or fields.Date.today()
+            if record.service_start_date and service_until > record.service_start_date:
+                service_duration = relativedelta(
+                    service_until, record.service_start_date
+                )
+                record.service_duration_years = service_duration.years
+                record.service_duration_months = service_duration.months
+                record.service_duration_days = service_duration.days
+            else:
+                record.service_duration_years = 0
+                record.service_duration_months = 0
+                record.service_duration_days = 0
+
+    @api.onchange("service_hire_date")
+    def _onchange_service_hire_date(self):
+        if not self.service_start_date:
+            self.service_start_date = self.service_hire_date
+
+    def _get_date_start_work(self):
+        service_start_date = self.sudo().service_start_date
+        if service_start_date:
+            return datetime.combine(service_start_date, time(0, 0, 0))
+        else:
+            return super()._get_date_start_work()

@@ -29,4 +29,109 @@
         <field name="target">new</field>
     </record>
 
+    <!-- ── Shortlist Criteria Wizard ─────────────────────────────────── -->
+    <record id="external_recruitment_shortlist_wizard_form" model="ir.ui.view">
+        <field name="name">external.recruitment.shortlist.wizard.form</field>
+        <field name="model">external.recruitment.shortlist.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Define Shortlisting Criteria">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Shortlisting Criteria</h2>
+                        <p class="text-muted">
+                            Set the criteria below. Only candidates matching
+                            <strong>all filled criteria</strong> will be shortlisted.
+                            Leave any section empty to skip that filter.
+                        </p>
+                    </div>
+
+                    <group>
+                        <field name="recruitment_id" readonly="1"/>
+                    </group>
+
+                    <separator string="Academic Requirements"/>
+                    <group>
+                        <group>
+                            <field name="minimum_cgpa"
+                                   help="Minimum CGPA required. Set to 0 to skip this check."/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="qualification_ids"
+                               widget="many2many_tags"
+                               help="Select from education qualifications registered across candidates (external_applicant_education). Candidate must match at least one."/>
+                    </group>
+
+                    <separator string="Experience Requirements"/>
+                    <group>
+                        <group>
+                            <field name="minimum_experience_years"
+                                   string="Min. Relevant Experience (Yrs)"
+                                   help="Minimum relevant experience in years. Set to 0 to skip."/>
+                            <field name="minimum_banking_experience"
+                                   string="Min. Banking Sector Experience (Yrs)"
+                                   help="Minimum years in banking sector. Set to 0 to skip."/>
+                        </group>
+                        <group>
+                            <field name="minimum_supervisory_experience"
+                                   string="Min. Supervisory Experience (Yrs)"
+                                   help="Minimum supervisory/managerial experience in years. Set to 0 to skip."/>
+                        </group>
+                    </group>
+
+                    <separator string="Required Skills &amp; Certifications"/>
+                    <group>
+                        <field name="skill_ids"
+                               widget="many2many_tags"
+                               help="Select from skills registered across candidates. Candidate must possess ALL selected skills."/>
+                    </group>
+                    <group>
+                        <field name="cert_ids"
+                               widget="many2many_tags"
+                               help="Select from certifications registered across candidates. Candidate must hold ALL selected certifications."/>
+                    </group>
+
+                    <separator string="Personal &amp; Demographics"/>
+                    <group>
+                        <group>
+                            <field name="gender"/>
+                            <field name="max_age" help="Maximum age in years. Set to 0 for no age limit."/>
+                        </group>
+                        <group>
+                            <field name="required_language"/>
+                        </group>
+                    </group>
+
+                    <separator string="Employment Preferences &amp; Status"/>
+                    <group>
+                        <group>
+                            <field name="working_status"/>
+                            <field name="join_immediately"/>
+                        </group>
+                        <group>
+                            <field name="ex_bunna"/>
+                        </group>
+                    </group>
+
+                </sheet>
+                <footer>
+                    <button name="action_submit_criteria"
+                            string="Submit &amp; Shortlist"
+                            type="object"
+                            class="btn btn-primary"
+                            data-hotkey="s"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_external_recruitment_shortlist_wizard" model="ir.actions.act_window">
+        <field name="name">Define Shortlisting Criteria</field>
+        <field name="res_model">external.recruitment.shortlist.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="external_recruitment_shortlist_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
 </odoo>

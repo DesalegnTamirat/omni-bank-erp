@@ -9,10 +9,9 @@
                     <group>
                         <field name="grade_code"/>
                         <field name="grade_name"/>
-                         <field name="category"/>
+                        <field name="category"/>
                     </group>
                     <group>
-                        <field name="parent_grade"/>
                         <field name="base_salary"/>
                         <field name="salary_factor"/>
 
@@ -23,32 +22,32 @@
                         <field name="end_date"/>
                     </group>
                     <group>
-<!--                     <field name="status" type="checkbox"/>-->
-                    <!-- PAYROLL MODULE NOT INSTALLED — this button called a "salary_rule"
-                         object method that no longer exists (it depended on hr.salary.rule).
-                         Restore once the payroll module is installed and the method is added back.
-                    <button name="salary_rule" string="Salary Rule" type="object" class="oe_highlight"/>
-                    -->
+                        <!--                     <field name="status" type="checkbox"/>-->
+                        <!-- PAYROLL MODULE NOT INSTALLED — this button called a "salary_rule"
+                             object method that no longer exists (it depended on hr.salary.rule).
+                             Restore once the payroll module is installed and the method is added back.
+                        <button name="salary_rule" string="Salary Rule" type="object" class="oe_highlight"/>
+                        -->
+                    </group>
                 </group>
-                </group>
 
-<!--                 <group>-->
-<!--                    <notebook >-->
-<!--                        <page string="Salary Details">-->
+                <!--                 <group>-->
+                <!--                    <notebook >-->
+                <!--                        <page string="Salary Details">-->
 
-<!--                <field name="job_multi_id">-->
-<!--                       <list editable="bottom">-->
-<!--                            <field name="salary_rule"/>-->
-<!--                            <field name="value"/>-->
-<!--                            <field name="start_date"/>-->
-<!--                            <field name="end_date"/>-->
+                <!--                <field name="job_multi_id">-->
+                <!--                       <list editable="bottom">-->
+                <!--                            <field name="salary_rule"/>-->
+                <!--                            <field name="value"/>-->
+                <!--                            <field name="start_date"/>-->
+                <!--                            <field name="end_date"/>-->
 
-<!--                        </list>-->
+                <!--                        </list>-->
 
-<!--                    </field>-->
-<!--			</page>-->
-<!--                    </notebook>-->
-<!--                </group>-->
+                <!--                    </field>-->
+                <!--			</page>-->
+                <!--                    </notebook>-->
+                <!--                </group>-->
 
             </form>
         </field>
@@ -60,17 +59,17 @@
             <list string="Job Grade">
                 <field name="grade_code"/>
                 <field name="grade_name"/>
+
                 <field name="category"/>
-                <field name="parent_grade"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
-<!--                 <field name="status" type="checkbox"/>-->
-<!--                <field name="active"  invisible="inactive == True"/>-->
-<!--                <field name="inactive"  invisible="active == True"/>-->
+                <!--                 <field name="status" type="checkbox"/>-->
+                <!--                <field name="active"  invisible="inactive == True"/>-->
+                <!--                <field name="inactive"  invisible="active == True"/>-->
             </list>
         </field>
     </record>
-        <record id="employee_grade_tree_action" model="ir.actions.act_window">
+    <record id="employee_grade_tree_action" model="ir.actions.act_window">
         <field name="name">Job Grade Details</field>
         <field name="res_model">employee.grade</field>
         <field name="context">{}</field>

@@ -25,13 +25,18 @@
                         <group>
                             <field name="sol_id" placeholder="e.g. 1001" required="1"/>
                             <field name="code" placeholder="e.g. 10001"/>
-                            <field name="old_code" placeholder="e.g. 9001"/>
+                            <field name="manager_id" placeholder="Manager Name"/>
                             <field name="active" widget="boolean_toggle"/>
+                            <field name="branch_grade"/>
+                            <field name="region"/>
                         </group>
                         <group>
                             <field name="work_unit_type" required="1"/>
+                            <field name="department"/>
                             <field name="parent_unit"/>
-                            <field name="branch_grade"/>
+                            <field name="latitude"/>
+                            <field name="longitude"/>
+
                         </group>
                     </group>
 
@@ -40,8 +45,8 @@
                             <field name="hardship_allowance"/>
                         </group>
                         <group>
-                            <field name="partner_id" context="{'res_partner_search_mode': 'customer'}"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
+<!--                            <field name="company_id" context="{'res_partner_search_mode': 'customer'}"/>-->
+                            <field name="company_id"/>
                         </group>
                     </group>
 
@@ -91,7 +96,11 @@
                 <field name="sol_id" string="Sol ID"/>
                 <field name="name" string="Name"/>
                 <field name="code" string="Code"/>
-                <field name="old_code" string="Old Code" optional="show"/>
+                <field name="manager_id" placeholder="Manager Name" optional="show"/>
+                <field name="latitude" optional="show"/>
+                <field name="longitude" optional="show"/>
+                <field name="district"/>
+                <field name="region"/>
                 <field name="work_unit_type" string="Type" widget="badge"/>
                 <field name="parent_unit" string="Parent Unit" optional="show"/>
                 <field name="branch_grade" string="Grade" optional="show"/>
@@ -112,14 +121,19 @@
                 <field name="name" string="Name"/>
                 <field name="sol_id" string="Sol ID"/>
                 <field name="code" string="Code"/>
-                <field name="old_code" string="Old Code"/>
+                <field name="manager_id" string="Manager"/>
+                <field name="latitude"/>
+                <field name="longitude"/>
+                <field name="district"/>
+                <field name="region"/>
                 <field name="work_unit_type" string="Work Unit Type"/>
                 <field name="parent_unit" string="Parent Unit"/>
                 <separator/>
                 <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
                 <filter name="filter_inactive" string="Archived" domain="[('active', '=', False)]"/>
                 <separator/>
-                <filter name="group_by_work_unit_type" string="Work Unit Type" context="{'group_by': 'work_unit_type'}"/>
+                <filter name="group_by_work_unit_type" string="Work Unit Type"
+                        context="{'group_by': 'work_unit_type'}"/>
                 <filter name="group_by_parent" string="Parent Unit" context="{'group_by': 'parent_unit'}"/>
             </search>
         </field>

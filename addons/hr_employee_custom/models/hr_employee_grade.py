@@ -45,13 +45,11 @@ class HrEmployeeGrade(models.Model):
     parent_grade = fields.Char("Parent Grade")
 
 
-    category = fields.Selection(
-        [
-            ('managerial', 'Managerial'),
-            ('non_managerial', 'Non-Managerial'),
-        ],
-        string='Category',
+    category = fields.Many2one('employee.category', string='Category'
     )
+    # manager=fields.Boolean(string='Manager')
+    # non_manager=fields.Boolean(string='Non Manager')
+
     salary_structure = fields.Many2one('hr.payroll.structure', 'Salary Structure')
     base_salary = fields.Float("Base Salary")
     salary_factor = fields.Float("Salary Factor", digits=(16, 3), default=1.000)

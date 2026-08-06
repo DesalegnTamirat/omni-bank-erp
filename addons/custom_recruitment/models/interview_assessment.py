@@ -10,6 +10,10 @@ class InterviewAssessment(models.Model):
     assessor_name = fields.Many2one("hr.employee","Assessor")
     assessment_date = fields.Date("Assessment Date")
     applicant_name = fields.Many2one("hr.applicant","Applicant Name")
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        self.write({"active": False})
+        return True
     recruitment_type = fields.Selection(
         [('Internal', 'Internal Recruitment'), ('External', 'External Recruitment')], string="Recruitment Type", default='Internal')
     assessment_criteria = fields.Many2one("assessment.criteria","Assessment Criteria")

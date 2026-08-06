@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         DEFAULT SHORTLIST CRITERIA — Form view (Configuration)
+    ════════════════════════════════════════════════════════════ -->
+    <record id="view_external_default_shortlist_criteria_form" model="ir.ui.view">
+        <field name="name">external.default.shortlist.criteria.form</field>
+        <field name="model">external.default.shortlist.criteria</field>
+        <field name="arch" type="xml">
+            <form string="Default Shortlist Criteria">
+                <header>
+                    <button name="action_set_as_default"
+                            string="Set as Active Default"
+                            type="object"
+                            class="btn-primary"
+                            invisible="active"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. Standard External Criteria"/></h1>
+                    </div>
+                    <group>
+                        <field name="active" widget="boolean_toggle"/>
+                    </group>
+
+                    <separator string="Academic Requirements"/>
+                    <group>
+                        <group>
+                            <field name="minimum_education"
+                                   help="Minimum education level candidates must have. Leave empty to skip."/>
+                            <field name="minimum_cgpa"
+                                   help="Minimum CGPA required. Set 0 to skip."/>
+                        </group>
+                    </group>
+
+                    <separator string="Experience Requirements"/>
+                    <group>
+                        <group>
+                            <field name="minimum_experience_years"
+                                   string="Min. Relevant Experience (Yrs)"
+                                   help="Set 0 to skip."/>
+                            <field name="minimum_banking_experience"
+                                   string="Min. Banking Experience (Yrs)"
+                                   help="Set 0 to skip."/>
+                        </group>
+                    </group>
+
+                    <separator string="Notes"/>
+                    <group>
+                        <field name="notes" nolabel="1" placeholder="Describe when this criteria applies..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- List view -->
+    <record id="view_external_default_shortlist_criteria_list" model="ir.ui.view">
+        <field name="name">external.default.shortlist.criteria.list</field>
+        <field name="model">external.default.shortlist.criteria</field>
+        <field name="arch" type="xml">
+            <list string="Default Shortlist Criteria" decoration-success="active">
+                <field name="name"/>
+                <field name="minimum_education"/>
+                <field name="minimum_cgpa"/>
+                <field name="minimum_experience_years" string="Min. Exp (Yrs)"/>
+                <field name="minimum_banking_experience" string="Min. Banking Exp (Yrs)"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_external_default_shortlist_criteria" model="ir.actions.act_window">
+        <field name="name">Default Shortlist Criteria</field>
+        <field name="res_model">external.default.shortlist.criteria</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'active_test': False}</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SHORTLIST CHOICE WIZARD — shown when clicking Shortlist btn
+    ════════════════════════════════════════════════════════════ -->
+    <record id="view_external_shortlist_choice_wizard_form" model="ir.ui.view">
+        <field name="name">external.shortlist.choice.wizard.form</field>
+        <field name="model">external.shortlist.choice.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Shortlist Candidates">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>How would you like to shortlist?</h2>
+                    </div>
+
+                    <field name="recruitment_id" invisible="1"/>
+
+                    <group class="o_column_2">
+                        <group string="Default Criteria" class="o_box" colspan="1">
+                            <field name="default_criteria_id" invisible="1"/>
+                            <group class="o_column_1 mb-3" invisible="not default_criteria_id">
+                                <field name="default_criteria_summary" nolabel="1" readonly="1"/>
+                            </group>
+                            <button name="action_use_default_criteria"
+                                    string="Submit Default Criteria"
+                                    type="object"
+                                    class="btn btn-primary mt-3 w-100"
+                                    invisible="not default_criteria_id"
+                                    help="Apply the selected default criteria to shortlist candidates."/>
+                            <button name="action_open_default_criteria_config"
+                                    string="+ Manage Default Criteria"
+                                    type="object"
+                                    class="btn btn-secondary mt-2 w-100"
+                                    help="Create or edit default criteria records."/>
+                        </group>
+
+                        <group string="Specific Criteria" class="o_box" colspan="1">
+                            <button name="action_use_specific_criteria"
+                                    string="Configure Specific Criteria"
+                                    type="object"
+                                    class="btn btn-secondary mt-4 w-100"
+                                    help="Open the vacancy-specific shortlisting criteria wizard."/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_external_shortlist_choice_wizard" model="ir.actions.act_window">
+        <field name="name">Shortlist Candidates</field>
+        <field name="res_model">external.shortlist.choice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_external_shortlist_choice_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

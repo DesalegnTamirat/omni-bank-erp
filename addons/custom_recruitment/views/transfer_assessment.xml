@@ -1,0 +1,205 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- ================================================================ -->
+    <!-- Transfer Assessment Configuration –                     -->
+    <!-- ================================================================ -->
+    <record id="transfer_assessment_config_list_view" model="ir.ui.view">
+        <field name="name">transfer.assessment.config.list</field>
+        <field name="model">transfer.assessment.config</field>
+        <field name="arch" type="xml">
+            <list string="Transfer Assessment Configurations">
+                <field name="name"/>
+                <field name="exam_weight"/>
+                <field name="interview_weight"/>
+                <field name="passing_score"/>
+                <field name="default_panel_size"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="transfer_assessment_config_form_view" model="ir.ui.view">
+        <field name="name">transfer.assessment.config.form</field>
+        <field name="model">transfer.assessment.config</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Assessment Configuration">
+                <sheet>
+                    <div class="oe_title"><h1><field name="name"/></h1></div>
+                    <group>
+                        <group string="Weighting ">
+                            <field name="exam_weight"/>
+                            <field name="interview_weight"/>
+                        </group>
+                        <group string="Policy">
+                            <field name="passing_score" help="BRD 8.3: Minimum 50% in any individual assessment component."/>
+                            <field name="default_panel_size"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_transfer_assessment_config" model="ir.actions.act_window">
+        <field name="name">Transfer Assessment Configuration</field>
+        <field name="res_model">transfer.assessment.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Configure Transfer Assessment Parameters!</p>
+            <p>Set the Written Exam / Interview weighting and minimum passing score used to score
+               Transfer Assessments. Flexible so it can be updated whenever the assessment
+               procedure changes .</p>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Transfer Assessment – List View                                   -->
+    <!-- ================================================================ -->
+    <record id="transfer_assessment_list_view" model="ir.ui.view">
+        <field name="name">transfer.assessment.list</field>
+        <field name="model">transfer.assessment</field>
+        <field name="arch" type="xml">
+            <list string="Transfer Assessments"
+                  decoration-success="state == 'published'"
+                  decoration-info="state in ('scheduled','assessed')"
+                  decoration-warning="state == 'pending_approval'"
+                  decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="exam_scheduled_date"/>
+                <field name="interview_scheduled_date"/>
+                <field name="exam_score"/>
+                <field name="interview_score"/>
+                <field name="weighted_assessment_score"/>
+                <field name="final_transfer_result"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'published'"
+                       decoration-warning="state == 'pending_approval'"
+                       decoration-info="state in ('scheduled','assessed')"
+                       decoration-muted="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Transfer Assessment – Search View                                 -->
+    <!-- ================================================================ -->
+    <record id="transfer_assessment_search_view" model="ir.ui.view">
+        <field name="name">transfer.assessment.search</field>
+        <field name="model">transfer.assessment</field>
+        <field name="arch" type="xml">
+            <search string="Search Transfer Assessments">
+                <field name="name" string="Reference"/>
+                <field name="employee_id"/>
+                <field name="target_vacancy_id"/>
+                <separator/>
+                <filter name="filter_draft" string="Draft" domain="[('state','=','draft')]"/>
+                <filter name="filter_scheduled" string="Scheduled" domain="[('state','=','scheduled')]"/>
+                <filter name="filter_assessed" string="Assessed" domain="[('state','=','assessed')]"/>
+                <filter name="filter_pending_approval" string="Pending Approval" domain="[('state','=','pending_approval')]"/>
+                <filter name="filter_approved" string="Approved" domain="[('state','=','approved')]"/>
+                <filter name="filter_published" string="Published" domain="[('state','=','published')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_by_vacancy" string="Target Vacancy" context="{'group_by': 'target_vacancy_id'}"/>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Transfer Assessment – Form View                                   -->
+    <!-- ================================================================ -->
+    <record id="transfer_assessment_form_view" model="ir.ui.view">
+        <field name="name">transfer.assessment.form</field>
+        <field name="model">transfer.assessment</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Assessment">
+                <header>
+                    <button name="action_schedule" string="Schedule" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"
+                            help=": schedule the exam and/or interview."/>
+                    <button name="action_mark_assessed" string="Mark Assessed" type="object"
+                            class="oe_highlight" invisible="state != 'scheduled'"
+                            help=": finalize scores once exam and interview are completed."/>
+                    <button name="action_submit_for_approval" string="Submit for Approval" type="object"
+                            class="oe_highlight" invisible="state != 'assessed'"
+                            help=": route the result for approval."/>
+                    <button name="action_approve" string="Approve" type="object"
+                            class="oe_highlight" invisible="state != 'pending_approval'"/>
+                    <button name="action_publish_result" string="Publish Result" type="object"
+                            class="oe_highlight" invisible="state != 'approved'"
+                            help=": notify the applicant of their result."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,scheduled,assessed,pending_approval,approved,published"/>
+                </header>
+                <sheet>
+                    <div class="oe_title"><h1><field name="name" readonly="1"/></h1></div>
+
+                    <group>
+                        <group string="Transfer Request">
+                            <field name="transfer_request_id" readonly="1"/>
+                            <field name="employee_id" readonly="1"/>
+                            <field name="target_vacancy_id" readonly="1"/>
+                            <field name="config_id"/>
+                        </group>
+                        <group string="Result Summary  / ">
+                            <field name="weighted_assessment_score" readonly="1"/>
+                            <field name="transfer_suitability_score" readonly="1"/>
+                            <field name="final_transfer_result" readonly="1"/>
+                            <field name="passed_minimum_component_score" readonly="1" widget="boolean"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Written Exam ">
+                            <group>
+                                <field name="exam_scheduled_date" readonly="state not in ('draft','scheduled')"/>
+                                <field name="exam_completed" readonly="state not in ('scheduled',)"/>
+                                <field name="exam_score" readonly="state not in ('scheduled',)"/>
+                            </group>
+                        </page>
+                        <page string="Interview ">
+                            <group>
+                                <field name="interview_scheduled_date" readonly="state not in ('draft','scheduled')"/>
+                                <field name="interview_panel_ids" widget="many2many_tags"
+                                       readonly="state not in ('draft','scheduled')"/>
+                                <field name="interview_completed" readonly="state not in ('scheduled',)"/>
+                                <field name="interview_score" readonly="state not in ('scheduled',)"/>
+                            </group>
+                        </page>
+                        <page string="Approval &amp; Notification  /  / ">
+                            <group>
+                                <field name="approved_by" readonly="1"/>
+                                <field name="approved_date" readonly="1"/>
+                                <field name="result_published_date" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Action                                                            -->
+    <!-- ================================================================ -->
+    <record id="action_transfer_assessment" model="ir.actions.act_window">
+        <field name="name">Transfer Assessments</field>
+        <field name="res_model">transfer.assessment</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="transfer_assessment_search_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No Transfer Assessments yet</p>
+            <p>Transfer Assessments are automatically created when an eligible Employee Transfer
+               Request is submitted  / . Schedule the written exam and
+               interview, record scores, and route results for approval and publication
+               .</p>
+        </field>
+    </record>
+</odoo>

@@ -14,6 +14,7 @@ class EmployeeIncrementSetup(models.Model):
     # does not exist in this database. This field was required=True; uncomment
     # once that module is installed.
     # fiscal_year = fields.Many2one("account.fiscal.year", string="Fiscal Year", required=True)
+    # fiscal_year = fields.Many2one("account.fiscal.year", string="Fiscal Year", required=True)
     pms_score_from = fields.Float(string="PMS Score From")
     pms_score_to = fields.Float(string="PMS Score To")
     pms_ranking = fields.Selection([('Outstanding', 'Outstanding'),
@@ -21,10 +22,5 @@ class EmployeeIncrementSetup(models.Model):
                                  ('Satisfactory', 'Satisfactory'),
                                  ('Unsatisfactory', 'Unsatisfactory')], string="PMS Rank",required=True)
     increment_factor = fields.Float(string="Increment Multiple" ,required=True)
-    disciplinary_measure = fields.Many2one("discipline.category", string="Disciplinary Measure")
-    breach_count = fields.Integer(string="Breach Count")
-    penalty_factor = fields.Float(string="Penalty Factor")
     work_unit = fields.Many2one("operating.unit", string="Work Unit")
     state = fields.Selection([('draft', 'Draft'), ('applied', 'Applied')], string="State", default="draft", readonly=True)
-
-    

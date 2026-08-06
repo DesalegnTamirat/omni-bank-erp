@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Regular employees: only see / touch their own leave requests -->
+    <record id="rule_leave_request_own_records" model="ir.rule">
+        <field name="name">Leave Request: own requests only</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">[('requester_user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <!-- HR users/managers: global visibility (overrides the employee rule) -->
+    <record id="rule_leave_request_hr_all" model="ir.rule">
+        <field name="name">Leave Request: HR sees all</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr.group_hr_user')), (4, ref('hr.group_hr_manager'))]"/>
+    </record>
+</odoo>

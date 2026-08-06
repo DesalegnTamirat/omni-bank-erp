@@ -1,16 +1,16 @@
 <odoo>
-        <!-- Tree View -->
+    <!-- Tree View -->
     <record id="location_based_exception_view_tree" model="ir.ui.view">
         <field name="name">Location Based Exception List</field>
         <field name="model">location.based.exception</field>
         <field name="arch" type="xml">
             <list string="Location Based Exception" edit="0">
-                <field name="schedule_name"/>
-                <field name="operating_unit"/>
-                <field name="start_time"/>
-                <field name="end_time" />
-                <field name="duration"/>
-                <field name="time_range"/>
+                <field name="schedule_name" />
+                <field name="operating_unit" />
+                <field name="start_time" widget="float_time" />
+                <field name="end_time" widget="float_time" />
+                <field name="duration" widget="float_time" />
+                <field name="time_range" />
             </list>
         </field>
     </record>
@@ -24,21 +24,21 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="schedule_name"/>
-                            <field name="operating_unit"/>
+                            <field name="schedule_name" />
+                            <field name="operating_unit" />
                         </group>
                         <group>
-                            <field name="start_time"  />
-                            <field name="end_time"/>
-                            <field name="duration"/>
-                            <field name="time_range"/>
+                            <field name="start_time" widget="float_time" />
+                            <field name="end_time" widget="float_time" />
+                            <field name="duration" widget="float_time" />
+                            <field name="time_range" />
                         </group>
                     </group>
                 </sheet>
             </form>
         </field>
     </record>
-     <!-- Action -->
+    <!-- Action -->
     <record id="action_location_based_exception" model="ir.actions.act_window">
         <field name="name">Location Based Exception</field>
         <field name="res_model">location.based.exception</field>

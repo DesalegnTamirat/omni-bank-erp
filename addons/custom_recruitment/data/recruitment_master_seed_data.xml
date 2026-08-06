@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Seed Skills -->
+    <record id="skill_accounting" model="recruitment.skill">
+        <field name="name">Accounting &amp; Financial Reporting</field>
+    </record>
+    <record id="skill_banking_ops" model="recruitment.skill">
+        <field name="name">Banking Operations</field>
+    </record>
+    <record id="skill_credit_analysis" model="recruitment.skill">
+        <field name="name">Credit Analysis &amp; Risk Assessment</field>
+    </record>
+    <record id="skill_customer_service" model="recruitment.skill">
+        <field name="name">Customer Service &amp; Relationship Management</field>
+    </record>
+    <record id="skill_ifrs" model="recruitment.skill">
+        <field name="name">IFRS Compliance</field>
+    </record>
+    <record id="skill_it_support" model="recruitment.skill">
+        <field name="name">IT &amp; Core Banking Systems</field>
+    </record>
+    <record id="skill_leadership" model="recruitment.skill">
+        <field name="name">Leadership &amp; Team Management</field>
+    </record>
+    <record id="skill_data_analysis" model="recruitment.skill">
+        <field name="name">Data Analysis &amp; Advanced Excel</field>
+    </record>
+
+    <!-- Seed Certifications -->
+    <record id="cert_acca" model="recruitment.certification">
+        <field name="name">ACCA (Association of Chartered Certified Accountants)</field>
+    </record>
+    <record id="cert_cpa" model="recruitment.certification">
+        <field name="name">CPA (Certified Public Accountant)</field>
+    </record>
+    <record id="cert_cfa" model="recruitment.certification">
+        <field name="name">CFA (Chartered Financial Analyst)</field>
+    </record>
+    <record id="cert_ifrs" model="recruitment.certification">
+        <field name="name">IFRS Certificate</field>
+    </record>
+    <record id="cert_pmp" model="recruitment.certification">
+        <field name="name">PMP (Project Management Professional)</field>
+    </record>
+    <record id="cert_cisa" model="recruitment.certification">
+        <field name="name">CISA (Certified Information Systems Auditor)</field>
+    </record>
+</odoo>

@@ -1,0 +1,41 @@
+/* Public Banking Portal Header Styling */
+header .navbar {
+    background-color: #1d2b32  !important; /* Forces Deep Espresso container layout */
+    border-bottom: 2px solid #A07855 !important; /* Fine accent line underneath the header */
+}
+
+/* Nav Link Treatments */
+header .navbar .nav-link {
+    color: #FDFBF7 !important; /* Soft milk froth readable text color */
+    font-weight: 500 !important;
+
+    &:hover {
+        color: #D4B996 !important; /* Creamy Foam highlights on focus hover */
+    }
+}
+
+/* Call-to-Action Primary Buttons (e.g., Online Banking Sign-In) */
+header .navbar .btn-primary,
+.oe_structure .btn-primary {
+    background-color: #A07855 !important; /* Warm Latte buttons */
+    border-color: #A07855 !important;
+    color: #FFFFFF !important;
+
+    &:hover {
+        background-color: #8C6646 !important; /* Rich darker shade during interaction */
+        border-color: #8C6646 !important;
+    }
+}
+
+
+
+:root {
+    --o-brand-primary: #1d2b32 ;
+    --o-brand-secondary: #D4B996;
+}
+
+
+.o_web_client {
+    --btn-primary-bg: #A07855;
+    --btn-primary-border: #A07855;
+}

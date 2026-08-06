@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Attendance-specific discipline offense seeds.
+        Loaded after discipline_management data to ensure offense_cat_attendance exists.
+        noupdate="1": prevents overwrite on module upgrade to preserve any
+        admin customizations made after initial installation.
+    -->
+    <data noupdate="1">
+
+        <!--
+            Repeated Lateness Violation (Level 4):
+            Triggered when an employee's rolling late_count_rolling reaches the
+            configured threshold (default: 3 occurrences).
+            Severity mirrors discipline_management Level 4: First Written Warning + 5% penalty.
+            Approval authority: Direct Manager (as per Bunna Bank HR policy for Level 4).
+        -->
+        <record id="offense_repeated_lateness" model="discipline.offense">
+            <field name="name">Repeated Lateness Violation</field>
+            <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
+            <field name="severity_level">level_4</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="penalty_percentage">5.0</field>
+            <field name="approval_authority">direct_manager</field>
+            <field name="description">
+                Automatically triggered by the Attendance module when an employee exceeds the
+                configured repeated lateness threshold. Results in First Written Warning and 5%
+                monthly salary deduction upon approval. The initiating discipline case requires
+                human review before enforcement.
+            </field>
+        </record>
+
+        <!--
+            Repeated Force Checkout / Attendance Irregularity (Level 3):
+            Triggered when an employee's rolling force_checkout_count_rolling reaches the
+            configured threshold (default: 2 occurrences).
+            Severity: Level 3 Second Written Warning + 10% penalty.
+            Approval authority: HR Manager (higher authority for repeated system-forced checkouts).
+        -->
+        <record id="offense_repeated_force_checkout" model="discipline.offense">
+            <field name="name">Repeated Force Checkout / Attendance Irregularity</field>
+            <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
+            <field name="severity_level">level_3</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="penalty_percentage">10.0</field>
+            <field name="approval_authority">hr_manager</field>
+            <field name="description">
+                Automatically triggered by the Attendance module when an employee repeatedly fails
+                to check out before the automatic force checkout threshold, indicating attendance
+                irregularity. Results in Second Written Warning and 10% monthly salary deduction
+                upon HR Manager approval. Human review is required before enforcement.
+            </field>
+        </record>
+
+    </data>
+</odoo>
+

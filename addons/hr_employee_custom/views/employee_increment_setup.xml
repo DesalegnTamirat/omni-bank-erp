@@ -22,9 +22,6 @@
 				<field name="pms_score_to"/>
                 <!--<field name="pms_ranking"/>-->
                 <field name="increment_factor"/>
-				<field name="disciplinary_measure"/>
-				<field name="breach_count"/>
-				<field name="penalty_factor"/>
 				<field name="state"/>
             </list>
         </field>

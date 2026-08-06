@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2018-2019 Brainbean Apps (https://brainbeanapps.com)
+    License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl.html).
+-->
+<odoo>
+    <!-- Form View - Employee ID Notification Field -->
+    <record id="new_hr_leave_allocation_inherit" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.inherit</field>
+        <field name="model">hr.leave.allocation</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_allocation_view_form_manager"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='employee_id']" position="after">
+                <field name="employee_idnfctn"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Tree View - Employee ID Notification Field -->
+    <record id="new_hr_leave_allocation_tree_inherit" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.tree.inherit</field>
+        <field name="model">hr.leave.allocation</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_allocation_view_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='employee_id']" position="before">
+                <field name="employee_idnfctn"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Manager Form View - Accrual Fields -->
+    <record id="hr_leave_allocation_view_form_manager" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.view.form.manager.inherit.accrual</field>
+        <field name="model">hr.leave.allocation</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_allocation_view_form_manager"/>
+        <field name="arch" type="xml">
+            <!-- Hide number_of_days_display label for accrual allocations -->
+            <xpath expr="//label[@for='number_of_days_display']" position="attributes">
+                <attribute name="invisible">allocation_type == 'accrual'</attribute>
+            </xpath>
+
+            <!-- Hide number_of_days_display / number_of_hours_display block for accrual allocations -->
+            <xpath expr="//div[@name='duration_display']" position="attributes">
+                <attribute name="invisible">allocation_type == 'accrual'</attribute>
+            </xpath>
+
+            <!-- Add new accrual configuration section -->
+            <xpath expr="//field[@name='allocation_type']/../.." position="inside">
+                <group string="Accrual Configuration" invisible="allocation_type == 'regular'">
+                    <!-- Accrued Days Limit -->
+                    <group>
+                        <label for="limit_accrued_days" string="Limit Days Accrued per Period"/>
+                        <div class="o_row">
+                            <field name="limit_accrued_days" nolabel="1"/>
+                            <field name="max_accrued_days" nolabel="1" invisible="not limit_accrued_days"/>
+                        </div>
+                    </group>
+
+                    <!-- Carryover Days Limit -->
+                    <group>
+                        <label for="limit_carryover_days" string="Limit Carryover Days"/>
+                        <div class="o_row">
+                            <field name="limit_carryover_days" nolabel="1"/>
+                            <field name="max_carryover_days" nolabel="1" invisible="not limit_carryover_days"/>
+                        </div>
+                    </group>
+
+                    <!-- Total Accumulated Balance Limit -->
+                    <group>
+                        <label for="limit_accumulated_days" string="Limit Total Balance"/>
+                        <div class="o_row">
+                            <field name="limit_accumulated_days" nolabel="1"/>
+                            <field name="max_accumulated_days" nolabel="1" invisible="not limit_accumulated_days"/>
+                        </div>
+                    </group>
+
+                    <!-- Accrual Method -->
+                    <group>
+                        <field name="accrual_method"/>
+                    </group>
+
+                    <!-- Allocation per Period -->
+                    <group>
+                        <label for="number_per_interval" string="Allocation per Period"/>
+                        <div class="o_row">
+                            <field name="number_per_interval" nolabel="1" class="oe_inline"/>
+                            <field name="unit_per_interval" nolabel="1" class="oe_inline"/>
+                        </div>
+                    </group>
+
+                    <!-- Period Duration -->
+                    <group>
+                        <label for="interval_number" string="Period Duration"/>
+                        <div class="o_row">
+                            <field name="interval_number" nolabel="1" class="oe_inline"/>
+                            <field name="interval_unit" nolabel="1" class="oe_inline"/>
+                        </div>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Employee Form View - Accruements Section -->
+    <record id="hr_leave_allocation_view_form" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.view.form.inherit.accrual</field>
+        <field name="model">hr.leave.allocation</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_allocation_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Add Accruements section before notes -->
+            <field name="notes" position="before">
+                <group string="Accruement Details" invisible="allocation_type == 'regular' or state != 'validate'">
+                    <field name="accruement_ids" nolabel="1" readonly="1">
+                        <list>
+                            <field name="accrued_on"/>
+                            <field name="days_accrued"/>
+                            <field name="reason"/>
+                        </list>
+                    </field>
+                </group>
+            </field>
+        </field>
+    </record>
+
+    <!-- Server Action - Recalculate Selected Accrual Allocations -->
+    <record id="hr_holidays_accrual_recalculate" model="ir.actions.server">
+        <field name="name">Recalculate Accrual Allocations</field>
+        <field name="type">ir.actions.server</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave_allocation"/>
+        <field name="binding_model_id" ref="hr_holidays.model_hr_leave_allocation"/>
+        <field name="binding_type">action</field>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    records.action_recalculate_accrual_allocations()
+        </field>
+    </record>
+
+    <!-- Server Action - Recalculate All Accrual Allocations -->
+    <record id="hr_holidays_accrual_recalculate_all" model="ir.actions.server">
+        <field name="name">Recalculate All Accrual Allocations</field>
+        <field name="type">ir.actions.server</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave_allocation"/>
+        <field name="state">code</field>
+        <field name="code">
+model.action_recalculate_accrual_allocations_all()
+        </field>
+    </record>
+
+    <!-- Menu Item - Recalculate All Accruals -->
+    <menuitem
+        id="hr_holidays_accrual_recalculate_menuitem"
+        action="hr_holidays_accrual_recalculate_all"
+        name="Recalculate Accrual Allocations"
+        parent="hr_holidays.menu_hr_holidays_configuration"
+        groups="hr_holidays.group_hr_holidays_user"
+        sequence="0"
+    />
+
+</odoo>

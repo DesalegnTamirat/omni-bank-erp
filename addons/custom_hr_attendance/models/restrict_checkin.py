@@ -59,6 +59,13 @@ class HrEmployee(models.Model):
             if (loc.start_time - checkin_buffer) <= current_float <= loc.end_time:
                 return loc.start_time, loc.end_time
 
+        # If check-in restriction feature toggle is OFF, bypass shift boundary check
+        enable_checkin_restriction = self.env['ir.config_parameter'].sudo().get_param(
+            'hr_attendance.enable_checkin_restriction', 'True')
+        if enable_checkin_restriction.lower() not in ('true', '1'):
+            _logger.info("Check-in Restriction Disabled: Returning default shift bounds.")
+            return morning_start, exit_time
+
         # ----------------------------
         # 3. Default system shifts (Full Day)
         # ----------------------------
@@ -194,7 +201,7 @@ class HrEmployee(models.Model):
         # ----------------------------------------------------
         # Saturday Half Day Logic (Head Office Only)
         # ----------------------------------------------------
-        is_saturday = local_dt.weekday() == 4
+        is_saturday = local_dt.weekday() == 5
         operating_unit = self.default_operating_unit_id
         enable_saturday_halfday = self.env['ir.config_parameter'].sudo().get_param(
             'hr_attendance.enable_saturday_halfday', 'True')
@@ -219,34 +226,47 @@ class HrEmployee(models.Model):
                 "Employee account is archived or inactive."
             ))
 
-        # ----------------------------------------------------
-        # Disciplinary Suspension Validation (Dynamic)
-        # ----------------------------------------------------
-        if 'hr.discipline' in self.env:
-            discipline = self.env['hr.discipline'].search([
+        # ATT-8: ORM-level dismissal block. Even if the employee is still
+        # technically 'active', a finalised Level-1 / dismissal discipline case
+        # MUST prevent attendance. This stops API callers from bypassing the UI guard.
+        if self.env.get('discipline.case'):
+            active_dismissal = self.env['discipline.case'].sudo().search([
                 ('employee_id', '=', self.id),
-                ('state', 'in', ['active', 'confirmed', 'validated']),
-                ('penalty_type', '=', 'suspension'),
-                ('date_from', '<=', today_date),
-                ('date_to', '>=', today_date),
+                ('punishment_type', '=', 'dismissal'),
+                ('state', '=', 'enforced'),
             ], limit=1)
-            if discipline:
+            if active_dismissal:
                 raise UserError(_(
                     "Attendance cannot be recorded.\n\n"
-                    "Employee is currently under disciplinary suspension until %s."
-                ) % discipline.date_to)
+                    "Employee %s has an enforced dismissal decision (Case: %s). "
+                    "Contact HR to resolve."
+                ) % (self.name, active_dismissal.name))
 
-        # Leave Validation
-        leave = self.env['hr.leave'].search([
-            ('employee_id', '=', self.id), ('state', '=', 'validate'), ('holiday_status_id', '!=', 80),
-            ('date_from', '<=', today_date), ('date_to', '>=', today_date),
-        ], limit=1)
+        # ----------------------------------------------------
+        # Disciplinary Suspension Validation
+        # Checks is_suspended and suspension_type from discipline_management.
+        # Employees under any active suspension are blocked from attendance.
+        # ----------------------------------------------------
+        if hasattr(self, 'is_suspended') and self.is_suspended:
+            suspension_label = dict(
+                self._fields.get('suspension_type', fields.Selection([])).selection
+            ).get(self.suspension_type, self.suspension_type or _('Unknown'))
+            raise UserError(_(
+                "Attendance cannot be recorded.\n\n"
+                "Employee is currently under disciplinary suspension (%s).\n"
+                "Please contact HR to resolve the active disciplinary case."
+            ) % suspension_label)
 
-        if leave:
+        # Leave Validation — delegates to reusable method for testability and future Leave module reuse
+        if self._is_covered_by_approved_leave(self.id, today_date):
+            leave = self.env['hr.leave'].search([
+                ('employee_id', '=', self.id), ('state', '=', 'validate'), ('holiday_status_id', '!=', 80),
+                ('date_from', '<=', today_date), ('date_to', '>=', today_date),
+            ], limit=1)
             raise UserError(_(
                 "Attendance cannot be recorded.\n\n"
                 "You are currently on approved leave:\n%s"
-            ) % leave.holiday_status_id.name)
+            ) % (leave.holiday_status_id.name if leave else _('Unknown Leave')))
 
         # ----------------------------------------------------
         # Pre-approval Exceptions
@@ -285,24 +305,37 @@ class HrEmployee(models.Model):
         # Convert float shift times to Odoo-ready UTC datetimes
         shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
         shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt)
+        open_attendance = self.env['hr.attendance'].search([
+            ('employee_id', '=', self.id), ('check_out', '=', False)
+        ], limit=1)
+
         # ----------------------------------------------------
-        # CHECK-IN
+        # CHECK-IN (when no open attendance exists)
         # ----------------------------------------------------
-        if self.attendance_state == 'checked_out':
+        if not open_attendance and self.attendance_state != 'lunch_out':
             enable_checkin_restriction = self.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkin_restriction', 'True')
-            if enable_checkin_restriction.lower() in ('true', '1'):
+            checkin_restriction_enabled = enable_checkin_restriction.lower() in ('true', '1')
+
+            if checkin_restriction_enabled:
                 status, late_time, ot, pre_late = self._evaluate_checkin_status(
                     current_float, shift_start, dead_time, predefined_late
                 )
-                if status == 'Late':
-                    shift_start_utc = utc_naive_dt
+                checkin_dt = utc_naive_dt if status == 'Late' else shift_start_utc
             else:
+                # Restriction disabled: no shift boundary to snap to, so
+                # credit the real wall-clock check-in time instead of
+                # always pinning to the official shift start.
                 status, late_time, ot, pre_late = 'Normal', 0.0, 0.0, 0.0
+                checkin_dt = utc_naive_dt
             vals = {
                 'employee_id': self.id,
                 # 'check_in': utc_naive_dt,
-                'check_in': shift_start_utc,
+                'check_in': checkin_dt,
+                # Real wall-clock check-in moment, kept separately so the
+                # live dashboard timer starts counting from 00:00:00 at the
+                # actual tap time instead of jumping to elapsed-since-shift-start.
+                'actual_check_in': utc_naive_dt,
                 'check_in_status': status,
                 'late_time_hour': late_time,
                 'pre_defined_lateness': pre_late
@@ -311,7 +344,10 @@ class HrEmployee(models.Model):
                 vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
             _logger.info("Creating Check-in: %s", vals)
             attendance = self.env['hr.attendance'].create(vals)
-            self.attendance_state = 'checked_in'
+            self.write({'attendance_state': 'checked_in', 'last_attendance_id': attendance.id})
+            # Offload discipline counter increments and violation threshold checks
+            # asynchronously so the check-in response is never delayed by side effects.
+            attendance._enqueue_attendance_side_effects()
             return attendance
 
         # ----------------------------------------------------
@@ -353,26 +389,43 @@ class HrEmployee(models.Model):
         # ----------------------------------------------------
         # CHECK-OUT
         # ----------------------------------------------------
-        if self.attendance_state == 'checked_in':
-            attendance = self.env['hr.attendance'].search([
-                ('employee_id', '=', self.id), ('check_out', '=', False)
-            ], limit=1)
-            if not attendance:
-                raise UserError(_("No active check-in found."))
+        if open_attendance and self.attendance_state != 'lunch_out':
+            attendance = open_attendance
 
-            # Validate checkout restriction toggle
             enable_checkout_restriction = self.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkout_restriction', 'True')
-            if enable_checkout_restriction.lower() in ('true', '1'):
+            checkout_restriction_enabled = enable_checkout_restriction.lower() in ('true', '1')
+
+            if not checkout_restriction_enabled:
+                # Restriction disabled: no shift boundary to snap to, so
+                # credit the real wall-clock checkout time instead of
+                # always pinning to the official shift end.
+                checkout_dt = utc_naive_dt
+                status, early_exit, ot, pre_early = 'Normal', 0.0, 0.0, 0.0
+            elif shift_end_utc <= attendance.check_in:
+                # Guard: the resolved shift end is normally a safe anchor for
+                # check_out, but if this attendance's actual check_in already
+                # falls at or after that shift end (e.g. employee checked in
+                # very late, past the official exit time), snapping check_out
+                # to shift_end_utc would land BEFORE check_in and produce a
+                # negative/invalid worked_hours. Fall back to the real
+                # checkout time in that case instead.
+                _logger.warning(
+                    "Resolved shift end (%s) is not after check_in (%s) for %s; "
+                    "using actual checkout time instead of shift end.",
+                    shift_end_utc, attendance.check_in, self.name,
+                )
+                checkout_dt = utc_naive_dt
+                status, early_exit, ot, pre_early = 'Normal', 0.0, 0.0, 0.0
+            else:
+                checkout_dt = shift_end_utc
                 status, early_exit, ot, pre_early = self._evaluate_checkout_status(
                     current_float, shift_end, attendance, utc_naive_dt, min_work_hour, predefined_early_exit
                 )
-            else:
-                status, early_exit, ot, pre_early = 'Normal', 0.0, 0.0, 0.0
 
             vals = {
                 # 'check_out': utc_naive_dt,
-                'check_out': shift_end_utc,
+                'check_out': checkout_dt,
                 'check_out_status': status,
                 'early_exit_hour': early_exit,
                 'pre_approved_early_checkout': pre_early
@@ -380,9 +433,28 @@ class HrEmployee(models.Model):
             if geo_information:
                 vals.update({'out_%s' % key: geo_information[key] for key in geo_information})
             attendance.write(vals)
-            self.attendance_state = 'checked_out'
+            self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
+            # Offload force-checkout counter increment and violation threshold check asynchronously.
+            attendance._enqueue_attendance_side_effects()
             _logger.info("Check-out completed for %s", self.name)
             return attendance
 
         raise UserError(_("Unexpected attendance state: %s") % self.attendance_state)
+
+    # ============================================================
+    # Leave Coverage Check (reusable by Leave module and wizards)
+    # ============================================================
+    def _is_covered_by_approved_leave(self, employee_id, date):
+        """
+        Returns True if the given employee has an approved leave record covering the given date.
+        Excludes leave type ID 80 (internal Bunna Bank exclusion — verify periodically).
+        Extracted here so Leave module wizards can call identical logic without duplication.
+        """
+        return bool(self.env['hr.leave'].search([
+            ('employee_id', '=', employee_id),
+            ('state', '=', 'validate'),
+            ('holiday_status_id', '!=', 80),
+            ('date_from', '<=', date),
+            ('date_to', '>=', date),
+        ], limit=1))
 

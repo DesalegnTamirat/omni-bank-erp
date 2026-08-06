@@ -1,83 +1,81 @@
 # -*- coding: utf-8 -*-
 {
-    'name': 'Custom HR Attendance Management',
+    "name": "Custom HR Attendance Management",
+    
+    "summary": "Centralized platform for recording, validating, and managing employee attendance across all work locations.",
+    
+    "description": """
+        HR Attendance Management System
 
-    'summary': (
-        'Advanced Attendance Management, Exceptions, Overtime and Approvals for Odoo 19'
-    ),
-
-    'description': """
-        Custom HR Attendance Management
+        Provides a centralized platform for recording, validating, monitoring, and managing employee attendance across all work locations, work schedules, and job categories. 
         
-        This module extends Odoo HR Attendance with:
-            - Overtime tracking and balance computation
-            - Job position based attendance exceptions
-            - Location based attendance exceptions
-            - Attendance pre-approval workflow
-            - Configurable attendance reasons
-            - Operating Unit based access control
-            - Attendance analytics and summary wizard
-            """,
-
-    'author': 'Abeza',
-    'website': 'https://bunnabanksc.com/',
-    'license': 'LGPL-3',
-
-    'category': 'Human Resources',
-    'version': '19.0.1.0.0',
-
-    'depends': [
-        'hr',
-        'hr_attendance',
-        'mail',
-        'hr_employee_custom',
-        'hr_holidays',
+        Key Capabilities:
+        - Configurable work calendars and multiple attendance scenarios
+        - Supervisor interventions and attendance validation
+        - Force checkout management
+        - Seamless integration with Leave, Discipline, Payroll, and Employee Master Data
+    """,
+    
+    "author": "Abeza&Desalegn",
+    "website": "https://bunnabanksc.com/",
+    "license": "LGPL-3",
+    "category": "Human Resources",
+    "version": "19.0.3.0.0",
+    "depends": [
+        "hr",
+        "hr_attendance",
+        "mail",
+        "hr_employee_custom",
+        "hr_holidays",
+        "discipline_management",
     ],
-
-    'data': [
+    "data": [
         # Security
-        'security/hr_attendance_security.xml',
-        'security/ir.model.access.csv',
-
+        "security/hr_attendance_security.xml",
+        "security/ir.model.access.csv",
         # Views
-        'views/attendance_preapproval_views.xml',
-        'views/location_based_exception_views.xml',
-        'views/job_shift_views.xml',
-        'views/job_position_exception_views.xml',
-        'views/hr_attendance_view.xml',
-        'views/hr_attendance_reason_view.xml',
-        'views/res_config_settings_views.xml',
-        'views/over_time_views.xml',
-        'views/hr_employee_views.xml',
+        "views/attendance_preapproval_views.xml",
+        "views/location_based_exception_views.xml",
+        "views/job_shift_views.xml",
+        "views/job_position_exception_views.xml",
+        "views/hr_attendance_view.xml",
+        "views/hr_attendance_reason_view.xml",
+        "views/res_config_settings_views.xml",
+        "views/over_time_views.xml",
+        "views/hr_employee_views.xml",
         # Reports
-        'views/overtime_report_views.xml',
-        'views/job_position_exception_report_views.xml',
-        'views/attendance_preapproval_report_views.xml',
-        'views/acknowledged_attendance_report_views.xml',
+        "views/overtime_report_views.xml",
+        "views/job_position_exception_report_views.xml",
+        "views/attendance_preapproval_report_views.xml",
+        "views/acknowledged_attendance_report_views.xml",
+        "views/force_checkout_history_views.xml",
         # Wizards
-        #'wizard/generate_attendance_summary.xml',
-        'wizard/generate_detail_employee_attendance_report.xml',
-        'wizard/manager_daily_attendance_wizard.xml',
-        'views/generated_employee_attendance_details.xml',
+        "wizard/generate_detail_employee_attendance_report.xml",
+        "wizard/manager_daily_attendance_wizard.xml",
+        #  Discipline flag wizard
+        "wizard/hr_attendance_flag_wizard.xml",
+        # Manual attendance entry wizard
+        "wizard/hr_attendance_manual_wizard.xml",
+        "views/generated_employee_attendance_details.xml",
         # Menus
-        'views/menu_views.xml',
-        'views/hide_regular_views.xml',
-        # Data
-        'data/job_shift_data.xml',
-        'data/hr_attendance_reason_data.xml',
-        'data/sql_functions.xml',
-        'data/ir_cron_data.xml',
+        "views/menu_views.xml",
+        "views/hide_regular_views.xml",
+        # Static Data
+        "data/job_shift_data.xml",
+        "data/hr_attendance_reason_data.xml",
+        "data/sql_functions.xml",
+        # Discipline Offense Seeds 
+        "data/discipline_offense_attendance_data.xml",
+        # Scheduled Actions
+        "data/ir_cron_data.xml",
     ],
-
-    'demo': [],
-
-    'assets': {
-        'web.assets_backend': [
-            'custom_hr_attendance/static/src/my_attendance/my_attendance.js',
-            'custom_hr_attendance/static/src/my_attendance/my_attendance.xml',
-            'custom_hr_attendance/static/src/my_attendance/my_attendance.scss',
+    "demo": [],
+    "assets": {
+        "web.assets_backend": [
+            "custom_hr_attendance/static/src/my_attendance/my_attendance.js",
+            "custom_hr_attendance/static/src/my_attendance/my_attendance.xml",
+            "custom_hr_attendance/static/src/my_attendance/my_attendance.scss",
         ],
     },
-
-    'installable': True,
+    "installable": True,
 }

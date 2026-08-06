@@ -9,7 +9,6 @@
                     <group colspan="2">
                         <group>
                             <field name="vacancy_reference"/>
-                            <field name="recruitment_reference"/>
                             <field name="job_position"/>
                             <field name="employee_grade"/>
                         </group>

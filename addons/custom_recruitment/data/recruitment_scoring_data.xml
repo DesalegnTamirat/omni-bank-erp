@@ -15,7 +15,7 @@
             <field name="name">Expire Reserve Pool Candidates (FRS 9.4.2)</field>
             <field name="model_id" ref="model_recruitment_candidate_score"/>
             <field name="state">code</field>
-            <field name="code">model._cron_expire_reserve_pool()</field>
+            <field name="code">model._cron_expire_reserve_pool</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="active">True</field>
@@ -26,7 +26,7 @@
             <field name="name">Expire Pending Offer Letters (FRS 11.2.2)</field>
             <field name="model_id" ref="model_recruitment_offer_letter"/>
             <field name="state">code</field>
-            <field name="code">model._cron_expire_pending_offers()</field>
+            <field name="code">model._cron_expire_pending_offers</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="active">True</field>
@@ -37,7 +37,7 @@
             <field name="name">Close Expired Internal Application Windows (FRS 5.2.1)</field>
             <field name="model_id" ref="model_recruitment_application_window"/>
             <field name="state">code</field>
-            <field name="code">model._cron_close_expired_windows()</field>
+            <field name="code">model._cron_close_expired_windows</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="active">True</field>

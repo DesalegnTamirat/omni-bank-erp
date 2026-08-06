@@ -9,11 +9,10 @@ JOB_VACANCY_TYPE_CODE_MAP = {
     'external': 'EXT',
 }
 
-# Fields still allowed to change on job.vacancy once the record is locked
-# (status transitions themselves, reference generation, chatter/mail bookkeeping).
+
 LOCKED_ALLOWED_FIELDS = {
     'vacancy_status', 'status', 'reference', 'message_ids',
-    'message_follower_ids', 'activity_ids',
+    'message_follower_ids', 'activity_ids', 'website_published',
 }
 
 
@@ -21,6 +20,10 @@ class JobVacancy(models.Model):
     _name = 'job.vacancy'
     _description = "Job Vacancy Form"
     _rec_name = "reference"
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        self.write({"active": False})
+        return True
 
     reference = fields.Char(string='Reference', copy=False, readonly=True, default=lambda self: _('New'))
 
@@ -31,11 +34,11 @@ class JobVacancy(models.Model):
     ], string='Status', required=True, readonly=True, copy=False, tracking=True,
         default='draft')
 
-    # FR-REC-009: Sourcing designation — Internal Only / External Only / Both
+    # : Sourcing designation — Internal Only / External Only / Both
     sourcing_type = fields.Selection(
         [('internal', 'Internal Only'), ('external', 'External Only'), ('both', 'Both')],
         string='Sourcing Type', default='internal',
-        help="FR-REC-009: HR designates vacancy as Internal Only, External Only, or Both."
+        help="HR designates vacancy as Internal Only, External Only, or Both."
     )
 
     # External source channel — where the vacancy is published externally
@@ -49,8 +52,37 @@ class JobVacancy(models.Model):
         help="External publication channel (LinkedIn, Telegram, Website, etc.)"
     )
 
-    # FR-REC-011: Internal movement type for reference generation
-    # Extended with 'promotion' from bunna_hr_addons
+    # ── External-specific eligibility/requirement fields ──────────────────────
+    minimum_education = fields.Selection(
+        [('diploma', 'Diploma'),
+         ('bachelor', "Bachelor's Degree"),
+         ('master', "Master's Degree"),
+         ('phd', 'PhD / Doctorate')],
+        string='Minimum Education',
+        help="Minimum academic qualification required for external applicants."
+    )
+    minimum_cgpa = fields.Float(
+        string='Minimum CGPA',
+        help="Minimum CGPA/GPA required for external applicants."
+    )
+    minimum_experience_years = fields.Float(
+        string='Minimum Total Experience (Years)',
+        help="Minimum total work experience required for external applicants."
+    )
+    banking_experience_required = fields.Float(
+        string='Banking Experience Required (Years)',
+        help="Minimum banking sector experience required."
+    )
+    ex_bunna_preferred = fields.Boolean(
+        string='Ex-Bunna Preferred',
+        help="Check if preference is given to ex-Bunna employees."
+    )
+    website_published = fields.Boolean(
+        string='Published on Website',
+        readonly=True,
+        help="Indicates if this vacancy has been published on the company website."
+    )
+
     internal_movement_type = fields.Selection(
         [('internal', 'Internal Promotion/Transfer'),
          ('promotion', 'Promotion'),
@@ -60,9 +92,29 @@ class JobVacancy(models.Model):
         help="Drives the reference number prefix (INT/LAT/EXT)."
     )
 
+    @api.onchange('sourcing_type')
+    def _onchange_sourcing_type(self):
+        """Auto-set movement type and legacy recruitment_type when sourcing changes."""
+        for rec in self:
+            if rec.sourcing_type == 'external':
+                rec.internal_movement_type = 'external'
+                rec.recruitment_type = 'External'
+            elif rec.sourcing_type == 'internal':
+                if rec.internal_movement_type == 'external':
+                    rec.internal_movement_type = 'internal'
+                rec.recruitment_type = 'Internal'
+            elif rec.sourcing_type == 'both':
+                # For a vacancy that can be sourced both internally and externally,
+                # keep the legacy recruitment_type as 'Internal' so internal records
+                # are treated as internal and external records are treated as external.
+                # The external recruitment view relies on the external model, not on
+                # this flag. Leaving it as 'Internal' prevents internal view from
+                # mistakenly picking up external candidates.
+                rec.recruitment_type = 'Internal'
+
     @api.constrains('recruitment_type', 'internal_movement_type')
     def _check_internal_movement_type(self):
-        """FR-bunna: Internal Movement Type required for internal vacancies."""
+        """Internal Movement Type required for internal vacancies."""
         for rec in self:
             if (rec.recruitment_type == 'Internal' or rec.sourcing_type == 'internal') \
                     and not rec.internal_movement_type:
@@ -76,11 +128,23 @@ class JobVacancy(models.Model):
     employee_category = fields.Selection(
         [('Managerial', 'Managerial'), ('Non Managerial', 'Non Managerial')],
         string='Job Category', default='Non Managerial')
+
+    # ── NEW: Job Level now lives on the vacancy itself, not on each
+    # candidate score. Only relevant / visible when employee_category is
+    # 'Non Managerial' — Managerial vacancies have no sub-level.
+    job_level = fields.Selection(
+        [('junior', 'Junior'), ('senior', 'Senior / Regular')],
+        string='Job Level',
+        help="Only applicable for Non-Managerial vacancies. Drives the "
+             "Job Level shown on every Candidate Score linked to this "
+             "vacancy — no longer chosen per-candidate."
+    )
+
     recruitment_reference = fields.Char(string="Recruitment Reference")
 
-    # FR-REC-012/013: Opening and closing dates with validation
+    # /013: Opening and closing dates with validation
     opening_date = fields.Date(string="Opening Date", default=fields.Date.context_today, required=True,
-                               help="FR-REC-012: Vacancy opening date.")
+                               help=" Vacancy opening date.")
     last_date_to_apply = fields.Date(string="Last Date To Apply", required=True,
                                      help=" Closing Date must be > Opening Date.")
 
@@ -135,10 +199,45 @@ class JobVacancy(models.Model):
     memb_panel_vac = fields.One2many("vac.panel.members", "panl_memb_vac", "Vacancy panel Members")
     vac_del_team_id = fields.One2many("vacancy.delegation.team", "vac_del_id", string="Vacancy Delegation Team")
 
+    # Release date — recorded when an internally selected candidate is officially
+    # cleared from their current role and released to start the new placement.
+    release_date = fields.Date(
+        string="Release Date",
+        help="Date on which the selected internal candidate was officially released from "
+             "their current position to take up the new role (transfer/promotion placement).",
+        tracking=True,
+        copy=False,
+    )
+    release_notes = fields.Text(
+        string="Release Notes",
+        help="Optional notes regarding the release process (e.g., handover completion date).",
+        copy=False,
+    )
+
+
     competency_line_ids = fields.One2many(
         'job.vacancy.competency', 'vacancy_id', string="Competencies",
         help=" Required competencies with required level."
     )
+
+
+    @api.onchange('employee_category')
+    def _onchange_employee_category_clear_job_level(self):
+        for rec in self:
+            if rec.employee_category == 'Managerial':
+                rec.job_level = False
+
+    @api.constrains('employee_category', 'job_level')
+    def _check_job_level_required(self):
+        for rec in self:
+            if rec.employee_category == 'Non Managerial' and not rec.job_level:
+                raise ValidationError(_(
+                    "Job Level (Junior / Senior) is required for Non-Managerial vacancies."
+                ))
+            if rec.employee_category == 'Managerial' and rec.job_level:
+                raise ValidationError(_(
+                    "Job Level does not apply to Managerial vacancies — clear it before saving."
+                ))
 
     @api.constrains('opening_date', 'last_date_to_apply')
     def _check_dates(self):
@@ -153,7 +252,7 @@ class JobVacancy(models.Model):
                     'competency_line_ids',
                     'opening_date', 'last_date_to_apply')
     def _check_mandatory_data(self):
-        """FR-REC-012: Vacancy record shall require Opening Date, Closing Date,
+        """ Vacancy record shall require Opening Date, Closing Date,
         Job Position, Grade, Location, Job Description, and Competencies with
         required level."""
         for rec in self:
@@ -198,17 +297,139 @@ class JobVacancy(models.Model):
         of which view/route triggers the write (form, list, API, automation).
         One2many line writes bundled from the form (competencies, hiring details,
         panel members, etc.) are covered here too, since Odoo routes those through
-        the parent's write() when saved from an embedded list editor. Only the
+        the parent's write when saved from an embedded list editor. Only the
         technical fields needed for the workflow itself still pass through."""
         for rec in self:
-            if rec._is_locked():
+            if rec._is_locked:
                 blocked = set(vals.keys()) - LOCKED_ALLOWED_FIELDS
                 if blocked:
                     raise ValidationError(_(
                         "This vacancy is locked (Published/Closed) and can no "
                         "longer be edited, including its lines."
                     ))
-        return super().write(vals)
+        res = super().write(vals)
+        if vals.get('vacancy_status') == 'published':
+            for rec in self:
+                rec._sync_published_vacancy_records
+        return res
+
+    def _sync_published_vacancy_records(self):
+        """Automatically populate recruitment application process models when a vacancy is evaluated or published."""
+        for rec in self:
+            if not rec.reference or rec.reference == _('New'):
+                continue
+
+            sourcing = rec.sourcing_type or ('internal' if rec.recruitment_type == 'Internal' else 'external')
+            is_internal = sourcing in ('internal', 'both')
+            is_external = sourcing in ('external', 'both')
+
+            vals_base = {
+                'vacancy_reference': rec.reference,
+                'job_location': rec.operating_unit_id.name if rec.operating_unit_id else False,
+                'job_grade': rec.job_grade.grade_name if rec.job_grade else False,
+                'job_category': rec.employee_category,
+                'vacancy_announced_on': rec.opening_date or fields.Date.context_today(self),
+                'last_date_to_apply': rec.last_date_to_apply,
+                'no_of_vacancies': rec.no_of_vacancies,
+                'responsible': rec.responsible.id if rec.responsible else False,
+            }
+
+            # 1. Internal Recruitment Process & Portal
+            if is_internal:
+                IntRec = self.env['employee.recruitment.internal']
+                existing_int = IntRec.search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ], limit=1)
+
+                int_vals = dict(vals_base, **{
+                    'vacancy_id': rec.id,
+                    'job_position': rec.job_position.id if rec.job_position else False,
+                    'emp_type': rec.type_of_employment,
+                })
+
+                if existing_int:
+                    existing_int.write(int_vals)
+                else:
+                    IntRec.create(int_vals)
+
+                # Available Internal Vacancies for Employee Portal/Applications
+                Available = self.env['employee.recruitment.available']
+                existing_avail = Available.search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ], limit=1)
+
+                avail_vals = {
+                    'vacancy_id': rec.id,
+                    'vacancy_reference': rec.reference,
+                    'job_position': rec.job_position.name if rec.job_position else False,
+                    'job_location': rec.operating_unit_id.name if rec.operating_unit_id else False,
+                    'employee_grade': rec.job_grade.grade_name if rec.job_grade else False,
+                    'employee_category': rec.employee_category,
+                    'type_of_employment': rec.type_of_employment,
+                    'number_of_vacancies': rec.no_of_vacancies,
+                    'vacancy_announced_on': rec.opening_date or fields.Date.context_today(self),
+                    'last_date_to_apply': rec.last_date_to_apply,
+                    'job_description': rec.vacancy_description or '',
+                }
+
+                if existing_avail:
+                    existing_avail.write(avail_vals)
+                else:
+                    Available.create(avail_vals)
+
+                # Application Window
+                AppWindow = self.env['recruitment.application.window']
+                existing_win = AppWindow.search([('vacancy_id', '=', rec.id)], limit=1)
+                if not existing_win:
+                    AppWindow.create({
+                        'vacancy_id': rec.id,
+                        'notification_date': rec.opening_date or fields.Date.context_today(self),
+                    })
+
+                # Ensure total separation: remove any external process record
+                if sourcing == 'internal':
+                    self.env['employee.recruitment.external'].search([
+                        '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                    ]).unlink
+            else:
+                # Remove internal process records for external-only vacancies
+                self.env['employee.recruitment.internal'].search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ]).unlink
+                self.env['employee.recruitment.available'].search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ]).unlink
+
+            # 2. External Recruitment Process
+            if is_external:
+                ExtRec = self.env['employee.recruitment.external']
+                existing_ext = ExtRec.search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ], limit=1)
+
+                ext_vals = dict(vals_base, **{
+                    'vacancy_id': rec.id,
+                    'job_position': rec.job_position.id if rec.job_position else False,
+                })
+
+                if existing_ext:
+                    existing_ext.write(ext_vals)
+                else:
+                    ExtRec.create(ext_vals)
+
+                # Ensure total separation: remove any internal process records
+                if sourcing == 'external':
+                    self.env['employee.recruitment.internal'].search([
+                        '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                    ]).unlink
+                    self.env['employee.recruitment.available'].search([
+                        '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                    ]).unlink
+            else:
+                # Remove external process records for internal-only vacancies
+                self.env['employee.recruitment.external'].search([
+                    '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
+                ]).unlink
 
     def notify(self):
         for com in self.vac_del_team_id:
@@ -254,7 +475,7 @@ class JobVacancy(models.Model):
         return f"BB/{type_code}/{str(start_year)[-2:]}-{str(end_year)[-2:]}/"
 
     def _get_next_reference(self):
-        """FR-REC-011: auto-generate Unique Vacancy Reference Number."""
+        """: auto-generate Unique Vacancy Reference Number."""
         movement_type = self.internal_movement_type or 'internal'
         type_code = JOB_VACANCY_TYPE_CODE_MAP.get(movement_type, 'INT')
         current_prefix = self._get_fiscal_year_prefix(type_code)
@@ -265,7 +486,7 @@ class JobVacancy(models.Model):
               AND reference LIKE %s
             ORDER BY id DESC LIMIT 1
         """, (movement_type, current_prefix + '%'))
-        result = self.env.cr.fetchone()
+        result = self.env.cr.fetchone
         if result and result[0]:
             _, _, numeric_part = result[0].rpartition('/')
             try:
@@ -308,6 +529,7 @@ class JobVacancy(models.Model):
             if not self.reference or self.reference == _('New'):
                 self.reference = self._get_next_reference()
             self.write({'status': 'evaluate', 'vacancy_status': 'evaluate'})
+            self._sync_published_vacancy_records()
 
         return {
             'type': 'ir.actions.client',
@@ -322,7 +544,7 @@ class JobVacancy(models.Model):
         }
 
     def check_plan(self):
-        """FR-REC-006/007: validate against approved workforce plan."""
+        """/007: validate against approved workforce plan."""
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -336,23 +558,39 @@ class JobVacancy(models.Model):
         }
 
     def publish_vacancy(self):
-        """FR-REC-015: publish vacancy."""
+        """: publish vacancy. Auto-posts to website for external vacancies."""
         for val in self.vac_del_team_id:
             if not val.approve:
                 raise ValidationError(_("You cannot publish the vacancy until it is fully Approved."))
         if not self.reference or self.reference == _('New'):
             raise ValidationError(_(
                 "This vacancy does not have a reference number yet.\n"
-                "Please click 'Evaluate' first — the reference is generated once all "
+                "Please click 'Evaluate' first \u2014 the reference is generated once all "
                 "committee members have approved."
             ))
         self.write({"vacancy_status": "published"})
+        self._sync_published_vacancy_records()
+
+        # Auto-publish external vacancies to the website
+        if self.sourcing_type in ('external', 'both'):
+            if self.job_position:
+                self.job_position.write({
+                    'website_published': True,
+                    'no_of_recruitment': self.no_of_vacancies or 1,
+                    'description': self.vacancy_description or self.job_position.description or '',
+                })
+            self.write({'website_published': True})
+            msg = _('Vacancy %s has been published successfully and posted to the website.') % self.reference
+        else:
+            self.write({'website_published': False})
+            msg = _('Internal vacancy %s has been published for internal recruitment.') % self.reference
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Vacancy Published'),
-                'message': _('Vacancy %s has been published successfully.') % self.reference,
+                'message': msg,
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -360,8 +598,14 @@ class JobVacancy(models.Model):
         }
 
     def close_vacancy(self):
-        """FR-REC-016: close vacancy at closing date."""
+        """: close vacancy at closing date. Also unpublishes from website."""
         self.write({"vacancy_status": "closed"})
+
+        # Auto-unpublish from website when closing vacancies
+        if self.sourcing_type in ('external', 'both') and self.job_position:
+            self.job_position.write({'website_published': False})
+        self.write({'website_published': False})
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -376,7 +620,7 @@ class JobVacancy(models.Model):
 
     @api.model
     def _cron_auto_close_expired_vacancies(self):
-        """FR-REC-016: automatically close vacancies when closing date is reached."""
+        """: automatically close vacancies when closing date is reached."""
         today = fields.Date.today()
         expired = self.search([
             ('vacancy_status', '=', 'published'),
@@ -391,16 +635,18 @@ class JobVacancy(models.Model):
 
 class PanelMembers(models.Model):
     _name = 'vac.panel.members'
+    _description = "Vac Panel Members"
 
     role = fields.Char(string='Role')
     panel_member_name = fields.Char(string='Panel Member Name')
+    active = fields.Boolean(default=True)
     panel_type = fields.Char(string='Panel Type')
     status = fields.Boolean(string='Status')
     panl_memb_vac = fields.Many2one("job.vacancy", "Vacancy panel Members")
 
     def _check_parent_lock(self):
         for rec in self:
-            if rec.panl_memb_vac and rec.panl_memb_vac._is_locked():
+            if rec.panl_memb_vac and rec.panl_memb_vac._is_locked:
                 raise ValidationError(_(
                     "This vacancy is locked (Published/Closed); "
                     "panel members can no longer be edited."
@@ -412,13 +658,15 @@ class PanelMembers(models.Model):
 
     def unlink(self):
         self._check_parent_lock()
-        return super().unlink()
+        self.write({"active": False})
+        return True
 
 
 class Job_vacancy_hiring_status(models.Model):
     _name = 'hiring.status'
     _description = "Job Vacancy Hiring Status"
     _rec_name = "work_unit"
+    active = fields.Boolean(default=True)
     hiring_id = fields.Many2one("job.vacancy", 'Job Vacancy Hiring Status')
     work_unit = fields.Many2one("operating.unit", string="Work Unit")
     responsible_employee = fields.Many2one("hr.employee", string="Responsible Officer")
@@ -426,9 +674,13 @@ class Job_vacancy_hiring_status(models.Model):
     planned_positions = fields.Integer(string="Planned Openings")
     status = fields.Char(string="Status")
 
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.work_unit.name or str(rec.id)
+
     def _check_parent_lock(self):
         for rec in self:
-            if rec.hiring_id and rec.hiring_id._is_locked():
+            if rec.hiring_id and rec.hiring_id._is_locked:
                 raise ValidationError(_(
                     "This vacancy is locked (Published/Closed); "
                     "hiring status lines can no longer be edited."
@@ -440,22 +692,25 @@ class Job_vacancy_hiring_status(models.Model):
 
     def unlink(self):
         self._check_parent_lock()
-        return super().unlink()
+        self.write({"active": False})
+        return True
 
 
 class ResultSummaryRank(models.Model):
     _name = 'result.summary.rank'
+    _description = "Result Summary Rank"
 
     no = fields.Integer(string='No')
     rank = fields.Integer(string='Rank')
     statues = fields.Char(string='Status')
     applicant_name = fields.Char(string='Applicant name')
+    active = fields.Boolean(default=True)
     result = fields.Char(string='Result')
     summ_rank_id = fields.Many2one("job.vacancy", 'Job Result Summary Rank')
 
     def _check_parent_lock(self):
         for rec in self:
-            if rec.summ_rank_id and rec.summ_rank_id._is_locked():
+            if rec.summ_rank_id and rec.summ_rank_id._is_locked:
                 raise ValidationError(_(
                     "This vacancy is locked (Published/Closed); "
                     "result summary lines can no longer be edited."
@@ -467,11 +722,19 @@ class ResultSummaryRank(models.Model):
 
     def unlink(self):
         self._check_parent_lock()
-        return super().unlink()
+        self.write({"active": False})
+        return True
 
 
 class VacancyDelegation(models.Model):
     _name = "vacancy.delegation.team"
+    _description = "Vacancy Delegation Team"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        self.write({"active": False})
+        return True
+
     role = fields.Char(string="Role", default='Approver', readonly=True)
     employee_name = fields.Many2one(
         'res.users',
@@ -519,18 +782,23 @@ class VacancyDelegation(models.Model):
     approve = fields.Boolean(string="Approve", readonly=True)
     vac_del_id = fields.Many2one("job.vacancy", string="Vacancy Delegation Team")
 
-    # NOTE: intentionally NOT locked here — vacancy_evaluate() sets `approve = True`
-    # on these lines via write(), and that call must keep working after the
+    # NOTE: intentionally NOT locked here — vacancy_evaluate sets `approve = True`
+    # on these lines via write, and that call must keep working after the
     # vacancy itself becomes locked (evaluation happens right before/at lock time).
 
 
 class BBIntRec(models.Model):
     _name = "bb.internal"
+    _description = "Bb Internal"
 
     int_reference = fields.Char(string='Reference', required=True, copy=False, readonly=True,
                                 default=lambda self: _('New'))
     applicant_id = fields.Integer(string="Applicant_Id")
     applicant_name = fields.Char(string="Applicant name")
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        self.write({"active": False})
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -542,11 +810,16 @@ class BBIntRec(models.Model):
 
 class BBExtRec(models.Model):
     _name = "bb.external"
+    _description = "Bb External"
 
     ext_reference = fields.Char(string='Reference', required=True, copy=False, readonly=True,
                                 default=lambda self: _('New'))
     applicant_id = fields.Integer(string="Applicant_Id")
     applicant_name = fields.Char(string="Applicant name")
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        self.write({"active": False})
+        return True
 
     @api.model_create_multi
     def create(self, vals_list):

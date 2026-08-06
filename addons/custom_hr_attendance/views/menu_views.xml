@@ -69,11 +69,18 @@
               └─ Generate Employee Attendance Report Wizard (wizard)
               └─ Employee Attendance Details             (attendance details view)
          ==================================================== -->
+    <!-- ====================================================
+         5. Manager Menu (Accessible by Managers only)
+              └─ Attendances                             (hr_attendance list)
+              └─ Employees                               (hr.employee list)
+              └─ Generate Employee Attendance Report Wizard (wizard)
+              └─ Daily Employee Attendance Detail        (daily attendance details view)
+         ==================================================== -->
     <menuitem
             id="hr_attendance.menu_hr_attendance_view_attendances_management"
             name="Manager"
             parent="hr_attendance.menu_hr_attendance_root"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
+            groups="hr_attendance.group_hr_attendance_manager"
             sequence="5"/>
 
     <!-- 5.1 Attendances -->
@@ -82,7 +89,7 @@
             name="Attendances"
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
             action="hr_attendance.hr_attendance_action"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
+            groups="hr_attendance.group_hr_attendance_manager"
             sequence="10"/>
 
     <!-- 5.2 Employees -->
@@ -91,7 +98,7 @@
             name="Employees"
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
             action="hr.open_view_employee_list_my"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
+            groups="hr_attendance.group_hr_attendance_manager"
             sequence="20"/>
 
     <!-- 5.3 Generate Employee Attendance Report Wizard -->
@@ -99,17 +106,17 @@
             id="menu_manager_generate_attendance_report"
             name="Generate Employee Attendance Report Wizard"
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
+            groups="hr_attendance.group_hr_attendance_manager"
             action="action_manager_daily_attendance_wizard"
             sequence="30"/>
 
-    <!-- 5.4 Employee Attendance Details -->
+    <!-- 5.4 Daily Employee Attendance Detail -->
     <menuitem
             id="menu_manager_attendance_details"
-            name="Employee Attendance Details"
+            name="Daily Employee Attendance Detail"
             action="generated_employee_attendance_details_action"
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
-            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"
+            groups="hr_attendance.group_hr_attendance_manager"
             sequence="40"/>
 
     <!-- ====================================================
@@ -176,14 +183,24 @@
             sequence="50"
             groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
 
-    <!-- 6.7 Over Time Report -->
+    <!-- 6.8 Force Checkout History (ATT-021) -->
     <menuitem
-            id="menu_overtime_report"
-            name="Over Time Report"
+            id="menu_force_checkout_history"
+            name="Force Checkout History"
             parent="hr_attendance.menu_hr_attendance_reporting"
-            action="action_overtime_report"
-            sequence="60"
+            action="action_hr_attendance_force_checkout_history"
+            sequence="70"
             groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
+
+    <!-- 5.5 Manual Attendance Entry Wizard (ATT-016) -->
+    <menuitem
+            id="menu_manual_attendance_wizard"
+            name="Manual Attendance Entry"
+            parent="hr_attendance.menu_hr_attendance_view_attendances_management"
+            action="action_hr_attendance_manual_wizard"
+            sequence="50"
+            groups="hr_attendance.group_hr_attendance_user,hr_attendance.group_hr_attendance_manager"/>
+
 
     <!-- ====================================================
          7. Configuration

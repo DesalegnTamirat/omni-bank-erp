@@ -10,6 +10,12 @@ class CandidateShortlist(models.Model):
     job_position = fields.Char(string="Job Applied For")
     employee_id = fields.Many2one("hr.employee", "Employee Name")
     employee_name = fields.Char(string="Employee Name")
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     employee_number = fields.Char(string="Employee Number")
     employee_gender= fields.Char(string="Gender")
     current_position=fields.Char(string="Position")

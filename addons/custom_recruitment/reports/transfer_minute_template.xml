@@ -25,10 +25,11 @@
                                 <tr>
                                     <th class="text-left"><span>Rank</span></th>
                                     <th class="text-left"><span>Employee</span></th>
-                                    <th class="text-left"><span>Application Date (20%)</span></th>
+                                    <th class="text-left"><span>App Date (20%)</span></th>
                                     <th class="text-left"><span>Experience (20%)</span></th>
                                     <th class="text-left"><span>Location Tenure (20%)</span></th>
-                                    <th class="text-left"><span>PMS (40%)</span></th>
+                                    <th class="text-left"><span>PMS (30%)</span></th>
+                                    <th class="text-left"><span>Supervisor Rec (10%)</span></th>
                                     <th class="text-left"><span>Discipline Deduction</span></th>
                                     <th class="text-left"><span>Final Score</span></th>
                                     <th class="text-left"><span>Decision</span></th>
@@ -43,6 +44,7 @@
                                         <td><span t-esc="'%.2f' % line.experience_score"/></td>
                                         <td><span t-esc="'%.2f' % line.service_location_score"/></td>
                                         <td><span t-esc="'%.2f' % line.pms_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.recommendation_score"/></td>
                                         <td><span t-esc="'%.2f' % line.discipline_deduction_percent"/></td>
                                         <td><span t-esc="'%.2f' % line.final_score"/></td>
                                         <td><span t-field="line.selection_decision"/></td>

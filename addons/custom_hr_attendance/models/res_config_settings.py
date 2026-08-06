@@ -44,6 +44,30 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_ip_tracking",
         help="Track IP address of device used when employee checks in and checks out"
     )
+    enable_checkin_gate = fields.Boolean(
+        string='Enable ERP Access Gate (Requires Check-In)',
+        default=False,
+        config_parameter="hr_attendance.enable_checkin_gate",
+        help="When enabled, employees must be checked in to access ERP modules. "
+             "Exempt routes (Settings, Attendance, Discuss) are always accessible. "
+             "Roll out branch-by-branch after load testing."
+    )
+
+    escalation_hr_user_id = fields.Many2one(
+        'res.users',
+        string='HR Escalation Target User',
+        config_parameter="hr_attendance.escalation_hr_user_id",
+        help="User account to receive HR escalation activities when attendance violation thresholds are breached."
+    )
+
+    checkin_auth_method = fields.Selection([
+        ('session', 'Odoo Web Session (Standard)'),
+        ('pin', 'Employee Security PIN'),
+        ('qr', 'Branch Kiosk QR Code'),
+    ], string='Check-in Authentication Method', default='session',
+        config_parameter="hr_attendance.checkin_auth_method",
+        help="Configurable authentication method required before check-in is recorded.")
+
 
     # ----------------------------------------------------------
     # ATTENDANCE TIME SETTINGS
@@ -88,7 +112,8 @@ class ResConfigSettings(models.TransientModel):
     # ----------------------------------------------------------
     # LUNCH BREAK SETTINGS
     # ----------------------------------------------------------
-    lunch_out_time = fields.Float(
+    lunch_out_time =
+    fields.Float(
         string='Lunch Break Start Time',
         default=12.00,
         config_parameter="hr_attendance.lunch_out_time",
@@ -105,6 +130,24 @@ class ResConfigSettings(models.TransientModel):
         default=0.25,
         config_parameter="hr_attendance.lunch_grace_time",
         help="Grace period around the lunch window in hours (e.g., 0.25 = 15 minutes before/after)"
+    )
+
+    # ----------------------------------------------------------
+    # DISCIPLINE INTEGRATION THRESHOLDS
+    # ----------------------------------------------------------
+    lateness_violation_threshold = fields.Integer(
+        string='Lateness Violation Threshold (Occurrences)',
+        default=3,
+        config_parameter="hr_attendance.lateness_violation_threshold",
+        help="Number of late check-ins that triggers an automatic discipline case (Repeated Lateness Violation). "
+             "Counter resets to zero after a case is created."
+    )
+    force_checkout_violation_threshold = fields.Integer(
+        string='Force Checkout Violation Threshold (Occurrences)',
+        default=2,
+        config_parameter="hr_attendance.force_checkout_violation_threshold",
+        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout). "
+             "Counter resets to zero after a case is created."
     )
 
     def get_values(self):
@@ -126,6 +169,7 @@ class ResConfigSettings(models.TransientModel):
             enable_lunch_break=_get_bool('hr_attendance.enable_lunch_break', False),
             enable_auto_absence=_get_bool('hr_attendance.enable_auto_absence', True),
             enable_ip_tracking=_get_bool('hr_attendance.enable_ip_tracking', True),
+            enable_checkin_gate=_get_bool('hr_attendance.enable_checkin_gate', False),
         )
         return res
 
@@ -156,5 +200,6 @@ class ResConfigSettings(models.TransientModel):
         params.set_param('hr_attendance.enable_lunch_break', str(self.enable_lunch_break))
         params.set_param('hr_attendance.enable_auto_absence', str(self.enable_auto_absence))
         params.set_param('hr_attendance.enable_ip_tracking', str(self.enable_ip_tracking))
+        params.set_param('hr_attendance.enable_checkin_gate', str(self.enable_checkin_gate))
 
 

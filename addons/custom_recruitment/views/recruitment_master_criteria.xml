@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ── Recruitment Competency ──────────────────────────────────────── -->
+    <record id="recruitment_competency_list_view" model="ir.ui.view">
+        <field name="name">recruitment.competency.list</field>
+        <field name="model">recruitment.competency</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1">
+                <field name="competency"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_recruitment_competency" model="ir.actions.act_window">
+        <field name="name">Recruitment Competency</field>
+        <field name="res_model">recruitment.competency</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- ── Recruitment Qualification ─────────────────────────────────── -->
+    <record id="recruitment_qualification_list_view" model="ir.ui.view">
+        <field name="name">recruitment.qualification.list</field>
+        <field name="model">recruitment.qualification</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1">
+                <field name="qualification"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_recruitment_qualification" model="ir.actions.act_window">
+        <field name="name">Recruitment Qualifications</field>
+        <field name="res_model">recruitment.qualification</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- ── Recruitment Experience ─────────────────────────────────────── -->
+    <record id="recruitment_experience_list_view" model="ir.ui.view">
+        <field name="name">recruitment.experience.list</field>
+        <field name="model">recruitment.experience</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1">
+                <field name="experience"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_recruitment_experience" model="ir.actions.act_window">
+        <field name="name">Recruitment Experiences</field>
+        <field name="res_model">recruitment.experience</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- ── Master Data menu ───────────────────────────────────────────── -->
+    <menuitem id="menu_recruitment_master_data_root"
+              name="Master Data"
+              parent="new_recruitment_menu"
+              sequence="70"/>
+
+    <menuitem id="menu_recruitment_competency"
+              name="Competencies"
+              parent="menu_recruitment_master_data_root"
+              action="action_recruitment_competency"
+              sequence="1"/>
+
+    <menuitem id="menu_recruitment_qualification"
+              name="Qualifications"
+              parent="menu_recruitment_master_data_root"
+              action="action_recruitment_qualification"
+              sequence="2"/>
+
+    <menuitem id="menu_recruitment_experience"
+              name="Experiences"
+              parent="menu_recruitment_master_data_root"
+              action="action_recruitment_experience"
+              sequence="3"/>
+</odoo>

@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="recruitment_competency_tree" model="ir.ui.view">
+        <field name="name">recruitment.competency.form</field>
+        <field name="model">recruitment.competency</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Recruitment Competency">
+                <field name="competency"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+        <record id="recruitment_competency_form_tree" model="ir.actions.act_window">
+        <field name="name">Recruitment Competency</field>
+        <field name="res_model">recruitment.competency</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list</field>
+    </record>
+
+
+
+</odoo>

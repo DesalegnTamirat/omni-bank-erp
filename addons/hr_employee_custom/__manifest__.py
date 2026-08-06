@@ -15,6 +15,7 @@
         'hr_homeworking',
         'hr_org_chart',
         'hr_recruitment',
+        'hr_holidays',
         'mail',
         'portal',
         'website',
@@ -22,23 +23,17 @@
 
     ],
     'data': [
-
         'security/security.xml',
-
         'security/operating_unit_security.xml',
         'security/security_hr_contract.xml',
         'security/ir.model.access.csv',
-
-        # -- Contract --
+        'security/leave_request_security.xml',
         'data/hr_contract_data.xml',
         'views/hr_contract_views.xml',
         'views/hr_contract_history_views.xml',
         'wizards/contract_wizard.xml',
-
-        # -- Employee Master --
         'views/hr_department_views.xml',
         'views/hr_operating_unit_views.xml',
-        # Merged from the standalone 'operating_unit' module.
         'data/operating_unit_data.xml',
         'views/res_users_operating_unit_views.xml',
         'views/hr_employee_grade_views.xml',
@@ -48,27 +43,12 @@
         'views/history_views.xml',
         'views/hr_job.xml',
         'views/job_history.xml',
-
-
+        'views/hr_leave_allocation.xml',
+        'views/hr_leave_allocation_accruement.xml',
         'views/recruitment_qualifications.xml',
         'views/recruitment_competency.xml',
         'views/recruitment_experience.xml',
         'data/hr_job_data.xml',
-
-        # -- Menu (edited to only reference the active items above) --
-
-        # -- Discipline / Bonus & Penalty --
-        'views/disciplinary_sequence.xml',
-        'security/security_disciplinary.xml',
-        'views/discipline_action.xml',
-        'views/discipline_appeal.xml',
-        'views/disciplinary_outcome.xml',
-        'views/bonus_penalty_views.xml',
-        'views/bonus_penalty.xml',
-        'views/category_view.xml',
-        'views/discipline_penalty_rule.xml',
-        'wizards/bonus_transfer_wizard.xml',
-        'wizards/compute_bonus_wizard.xml',
 
         # -- Service Request --
         'security/security_service_request.xml',
@@ -117,15 +97,7 @@
         'views/service_award.xml',
         'views/award_received.xml',
 
-        # -- Manpower Plan --
-        'views/company_manpower_plan.xml',
-        'views/work_unit_manpower_plan.xml',
-        'views/manpower_details.xml',
-        'wizards/copy_manpower_plan_wizard_views.xml',
-        'wizards/copy_manpower_plan.xml',
-
         # -- Leave / Misc data --
-        'data/discipline_seq.xml',
         'data/leave_request.xml',
         'data/supp_role.xml',
         'views/hr_payroll_structure_views.xml',
@@ -136,7 +108,6 @@
         'reports/acting_termination.xml',
         'reports/mangerial_different_location.xml',
         'reports/mangerial_same_location.xml',
-        # 'reports/minute_template.xml',  # moved to custom_recruitment
         'reports/non_mangerial_different_location.xml',
         'reports/non_mangerial_same_location.xml',
         'reports/permanent_letters.xml',
@@ -147,39 +118,11 @@
         'reports/report.xml',
         'reports/transfer_letter.xml',
         'reports/employee_experience_letter.xml',
-
+        'views/employee_category_views.xml',
         # -- Misc utility wizards --
-        'wizards/reset_employee_login_wizard_views.xml',
-        'wizards/reset_login.xml',
         'wizards/print_employee_report_views.xml',
         'views/employee_history.xml',
         'views/hr_employee_master_views.xml',
-
-        # ══════════════════════════════════════════════════════════
-        # DISABLED — Attendance (module not available in Odoo 19)
-        # and Payroll/Salary/Accounting (hr.salary.rule-related).
-        # Re-add when those modules/features are available again.
-        # ══════════════════════════════════════════════════════════
-
-        # -- Attendance --
-        # 'security/security_attendance_regular.xml',
-        # 'views/category_attendance_regular.xml',
-        # 'views/employee_attendance_details.xml',
-        # 'views/regularization_views.xml',
-        # 'views/staff_attendance_details.xml',
-        # 'wizards/generate_employee_attendance_report.xml',
-
-        # -- Allowance / Payroll / Salary (accounting / hr.salary.rule) --
-        # 'views/emp_allowance.xml',
-        # 'views/salary_rules.xml',
-        # 'views/payroll_adj.xml',
-        # 'data/payroll_adjustments_seq.xml',
-        # 'wizards/net_salary_payment_wizard.xml',
-        # 'wizards/post_processing_salary_information.xml',
-        # 'wizards/preprocessing_salary_information.xml',
-        # 'wizards/salary_details_wizard.xml',
-        # 'views/hr_salary_history_views.xml',
-        # 'views/hr_timesheet_cost_history_views.xml',
         'views/menu.xml',
     ],
     'assets': {

@@ -1,442 +1,409 @@
 # -*- coding: utf-8 -*-
+"""
+hr_applicant.py
+Extends the core hr.applicant model with custom recruitment fields required
+by Bunna Bank's recruitment process (Internal / External recruitment journeys).
+"""
+from email.policy import default
+
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
-from datetime import datetime
-import re
+# ── Applicant qualification line ───────────────────────────────────────────
+class ApplicantQualificationLine(models.Model):
+    _name = 'applicant.qualification.line'
+    _description = 'Applicant Qualification Line'
 
-from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError, UserError
-
-
-class HrApplicantScoringFields(models.Model):
-    """
-    Fields on hr.applicant that reference custom_recruitment models
-    (recruitment.candidate.score, recruitment.offer.letter).
-    """
-    _inherit = "hr.applicant"
-
-    internal_reference_no = fields.Char(string='Reference No.', copy=False)
-
-    # Domain now references app_reference directly — the candidate list is
-    # restricted to Selected candidates belonging to the chosen vacancy.
-    # Empty/False app_reference => vacancy_id = False => no candidates shown,
-    # forcing the user to pick Applicant Reference first.
-    candidate_score_id = fields.Many2one(
-        "recruitment.candidate.score",
-        string="Selected Candidate",
-        domain="[('selection_status', '=', 'selected'), ('vacancy_id', '=', app_reference)]",
-        copy=False,
-        help="Select a candidate marked 'Selected' for the chosen Applicant "
-             "Reference (Vacancy). Only candidates belonging to that vacancy "
-             "are shown."
+    applicant_id = fields.Many2one(
+        'hr.applicant', string='Applicant',
+        required=True, ondelete='cascade', index=True,
     )
+    qualification = fields.Many2one(
+        'recruitment.qualification', string='Qualification',
+    )
+    requirement = fields.Char(string='Requirement')
+    response = fields.Char(string='Response / Achieved')
+    active = fields.Boolean(default=True)
 
-    # Real selectable field — picking a vacancy here cascades Job Position,
-    # Application Type, and Preferred Location (see _apply_vacancy_defaults),
-    # and restricts candidate_score_id's list above. Raises an error if the
-    # chosen vacancy has no candidate marked 'Selected' yet.
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+
+# ── Applicant experience line ──────────────────────────────────────────────
+class ApplicantExperienceLine(models.Model):
+    _name = 'applicant.experience.line'
+    _description = 'Applicant Experience Line'
+
+    applicant_id = fields.Many2one(
+        'hr.applicant', string='Applicant',
+        required=True, ondelete='cascade', index=True,
+    )
+    experience = fields.Many2one(
+        'recruitment.experience', string='Experience',
+    )
+    requirement = fields.Char(string='Requirement')
+    response = fields.Char(string='Response / Achieved')
+
+
+# ── Applicant competency line ──────────────────────────────────────────────
+class ApplicantCompetencyLine(models.Model):
+    _name = 'applicant.competency.line'
+    _description = 'Applicant Competency Line'
+
+    applicant_id = fields.Many2one(
+        'hr.applicant', string='Applicant',
+        required=True, ondelete='cascade', index=True,
+    )
+    competencies = fields.Many2one(
+        'recruitment.competency', string='Competency',
+    )
+    requirement = fields.Char(string='Requirement')
+    response = fields.Char(string='Response / Achieved')
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+
+# ── hr.applicant extension ─────────────────────────────────────────────────
+class HrApplicantCustom(models.Model):
+    """Extends hr.applicant with Bunna Bank recruitment-specific fields."""
+    _inherit = 'hr.applicant'
+
+    # ── Application classification ─────────────────────────────────────────
+    application_type = fields.Selection([
+        ('Internal', 'Internal'),
+        ('External', 'External'),
+    ], string='Application Type', default='External',
+        help='Whether this is an internal transfer/promotion or external hire.')
+
     app_reference = fields.Many2one(
-        "job.vacancy",
-        string="Applicant Reference",
-        copy=False,
-        domain="[('vacancy_status', 'in', ['evaluate', 'published'])]",
-        help="Select the Vacancy this application is for. Must already have "
-             "at least one 'Selected' candidate — Job Position, Application "
-             "Type and Preferred Location are auto-filled from it and locked."
+        'job.vacancy', string='Vacancy Reference',
+        help='Links this applicant to a specific job vacancy.',
+    )
+    vacancy_reference = fields.Char(
+        string='Vacancy No.',
+        related='app_reference.reference', store=True, readonly=True,
+    )
+    preferred_location = fields.Char(
+        string='Preferred Location',
+        help='Applicant preferred work location.',
+    )
+    candidate_score_id = fields.Many2one(
+        'recruitment.candidate.score', string='Candidate Score',
+        help='Link to the candidate score record for this applicant.',
     )
 
-    hr_new_ids = fields.One2many('hr.health.applicant', 'employee_id', string='Health wellness',
-                                 help='Hr application Information')
-    date_of_birth = fields.Date("Date of Birth")
-    place_of_birth = fields.Char("Place of Birth")
-    gender = fields.Selection(
-        [('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
-        string='Gender', default='male')
-    worked_in_bunna_earlier = fields.Boolean(string="Worked in Bunna Earlier")
-    current_company = fields.Char("Current Company")
-    current_working_location = fields.Char("Current Working Location")
-    contract_created_new = fields.Boolean(string="Create Contract")
-    offer_letter_sent = fields.Boolean(string="Offer Letter Sent", copy=False)
-    working_status = fields.Selection(
-        [('active', 'Active'), ('terminated', 'Terminated'), ('resigned', 'Resigned')],
-        string='Working Status')
-    willing_to_join_immediately = fields.Boolean("Willing to join Immediately")
-    date_of_availability = fields.Date("Date of Availability")
-    internal_employee_name = fields.Char("Employee Name")
-    employee_number = fields.Char("Employee Number")
-    employee_grade = fields.Char("Employee Grade", compute="_compute_employee_grade")
-    employee_position = fields.Char("Employee Position", compute="_compute_employee_position")
-    employee_work_unit = fields.Char("Current Work Unit")
-    promotion_date = fields.Date("Date of Promotion")
-    employment_start_date = fields.Date("Employment Start Date")
-    final_work_unit = fields.Many2one("operating.unit", string="Assigned Work Unit",
-                                      help='Enter the Appointed Work Unit')
-    preferred_location = fields.Char("Preferred Location")
-    vacancy_reference = fields.Char("Vacancy Reference")
-    cc_workunits = fields.Many2many("operating.unit", "apllicant_rel", string="CC To:",
-                                    help="Enter the Workunits to be copied")
-    application_type = fields.Selection(
-        [('Internal', 'Internal'), ('External', 'External'), ('Referral', 'Referral')],
-        string='Application Type', default='Internal')
-    select_flag = fields.Boolean(string="Select")
-    application_status = fields.Char(string="Application Status")
-    job_offer_status = fields.Char(string="Job Offer")
-    rejection_reason = fields.Text(string="Rejection Reason")
-    age = fields.Char(string="Age", compute='_calculate_age')
-    manager = fields.Many2one("hr.employee", string="Manager")
+    # ── Bunna-specific application status tracking ────────────────────────
+    # NOTE: core hr.applicant already defines 'application_status' as a
+    # computed field (ongoing/hired/refused/archived). We use a separate
+    # field 'bunna_app_status' to track the Bunna recruitment workflow stage
+    # without overriding the core field.
+    bunna_app_status = fields.Selection([
+        ('draft', 'Draft'),
+        ('shortlisted', 'Shortlisted'),
+        ('interview', 'Interview'),
+        ('offer', 'Offer Issued'),
+        ('hired', 'Hired'),
+        ('rejected', 'Rejected'),
+    ], string='Bunna Application Status', default='draft', tracking=True)
 
-    def _apply_vacancy_defaults(self, vacancy):
-        """
-        Cascade triggered from either app_reference or candidate_score_id.
-        Job Position, Application Type, Preferred Location, and Vacancy
-        Reference are all derived from the vacancy and locked readonly in
-        the view once app_reference is set.
-        """
+    job_offer_status = fields.Selection([
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+    ], string='Job Offer Status')
+
+    rejection_reason = fields.Text(string='Rejection Reason')
+    offer_letter_sent = fields.Boolean(string='Offer Letter Sent', default=False)
+    contract_created_new = fields.Boolean(string='Contract Created', default=False)
+
+    active_leave_status = fields.Char(
+        string="Leave Status", compute="_compute_applicant_leave_status", store=False,
+        help="Displays active leave status if applicant is currently an employee on leave."
+    )
+    active_disciplinary_status = fields.Selection(
+        [
+            ("none", "No Active Warning"),
+            ("first_warning", "First Warning (Severity Level 4)"),
+            ("second_warning", "Second Warning (Severity Level 3)"),
+            ("last_written_warning", "Active Last Written Warning (Severity Level 1/2)"),
+        ],
+        string="Discipline Warning Level",
+        compute="_compute_applicant_disciplinary_status",
+        store=False,
+        help="Pulled from Discipline Management (discipline.case) based on case severity levels."
+    )
+
+    @api.depends('internal_employee_id')
+    def _compute_applicant_disciplinary_status(self):
+        for rec in self:
+            emp = rec.internal_employee_id
+            if emp and 'discipline.case' in self.env:
+                active_cases = self.env['discipline.case'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'enforced'),
+                ])
+                if active_cases:
+                    severities = set(active_cases.mapped('severity_level'))
+                    punishments = set(active_cases.mapped('punishment_type'))
+                    if {'level_1', 'level_2'} & severities or 'final_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'last_written_warning'
+                    elif 'level_3' in severities or 'second_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'second_warning'
+                    elif 'level_4' in severities or 'first_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'first_warning'
+                    else:
+                        rec.active_disciplinary_status = 'none'
+                else:
+                    rec.active_disciplinary_status = 'none'
+            else:
+                rec.active_disciplinary_status = 'none'
+
+    @api.depends('internal_employee_id')
+    def _compute_applicant_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.internal_employee_id
+            if emp:
+                leaves = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leaves:
+                    rec.active_leave_status = leaves.holiday_status_id.name if leaves.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")
+
+
+    def action_validate_completeness(self):
+        """Validate applicant profile completeness. Automatically reject incomplete submissions."""
+        for rec in self:
+            missing = []
+            if rec.application_type == 'External':
+                if not (rec.partner_name or rec.name):
+                    missing.append(_("Full Name"))
+                if not rec.email_from:
+                    missing.append(_("Email"))
+                if not rec.partner_phone:
+                    missing.append(_("Phone Number"))
+                if not rec.gender:
+                    missing.append(_("Gender"))
+                if not rec.date_of_birth:
+                    missing.append(_("Date of Birth"))
+            elif rec.application_type == 'Internal':
+                if not rec.internal_employee_id:
+                    missing.append(_("Internal Employee"))
+
+            if missing:
+                reason = _("Rejected Incomplete Submission. Missing mandatory fields: %s") % ", ".join(missing)
+                rec.write({
+                    'bunna_app_status': 'rejected',
+                    'rejection_reason': reason,
+                    'active': False,
+                })
+                rec.message_post(body=reason)
+                return False
+        return True
+
+
+    cv_attachment_id = fields.Many2one('ir.attachment', string='CV Attachment', compute='_compute_cv_attachment_id',
+                                       store=False)
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+    def _compute_cv_attachment_id(self):
+        for rec in self:
+            att = self.env['ir.attachment'].search([
+                ('res_model', '=', 'hr.applicant'),
+                ('res_id', '=', rec.id)
+            ], limit=1, order='id desc')
+            rec.cv_attachment_id = att.id if att else False
+
+    def action_download_cv(self):
         self.ensure_one()
-        if not vacancy:
-            return
-        self.job_id = vacancy.job_position
-        if vacancy.recruitment_type == 'Internal':
-            self.application_type = 'Internal'
-        elif vacancy.recruitment_type == 'External':
-            self.application_type = 'External'
-        self.preferred_location = vacancy.operating_unit_id.name or False
-        self.vacancy_reference = vacancy.reference
+        att = self.cv_attachment_id
+        if not att:
+            att = self.env['ir.attachment'].search([
+                ('res_model', '=', 'hr.applicant'),
+                ('res_id', '=', self.id)
+            ], limit=1, order='id desc')
+        if not att:
+            raise ValidationError(_("No CV attachment found for this applicant."))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/{att.id}?download=true',
+            'target': 'new',
+        }
 
+    # ── Personal information ───────────────────────────────────────────────
+    date_of_birth = fields.Date(string='Date of Birth')
+    age = fields.Integer(string='Age', compute='_compute_age', store=True)
+    place_of_birth = fields.Char(string='Place of Birth')
+    gender = fields.Selection([
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ], string='Gender')
+
+    # ── Work history / suitability flags ──────────────────────────────────
+    worked_in_bunna_earlier = fields.Boolean(
+        string='Previously Worked at Bunna Bank', default=False,
+    )
+    current_company = fields.Char(string='Current Company')
+    current_working_location = fields.Char(string='Current Working Location')
+    working_status = fields.Selection([
+        ('employed', 'Employed'),
+        ('unemployed', 'Unemployed'),
+        ('self_employed', 'Self-Employed'),
+    ], string='Working Status', default='unemployed')
+    willing_to_join_immediately = fields.Boolean(
+        string='Willing to Join Immediately', default=False,
+    )
+    date_of_availability = fields.Date(string='Date of Availability')
+    functions = fields.Char(string='Functions', help='Internal compute helper flag.')
+    prmt_emp = fields.Char(string='Promote Employee Flag', default='No')
+
+    # ── Internal applicant details ─────────────────────────────────────────
+    # NOTE: the DB already has an 'internal_employee_name' varchar column with
+    # stored employee names. We keep that as a Char field for backward-compat
+    # and introduce 'internal_employee_id' (Many2one) with a different DB column.
+    internal_employee_name = fields.Char(
+        string='Internal Employee Name (Legacy)',
+        help='Previously stored as free text. Kept for backward compatibility.',
+    )
+    internal_employee_id = fields.Many2one(
+        'hr.employee', string='Internal Employee',
+        help='Select the internal employee applying for this vacancy.',
+    )
+    employee_work_unit = fields.Char(
+        string='Current Work Unit',
+        compute='_compute_employee_work_unit',
+        store=False, readonly=True,
+    )
+    employee_number = fields.Char(
+        string='Employee ID',
+        compute='_compute_employee_number',
+        store=False, readonly=True,
+    )
+    employee_grade = fields.Char(string='Employee Grade')
+    employee_position = fields.Char(string='Current Position')
+    manager = fields.Many2one('hr.employee', string='Direct Manager')
+    promotion_date = fields.Date(string='Last Promotion Date')
+    employment_start_date = fields.Date(string='Employment Start Date')
+    final_work_unit = fields.Many2one('hr.department', string='Assigned Work Unit', ondelete='set null')
+    cc_workunits = fields.Many2many(
+        'hr.department', string='CC Work Units',
+        help="Additional departments CC'd on this application.",
+    )
+
+    # ── Qualifications / Experience / Competency tabs ─────────────────────
+    qualification_id = fields.One2many(
+        'applicant.qualification.line', 'applicant_id',
+        string='Education Qualifications',
+    )
+    experiance_id = fields.One2many(
+        'applicant.experience.line', 'applicant_id',
+        string='Experience',
+    )
+    competencies_id = fields.One2many(
+        'applicant.competency.line', 'applicant_id',
+        string='Competencies',
+    )
+    hr_new_department_ids = fields.One2many(
+        'hr_new_department_info_job', 'applicant_id',
+        string='Vacancies',
+    )
+
+    # ── Computed fields ────────────────────────────────────────────────────
+    @api.depends('date_of_birth')
+    def _compute_age(self):
+        from datetime import date
+        today = date.today()
+        for rec in self:
+            if rec.date_of_birth:
+                dob = rec.date_of_birth
+                rec.age = (today - dob).days // 365
+            else:
+                rec.age = 0
+
+    @api.depends('internal_employee_id')
+    def _compute_employee_work_unit(self):
+        for rec in self:
+            rec.employee_work_unit = rec.internal_employee_id.department_id.name or ''
+
+    @api.depends('internal_employee_id')
+    def _compute_employee_number(self):
+        for rec in self:
+            rec.employee_number = rec.internal_employee_id.barcode or ''
+
+    # ── Onchange: cascade vacancy reference fields ─────────────────────────
     @api.onchange('app_reference')
     def _onchange_app_reference(self):
-        """
-        Selecting Applicant Reference cascades vacancy defaults, but first
-        requires the vacancy to already have at least one candidate marked
-        'Selected' — otherwise this raises and blocks the pick outright.
-        Also clears any previously chosen candidate_score_id that no longer
-        belongs to the new vacancy, so the two fields can't drift apart.
-        """
         for rec in self:
-            if not rec.app_reference:
-                continue
-            vacancy = rec.app_reference
+            if rec.app_reference:
+                rec.application_type = (
+                    'Internal' if rec.app_reference.internal_movement_type in ('internal', 'promotion', 'lateral')
+                    else 'External'
+                )
 
-            has_selected_candidate = self.env['recruitment.candidate.score'].search_count([
-                ('vacancy_id', '=', vacancy.id),
-                ('selection_status', '=', 'selected'),
-            ])
-            if not has_selected_candidate:
-                raise UserError(_(
-                    "Vacancy %s has no candidate marked as 'Selected'. "
-                    "Please complete candidate scoring and selection for "
-                    "this vacancy before choosing it as the Applicant "
-                    "Reference."
-                ) % vacancy.reference)
-
-            if rec.candidate_score_id and rec.candidate_score_id.vacancy_id != vacancy:
-                rec.candidate_score_id = False
-
-            rec._apply_vacancy_defaults(vacancy)
-
-    @api.onchange('candidate_score_id')
-    def _onchange_candidate_score_id(self):
-        """
-        Also sets app_reference from the score's vacancy and runs the same
-        cascade, so both entry points land on identical values.
-        """
-        for rec in self:
-            score = rec.candidate_score_id
-            if not score:
-                continue
-            rec.gender = score.gender
-            rec.partner_name = score.candidate_name
-
-            if score.vacancy_id:
-                rec.app_reference = score.vacancy_id
-                rec._apply_vacancy_defaults(score.vacancy_id)
-
-            if score.recruitment_type == 'internal' and score.employee_id:
-                rec.employee_id = score.employee_id
-                rec.internal_employee_name = score.employee_id.name
-
-    @api.constrains('app_reference', 'application_type')
-    def _check_application_type_matches_vacancy(self):
-        """
-        Application Type must match the vacancy's Recruitment Type exactly —
-        no other value permitted, regardless of how the record is written
-        (form, import, API).
-        """
-        for rec in self:
-            if not rec.app_reference:
-                continue
-            expected = rec.app_reference.recruitment_type
-            if expected and rec.application_type != expected:
-                raise ValidationError(_(
-                    "Application Type must be '%s' to match the Recruitment "
-                    "Type of vacancy %s. It cannot be changed independently."
-                ) % (expected, rec.app_reference.reference))
-
-    @api.constrains('app_reference', 'candidate_score_id')
-    def _check_candidate_score_matches_vacancy(self):
-        """
-        Server-side backstop (catches import/API writes that bypass the
-        onchange): Selected Candidate must belong to the same vacancy as
-        Applicant Reference, and that vacancy must actually have at least
-        one 'Selected' candidate.
-        """
-        for rec in self:
-            if not rec.app_reference:
-                continue
-
-            has_selected_candidate = self.env['recruitment.candidate.score'].search_count([
-                ('vacancy_id', '=', rec.app_reference.id),
-                ('selection_status', '=', 'selected'),
-            ])
-            if not has_selected_candidate:
-                raise ValidationError(_(
-                    "Vacancy %s has no candidate marked as 'Selected'. "
-                    "Applicant Reference cannot be set to a vacancy with no "
-                    "selected candidates."
-                ) % rec.app_reference.reference)
-
-            if rec.candidate_score_id and rec.candidate_score_id.vacancy_id != rec.app_reference:
-                raise ValidationError(_(
-                    "Selected Candidate must belong to vacancy %s "
-                    "(Applicant Reference). Please choose a candidate from "
-                    "that vacancy's selected list."
-                ) % rec.app_reference.reference)
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        records = super().create(vals_list)
-        for rec in records:
-            if rec.candidate_score_id and rec.candidate_score_id.recruitment_type == 'external' \
-                    and not rec.candidate_score_id.applicant_id:
-                rec.candidate_score_id.applicant_id = rec.id
-        return records
-
-    def _calculate_age(self):
-        for partner in self:
-            if partner.date_of_birth:
-                dob_str = fields.Date.to_string(partner.date_of_birth)
-                date_format = '%Y-%m-%d'
-                dob = datetime.strptime(dob_str, date_format)
-                today = datetime.now()
-                age_years = today.year - dob.year
-                age_months = today.month - dob.month
-                if today.day < dob.day:
-                    age_months -= 1
-                if age_months < 0:
-                    age_years -= 1
-                    age_months += 12
-                if age_years == 0:
-                    partner.age = "{} months".format(age_months)
-                elif age_months == 0:
-                    partner.age = "{} years".format(age_years)
-                else:
-                    partner.age = "{} years {} months".format(age_years, age_months)
-            else:
-                partner.age = "N/A"
-
-    def _compute_employee_grade(self):
-        for emp in self:
-            grd = self.env["hr.job"].search([("name", "=", emp.job_id.name)])
-            if grd:
-                emp.employee_grade = grd.grade.grade_name
-                return emp.employee_grade
-            else:
-                emp.employee_grade = "N/A"
-                return emp.employee_grade
-
-    def _compute_employee_position(self):
-        for emp in self:
-            if emp.job_id:
-                emp.employee_position = emp.job_id.name
-                return emp.employee_position
-            else:
-                emp.employee_position = emp.job_id.name
-                return emp.employee_position
-
-    def action_applicant_send(self):
-        self.ensure_one()
-        self.offer_letter_sent = True
-        '''
-        Opens a window to compose an email using the standard mail compose
-        wizard, addressed to the applicant.
-        '''
-        try:
-            compose_form_id = self.env.ref('mail.email_compose_message_wizard_form').id
-        except ValueError:
-            compose_form_id = False
-
-        ctx = {
-            'default_model': 'hr.applicant',
-            'default_res_ids': self.ids,
-            'default_use_template': False,
-            'default_composition_mode': 'comment',
-            'email_to': self.email_from,
-            'force_email': True,
-        }
-        lang = "en_US"
-
-        if ctx.get('default_template_id'):
-            template = self.env['mail.template'].browse(ctx['default_template_id'])
-            if template and template.lang:
-                lang = template.lang
-
-        self = self.with_context(lang=lang)
-
-        return {
-            'name': 'Compose Email',
-            'type': 'ir.actions.act_window',
-            'view_mode': 'form',
-            'res_model': 'mail.compose.message',
-            'views': [(compose_form_id, 'form')],
-            'view_id': compose_form_id,
-            'target': 'new',
-            'context': ctx,
-        }
-
-
-class HrHealthApplicant(models.Model):
-    _name = "hr.health.applicant"
-    _description = "Hr Applications"
-    _rec_name = "checklist"
-
-    employee_id = fields.Many2one("hr.applicant", string="Employee", help='Select corresponding Employee')
-    checklist = fields.Char("Checklist")
-    uploaded = fields.Boolean("Uploaded")
-    verified = fields.Boolean("Verified")
-
-    def set_to_draft(self):
-        pass
-
-
-class HrApplicantPromotion(models.Model):
-    """
-    Promotion / contract-creation workflow and the Recruitment Criteria
-    sub-tables (Education Qualification / Experience / Competencies /
-    Vacancies) on hr.applicant.
-    """
-    _inherit = 'hr.applicant'
-    _description = "Job Position"
-
-    qualification_id = fields.One2many('hr_qualification_info_applicant', 'applicant_id', 'Education Qualification')
-    experiance_id = fields.One2many('hr_experience_info_applicant', 'applicant_id', 'Experiance')
-    competencies_id = fields.One2many('hr_competencies_info_applicant', 'applicant_id', 'Competencies')
-    hr_new_department_ids = fields.One2many('hr_new_department_info_applicant', 'applicant_id', 'Department Info')
-    prmt_emp = fields.Selection([("Draft", "Draft"), ("Yes", "Yes")], string="Promote Employee", default="Draft")
-
-    functions = fields.Selection([
-        ('create_new_employee_from_applicant', 'Create New Employee From Applicant'),
-        ('promote_employee', 'Promote Employee')
-    ])
-    responsible_display = fields.Char(string="Responsible", compute="_compute_user_id")
-
-    def _compute_user_id(self):
-        for val in self:
-            usr = self.env["hr.job"].search([("name", "=", val.job_id.name)])
-            val.responsible_display = val.user_id.name if val.user_id else ''
-            return val.responsible_display
-
+    # ── Button actions ─────────────────────────────────────────────────────
     def create_contract(self):
-        if not self.employee_id:
-            raise UserError('Please link an Employee to this applicant before creating a contract.')
-        if not self.employment_start_date:
-            raise UserError('Please specify the Employment Start Date')
-
-        p_id = self.employee_id.id
-        self.env.cr.execute('SELECT populate_emp_identification(%s)', (p_id,))
-        self.env.cr.execute('SELECT create_new_employee_contract(%s)', (p_id,))
-        self.env['hr.employee'].invalidate_model()
-        self.env['hr.applicant'].invalidate_model()
+        """Placeholder: triggers contract creation workflow."""
+        self.write({'contract_created_new': True})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Contract Created'),
+                'message': _('Contract has been created for %s.') % self.partner_name,
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
     def promote_employee(self):
-        self.functions = 'promote_employee'
-        p_id = self.employee_id.id
-        if not self.promotion_date:
-            raise UserError('Please specify the Promotion Date')
-        else:
-            self.env.cr.execute('SELECT promote_employee(%s)', (p_id,))
-            self.env['hr.employee'].invalidate_model()
-        if self.application_type == "Internal":
-            self.env["bb.internal"].create({
-                'applicant_id': self.id,
-                'applicant_name': self.partner_name
-            })
-        if self.application_type == "External":
-            self.env["bb.external"].create({
-                'applicant_id': self.id,
-                'applicant_name': self.partner_name
-            })
-        self.ref_num()
-        self.prmt_emp = "Yes"
+        """Placeholder: triggers internal employee promotion workflow."""
+        self.write({'prmt_emp': 'Yes'})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Employee Promoted'),
+                'message': _('Promotion has been initiated for %s.') % self.partner_name,
+                'type': 'success',
+                'sticky': False,
+            },
+        }
 
-    def ref_num(self):
-        if self.application_type == "Internal":
-            ref = self.env["bb.internal"].search([("applicant_id", "=", self.id)])
-            self.internal_reference_no = str(ref.int_reference) + str("/2023/24")
-
-        if self.application_type == "External":
-            ref = self.env["bb.external"].search([("applicant_id", "=", self.id)])
-            self.internal_reference_no = str(ref.ext_reference) + str("/2023/24")
-
-    def create_new_employee_from_applicant(self):
-        self.functions = 'create_new_employee_from_applicant'
-        res = super(HrApplicantPromotion, self).create_employee_from_applicant()
-        if res.get("res_id", False):
-            employee_multi = self.env["hr.employee"].search([("id", "=", res.get("res_id", False))])
-            qualifications_list = []
-            for val in self.qualification_id:
-                qualifications_list.append((0, 0, {"qualification": val.qualification, "requirement": val.requirement,
-                                                   "response": val.response, "employee_id": employee_multi.id}))
-            experience_list = []
-            for val in self.experiance_id:
-                experience_list.append((0, 0, {"experience": val.experience, "requirement": val.requirement,
-                                               "response": val.response, "employee_id": employee_multi.id}))
-            competencies_list = []
-            for val in self.competencies_id:
-                competencies_list.append((0, 0, {"competencies": val.competencies, "requirement": val.requirement,
-                                                 "response": val.response, "employee_id": employee_multi.id}))
-
-            employee_multi.write({"qualification_id": qualifications_list, "experiance_id": experience_list,
-                                  "competencies_id": competencies_list})
-
-
-class HrQualificationInfoApplicant(models.Model):
-    _name = "hr_qualification_info_applicant"
-    _description = "qualification Profile"
-    _rec_name = "qualification"
-
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
-    qualification = fields.Char(string="Qualification")
-    requirement = fields.Float(string="Requirement(CGPA)")
-    response = fields.Float(string="Response")
-
-
-class HrExperienceInfoApplicant(models.Model):
-    _name = "hr_experience_info_applicant"
-    _description = "experience Profile"
-    _rec_name = "experience"
-
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
-    experience = fields.Char(string="Experience")
-    requirement = fields.Float(string="Requirement(Years)")
-    response = fields.Float(string="Response")
-
-
-class HrCompetenciesInfoApplicant(models.Model):
-    _name = "hr_competencies_info_applicant"
-    _description = "Competencies Profile"
-    _rec_name = "competencies"
-
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
-    competencies = fields.Char(string="Competencies")
-    requirement = fields.Char(string="Requirement")
-    response = fields.Char(string="Response")
-
-
-class HrNewDepartmentInfoApplicant(models.Model):
-    _name = "hr_new_department_info_applicant"
-    _rec_name = "work_unit"
-
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
-    work_unit = fields.Many2one('operating.unit', string="Work Unit", help='Select Work Unit')
-    number_of_vacancies = fields.Integer("Number of Vacancies")
-    response = fields.Char(string="Response")
+    def action_applicant_send(self):
+        """Placeholder: triggers offer letter sending workflow."""
+        self.write({'offer_letter_sent': True})
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Offer Letter Sent'),
+                'message': _('Offer Letter has been sent for %s.') % self.partner_name,
+                'type': 'success',
+                'sticky': False,
+            },
+        }

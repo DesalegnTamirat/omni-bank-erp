@@ -31,7 +31,7 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
 
         # Execute high-performance PostgreSQL function registered by model init()
         self.env.cr.execute(
-            "SELECT generate_detail_employee_attendance_report(%s::date, %s::date, %s::varchar)",
+            "SELECT generate_daily_employee_attendance_detail_report(%s::date, %s::date, %s::varchar)",
             (p_from, p_to, report_type)
         )
         return {

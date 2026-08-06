@@ -1,15 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Probation Management
-=====================
-Implements BRD Module 1 (Recruitment and Selection Management System),
-section 7.4 "Probation Management":
 
-    FR-REC-060  Duration Configuration : Non-Managerial 60 Days, Managerial 75 Days.
-    FR-REC-061  Proactive Notification : notify Supervisor 5 days prior to probation end date.
-    FR-REC-062  Outcome Recording      : Satisfactory (Confirmation) / Unsatisfactory
-                                          (Termination) / Discipline Issue.
-"""
 from datetime import timedelta
 
 from odoo import api, fields, models, _
@@ -25,6 +15,12 @@ class HrEmployeeProbation(models.Model):
     _inherit = ["mail.thread"]
     _description = "Employee Probation"
     _rec_name = "name"
+    active = fields.Boolean(default=True)
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     _order = "probation_end_date"
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
@@ -44,12 +40,12 @@ class HrEmployeeProbation(models.Model):
     )
     recruitment_reference = fields.Char(string="Recruitment Reference")
 
-    # FR-REC-060 -----------------------------------------------------------------
+    #  ---------------------------------
     employee_category = fields.Selection(
         [("Managerial", "Managerial"), ("Non Managerial", "Non Managerial")],
         string="Employee Category", required=True, default="Non Managerial", tracking=True,
         help="Drives the statutory probation duration: 60 days for Non-Managerial, "
-             "75 days for Managerial (FR-REC-060).",
+             "75 days for Managerial.",
     )
     probation_start_date = fields.Date(string="Probation Start Date", required=True, default=fields.Date.context_today)
     duration_days = fields.Integer(
@@ -59,11 +55,11 @@ class HrEmployeeProbation(models.Model):
         string="Probation End Date", compute="_compute_probation_end_date", store=True, readonly=True,
     )
 
-    # FR-REC-061 -----------------------------------------------------------------
+    #  ---------------------------------
     notification_sent = fields.Boolean(string="Supervisor Notified", default=False, readonly=True, copy=False)
     notification_date = fields.Datetime(string="Notification Sent On", readonly=True, copy=False)
 
-    # FR-REC-062 -----------------------------------------------------------------
+    #  ---------------------------------
     outcome = fields.Selection(
         [
             ("pending", "Pending"),
@@ -148,7 +144,7 @@ class HrEmployeeProbation(models.Model):
         channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def action_notify_supervisor(self):
-        """FR-REC-061: proactive notification to the Supervisor.
+        """: proactive notification to the Supervisor.
         Can be triggered manually or by the scheduled action below."""
         for rec in self:
             if rec.notification_sent:
@@ -185,7 +181,7 @@ class HrEmployeeProbation(models.Model):
 
     @api.model
     def _cron_notify_upcoming_probation_end(self):
-        """Scheduled action (FR-REC-061): notify supervisors 5 days before the
+        """Scheduled action : notify supervisors 5 days before the
         probation end date for probations still pending an outcome."""
         target_date = fields.Date.context_today(self) + timedelta(days=NOTIFICATION_DAYS_BEFORE_END)
         records = self.search([
@@ -194,10 +190,10 @@ class HrEmployeeProbation(models.Model):
             ("outcome", "=", "pending"),
             ("probation_end_date", "<=", target_date),
         ])
-        records.action_notify_supervisor()
+        records.action_notify_supervisor
 
     def action_record_outcome(self):
-        """FR-REC-062: record the probation outcome."""
+        """: record the probation outcome."""
         for rec in self:
             if rec.outcome == "pending":
                 raise UserError(_("Please select an Outcome (Satisfactory, Unsatisfactory, or Discipline Issue) "

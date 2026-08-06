@@ -150,9 +150,6 @@ class LeaveRequest(models.Model):
         if cnt == mem_cnt:
            self.apr_state = "approve"
 
-    def fetch(self):
-        pass
-
     def check_leave_balance(self):
         for record in self:
             self.env.cr.execute("SELECT get_eligible_leave(%s)", (record.requester_name.id,))

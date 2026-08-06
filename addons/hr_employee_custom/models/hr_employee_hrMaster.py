@@ -9,24 +9,7 @@ from odoo import models, fields
 from odoo.exceptions import UserError
 
 
-class DisciplinaryActionRecord(models.Model):
-    _name = "emp.discipline.action.record"
-
-    reference = fields.Char(string="Reference")
-    breach_count = fields.Integer(string="Breach Count")
-    breach = fields.Char(string="Breach")
-    code = fields.Char(string="Code", default="PENALTY")
-    penalty_effective_date = fields.Date(string="Penalty Effective Date", compute="_compute_penalty_effective_date")
-    fine_imposed = fields.Float(string="Total Fine Imposed")
-    status = fields.Selection(
-        [("in_progress", "In Progress"), ("appeal", "Appeal"), ("approved", "Approved"), ("revoked", "Revoked")],
-        string="Status", default="in_progress")
-    disc_rec_id = fields.Many2one("hr.employee", string="Employee Disciplinary action Records")
-
-    def _compute_penalty_effective_date(self):
-        for val in self:
-            rec = self.env["discipline.action"].search([("reference", "=", val.reference)])
-            val.penalty_effective_date = rec.penalty_effective_date if rec else False
+# DisciplinaryActionRecord (emp.discipline.action.record) REMOVED — Disciplinary feature removed
 
 
 class HrEmployeeFamilyInfo(models.Model):
@@ -542,8 +525,7 @@ class hr_department_job(models.Model):
     # _description = " Department Form"
     _rec_name = "work_unit"
     job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
-    # applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee',
-    #                                invisible=1)
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
     # work_unit = fields.Many2one('operating.unit', string="Work Unit", help='Select Work Unit')
     work_unit = fields.Many2one('vacancy.workunit', string="Work Unit", help='Select Work Unit')
     # recruitment_name = fields.Char("Recruitment Name")

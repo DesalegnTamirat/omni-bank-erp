@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Recruitment Request sequence (FR-08) -->
+        <!-- Recruitment Request sequence  -->
         <record id="sequence_recruitment_request" model="ir.sequence">
             <field name="name">Recruitment Request</field>
             <field name="code">recruitment.request</field>

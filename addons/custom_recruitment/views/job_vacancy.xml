@@ -44,15 +44,18 @@
                             <field name="job_position" readonly="vacancy_status != 'draft'"/>
                             <field name="job_grade" readonly="vacancy_status != 'draft'"/>
                             <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
+                            <field name="job_level" invisible="employee_category != 'Non Managerial'"
+                                   required="employee_category == 'Non Managerial'" readonly="vacancy_status != 'draft'"/>
                             <field name="recruitment_reference" readonly="vacancy_status != 'draft'"/>
                             <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
+                            <!-- INTERNAL ONLY: movement type -->
                             <field name="internal_movement_type" string="Movement Type"
-                                   invisible="sourcing_type not in ['internal']"
+                                   invisible="sourcing_type not in ['internal', 'both']"
                                    readonly="vacancy_status != 'draft'"/>
+                            <!-- EXTERNAL ONLY: source channel -->
                             <field name="source_channel" string="Source Channel"
                                    invisible="sourcing_type not in ['external', 'both']"
                                    readonly="vacancy_status != 'draft'"/>
-                            <field name="recruitment_type" string="Recruitment Type" readonly="vacancy_status != 'draft'"/>
                             <field name="operating_unit_id" readonly="vacancy_status != 'draft'"/>
                             <field name="type_of_employment" readonly="vacancy_status != 'draft'"/>
                         </group>
@@ -66,6 +69,28 @@
                             <field name="vacancy_description" readonly="vacancy_status != 'draft'"/>
                         </group>
                     </group>
+
+                    <!-- EXTERNAL REQUIREMENTS — only visible for external/both -->
+                    <group string="External Applicant Requirements"
+                           invisible="sourcing_type not in ['external', 'both']">
+                        <group string="Academic Requirements">
+                            <field name="minimum_education" readonly="vacancy_status != 'draft'"/>
+                            <field name="minimum_cgpa" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                        <group string="Experience Requirements">
+                            <field name="minimum_experience_years" readonly="vacancy_status != 'draft'"/>
+                            <field name="banking_experience_required" readonly="vacancy_status != 'draft'"/>
+                            <field name="ex_bunna_preferred" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- Website publishing status — only visible for external/both -->
+                    <group invisible="sourcing_type not in ['external', 'both']">
+                        <group string="Website Status">
+                            <field name="website_published" readonly="1"/>
+                        </group>
+                    </group>
+
 
                     <div>
                         <button name="publish_vacancy"
@@ -100,7 +125,8 @@
                                     <field name="employee_name" readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="operating_unit"/>
                                     <field name="status" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="alternate_committee_member" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="alternate_committee_member"
+                                           readonly="parent.vacancy_status != 'draft'"/>
                                     <field name="alter_operating_unit"/>
                                     <field name="approve"/>
                                 </list>
@@ -130,8 +156,10 @@
                             <field name="total_number_of_applicant" readonly="vacancy_status != 'draft'"/>
                             <field name="short_listed_applicant" readonly="vacancy_status != 'draft'"/>
                             <field name="purpose_of_employment" readonly="vacancy_status != 'draft'"/>
-                            <field name="vacancy_announcement_no" string="Required Number" readonly="vacancy_status != 'draft'"/>
-                            <field name="total_participant_on_the_assessment" string="Shortlisted for Interview" readonly="vacancy_status != 'draft'"/>
+                            <field name="vacancy_announcement_no" string="Required Number"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="total_participant_on_the_assessment" string="Shortlisted for Interview"
+                                   readonly="vacancy_status != 'draft'"/>
                             <field name="not_selected_applicants" readonly="vacancy_status != 'draft'"/>
                         </group>
                     </group>
@@ -163,7 +191,17 @@
                     <group string="Comment">
                         <field name="comment" nolabel="1" readonly="vacancy_status != 'draft'"/>
                     </group>
+
+                    <!-- Internal Placement Release Tracking — only relevant for internal/both vacancies -->
+                    <group string="Internal Placement &amp; Release"
+                           invisible="sourcing_type not in ['internal', 'both']">
+                        <group>
+                            <field name="release_date"/>
+                            <field name="release_notes" nolabel="1" placeholder="Optional release / handover notes..."/>
+                        </group>
+                    </group>
                 </sheet>
+
             </form>
         </field>
     </record>

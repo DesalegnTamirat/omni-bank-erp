@@ -68,41 +68,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <menuitem id="menu_employee_education"
-                  name="Education"
-                  parent="hr.menu_human_resources_configuration"
-                  action="action_employee_education"
-                  sequence="50"/>
 
-        <!-- Embed as a tab on the Employee form -->
-        <record id="view_hr_employee_form_education_inherit" model="ir.ui.view">
-            <field name="name">hr.employee.form.education.inherit</field>
-            <field name="model">hr.employee</field>
-            <field name="inherit_id" ref="hr.view_employee_form"/>
-            <field name="arch" type="xml">
-                <xpath expr="//notebook" position="inside">
-                    <page string="Education" name="education">
-                        <field name="education_ids">
-                            <list editable="bottom">
-                                <field name="illiterate"/>
-                                <field name="edu_type" column_invisible="parent.illiterate"/>
-                                <field name="qualification"/>
-                                <field name="field"/>
-                                <field name="school_name"/>
-                                <field name="from_date"/>
-                                <field name="to_date"/>
-                                <field name="grade"/>
-                                <field name="CGPA"/>
-                                <field name="country_id"/>
-                                <field name="state_id"/>
-                                <field name="province"/>
-                                <field name="education_rank"/>
-                            </list>
-                        </field>
-                    </page>
-                </xpath>
-            </field>
-        </record>
 
     </data>
-</odoo>
+</odoo>

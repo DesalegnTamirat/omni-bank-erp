@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="recruitment_qualification_tree" model="ir.ui.view">
+        <field name="name">recruitment.qualification.form</field>
+        <field name="model">recruitment.qualification</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Recruitment Qualifications">
+                <field name="qualification"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+        <record id="recruitment_qualification_form_tree" model="ir.actions.act_window">
+        <field name="name">Recruitment Qualifications</field>
+        <field name="res_model">recruitment.qualification</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list</field>
+    </record>
+
+
+</odoo>

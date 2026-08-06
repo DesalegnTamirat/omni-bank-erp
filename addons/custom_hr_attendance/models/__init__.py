@@ -19,4 +19,13 @@ from . import attendance_preapproval_report
 from . import acknowledged_attendance_report
 from . import res_users
 from . import restrict_checkin
+from . import attendance_payroll_payload
+# Rolling violation counters on hr.employee 
+from . import hr_employee_counters
+# Discipline integration: case creation and violation counter processing
+from . import discipline_case_attendance
+# ERP access gate: session-cached check-in enforcement (feature-flagged, OFF by default)
+from . import ir_http
+from . import hr_attendance_notification_log
+
 # from . import test

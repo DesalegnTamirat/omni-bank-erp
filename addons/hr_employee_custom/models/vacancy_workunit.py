@@ -11,6 +11,7 @@ class VacancyWorkunit(models.Model):
 
     workunit_id=fields.Integer(string="Workunit Id")
     workunit_name=fields.Char(string="Workunit Name")
+    _rec_name = 'workunit_name'
     
     #@api.model_cr
     def init(self):

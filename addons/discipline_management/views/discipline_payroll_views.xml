@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_discipline_payroll_penalty_tree" model="ir.ui.view">
+            <field name="name">discipline.payroll.penalty.list</field>
+            <field name="model">discipline.payroll.penalty</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="case_id"/>
+                    <field name="employee_id"/>
+                    <field name="penalty_type"/>
+                    <field name="penalty_percentage"/>
+                    <field name="suspension_days"/>
+                    <field name="daily_rate"/>
+                    <field name="calculated_amount"/>
+                    <field name="effective_date"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_payroll_penalty_form" model="ir.ui.view">
+            <field name="name">discipline.payroll.penalty.form</field>
+            <field name="model">discipline.payroll.penalty</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_transmit_to_payroll" string="Transmit to Payroll" type="object" class="oe_highlight" invisible="state != 'pending'"/>
+                        <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success" invisible="state != 'transferred'"/>
+                        <!-- DIS-9: Cancel button -->
+                        <button name="action_cancel" string="Cancel / Waive" type="object" class="btn-danger"
+                                invisible="state in ('deducted', 'cancelled')"
+                                confirm="Cancel this penalty deduction?"/>
+                        <field name="state" widget="statusbar" statusbar_visible="pending,transferred,deducted"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Penalty &amp; Case">
+                                <field name="name" readonly="1"/>
+                                <field name="case_id"/>
+                                <field name="employee_id"/>
+                            </group>
+                            <!-- DIS-9: Penalty type selector -->
+                            <group string="Calculation Type">
+                                <field name="penalty_type"/>
+                                <field name="penalty_percentage" invisible="penalty_type != 'percentage'"/>
+                                <field name="suspension_id" invisible="penalty_type != 'suspension_without_pay'"/>
+                                <field name="suspension_days" invisible="penalty_type != 'suspension_without_pay'"/>
+                                <field name="managerial_days" invisible="penalty_type != 'managerial'"/>
+                                <field name="daily_rate" readonly="1"
+                                       invisible="penalty_type not in ('suspension_without_pay', 'managerial')"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Deduction Amounts &amp; Dates">
+                                <field name="calculated_amount" readonly="1"/>
+                                <field name="effective_date"/>
+                                <field name="payslip_reference"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Integration Notes">
+                                <field name="notes" placeholder="Integration log notes..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_payroll_penalty" model="ir.actions.act_window">
+            <field name="name">Payroll Penalty Deductions</field>
+            <field name="res_model">discipline.payroll.penalty</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

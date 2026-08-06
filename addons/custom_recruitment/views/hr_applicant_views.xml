@@ -9,12 +9,14 @@
             <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_form"/>
             <field name="arch" type="xml">
                 <button name="archive_applicant" position="before">
-                    <button name="create_contract" invisible="((application_type == 'Internal' or contract_created_new == True) or application_status == 'rejected')" string="Create Contract" type="object" class="oe_highlight"/>
-                    <button name="promote_employee" string="Promote Employee" invisible="((application_type in 'External' or application_status == 'rejected') or prmt_emp in 'Yes')" type="object" class="oe_highlight"/>
+                    <button name="create_contract" invisible="((application_type == 'Internal' or contract_created_new == True) or bunna_app_status == 'rejected')" string="Create Contract" type="object" class="oe_highlight"/>
+                    <button name="promote_employee" string="Promote Employee" invisible="((application_type in 'External' or bunna_app_status == 'rejected') or prmt_emp in 'Yes')" type="object" class="oe_highlight"/>
                     <button name="action_applicant_send" invisible="application_type == 'Internal' or offer_letter_sent == True" string="Send Offer Letter" type="object" class="oe_highlight"/>
+                    <button name="action_download_cv" string="Download CV" type="object" class="btn-secondary" icon="fa-download"/>
                 </button>
                 <xpath expr="//field[@name='email_from']" position="before">
                     <field name="candidate_score_id"/>
+                    <field name="cv_attachment_id" readonly="1"/>
                     <field name="app_reference"/>
                     <!-- Cascaded from app_reference — locked once a vacancy
                          is selected, since these are derived values, not
@@ -35,17 +37,21 @@
                         <field name="willing_to_join_immediately"/>
                         <field name="contract_created_new" invisible="1"/>
                         <field name="date_of_availability"/>
-                        <field name="application_status"/>
+                        <field name="bunna_app_status"/>
                         <field name="prmt_emp" invisible="1"/>
                     </group>
                     <group>
-                        <field name="internal_employee_name"/>
+                        <field name="internal_employee_id"/>
                         <field name="employee_work_unit"/>
                         <field name="employee_number"/>
                         <!-- job_grade_id removed — duplicated employee_grade below -->
                         <field name="employee_grade"/>
                         <field name="employee_position"/>
                         <field name="manager"/>
+                        <field name="active_leave_status" string="Leave Status" readonly="1"
+                               invisible="application_type != 'Internal'"/>
+                        <field name="active_disciplinary_status" string="Discipline Warning Level" readonly="1"
+                               invisible="application_type != 'Internal'"/>
                         <field name="promotion_date"/>
                         <field name="employment_start_date"/>
                         <field name="final_work_unit"/>

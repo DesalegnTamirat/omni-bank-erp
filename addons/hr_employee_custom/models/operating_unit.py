@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from email.policy import default
 
 from odoo.exceptions import UserError
 from odoo import api, fields, models, _
@@ -12,9 +13,9 @@ class OperatingUnit(models.Model):
     # code = fields.Char(string="Code")
     code = fields.Many2one(
         comodel_name='hr.report.code',
-        string='Code',
+        string='Report Code',
     )
-    old_code = fields.Char(string="Old Code")
+    manager_id = fields.Many2one('hr.employee',string ="Manager")
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
         "res.company",
@@ -22,7 +23,7 @@ class OperatingUnit(models.Model):
         readonly=True,
         default=lambda self: self.env.company,
     )
-    partner_id = fields.Many2one("res.partner", "Partner", required=True)
+    # partner_id = fields.Many2one("res.partner", "Company", readonly=True,default=lambda self: self.env.company)
     user_ids = fields.Many2many(
         "res.users",
         "operating_unit_users_rel",
@@ -69,6 +70,11 @@ class OperatingUnit(models.Model):
     branch_grade = fields.Char(
         string='Branch Grade',
     )
+    latitude=fields.Float(string="Latitude")
+    longitude = fields.Float(string="Longitude")
+    district=fields.Char(string="District" ,required=True)
+    region=fields.Char(string="Region", required=True)
+    department=fields.Many2one('hr.department',string='Department', required=True)
 
     def _compute_display_name(self):
         for ou in self:

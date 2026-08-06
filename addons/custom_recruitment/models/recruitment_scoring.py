@@ -7,9 +7,9 @@ from odoo.exceptions import UserError, ValidationError
 
 DISQUALIFICATION_THRESHOLD = 50.0  # Section 9.2
 OFFER_RESPONSE_DAYS = 3  # Section 11.2.2
-INTERNAL_APPLICATION_DAYS = 3  # Section 5.2.1
+EXTERNAL_APPLICATION_DAYS = 5  # BRD FR-REC-018: 5 working-day window for external vacancies (flexible)
 
-# ── FR-REC-034: Default weight matrix ────────────────────────────────────
+# ── : Default weight matrix ────────────────────────────────────
 # Keyed by (recruitment_type, vacancy employee_category, job_level)
 # job_level is only meaningful when employee_category == 'Non Managerial'.
 # For 'Managerial' vacancies job_level is always False.
@@ -42,22 +42,42 @@ class RecruitmentCandidateScore(models.Model):
     _order = "rank asc, final_score desc"
 
     vacancy_id = fields.Many2one("job.vacancy", string="Vacancy", required=True, ondelete="cascade", tracking=True)
+
     recruitment_type = fields.Selection(
         [("internal", "Internal"), ("external", "External")],
-        string="Recruitment Type", required=True, default="internal"
+        string="Recruitment Type", compute="_compute_recruitment_type",
+        store=True, readonly=True,
+        help="Pulled directly from the Vacancy's Recruitment Type — set it "
+             "there, not here."
     )
+
+    _VACANCY_RECRUITMENT_TYPE_MAP = {
+        "Internal": "internal",
+        "External": "external",
+    }
+
+    @api.depends("vacancy_id.recruitment_type")
+    def _compute_recruitment_type(self):
+        for rec in self:
+            rec.recruitment_type = rec._VACANCY_RECRUITMENT_TYPE_MAP.get(
+                rec.vacancy_id.recruitment_type, False
+            )
 
     # ── Driven by job.vacancy.employee_category — NOT independently set ───
     vacancy_employee_category = fields.Selection(
         related="vacancy_id.employee_category", string="Job Category", store=True, readonly=True
     )
 
-    # Only relevant / visible when vacancy_employee_category == 'Non Managerial'
+    # ── CHANGED: Job Level is no longer chosen per-candidate. It's now
+    # driven entirely by the vacancy's own Job Level field, so every
+    # candidate scored against the same vacancy automatically shares the
+    # same level — no more risk of mismatched/miskeyed levels between
+    # candidates on the same vacancy.
     job_level = fields.Selection(
         [("junior", "Junior"), ("senior", "Senior / Regular")],
-        string="Job Level", tracking=True,
-        help="Only applicable for Non-Managerial posts. Managerial posts have "
-             "no sub-level, so this is hidden and cleared automatically."
+        string="Job Level", related="vacancy_id.job_level", store=True, readonly=True,
+        help="Only applicable for Non-Managerial posts. Pulled directly "
+             "from the Vacancy's Job Level — set it there, not here."
     )
 
     # ── Vacancy slot info (read-only reference for the Selected cap) ──────
@@ -105,6 +125,100 @@ class RecruitmentCandidateScore(models.Model):
     )
     reserve_expiry = fields.Date(string="Reserve Pool Expiry", readonly=True, copy=False)
 
+    # ── Offer Letter tracking flag ────────────────────────────────────────
+    has_offer_letter = fields.Boolean(
+        string="Has Offer Letter", default=False, copy=False, readonly=True,
+        tracking=True,
+        help="Set automatically when an offer letter is created for this candidate. "
+             "Prevents duplicate offer letters being issued."
+    )
+
+    # ── Leave status flag ────────────────────────────────────────────────
+    active_leave_status = fields.Char(
+        string="Leave Status", compute="_compute_leave_status", store=False,
+        help="Displays active leave status (Annual, Medical, Maternity, etc.) if candidate is on leave."
+    )
+
+    # ── Penalty Deductions ───────────────────────────────────────────────
+    penalty_deduction_ids = fields.One2many(
+        'recruitment.penalty.deduction', 'candidate_score_id', string="Penalty Deductions"
+    )
+    penalty_deduction_amount = fields.Float(
+        string="Penalty Deduction (%)", compute="_compute_penalty_deduction", store=True,
+        help="Deduction percentage applied for active disciplinary written warnings (3% for 1st warning, 4% for 2nd warning)."
+    )
+
+    @api.depends('employee_id')
+    def _compute_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.employee_id
+            if emp:
+                leaves = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leaves:
+                    rec.active_leave_status = leaves.holiday_status_id.name if leaves.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")
+
+    active_disciplinary_status = fields.Selection(
+        [
+            ("none", "No Active Warning"),
+            ("first_warning", "First Warning (Severity Level 4)"),
+            ("second_warning", "Second Warning (Severity Level 3)"),
+            ("last_written_warning", "Active Last Written Warning (Severity Level 1/2)"),
+        ],
+        string="Discipline Warning Level",
+        compute="_compute_active_disciplinary_status",
+        store=False,
+        help="Pulled from Discipline Management (discipline.case) based on case severity levels."
+    )
+
+    @api.depends('employee_id', 'recruitment_type')
+    def _compute_active_disciplinary_status(self):
+        for rec in self:
+            if rec.recruitment_type == 'internal' and rec.employee_id and 'discipline.case' in self.env:
+                active_cases = self.env['discipline.case'].search([
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('state', '=', 'enforced'),
+                ])
+                if active_cases:
+                    severities = set(active_cases.mapped('severity_level'))
+                    punishments = set(active_cases.mapped('punishment_type'))
+                    if {'level_1', 'level_2'} & severities or 'final_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'last_written_warning'
+                    elif 'level_3' in severities or 'second_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'second_warning'
+                    elif 'level_4' in severities or 'first_warning_penalty' in punishments:
+                        rec.active_disciplinary_status = 'first_warning'
+                    else:
+                        rec.active_disciplinary_status = 'none'
+                else:
+                    rec.active_disciplinary_status = 'none'
+            else:
+                rec.active_disciplinary_status = 'none'
+
+    @api.depends('penalty_deduction_ids', 'penalty_deduction_ids.deduction_percentage', 'penalty_deduction_ids.applied', 'employee_id')
+    def _compute_penalty_deduction(self):
+        for rec in self:
+            amount = sum(p.deduction_percentage for p in rec.penalty_deduction_ids if p.applied)
+            # If internal candidate has active discipline warnings in discipline.case, auto-add penalty deduction if none explicitly entered
+            if rec.recruitment_type == 'internal' and rec.active_disciplinary_status != 'none' and amount == 0.0:
+                if rec.active_disciplinary_status == 'first_warning':
+                    amount = 5.0
+                elif rec.active_disciplinary_status == 'second_warning':
+                    amount = 10.0
+                elif rec.active_disciplinary_status == 'last_written_warning':
+                    amount = 20.0
+            rec.penalty_deduction_amount = amount
+
+
     # ── Tick-box UX for Selected / Reserve, mutually exclusive ────────────
     mark_selected = fields.Boolean(
         string="Selected", compute="_compute_marks", inverse="_inverse_mark_selected", store=False
@@ -122,7 +236,7 @@ class RecruitmentCandidateScore(models.Model):
     def _inverse_mark_selected(self):
         for rec in self:
             if rec.mark_selected:
-                rec._select_candidate()
+                rec._select_candidate
                 rec.message_post(body=_("Candidate marked as Selected."))
             elif rec.selection_status == "selected":
                 rec.write({"selection_status": "pending"})
@@ -132,7 +246,7 @@ class RecruitmentCandidateScore(models.Model):
             if rec.mark_reserve:
                 if rec.disqualified:
                     raise ValidationError(_("Cannot reserve a disqualified candidate."))
-                rec.action_set_reserve()
+                rec.action_set_reserve
             elif rec.selection_status == "reserve":
                 rec.write({"selection_status": "pending", "reserve_expiry": False})
 
@@ -203,12 +317,19 @@ class RecruitmentCandidateScore(models.Model):
             else:
                 rec.candidate_name = _("Unknown")
 
-    # ── Job level visibility: clear it when vacancy is Managerial ─────────
-    @api.onchange("vacancy_id", "vacancy_employee_category")
-    def _onchange_vacancy_clear_job_level(self):
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
         for rec in self:
-            if rec.vacancy_employee_category == "Managerial":
-                rec.job_level = False
+            rec.write({'active': False})
+        return True
+
+    # ── NOTE: job_level is now a related field sourced from
+    # vacancy_id.job_level (see field definition above), so it's no longer
+    # cleared/set manually here — it simply follows whatever the vacancy's
+    # Job Level is. job.vacancy itself enforces that Job Level is required
+    # for Non-Managerial vacancies and forbidden for Managerial ones.
 
     @api.constrains("vacancy_employee_category", "job_level")
     def _check_job_level_required(self):
@@ -222,7 +343,7 @@ class RecruitmentCandidateScore(models.Model):
                     "Job Level does not apply to Managerial vacancies — clear it before saving."
                 ))
 
-    # ── FR-REC-034: auto-populate weights from the matrix ─────────────────
+    # ── : auto-populate weights from the matrix ─────────────────
     @api.onchange("recruitment_type", "vacancy_employee_category", "job_level")
     def _onchange_weight_defaults(self):
         for rec in self:
@@ -251,23 +372,25 @@ class RecruitmentCandidateScore(models.Model):
 
     @api.depends("pms_score", "written_score", "interview_score",
                  "pms_weight", "written_weight", "interview_weight",
-                 "recruitment_type", "disqualified")
+                 "penalty_deduction_amount", "recruitment_type", "disqualified")
     def _compute_final_score(self):
         for rec in self:
             if rec.disqualified:
                 rec.final_score = 0.0
                 continue
             if rec.recruitment_type == "internal":
-                rec.final_score = (
+                weighted_sum = (
                         (rec.pms_score * rec.pms_weight / 100.0) +
                         (rec.written_score * rec.written_weight / 100.0) +
                         (rec.interview_score * rec.interview_weight / 100.0)
                 )
+                rec.final_score = max(0.0, weighted_sum - (rec.penalty_deduction_amount or 0.0))
             else:
                 rec.final_score = (
                         (rec.written_score * rec.written_weight / 100.0) +
                         (rec.interview_score * rec.interview_weight / 100.0)
                 )
+
 
     def action_apply_disqualification_check(self):
         """
@@ -293,6 +416,8 @@ class RecruitmentCandidateScore(models.Model):
                 reasons.append(_("Interview score %.1f%% < 50%%") % rec.interview_score)
 
             if rec.recruitment_type == "internal":
+                if rec.active_disciplinary_status == 'last_written_warning':
+                    reasons.append(_("Active Last Written Warning / Severe Disciplinary Record (Severity Level 1/2)"))
                 raw_final_score = (
                         (rec.pms_score * rec.pms_weight / 100.0) +
                         (rec.written_score * rec.written_weight / 100.0) +
@@ -305,6 +430,7 @@ class RecruitmentCandidateScore(models.Model):
                 )
             if raw_final_score < DISQUALIFICATION_THRESHOLD:
                 reasons.append(_("Overall weighted Final Score %.1f%% < 50%%") % raw_final_score)
+
 
             if reasons:
                 rec.write({
@@ -342,7 +468,7 @@ class RecruitmentCandidateScore(models.Model):
                     "nothing to check."
                 ))
 
-        candidates.action_apply_disqualification_check()
+        candidates.action_apply_disqualification_check
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -367,7 +493,7 @@ class RecruitmentCandidateScore(models.Model):
         vacancy must have disqualification_checked = True — set by running
         'Check Disqualification (50% Gate)' — or this raises, telling the
         user to run that first. Editing any score/weight after a check
-        clears disqualification_checked again (see write()), so a stale
+        clears disqualification_checked again (see write), so a stale
         check can't be used to sneak past this gate.
         """
         if not self:
@@ -410,32 +536,7 @@ class RecruitmentCandidateScore(models.Model):
         }
 
     def action_auto_select_candidates(self):
-        """
-        Section 9.3.x: the ONE-CLICK action from the LIST VIEW header (and
-        also callable from the form / gear menu). This is the ONLY path a
-        user has to reach 'selected' or 'reserve' status — the manual
-        mark_selected/mark_reserve tick-boxes are no longer exposed in
-        the UI.
-
-        Per vacancy, this does ALL of the following in one call — nothing
-        needs to be run beforehand:
-          1. Re-applies the disqualification check (Section 9.2, including
-             the weighted Final Score gate) to every non-locked candidate,
-             so a bad candidate is always caught even if this is the only
-             button ever clicked.
-          2. Ranks the remaining eligible (non-disqualified) candidates.
-          3. Candidates already locked in by an ACCEPTED offer letter are
-             left untouched throughout (retracting an accepted offer is a
-             separate, deliberate action).
-          4. Selects the top (slots - locked) candidates by rank.
-          5. Every remaining eligible candidate beyond the slot count is
-             put in the Reserve Pool (6-month expiry) instead of being
-             left as 'Pending' — so after this runs, every candidate for
-             the vacancy is Selected, Reserved, or Disqualified.
-
-        Idempotent: re-running it (e.g. after scores change) recomputes
-        everything from scratch for non-locked candidates.
-        """
+        """Auto-select candidates for vacancy (Section 9.3.x)."""
         if not self:
             raise UserError(_(
                 "Select at least one candidate row (e.g. all rows for a vacancy) "
@@ -465,7 +566,7 @@ class RecruitmentCandidateScore(models.Model):
             ]).mapped("candidate_score_id")
 
             # 1. Disqualification check (component scores + weighted Final Score).
-            (all_for_vacancy - locked).action_apply_disqualification_check()
+            (all_for_vacancy - locked).action_apply_disqualification_check
 
             # 2. Rank the eligible (non-disqualified) candidates.
             eligible = Score.search([
@@ -577,7 +678,7 @@ class RecruitmentCandidateScore(models.Model):
 
         Score = self.env["recruitment.candidate.score"]
         all_candidates = Score.search([("vacancy_id", "in", vacancies.ids)])
-        return all_candidates.action_rank_candidates()
+        return all_candidates.action_rank_candidates
 
     def action_set_reserve(self):
         """Section 9.4: mark as reserve with 6-month expiry."""
@@ -598,6 +699,57 @@ class RecruitmentCandidateScore(models.Model):
         for rec in expired:
             rec.message_post(body=_("Reserve pool status expired automatically."))
 
+    def action_transfer_to_talent_roster(self):
+        """Transfer selected candidate score records to the Talent Roster."""
+        return {
+            'name': _('Transfer to Talent Roster'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'talent.roster.transfer.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'active_ids': self.ids,
+                'active_model': 'recruitment.candidate.score',
+            }
+        }
+
+
+# ── NEW: exposes which vacancies currently have at least one Selected
+# candidate who doesn't already have an offer letter — used to filter the
+# Vacancy dropdown on Offer Letter creation, so vacancies with nothing left
+# to offer simply disappear from the list.
+class JobVacancyOfferableCandidates(models.Model):
+    _inherit = "job.vacancy"
+
+    has_offerable_candidates = fields.Boolean(
+        string="Has Offerable Candidates",
+        compute="_compute_has_offerable_candidates",
+        search="_search_has_offerable_candidates",
+        help="True if this vacancy currently has at least one candidate "
+             "who is Selected and does not already have an offer letter."
+    )
+
+    def _compute_has_offerable_candidates(self):
+        Score = self.env["recruitment.candidate.score"]
+        for rec in self:
+            rec.has_offerable_candidates = bool(Score.search_count([
+                ("vacancy_id", "=", rec.id),
+                ("selection_status", "=", "selected"),
+                ("has_offer_letter", "=", False),
+            ]))
+
+    def _search_has_offerable_candidates(self, operator, value):
+        Score = self.env["recruitment.candidate.score"]
+        eligible_vacancy_ids = Score.search([
+            ("selection_status", "=", "selected"),
+            ("has_offer_letter", "=", False),
+        ]).mapped("vacancy_id").ids
+
+        if (operator == "=" and value) or (operator == "!=" and not value):
+            return [("id", "in", eligible_vacancy_ids)]
+        else:
+            return [("id", "not in", eligible_vacancy_ids)]
+
 
 # ── Section 11: Offer Management ────────────────────────────────────────────
 
@@ -613,10 +765,22 @@ class RecruitmentOfferLetter(models.Model):
 
     reference = fields.Char(string="Offer Reference", copy=False, readonly=True,
                             default=lambda self: _("New"))
-    vacancy_id = fields.Many2one("job.vacancy", string="Vacancy", required=True, tracking=True)
-    candidate_score_id = fields.Many2one("recruitment.candidate.score", string="Candidate", required=True,
-                                         domain="[('vacancy_id','=',vacancy_id),('selection_status','in',['pending','reserve','selected'])]")
+    # ── CHANGED: only vacancies that still have at least one Selected,
+    # not-yet-offered candidate are selectable.
+    vacancy_id = fields.Many2one(
+        "job.vacancy", string="Vacancy", required=True, tracking=True,
+        domain="[('has_offerable_candidates', '=', True)]"
+    )
+    # ── CHANGED: only "Selected" candidates who don't already have an
+    # offer letter (in ANY state) may be picked when creating a new offer.
+    candidate_score_id = fields.Many2one(
+        "recruitment.candidate.score", string="Candidate", required=True,
+        domain="[('vacancy_id','=',vacancy_id),"
+               "('selection_status','=','selected'),"
+               "('has_offer_letter','=',False)]"
+    )
     candidate_name = fields.Char(related="candidate_score_id.candidate_name", store=True)
+    active = fields.Boolean(default=True)
 
     offer_date = fields.Date(string="Offer Issue Date", default=fields.Date.context_today, required=True)
     response_deadline = fields.Date(string="Response Deadline", compute="_compute_deadline", store=True)
@@ -642,7 +806,42 @@ class RecruitmentOfferLetter(models.Model):
                 vals["reference"] = (
                         self.env["ir.sequence"].next_by_code("recruitment.offer.letter") or _("New")
                 )
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # ── NEW: flag each candidate as having an offer letter, so they're
+        # excluded from the candidate_score_id domain on any future offer.
+        records.mapped("candidate_score_id").write({"has_offer_letter": True})
+        return records
+
+    def unlink(self):
+        # ── NEW: keep has_offer_letter accurate if an offer letter is
+        # deleted (e.g. created in error) — recompute per remaining offers.
+        candidates = self.mapped("candidate_score_id")
+        res = super.unlink
+        for cand in candidates:
+            cand.has_offer_letter = bool(self.search_count([
+                ("candidate_score_id", "=", cand.id),
+            ]))
+        return res
+
+    # ── NEW: server-side backstop — the UI domain above is advisory only
+    # and can be bypassed by imports, API calls, or direct create calls
+    # (e.g. from _cascade_to_next_candidate below, which intentionally
+    # creates a new offer for the next candidate and must still be allowed
+    # to do so — cascade offers are for a *different* candidate each time,
+    # so this constraint only blocks a *second* offer for the *same*
+    # candidate).
+    @api.constrains("candidate_score_id")
+    def _check_candidate_not_already_offered(self):
+        for rec in self:
+            dupes = self.search([
+                ("candidate_score_id", "=", rec.candidate_score_id.id),
+                ("id", "!=", rec.id),
+            ])
+            if dupes:
+                raise ValidationError(_(
+                    "Candidate %s already has an offer letter (%s). A candidate "
+                    "can only ever receive one offer letter."
+                ) % (rec.candidate_name, dupes[0].reference))
 
     @api.depends("offer_date")
     def _compute_deadline(self):
@@ -654,11 +853,11 @@ class RecruitmentOfferLetter(models.Model):
 
     def action_send_offer(self):
         """11.2.1: Send the offer letter. Selection now routes through the
-        validated _select_candidate() so the vacancy slot cap is respected
+        validated _select_candidate so the vacancy slot cap is respected
         even when this fires automatically from a cascade."""
         for rec in self:
             rec.write({"state": "sent"})
-            rec.candidate_score_id._select_candidate()
+            rec.candidate_score_id._select_candidate
             rec.message_post(body=_(
                 "Offer letter sent to <b>%s</b>. Response deadline: <b>%s</b>."
             ) % (rec.candidate_name, rec.response_deadline))
@@ -711,7 +910,7 @@ class RecruitmentOfferLetter(models.Model):
         Find the next-ranked eligible candidate — not disqualified, and
         currently 'pending' or 'reserve' — and automatically create + send
         them an offer. Sending the offer is what flips their status to
-        'selected' (via _select_candidate()), so the vacancy slot cap is
+        'selected' (via _select_candidate), so the vacancy slot cap is
         always respected on every hop of the cascade.
         """
         self.ensure_one()
@@ -721,7 +920,14 @@ class RecruitmentOfferLetter(models.Model):
         next_candidate = Score.search([
             ("vacancy_id", "=", self.vacancy_id.id),
             ("disqualified", "=", False),
-            ("selection_status", "in", ("pending", "reserve")),
+            ("selection_status", "in", ("reserve")),
+            ("rank", ">", current_rank),
+        ], order="rank asc", limit=1)
+        offer_sent = self.env["recruitment.offer.letter"]
+        next_offer_sent = Score.search([
+            ("vacancy_id", "=", self.vacancy_id.id),
+            ("disqualified", "=", False),
+            ("selection_status", "not in", ("accepted","expired","cascaded","declined","pending")),
             ("rank", ">", current_rank),
         ], order="rank asc", limit=1)
 
@@ -752,7 +958,7 @@ class RecruitmentOfferLetter(models.Model):
             rec.write({"state": "expired", "response": "expired"})
             rec.candidate_score_id.write({"selection_status": "rejected"})
             rec.message_post(body=_("Offer expired. Response deadline %s passed.") % rec.response_deadline)
-            rec._cascade_to_next_candidate()
+            rec._cascade_to_next_candidate
 
 
 # ── Section 5: Application Window Enforcement ────────────────────────────────
@@ -761,6 +967,17 @@ class RecruitmentApplicationWindow(models.Model):
     _name = "recruitment.application.window"
     _description = "Internal Application Window"
     _rec_name = "vacancy_id"
+    active = fields.Boolean(default=True)
+
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
+    def _compute_display_name(self):
+        for rec in self:
+            rec.display_name = rec.vacancy_id.reference or str(rec.id)
 
     vacancy_id = fields.Many2one("job.vacancy", string="Vacancy", required=True, ondelete="cascade")
     notification_date = fields.Date(string="Notification Sent Date", required=True,
@@ -770,25 +987,32 @@ class RecruitmentApplicationWindow(models.Model):
     late_inclusion_allowed = fields.Boolean(string="Late Inclusion Allowed", default=False)
     late_inclusion_justification = fields.Text(string="Justification for Late Inclusion")
 
-    @api.depends("notification_date")
+    @api.depends("notification_date", "vacancy_id", "vacancy_id.sourcing_type")
     def _compute_deadline(self):
+        """
+        BRD FR-REC-018: 5 working-day window for external vacancies.
+        Internal application windows use the vacancy last_date_to_apply directly.
+        This field is editable so HR can extend/shorten as per procedure.
+        """
         for rec in self:
             if rec.notification_date:
-                rec.deadline = rec.notification_date + timedelta(days=INTERNAL_APPLICATION_DAYS)
+                rec.deadline = rec.notification_date + timedelta(days=EXTERNAL_APPLICATION_DAYS)
             else:
                 rec.deadline = False
 
     def check_application_allowed(self, application_date=None):
+        """BRD FR-REC-019: Reject applications after deadline unless HR granted late inclusion."""
         self.ensure_one()
         today = application_date or fields.Date.today()
         if self.is_closed and not self.late_inclusion_allowed:
             return False
-        if today > self.deadline and not self.late_inclusion_allowed:
+        if self.deadline and today > self.deadline and not self.late_inclusion_allowed:
             return False
         return True
 
     @api.model
     def _cron_close_expired_windows(self):
+        """BRD FR-REC-019: Auto-close vacancy at specified Closing Date."""
         today = fields.Date.today()
         windows = self.search([
             ("is_closed", "=", False),
@@ -797,7 +1021,8 @@ class RecruitmentApplicationWindow(models.Model):
         windows.write({"is_closed": True})
         for w in windows:
             w.vacancy_id.message_post(
-                body=_("Internal application window closed. Deadline %s has passed.") % w.deadline
+                body=_("Application window closed. Deadline %s has passed. "
+                       "Late applications require HR approval with justification.") % w.deadline
             )
 
 
@@ -811,6 +1036,11 @@ class BlacklistPool(models.Model):
     blacklisted_on = fields.Date(string="Blacklisted On", default=fields.Date.context_today)
     active = fields.Boolean(default=True)
 
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     @api.model
     def is_blacklisted(self, name=None, national_id=None):
         domain = []
@@ -831,7 +1061,13 @@ class ApplicantAssessmentBlacklistCheck(models.Model):
         [("clear", "Clear"), ("flagged", "Flagged - On Blacklist"), ("not_checked", "Not Checked")],
         string="Blacklist Status", default="not_checked", readonly=True
     )
+    active = fields.Boolean(default=True)
 
+    def unlink(self):
+        """ Soft delete: Archive records instead of removing from DB """
+        for rec in self:
+            rec.write({'active': False})
+        return True
     def action_check_blacklist(self):
         for rec in self:
             blacklist = self.env["blacklist.pool"]

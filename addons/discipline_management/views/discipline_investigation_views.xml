@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_discipline_investigation_tree" model="ir.ui.view">
+            <field name="name">discipline.investigation.list</field>
+            <field name="model">discipline.investigation</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="case_id"/>
+                    <field name="employee_id"/>
+                    <field name="investigator_id"/>
+                    <field name="misconduct_type"/>
+                    <field name="examination_date"/>
+                    <field name="investigation_date"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_investigation_form" model="ir.ui.view">
+            <field name="name">discipline.investigation.form</field>
+            <field name="model">discipline.investigation</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit_findings" string="Submit Findings" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_accept_findings" string="Accept &amp; Sign-off Findings" type="object" class="btn-success" invisible="state != 'submitted'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved"/>
+                    </header>
+                    <sheet>
+                        <!-- FR-DIS-013 Part 1 & 2: Header Info -->
+                        <group>
+                            <group string="Case Reference">
+                                <field name="name"/>
+                                <field name="case_id"/>
+                                <field name="employee_id"/>
+                            </group>
+                            <group string="Investigator &amp; Dates">
+                                <field name="investigator_id"/>
+                                <field name="investigation_date"/>
+                                <field name="examination_date"/>
+                                <!-- FR-DIS-013 Part 1 -->
+                                <field name="misconduct_type"/>
+                                <field name="misconduct_type_notes" invisible="misconduct_type != 'other'"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <!-- FR-DIS-013 Part 3: Findings -->
+                            <page string="Findings &amp; Summary">
+                                <field name="summary_findings" placeholder="Detail all facts established during the investigation..."/>
+                            </page>
+                            <!-- FR-DIS-013 Part 4: Liable Employees -->
+                            <page string="Liable Employees">
+                                <field name="liable_employee_ids">
+                                    <list editable="bottom">
+                                        <field name="employee_id"/>
+                                        <field name="role_in_incident"/>
+                                        <field name="degree_of_liability"/>
+                                        <field name="recommended_action"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <!-- FR-DIS-013 Part 5 & 6: Policy &amp; Evidence -->
+                            <page string="Policy &amp; Evidence">
+                                <group>
+                                    <field name="applicable_policy" placeholder="e.g. HR Policy Section 4.2 – Attendance Violations"/>
+                                    <field name="policy_clause"/>
+                                    <field name="witness_statements" placeholder="Enter witness statements and interview notes..."/>
+                                    <field name="evidence_description" placeholder="Evidence collected, chain of custody, CCTV references..."/>
+                                </group>
+                            </page>
+                            <!-- FR-DIS-013 Part 7: Recommendation -->
+                            <page string="Conclusion &amp; Recommendation">
+                                <field name="investigator_recommendation" placeholder="Investigator recommended action based on evidence..."/>
+                            </page>
+                            <!-- FR-DIS-013 Part 8: Management Review -->
+                            <page string="Management Review Sign-off">
+                                <group>
+                                    <field name="reviewed_by_id"/>
+                                    <field name="management_review_date"/>
+                                    <field name="management_review_notes" placeholder="Management review notes and approval remarks..."/>
+                                </group>
+                            </page>
+                            <page string="Evidence Attachments">
+                                <group>
+                                    <field name="report_file" filename="report_filename"/>
+                                    <field name="report_filename" invisible="1"/>
+                                    <field name="evidence_file" filename="evidence_filename"/>
+                                    <field name="evidence_filename" invisible="1"/>
+                                    <field name="statement_file" filename="statement_filename"/>
+                                    <field name="statement_filename" invisible="1"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_investigation" model="ir.actions.act_window">
+            <field name="name">Investigations &amp; Findings</field>
+            <field name="res_model">discipline.investigation</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>
+

@@ -8,7 +8,13 @@
 
 
         <menuitem id="new_recruitment_process_external" name="External Recruitment Process"
-                  action="action_employee_recruitment_external" parent="menu_external_recruitment"/>
+                  action="action_employee_recruitment_external" parent="menu_external_recruitment" sequence="2"/>
+        <menuitem id="menu_external_application_window" name="Application Windows"
+                  action="action_recruitment_application_window" parent="menu_external_recruitment" sequence="3"
+                  groups="hr.group_hr_user"/>
+        <menuitem id="menu_external_eligible_candidates" name="Eligible Candidates (CV Review)"
+                  action="action_external_recruitment_eligible_employees" parent="menu_external_recruitment" sequence="4"
+                  groups="hr.group_hr_user"/>
         <menuitem id="new_recruitment_process_internal" name="Internal Recruitment Process"
                   action="action_employee_recruitment_internal" parent="menu_internal_recruitment" sequence="7"/>
         <menuitem id="menu_external_recruitment_selected" name="External Recruitment Process Selected"
@@ -29,6 +35,10 @@
                   parent="hr_recruitment.menu_hr_recruitment_configuration" action="bb_internal_form_tree"/>
         <menuitem id="menu_bb_external_list" name="BB external Form"
                   parent="hr_recruitment.menu_hr_recruitment_configuration" action="bb_external_form_tree"/>
+        <menuitem id="menu_hr_recruitment_skill" name="Skills"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration" action="action_recruitment_skill"/>
+        <menuitem id="menu_hr_recruitment_certification" name="Certifications"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration" action="action_recruitment_certification"/>
 
         <menuitem id="menu_hr_employee_probation" name="Probation Management" parent="new_recruitment_menu"
                   action="action_hr_employee_probation" sequence="10"/>
@@ -39,6 +49,11 @@
 
         <menuitem id="menu_transfer_committee_minutes" name="Transfer Committee Minutes" parent="menu_employee_transfer"
                   action="action_transfer_committee_minutes" sequence="2"/>
+
+        <!-- : Itemized Transfer Report & History Tracking -->
+        <menuitem id="menu_transfer_history_tracking" name="Transfer History" parent="menu_employee_transfer"
+                  action="hr_employee_custom.action_hr_employee_transfer_history" sequence="3"
+                  groups="hr.group_hr_user"/>
         <menuitem
                 id="menu_recruitment_dashboard"
                 name="Dashboard"
@@ -62,13 +77,28 @@
                   parent="menu_recruitment_request_management"
                   action="action_recruitment_request"
                   sequence="2"/>
+        <menuitem id="menu_employee_education"
+                  name="Education"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_employee_education"
+                  sequence="50"/>
 
         <!-- new_recruitment_menu, menu_internal_recruitment, menu_external_recruitment
              are defined in views/menu_recruitment_root.xml (loaded first). -->
 
+        <!-- Talent Roster & Candidate Reuse -->
+        <menuitem id="menu_talent_roster"
+                  name="Talent Roster"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  action="action_talent_roster"
+                  sequence="3"
+                  groups="hr.group_hr_user"/>
+
         <!-- Wizard menu items (views/actions defined in wizards/*.xml, loaded before this file) -->
+        <!-- Commented out: External candidates are shortlisted automatically based on vacancy criteria config
         <menuitem id="menu_external_candidates_wizard" name="Shortlist External Candidates Wizard"
                   parent="menu_external_recruitment" action="action_external_candidates_wizard" sequence="1"/>
+        -->
         <menuitem id="menu_internal_candidates_wizard" name="Shortlist Internal Candidates Wizard"
                   parent="menu_internal_recruitment" action="action_internal_candidates_wizard" sequence="1"/>
 

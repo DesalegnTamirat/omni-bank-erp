@@ -1,0 +1,17 @@
+// 1. Core Brand Colors
+$o-community-color: #1d2b32 !default; // Dark Navy
+$o-enterprise-color: #1d2b32 !default;
+$o-enterprise-action-color: #2e8fa3 !default; // Steel Teal (accent)
+
+$o-brand-odoo: $o-community-color !default;
+$o-brand-primary: $o-community-color !default;
+$o-brand-secondary: #a8bfc8 !default; // Muted Steel Blue (secondary items)
+$o-brand-lightsecondary: #f2f6f8 !default; // Ice White (light layout blocks)
+
+// 2. Global Component Backgrounds
+$o-view-background-color: #f2f6f8 !default; // Soft ice white background
+$o-form-lightsecondary: #d0dde3 !default; // Cool steel border/divider line
+
+// 3. Component Active States
+$o-component-active-bg: #d0dde3 !default; // Active row background in lists
+$o-component-active-border: #2e8fa3 !default; // Active focus borders on input fields
