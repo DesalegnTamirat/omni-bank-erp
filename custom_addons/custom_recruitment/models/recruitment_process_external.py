@@ -145,11 +145,40 @@ class EligibleEmployeesexternal(models.Model):
     preferred_location = fields.Char(string="Preferred Location")
     ex_bunna = fields.Boolean(string="Ex-Bunna Employee")
 
+    # ── Former Bunna Bank employment details (shown when ex_bunna is Yes) ───
+    last_position_held = fields.Char(
+        string="Last Position Held",
+        help="The last job title/position the candidate held at Bunna Bank."
+    )
+    last_department = fields.Char(
+        string="Last Department",
+        help="The department the candidate last worked in at Bunna Bank."
+    )
+    reporting_manager = fields.Char(
+        string="Reporting Manager",
+        help="The manager the candidate last reported to at Bunna Bank."
+    )
+    length_of_service = fields.Char(
+        string="Length of Service",
+        help='Duration the candidate previously worked at Bunna Bank (e.g. "2 years 3 months").'
+    )
+    termination_reason = fields.Selection(
+        [('resignation', 'Resignation'),
+         ('contract_end', 'End of Contract'),
+         ('termination', 'Termination'),
+         ('retirement', 'Retirement'),
+         ],
+        string="Termination Reason",
+        help="Reason the candidate left Bunna Bank previously."
+    )
+
     # ── Academic Qualifications (highest – kept for quick filter/search) ─────
     educational_qualification = fields.Selection(
         [('diploma', 'Diploma'),
-         ('bachelor', "Bachelor's Degree"),
-         ('master', "Master's Degree"),
+         ('bsc', "Bsc Degree"),
+         ('ba', "BA Degree"),
+         ('msc', "Msc Degree"),
+         ('mba', "MBA Degree"),
          ('phd', 'PhD / Doctorate')],
         string="Highest Qualification",
         compute='_compute_highest_qualification', store=True
@@ -381,8 +410,10 @@ class ExternalApplicantEducation(models.Model):
     )
     level = fields.Selection(
         [('diploma', 'Diploma'),
-         ('bachelor', "Bachelor's Degree"),
-         ('master', "Master's Degree"),
+         ('bsc', "Bsc Degree"),
+         ('ba', "BA Degree"),
+         ('msc', "Msc Degree"),
+         ('mba', "MBA Degree"),
          ('phd', 'PhD / Doctorate')],
         string="Qualification Level", required=True,
     )
@@ -535,17 +566,7 @@ class ExternalApplicantLanguage(models.Model):
          ('tigrinya', 'Tigrinya'),
          ('somali', 'Somali (Afaan Soomaali)'),
          ('sidama', 'Sidama'),
-         ('wolaytta', 'Wolaytta'),
-         ('hadiya', 'Hadiya'),
-         ('guragigna', 'Guragigna'),
          ('afar', 'Afar'),
-         ('bench', 'Bench'),
-         ('dawro', 'Dawro'),
-         ('awngi', 'Awngi'),
-         ('gamo', 'Gamo'),
-         ('konso', 'Konso'),
-         ('arabic', 'Arabic'),
-         ('french', 'French'),
          ('other', 'Other')],
         string="Language", required=True,
     )

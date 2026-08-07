@@ -247,4 +247,4 @@ class ActingRoleAssignment(models.Model):
             ("permanent_candidate_assigned", "=", True),
         ])
         for rec in auto_terminate:
-            rec.action_terminate
+            rec.action_terminate()

@@ -46,7 +46,7 @@
                             <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
                             <field name="job_level" invisible="employee_category != 'Non Managerial'"
                                    required="employee_category == 'Non Managerial'" readonly="vacancy_status != 'draft'"/>
-                            <field name="recruitment_reference" readonly="vacancy_status != 'draft'"/>
+                            <field name="recruitment_request_id" string="Recruitment Reference" readonly="vacancy_status != 'draft'"/>
                             <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
                             <!-- INTERNAL ONLY: movement type -->
                             <field name="internal_movement_type" string="Movement Type"

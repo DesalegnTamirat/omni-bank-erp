@@ -1,14 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <!-- Standalone Transfer Request Configuration Settings -->
-    <record id="transfer_config_settings_action" model="ir.actions.act_window">
-        <field name="name">Transfer Request Settings</field>
-        <field name="res_model">transfer.request.config</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="view_id" ref="transfer_config_settings_form"/>
-    </record>
-
     <record id="transfer_config_settings_form" model="ir.ui.view">
         <field name="name">transfer.request.config.form</field>
         <field name="model">transfer.request.config</field>
@@ -56,11 +47,21 @@
         </field>
     </record>
 
+    <!-- Standalone Transfer Request Configuration Settings -->
+    <record id="transfer_config_settings_action" model="ir.actions.act_window">
+        <field name="name">Transfer Request Settings</field>
+        <field name="res_model">transfer.request.config</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="transfer_config_settings_form"/>
+    </record>
+
     <!-- Menu Item: Transfer Settings under Recruitment → Configuration -->
     <menuitem id="menu_transfer_config_settings"
               name="Transfer Settings"
               parent="hr_recruitment.menu_hr_recruitment_configuration"
               action="transfer_config_settings_action"
+              groups="hr_recruitment.group_hr_recruitment_manager,base.group_system"
               sequence="100"/>
 
 </odoo>

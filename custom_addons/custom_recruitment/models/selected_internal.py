@@ -334,6 +334,36 @@ class InternalRecruitmentSelectedCandidates(models.Model):
         for rec in self:
             rec.write({'active': False})
         return True
+
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # Displays on Written Exam Selection Table and Interview Evaluation Dashboard.
+    # No new model; reads directly from hr.leave for the linked employee.
+    active_leave_status = fields.Char(
+        string="Leave Status",
+        compute="_compute_leave_status",
+        store=False,
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+             "if the employee has an approved leave covering today's date.",
+    )
+
+    @api.depends('emp_name')
+    def _compute_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.emp_name
+            if emp:
+                leave = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leave:
+                    rec.active_leave_status = leave.holiday_status_id.name if leave.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")
     emp_grade = fields.Char(string="Grade")
     emp_position = fields.Char(string="Position",compute="_compute_employee_details", 
                     store=True)

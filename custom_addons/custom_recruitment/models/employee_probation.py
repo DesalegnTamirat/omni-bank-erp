@@ -190,7 +190,7 @@ class HrEmployeeProbation(models.Model):
             ("outcome", "=", "pending"),
             ("probation_end_date", "<=", target_date),
         ])
-        records.action_notify_supervisor
+        records.action_notify_supervisor()
 
     def action_record_outcome(self):
         """: record the probation outcome."""

@@ -68,11 +68,7 @@ class RecruitmentCandidateScore(models.Model):
         related="vacancy_id.employee_category", string="Job Category", store=True, readonly=True
     )
 
-    # ── CHANGED: Job Level is no longer chosen per-candidate. It's now
-    # driven entirely by the vacancy's own Job Level field, so every
-    # candidate scored against the same vacancy automatically shares the
-    # same level — no more risk of mismatched/miskeyed levels between
-    # candidates on the same vacancy.
+
     job_level = fields.Selection(
         [("junior", "Junior"), ("senior", "Senior / Regular")],
         string="Job Level", related="vacancy_id.job_level", store=True, readonly=True,
@@ -92,15 +88,43 @@ class RecruitmentCandidateScore(models.Model):
     gender = fields.Selection([("male", "Male"), ("female", "Female"), ("other", "Other")], string="Gender")
 
     # ── Assessment Scores ────────────────────────────────────────────────
-    pms_score = fields.Float(string="PMS Score", digits=(5, 2), readonly=True)
-    written_score = fields.Float(string="Written Exam Score", digits=(5, 2))
-    interview_score = fields.Float(string="Interview Score", digits=(5, 2))
+    pms_score = fields.Float(
+        string="PMS Score", 
+        digits=(5, 2), 
+        readonly=True,
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
+    written_score = fields.Float(
+        string="Written Exam Score", 
+        digits=(5, 2),
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
+    interview_score = fields.Float(
+        string="Interview Score", 
+        digits=(5, 2),
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
 
     # ── Weights (auto-defaulted from matrix, but fully user-editable) ─────
     weights_manually_set = fields.Boolean(string="Weights Manually Overridden", default=False, copy=False)
-    pms_weight = fields.Float(string="PMS Weight (%)", default=0.0, digits=(5, 2))
-    written_weight = fields.Float(string="Exam Weight (%)", default=50.0, digits=(5, 2))
-    interview_weight = fields.Float(string="Interview Weight (%)", default=50.0, digits=(5, 2))
+    pms_weight = fields.Float(
+        string="PMS Weight (%)", 
+        default=0.0, 
+        digits=(5, 2),
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
+    written_weight = fields.Float(
+        string="Exam Weight (%)", 
+        default=50.0, 
+        digits=(5, 2),
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
+    interview_weight = fields.Float(
+        string="Interview Weight (%)", 
+        default=50.0, 
+        digits=(5, 2),
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
 
     # ── Disqualification flags ────────────────────────────────────────────
     disqualified = fields.Boolean(string="Disqualified", default=False, readonly=True, tracking=True)
@@ -114,8 +138,18 @@ class RecruitmentCandidateScore(models.Model):
     )
 
     # ── Computed scores ───────────────────────────────────────────────────
-    final_score = fields.Float(string="Final Score", digits=(5, 2), compute="_compute_final_score", store=True)
-    rank = fields.Integer(string="Rank", default=0)
+    final_score = fields.Float(
+        string="Final Score", 
+        digits=(5, 2), 
+        compute="_compute_final_score", 
+        store=True,
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
+    rank = fields.Integer(
+        string="Rank", 
+        default=0,
+        groups="hr_recruitment.group_hr_recruitment_manager"
+    )
 
     # ── Selection outcome ─────────────────────────────────────────────────
     selection_status = fields.Selection(
@@ -141,10 +175,12 @@ class RecruitmentCandidateScore(models.Model):
 
     # ── Penalty Deductions ───────────────────────────────────────────────
     penalty_deduction_ids = fields.One2many(
-        'recruitment.penalty.deduction', 'candidate_score_id', string="Penalty Deductions"
+        'recruitment.penalty.deduction', 'candidate_score_id', string="Penalty Deductions",
+        groups="hr_recruitment.group_hr_recruitment_manager"
     )
     penalty_deduction_amount = fields.Float(
         string="Penalty Deduction (%)", compute="_compute_penalty_deduction", store=True,
+        groups="hr_recruitment.group_hr_recruitment_manager",
         help="Deduction percentage applied for active disciplinary written warnings (3% for 1st warning, 4% for 2nd warning)."
     )
 
@@ -236,7 +272,7 @@ class RecruitmentCandidateScore(models.Model):
     def _inverse_mark_selected(self):
         for rec in self:
             if rec.mark_selected:
-                rec._select_candidate
+                rec._select_candidate()
                 rec.message_post(body=_("Candidate marked as Selected."))
             elif rec.selection_status == "selected":
                 rec.write({"selection_status": "pending"})
@@ -246,7 +282,7 @@ class RecruitmentCandidateScore(models.Model):
             if rec.mark_reserve:
                 if rec.disqualified:
                     raise ValidationError(_("Cannot reserve a disqualified candidate."))
-                rec.action_set_reserve
+                rec.action_set_reserve()
             elif rec.selection_status == "reserve":
                 rec.write({"selection_status": "pending", "reserve_expiry": False})
 
@@ -325,11 +361,7 @@ class RecruitmentCandidateScore(models.Model):
             rec.write({'active': False})
         return True
 
-    # ── NOTE: job_level is now a related field sourced from
-    # vacancy_id.job_level (see field definition above), so it's no longer
-    # cleared/set manually here — it simply follows whatever the vacancy's
-    # Job Level is. job.vacancy itself enforces that Job Level is required
-    # for Non-Managerial vacancies and forbidden for Managerial ones.
+
 
     @api.constrains("vacancy_employee_category", "job_level")
     def _check_job_level_required(self):
@@ -393,21 +425,7 @@ class RecruitmentCandidateScore(models.Model):
 
 
     def action_apply_disqualification_check(self):
-        """
-        Section 9.2: disqualify a candidate if EITHER:
-          - an individual component (Written Exam or Interview) is < 50%, OR
-          - the overall WEIGHTED Final Score is < 50% (catches cases where
-            each individual component looks fine but a low-scoring,
-            heavily-weighted component — e.g. PMS — drags the weighted
-            average below the gate).
 
-        The weighted score is computed here directly from raw
-        scores/weights rather than read from the stored `final_score`
-        field, because `final_score` is forced to 0 once `disqualified`
-        is True — reading it directly would make a second run on an
-        already-disqualified record always see 0 and never re-clear them
-        even if scores were corrected afterward.
-        """
         for rec in self:
             reasons = []
             if rec.written_score < DISQUALIFICATION_THRESHOLD and rec.written_weight > 0:
@@ -449,14 +467,7 @@ class RecruitmentCandidateScore(models.Model):
                 })
 
     def action_apply_disqualification_check_menu(self):
-        """
-        Same disqualification check (Section 9.2), exposed separately in
-        the list view's ⚙ Actions menu so it can run WITHOUT ticking any
-        row checkboxes first — same no-selection scope resolution as the
-        Rank / Rank & Auto-Select menu actions: uses the current list
-        filter (active_domain) if nothing is selected, or every candidate
-        score if no filter is active.
-        """
+
         if self:
             candidates = self
         else:
@@ -468,7 +479,7 @@ class RecruitmentCandidateScore(models.Model):
                     "nothing to check."
                 ))
 
-        candidates.action_apply_disqualification_check
+        candidates.action_apply_disqualification_check()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -481,21 +492,7 @@ class RecruitmentCandidateScore(models.Model):
         }
 
     def action_rank_candidates(self):
-        """
-        Section 9.3: mass-action from the LIST VIEW. Select any subset of
-        candidate rows (typically all rows for one vacancy) and click
-        'Rank Selected Candidates' — ranks all of them in a single pass
-        instead of ranking record-by-record from the form. If the selection
-        spans multiple vacancies, each vacancy's candidates rank independently.
 
-        Required order: Check Disqualification → Rank → Auto-Select. To
-        enforce this, every eligible (non-disqualified) candidate in the
-        vacancy must have disqualification_checked = True — set by running
-        'Check Disqualification (50% Gate)' — or this raises, telling the
-        user to run that first. Editing any score/weight after a check
-        clears disqualification_checked again (see write), so a stale
-        check can't be used to sneak past this gate.
-        """
         if not self:
             raise UserError(_("Select at least one candidate to rank."))
 
@@ -566,7 +563,7 @@ class RecruitmentCandidateScore(models.Model):
             ]).mapped("candidate_score_id")
 
             # 1. Disqualification check (component scores + weighted Final Score).
-            (all_for_vacancy - locked).action_apply_disqualification_check
+            (all_for_vacancy - locked).action_apply_disqualification_check()
 
             # 2. Rank the eligible (non-disqualified) candidates.
             eligible = Score.search([
@@ -618,22 +615,7 @@ class RecruitmentCandidateScore(models.Model):
         }
 
     def action_rank_and_auto_select(self):
-        """
-        Combined one-click action: rank, then auto-select — bound to the
-        list view's ⚙ Actions menu, so it's usable WITHOUT ticking any row
-        checkboxes first (unlike the <header> buttons, which only appear
-        once at least one row is selected).
 
-        Scope of "which candidates":
-          - If called with a non-empty recordset (e.g. triggered from a
-            manual row selection), rank/select only those candidates'
-            vacancies — same as running the two separate buttons.
-          - If called with an EMPTY recordset (e.g. clicked from the ⚙
-            menu with nothing ticked), Odoo still passes along the current
-            list view's search filters as `active_domain` in the context.
-            We use that domain to find the in-scope candidates; if no
-            filter is active, that means "every candidate score record."
-        """
         if self:
             vacancies = self.mapped("vacancy_id")
         else:
@@ -654,16 +636,7 @@ class RecruitmentCandidateScore(models.Model):
         return all_candidates.action_auto_select_candidates()
 
     def action_rank_candidates_menu(self):
-        """
-        Same ranking as action_rank_candidates (Section 9.3), but exposed
-        separately in the list view's ⚙ Actions menu so ranking alone can
-        be run WITHOUT ticking any row checkboxes first — same
-        no-selection scope resolution as action_rank_and_auto_select:
-        uses the current list filter (active_domain) if nothing is
-        selected, or falls back to every candidate score if no filter is
-        active. Selection is intentionally NOT run here — this only
-        updates the Rank column.
-        """
+
         if self:
             vacancies = self.mapped("vacancy_id")
         else:
@@ -678,7 +651,7 @@ class RecruitmentCandidateScore(models.Model):
 
         Score = self.env["recruitment.candidate.score"]
         all_candidates = Score.search([("vacancy_id", "in", vacancies.ids)])
-        return all_candidates.action_rank_candidates
+        return all_candidates.action_rank_candidates()
 
     def action_set_reserve(self):
         """Section 9.4: mark as reserve with 6-month expiry."""
@@ -714,10 +687,7 @@ class RecruitmentCandidateScore(models.Model):
         }
 
 
-# ── NEW: exposes which vacancies currently have at least one Selected
-# candidate who doesn't already have an offer letter — used to filter the
-# Vacancy dropdown on Offer Letter creation, so vacancies with nothing left
-# to offer simply disappear from the list.
+
 class JobVacancyOfferableCandidates(models.Model):
     _inherit = "job.vacancy"
 
@@ -816,20 +786,14 @@ class RecruitmentOfferLetter(models.Model):
         # ── NEW: keep has_offer_letter accurate if an offer letter is
         # deleted (e.g. created in error) — recompute per remaining offers.
         candidates = self.mapped("candidate_score_id")
-        res = super.unlink
+        res = super().unlink()
         for cand in candidates:
             cand.has_offer_letter = bool(self.search_count([
                 ("candidate_score_id", "=", cand.id),
             ]))
         return res
 
-    # ── NEW: server-side backstop — the UI domain above is advisory only
-    # and can be bypassed by imports, API calls, or direct create calls
-    # (e.g. from _cascade_to_next_candidate below, which intentionally
-    # creates a new offer for the next candidate and must still be allowed
-    # to do so — cascade offers are for a *different* candidate each time,
-    # so this constraint only blocks a *second* offer for the *same*
-    # candidate).
+
     @api.constrains("candidate_score_id")
     def _check_candidate_not_already_offered(self):
         for rec in self:
@@ -857,7 +821,7 @@ class RecruitmentOfferLetter(models.Model):
         even when this fires automatically from a cascade."""
         for rec in self:
             rec.write({"state": "sent"})
-            rec.candidate_score_id._select_candidate
+            rec.candidate_score_id._select_candidate()
             rec.message_post(body=_(
                 "Offer letter sent to <b>%s</b>. Response deadline: <b>%s</b>."
             ) % (rec.candidate_name, rec.response_deadline))
@@ -906,13 +870,7 @@ class RecruitmentOfferLetter(models.Model):
             rec._cascade_to_next_candidate()
 
     def _cascade_to_next_candidate(self):
-        """
-        Find the next-ranked eligible candidate — not disqualified, and
-        currently 'pending' or 'reserve' — and automatically create + send
-        them an offer. Sending the offer is what flips their status to
-        'selected' (via _select_candidate), so the vacancy slot cap is
-        always respected on every hop of the cascade.
-        """
+
         self.ensure_one()
         current_rank = self.candidate_score_id.rank
 

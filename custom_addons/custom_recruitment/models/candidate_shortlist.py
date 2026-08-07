@@ -34,3 +34,32 @@ class CandidateShortlist(models.Model):
     applicant_id = fields.Many2one("hr.applicant", "Applicant Name")
     applicant_email = fields.Char(string="Applicant email")
     notify_candidate = fields.Boolean(string='Notify Candidate', default=False)
+
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # No new model created; reads directly from hr.leave for the linked employee.
+    active_leave_status = fields.Char(
+        string="Leave Status",
+        compute="_compute_leave_status",
+        store=False,
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+             "if the employee has an approved leave covering today's date.",
+    )
+
+    @api.depends('employee_id')
+    def _compute_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.employee_id
+            if emp:
+                leave = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leave:
+                    rec.active_leave_status = leave.holiday_status_id.name if leave.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")

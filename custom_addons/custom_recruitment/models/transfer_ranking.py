@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Transfer Ranking Engine – , , , , 
+# Transfer Ranking Engine – Fixed for Direct & Vacancy Transfers
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
@@ -17,10 +17,20 @@ class TransferCommitteeMinutes(models.Model):
         for rec in self:
             rec.write({'active': False})
         return True
+
     _order = "meeting_date desc"
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
-    target_vacancy_id = fields.Many2one("job.vacancy", string="Target Vacancy", required=True, tracking=True)
+
+    target_vacancy_id = fields.Many2one(
+        "job.vacancy",
+        string="Target Vacancy",
+        tracking=True,
+        required=False,
+        help="Optional. Leave empty for committees reviewing direct transfer "
+             "requests that are not linked to a specific vacancy.",
+    )
+
     meeting_date = fields.Date(string="Meeting Date", default=fields.Date.context_today, required=True)
     state = fields.Selection(
         [("draft", "Draft"), ("ranked", "Ranked"), ("approved", "Approved")],
@@ -29,42 +39,111 @@ class TransferCommitteeMinutes(models.Model):
 
     transfer_request_ids = fields.Many2many(
         "employee.transfer.request", string="Transfer Requests Considered",
-        domain="[('target_vacancy_id', '=', target_vacancy_id), "
-               "('state', 'in', ['submitted', 'under_review', 'approved'])]",
     )
     ranking_line_ids = fields.One2many(
         "transfer.committee.minutes.line", "minutes_id", string="Ranked Candidates"
     )
     selection_decision = fields.Text(string="Selection Decision / Committee Notes")
 
+    @api.onchange('target_vacancy_id')
+    def _onchange_target_vacancy_id(self):
+        """Auto-populate transfer_request_ids with all eligible requests matching
+        the current vacancy setting (or direct transfers if left empty), and keep
+        the picker domain in sync for any manual adjustments afterward."""
+        if self.target_vacancy_id:
+            domain = [
+                ('target_vacancy_id', '=', self.target_vacancy_id.id),
+                ('state', 'in', ['submitted', 'under_review', 'approved']),
+                ('eligibility_status', '=', 'eligible'),
+            ]
+        else:
+            domain = [
+                ('target_vacancy_id', '=', False),
+                ('state', 'in', ['submitted', 'under_review', 'approved']),
+                ('eligibility_status', '=', 'eligible'),
+            ]
+
+        matching_requests = self.env['employee.transfer.request'].search(domain)
+        self.transfer_request_ids = matching_requests
+
+        return {'domain': {'transfer_request_ids': domain}}
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("transfer.committee.minutes") or _("New")
+            if 'target_vacancy_id' not in vals:
+                vals['target_vacancy_id'] = False
         return super().create(vals_list)
 
-    def action_compute_ranking(self):
-        """ /  / : compute the weighted Transfer Suitability
-        Score for every eligible transfer request considered by this committee,
-        apply the discipline deduction, and populate the ranked list.
+    @api.constrains('target_vacancy_id', 'transfer_request_ids')
+    def _check_vacancy_consistency(self):
+        """Validate that transfer requests match the vacancy setting"""
+        for rec in self:
+            if rec.transfer_request_ids:
+                vacancy_requests = rec.transfer_request_ids.filtered(
+                    lambda r: r.target_vacancy_id
+                )
+                direct_requests = rec.transfer_request_ids.filtered(
+                    lambda r: not r.target_vacancy_id
+                )
+                if vacancy_requests and direct_requests:
+                    pass  # Allow mixing both types
 
-        Weighting (BRD Section 8.3 / :
-            Configured weights are loaded dynamically, defaulting to:
+    def action_refresh_eligible_requests(self):
+        """Manually re-sync transfer_request_ids with all eligible requests matching
+        the current Target Vacancy (or direct transfers if empty)."""
+        for rec in self:
+            domain = [
+                ('state', 'in', ['submitted', 'under_review', 'approved']),
+                ('eligibility_status', '=', 'eligible'),
+            ]
+            if rec.target_vacancy_id:
+                domain.append(('target_vacancy_id', '=', rec.target_vacancy_id.id))
+            else:
+                domain.append(('target_vacancy_id', '=', False))
+
+            matching_requests = self.env['employee.transfer.request'].search(domain)
+            rec.transfer_request_ids = matching_requests
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Requests Refreshed'),
+                'message': _('Eligible transfer requests have been reloaded.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    def action_compute_ranking(self):
+        """ Compute the weighted Transfer Suitability Score for every eligible transfer request,
+        apply discipline deduction, and populate the ranked list.
+
+        Weighting (BRD Section 8.3):
             Application Date   20%
             Total Experience   20%
             Service in Location 20%
             PMS Score          30%
             Recommendation     10%
 
-        Tie-breaking :
+        Tie-breaking:
             1. Final Transfer Suitability Score (descending)
             2. Female gender priority (female ranked higher)
             3. Earlier Application Date/Timestamp
             4. Total Work Experience at Bunna Bank
             5. PMS Score
+
+        Auto-selection:
+            The top N ranked candidates are automatically marked "Selected" on the
+            ranking line, where N = target_vacancy_id.no_of_vacancies (or 1 if this
+            committee has no target vacancy, i.e. a direct transfer). The committee
+            can still manually override any line's Decision afterward before
+            approving the minutes.
         """
-        # Fetch config weights
         ICPSudo = self.env["ir.config_parameter"].sudo()
         try:
             w_pms = float(ICPSudo.get_param("custom_recruitment.transfer_weight_pms", "30.0")) / 100.0
@@ -88,13 +167,36 @@ class TransferCommitteeMinutes(models.Model):
             w_rec = 0.10
 
         for rec in self:
+            if not rec.transfer_request_ids:
+                raise UserError(_(
+                    "No transfer requests have been added to this committee yet. "
+                    "Select at least one request under 'Transfer Requests Considered' "
+                    "before computing the ranking. If none appear as selectable, check "
+                    "that this committee's Target Vacancy matches the vacancy on the "
+                    "requests you're trying to rank (or leave it empty for direct "
+                    "transfers)."
+                ))
+
             eligible_requests = rec.transfer_request_ids.filtered(
                 lambda r: r.eligibility_status == "eligible"
             )
             if not eligible_requests:
-                raise UserError(_("There are no eligible transfer requests to rank."))
+                status_summary = ", ".join(
+                    "%s (%s)" % (r.name, r.eligibility_status or _("unknown"))
+                    for r in rec.transfer_request_ids
+                )
+                raise UserError(_(
+                    "None of the %d transfer request(s) added to this committee are "
+                    "marked eligible. Current status: %s"
+                ) % (len(rec.transfer_request_ids), status_summary))
 
-            rec.ranking_line_ids.unlink
+            rec.ranking_line_ids.unlink()
+
+            # --- Determine number of open slots for auto-selection ---------
+            if rec.target_vacancy_id:
+                slots = rec.target_vacancy_id.no_of_vacancies or 1
+            else:
+                slots = 1
 
             # --- Normalize each factor across the pool (0-100 scale) ---------
             dates = eligible_requests.mapped("request_date")
@@ -107,7 +209,6 @@ class TransferCommitteeMinutes(models.Model):
 
             scored = []
             for req in eligible_requests:
-                # Earlier application → higher score
                 days_from_earliest = (req.request_date - min_date).days
                 application_score = 100.0 * (1 - (days_from_earliest / date_span))
 
@@ -124,40 +225,32 @@ class TransferCommitteeMinutes(models.Model):
                 deduction = req.discipline_deduction_percent or 0.0
 
                 weighted_total = (
-                    application_score * w_app
-                    + experience_score * w_exp
-                    + location_score * w_loc
-                    + pms_score * w_pms
-                    + recommendation_score * w_rec
+                        application_score * w_app
+                        + experience_score * w_exp
+                        + location_score * w_loc
+                        + pms_score * w_pms
+                        + recommendation_score * w_rec
                 )
                 final_score = max(0.0, weighted_total - deduction)
 
-                # FIX: Append tuple to scored list (was missing in original code)
                 scored.append((
-                    req,            # [0] request record
-                    application_score,  # [1]
-                    experience_score,   # [2]
-                    location_score,     # [3]
-                    pms_score,          # [4]
-                    recommendation_score,  # [5]
-                    deduction,          # [6]
-                    final_score,        # [7]
+                    req,                    # [0]
+                    application_score,      # [1]
+                    experience_score,       # [2]
+                    location_score,         # [3]
+                    pms_score,              # [4]
+                    recommendation_score,   # [5]
+                    deduction,              # [6]
+                    final_score,            # [7]
                 ))
 
-            # --- Sort descending by composite score with tie-breaking  ---
-            # Tie-break order:
-            #   1. Final score (higher = better)
-            #   2. Female priority (female = 1, else = 0, higher = better)
-            #   3. Earlier application date (lower days_from_earliest = better)
-            #   4. More experience (higher = better)
-            #   5. Higher PMS score (higher = better)
             scored.sort(
                 key=lambda t: (
-                    round(t[7], 4),                                        # final score
-                    1 if getattr(t[0].employee_id, "gender", "") == "female" else 0,  # gender priority
-                    -((t[0].request_date - min_date).days),               # earlier date (negative for desc)
-                    t[0].total_experience_years or 0.0,                   # total experience
-                    t[4] or 0.0,                                           # PMS score
+                    round(t[7], 4),
+                    1 if getattr(t[0].employee_id, "gender", "") == "female" else 0,
+                    -((t[0].request_date - min_date).days),
+                    t[0].total_experience_years or 0.0,
+                    t[4] or 0.0,
                 ),
                 reverse=True,
             )
@@ -174,11 +267,16 @@ class TransferCommitteeMinutes(models.Model):
                     "recommendation_score": round(rec_s, 2),
                     "discipline_deduction_percent": round(deduction, 2),
                     "final_score": round(final_s, 2),
+                    "selection_decision": "selected" if idx <= slots else "not_selected",
                 })
                 req.transfer_suitability_score = round(final_s, 2)
 
             rec.state = "ranked"
-            rec.message_post(body=_("Transfer ranking computed. %d candidates ranked.") % len(scored))
+            rec.message_post(
+                body=_("Transfer ranking computed. %d candidates ranked. "
+                       "Top %d auto-marked as Selected based on %d open slot(s).")
+                     % (len(scored), min(slots, len(scored)), slots)
+            )
 
         return {
             'type': 'ir.actions.client',
@@ -193,30 +291,32 @@ class TransferCommitteeMinutes(models.Model):
         }
 
     def action_approve_minutes(self):
-        """: Approve the minutes and auto-approve all transfer requests
-        for candidates marked as 'selected' in the ranked list.
-        Triggers Employee Master Data updates for selected candidates."""
+        """Approve the minutes and auto-approve all transfer requests
+        for candidates marked as 'selected' in the ranked list."""
         for rec in self:
             if rec.state != "ranked":
                 raise UserError(_("Please compute the ranking before approving the minutes."))
             rec.state = "approved"
             rec.message_post(body=_("Transfer Committee Minutes approved."))
 
-            # : Auto-approve transfer requests for selected candidates
             selected_lines = rec.ranking_line_ids.filtered(
                 lambda l: l.selection_decision == "selected"
             )
             for line in selected_lines:
                 transfer_req = line.transfer_request_id
-                if transfer_req and transfer_req.state in ("submitted", "under_review"):
-                    try:
-                        transfer_req.action_approve
-                    except Exception as e:
-                        rec.message_post(
-                            body=_("Could not auto-approve transfer request %s: %s") % (
-                                transfer_req.name, str(e)
-                            )
+                if not transfer_req:
+                    continue
+                try:
+                    if transfer_req.state in ("submitted", "under_review"):
+                        transfer_req.action_approve()
+                    if transfer_req.state == "approved":
+                        transfer_req.action_complete_transfer()
+                except Exception as e:
+                    rec.message_post(
+                        body=_("Could not complete transfer for request %s: %s") % (
+                            transfer_req.name, str(e)
                         )
+                    )
 
         return {
             'type': 'ir.actions.client',

@@ -40,7 +40,7 @@ class ProbationAssessmentForm(models.Model):
         default=lambda self: _('New')
     )
     name_of_probationer = fields.Many2one(
-        "hr.contract", string="Name of Probationer",
+        "hr.version", string="Name of Probationer",
         domain=[('state', '=', 'probation')]
     )
     position_title = fields.Char(string="Position Title", readonly=True)
@@ -202,7 +202,7 @@ class ProbationAssessmentForm(models.Model):
         }
 
     def confirm_permenancy(self):
-        val = self.env["hr.contract"].search([
+        val = self.env["hr.version"].search([
             ("employee_id", "=", self.name_of_probationer.employee_id.id)
         ])
         val.write({"approval_status": "approved", "state": "open"})
@@ -233,7 +233,7 @@ class ProbationAssessmentForm(models.Model):
 
     def terminate_contract(self):
         self.state = "terminate_contract"
-        val = self.env["hr.contract"].search([
+        val = self.env["hr.version"].search([
             ("employee_id", "=", self.name_of_probationer.employee_id.id)
         ])
         val.write({"state": "cancel"})

@@ -1,26 +1,5 @@
 # -*- coding: utf-8 -*-
-# Transfer Assessment Scheduling and Management – Module 3 (Assessment
-# Management Module) BRD Requirements:
-#     Auto-trigger transfer assessment on Transfer Request submission
-#     Configurable transfer assessment parameters
-#     Assignment of transfer assessment to eligible transfer applicants
-#     Transfer-specific written exam creation
-#     Transfer interview scheduling with configurable panel composition
-#     Bulk scheduling/management of assessments for multiple applicants
-#     Automatic calculation of transfer assessment scores
-#     Transfer Ranking integration (Recruitment Module)
-#     Final transfer result calculation (assessment + ranking criteria)
-#     Transfer result approval routing
-#     Transfer result notification to applicants
-#     Transfer result archiving (historical record)
-#
-# This module was previously missing: `employee.transfer.request` 
-# to  only carried the ranking inputs (PMS, experience, service,
-# recommendation) but had no Written Exam Score / Interview Score / Weighted
-# Assessment Score, even though  (Mandatory Data Fields – Internal
-# Applicants, Transfer Purpose) explicitly lists "Written Exam Score,
-# Interview Score, Weighted Score, Final Result" as required data, and
-# Module 3 dedicates  entirely to Transfer Assessment.
+
 
 from datetime import date
 
@@ -299,7 +278,7 @@ class TransferAssessment(models.Model):
             vals["interview_scheduled_date"] = interview_date
         if vals:
             records.write(vals)
-        records.filtered(lambda r: r.state == "draft").action_schedule
+        records.filtered(lambda r: r.state == "draft").action_schedule()
         return True
 
     # ---------------------------------------

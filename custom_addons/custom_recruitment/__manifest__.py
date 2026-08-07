@@ -60,8 +60,9 @@ dependency, so they were intentionally left in place.
         'discipline_management',
     ],
     'data': [
-        'security/ir.model.access.csv',
+        'security/recruitment_security_groups.xml',
         'security/recruitment_security_rules.xml',
+        'security/ir.model.access.csv',
         'views/recruitment_master_data.xml',
 
         # -- Data / Sequences --
@@ -78,7 +79,7 @@ dependency, so they were intentionally left in place.
         'reports/transfer_minute_template.xml',
 
         # -- Menus Root (must load first so parent menus exist early) --
-        'views/menu_recruitment_root.xml',
+        # 'views/menu_recruitment_root.xml',
 
         # -- Dashboard --
         'views/recruitment_dashboard_action.xml',

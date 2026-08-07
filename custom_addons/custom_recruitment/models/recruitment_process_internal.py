@@ -58,20 +58,63 @@ class RecruitmentProcessInternal(models.Model):
         p_id = self.id
         _logger.info("Starting notification process for Internal Recruitment ID: %s", self.id)
         self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
-        vac = self.env["job.vacancy"].search([("reference", "=", self.vacancy_reference)])
+        vac = self.env["job.vacancy"].search([("reference", "=", self.vacancy_reference)], limit=1)
         work_units = []
-        for rec in vac.hiring_details:
-            work_units.append(rec.work_unit.name)
+        if vac:
+            for rec in vac.hiring_details:
+                if rec.work_unit:
+                    work_units.append(rec.work_unit.name)
         work_units_str = ", ".join(work_units)
+
+        Available = self.env['employee.recruitment.available']
+
         n = 0
         for val in self.eligible_emp:
-            if val.select_flag:
-                n = n + 1
-                _logger.info("Notifying Employee: %s", val.emp_name.name)
-                usr = self.env["res.partner"].search([("id", "=", val.emp_name.user_id.partner_id.id)])
-                _logger.debug("Partner/User found: %s", usr)
-                self.mail_channel_msgs(usr.id, self.job_position.name, self.last_date_to_apply, work_units_str)
-                _logger.info("************* No of employees that are notified: %s", n)
+            if val.select_flag and val.emp_name:
+                n += 1
+                emp_user = val.emp_name.user_id
+                _logger.info("Notifying Employee: %s (User ID: %s)", val.emp_name.name, emp_user.id if emp_user else None)
+
+                if emp_user:
+                    existing = Available.search([
+                        ('vacancy_reference', '=', self.vacancy_reference),
+                        ('employee_user_id', '=', emp_user.id),
+                    ], limit=1)
+                    avail_vals = {
+                        'vacancy_id': vac.id if vac else False,
+                        'vacancy_reference': self.vacancy_reference,
+                        'job_position': self.job_position.name if self.job_position else False,
+                        'job_location': self.job_location,
+                        'employee_grade': self.job_grade,
+                        'employee_category': self.job_category,
+                        'type_of_employment': self.emp_type,
+                        'number_of_vacancies': self.no_of_vacancies,
+                        'vacancy_announced_on': self.vacancy_announced_on,
+                        'last_date_to_apply': self.last_date_to_apply,
+                        'job_description': vac.vacancy_description if vac else '',
+                        'employee_id': val.emp_name.id,
+                        'employee_user_id': emp_user.id,
+                        'employee_applicant': val.emp_name.name,
+                        'application_status': 'New',
+                    }
+                    if existing:
+                        existing.write(avail_vals)
+                        avail_rec = existing
+                    else:
+                        avail_rec = Available.create(avail_vals)
+
+                    if vac and vac.hiring_details:
+                        avail_rec.employee_vacancy_ids.unlink()
+                        vac_lines = [(0, 0, {
+                            'operating_unit': h.work_unit.name if h.work_unit else False,
+                            'number_of_vacancies': h.number_of_openings or 0,
+                            'location_preference': 0,
+                        }) for h in vac.hiring_details]
+                        avail_rec.write({'employee_vacancy_ids': vac_lines})
+
+                if emp_user and emp_user.partner_id:
+                    self.mail_channel_msgs(emp_user.partner_id.id, self.job_position.name if self.job_position else '', self.last_date_to_apply, work_units_str)
+
         self.status = 'notify'
         return self.status
 
@@ -101,6 +144,35 @@ class EligibleEmployees(models.Model):
         for rec in self:
             rec.write({'active': False})
         return True
+
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # No new model created; reads directly from hr.leave for the linked employee.
+    active_leave_status = fields.Char(
+        string="Leave Status",
+        compute="_compute_leave_status",
+        store=False,
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+             "if the employee has an approved leave covering today's date.",
+    )
+
+    @api.depends('emp_name')
+    def _compute_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.emp_name
+            if emp:
+                leave = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leave:
+                    rec.active_leave_status = leave.holiday_status_id.name if leave.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")
 
     emp_grade = fields.Char(string="Grade", compute="_compute_employee_details", store=True)
     emp_position = fields.Char(string="Position", compute="_compute_employee_details", store=True)
@@ -255,6 +327,34 @@ class InternalEligibleEmployees(models.Model):
         for rec in self:
             rec.write({'active': False})
         return True
+
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    active_leave_status = fields.Char(
+        string="Leave Status",
+        compute="_compute_leave_status",
+        store=False,
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+             "if the employee has an approved leave covering today's date.",
+    )
+
+    @api.depends('emp_name')
+    def _compute_leave_status(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            emp = rec.emp_name
+            if emp:
+                leave = self.env['hr.leave'].search([
+                    ('employee_id', '=', emp.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', today),
+                    ('date_to', '>=', today),
+                ], limit=1)
+                if leave:
+                    rec.active_leave_status = leave.holiday_status_id.name if leave.holiday_status_id else _("On Leave")
+                else:
+                    rec.active_leave_status = _("Active")
+            else:
+                rec.active_leave_status = _("N/A")
 
     emp_grade = fields.Char(string="Grade")
     emp_position = fields.Char(string="Position")

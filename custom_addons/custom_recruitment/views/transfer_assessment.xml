@@ -49,9 +49,16 @@
             <p class="o_view_nocontent_smiling_face">Configure Transfer Assessment Parameters!</p>
             <p>Set the Written Exam / Interview weighting and minimum passing score used to score
                Transfer Assessments. Flexible so it can be updated whenever the assessment
-               procedure changes .</p>
+               procedure changes.</p>
         </field>
     </record>
+
+    <menuitem id="menu_transfer_assessment_config"
+              name="Transfer Assessment Policy"
+              parent="hr_recruitment.menu_hr_recruitment_configuration"
+              action="action_transfer_assessment_config"
+              groups="hr_recruitment.group_hr_recruitment_manager,base.group_system"
+              sequence="101"/>
 
     <!-- ================================================================ -->
     <!-- Transfer Assessment – List View                                   -->

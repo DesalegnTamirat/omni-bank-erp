@@ -23,6 +23,8 @@
                 <field name="job_position_id"/>
                 <field name="required_headcount"/>
                 <field name="employment_type"/>
+                <field name="employee_category" widget="badge"/>
+                <field name="job_level" widget="badge" optional="show"/>
                 <field name="sourcing_type"/>
                 <field name="is_replacement"/>
                 <field name="state" widget="badge"
@@ -54,7 +56,8 @@
                             groups="hr.group_hr_manager"/>
                     <button name="action_create_vacancy" string="Create Vacancy" type="object"
                             class="btn-primary"
-                            invisible="state != 'approved' or vacancy_id != False"/>
+                            invisible="state != 'approved' or vacancy_id != False"
+                            groups="hr.group_hr_user,hr.group_hr_manager"/>
                     <button name="action_cancel" string="Cancel" type="object"
                             invisible="state in ('approved', 'cancelled')"/>
                     <button name="action_reset_draft" string="Reset to Draft" type="object"
@@ -83,27 +86,23 @@
                         <field name="rejection_reason" readonly="1" nolabel="1"/>
                     </div>
 
+                    <field name="allowed_job_ids" invisible="1"/>
+                    <field name="allowed_grade_ids" invisible="1"/>
+
                     <group>
                         <!-- LEFT: Request Info -->
                         <group string="Request Information">
                             <field name="request_type" widget="radio" readonly="state != 'draft'"/>
                             <field name="request_date" readonly="state != 'draft'"/>
-                            <!-- Auto-fetched from the logged-in user's own
-                                 employee record; locked once Submitted so
-                                 it can't be spoofed, but editable while
-                                 still Draft in case the default is wrong. -->
-                            <field name="requested_by" readonly="state != 'draft'"/>
-                            <field name="operating_unit_id" readonly="state != 'draft'"/>
-                            <!-- /007: Planned -> link workforce plan.
-                                 Domain restricts the picker to Approved,
-                                 non-deleted plans for the same Work Unit. -->
+
+                            <field name="requested_by" />
+                            <field name="operating_unit_id"/>
+
                             <field name="workforce_plan_id"
                                    invisible="request_type != 'planned'"
                                    required="request_type == 'planned'"
-                                   readonly="state != 'draft'"/>
-                            <!-- Read-only plan availability, so the requester
-                                 sees whether they're within budget BEFORE
-                                 hitting the automated validation on Submit. -->
+                                   />
+
                             <field name="plan_total_headcount"
                                    invisible="request_type != 'planned' or not workforce_plan_id"/>
                             <field name="plan_consumed_headcount"
@@ -113,16 +112,18 @@
                         </group>
                         <!-- RIGHT: Job Information  -->
                         <group string="Job Information">
-                            <field name="job_position_id" readonly="state != 'draft'"/>
-                            <field name="job_grade_id" readonly="state != 'draft'"/>
-                            <!-- Auto-fetched from the logged-in user's own
-                                 department; locked once Submitted. -->
-                            <field name="department_id" readonly="state != 'draft'"/>
+                            <field name="job_position_id" domain="[('id', 'in', allowed_job_ids)]" readonly="state != 'draft'"/>
+                            <field name="job_grade_id" domain="[('id', 'in', allowed_grade_ids)]" readonly="state != 'draft'"/>
+                            <field name="department_id" />
+                            <field name="employee_category" readonly="state != 'draft'" widget="radio"/>
+                            <field name="job_level"
+                                   invisible="employee_category != 'Non Managerial'"
+                                   required="employee_category == 'Non Managerial'"
+                                   readonly="state != 'draft'"/>
                             <field name="employment_type" readonly="state != 'draft'"/>
                             <field name="required_headcount" readonly="state != 'draft'"/>
                             <field name="sourcing_type" readonly="state != 'draft'"/>
-                            <field name="last_date_to_apply" readonly="state != 'draft'"
-                                   help="Application deadline for the vacancy. Defaults to 30 days from vacancy creation if not set."/>
+
                         </group>
                     </group>
 
@@ -171,10 +172,7 @@
                     </notebook>
                 </sheet>
 
-                <!-- CHATTER/ACTIVITY SECTION - HIDDEN -->
-                <!-- Set invisible="1" to hide the activity log, followers, and message threads.
-                     This reduces visual clutter while preserving the audit trail in the database.
-                     Remove invisible="1" to re-enable if needed later. -->
+
 
             </form>
         </field>

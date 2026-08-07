@@ -58,7 +58,7 @@
 
     <record id="action_report_probation_termination" model="ir.actions.report">
         <field name="name">Probation Termination Letter</field>
-        <field name="model">hr.contract</field>
+        <field name="model">hr.version</field>
         <field name="report_type">qweb-html</field>
         <field name="report_name">custom_recruitment.report_probation_revocation</field>
         <field name="report_file">custom_recruitment.report_probation_revocation</field>

@@ -4,7 +4,9 @@
         <field name="name">candidate.shortlist.form</field>
         <field name="model">candidate.shortlist</field>
         <field name="arch" type="xml">
-            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Employee Shortlist">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Employee Shortlist"
+                  decoration-danger="active_leave_status not in ('Active', 'N/A')"
+                  decoration-success="active_leave_status == 'Active'">
                 <field name="recruitment_reference"/>
                 <field name="job_position"/>
                 <field name="employee_id"/>
@@ -24,8 +26,12 @@
                 <field name="current_location"/>
                 <field name="current_work_unit"/>
                 <field name="applicant_id"/>
+                <!-- FR-REC-056: Leave Status from Time Off module -->
+                <field name="active_leave_status" string="Leave Status" readonly="1"
+                       optional="show"
+                       decoration-danger="active_leave_status not in ('Active', 'N/A')"
+                       decoration-success="active_leave_status == 'Active'"/>
                 <field name="notify_candidate"/>
-
             </list>
         </field>
     </record>

@@ -140,7 +140,12 @@ class JobVacancy(models.Model):
              "vacancy — no longer chosen per-candidate."
     )
 
-    recruitment_reference = fields.Char(string="Recruitment Reference")
+    recruitment_request_id = fields.Many2one(
+        "recruitment.request", string="Recruitment Reference",
+        domain="[('state', '=', 'approved')]", tracking=True,
+        help="Select an approved Recruitment Request to auto-populate vacancy fields."
+    )
+    recruitment_reference = fields.Char(string="Recruitment Reference String")
 
     # /013: Opening and closing dates with validation
     opening_date = fields.Date(string="Opening Date", default=fields.Date.context_today, required=True,
@@ -221,6 +226,35 @@ class JobVacancy(models.Model):
     )
 
 
+    @api.onchange('recruitment_request_id')
+    def _onchange_recruitment_request_id_sync_fields(self):
+        """Auto-populate Job Vacancy fields when an approved Recruitment Request is selected."""
+        if not self.recruitment_request_id:
+            return
+        req = self.recruitment_request_id
+        self.recruitment_reference = req.reference
+        if req.job_position_id:
+            self.job_position = req.job_position_id
+        if req.operating_unit_id:
+            self.operating_unit_id = req.operating_unit_id
+        if req.requested_by:
+            self.responsible = req.requested_by
+        if req.required_headcount:
+            self.no_of_vacancies = req.required_headcount
+        if req.employment_type:
+            self.type_of_employment = "Permanent" if req.employment_type == "permanent" else "Contractual"
+        if req.sourcing_type:
+            self.sourcing_type = req.sourcing_type
+            self.recruitment_type = "Internal" if req.sourcing_type == "internal" else "External"
+        if req.job_description:
+            self.vacancy_description = req.job_description
+        if req.last_date_to_apply:
+            self.last_date_to_apply = req.last_date_to_apply
+        if req.employee_category:
+            self.employee_category = req.employee_category
+        if req.job_level:
+            self.job_level = req.job_level if req.employee_category == "Non Managerial" else False
+
     @api.onchange('employee_category')
     def _onchange_employee_category_clear_job_level(self):
         for rec in self:
@@ -300,7 +334,7 @@ class JobVacancy(models.Model):
         the parent's write when saved from an embedded list editor. Only the
         technical fields needed for the workflow itself still pass through."""
         for rec in self:
-            if rec._is_locked:
+            if rec._is_locked():
                 blocked = set(vals.keys()) - LOCKED_ALLOWED_FIELDS
                 if blocked:
                     raise ValidationError(_(
@@ -310,7 +344,7 @@ class JobVacancy(models.Model):
         res = super().write(vals)
         if vals.get('vacancy_status') == 'published':
             for rec in self:
-                rec._sync_published_vacancy_records
+                rec._sync_published_vacancy_records()
         return res
 
     def _sync_published_vacancy_records(self):
@@ -374,8 +408,18 @@ class JobVacancy(models.Model):
 
                 if existing_avail:
                     existing_avail.write(avail_vals)
+                    avail_rec = existing_avail
                 else:
-                    Available.create(avail_vals)
+                    avail_rec = Available.create(avail_vals)
+
+                if rec.hiring_details:
+                    avail_rec.employee_vacancy_ids.unlink()
+                    vac_lines = [(0, 0, {
+                        'operating_unit': h.work_unit.name if h.work_unit else False,
+                        'number_of_vacancies': h.number_of_openings or 0,
+                        'location_preference': 0,
+                    }) for h in rec.hiring_details]
+                    avail_rec.write({'employee_vacancy_ids': vac_lines})
 
                 # Application Window
                 AppWindow = self.env['recruitment.application.window']
@@ -390,15 +434,15 @@ class JobVacancy(models.Model):
                 if sourcing == 'internal':
                     self.env['employee.recruitment.external'].search([
                         '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                    ]).unlink
+                    ]).unlink()
             else:
                 # Remove internal process records for external-only vacancies
                 self.env['employee.recruitment.internal'].search([
                     '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                ]).unlink
+                ]).unlink()
                 self.env['employee.recruitment.available'].search([
                     '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                ]).unlink
+                ]).unlink()
 
             # 2. External Recruitment Process
             if is_external:
@@ -421,15 +465,15 @@ class JobVacancy(models.Model):
                 if sourcing == 'external':
                     self.env['employee.recruitment.internal'].search([
                         '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                    ]).unlink
+                    ]).unlink()
                     self.env['employee.recruitment.available'].search([
                         '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                    ]).unlink
+                    ]).unlink()
             else:
                 # Remove external process records for internal-only vacancies
                 self.env['employee.recruitment.external'].search([
                     '|', ('vacancy_id', '=', rec.id), ('vacancy_reference', '=', rec.reference)
-                ]).unlink
+                ]).unlink()
 
     def notify(self):
         for com in self.vac_del_team_id:
@@ -444,6 +488,7 @@ class JobVacancy(models.Model):
                     raise ValidationError('Approver is not an Employee')
                 self.mail_channel_msgs(usr.id, self.reference, self.job_position.name, self.type_of_employment)
         self.status = "notify"
+        self._sync_published_vacancy_records()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -486,7 +531,7 @@ class JobVacancy(models.Model):
               AND reference LIKE %s
             ORDER BY id DESC LIMIT 1
         """, (movement_type, current_prefix + '%'))
-        result = self.env.cr.fetchone
+        result = self.env.cr.fetchone()
         if result and result[0]:
             _, _, numeric_part = result[0].rpartition('/')
             try:

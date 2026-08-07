@@ -8,10 +8,10 @@ class ReportProbationRevocation(models.AbstractModel):
 
     @api.model
     def _get_report_values(self, docids, data=None):
-        docs = self.env["hr.contract"].search([("id", "=", docids[0])])
+        docs = self.env["hr.version"].search([("id", "=", docids[0])])
         return {
             'doc_ids': docids,
-            'doc_model': "hr.contract",
+            'doc_model': "hr.version",
             'docs': docs,
             'data': data,
         }

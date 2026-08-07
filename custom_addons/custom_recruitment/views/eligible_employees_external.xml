@@ -69,6 +69,11 @@
                             <field name="age" string="Age (Years)"/>
                             <field name="gender"/>
                             <field name="ex_bunna" string="Ex-Bunna Employee"/>
+                            <field name="last_position_held" invisible="not ex_bunna"/>
+                            <field name="last_department" invisible="not ex_bunna"/>
+                            <field name="reporting_manager" invisible="not ex_bunna"/>
+                            <field name="length_of_service" invisible="not ex_bunna"/>
+                            <field name="termination_reason" invisible="not ex_bunna"/>
                         </group>
                         <group string="CV &amp; Selection">
                             <field name="cv_attachment_id" string="CV Attachment" readonly="1"/>
