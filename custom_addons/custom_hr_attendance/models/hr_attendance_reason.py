@@ -18,6 +18,11 @@ class HrAttendanceReason(models.Model):
             rec.write({'active': False})
         return True
 
+    # sequence = fields.Integer()
+    # company_id = fields.Many2one(
+    #     comodel_name="res.company",
+    #     string="Company",
+    # )
     name = fields.Char(
         string="Reason",
         help="Specifies the reason leaving soon or arriving late",
