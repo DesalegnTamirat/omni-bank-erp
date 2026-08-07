@@ -25,8 +25,8 @@ access_hr_reinstated_history,hr.reinstated.history,model_hr_reinstated_history,h
 access_hr_reinstated_history_manager,hr.reinstated.history,model_hr_reinstated_history,hr.group_hr_manager,1,1,1,1
 access_hr_employee_insurance,hr.employee.insurance,model_hr_employee_insurance,hr.group_hr_user,1,1,1,1
 access_hr_employee_insurance_manager,hr.employee.insurance,model_hr_employee_insurance,hr.group_hr_manager,1,1,1,1
-access_hr_contract_user,hr.contract user,model_hr_contract,hr.group_hr_user,1,0,0,0
-access_hr_contract_manager,hr.contract manager,model_hr_contract,hr_employee_custom.group_hr_contract_manager,1,1,1,1
+access_hr_contract_user,hr.version user,hr.model_hr_version,hr.group_hr_user,1,0,0,0
+access_hr_contract_manager,hr.version manager,hr.model_hr_version,hr_employee_custom.group_hr_contract_manager,1,1,1,1
 access_hr_payroll_structure_type_manager,hr.payroll.structure.type manager,model_hr_payroll_structure_type,hr_employee_custom.group_hr_contract_manager,1,1,1,1
 access_hr_contract_type_user,hr.contract.type user,hr.model_hr_contract_type,hr.group_hr_user,1,0,0,0
 access_hr_contract_type_manager,hr.contract.type manager,hr.model_hr_contract_type,hr_employee_custom.group_hr_contract_manager,1,1,1,1
@@ -157,9 +157,3 @@ access_hr_competencies_info_job_user,hr_competencies_info_job.user,model_hr_comp
 access_hr_competencies_info_job_manager,hr_competencies_info_job.manager,model_hr_competencies_info_job,hr.group_hr_manager,1,1,1,1
 access_vacancy_workunit_user,vacancy.workunit.user,model_vacancy_workunit,hr.group_hr_user,1,1,1,1
 access_employee_category_manager,employee.category.manager,model_employee_category,hr.group_hr_manager,1,1,1,1
-access_leave_request_employee,leave.request employee,model_leave_request,base.group_user,1,1,1,0
-access_leave_request_user,leave.request user,model_leave_request,hr.group_hr_user,1,1,1,1
-access_leave_request_manager,leave.request manager,model_leave_request,hr.group_hr_manager,1,1,1,1
-access_leave_request_manager_employee,leave.request.manager employee,model_leave_request_manager,base.group_user,1,0,0,0
-access_leave_request_manager_user,leave.request.manager user,model_leave_request_manager,hr.group_hr_user,1,1,1,1
-access_leave_request_manager_manager,leave.request.manager manager,model_leave_request_manager,hr.group_hr_manager,1,1,1,1

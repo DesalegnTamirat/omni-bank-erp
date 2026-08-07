@@ -38,11 +38,11 @@
     </record>
     <record id="acting_permanent_letters" model="ir.actions.report">
         <field name="name">Permanent Letters</field>
-        <field name="model">hr.contract</field>
+        <field name="model">hr.version</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">hr_employee_custom.report_permanent_letter</field>
         <field name="report_file">hr_employee_custom.report_permanent_letter</field>
-        <field name="binding_model_id" ref="model_hr_contract"/>
+        <field name="binding_model_id" ref="hr.model_hr_version"/>
 		<field name="binding_type">report</field>
     </record>
      <record id="acting_promotion_letters" model="ir.actions.report">
@@ -80,11 +80,11 @@
     <!-- </record> -->
 	<record id="acting_probation_revocation" model="ir.actions.report">
         <field name="name">Probation Termination</field>
-        <field name="model">hr.contract</field>
+        <field name="model">hr.version</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">hr_employee_custom.report_probation_revocation</field>
         <field name="report_file">hr_employee_custom.report_probation_revocation</field>
-        <field name="binding_model_id" ref="model_hr_contract"/>
+        <field name="binding_model_id" ref="hr.model_hr_version"/>
         <field name="binding_type">report</field>
     </record>
 	<!-- <record id="action_increment_letter" model="ir.actions.report"> -->

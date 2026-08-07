@@ -41,12 +41,19 @@ class HrEmployeeGrade(models.Model):
 
     grade_name = fields.Char("Grade Name", default=lambda self: self._default_grade_name())
 
-
     parent_grade = fields.Char("Parent Grade")
 
-
-    category = fields.Many2one('employee.category', string='Category'
+    grade_level = fields.Selection(
+        [
+            ('junior', 'Junior'),
+            ('senior', 'Senior'),
+        ],
+        string="Grade Level",
+        required=True,
+        default='junior',
     )
+    category = fields.Many2one('employee.category', string='Category'
+                               )
     # manager=fields.Boolean(string='Manager')
     # non_manager=fields.Boolean(string='Non Manager')
 

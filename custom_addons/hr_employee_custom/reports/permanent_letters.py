@@ -10,11 +10,11 @@ class projection_detail_acting_permanent_letters_Clerical_and_Managerial(models.
         #docs = self.env[model.model].search([])
         # docs = self.env["account.asset"].search([])
 
-        docs = self.env["hr.contract"].search([("id", "=", docids[0])])
+        docs = self.env["hr.version"].search([("id", "=", docids[0])])
         
         return {
               'doc_ids': docids,
-              'doc_model': "hr.contract",
+              'doc_model': "hr.version",
               
               'docs': docs,
               'data': data,

@@ -6,7 +6,7 @@ from datetime import datetime
 from datetime import date
 
 class InheritedHRContract(models.Model):
-    _inherit = 'hr.contract'
+    _inherit = 'hr.version'
 
     _rec_name = 'employee_id'
 
@@ -25,12 +25,12 @@ class ProbationAssessmentForm(models.Model):
 
     prob_sequence = fields.Char(string='Reference', required=True, copy=False, readonly=True,
                                default=lambda self: _('New'))
-    name_of_probationer = fields.Many2one("hr.contract", string="Name of Probationer", domain=[('state', '=', 'probation')])
+    name_of_probationer = fields.Many2one("hr.version", string="Name of Probationer", domain=[('state', '=', 'probation')])
     position_title = fields.Char(string="Position Title", readonly=True)
     place_of_assessment = fields.Char(string="Place of Assessment")
     employment_date = fields.Date(string="Employment Date", related="name_of_probationer.first_contract_date")
-    from_date = fields.Date(string="From", related="name_of_probationer.date_start")
-    to_date = fields.Date(string="To", related="name_of_probationer.date_end")
+    from_date = fields.Date(string="From", related="name_of_probationer.contract_date_start")
+    to_date = fields.Date(string="To", related="name_of_probationer.contract_date_end")
     pro_assess_form = fields.One2many("probation.assessment.form.criteria", "prob_cri", string="Probation Criteria")
     evaluation_period = fields.Char(string="Evaluation Period", compute="_compute_evaluation_period", store=True)
     in_charge = fields.Many2one("hr.employee", string="TDD In-charge Officer")
@@ -74,6 +74,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Delegation team notified successfully.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -127,6 +128,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Evaluation recorded.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -135,7 +137,7 @@ class ProbationAssessmentForm(models.Model):
     def set_position_title(self):
         for record in self:
             if record.name_of_probationer:
-                probationer = self.env["hr.contract"].search([("name", "=", record.name_of_probationer.name)])
+                probationer = self.env["hr.version"].search([("name", "=", record.name_of_probationer.name)])
                 record.position_title = probationer.job_id.name
 
             else:
@@ -146,7 +148,7 @@ class ProbationAssessmentForm(models.Model):
     def set_position_place(self):
         for record in self:
             if record.name_of_probationer:
-                probationer = self.env["hr.contract"].search([("name", "=", record.name_of_probationer.name)])
+                probationer = self.env["hr.version"].search([("name", "=", record.name_of_probationer.name)])
                 record.place_of_assessment= probationer.operating_unit_id.name
 
             else:
@@ -177,6 +179,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('TDD In-charge Officer has been informed.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -201,7 +204,7 @@ class ProbationAssessmentForm(models.Model):
             # msg2 = "is <b><u>Approved</u></b>"
             # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title,
                                     # rec.place_of_assessment, rec.evaluation_period, msg2)
-       val = self.env["hr.contract"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])
+       val = self.env["hr.version"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])
        value = {
                  "approval_status": "approved",
                  "state": "open"
@@ -217,6 +220,7 @@ class ProbationAssessmentForm(models.Model):
                'message': _('Employee confirmed as permanent.'),
                'type': 'success',
                'sticky': False,
+               'next': {'type': 'ir.actions.client', 'tag': 'reload'},
            },
        }
 	   
@@ -230,6 +234,7 @@ class ProbationAssessmentForm(models.Model):
 	            'message': _('Probation rejected.'),
 	            'type': 'warning',
 	            'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
 	        },
 	    }
 
@@ -241,7 +246,7 @@ class ProbationAssessmentForm(models.Model):
             # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title,
                                     # rec.place_of_assessment, rec.evaluation_period, msg2)
         self.state = "terminate_contract"
-        val = self.env["hr.contract"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])
+        val = self.env["hr.version"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])
         value = {
                   "state": "cancel"
         }
@@ -254,6 +259,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Contract terminated.'),
                 'type': 'warning',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 

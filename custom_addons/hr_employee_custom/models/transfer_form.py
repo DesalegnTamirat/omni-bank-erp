@@ -144,7 +144,7 @@ class TransformDetails(models.Model):
         self.job_grade1 = self.employee_name.contract_id.job_grade.id
         self.job_category = self.employee_name.contract_id.job_category.id
         self.job_category1 = self.employee_name.contract_id.job_category.id
-        self.contract_start_date = self.employee_name.contract_id.date_start
+        self.contract_start_date = self.employee_name.contract_id.contract_date_start
 
     @api.onchange('requested_operating_unit')
     def _onchange_requested_operating_unit(self):
@@ -168,7 +168,7 @@ class TransformDetails(models.Model):
 
     def approve(self):
         p_id=self.id
-        contract_info = self.env["hr.contract"].search([('employee_id', '=', self.employee_name.id)])
+        contract_info = self.env["hr.version"].search([('employee_id', '=', self.employee_name.id)])
 
         vals = {
             "employee_id": self.employee_name.id,

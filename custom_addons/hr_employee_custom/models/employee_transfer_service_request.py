@@ -64,7 +64,7 @@ class EmployeeTransferServiceRequest(models.Model):
     def populate(self):
         for val in self:
             val.requestor_name = self.env.user.name
-            vals = self.env["hr.contract"].search([("employee_id.name", "=", self.env.user.name)])
+            vals = self.env["hr.version"].search([("employee_id.name", "=", self.env.user.name)])
             value = self.env["hr.employee"].search([("name", "=", self.env.user.name)])
             val.job_position = value.job_position
             val.job_grade_t = value.job_grade.grade_code
@@ -72,7 +72,7 @@ class EmployeeTransferServiceRequest(models.Model):
             val.operating_unit = value.default_operating_unit_id
             val.department = value.department_id
             val.gender = value.gender
-            val.contract_start_date = vals.date_start
+            val.contract_start_date = vals.contract_date_start
             val.active_phone_num = value.personal_phone
             val.active_email_id = value.work_email
             # print("********", value, val.job_grade_t, val.job_grade_t)

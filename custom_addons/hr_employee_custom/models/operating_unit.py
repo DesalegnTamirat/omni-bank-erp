@@ -72,9 +72,9 @@ class OperatingUnit(models.Model):
     )
     latitude=fields.Float(string="Latitude")
     longitude = fields.Float(string="Longitude")
-    district=fields.Char(string="District" ,required=True)
-    region=fields.Char(string="Region", required=True)
-    department=fields.Many2one('hr.department',string='Department', required=True)
+    district = fields.Char(string="District")
+    region = fields.Char(string="Region")
+    department = fields.Many2one('hr.department', string='Department')
 
     def _compute_display_name(self):
         for ou in self:

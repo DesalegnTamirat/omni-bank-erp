@@ -23,9 +23,8 @@ from . import hr_payroll_structure
 from . import hr_payroll_structure_type
 from . import hr_contract
 from . import hr_contract_type
-# hr_contract (above) must load before any file below that does
-# `_inherit = 'hr.contract'`, since this module defines hr.contract itself
-# instead of depending on the stock hr_contract addon.
+# hr_contract extends hr.version (Odoo 19 replacement for hr.contract)
+# and must load before any file that uses _inherit = 'hr.version'.
 from . import emp_probation
 from . import history
 from . import hr_department

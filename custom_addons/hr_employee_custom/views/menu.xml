@@ -69,8 +69,11 @@
                   action="employee_supplementary_role_tree" sequence="14"/>
         <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
                   action="employee_re_instating_tree" sequence="15"/>
+        <!-- <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
+                  action="employee_transfer_form_tree" sequence="16"/> -->
         <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="employee_transfer_form_tree" sequence="16"/>
+                  action="custom_recruitment.action_employee_transfer_request" sequence="16"/>
+                  
         <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
                   action="employee_demotion_action" sequence="18"/>
         <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"
@@ -92,7 +95,8 @@
                   parent="hr.hr_menu_hr_reports" action="action_print_employee_experience_report" sequence="3"/>
         <menuitem id="menu_employee_presence_custom" name="Employee Presence" parent="hr.hr_menu_hr_reports"
                   action="action_employee_presence_reporting" sequence="4"/>
-<menuitem id="menu_employee_category" name="Employee category" parent="hr.menu_human_resources_configuration"  action="employee_category" sequence="17"/>
+        <menuitem id="menu_employee_category" name="Employee category" parent="hr.menu_human_resources_configuration"
+                  action="employee_category" sequence="17"/>
 
         <menuitem id="menu_hr_payroll_structure_view"
                   name="Salary Structures"

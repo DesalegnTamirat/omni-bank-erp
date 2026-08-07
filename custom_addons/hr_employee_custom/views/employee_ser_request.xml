@@ -74,7 +74,7 @@
                             <field name="employee_phone"/>
                         </group>
                         <group invisible="sr_category == 'Self Service Letter'">
-                            
+
                             <field name="acting_suggested_employee"/>
                             <field name="transfer_ou1"/>
                             <field name="transfer_ou2"/>
@@ -83,7 +83,7 @@
                             <field name="end_date"/>
                         </group>
 						<group invisible="letter_name != 'Guarantee Letter'">
-                            
+
                             <field name="name_of_the_external_person"/>
                             <field name="name_of_the_organization"/>
                             <field name="organization_address"/>
@@ -93,7 +93,7 @@
 							<field name="kebele"/>
 							<field name="phone_number"/>
                         </group>
-						<group invisible="letter_name != 'Support Letter'"> 
+						<group invisible="letter_name != 'Support Letter'">
                             <field name="support"/>
                             <field name="organization_name"/>
                             <field name="salary"/>

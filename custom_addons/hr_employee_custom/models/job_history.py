@@ -15,7 +15,7 @@ class job_form_details(models.Model):
     status= fields.Char(string='Status', help="Status")
     salary_details = fields.One2many("salary.detail.changes", 'details_id', string="Salary Details Changes")
     def approve(self):
-        contract_info = self.env["hr.contract"].search([('employee_id', '=', self.employee_name.id)])
+        contract_info = self.env["hr.version"].search([('employee_id', '=', self.employee_name.id)])
 
         vals = {
             "employee_id": self.employee_name.id,

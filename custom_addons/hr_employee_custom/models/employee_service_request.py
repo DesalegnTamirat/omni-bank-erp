@@ -39,7 +39,6 @@ class ServiceRequestEmployee(models.Model):
     sr_type = fields.Many2one("service.request.type", string="Request Type")
 
     sr_category = fields.Selection([
-        ("Acting",              "Acting"),
         ("Transfer",            "Transfer"),
         ("Others",              "Others"),
         ("Resignation",         "Resignation"),
@@ -167,7 +166,7 @@ class ServiceRequestEmployee(models.Model):
                 domain.append(('name', '=', self.letter_name))
             if 'sr_type' in sr_type_model._fields:
                 domain.append(('sr_type', '=', self.letter_name))
-            
+
             search_domain = ['|'] * (len(domain) - 1) + domain if len(domain) > 1 else domain
             sr_type_rec = sr_type_model.search(search_domain, limit=1)
             if not sr_type_rec:
@@ -189,7 +188,7 @@ class ServiceRequestEmployee(models.Model):
                 domain.append(('name', '=', letter_name))
             if 'sr_type' in sr_type_model._fields:
                 domain.append(('sr_type', '=', letter_name))
-            
+
             search_domain = ['|'] * (len(domain) - 1) + domain if len(domain) > 1 else domain
             sr_type_rec = sr_type_model.search(search_domain, limit=1)
             if not sr_type_rec:
@@ -304,15 +303,15 @@ class ServiceRequestEmployee(models.Model):
             'organization_address':        'Organization Address',
         }
         missing = [label for field, label in required.items() if not getattr(self, field)]
-        
+
         email = self.organization_email_address
         pobox_val = self.pobox
-        
+
         if not email and not pobox_val:
             raise ValidationError(
                 _("Either Organization Email Address or P.O. Box must be provided.")
             )
-            
+
         if missing:
             raise ValidationError(
                 _('The following Guarantee Information fields are required:\n• ')
@@ -341,36 +340,36 @@ class ServiceRequestEmployee(models.Model):
     def action_fetch_employee_data(self):
         """Fetch/reload the service request form and refresh employee data"""
         self.ensure_one()
-        
+
         # Refresh the employee information from the current logged-in user
         employee = self.env['hr.employee'].search(
             [('user_id', '=', self.env.uid)], limit=1
         )
-        
+
         if not employee:
             raise UserError(_('No employee record found for the current user.'))
-        
+
         # Update employee-related read-only fields with fresh data
         manager = employee.coach_id.sudo() or employee.parent_id.sudo()
-        
+
         position_id = False
         if hasattr(employee, 'job_id') and employee.job_id:
             position_id = employee.job_id.id
-        
+
         category_name = ''
         if employee.grade_id and employee.grade_id.category:
             category_name = employee.grade_id.category
         elif hasattr(employee, 'contract_id') and employee.contract_id and employee.contract_id.employee_category:
             category_name = employee.contract_id.employee_category.name
-        
+
         grade_id = False
         if employee.grade_id:
             grade_id = employee.grade_id.id
-        
+
         work_unit_name = ''
         if hasattr(employee, 'default_operating_unit_id') and employee.default_operating_unit_id:
             work_unit_name = employee.default_operating_unit_id.name
-        
+
         # Update the record with refreshed employee data
         self.write({
             'employee_manager': manager.name if manager else '',
@@ -382,7 +381,7 @@ class ServiceRequestEmployee(models.Model):
             'employee_mail': employee.work_email or '',
             'employee_phone': employee.work_phone or employee.phone_num or '',
         })
-        
+
         # Reload and return the form view
         return {
             'name': _('Service Request'),
@@ -489,7 +488,7 @@ class ServiceRequestEmployee(models.Model):
             if live_emp and coach and coach.user_id:
                 p = coach.user_id.partner_id
                 manager_partner_id = p.id if p else 0
-        
+
         if manager_partner_id:
             partner_ids.append(manager_partner_id)
 
@@ -505,7 +504,7 @@ class ServiceRequestEmployee(models.Model):
             """
             self.env.cr.execute(user_query)
             target_partner_ids = [row[0] for row in self.env.cr.fetchall() if row[0]]
-            
+
             if target_partner_ids:
                 partner_ids.extend(target_partner_ids)
                 _logger.info("Successfully matched and added %s HR partner accounts directly via relational coach mapping.", len(target_partner_ids))
@@ -545,7 +544,7 @@ class ServiceRequestEmployee(models.Model):
                 existing_guarantee = self.env['guarentees.details'].search([
                     ('service_request_id', '=', self.id)
                 ], limit=1)
-                
+
                 vals = {
                     'employee_id': self.employee_id.id,
                     'ref_num': self.ref_num or self.reference,
@@ -559,7 +558,7 @@ class ServiceRequestEmployee(models.Model):
                     'state': 'active',
                     'service_request_id': self.id,
                 }
-                
+
                 if existing_guarantee:
                     existing_guarantee.write(vals)
                 else:
@@ -608,7 +607,6 @@ class ServiceRequestEmployee(models.Model):
         )
 
         try:
-            # Odoo 17/18/19 way: discuss.channel and _get_or_create_chat
             channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[partner_id])
             channel.message_post(
                 body=body,
@@ -652,7 +650,7 @@ class ServiceRequestEmployee(models.Model):
                     'target': 'new',
                     'context': {'default_request_id': record.id},
                 }
-            
+
             # Normal completion flow for non-Guarantee Letters
             record.write({"status": "completed"})
             if (

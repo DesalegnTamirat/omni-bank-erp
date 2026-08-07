@@ -468,8 +468,8 @@
         </record>
 
         <record id="hr_contract_view_form_hrcustom_ext" model="ir.ui.view">
-            <field name="name">hr.contract.form.hrcustom.ext</field>
-            <field name="model">hr.contract</field>
+            <field name="name">hr.version.form.hrcustom.ext</field>
+            <field name="model">hr.version</field>
             <field name="inherit_id" ref="hr_contract_view_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='employee_id']" position="after">
@@ -1053,16 +1053,13 @@
             </field>
         </record>
 
-        <record id="hr_employee_view_search_contract" model="ir.ui.view">
+        <record id="hr_employee_view_search_contract_v2" model="ir.ui.view">
             <field name="name">hr.employee.view.search.contract</field>
             <field name="model">hr.employee</field>
             <field name="inherit_id" ref="hr.view_employee_filter"/>
             <field name="arch" type="xml">
                 <xpath expr="//filter[@name='message_needaction']" position="after">
                     <separator/>
-                    <filter string="Contract Warning" name="with_contract_warning"
-                            domain="[('contract_warning','=',True)]"
-                            groups="hr_employee_custom.group_hr_contract_manager"/>
                 </xpath>
             </field>
         </record>

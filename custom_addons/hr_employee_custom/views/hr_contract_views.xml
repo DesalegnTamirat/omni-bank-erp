@@ -6,7 +6,7 @@
     ====================================================== -->
     <record id="action_hr_contract_menu" model="ir.actions.act_window">
         <field name="name">Contracts</field>
-        <field name="res_model">hr.contract</field>
+        <field name="res_model">hr.version</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="context">{'search_default_group_by_state': 1}</field>
         <field name="help" type="html">
@@ -21,7 +21,7 @@
     ====================================================== -->
     <record id="act_hr_employee_2_hr_contract" model="ir.actions.act_window">
         <field name="name">Contracts</field>
-        <field name="res_model">hr.contract</field>
+        <field name="res_model">hr.version</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="context">{
             'search_default_employee_id': active_id,
@@ -33,10 +33,9 @@
     <!-- ======================================================
          KANBAN VIEW
     ====================================================== -->
-
     <record id="hr_contract_view_kanban" model="ir.ui.view">
-        <field name="name">hr.contract.kanban</field>
-        <field name="model">hr.contract</field>
+        <field name="name">hr.version.kanban.custom</field>
+        <field name="model">hr.version</field>
         <field name="arch" type="xml">
             <kanban default_group_by="state" class="o_kanban_small_column">
                 <field name="name"/>
@@ -45,8 +44,8 @@
                 <field name="department_id"/>
                 <field name="state"/>
                 <field name="kanban_state"/>
-                <field name="date_start"/>
-                <field name="date_end"/>
+                <field name="contract_date_start"/>
+                <field name="contract_date_end"/>
                 <field name="wage"/>
                 <templates>
                     <t t-name="card">
@@ -90,12 +89,7 @@
         </field>
     </record>
 
-    <!-- ======================================================
-         Bind our Kanban view explicitly to both actions so Odoo
-         doesn't ambiguously fall back to another module's
-         hr.contract Kanban view (e.g. hr_contract.hr_contract_view_kanban)
-         NOTE: these must come AFTER hr_contract_view_kanban is defined above.
-    ====================================================== -->
+    <!-- Bind Kanban explicitly so Odoo doesn't fall back to another module's view -->
     <record id="action_hr_contract_menu_view_kanban" model="ir.actions.act_window.view">
         <field name="sequence">1</field>
         <field name="view_mode">kanban</field>
@@ -114,8 +108,8 @@
          LIST VIEW
     ====================================================== -->
     <record id="hr_contract_view_list" model="ir.ui.view">
-        <field name="name">hr.contract.list</field>
-        <field name="model">hr.contract</field>
+        <field name="name">hr.version.list.custom</field>
+        <field name="model">hr.version</field>
         <field name="arch" type="xml">
             <list string="Employee Contracts"
                   decoration-info="state == 'draft'"
@@ -126,8 +120,8 @@
                 <field name="job_id"/>
                 <field name="department_id"/>
                 <field name="operating_unit_id" optional="show"/>
-                <field name="date_start"/>
-                <field name="date_end" optional="show"/>
+                <field name="contract_date_start" string="Start Date"/>
+                <field name="contract_date_end" string="End Date" optional="show"/>
                 <field name="wage"/>
                 <field name="state"
                        widget="badge"
@@ -141,22 +135,36 @@
         </field>
     </record>
 
+    <!-- Bind List explicitly for the same reason as Kanban above -->
+    <record id="action_hr_contract_menu_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="hr_contract_view_list"/>
+        <field name="act_window_id" ref="action_hr_contract_menu"/>
+    </record>
+
+    <record id="act_hr_employee_2_hr_contract_view_list" model="ir.actions.act_window.view">
+        <field name="sequence">2</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="hr_contract_view_list"/>
+        <field name="act_window_id" ref="act_hr_employee_2_hr_contract"/>
+    </record>
+
     <!-- ======================================================
          SEARCH VIEW
     ====================================================== -->
     <record id="hr_contract_view_search" model="ir.ui.view">
-        <field name="name">hr.contract.search</field>
-        <field name="model">hr.contract</field>
+        <field name="name">hr.version.search.custom</field>
+        <field name="model">hr.version</field>
         <field name="arch" type="xml">
             <search string="Search Contracts">
-
                 <field name="name"/>
                 <field name="employee_id"/>
                 <field name="job_id"/>
                 <field name="department_id"/>
                 <field name="operating_unit_id"/>
-                <field name="date_start"/>
-                <field name="date_end"/>
+                <field name="contract_date_start"/>
+                <field name="contract_date_end"/>
                 <field name="resource_calendar_id"/>
 
                 <filter string="New"       name="new"       domain="[('state','=','draft')]"/>
@@ -181,7 +189,7 @@
                 <filter string="Future Activities"
                         name="activities_upcoming"
                         domain="[('activity_date_deadline','&gt;', context_today())]"/>
-
+                <separator/>
                 <group>
                     <filter string="Status"
                             name="group_by_state"
@@ -202,21 +210,18 @@
                             name="group_category"
                             context="{'group_by':'employee_category'}"/>
                 </group>
-
             </search>
         </field>
     </record>
 
     <!-- ======================================================
-         FORM VIEW — Odoo 14 two-column flat layout
+         FORM VIEW
     ====================================================== -->
     <record id="hr_contract_view_form" model="ir.ui.view">
-        <field name="name">hr.contract.form</field>
-        <field name="model">hr.contract</field>
+        <field name="name">hr.version.form.custom</field>
+        <field name="model">hr.version</field>
         <field name="arch" type="xml">
-
             <form string="Employee Contract">
-
                 <header>
                     <button string="Start Probation"
                             name="action_start_probation"
@@ -247,12 +252,11 @@
                 </header>
 
                 <sheet>
-
                     <div class="oe_button_box" name="button_box"/>
 
                     <widget name="web_ribbon"
                             title="Archived"
-                            bg_color="bg-danger"
+                            bg_color="text-bg-danger"
                             invisible="active"/>
 
                     <div class="oe_title">
@@ -262,10 +266,8 @@
                     </div>
 
                     <group>
-                        <!-- LEFT COLUMN -->
                         <group>
                             <field name="active" invisible="1"/>
-                            <field name="company_country_id" invisible="1"/>
                             <field name="employee_id"/>
                             <field name="job_category"/>
                             <field name="grade_id" readonly="1" invisible="not employee_id"/>
@@ -276,17 +278,15 @@
                             <field name="job_description"/>
                             <field name="job_id"/>
                             <field name="employee_category"/>
-                            <field name="type_id" string="Salary Structure"/>
+                            <field name="type_id" string="Contract Type"/>
                             <field name="operating_unit_id"/>
                             <field name="structure_type_id" string="Salary Structure Type"/>
                             <field name="company_id" groups="base.group_multi_company"/>
                         </group>
-
-                        <!-- RIGHT COLUMN -->
                         <group>
-                            <field name="date_start"/>
+                            <field name="contract_date_start" string="Start Date"/>
                             <field name="first_contract_date"/>
-                            <field name="date_end"/>
+                            <field name="contract_date_end" string="End Date"/>
                             <field name="notice_period"/>
                             <field name="resource_calendar_id"/>
                             <field name="hr_responsible_id"/>
@@ -310,7 +310,6 @@
                         </group>
                     </group>
 
-                    <!-- Accounting / Salary section -->
                     <group string="Accounting">
                         <group>
                             <field name="wage_type"/>
@@ -341,18 +340,26 @@
                 <chatter/>
 
             </form>
-
         </field>
+    </record>
+
+    <!-- Bind Form explicitly — this is the fix for the sparse default form issue -->
+    <record id="action_hr_contract_menu_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">3</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="hr_contract_view_form"/>
+        <field name="act_window_id" ref="action_hr_contract_menu"/>
+    </record>
+
+    <record id="act_hr_employee_2_hr_contract_view_form" model="ir.actions.act_window.view">
+        <field name="sequence">3</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="hr_contract_view_form"/>
+        <field name="act_window_id" ref="act_hr_employee_2_hr_contract"/>
     </record>
 
     <!-- ======================================================
          MENU: Contracts under the "Employees" nav item
-
-         The core hr_contract module is NOT installed/depended on
-         (this module ships its own standalone hr.contract model),
-         so we create a plain local menuitem under the native
-         "Employees" payroll menu (hr.menu_hr_employee_payroll,
-         from the 'hr' module) pointing at our own action.
     ====================================================== -->
     <menuitem id="menu_hr_employee_custom_contracts"
               name="Contracts"
@@ -361,7 +368,7 @@
               sequence="10"/>
 
     <!-- ======================================================
-         MENU: Organizational Chart under the "Employees" nav item
+         MENU: Organizational Chart
     ====================================================== -->
     <menuitem
         id="menu_hr_org_chart_custom"

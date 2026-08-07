@@ -61,7 +61,7 @@ class re_instating_details(models.Model):
                 my_json = {"contract_value": val.value, "contract_start_date": re_instating.date_re_instated,
                            "contract_end_date": val.end_date}
             salary_contract_list.append((0, 0, my_json))
-            contract_info = self.env["hr.contract"].search([('job_grade', '=', self.new_job_grade.id)])
+            contract_info = self.env["hr.version"].search([('job_grade', '=', self.new_job_grade.id)])
             for job_val in contract_info:
                 # if not job_val.contract_multi_id:
                 for val3 in job_val.contract_multi_id:
@@ -79,7 +79,7 @@ class re_instating_details(models.Model):
             "trial_date_end": self.trial_date_end,
             "wage": self.wage,
         }
-        self.env["hr.contract"].create(vals)
+        self.env["hr.version"].create(vals)
         vals1={
             "employee_id":self.employee_name.id,
             "new_job_title":self.new_job_title.id,

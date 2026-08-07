@@ -205,6 +205,25 @@ class hr_job_updated(models.Model):
     survey_id2 = fields.Char(string="Interview Form")
 
 
+sql_constraints = [
+    ('job_name_uniq', 'unique(name)',
+     'A job position with this name already exists! Job names must be unique.'),
+]
+
+
+@api.constrains('name')
+def _check_job_name_unique(self):
+    for job in self:
+        if not job.name:
+            continue
+        if self.env['hr.job'].search_count([
+            ('id', '!=', job.id),
+            ('name', '=', job.name),
+        ]):
+            raise ValidationError(
+                "A job position named '%s' already exists. "
+                "Job position names must be unique." % job.name
+            )
 
 
 class Hr(models.Model):
@@ -277,7 +296,7 @@ class Bank_info(models.Model):
     _name = "bank.info"
     _description = "Bank Info"
     _rec_name = "account_type"
-    employee_id = fields.Many2one('hr.contract', string="Employee Contract",
+    employee_id = fields.Many2one('hr.version', string="Employee Contract",
                                   help='Select corresponding Employee')
     bank_name = fields.Char(string='Bank Name')
     branch_name = fields.Char(string='Branch Name')
@@ -288,7 +307,7 @@ class Bank_info(models.Model):
 
 
 class Hr_contact_Fields(models.Model):
-    _inherit = "hr.contract"
+    _inherit = "hr.version"
     # company_name = fields.Char(string='Company Name',required=True)
 
     job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
@@ -355,7 +374,7 @@ class job_multi_record(models.Model):
     # Restore as _rec_name = "contract_salary_rule" once the payroll module is
     # installed and the field below is uncommented.
     # _rec_name = "contract_salary_rule"
-    contract_salary_id = fields.Many2one('hr.contract', string="Employee Contract",
+    contract_salary_id = fields.Many2one('hr.version', string="Employee Contract",
                                          help='Select corresponding Employee')
     # PAYROLL MODULE NOT INSTALLED — uncomment once a payroll module providing
     # hr.salary.rule (e.g. hr_payroll_community) is installed.
@@ -373,7 +392,7 @@ class hr_salary_breakup(models.Model):
     _rec_name = "pay_elements"
     # employee_contract_new_id = fields.Many2one('hr.contract', string="Employee Contract", help='Select corresponding Employee',
     #                               invisible=1)
-    salary_id = fields.Many2one('hr.contract', string="Employee Contract", help='Select corresponding Employee')
+    salary_id = fields.Many2one('hr.version', string="Employee Contract", help='Select corresponding Employee')
     pay_elements = fields.Char(string='Pay Elements', required=True)
     category = fields.Char(string='Category', required=True)
     value = fields.Char(string='Value', required=True)
@@ -386,7 +405,7 @@ class non_monetary_benefits(models.Model):
     _name = "non_monetary_benefits"
     _description = "Non-Monetary Benefits"
     _rec_name = "period_of_issue"
-    benefits_id = fields.Many2one('hr.contract', string="Employee Contract",
+    benefits_id = fields.Many2one('hr.version', string="Employee Contract",
                                   help='Select corresponding Employee')
     period_of_issue = fields.Char(string='Period of Issue', required=True)
     material_issued = fields.Char(string='Material Issued', required=True)

@@ -27,7 +27,6 @@
         'security/operating_unit_security.xml',
         'security/security_hr_contract.xml',
         'security/ir.model.access.csv',
-        'security/leave_request_security.xml',
         'data/hr_contract_data.xml',
         'views/hr_contract_views.xml',
         'views/hr_contract_history_views.xml',

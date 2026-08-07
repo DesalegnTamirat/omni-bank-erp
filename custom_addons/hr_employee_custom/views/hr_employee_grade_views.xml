@@ -19,6 +19,8 @@
                         <group>
                             <field name="grade_code"/>
                             <field name="grade_name"/>
+                            <field name="grade_level"/>
+
                             <field name="category" can_create="false" can_write="false"/>
                         </group>
                         <group>
@@ -62,6 +64,7 @@
             <list string="Job Grade" delete="false">
                 <field name="grade_code"/>
                 <field name="grade_name"/>
+                <field name="grade_level"/>
                 <field name="category" can_create="false" can_write="false"/>
                 <field name="start_date"/>
                 <field name="end_date"/>

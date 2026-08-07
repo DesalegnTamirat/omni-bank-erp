@@ -13,7 +13,7 @@ class HolidaysRequest(models.Model):
     job_grade = fields.Char(string="Job Grade", required=False)
 
 class HrContract(models.Model):
-    _inherit = 'hr.contract'
+    _inherit = 'hr.version'
 
     approval_status = fields.Selection([
         ('draft', 'Draft'),

@@ -13,7 +13,7 @@ class hr_contract_salary_details(models.Model):
     def propagate_button(self):
         increment_list = []
         # print(self.job_grade.salary_contract_multi_id)
-        contract_info = self.env["hr.contract"].search([('job_grade', '=', self.grade_code)])
+        contract_info = self.env["hr.version"].search([('job_grade', '=', self.grade_code)])
         for increment_val in contract_info:
             for val in self.grade_increment_details:
                 if not val.start_date:
