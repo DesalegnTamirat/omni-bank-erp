@@ -401,3 +401,18 @@
         to { transform: translateX(0); }
     }
 }
+
+/* Hide top-left App Switcher (:::) icon when ERP Access Gate is active & employee is not checked in */
+body.o_gate_active {
+    .o_navbar_apps_menu,
+    .o_home_menu_toggle,
+    .o_menu_toggle,
+    .o_app_switcher_toggle,
+    [title="Apps"],
+    [title="Home Menu"] {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+}
+

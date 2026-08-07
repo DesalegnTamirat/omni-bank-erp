@@ -28,7 +28,7 @@ class CompetencyFramework(models.Model):
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     approval_history_ids = fields.One2many(
-        'competency.approval.history', 'framework_id', string='Approval History')
+        'competency.approval.history', 'framework_id', string='Approval History', copy=False)
 
     _sql_constraints = [
         ('code_version_uniq', 'unique(code, version)',
@@ -84,7 +84,6 @@ class CompetencyFramework(models.Model):
             'approved_by_id': False,
             'approval_date': False,
             'change_description': False,
-            'approval_history_ids': [(5, 0, 0)],
         })
         return {
             'type': 'ir.actions.act_window',

@@ -92,7 +92,7 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <!-- Task 4: vendor proposal (two-envelope registration) -->
+        <!-- Task 4: vendor proposal -->
         <record id="seq_eds_vendor_proposal" model="ir.sequence">
             <field name="name">Vendor Proposal Sequence</field>
             <field name="code">eds.vendor.proposal</field>
@@ -179,6 +179,105 @@
             <field name="code">eds.enrollment</field>
             <field name="prefix">ENR/%(year)s/</field>
             <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 7: session attendance record -->
+        <record id="seq_eds_session_attendance" model="ir.sequence">
+            <field name="name">Session Attendance Sequence</field>
+            <field name="code">eds.session.attendance</field>
+            <field name="prefix">ATT/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 7: training material -->
+        <record id="seq_eds_material" model="ir.sequence">
+            <field name="name">Training Material Sequence</field>
+            <field name="code">eds.material</field>
+            <field name="prefix">MAT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 7: international training -->
+        <record id="seq_eds_international_training" model="ir.sequence">
+            <field name="name">International Training Sequence</field>
+            <field name="code">eds.international.training</field>
+            <field name="prefix">INT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 9: Level 4 Evaluation -->
+        <record id="seq_eds_level4_evaluation" model="ir.sequence">
+            <field name="name">Level 4 Impact Evaluation Sequence</field>
+            <field name="code">eds.level4.evaluation</field>
+            <field name="prefix">LV4/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 10: Completion Certificate -->
+        <record id="seq_eds_certificate" model="ir.sequence">
+            <field name="name">Certificate Sequence</field>
+            <field name="code">eds.certificate</field>
+            <field name="prefix">EDS-CERT-%(year)s-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 11: Budget -->
+        <record id="seq_eds_budget" model="ir.sequence">
+            <field name="name">Budget Sequence</field>
+            <field name="code">eds.budget</field>
+            <field name="prefix">BDG/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 11: Learning Partner -->
+        <record id="seq_eds_learning_partner" model="ir.sequence">
+            <field name="name">Learning Partner Sequence</field>
+            <field name="code">eds.learning.partner</field>
+            <field name="prefix">PTR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 13: Payroll Payload -->
+        <record id="seq_eds_payroll_payload" model="ir.sequence">
+            <field name="name">Payroll Payload Sequence</field>
+            <field name="code">eds.payroll.payload</field>
+            <field name="prefix">PAY/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 14: Sponsorship -->
+        <record id="seq_eds_sponsorship" model="ir.sequence">
+            <field name="name">Sponsorship Sequence</field>
+            <field name="code">eds.sponsorship</field>
+            <field name="prefix">SPO/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 14: Staff Education Assistance -->
+        <record id="seq_eds_education_assistance" model="ir.sequence">
+            <field name="name">Education Assistance Sequence</field>
+            <field name="code">eds.education.assistance</field>
+            <field name="prefix">EDU/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Task 15: Internship Application -->
+        <record id="seq_eds_internship_application" model="ir.sequence">
+            <field name="name">Internship Application Sequence</field>
+            <field name="code">eds.internship.application</field>
+            <field name="prefix">INT-APP/%(year)s/</field>
+            <field name="padding">4</field>
             <field name="company_id" eval="False"/>
         </record>
 

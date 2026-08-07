@@ -104,6 +104,12 @@
                                     groups="employee_development_system.group_eds_officer">
                                 <field name="development_request_count" widget="statinfo" string="Dev Requests"/>
                             </button>
+                            <button name="action_view_materials" type="object"
+                                    class="oe_stat_button" icon="fa-folder-open"
+                                    groups="employee_development_system.group_eds_officer">
+                                <field name="material_count" widget="statinfo" string="Materials"/>
+                                <span class="o_stat_text">Approval gate (FREDS045)</span>
+                            </button>
                         </div>
                         <group>
                             <group string="Course">
@@ -149,6 +155,19 @@
                                     </list>
                                 </field>
                             </page>
+                            <page string="Training Materials (FREDS045)">
+                                <field name="material_ids">
+                                    <list editable="bottom">
+                                        <field name="name" readonly="1"/>
+                                        <field name="title"/>
+                                        <field name="material_type"/>
+                                        <field name="version"/>
+                                        <field name="is_approved" string="Approved"/>
+                                        <field name="quality_state" widget="badge"/>
+                                        <field name="approval_state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
                         </notebook>
                     </sheet>
                     <chatter/>
@@ -167,35 +186,30 @@
                     <field name="state"/>
                     <field name="sla_deadline"/>
                     <field name="assigned_officer_id"/>
-                    <field name="competency_gap_ids"/>
-                    <t t-call="kanban-box">
-                        <div class="o_kanban_record_top mb16">
-                            <div class="o_kanban_record_title">
-                                <strong t-esc="record.name.raw_value"/>
+                    <field name="sla_breached"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="o_kanban_record_top mb16">
+                                <div class="o_kanban_record_title">
+                                    <strong><field name="name"/></strong>
+                                </div>
+                                <span t-if="record.state.raw_value == 'done'"
+                                      class="o_kanban_record_badge badge text-bg-success">Done</span>
+                                <span t-elif="record.state.raw_value == 'approved'"
+                                      class="o_kanban_record_badge badge text-bg-info">Approved</span>
+                                <span t-elif="record.state.raw_value == 'submitted'"
+                                      class="o_kanban_record_badge badge text-bg-warning">Submitted</span>
+                                <span t-elif="record.state.raw_value == 'in_development'"
+                                      class="o_kanban_record_badge badge text-bg-primary">In Development</span>
+                                <span t-else="" class="o_kanban_record_badge badge text-bg-secondary">Draft</span>
                             </div>
-                            <span t-if="record.state.raw_value == 'done'"
-                                  class="o_kanban_record_badge badge text-bg-success">Done</span>
-                            <span t-elif="record.state.raw_value == 'approved'"
-                                  class="o_kanban_record_badge badge text-bg-info">Approved</span>
-                            <span t-elif="record.state.raw_value == 'submitted'"
-                                  class="o_kanban_record_badge badge text-bg-warning">Submitted</span>
-                            <span t-elif="record.state.raw_value == 'in_development'"
-                                  class="o_kanban_record_badge badge text-bg-primary">In Development</span>
-                            <span t-else="" class="o_kanban_record_badge badge text-bg-secondary">Draft</span>
-                        </div>
-                        <div class="mb8">
-                            <t t-foreach="record.competency_gap_ids.raw_value" t-as="gap">
-                                <span class="badge text-bg-light" t-esc="gap.display_name"/>
-                            </t>
-                        </div>
-                        <div class="text-muted">
-                            SLA Deadline: <span t-esc="record.sla_deadline.value or 'N/A'"/>
-                            <t t-if="record.sla_breached.raw_value">
-                                <span class="badge text-bg-danger">SLA Breached</span>
-                            </t>
-                        </div>
-                        <div class="text-muted">Assigned: <t t-esc="record.assigned_officer_id.value"/></div>
-                    </t>
+                            <div class="text-muted">
+                                SLA: <t t-esc="record.sla_deadline.value or 'N/A'"/>
+                                <span t-if="record.sla_breached.raw_value" class="badge text-bg-danger ms-1">SLA Breached</span>
+                            </div>
+                            <div class="text-muted">Assigned: <t t-esc="record.assigned_officer_id.value"/></div>
+                        </t>
+                    </templates>
                 </kanban>
             </field>
         </record>

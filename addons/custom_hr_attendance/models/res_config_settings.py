@@ -53,12 +53,12 @@ class ResConfigSettings(models.TransientModel):
              "Roll out branch-by-branch after load testing."
     )
 
-    # Target HR User for Escalation 
+    # Target HR User for Escalation
     escalation_hr_user_id = fields.Many2one(
         'res.users',
         string='HR Escalation Target User',
         config_parameter="hr_attendance.escalation_hr_user_id",
-        help="FR-ATT-029: User account to receive HR escalation activities when attendance violation thresholds are breached."
+        help="User account to receive HR escalation activities when attendance violation thresholds are breached."
     )
 
     #  Pluggable Authentication Method Framework
@@ -68,8 +68,7 @@ class ResConfigSettings(models.TransientModel):
         ('qr', 'Branch Kiosk QR Code'),
     ], string='Check-in Authentication Method', default='session',
         config_parameter="hr_attendance.checkin_auth_method",
-        help="FR-ATT-034: Configurable authentication method required before check-in is recorded.")
-
+        help="Configurable authentication method required before check-in is recorded.")
 
     # ----------------------------------------------------------
     # ATTENDANCE TIME SETTINGS
@@ -160,7 +159,11 @@ class ResConfigSettings(models.TransientModel):
             val = params.get_param(key)
             if val is False or val is None:
                 return default
-            return val.lower() in ('true', '1', 'yes')
+            return val.lower() in (
+                "true",
+                "1",
+                "yes",
+            )  # returns True if one of the three if not returns false
 
         res.update(
             # Feature toggles
@@ -202,5 +205,3 @@ class ResConfigSettings(models.TransientModel):
         params.set_param('hr_attendance.enable_auto_absence', str(self.enable_auto_absence))
         params.set_param('hr_attendance.enable_ip_tracking', str(self.enable_ip_tracking))
         params.set_param('hr_attendance.enable_checkin_gate', str(self.enable_checkin_gate))
-
-

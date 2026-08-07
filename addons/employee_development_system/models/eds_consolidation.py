@@ -146,7 +146,7 @@ class EdsTnaConsolidation(models.Model):
         string='Weighted Priority Score', compute='_compute_priority_score', store=True)
     approval_deadline = fields.Date(
         string='Approval Deadline', related='cycle_id.approval_deadline', store=True)
-    days_to_deadline = fields.Integer(string='Days to Deadline', compute='_compute_days_to_deadline')
+    days_to_deadline = fields.Integer(string='Days to Deadline', compute='_compute_days_to_deadline', store=True)
     deadline_breached = fields.Boolean(
         string='Deadline Breached', compute='_compute_days_to_deadline', store=True, tracking=True)
 

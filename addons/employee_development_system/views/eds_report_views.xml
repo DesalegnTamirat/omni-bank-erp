@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Bank-wide TNA Summary Report View -->
+    <record id="view_eds_report_tna_tree" model="ir.ui.view">
+        <field name="name">eds.report.tna.tree</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <list string="Bank-wide TNA Summary Report" create="false" edit="false">
+                <field name="cycle_id"/>
+                <field name="work_unit_id"/>
+                <field name="competency_id"/>
+                <field name="gap_severity" widget="badge"/>
+                <field name="delivery_mode"/>
+                <field name="total_entries" sum="Total Needs"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_report_tna" model="ir.actions.act_window">
+        <field name="name">Bank-wide TNA Summary Report</field>
+        <field name="res_model">eds.report.tna</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Annual Plan Variance Report View -->
+    <record id="view_eds_report_annual_plan_tree" model="ir.ui.view">
+        <field name="name">eds.report.annual.plan.tree</field>
+        <field name="model">eds.report.annual.plan</field>
+        <field name="arch" type="xml">
+            <list string="Annual L&amp;D Plan Variance Report" create="false" edit="false">
+                <field name="annual_plan_id"/>
+                <field name="course_id"/>
+                <field name="scheduled_month"/>
+                <field name="budget_allocated"/>
+                <field name="status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_report_annual_plan" model="ir.actions.act_window">
+        <field name="name">Annual L&amp;D Plan Variance Report</field>
+        <field name="res_model">eds.report.annual.plan</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Training Delivery & Attendance Report View -->
+    <record id="view_eds_report_delivery_tree" model="ir.ui.view">
+        <field name="name">eds.report.delivery.tree</field>
+        <field name="model">eds.report.delivery</field>
+        <field name="arch" type="xml">
+            <list string="Training Delivery &amp; Attendance Report" create="false" edit="false">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="employee_id"/>
+                <field name="attended" widget="boolean_toggle"/>
+                <field name="attendance_percentage" widget="progressbar"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_report_delivery" model="ir.actions.act_window">
+        <field name="name">Training Delivery &amp; Attendance Report</field>
+        <field name="res_model">eds.report.delivery</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Consolidated L1-L4 Evaluation Report View -->
+    <record id="view_eds_report_evaluation_tree" model="ir.ui.view">
+        <field name="name">eds.report.evaluation.tree</field>
+        <field name="model">eds.report.evaluation</field>
+        <field name="arch" type="xml">
+            <list string="Consolidated L1-L4 Evaluation Report" create="false" edit="false">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="employee_id"/>
+                <field name="l1_score" widget="progressbar"/>
+                <field name="l2_post_score" widget="progressbar"/>
+                <field name="l2_passed" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_report_evaluation" model="ir.actions.act_window">
+        <field name="name">Consolidated L1-L4 Evaluation Report</field>
+        <field name="res_model">eds.report.evaluation</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Employee Learning & Certification Transcript View -->
+    <record id="view_eds_report_transcript_tree" model="ir.ui.view">
+        <field name="name">eds.report.transcript.tree</field>
+        <field name="model">eds.report.transcript</field>
+        <field name="arch" type="xml">
+            <list string="Employee Learning &amp; Certification Transcript" create="false" edit="false">
+                <field name="employee_id"/>
+                <field name="course_id"/>
+                <field name="session_id"/>
+                <field name="completion_date"/>
+                <field name="certificate_code"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_report_transcript" model="ir.actions.act_window">
+        <field name="name">Employee Learning Transcripts</field>
+        <field name="res_model">eds.report.transcript</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

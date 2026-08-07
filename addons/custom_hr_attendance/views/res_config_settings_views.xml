@@ -54,31 +54,31 @@
                             <setting string="Morning Check-in Time"
                                      help="The standard morning check-in time (24h format)"
                                      invisible="not enable_checkin_restriction">
-                                <field name="morning_time"/>
+                                <field name="morning_time" widget="float_time"/>
                             </setting>
                             <setting string="Check-in Buffer (Hours)"
                                      help="How early (in hours) employees are allowed to check in before shift start"
                                      invisible="not enable_checkin_restriction">
-                                <field name="checkin_buffer"/>
+                                <field name="checkin_buffer" widget="float_time" />
                             </setting>
                             <setting string="Dead Time (Grace Period, Hours)"
                                      help="Grace period in hours around check-in/out times before marking as late"
                                      invisible="not enable_checkin_restriction">
-                                <field name="dead_time"/>
+                                <field name="dead_time" widget="float_time" />
                             </setting>
                             <setting string="Exit Time"
                                      help="The standard exit/check-out time (24h format)"
                                      invisible="not enable_checkout_restriction">
-                                <field name="exit_time"/>
+                                <field name="exit_time" widget="float_time" />
                             </setting>
                             <setting string="Saturday Head Office Exit Time"
                                      help="Default exit time on Saturdays for Head Office staff (e.g., 14.75 for 2:45 PM)"
                                      invisible="not enable_saturday_halfday">
-                                <field name="saturday_exit_time"/>
+                                <field name="saturday_exit_time" widget="float_time" />
                             </setting>
                             <setting string="Force Checkout Threshold (Hours)"
                                      help="Hours after check-in before automatic force checkout is performed">
-                                <field name="force_checkout_hours"/>
+                                <field name="force_checkout_hours" widget="float_time" />
                             </setting>
                         </block>
 
@@ -89,15 +89,15 @@
                                invisible="not enable_lunch_break">
                             <setting string="Lunch Break Start Time"
                                      help="Time when lunch break starts (24h format, e.g., 12.00 for noon)">
-                                <field name="lunch_out_time"/>
+                                <field name="lunch_out_time" widget="float_time" />
                             </setting>
                             <setting string="Lunch Break Duration (Hours)"
                                      help="Duration of the lunch break (e.g., 1.0 = 1 hour, 0.5 = 30 minutes)">
-                                <field name="lunch_duration"/>
+                                <field name="lunch_duration" widget="float_time" />
                             </setting>
                             <setting string="Lunch Grace Time (Hours)"
                                      help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)">
-                                <field name="lunch_grace_time"/>
+                                <field name="lunch_grace_time" widget="float_time" />
                             </setting>
                         </block>
 

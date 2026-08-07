@@ -2,10 +2,10 @@ from odoo import models, fields, tools
 
 
 class AttendancepreApprovalReport(models.Model):
-    _name = 'attendance.preapproval.report'
-    _description = 'PreDefined Attendance Report'
+    _name = "attendance.preapproval.report"
+    _description = "PreDefined Attendance Report"
     _auto = False
-    _order = 'date desc'
+    _order = "date desc"
 
     employee_id = fields.Many2one("hr.employee", string="Employee", readonly=True)
     employee_identification = fields.Char(string="Employee ID", readonly=True)
@@ -22,7 +22,6 @@ class AttendancepreApprovalReport(models.Model):
     approved_by = fields.Char(string="Approved By", readonly=True)
 
     def init(self):
-        self.env.cr.execute(f"DROP TABLE IF EXISTS {self._table} CASCADE;")
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW attendance_preapproval_report AS (
@@ -46,11 +45,11 @@ class AttendancepreApprovalReport(models.Model):
                     pa.start_time AS start_time,
                     pa.end_time AS end_time,
                     COALESCE(pa.state, '') AS status,
-                    COALESCE(usr.name::text, '') AS approved_by
+                    COALESCE(part.name::text, '') AS approved_by
                 FROM attendance_preapproval pa
                 JOIN hr_employee emp ON pa.employee_id = emp.id
                 LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
                 LEFT JOIN res_users usr ON pa.approved_by = usr.id
+                LEFT JOIN res_partner part ON usr.partner_id = part.id
             )
         """)
-

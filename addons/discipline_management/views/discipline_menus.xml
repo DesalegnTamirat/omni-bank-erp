@@ -5,7 +5,7 @@
         <!-- Root Menu -->
         <menuitem id="menu_discipline_root"
                   name="Discipline Management"
-                  web_icon="discipline_management,static/description/icon.png"
+                  web_icon="discipline_management,static/description/icon.svg"
                   groups="discipline_management.group_discipline_user"
                   sequence="75"/>
 

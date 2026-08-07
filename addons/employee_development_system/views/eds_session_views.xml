@@ -293,6 +293,13 @@
                                     <span class="o_stat_text">of capacity <field name="capacity"/> (waitlist <field name="waitlist_count"/>)</span>
                                 </div>
                             </button>
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_attendance" icon="fa-check-square-o">
+                                <div class="o_stat_info">
+                                    <field name="attendance_count" widget="statinfo" string="Attendance"/>
+                                    <span class="o_stat_text">Session rate <field name="attendance_rate"/>%</span>
+                                </div>
+                            </button>
                         </div>
                         <group>
                             <group string="Program">
@@ -350,6 +357,43 @@
                                         <field name="waitlisted"/>
                                         <field name="employee_confirmed" widget="badge"/>
                                         <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Attendance" name="attendance"
+                                  invisible="status not in ('ongoing','completed')">
+                                <field name="attendance_ids">
+                                    <list editable="bottom">
+                                        <field name="name" readonly="1"/>
+                                        <field name="employee_id"/>
+                                        <field name="attendance_date"/>
+                                        <field name="attended"/>
+                                        <field name="hours_attended"/>
+                                        <field name="notes"/>
+                                        <field name="attendance_percentage" string="Program %"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Daily Feedback" name="feedback">
+                                <field name="feedback_ids">
+                                    <list editable="bottom">
+                                        <field name="employee_id"/>
+                                        <field name="feedback_date"/>
+                                        <field name="day_number"/>
+                                        <field name="rating" widget="badge"/>
+                                        <field name="topic"/>
+                                        <field name="comment"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Assessments" name="assessments">
+                                <field name="assessment_ids">
+                                    <list editable="bottom">
+                                        <field name="employee_id"/>
+                                        <field name="assessment_type"/>
+                                        <field name="score"/>
+                                        <field name="passed"/>
+                                        <field name="assessment_date"/>
                                     </list>
                                 </field>
                             </page>

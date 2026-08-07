@@ -145,7 +145,7 @@ class EdsTrainer(models.Model):
         if competency_ids:
             comp_ids = [c.id for c in competency_ids] if not isinstance(competency_ids, (list, tuple)) \
                 else list(competency_ids)
-            trainers = trainers.filtered(lambda t: comp_ids and bool(t.competency_ids & comp_ids))
+            trainers = trainers.filtered(lambda t: comp_ids and bool(set(t.competency_ids.ids) & set(comp_ids)))
         if date_start and date_end:
             for t in trainers:
                 for slot in t.availability_ids.filtered(lambda a: a.state == 'blocked'):

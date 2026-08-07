@@ -9,6 +9,15 @@ from . import eds_provider
 from . import eds_procurement
 from . import eds_annual_plan
 from . import eds_session
+from . import eds_delivery
 from . import eds_nomination
 from . import eds_unscheduled
+from . import eds_evaluation
+from . import eds_certificate
+from . import eds_budget
+from . import eds_integration
+from . import eds_sponsorship
+from . import eds_education
+from . import eds_internship
+from . import eds_reporting
 from . import hr_employee

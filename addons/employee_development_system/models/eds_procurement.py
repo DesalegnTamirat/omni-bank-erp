@@ -116,7 +116,7 @@ class EdsRfp(models.Model):
     min_providers = fields.Integer(
         string='Minimum Providers', compute='_compute_min_providers', store=True,
         help='Configurable minimum number of qualified providers to issue to (default >= 3, FREDS030).')
-    min_providers_met = fields.Boolean(string='Minimum Providers Met', compute='_compute_min_providers')
+    min_providers_met = fields.Boolean(string='Minimum Providers Met', compute='_compute_min_providers', store=True)
     provider_ids = fields.Many2many(
         'eds.external.provider', 'eds_rfp_provider_rel', 'rfp_id', 'provider_id',
         string='Qualified Providers',

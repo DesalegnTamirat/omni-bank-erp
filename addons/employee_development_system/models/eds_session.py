@@ -251,6 +251,24 @@ class EdsSession(models.Model):
     booking_ids = fields.One2many('eds.venue.booking', 'session_id', string='Venue Bookings')
     booking_id = fields.Many2one('eds.venue.booking', string='Current Booking',
                                  compute='_compute_booking_id')
+
+    # ── Task 7: attendance & delivery tracking (FREDS040/041/045) ─────────────
+    attendance_ids = fields.One2many(
+        'eds.session.attendance', 'session_id', string='Attendance Records')
+    attendance_count = fields.Integer(string='Attendance', compute='_compute_delivery_counts')
+    attendance_rate = fields.Float(
+        string='Session Attendance %', compute='_compute_attendance_rate', store=True,
+        digits=(5, 2),
+        help='Attended / recorded participants for this session (FREDS040).')
+    feedback_ids = fields.One2many('eds.feedback', 'session_id', string='Daily Feedback')
+    feedback_count = fields.Integer(string='Feedback', compute='_compute_delivery_counts')
+    assessment_ids = fields.One2many('eds.assessment', 'session_id', string='Assessments')
+    assessment_count = fields.Integer(string='Assessment Count', compute='_compute_delivery_counts')
+    international_training_ids = fields.One2many(
+        'eds.international.training', 'session_id', string='International Training')
+    international_training_count = fields.Integer(
+        string='International Training Count', compute='_compute_delivery_counts')
+
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
@@ -302,6 +320,24 @@ class EdsSession(models.Model):
     def _compute_nomination_count(self):
         for rec in self:
             rec.nomination_count = len(rec.nomination_ids)
+
+    @api.depends('attendance_ids', 'feedback_ids', 'assessment_ids',
+                 'international_training_ids')
+    def _compute_delivery_counts(self):
+        for rec in self:
+            rec.attendance_count = len(rec.attendance_ids)
+            rec.feedback_count = len(rec.feedback_ids)
+            rec.assessment_count = len(rec.assessment_ids)
+            rec.international_training_count = len(rec.international_training_ids)
+
+    @api.depends('attendance_ids', 'attendance_ids.attended')
+    def _compute_attendance_rate(self):
+        """Session-level attendance % (FREDS040)."""
+        for rec in self:
+            total = len(rec.attendance_ids)
+            rec.attendance_rate = (
+                round(len(rec.attendance_ids.filtered('attended')) * 100.0 / total, 2)
+                if total else 0.0)
 
     @api.model
     def _get_int_param(self, key, default):
@@ -452,13 +488,14 @@ class EdsSession(models.Model):
 
     # ── Session workflow (FREDS024/FR-EDS-022) ──────────────────────────────
     def action_confirm(self):
-        """Draft -> Scheduled: validate conflicts and request the venue booking."""
+        """Draft -> Scheduled: validate conflicts + material gate and book the venue."""
         for rec in self:
             if rec.status != 'draft':
                 raise UserError(_('Only draft sessions can be confirmed.'))
             if not rec.course_id and not rec.program_name:
                 raise UserError(_('Link the session to a training program first.'))
             rec._check_session_conflicts()
+            rec._check_material_approval()
             rec.status = 'scheduled'
             if rec.venue_id and not rec.booking_id:
                 self.env['eds.venue.booking'].create({
@@ -471,20 +508,34 @@ class EdsSession(models.Model):
             rec.message_post(body=_('Session %s confirmed and scheduled (FREDS024).') % rec.name)
 
     def action_start(self):
-        """Scheduled -> Ongoing: delivery has begun (attendance in Task 7)."""
+        """Scheduled -> Ongoing: delivery has begun.
+
+        Attendance records are auto-created for every enrolled participant so the
+        trainer only marks who attended (FREDS040).
+        """
         for rec in self:
             if rec.status != 'scheduled':
                 raise UserError(_('Only scheduled sessions can be started.'))
             rec.status = 'ongoing'
-            rec.message_post(body=_('Session %s started.') % rec.name)
+            rec._ensure_attendance_records()
+            rec.message_post(body=_('Session %s started - attendance sheet opened for the '
+                                    'trainer (FREDS040).') % rec.name)
 
     def action_complete(self):
-        """Ongoing -> Completed: delivery finished (feeds attendance/certification tasks)."""
+        """Ongoing -> Completed: delivery finished.
+
+        Posts the attendance summary; per-program attendance % and the 80% rule
+        are computed on the attendance records (Task 10 certification reads them).
+        """
         for rec in self:
             if rec.status != 'ongoing':
                 raise UserError(_('Only ongoing sessions can be completed.'))
             rec.status = 'completed'
-            rec.message_post(body=_('Session %s completed (FREDS025).') % rec.name)
+            present = len(rec.attendance_ids.filtered('attended'))
+            total = len(rec.attendance_ids)
+            rec.message_post(
+                body=_('Session %s completed (FREDS025) - attendance %d/%d recorded '
+                       '(FREDS040).') % (rec.name, present, total))
 
     def action_reschedule(self):
         """Scheduled/Ongoing -> Rescheduled: allow date edits, then confirm again (FR-EDS-022)."""
@@ -498,13 +549,14 @@ class EdsSession(models.Model):
                                      % rec.name)
 
     def action_confirm_reschedule(self):
-        """Rescheduled -> Scheduled: re-validate conflicts and re-book the venue."""
+        """Rescheduled -> Scheduled: re-validate conflicts + material gate, re-book."""
         for rec in self:
             if rec.status != 'rescheduled':
                 raise UserError(_('Only rescheduled sessions can be confirmed again.'))
             if not rec.date_start or not rec.date_end:
                 raise UserError(_('Set the new session dates before confirming the reschedule.'))
             rec._check_session_conflicts()
+            rec._check_material_approval()
             rec.status = 'scheduled'
             if rec.venue_id and not rec.booking_id:
                 self.env['eds.venue.booking'].create({
@@ -573,6 +625,76 @@ class EdsSession(models.Model):
             'name': _('Enrollments'),
             'type': 'ir.actions.act_window',
             'res_model': 'eds.enrollment',
+            'view_mode': 'list,form',
+            'domain': [('session_id', '=', self.id)],
+            'context': {'default_session_id': self.id},
+        }
+
+    # ── Task 7: attendance & delivery helpers (FREDS040/041/045) ─────────────
+    def _check_material_approval(self):
+        """FREDS045: a session whose course has materials cannot be confirmed until
+        at least one material version is approved (quality + Director PPDD)."""
+        self.ensure_one()
+        if not self.course_id or not self.course_id.material_ids:
+            return
+        if not self.course_id.material_ids.filtered('is_approved'):
+            raise UserError(_(
+                'Training materials must be approved before the schedule is confirmed '
+                '(FREDS045). Approve the materials on training program %s first.')
+                % self.course_id.name)
+
+    def _ensure_attendance_records(self):
+        """Auto-create the attendance sheet for all enrolled participants (FREDS040)."""
+        self.ensure_one()
+        existing = self.attendance_ids.mapped('employee_id')
+        enrolled = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled')
+        for enrollment in enrolled:
+            if enrollment.employee_id not in existing:
+                self.env['eds.session.attendance'].create({
+                    'session_id': self.id,
+                    'employee_id': enrollment.employee_id.id,
+                    'attended': True,
+                })
+
+    def action_view_attendance(self):
+        self.ensure_one()
+        return {
+            'name': _('Attendance'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.session.attendance',
+            'view_mode': 'list,form',
+            'domain': [('session_id', '=', self.id)],
+            'context': {'default_session_id': self.id},
+        }
+
+    def action_view_feedback(self):
+        self.ensure_one()
+        return {
+            'name': _('Daily Feedback'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.feedback',
+            'view_mode': 'list,form',
+            'domain': [('session_id', '=', self.id)],
+            'context': {'default_session_id': self.id},
+        }
+
+    def action_view_assessments(self):
+        self.ensure_one()
+        return {
+            'name': _('Pre/Post Assessments'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.assessment',
+            'view_mode': 'list,form',
+            'domain': [('session_id', '=', self.id)],
+            'context': {'default_session_id': self.id},
+        }
+
+    def action_view_international_training(self):
+        self.ensure_one()
+        return {
+            'name': _('International Training'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.international.training',
             'view_mode': 'list,form',
             'domain': [('session_id', '=', self.id)],
             'context': {'default_session_id': self.id},

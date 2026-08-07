@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_eds_certificate_document">
+        <t t-call="web.basic_layout">
+            <t t-foreach="docs" t-as="o">
+                <div class="page" style="border: 10px double #003366; padding: 40px; text-align: center; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                    <div style="margin-bottom: 20px;">
+                        <h2 style="color: #003366; font-size: 28px; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
+                        <h4 style="color: #666; font-size: 16px; margin-top: 0;">Human Capital &amp; Learning Center</h4>
+                    </div>
+                    
+                    <div style="margin-top: 40px; margin-bottom: 30px;">
+                        <h1 style="font-size: 36px; color: #b8860b; font-family: 'Georgia', serif; font-style: italic;">Certificate of Completion</h1>
+                    </div>
+
+                    <p style="font-size: 16px; color: #444;">This is to certify that</p>
+                    
+                    <h2 style="font-size: 26px; color: #003366; text-decoration: underline; margin: 20px 0;">
+                        <span t-field="o.employee_id.name"/>
+                    </h2>
+
+                    <p style="font-size: 16px; color: #444;">has successfully completed the classroom training program on</p>
+
+                    <h3 style="font-size: 22px; color: #222; margin: 15px 0;">
+                        <span t-field="o.course_id.name"/>
+                    </h3>
+
+                    <p style="font-size: 14px; color: #666; margin-top: 20px;">
+                        Issued on <span t-field="o.issue_date"/> | Certificate No: <strong><span t-field="o.code"/></strong>
+                    </p>
+
+                    <div style="margin-top: 60px; width: 100%;">
+                        <div style="float: left; width: 45%; text-align: center;">
+                            <div style="border-bottom: 1px solid #333; width: 80%; margin: 0 auto; height: 40px;"></div>
+                            <p style="font-size: 12px; margin-top: 5px; font-weight: bold;">L&amp;D Manager / Instructor</p>
+                        </div>
+                        <div style="float: right; width: 45%; text-align: center;">
+                            <div style="border-bottom: 1px solid #333; width: 80%; margin: 0 auto; height: 40px;"></div>
+                            <p style="font-size: 12px; margin-top: 5px; font-weight: bold;">Director, Human Capital</p>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

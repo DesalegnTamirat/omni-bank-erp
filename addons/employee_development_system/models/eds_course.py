@@ -58,6 +58,10 @@ class EdsCourse(models.Model):
         string='Development Requests', compute='_compute_counts')
     curriculum_count = fields.Integer(string='Curriculums', compute='_compute_counts')
 
+    # Task 7: training materials with approval gate (FREDS045)
+    material_ids = fields.One2many('eds.material', 'course_id', string='Training Materials')
+    material_count = fields.Integer(string='Materials', compute='_compute_counts')
+
     # ── Training delivery sourcing recommendation (FREDS027) ─────────────────
     recommended_source = fields.Selection([
         ('internal', 'Internal Delivery'),
@@ -117,11 +121,23 @@ class EdsCourse(models.Model):
             approved = rec.curriculum_ids.filtered(lambda c: c.state == 'approved')
             rec.current_curriculum_id = approved.sorted('id', reverse=True).ids[0] if approved else False
 
-    @api.depends('curriculum_ids', 'development_request_ids')
+    @api.depends('curriculum_ids', 'development_request_ids', 'material_ids')
     def _compute_counts(self):
         for rec in self:
             rec.curriculum_count = len(rec.curriculum_ids)
             rec.development_request_count = len(rec.development_request_ids)
+            rec.material_count = len(rec.material_ids)
+
+    def action_view_materials(self):
+        self.ensure_one()
+        return {
+            'name': _('Training Materials'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.material',
+            'view_mode': 'list,form',
+            'domain': [('course_id', '=', self.id)],
+            'context': {'default_course_id': self.id},
+        }
 
     @api.model_create_multi
     def create(self, vals_list):

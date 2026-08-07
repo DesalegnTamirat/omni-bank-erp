@@ -45,7 +45,7 @@ class EdsExternalProvider(models.Model):
     @api.depends('performance_history_ids.rating')
     def _compute_rating(self):
         for rec in self:
-            ratings = [r.rating for r in rec.performance_history_ids if r.rating]
+            ratings = [float(r.rating) for r in rec.performance_history_ids if r.rating]
             rec.rating = round(sum(ratings) / len(ratings), 2) if ratings else 0.0
             rec.rating_count = len(ratings)
 
