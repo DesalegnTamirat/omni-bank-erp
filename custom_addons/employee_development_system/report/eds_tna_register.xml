@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="action_report_tna_register" model="ir.actions.report">
+            <field name="name">Bank-wide TNA Register</field>
+            <field name="model">eds.tna.cycle</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">employee_development_system.report_tna_register</field>
+            <field name="report_file">employee_development_system.report_tna_register</field>
+            <field name="binding_model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <template id="report_tna_register">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="cycle">
+                    <t t-call="web.external_layout">
+                        <div class="page">
+                            <div class="row">
+                                <div class="col-12">
+                                    <h2 class="text-center mb-0">Bank-Wide Training Needs Register</h2>
+                                    <h5 class="text-center" t-esc="'TNA Cycle: %s (%s)' % (cycle.name, cycle.year)"/>
+                                </div>
+                            </div>
+                            <div class="row mt16 mb16">
+                                <div class="col-4"><strong>Cycle Start:</strong> <span t-field="cycle.start_date"/></div>
+                                <div class="col-4"><strong>Submission End:</strong> <span t-field="cycle.submission_end_date"/></div>
+                                <div class="col-4"><strong>Approval Deadline:</strong> <span t-field="cycle.approval_deadline"/></div>
+                            </div>
+
+                            <t t-set="units" t-value="cycle.entry_ids.mapped('work_unit_id')"/>
+                            <t t-foreach="units" t-as="unit">
+                                <t t-set="unit_entries"
+                                   t-value="cycle.entry_ids.filtered(lambda e: e.work_unit_id == unit)"/>
+                                <h5 t-esc="unit.name or 'No Work Unit'"/>
+                                <table class="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Ref</th>
+                                            <th>Employee</th>
+                                            <th>Competency</th>
+                                            <th>Source</th>
+                                            <th>Delivery</th>
+                                            <th>Priority</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="unit_entries.sorted(key=lambda e: e.priority_score, reverse=True)" t-as="entry">
+                                            <tr>
+                                                <td t-esc="entry.name"/>
+                                                <td t-esc="entry.employee_id.name or ''"/>
+                                                <td t-esc="entry.competency_id.name or ''"/>
+                                                <td t-esc="entry.source"/>
+                                                <td t-esc="entry.delivery_mode"/>
+                                                <td t-esc="entry.priority_score"/>
+                                                <td t-esc="entry.state"/>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </t>
+
+                            <div class="row mt32">
+                                <div class="col-6">
+                                    <strong>Prepared By:</strong> <span t-field="cycle.write_uid"/>
+                                </div>
+                                <div class="col-6 text-right">
+                                    <strong>Generated:</strong> <span t-esc="datetime.date.today()"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+    </data>
+</odoo>

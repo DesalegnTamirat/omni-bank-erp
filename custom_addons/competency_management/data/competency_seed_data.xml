@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Default 4-point rating model (FR-COM-012) -->
+        <record id="rating_model_4_scale" model="competency.rating.model">
+            <field name="name">4-Point Proficiency Scale</field>
+            <field name="code">4SCALE</field>
+            <field name="max_rating">4</field>
+            <field name="description">Basic / Intermediate / Advanced / Expert rating scale with behavioral anchors.</field>
+        </record>
+
+        <!-- Core Competencies (5) — BRD Module 12 (execution mastery, professional authenticity,
+             ethical influence, collaboration, creativity) -->
+        <record id="comp_core_execution_mastery" model="competency.competency">
+            <field name="name">Execution Mastery</field>
+            <field name="code">CORE-01</field>
+            <field name="pillar">core</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_core_professional_authenticity" model="competency.competency">
+            <field name="name">Professional Authenticity</field>
+            <field name="code">CORE-02</field>
+            <field name="pillar">core</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_core_ethical_influence" model="competency.competency">
+            <field name="name">Ethical Influence</field>
+            <field name="code">CORE-03</field>
+            <field name="pillar">core</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_core_collaboration" model="competency.competency">
+            <field name="name">Collaboration</field>
+            <field name="code">CORE-04</field>
+            <field name="pillar">core</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_core_creativity" model="competency.competency">
+            <field name="name">Creativity</field>
+            <field name="code">CORE-05</field>
+            <field name="pillar">core</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+
+        <!-- Leadership Competencies (6) — BRD Module 12 -->
+        <record id="comp_lead_strategy_management" model="competency.competency">
+            <field name="name">Strategy Management</field>
+            <field name="code">LEAD-01</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_lead_continuous_improvement" model="competency.competency">
+            <field name="name">Continuous Improvement</field>
+            <field name="code">LEAD-02</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_lead_prudential_decision" model="competency.competency">
+            <field name="name">Prudential Decision Making</field>
+            <field name="code">LEAD-03</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_lead_self_leadership" model="competency.competency">
+            <field name="name">Self-Leadership</field>
+            <field name="code">LEAD-04</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_lead_people_leadership" model="competency.competency">
+            <field name="name">People Leadership</field>
+            <field name="code">LEAD-05</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+        <record id="comp_lead_ambidextrous_leadership" model="competency.competency">
+            <field name="name">Ambidextrous Leadership</field>
+            <field name="code">LEAD-06</field>
+            <field name="pillar">leadership</field>
+            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
+            <field name="is_seed">True</field>
+        </record>
+
+    </data>
+</odoo>

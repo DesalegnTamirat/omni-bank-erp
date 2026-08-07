@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="res_config_settings_view_form_eds" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.eds</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form" position="inside">
+                    <app data-string="Employee Development" string="Employee Development System"
+                         name="employee_development_system"
+                         groups="employee_development_system.group_eds_officer">
+
+                        <block title="TNA Cycle (FREDS001/002/009)" name="eds_tna_cycle">
+                            <setting string="TNA Cycle Start Month"
+                                     help="Month (1-12) when the annual TNA cycle starts. Default: 4 (April).">
+                                <field name="eds_tna_cycle_start_month"/>
+                            </setting>
+                            <setting string="Submission Window (Working Days)"
+                                     help="How long line managers have to submit unit-level needs (default 10).">
+                                <field name="eds_tna_submission_days"/>
+                            </setting>
+                            <setting string="TNA Approval Deadline"
+                                     help="Month and day by which the SMC must finally approve the TNA (default 31 May).">
+                                <field name="eds_tna_approval_deadline_month"/>
+                                <field name="eds_tna_approval_deadline_day"/>
+                            </setting>
+                        </block>
+
+                        <block title="Nomination Approval Chain (FR-EDS-026)" name="eds_nomination_chain">
+                            <setting string="Require Line Manager Approval Step"
+                                     help="Whether the Line Manager approval step is part of the nomination chain (default on).">
+                                <field name="eds_nomination_require_line_manager"/>
+                            </setting>
+                            <setting string="Require Budget/HR Approval Step"
+                                     help="Whether every nomination passes an explicit Budget/HR gate (can also be set per session approval flow).">
+                                <field name="eds_nomination_require_budget"/>
+                            </setting>
+                        </block>
+
+                        <block title="Delivery Rules (FREDS039/040)" name="eds_delivery_rules">
+                            <setting string="Default Session Capacity"
+                                     help="Default class size for training sessions (BRD: 25-30).">
+                                <field name="eds_default_class_capacity"/>
+                            </setting>
+                            <setting string="Minimum Attendance % for Certification"
+                                     help="Minimum attendance percentage required for certificate eligibility (default 80).">
+                                <field name="eds_min_attendance_pct"/>
+                            </setting>
+                            <setting string="Level 2 Pass Threshold (%)"
+                                     help="Pass mark for pre/post learning assessments (recommended default 60).">
+                                <field name="eds_level2_pass_threshold"/>
+                            </setting>
+                        </block>
+
+                        <block title="Service Level Agreements (Working Days)" name="eds_slas">
+                            <setting string="Course-to-Competency Mapping SLA"
+                                     help="Validation SLA for course-to-competency mapping (default 5).">
+                                <field name="eds_course_mapping_sla_days"/>
+                            </setting>
+                            <setting string="Curriculum Development SLA"
+                                     help="SLA per course for curriculum development (default 10).">
+                                <field name="eds_curriculum_sla_days"/>
+                            </setting>
+                            <setting string="Annual Calendar Generation SLA"
+                                     help="SLA to generate the draft annual L&amp;D calendar (default 5).">
+                                <field name="eds_calendar_sla_days"/>
+                            </setting>
+                            <setting string="Level 1 Evaluation Report SLA"
+                                     help="SLA to consolidate Level 1 reaction evaluations (default 7).">
+                                <field name="eds_level1_report_sla_days"/>
+                            </setting>
+                        </block>
+
+                        <block title="Sponsorship &amp; Partnerships (FREDS062/069)" name="eds_finance">
+                            <setting string="Sponsorship Minimum Service (Months)"
+                                     help="Minimum continuous service for certification sponsorship eligibility (default 12).">
+                                <field name="eds_sponsorship_min_service_months"/>
+                            </setting>
+                            <setting string="Learning Partnership Minimum Score"
+                                     help="Minimum qualification threshold for learning partnership proposals (default 70).">
+                                <field name="eds_partnership_min_score"/>
+                            </setting>
+                        </block>
+
+                        <block title="Procurement &amp; Vendors (FREDS030/032/034)" name="eds_procurement">
+                            <setting string="Minimum Providers per RFP"
+                                     help="Minimum number of qualified providers an RFP must be issued to (FREDS030, default >= 3).">
+                                <field name="eds_rfp_min_providers"/>
+                            </setting>
+                            <setting string="Technical Minimum Threshold (%)"
+                                     help="Minimum technical qualification threshold before the financial evaluation is permitted (FREDS032, default 70).">
+                                <field name="eds_technical_min_threshold"/>
+                            </setting>
+                            <setting string="Technical / Financial Weight (%)"
+                                     help="Weight of the technical score in the combined award score; financial is 100 minus this (FREDS034, default 70/30).">
+                                <field name="eds_technical_financial_blend"/>
+                            </setting>
+                        </block>
+
+                    </app>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="action_eds_configuration" model="ir.actions.act_window">
+            <field name="name">EDS Settings</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_mode">form</field>
+            <field name="context">{'module': 'employee_development_system', 'bin_size': False}</field>
+        </record>
+
+    </data>
+</odoo>

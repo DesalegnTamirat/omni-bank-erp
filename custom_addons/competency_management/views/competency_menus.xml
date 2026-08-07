@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Root app menu (top-level, appears in the app switcher) -->
+        <menuitem id="menu_competency_management_root"
+            name="Competency Management"
+            web_icon="competency_management,static/description/icon.svg"
+            sequence="60" />
+
+        <!-- Dictionary & Framework -->
+        <menuitem id="menu_competency_dictionary"
+            name="Competency Dictionary"
+            parent="menu_competency_management_root"
+            action="action_competency_competency"
+            sequence="10" />
+        <menuitem id="menu_competency_framework"
+            name="Competency Frameworks"
+            parent="menu_competency_management_root"
+            action="action_competency_framework"
+            sequence="20"
+            groups="competency_management.group_competency_admin" />
+        <menuitem id="menu_competency_role_mapping"
+            name="Role-Competency Mapping"
+            parent="menu_competency_management_root"
+            action="action_competency_role_mapping"
+            sequence="30" />
+
+        <!-- Assessment -->
+        <menuitem id="menu_competency_assessment_cycles"
+            name="Assessment Cycles"
+            parent="menu_competency_management_root"
+            action="action_competency_assessment_cycle"
+            sequence="40"
+            groups="competency_management.group_competency_supervisor" />
+        <menuitem id="menu_competency_assessments"
+            name="Competency Assessments"
+            parent="menu_competency_management_root"
+            action="action_competency_assessment"
+            sequence="50"
+            groups="competency_management.group_competency_supervisor" />
+
+        <!-- Development -->
+        <menuitem id="menu_competency_idp"
+            name="Development Plans (IDP)"
+            parent="menu_competency_management_root"
+            action="action_competency_idp"
+            sequence="60" />
+
+        <!-- Configuration -->
+        <menuitem id="menu_competency_rating_models"
+            name="Rating Models"
+            parent="menu_competency_management_root"
+            action="action_competency_rating_model"
+            sequence="70"
+            groups="competency_management.group_competency_admin" />
+
+    </data>
+</odoo>

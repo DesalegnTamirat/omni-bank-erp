@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Trainer Register (FREDS028) ══════════════ -->
+
+        <record id="view_eds_trainer_list" model="ir.ui.view">
+            <field name="name">eds.trainer.list</field>
+            <field name="model">eds.trainer</field>
+            <field name="arch" type="xml">
+                <list string="Trainer Register">
+                    <field name="name"/>
+                    <field name="trainer_type" widget="badge"/>
+                    <field name="employee_id"/>
+                    <field name="external_provider_id"/>
+                    <field name="tot_certified"/>
+                    <field name="avg_rating" widget="progressbar"/>
+                    <field name="next_review_date"/>
+                    <field name="review_overdue" decoration-danger="review_overdue"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_trainer_search" model="ir.ui.view">
+            <field name="name">eds.trainer.search</field>
+            <field name="model">eds.trainer</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="competency_ids"/>
+                    <field name="employee_id"/>
+                    <field name="external_provider_id"/>
+                    <filter string="ToT Certified" name="tot" domain="[('tot_certified','=',True)]"/>
+                    <filter string="Review Overdue" name="overdue" domain="[('review_overdue','=',True)]"/>
+                    <filter string="Active" name="active" domain="[('state','=','active')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Trainer Type" name="g_type" context="{'group_by':'trainer_type'}"/>
+                        <filter string="Status" name="g_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_trainer_form" model="ir.ui.view">
+            <field name="name">eds.trainer.form</field>
+            <field name="model">eds.trainer</field>
+            <field name="arch" type="xml">
+                <form string="Trainer Profile">
+                    <header>
+                        <button name="action_activate" string="Activate" type="object"
+                                class="oe_highlight" invisible="state != 'inactive'"/>
+                        <button name="action_deactivate" string="Deactivate" type="object"
+                                invisible="state != 'active'"/>
+                        <button name="action_mark_reviewed" string="Mark Reviewed" type="object"
+                                invisible="state != 'active'"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box">
+                            <button class="oe_stat_button" icon="fa-star" type="object"
+                                    name="action_mark_reviewed"
+                                    invisible="state != 'active'"
+                                    help="Record a periodic review (FREDS028).">
+                                <div class="o_stat_info">
+                                    <field name="avg_rating" widget="statinfo" string="Avg Rating"/>
+                                    <span class="o_stat_text">Next review <field name="next_review_date"/></span>
+                                </div>
+                            </button>
+                            <div class="o_stat_info">
+                                <field name="tot_certified" widget="statinfo" string="ToT Certified"/>
+                                <span class="o_stat_text">Certifications</span>
+                            </div>
+                        </div>
+                        <group>
+                            <group string="Trainer">
+                                <field name="trainer_type"/>
+                                <field name="employee_id" invisible="trainer_type != 'internal'"/>
+                                <field name="external_partner_id" invisible="trainer_type != 'external'"/>
+                                <field name="external_provider_id" invisible="trainer_type != 'external'"/>
+                                <field name="name"/>
+                                <field name="job_title"/>
+                                <field name="phone"/>
+                                <field name="email"/>
+                            </group>
+                            <group string="Qualification (FREDS028)">
+                                <field name="competency_ids" widget="many2many_tags"/>
+                                <field name="tot_certified"/>
+                                <field name="review_cycle_months"/>
+                                <field name="last_review_date"/>
+                                <field name="next_review_date" readonly="1"/>
+                                <field name="review_overdue"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="ToT Certifications" name="certs">
+                                <field name="tot_certificate_ids">
+                                    <list editable="bottom">
+                                        <field name="name"/>
+                                        <field name="issued_by"/>
+                                        <field name="issued_date"/>
+                                        <field name="expiry_date"/>
+                                        <field name="status" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Availability" name="availability">
+                                <field name="availability_ids">
+                                    <list editable="bottom">
+                                        <field name="date_start"/>
+                                        <field name="date_end"/>
+                                        <field name="state"/>
+                                        <field name="note"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Quarterly Reviews" name="reviews">
+                                <field name="quarterly_review_ids">
+                                    <list editable="bottom">
+                                        <field name="period"/>
+                                        <field name="review_date"/>
+                                        <field name="reviewer_id"/>
+                                        <field name="rating"/>
+                                        <field name="strengths"/>
+                                        <field name="improvements"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Participant Feedback" name="feedback">
+                                <field name="feedback_ids">
+                                    <list editable="bottom">
+                                        <field name="date"/>
+                                        <field name="level"/>
+                                        <field name="participant_id"/>
+                                        <field name="rating"/>
+                                        <field name="comment"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_trainer" model="ir.actions.act_window">
+            <field name="name">Trainer Register</field>
+            <field name="res_model">eds.trainer</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_trainer_search"/>
+        </record>
+
+        <!-- ══════════════ External Provider Registry (FREDS029/036) ══════════════ -->
+
+        <record id="view_eds_external_provider_list" model="ir.ui.view">
+            <field name="name">eds.external.provider.list</field>
+            <field name="model">eds.external.provider</field>
+            <field name="arch" type="xml">
+                <list string="External Providers">
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="category" widget="badge"/>
+                    <field name="country_id"/>
+                    <field name="accreditation"/>
+                    <field name="pre_qualified" widget="boolean_toggle"/>
+                    <field name="rating" widget="progressbar"/>
+                    <field name="contract_count"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_external_provider_form" model="ir.ui.view">
+            <field name="name">eds.external.provider.form</field>
+            <field name="model">eds.external.provider</field>
+            <field name="arch" type="xml">
+                <form string="External Training Provider">
+                    <header>
+                        <button name="action_toggle_qualified" string="Toggle Pre-Qualification"
+                                type="object" class="oe_highlight"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Provider">
+                                <field name="code" readonly="1"/>
+                                <field name="name"/>
+                                <field name="partner_id"/>
+                                <field name="category"/>
+                                <field name="country_id"/>
+                            </group>
+                            <group string="Qualification">
+                                <field name="accreditation"/>
+                                <field name="pre_qualified"/>
+                                <field name="rating"/>
+                                <field name="rating_count"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Service Offerings">
+                            <field name="service_offerings"/>
+                        </group>
+                        <notebook>
+                            <page string="Performance History (FREDS036)" name="performance">
+                                <field name="performance_history_ids">
+                                    <list editable="bottom">
+                                        <field name="evaluation_date"/>
+                                        <field name="course_id"/>
+                                        <field name="venue_name"/>
+                                        <field name="service_quality"/>
+                                        <field name="rating"/>
+                                        <field name="issues_raised"/>
+                                        <field name="corrective_actions"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Contracts" name="contracts">
+                                <field name="contract_ids" readonly="1"/>
+                            </page>
+                            <page string="External Trainers" name="trainers">
+                                <field name="trainer_ids" readonly="1"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_external_provider" model="ir.actions.act_window">
+            <field name="name">External Providers</field>
+            <field name="res_model">eds.external.provider</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

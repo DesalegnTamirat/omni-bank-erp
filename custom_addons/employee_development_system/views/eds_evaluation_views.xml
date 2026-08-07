@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Evaluation Instrument Views -->
+    <record id="view_eds_evaluation_instrument_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.instrument.tree</field>
+        <field name="model">eds.evaluation.instrument</field>
+        <field name="arch" type="xml">
+            <list string="Evaluation Instruments">
+                <field name="name"/>
+                <field name="instrument_type"/>
+                <field name="version"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'published'" decoration-muted="state == 'archived'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_evaluation_instrument_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.instrument.form</field>
+        <field name="model">eds.evaluation.instrument</field>
+        <field name="arch" type="xml">
+            <form string="Evaluation Instrument">
+                <header>
+                    <button name="action_publish" string="Publish Instrument" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_create_new_version" string="Create New Version" type="object" invisible="state != 'published'"/>
+                    <button name="action_archive" string="Archive" type="object" invisible="state == 'archived'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,published,archived"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Standard Kirkpatrick Level 1 Feedback"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="instrument_type"/>
+                            <field name="version"/>
+                        </group>
+                        <group>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Questions">
+                            <field name="question_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="category"/>
+                                    <field name="question_type"/>
+                                    <field name="weight"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Instructions &amp; Description">
+                            <field name="notes" placeholder="Enter instructions for respondents..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_evaluation_instrument" model="ir.actions.act_window">
+        <field name="name">Evaluation Instruments</field>
+        <field name="res_model">eds.evaluation.instrument</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Level 1 Evaluation Views -->
+    <record id="view_eds_evaluation_level1_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.level1.tree</field>
+        <field name="model">eds.evaluation.level1</field>
+        <field name="arch" type="xml">
+            <list string="Level 1 Feedback">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="employee_id"/>
+                <field name="submitted_date"/>
+                <field name="overall_score" widget="progressbar"/>
+                <field name="report_sla_deadline"/>
+                <field name="state" widget="badge" decoration-info="state == 'distributed'" decoration-success="state == 'submitted'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_evaluation_level1_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level1.form</field>
+        <field name="model">eds.evaluation.level1</field>
+        <field name="arch" type="xml">
+            <form string="Level 1 Participant Feedback">
+                <header>
+                    <button name="action_submit_feedback" string="Submit Feedback" type="object" class="oe_highlight" invisible="state != 'distributed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="distributed,submitted,consolidated"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="submitted_date"/>
+                            <field name="report_sla_deadline"/>
+                            <field name="overall_score" widget="progressbar"/>
+                            <field name="recommend_to_others"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Responses">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="question_id"/>
+                                    <field name="rating_val"/>
+                                    <field name="yes_no_val"/>
+                                    <field name="score_pct" widget="progressbar"/>
+                                    <field name="text_val"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="General Comments">
+                            <field name="general_comments" placeholder="Additional feedback..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_evaluation_level1" model="ir.actions.act_window">
+        <field name="name">Level 1 Participant Feedback</field>
+        <field name="res_model">eds.evaluation.level1</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Level 2 Evaluation Views -->
+    <record id="view_eds_evaluation_level2_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.level2.tree</field>
+        <field name="model">eds.evaluation.level2</field>
+        <field name="arch" type="xml">
+            <list string="Level 2 Learning Evaluations">
+                <field name="session_id"/>
+                <field name="course_id"/>
+                <field name="employee_id"/>
+                <field name="pre_score"/>
+                <field name="post_score"/>
+                <field name="learning_gain"/>
+                <field name="passed" widget="boolean_toggle"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_evaluation_level2_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level2.form</field>
+        <field name="model">eds.evaluation.level2</field>
+        <field name="arch" type="xml">
+            <form string="Level 2 Learning Evaluation">
+                <header>
+                    <button name="action_evaluate" string="Complete Evaluation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group>
+                            <field name="pre_assessment_id"/>
+                            <field name="post_assessment_id"/>
+                            <field name="pre_score"/>
+                            <field name="post_score"/>
+                            <field name="learning_gain"/>
+                            <field name="passing_score"/>
+                            <field name="passed"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_evaluation_level2" model="ir.actions.act_window">
+        <field name="name">Level 2 Learning Evaluations</field>
+        <field name="res_model">eds.evaluation.level2</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Level 3 Evaluation Views -->
+    <record id="view_eds_evaluation_level3_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.level3.tree</field>
+        <field name="model">eds.evaluation.level3</field>
+        <field name="arch" type="xml">
+            <list string="Level 3 Behavioral Assessments">
+                <field name="session_id"/>
+                <field name="employee_id"/>
+                <field name="manager_id"/>
+                <field name="due_date"/>
+                <field name="behavior_score" widget="progressbar"/>
+                <field name="status" widget="badge" decoration-warning="status == 'pending'" decoration-danger="status == 'overdue'" decoration-success="status == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_evaluation_level3_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level3.form</field>
+        <field name="model">eds.evaluation.level3</field>
+        <field name="arch" type="xml">
+            <form string="Level 3 Behavioral Assessment">
+                <header>
+                    <button name="action_submit_level3" string="Submit Manager Assessment" type="object" class="oe_highlight" invisible="status == 'completed'"/>
+                    <field name="status" widget="statusbar" statusbar_visible="pending,in_progress,completed,overdue"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                            <field name="employee_id"/>
+                            <field name="manager_id"/>
+                        </group>
+                        <group>
+                            <field name="due_date"/>
+                            <field name="completed_date"/>
+                            <field name="behavior_score" widget="progressbar"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Competency Observations">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="competency_id"/>
+                                    <field name="observed_level"/>
+                                    <field name="score_pct" widget="progressbar"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Observation Evidence">
+                            <field name="observation_notes" placeholder="Enter detailed workplace behavior evidence..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_evaluation_level3" model="ir.actions.act_window">
+        <field name="name">Level 3 Behavioral Assessments</field>
+        <field name="res_model">eds.evaluation.level3</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Level 4 Evaluation Views -->
+    <record id="view_eds_evaluation_level4_tree" model="ir.ui.view">
+        <field name="name">eds.evaluation.level4.tree</field>
+        <field name="model">eds.evaluation.level4</field>
+        <field name="arch" type="xml">
+            <list string="Level 4 Business Impact &amp; ROI">
+                <field name="name"/>
+                <field name="course_id"/>
+                <field name="measurement_date"/>
+                <field name="total_program_cost"/>
+                <field name="estimated_financial_benefit"/>
+                <field name="roi_percentage"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_evaluation_level4_form" model="ir.ui.view">
+        <field name="name">eds.evaluation.level4.form</field>
+        <field name="model">eds.evaluation.level4</field>
+        <field name="arch" type="xml">
+            <form string="Level 4 Business Impact &amp; ROI Assessment">
+                <header>
+                    <button name="action_evaluate" string="Publish Impact Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,evaluated"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="course_id"/>
+                            <field name="measurement_date"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="total_program_cost"/>
+                            <field name="estimated_financial_benefit"/>
+                            <field name="roi_percentage"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Evaluated Business KPIs">
+                            <field name="kpi_ids">
+                                <list editable="bottom">
+                                    <field name="kpi_name"/>
+                                    <field name="baseline_value"/>
+                                    <field name="target_value"/>
+                                    <field name="achieved_value"/>
+                                    <field name="improvement_pct"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Impact Summary">
+                            <field name="impact_summary" placeholder="Executive summary of organizational performance improvement..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_evaluation_level4" model="ir.actions.act_window">
+        <field name="name">Level 4 Impact &amp; ROI Assessments</field>
+        <field name="res_model">eds.evaluation.level4</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

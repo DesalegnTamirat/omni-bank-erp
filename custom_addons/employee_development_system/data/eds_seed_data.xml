@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Task 5: default training venue -->
+        <record id="venue_default_head_office" model="eds.venue">
+            <field name="name">Head Office Training Hall</field>
+            <field name="location">Bunna Bank Head Office</field>
+            <field name="capacity">30</field>
+            <field name="facilities">Projector, whiteboard, tables &amp; chairs, catering area</field>
+        </record>
+
+        <!-- Task 2: default priority-rule weights (FREDS006) - sum 100% -->
+        <record id="rule_priority_strategic" model="eds.tna.priority.rule">
+            <field name="sequence">10</field>
+            <field name="name">Strategic Alignment</field>
+            <field name="criteria">strategic_alignment</field>
+            <field name="weight">25.0</field>
+            <field name="description">How closely the need aligns with bank strategy and corporate objectives.</field>
+        </record>
+        <record id="rule_priority_regulatory" model="eds.tna.priority.rule">
+            <field name="sequence">20</field>
+            <field name="name">Regulatory / Compliance Requirement</field>
+            <field name="criteria">regulatory</field>
+            <field name="weight">20.0</field>
+            <field name="description">Mandatory NBE / regulatory / compliance driven training.</field>
+        </record>
+        <record id="rule_priority_gap_severity" model="eds.tna.priority.rule">
+            <field name="sequence">30</field>
+            <field name="name">Gap Severity</field>
+            <field name="criteria">gap_severity</field>
+            <field name="weight">20.0</field>
+            <field name="description">Severity of the competency gap behind the need.</field>
+        </record>
+        <record id="rule_priority_risk" model="eds.tna.priority.rule">
+            <field name="sequence">40</field>
+            <field name="name">Risk Level</field>
+            <field name="criteria">risk_level</field>
+            <field name="weight">15.0</field>
+            <field name="description">Operational / audit / reputational risk exposure if unaddressed.</field>
+        </record>
+        <record id="rule_priority_tom" model="eds.tna.priority.rule">
+            <field name="sequence">50</field>
+            <field name="name">TOM Impact</field>
+            <field name="criteria">tom_impact</field>
+            <field name="weight">10.0</field>
+            <field name="description">Impact on the Target Operating Model and digital transformation.</field>
+        </record>
+        <record id="rule_priority_future" model="eds.tna.priority.rule">
+            <field name="sequence">60</field>
+            <field name="name">Future Capability</field>
+            <field name="criteria">future_capability</field>
+            <field name="weight">10.0</field>
+            <field name="description">Builds capability for future roles / succession readiness.</field>
+        </record>
+
+        <!-- Task 8: Standard Level 1 Evaluation Instrument Seed -->
+        <record id="inst_level1_standard" model="eds.evaluation.instrument">
+            <field name="name">Standard Level 1 Participant Satisfaction Survey</field>
+            <field name="instrument_type">level1</field>
+            <field name="version">v1.0</field>
+            <field name="state">published</field>
+            <field name="notes">Standard 5-point feedback survey for classroom training programs.</field>
+        </record>
+
+        <record id="inst_q1" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">10</field>
+            <field name="name">Course objectives were clearly communicated and achieved.</field>
+            <field name="category">objective</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <record id="inst_q2" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">20</field>
+            <field name="name">The trainer demonstrated deep expertise and engaged participants.</field>
+            <field name="category">trainer</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <record id="inst_q3" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">30</field>
+            <field name="name">Training materials and handouts were clear and relevant.</field>
+            <field name="category">content</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <record id="inst_q4" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">40</field>
+            <field name="name">The training venue, equipment and facilities were comfortable.</field>
+            <field name="category">venue</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <record id="inst_q5" model="eds.evaluation.instrument.question">
+            <field name="instrument_id" ref="inst_level1_standard"/>
+            <field name="sequence">50</field>
+            <field name="name">I will be able to apply the learned knowledge to my daily work.</field>
+            <field name="category">impact</field>
+            <field name="question_type">scale_1_5</field>
+        </record>
+
+        <!-- Task 10: Default Certification Rules -->
+        <record id="cert_rule_developmental" model="eds.certificate.rule">
+            <field name="name">Developmental Program Policy (80% Att + 60% L2 Pass)</field>
+            <field name="category">developmental</field>
+            <field name="require_attendance">1</field>
+            <field name="min_attendance_pct">80.0</field>
+            <field name="require_level2_pass">1</field>
+            <field name="min_level2_score">60.0</field>
+            <field name="active">1</field>
+        </record>
+
+        <record id="cert_rule_technical" model="eds.certificate.rule">
+            <field name="name">Technical &amp; Compliance Policy (80% Att + 70% L2 Pass)</field>
+            <field name="category">technical_compliance</field>
+            <field name="require_attendance">1</field>
+            <field name="min_attendance_pct">80.0</field>
+            <field name="require_level2_pass">1</field>
+            <field name="min_level2_score">70.0</field>
+            <field name="active">1</field>
+        </record>
+    </data>
+</odoo>

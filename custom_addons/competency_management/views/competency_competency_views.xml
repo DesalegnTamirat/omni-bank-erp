@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Rating Model Views -->
+        <record id="view_competency_rating_model_list" model="ir.ui.view">
+            <field name="name">competency.rating.model.list</field>
+            <field name="model">competency.rating.model</field>
+            <field name="arch" type="xml">
+                <list editable="bottom">
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="max_rating"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+        <record id="action_competency_rating_model" model="ir.actions.act_window">
+            <field name="name">Rating Models</field>
+            <field name="res_model">competency.rating.model</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Competency Dictionary Tree -->
+        <record id="view_competency_competency_list" model="ir.ui.view">
+            <field name="name">competency.competency.list</field>
+            <field name="model">competency.competency</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="pillar" widget="badge"/>
+                    <field name="functional_domain"/>
+                    <field name="status" widget="badge"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Competency Dictionary Form -->
+        <record id="view_competency_competency_form" model="ir.ui.view">
+            <field name="name">competency.competency.form</field>
+            <field name="model">competency.competency</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="status != 'retired'"/>
+                        <group>
+                            <group string="Identity">
+                                <field name="name"/>
+                                <field name="code"/>
+                                <field name="pillar"/>
+                                <field name="functional_domain"/>
+                                <field name="rating_model_id"/>
+                            </group>
+                            <group string="Status">
+                                <field name="status"/>
+                                <field name="active"/>
+                                <field name="is_seed"/>
+                            </group>
+                        </group>
+                        <group string="Definition">
+                            <field name="definition" placeholder="Define the competency and what it covers..."/>
+                        </group>
+                        <notebook>
+                            <page string="Proficiency Levels">
+                                <field name="proficiency_level_ids">
+                                    <list editable="bottom">
+                                        <field name="level"/>
+                                        <field name="name"/>
+                                        <field name="definition"/>
+                                        <field name="behavioral_indicators"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Applicable Job Positions">
+                                <field name="applicable_job_ids" widget="many2many_tags"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Competency Dictionary Search -->
+        <record id="view_competency_competency_search" model="ir.ui.view">
+            <field name="name">competency.competency.search</field>
+            <field name="model">competency.competency</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <filter string="Core" name="pillar_core" domain="[('pillar','=','core')]"/>
+                    <filter string="Leadership" name="pillar_leadership" domain="[('pillar','=','leadership')]"/>
+                    <filter string="Technical" name="pillar_technical" domain="[('pillar','=','technical')]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Pillar" name="group_pillar" context="{'group_by':'pillar'}"/>
+                        <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_competency" model="ir.actions.act_window">
+            <field name="name">Competency Dictionary</field>
+            <field name="res_model">competency.competency</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="competency_management.view_competency_competency_search"/>
+        </record>
+
+    </data>
+</odoo>

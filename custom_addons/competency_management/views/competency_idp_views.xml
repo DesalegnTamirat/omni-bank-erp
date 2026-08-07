@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- IDP Tree -->
+        <record id="view_competency_idp_list" model="ir.ui.view">
+            <field name="name">competency.idp.list</field>
+            <field name="model">competency.idp</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="assessment_id"/>
+                    <field name="mandatory" widget="boolean_toggle"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- IDP Form -->
+        <record id="view_competency_idp_form" model="ir.ui.view">
+            <field name="name">competency.idp.form</field>
+            <field name="model">competency.idp</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_submit" string="Submit"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve"
+                                type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="action_start" string="Start Plan"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_complete" string="Mark Completed"
+                                type="object" invisible="state not in ('active','approved')"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,submitted,approved,active,completed"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name" readonly="1"/>
+                                <field name="employee_id"/>
+                                <field name="assessment_id"/>
+                            </group>
+                            <group>
+                                <field name="mandatory" widget="boolean_toggle"/>
+                                <field name="approved_by_id"/>
+                                <field name="approval_date"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Development Activities">
+                                <field name="goal_ids">
+                                    <list editable="bottom">
+                                        <field name="goal"/>
+                                        <field name="activity_type"/>
+                                        <field name="course_name"/>
+                                        <field name="start_date"/>
+                                        <field name="target_end_date"/>
+                                        <field name="progress_percent"/>
+                                        <field name="status"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Review Checkpoints">
+                                <field name="checkpoint_ids">
+                                    <list editable="bottom">
+                                        <field name="scheduled_date"/>
+                                        <field name="status"/>
+                                        <field name="completed_date"/>
+                                        <field name="notes"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Notes">
+                                <field name="notes"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- IDP Search -->
+        <record id="view_competency_idp_search" model="ir.ui.view">
+            <field name="name">competency.idp.search</field>
+            <field name="model">competency.idp</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="employee_id"/>
+                    <filter string="Mandatory IDPs" name="mandatory_only" domain="[('mandatory','=',True)]"/>
+                    <filter string="Active" name="active_only" domain="[('state','in',('approved','active'))]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_idp" model="ir.actions.act_window">
+            <field name="name">Development Plans (IDP)</field>
+            <field name="res_model">competency.idp</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="competency_management.view_competency_idp_search"/>
+        </record>
+
+    </data>
+</odoo>
