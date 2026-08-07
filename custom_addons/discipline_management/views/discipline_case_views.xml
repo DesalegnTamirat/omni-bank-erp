@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- Search View -->
+        <!-- Search View --> 
         <record id="view_discipline_case_search" model="ir.ui.view">
             <field name="name">discipline.case.search</field>
             <field name="model">discipline.case</field>

@@ -59,12 +59,12 @@ class AttendancePreApproval(models.Model):
             if is_admin:
                 rec.is_manager_or_admin = True
             else:
-                emp = rec.employee_id
+                emp = rec.employee_id.sudo() if rec.employee_id else False
                 is_manager = False
                 if emp:
-                    if emp.parent_id and emp.parent_id.user_id and emp.parent_id.user_id.id == current_uid:
-                        is_manager = True
-                    elif emp.coach_id and emp.coach_id.user_id and emp.coach_id.user_id.id == current_uid:
+                    parent_user_id = emp.parent_id.sudo().user_id.id if (emp.parent_id and emp.parent_id.user_id) else False
+                    coach_user_id = emp.coach_id.sudo().user_id.id if (emp.coach_id and emp.coach_id.user_id) else False
+                    if (parent_user_id and parent_user_id == current_uid) or (coach_user_id and coach_user_id == current_uid):
                         is_manager = True
                 rec.is_manager_or_admin = is_manager
 

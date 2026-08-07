@@ -226,7 +226,7 @@ class HrEmployee(models.Model):
                 "Employee account is archived or inactive."
             ))
 
-        # ATT-8: ORM-level dismissal block. Even if the employee is still
+        # ORM-level dismissal block. Even if the employee is still
         # technically 'active', a finalised Level-1 / dismissal discipline case
         # MUST prevent attendance. This stops API callers from bypassing the UI guard.
         if self.env.get('discipline.case'):

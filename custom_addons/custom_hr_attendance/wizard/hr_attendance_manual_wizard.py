@@ -5,7 +5,7 @@ from odoo.exceptions import UserError, ValidationError
 
 class HrAttendanceManualWizard(models.TransientModel):
     """
-    ATT-016 / FR-ATT-016: Dedicated Manual Attendance Creation Wizard.
+    / FR-Dedicated Manual Attendance Creation Wizard.
     Allows HR officers and supervisors to create manual attendance records for
     employees who were unable to check in electronically.
     Requires mandatory justification and supervisor sign-off.
@@ -54,7 +54,7 @@ class HrAttendanceManualWizard(models.TransientModel):
             self.check_out = local_dt_out.astimezone(pytz.utc).replace(tzinfo=None)
 
     def action_create_manual_attendance(self):
-        """ATT-016: Create acknowledged manual attendance record."""
+        """Create acknowledged manual attendance record."""
         self.ensure_one()
         if self.check_out and self.check_out <= self.check_in:
             raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))

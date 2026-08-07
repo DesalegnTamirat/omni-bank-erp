@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ TNA Priority Rule ══════════════ -->
+
+        <record id="view_eds_tna_priority_rule_list" model="ir.ui.view">
+            <field name="name">eds.tna.priority.rule.list</field>
+            <field name="model">eds.tna.priority.rule</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="criteria"/>
+                    <field name="weight"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_priority_rule_form" model="ir.ui.view">
+            <field name="name">eds.tna.priority.rule.form</field>
+            <field name="model">eds.tna.priority.rule</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="sequence"/>
+                                <field name="name"/>
+                                <field name="criteria"/>
+                            </group>
+                            <group>
+                                <field name="weight"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Description">
+                            <field name="description"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_tna_priority_rule" model="ir.actions.act_window">
+            <field name="name">Priority Rules</field>
+            <field name="res_model">eds.tna.priority.rule</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ TNA Consolidation ══════════════ -->
+
+        <record id="view_eds_tna_consolidation_list" model="ir.ui.view">
+            <field name="name">eds.tna.consolidation.list</field>
+            <field name="model">eds.tna.consolidation</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="cycle_id"/>
+                    <field name="work_unit_id"/>
+                    <field name="entry_count"/>
+                    <field name="duplicate_count"/>
+                    <field name="non_training_count"/>
+                    <field name="priority_score"/>
+                    <field name="approval_deadline"/>
+                    <field name="days_to_deadline" decoration-danger="deadline_breached"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_consolidation_form" model="ir.ui.view">
+            <field name="name">eds.tna.consolidation.form</field>
+            <field name="model">eds.tna.consolidation</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_consolidate" string="Consolidate Needs"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"
+                                confirm="Re-gather needs for this consolidation? Existing flags will be refreshed."/>
+                        <button name="action_compute_priority" string="Recompute Priority"
+                                type="object" invisible="state in ('approved','locked')"/>
+                        <button name="action_submit_ppdd" string="Submit to PPDD Validation"
+                                type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_validate_ppdd" string="Validate (PPDD)"
+                                type="object" class="oe_highlight" invisible="state != 'ppdd_validation'"/>
+                        <button name="action_director_review" string="Director PPDD Review"
+                                type="object" class="oe_highlight" invisible="state != 'director_review'"/>
+                        <button name="action_cpco_endorsement" string="CPCO Endorsement"
+                                type="object" class="oe_highlight" invisible="state != 'cpco_endorsement'"/>
+                        <button name="action_smc_approve" string="SMC Final Approval"
+                                type="object" class="oe_highlight" invisible="state != 'smc_approval'"/>
+                        <button name="action_lock" string="Lock Register"
+                                type="object" invisible="state != 'approved'"/>
+                        <button name="action_unlock" string="Unlock (Change Request)"
+                                type="object" invisible="state != 'locked'"/>
+                        <field name="state" widget="statusbar"
+                               statusbar_visible="draft,ppdd_validation,director_review,cpco_endorsement,smc_approval,approved,locked"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group string="Consolidation">
+                                <field name="name" readonly="1"/>
+                                <field name="cycle_id" readonly="state != 'draft'"/>
+                                <field name="work_unit_id" readonly="state != 'draft'"/>
+                                <field name="priority_score"/>
+                            </group>
+                            <group string="Deadline &amp; Approval">
+                                <field name="approval_deadline"/>
+                                <field name="days_to_deadline"/>
+                                <field name="deadline_breached"/>
+                                <field name="approved_by_id"/>
+                                <field name="approval_date"/>
+                            </group>
+                        </group>
+                        <group string="Segregation of Duties (FREDS008)">
+                            <group>
+                                <field name="validator_id" groups="employee_development_system.group_eds_officer"/>
+                                <field name="reviewer_id"/>
+                            </group>
+                            <group>
+                                <field name="endorser_id"/>
+                                <field name="approver_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Training Needs">
+                                <field name="entry_ids" readonly="state == 'locked'">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="work_unit_id"/>
+                                        <field name="competency_id"/>
+                                        <field name="delivery_mode"/>
+                                        <field name="source"/>
+                                        <field name="priority_score"/>
+                                        <field name="is_duplicate" decoration-danger="is_duplicate"/>
+                                        <field name="exclusion_type"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Duplicates &amp; Non-Training">
+                                <group string="Duplicate Needs (FREDS007)">
+                                    <field name="duplicate_entry_ids" readonly="state == 'locked'">
+                                        <list>
+                                            <field name="name"/>
+                                            <field name="employee_id"/>
+                                            <field name="competency_id"/>
+                                            <field name="delivery_mode"/>
+                                            <field name="source"/>
+                                            <field name="duplicate_of_id"/>
+                                        </list>
+                                    </field>
+                                </group>
+                                <group string="Non-Training Items (Process/System/Structural)">
+                                    <field name="non_training_entry_ids" readonly="state == 'locked'">
+                                        <list>
+                                            <field name="name"/>
+                                            <field name="employee_id"/>
+                                            <field name="proposed_program"/>
+                                            <field name="exclusion_type"/>
+                                            <field name="state" widget="badge"/>
+                                        </list>
+                                    </field>
+                                </group>
+                                <group string="Excluded Needs">
+                                    <field name="excluded_entry_ids" readonly="1">
+                                        <list>
+                                            <field name="name"/>
+                                            <field name="employee_id"/>
+                                            <field name="excluded_reason"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </page>
+                            <page string="Approval History">
+                                <field name="approval_history_ids" readonly="1">
+                                    <list>
+                                        <field name="state_from"/>
+                                        <field name="state_to"/>
+                                        <field name="user_id"/>
+                                        <field name="comment"/>
+                                        <field name="timestamp"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Notes">
+                                <field name="notes"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_eds_tna_consolidation_search" model="ir.ui.view">
+            <field name="name">eds.tna.consolidation.search</field>
+            <field name="model">eds.tna.consolidation</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="cycle_id"/>
+                    <field name="work_unit_id"/>
+                    <filter string="In Approval Chain" name="in_approval"
+                            domain="[('state','in',('ppdd_validation','director_review','cpco_endorsement','smc_approval'))]"/>
+                    <filter string="Deadline Breached" name="breached" domain="[('deadline_breached','=',True)]"/>
+                    <filter string="Approved / Locked" name="finalized" domain="[('state','in',('approved','locked'))]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Work Unit" name="group_unit" context="{'group_by':'work_unit_id'}"/>
+                        <filter string="Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_eds_tna_consolidation" model="ir.actions.act_window">
+            <field name="name">TNA Consolidations</field>
+            <field name="res_model">eds.tna.consolidation</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_tna_consolidation_search"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields
+from odoo.exceptions import AccessError
 
 
 class HrEmployeeAttendanceCounters(models.Model):
@@ -17,6 +18,15 @@ class HrEmployeeAttendanceCounters(models.Model):
     whether 1 or 6,000 employees check in simultaneously.
     """
     _inherit = 'hr.employee'
+
+    def _check_private_fields(self, field_names):
+        """ Prevent AccessError for non-HR employees when accessing employee records """
+        try:
+            super()._check_private_fields(field_names)
+        except AccessError:
+            if self.env.user.has_group('custom_hr_attendance.group_hr_attendance_manual_user') or self.env.user.has_group('base.group_user'):
+                return
+            raise
 
     late_count_rolling = fields.Integer(
         string='Rolling Late Count',

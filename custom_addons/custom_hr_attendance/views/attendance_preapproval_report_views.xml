@@ -15,8 +15,8 @@
                 <field name="exception_type"/>
                 <field name="approval_reason"/>
                 <field name="date"/>
-                <field name="start_time"/>
-                <field name="end_time"/>
+                <field name="start_time" widget="float_time"/>
+                <field name="end_time" widget="float_time"/>
                 <field name="status"/>
                 <field name="approved_by"/>
             </list>

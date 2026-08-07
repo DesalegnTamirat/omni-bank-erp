@@ -32,32 +32,32 @@ class HrAttendance(models.Model):
     pre_defined_lateness = fields.Float(string="Pre-Defined")
     pre_approved_early_checkout = fields.Float(string="Pre-Approved Early Checkout")
 
-    # ATT-4: Manual discipline flag by supervisor/HR
+    # Manual discipline flag by supervisor/HR
     flagged_for_discipline = fields.Boolean(
         string='Flagged for Discipline Review',
         default=False,
         index=True,
         tracking=True,
-        help='ATT-4 / FR-ATT-031: HR or supervisor can flag this attendance record for discipline review.'
+        help='/ FR-HR or supervisor can flag this attendance record for discipline review.'
     )
     flagged_reason = fields.Char(string='Flag Reason', tracking=True)
     flagged_by_id = fields.Many2one('res.users', string='Flagged By', readonly=True, tracking=True)
     flagged_date = fields.Datetime(string='Flagged Date', readonly=True)
 
-    # ATT-5: Smart button counter (discipline cases referencing this attendance)
+    # Smart button counter (discipline cases referencing this attendance)
     discipline_case_count = fields.Integer(
         string='Discipline Cases',
         compute='_compute_discipline_case_count',
         help='Number of discipline cases where reference = ATT-{this id}.'
     )
 
-    # ATT-7: Overtime payroll approval tracking
+    # Overtime payroll approval tracking
     overtime_approved_for_payroll = fields.Boolean(
         string='Overtime Approved for Payroll',
         default=False,
         index=True,
         tracking=True,
-        help='ATT-7: Once supervisor approves overtime, this triggers payroll payload creation.'
+        help='Once supervisor approves overtime, this triggers payroll payload creation.'
     )
     overtime_approved_by_id = fields.Many2one('res.users', string='Overtime Approved By', readonly=True)
     overtime_approved_date = fields.Datetime(string='Overtime Approved Date', readonly=True)
@@ -111,7 +111,7 @@ class HrAttendance(models.Model):
         return True
 
     def _compute_discipline_case_count(self):
-        """ATT-5: Count discipline cases referencing this attendance record."""
+        """Count discipline cases referencing this attendance record."""
         for rec in self:
             if self.env.get('discipline.case'):
                 rec.discipline_case_count = self.env['discipline.case'].sudo().search_count([
@@ -122,7 +122,7 @@ class HrAttendance(models.Model):
 
     def action_flag_for_discipline(self):
         """
-        ATT-4 / FR-ATT-031: Flag this attendance record for discipline review.
+        / FR-Flag this attendance record for discipline review.
         Opens a popup so the supervisor can enter a reason.
         """
         self.ensure_one()
@@ -140,7 +140,7 @@ class HrAttendance(models.Model):
 
     def action_approve_overtime_for_payroll(self):
         """
-        ATT-7: Approve overtime and create a payroll payload record.
+        Approve overtime and create a payroll payload record.
         Restricted to managers and HR.
         """
         self.ensure_one()
@@ -157,7 +157,7 @@ class HrAttendance(models.Model):
             'overtime_approved_date': fields.Datetime.now(),
         })
 
-        # ATT-7: Create attendance.payroll.payload via factory method
+        # Create attendance.payroll.payload via factory method
         if self.env.get('attendance.payroll.payload'):
             self.env['attendance.payroll.payload'].sudo().create({
                 'employee_id': self.employee_id.id,
@@ -173,7 +173,7 @@ class HrAttendance(models.Model):
             })
 
         _logger.info(
-            'ATT-7: Overtime approved for employee %s, attendance ID %s, hours: %.2f',
+            'Overtime approved for employee %s, attendance ID %s, hours: %.2f',
             self.employee_id.name, self.id, self.over_time_hour
         )
         return True
@@ -212,7 +212,7 @@ class HrAttendance(models.Model):
         help='IP address of the device used when the employee checked out.',
     )
 
-    # ATT-007 / ATT-014: Device information capture
+    # / Device information capture
     check_in_device_info = fields.Char(
         string='Check-in Device Info',
         readonly=True,
@@ -227,7 +227,7 @@ class HrAttendance(models.Model):
     )
 
     def _resolve_request_device_info(self):
-        """ATT-007 / ATT-014: Captures client User-Agent device info."""
+        """/ Captures client User-Agent device info."""
         try:
             from odoo.http import request
             if request and request.httprequest:
@@ -442,7 +442,7 @@ class HrAttendance(models.Model):
                 if device_info:
                     vals['check_out_device_info'] = device_info
 
-        # Phase 8 (ATT-035): Audit log immutability hardening guard
+        # Phase 8: Audit log immutability hardening guard
         # Block core attendance edits if linked to a payroll payload already transferred or processed.
         core_fields = {'check_in', 'check_out', 'employee_id', 'check_in_status', 'check_out_status'}
         if any(f in vals for f in core_fields):
@@ -455,7 +455,7 @@ class HrAttendance(models.Model):
                     if processed_payload:
                         from odoo.exceptions import UserError
                         raise UserError(_(
-                            'Audit Immutability Violation (ATT-035): Attendance record for %s on %s has already '
+                            'Audit Immutability Violation: Attendance record for %s on %s has already '
                             'been consumed by Payroll (Payload %s, State: %s). Direct edits are locked.'
                         ) % (rec.employee_id.name, rec.check_in.date() if rec.check_in else '', processed_payload.display_name, processed_payload.state))
 
@@ -521,7 +521,7 @@ class HrAttendance(models.Model):
     @api.model
     def cron_automatic_absence_detection(self):
         """
-        ATT-2: Off-peak cron to detect employees who had no attendance and no approved leave
+        Off-peak cron to detect employees who had no attendance and no approved leave
         on scheduled work days. For each absent employee:
           1. Logs the absence
           2. Creates an attendance.payroll.payload (type: absence) so payroll can deduct
@@ -557,7 +557,7 @@ class HrAttendance(models.Model):
         self.env.cr.execute(sql, (yesterday, today, yesterday, yesterday))
         absent_employees = self.env.cr.fetchall()
         _logger.info(
-            "ATT-2: Absence cron found %d absent employees for date %s.",
+            "Absence cron found %d absent employees for date %s.",
             len(absent_employees), yesterday
         )
 
@@ -569,7 +569,7 @@ class HrAttendance(models.Model):
         for emp_id, emp_name in absent_employees:
             employee = self.env['hr.employee'].browse(emp_id)
 
-            # ATT-2a: Create payroll payload for absence deduction
+            # a: Create payroll payload for absence deduction
             if self.env.get('attendance.payroll.payload'):
                 self.env['attendance.payroll.payload'].sudo().create_absence_payload(
                     employee_id=emp_id,
@@ -577,7 +577,7 @@ class HrAttendance(models.Model):
                     hours=8.0,
                 )
 
-            # ATT-2b: Check absence counter and signal discipline if threshold reached
+            # b: Check absence counter and signal discipline if threshold reached
             if hasattr(employee, 'consecutive_absence_count'):
                 employee.consecutive_absence_count = (employee.consecutive_absence_count or 0) + 1
                 if employee.consecutive_absence_count >= absence_discipline_threshold:
@@ -588,19 +588,19 @@ class HrAttendance(models.Model):
                         )
                         employee.consecutive_absence_count = 0
                         _logger.info(
-                            "ATT-2: Discipline signal sent for employee %s after %d consecutive absences.",
+                            "Discipline signal sent for employee %s after %d consecutive absences.",
                             emp_name, absence_discipline_threshold
                         )
             else:
                 _logger.info(
-                    "ATT-2: Employee %s absent on %s. No consecutive_absence_count field — discipline threshold not checked.",
+                    "Employee %s absent on %s. No consecutive_absence_count field — discipline threshold not checked.",
                     emp_name, yesterday
                 )
 
     @api.model
     def cron_job_abandonment_detection(self):
         """
-        ATT-3: Detect job abandonment — employees absent for 3+ consecutive working days
+        Detect job abandonment — employees absent for 3+ consecutive working days
         with no approved leave or explanation. Creates a discipline case automatically.
         BRD definition: 3 consecutive working days = job abandonment trigger.
         """
@@ -648,7 +648,7 @@ class HrAttendance(models.Model):
 
         for emp_id, emp_name in abandoned_employees:
             _logger.warning(
-                "ATT-3: Job abandonment detected for employee %s (%d). Creating discipline case.",
+                "Job abandonment detected for employee %s (%d). Creating discipline case.",
                 emp_name, emp_id
             )
             if self.env.get('discipline.case'):
@@ -656,13 +656,13 @@ class HrAttendance(models.Model):
                 offense = self.env.ref(offense_xmlid, raise_if_not_found=False)
                 if not offense:
                     # Fall back to creating a case without a specific offense
-                    _logger.warning("ATT-3: offense_job_abandonment not found. Skipping case creation for %s.", emp_name)
+                    _logger.warning("offense_job_abandonment not found. Skipping case creation for %s.", emp_name)
                     continue
                 case = self.env['discipline.case'].sudo().create({
                     'employee_id': emp_id,
                     'offense_id': offense.id,
                     'description': _(
-                        'ATT-3 / Job Abandonment: Employee %s has been absent for %d+ consecutive working days '
+                        '/ Job Abandonment: Employee %s has been absent for %d+ consecutive working days '
                         '(from %s to %s) with no approved leave on record. '
                         'This case was auto-created by the attendance absence monitoring cron.'
                     ) % (emp_name, abandonment_days, check_from, today),
@@ -671,14 +671,14 @@ class HrAttendance(models.Model):
                 if hasattr(case, 'action_initiate'):
                     case.action_initiate()
                 _logger.info(
-                    "ATT-3: Job abandonment discipline case %s created for employee %s.",
+                    "Job abandonment discipline case %s created for employee %s.",
                     case.name, emp_name
                 )
 
     @api.model
     def cron_notify_missing_attendance(self):
         """
-        FR-ATT-027: Missing check-in / check-out notification to employees.
+        FR-Missing check-in / check-out notification to employees.
         Runs periodically during business hours (08:15–18:00).
         Notifies employees who are missing check-in or check-out.
         Deduplicates via hr.attendance.notification.log.

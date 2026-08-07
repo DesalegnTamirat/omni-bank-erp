@@ -14,9 +14,9 @@
                 <field name="job_title"/>
                 <field name="manager_name"/>
                 <field name="date"/>
-                <field name="over_time_hours"/>
-                <field name="used_hours"/>
-                <field name="remaining_hours"/>
+                <field name="over_time_hours" widget="float_time"/>
+                <field name="used_hours" widget="float_time"/>
+                <field name="remaining_hours" widget="float_time"/>
                 <field name="state"/>
             </list>
         </field>

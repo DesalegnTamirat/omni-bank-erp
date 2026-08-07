@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Nomination Wizard (FREDS038, FR-EDS-024...030) -->
+
+        <record id="view_eds_nomination_wizard_form" model="ir.ui.view">
+            <field name="name">eds.nomination.wizard.form</field>
+            <field name="model">eds.nomination.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Nominate Employees for a Session">
+                    <group>
+                        <group>
+                            <field name="session_id" options="{'no_create': True}"/>
+                            <field name="course_name" readonly="1"/>
+                            <field name="nomination_type"/>
+                        </group>
+                        <group>
+                            <field name="employee_ids" widget="many2many_tags"/>
+                            <field name="tna_entry_ids" widget="many2many_tags"
+                                    invisible="nomination_type != 'tna_based'"/>
+                            <field name="justification" invisible="nomination_type != 'ad_hoc'"/>
+                        </group>
+                    </group>
+                    <footer>
+                        <button name="action_create_nominations" string="Create &amp; Submit Nominations"
+                                type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_nomination_wizard" model="ir.actions.act_window">
+            <field name="name">Nominate for Session</field>
+            <field name="res_model">eds.nomination.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="context">{'default_nomination_type': 'tna_based'}</field>
+        </record>
+
+    </data>
+</odoo>

@@ -21,7 +21,7 @@ Key Features:
 - Disciplinary History tracking per employee and Recruitment/Promotion eligibility checks.
 - Formal Case Revocation with mandatory justification and immutable original record audit log.
     """,
-    'author': 'Bunna Bank / Antigravity AI',
+    'author': 'Abeza & Desalegn',
     'website': 'https://www.bunnabanksc.com',
     'license': 'LGPL-3',
     'depends': [

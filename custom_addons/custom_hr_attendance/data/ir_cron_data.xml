@@ -18,13 +18,13 @@
 
         <!--
             Absence Detection Cron: scheduled at 09:30 AM daily.
-            ATT-2: Now also creates payroll payload and signals discipline module.
+            Now also creates payroll payload and signals discipline module.
             Runs strictly AFTER the 08:00–08:15 peak check-in window closes to
             prevent any cron table-scan from contending with live check-in traffic.
             nextcall is set to 09:30 as the first execution anchor.
         -->
         <record id="ir_cron_automatic_absence_detection" model="ir.cron">
-            <field name="name">Attendance: Daily Automatic Absence Detection (ATT-2)</field>
+            <field name="name">Attendance: Daily Automatic Absence Detection</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_automatic_absence_detection()</field>
@@ -35,13 +35,13 @@
         </record>
 
         <!--
-            ATT-3: Job Abandonment Cron.
+            Job Abandonment Cron.
             Detects employees absent for 3+ consecutive working days with no approved leave.
             Runs daily at 03:00 AM server time (off-peak, well before business hours).
             Creates a discipline case automatically when triggered.
         -->
         <record id="ir_cron_job_abandonment_detection" model="ir.cron">
-            <field name="name">Attendance: Daily Job Abandonment Detection (ATT-3)</field>
+            <field name="name">Attendance: Daily Job Abandonment Detection</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_job_abandonment_detection()</field>
@@ -51,11 +51,11 @@
             <field name="active" eval="True"/>
         </record>
         <!--
-            FR-ATT-027: Missing Check-In / Check-Out Notification Cron.
+            FR-Missing Check-In / Check-Out Notification Cron.
             Runs every 30 minutes during business hours to notify employees of missing check-in/out.
         -->
         <record id="ir_cron_notify_missing_attendance" model="ir.cron">
-            <field name="name">Attendance: Missing Check-In / Check-Out Notification (FR-ATT-027)</field>
+            <field name="name">Attendance: Missing Check-In / Check-Out Notification (FR-)</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_notify_missing_attendance()</field>

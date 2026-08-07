@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Venues (FREDS020 / FR-EDS-019) ══════════════ -->
+
+        <record id="view_eds_venue_list" model="ir.ui.view">
+            <field name="name">eds.venue.list</field>
+            <field name="model">eds.venue</field>
+            <field name="arch" type="xml">
+                <list string="Training Venues">
+                    <field name="name"/>
+                    <field name="location"/>
+                    <field name="capacity"/>
+                    <field name="facilities"/>
+                    <field name="booking_count" string="Bookings"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_search" model="ir.ui.view">
+            <field name="name">eds.venue.search</field>
+            <field name="model">eds.venue</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="location"/>
+                    <filter string="Active" name="active" domain="[('active','=',True)]"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_form" model="ir.ui.view">
+            <field name="name">eds.venue.form</field>
+            <field name="model">eds.venue</field>
+            <field name="arch" type="xml">
+                <form string="Training Venue">
+                    <sheet>
+                        <div class="oe_button_box">
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_bookings" icon="fa-calendar">
+                                <div class="o_stat_info">
+                                    <field name="booking_count" widget="statinfo" string="Bookings"/>
+                                    <span class="o_stat_text">View venue bookings</span>
+                                </div>
+                            </button>
+                        </div>
+                        <group>
+                            <group string="Venue">
+                                <field name="name"/>
+                                <field name="location"/>
+                                <field name="capacity"/>
+                                <field name="active"/>
+                            </group>
+                            <group string="Facilities">
+                                <field name="facilities"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Bookings" name="bookings">
+                                <field name="booking_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="session_id"/>
+                                        <field name="date_start"/>
+                                        <field name="date_end"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_venue" model="ir.actions.act_window">
+            <field name="name">Venues</field>
+            <field name="res_model">eds.venue</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_venue_search"/>
+        </record>
+
+        <!-- ══════════════ Venue Bookings (FR-EDS-019/020) ══════════════ -->
+
+        <record id="view_eds_venue_booking_list" model="ir.ui.view">
+            <field name="name">eds.venue.booking.list</field>
+            <field name="model">eds.venue.booking</field>
+            <field name="arch" type="xml">
+                <list string="Venue Bookings">
+                    <field name="name"/>
+                    <field name="venue_id"/>
+                    <field name="session_id"/>
+                    <field name="date_start"/>
+                    <field name="date_end"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_venue_booking_form" model="ir.ui.view">
+            <field name="name">eds.venue.booking.form</field>
+            <field name="model">eds.venue.booking</field>
+            <field name="arch" type="xml">
+                <form string="Venue Booking">
+                    <header>
+                        <button name="action_confirm" string="Confirm" type="object"
+                                class="oe_highlight" invisible="state != 'requested'"/>
+                        <button name="action_cancel" string="Cancel Booking" type="object"
+                                invisible="state == 'cancelled'"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name" readonly="1"/>
+                                <field name="venue_id"/>
+                                <field name="session_id"/>
+                            </group>
+                            <group>
+                                <field name="date_start"/>
+                                <field name="date_end"/>
+                                <field name="notes"/>
+                            </group>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_venue_booking" model="ir.actions.act_window">
+            <field name="name">Venue Bookings</field>
+            <field name="res_model">eds.venue.booking</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ Batches / Cohorts (FREDS023) ══════════════ -->
+
+        <record id="view_eds_batch_list" model="ir.ui.view">
+            <field name="name">eds.batch.list</field>
+            <field name="model">eds.batch</field>
+            <field name="arch" type="xml">
+                <list string="Training Batches">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="description"/>
+                    <field name="max_capacity"/>
+                    <field name="participant_target"/>
+                    <field name="session_count" string="Sessions"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_batch_form" model="ir.ui.view">
+            <field name="name">eds.batch.form</field>
+            <field name="model">eds.batch</field>
+            <field name="arch" type="xml">
+                <form string="Training Batch">
+                    <header>
+                        <button name="action_plan" string="Plan" type="object"
+                                class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_activate" string="Activate" type="object"
+                                class="oe_highlight" invisible="state != 'planned'"/>
+                        <button name="action_close" string="Close" type="object"
+                                invisible="state == 'closed'"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name" readonly="1"/>
+                                <field name="course_id"/>
+                                <field name="description"/>
+                            </group>
+                            <group>
+                                <field name="max_capacity"/>
+                                <field name="participant_target"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Sessions" name="sessions">
+                                <field name="session_ids">
+                                    <list editable="bottom">
+                                        <field name="name" readonly="1"/>
+                                        <field name="date_start"/>
+                                        <field name="date_end"/>
+                                        <field name="venue_id"/>
+                                        <field name="capacity"/>
+                                        <field name="status" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_batch" model="ir.actions.act_window">
+            <field name="name">Batches / Cohorts</field>
+            <field name="res_model">eds.batch</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- ══════════════ Sessions (FREDS020-023, FR-EDS-017...022) ══════════════ -->
+
+        <record id="view_eds_session_list" model="ir.ui.view">
+            <field name="name">eds.session.list</field>
+            <field name="model">eds.session</field>
+            <field name="arch" type="xml">
+                <list string="Training Sessions">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="program_name"/>
+                    <field name="batch_id"/>
+                    <field name="date_start"/>
+                    <field name="date_end"/>
+                    <field name="venue_id"/>
+                    <field name="trainer_ids" widget="many2many_tags"/>
+                    <field name="capacity"/>
+                    <field name="enrolled_count"/>
+                    <field name="conflict_flag" decoration-danger="conflict_flag"/>
+                    <field name="status" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_eds_session_search" model="ir.ui.view">
+            <field name="name">eds.session.search</field>
+            <field name="model">eds.session</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="venue_id"/>
+                    <field name="trainer_ids"/>
+                    <filter string="Scheduled" name="scheduled" domain="[('status','=','scheduled')]"/>
+                    <filter string="Ongoing" name="ongoing" domain="[('status','=','ongoing')]"/>
+                    <filter string="Completed" name="completed" domain="[('status','=','completed')]"/>
+                    <filter string="Conflicts" name="conflicts" domain="[('conflict_flag','=',True)]"/>
+                    <separator/>
+                    <group name="group_by">
+                        <filter string="Month" name="g_month"
+                                context="{'group_by': 'date_start:month'}"/>
+                        <filter string="Status" name="g_state" context="{'group_by':'status'}"/>
+                        <filter string="Venue" name="g_venue" context="{'group_by':'venue_id'}"/>
+                        <filter string="Course" name="g_course" context="{'group_by':'course_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="view_eds_session_form" model="ir.ui.view">
+            <field name="name">eds.session.form</field>
+            <field name="model">eds.session</field>
+            <field name="arch" type="xml">
+                <form string="Training Session">
+                    <header>
+                        <button name="action_nominate" string="Nominate for Session" type="object"
+                                class="oe_highlight" invisible="status not in ('scheduled','ongoing','rescheduled')"/>
+                        <button name="action_confirm" string="Confirm Schedule" type="object"
+                                class="oe_highlight" invisible="status != 'draft'"/>
+                        <button name="action_start" string="Start Session" type="object"
+                                class="oe_highlight" invisible="status != 'scheduled'"/>
+                        <button name="action_complete" string="Complete Session" type="object"
+                                class="oe_highlight" invisible="status != 'ongoing'"/>
+                        <button name="action_reschedule" string="Reschedule" type="object"
+                                invisible="status not in ('scheduled','ongoing')"/>
+                        <button name="action_confirm_reschedule" string="Confirm Reschedule"
+                                type="object" class="oe_highlight" invisible="status != 'rescheduled'"/>
+                        <button name="action_cancel" string="Cancel Session" type="object"
+                                invisible="status in ('cancelled','completed')"/>
+                        <field name="status" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box">
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_nominations" icon="fa-list-alt">
+                                <div class="o_stat_info">
+                                    <field name="nomination_count" widget="statinfo" string="Nominations"/>
+                                    <span class="o_stat_text">Review / approve</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_enrollments" icon="fa-users">
+                                <div class="o_stat_info">
+                                    <field name="enrolled_count" widget="statinfo" string="Enrolled"/>
+                                    <span class="o_stat_text">of capacity <field name="capacity"/> (waitlist <field name="waitlist_count"/>)</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" type="object"
+                                    name="action_view_attendance" icon="fa-check-square-o">
+                                <div class="o_stat_info">
+                                    <field name="attendance_count" widget="statinfo" string="Attendance"/>
+                                    <span class="o_stat_text">Session rate <field name="attendance_rate"/>%</span>
+                                </div>
+                            </button>
+                        </div>
+                        <group>
+                            <group string="Program">
+                                <field name="name" readonly="1"/>
+                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="program_name"/>
+                                <field name="plan_line_id" options="{'no_create': True}"/>
+                                <field name="batch_id" options="{'no_create': True}"/>
+                            </group>
+                            <group string="Schedule">
+                                <field name="date_start"/>
+                                <field name="date_end"/>
+                                <field name="start_time" widget="float_time"/>
+                                <field name="duration_hours"/>
+                                <field name="recurrence"/>
+                                <field name="recurrence_details" invisible="recurrence == 'single'"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Venue &amp; Capacity">
+                                <field name="venue_id" options="{'no_create': True}"/>
+                                <field name="capacity"/>
+                                <field name="enrolled_count" readonly="1"/>
+                                <field name="waitlist_count" readonly="1"/>
+                                <field name="approval_flow"/>
+                            </group>
+                            <group string="Trainers">
+                                <field name="trainer_ids" widget="many2many_tags"/>
+                                <field name="conflict_flag" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Notes">
+                            <field name="notes"/>
+                        </group>
+                        <notebook>
+                            <page string="Participants" name="participants">
+                                <field name="enrollment_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="department_id"/>
+                                        <field name="nomination_id"/>
+                                        <field name="waitlist_position"/>
+                                        <field name="enrolled_date"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Nominations" name="nominations">
+                                <field name="nomination_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="employee_id"/>
+                                        <field name="nomination_type" widget="badge"/>
+                                        <field name="waitlisted"/>
+                                        <field name="employee_confirmed" widget="badge"/>
+                                        <field name="state" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Attendance" name="attendance"
+                                  invisible="status not in ('ongoing','completed')">
+                                <field name="attendance_ids">
+                                    <list editable="bottom">
+                                        <field name="name" readonly="1"/>
+                                        <field name="employee_id"/>
+                                        <field name="attendance_date"/>
+                                        <field name="attended"/>
+                                        <field name="hours_attended"/>
+                                        <field name="notes"/>
+                                        <field name="attendance_percentage" string="Program %"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Daily Feedback" name="feedback">
+                                <field name="feedback_ids">
+                                    <list editable="bottom">
+                                        <field name="employee_id"/>
+                                        <field name="feedback_date"/>
+                                        <field name="day_number"/>
+                                        <field name="rating" widget="badge"/>
+                                        <field name="topic"/>
+                                        <field name="comment"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Assessments" name="assessments">
+                                <field name="assessment_ids">
+                                    <list editable="bottom">
+                                        <field name="employee_id"/>
+                                        <field name="assessment_type"/>
+                                        <field name="score"/>
+                                        <field name="passed"/>
+                                        <field name="assessment_date"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_session" model="ir.actions.act_window">
+            <field name="name">Training Sessions</field>
+            <field name="res_model">eds.session</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="employee_development_system.view_eds_session_search"/>
+        </record>
+
+    </data>
+</odoo>

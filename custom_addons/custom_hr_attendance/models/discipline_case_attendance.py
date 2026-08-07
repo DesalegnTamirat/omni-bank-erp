@@ -122,7 +122,7 @@ class HrAttendanceViolationProcessor(models.Model):
                 employee.name, new_count, lateness_threshold
             )
 
-            # FR-ATT-028: Notify Supervisor on late check-in violation
+            # FR-Notify Supervisor on late check-in violation
             if employee.parent_id and employee.parent_id.user_id:
                 if notif_log.log_and_check(employee.id, 'violation_supervisor'):
                     self.env['mail.activity'].sudo().create({
@@ -140,7 +140,7 @@ class HrAttendanceViolationProcessor(models.Model):
                     employee.id, 'lateness', self.id
                 )
 
-                # FR-ATT-029: HR Escalation on threshold breach
+                # FR-HR Escalation on threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):
                     # Target configured HR user or fallback to managers
                     escalation_user_id = params.get_param('hr_attendance.escalation_hr_user_id')
@@ -166,7 +166,7 @@ class HrAttendanceViolationProcessor(models.Model):
                 employee.name, new_count, force_checkout_threshold
             )
 
-            # FR-ATT-028: Notify Supervisor on force checkout violation
+            # FR-Notify Supervisor on force checkout violation
             if employee.parent_id and employee.parent_id.user_id:
                 if notif_log.log_and_check(employee.id, 'violation_supervisor'):
                     self.env['mail.activity'].sudo().create({
@@ -184,7 +184,7 @@ class HrAttendanceViolationProcessor(models.Model):
                     employee.id, 'force_checkout', self.id
                 )
 
-                # FR-ATT-029: HR Escalation on force checkout threshold breach
+                # FR-HR Escalation on force checkout threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):
                     escalation_user_id = params.get_param('hr_attendance.escalation_hr_user_id')
                     target_users = self.env['res.users'].browse(int(escalation_user_id)) if escalation_user_id and escalation_user_id.isdigit() else self.env.ref('hr_attendance.group_hr_attendance_manager').users

@@ -5,7 +5,7 @@ from odoo.exceptions import UserError
 
 class HrAttendanceFlagWizard(models.TransientModel):
     """
-    ATT-4 / FR-ATT-031: Wizard for flagging an attendance record for discipline review.
+    / FR-Wizard for flagging an attendance record for discipline review.
     Allows a supervisor or HR officer to provide a mandatory reason before flagging.
     After saving, the wizard marks the attendance record and optionally pre-creates
     a discipline case for HR review.
@@ -42,7 +42,7 @@ class HrAttendanceFlagWizard(models.TransientModel):
     )
 
     def action_confirm_flag(self):
-        """ATT-4: Mark the attendance record as flagged and optionally create a discipline case."""
+        """Mark the attendance record as flagged and optionally create a discipline case."""
         self.ensure_one()
         att = self.attendance_id
         if not att:

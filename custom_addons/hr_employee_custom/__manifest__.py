@@ -4,7 +4,7 @@
     'summary': "Adds Employee Grades and Levels configurations and mandatory fields.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Bunna Bank',
+    'author': 'Abeza & Desalegn',
     'license': 'LGPL-3',
     'depends': [
         'base',

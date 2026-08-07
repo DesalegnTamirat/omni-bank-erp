@@ -9,8 +9,8 @@
             <list string="Job Shifts">
                 <field name="name"/>
                 <field name="code"/>
-                <field name="start_time"/>
-                <field name="end_time"/>
+                <field name="start_time" widget="float_time"/>
+                <field name="end_time" widget="float_time"/>
                 <field name="is_night_shift"/>
                 <field name="time_range"/>
             </list>
@@ -30,8 +30,8 @@
                     </group>
 
                     <group>
-                        <field name="start_time"/>
-                        <field name="end_time"/>
+                        <field name="start_time" widget="float_time"/>
+                        <field name="end_time" widget="float_time"/>
                         <field name="is_night_shift"/>
                     </group>
 

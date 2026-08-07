@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Integration Log Views -->
+    <record id="view_eds_integration_log_tree" model="ir.ui.view">
+        <field name="name">eds.integration.log.tree</field>
+        <field name="model">eds.integration.log</field>
+        <field name="arch" type="xml">
+            <list string="Integration Audit Logs" create="false" edit="false">
+                <field name="timestamp"/>
+                <field name="name"/>
+                <field name="system"/>
+                <field name="direction"/>
+                <field name="status" widget="badge" decoration-success="status == 'success'" decoration-danger="status == 'failed'"/>
+                <field name="error_message"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_integration_log" model="ir.actions.act_window">
+        <field name="name">Integration Logs</field>
+        <field name="res_model">eds.integration.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- LMS Routing Views -->
+    <record id="view_eds_lms_routing_tree" model="ir.ui.view">
+        <field name="name">eds.lms.routing.tree</field>
+        <field name="model">eds.lms.routing</field>
+        <field name="arch" type="xml">
+            <list string="LMS Course Routing">
+                <field name="course_id"/>
+                <field name="session_id"/>
+                <field name="delivery_mode"/>
+                <field name="lms_ref"/>
+                <field name="sync_state" widget="badge" decoration-success="sync_state == 'synced'" decoration-warning="sync_state == 'pending'"/>
+                <field name="lms_completion_pct" widget="progressbar"/>
+                <field name="last_sync_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_lms_routing" model="ir.actions.act_window">
+        <field name="name">LMS E-Learning Course Routing</field>
+        <field name="res_model">eds.lms.routing</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Payroll Payload Views -->
+    <record id="view_eds_payroll_payload_tree" model="ir.ui.view">
+        <field name="name">eds.payroll.payload.tree</field>
+        <field name="model">eds.payroll.payload</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Recovery Payloads">
+                <field name="name"/>
+                <field name="payload_type"/>
+                <field name="employee_id"/>
+                <field name="amount"/>
+                <field name="effective_date"/>
+                <field name="source_ref"/>
+                <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'processed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_eds_payroll_payload" model="ir.actions.act_window">
+        <field name="name">Payroll Recovery Payloads</field>
+        <field name="res_model">eds.payroll.payload</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- PMS Gap Import Wizard View -->
+    <record id="view_eds_pms_gap_import_form" model="ir.ui.view">
+        <field name="name">eds.pms.gap.import.form</field>
+        <field name="model">eds.pms.gap.import</field>
+        <field name="arch" type="xml">
+            <form string="Import Competency Gaps from PMS">
+                <sheet>
+                    <group>
+                        <field name="cycle_id"/>
+                        <field name="csv_file" filename="filename"/>
+                        <field name="filename" invisible="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_import_gaps" string="Import Gaps" type="object" class="oe_highlight"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_pms_gap_import" model="ir.actions.act_window">
+        <field name="name">Import Gaps from PMS</field>
+        <field name="res_model">eds.pms.gap.import</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>
