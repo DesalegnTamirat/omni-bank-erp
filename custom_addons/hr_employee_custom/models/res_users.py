@@ -42,7 +42,7 @@ class ResUsersOperatingUnit(models.Model):
     def _default_operating_units(self):
         return self._default_operating_unit()
 
-    operating_unit_ids = fields.One2many(
+    operating_unit_ids = fields.Many2many(
         comodel_name="operating.unit",
         compute="_compute_operating_unit_ids",
         inverse="_inverse_operating_unit_ids",
