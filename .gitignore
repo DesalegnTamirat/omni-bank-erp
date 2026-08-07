@@ -1,5 +1,5 @@
 # ---- Python ----
-__pycache__/
+pycache/
 *.py[cod]
 *$py.class
 *.egg-info/
@@ -46,3 +46,10 @@ desktop.ini
 config/odoo.conf.local
 *.pem
 *.key
+.venv/
+.venv-1/
+base_module_copy/
+odoo_core_reference/
+odoo-data/
+pgdata/
+discip_extracted/
