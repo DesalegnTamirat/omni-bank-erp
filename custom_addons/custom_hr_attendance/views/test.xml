@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="view_shop_form" model="ir.ui.view">
+        <field name="name">view.shop.form</field>
+        <field name="model">mall.shop</field>
+        <field name="arch" type="xml">
+            <form string="Shop">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="floor"/>
+                        </group>
+                        <group>
+                            <field name="closing_time"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <!-- Action: My shop Attendance -->
+    <record id="action_shop_my" model="ir.actions.act_window">
+        <field name="name">My Shop</field>
+        <field name="res_model">mall.shop</field>
+        <field name="view_mode">form</field>
+        <field name="domain">[('employee_id.user_id','=',uid)]</field>
+    </record>
+</odoo>

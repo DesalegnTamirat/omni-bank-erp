@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+    =========================================================================
+    BRD SIMULATION DEMO DATA — custom_recruitment
+    =========================================================================
+    Covers: Operating Units, Departments, Employee Grades, Employees,
+            Discipline Cases, Blacklist Pool, Recruitment Requests,
+            Job Vacancies, Shortlist Criteria, External Eligible Candidates,
+            Transfer Requests, and Talent Roster.
+
+    All model names and field names are verified against actual model code.
+    =========================================================================
+    -->
+    <data noupdate="1">
+
+        <!-- ================================================================ -->
+        <!-- 1. OPERATING UNITS (Work Units)                                  -->
+        <!-- ================================================================ -->
+
+        <record id="demo_ou_it_directorate" model="operating.unit">
+            <field name="name">Enterprise Application Development Directorate</field>
+            <field name="sol_id">501</field>
+            <field name="work_unit_type">head_office</field>
+            <field name="district">Addis Ababa District</field>
+            <field name="region">Central Region</field>
+        </record>
+
+        <record id="demo_ou_addis_main_branch" model="operating.unit">
+            <field name="name">Addis Ababa Main Branch</field>
+            <field name="sol_id">201</field>
+            <field name="work_unit_type">branch</field>
+            <field name="district">Addis Ababa District</field>
+            <field name="region">Central Region</field>
+        </record>
+
+        <record id="demo_ou_hawassa_branch" model="operating.unit">
+            <field name="name">Hawassa Regional Branch</field>
+            <field name="sol_id">301</field>
+            <field name="work_unit_type">branch</field>
+            <field name="district">Southern District</field>
+            <field name="region">Sidama Region</field>
+        </record>
+
+        <record id="demo_ou_diredawa_branch" model="operating.unit">
+            <field name="name">Dire Dawa Branch</field>
+            <field name="sol_id">401</field>
+            <field name="work_unit_type">branch</field>
+            <field name="district">Eastern District</field>
+            <field name="region">Dire Dawa Region</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 2. DEPARTMENTS                                                    -->
+        <!-- ================================================================ -->
+
+        <record id="demo_dept_it" model="hr.department">
+            <field name="name">Information Technology Department</field>
+        </record>
+
+        <record id="demo_dept_operations" model="hr.department">
+            <field name="name">Branch Operations Department</field>
+        </record>
+
+        <record id="demo_dept_credit" model="hr.department">
+            <field name="name">Credit Analysis Department</field>
+        </record>
+
+        <record id="demo_dept_hr" model="hr.department">
+            <field name="name">Human Resources Department</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 3. EMPLOYEE GRADES                                                -->
+        <!-- ================================================================ -->
+
+        <record id="demo_grade_15" model="employee.grade">
+            <field name="grade_code">G15</field>
+            <field name="grade_name">Grade 15 – Senior Officer</field>
+            <field name="base_salary">25000.0</field>
+        </record>
+
+        <record id="demo_grade_12" model="employee.grade">
+            <field name="grade_code">G12</field>
+            <field name="grade_name">Grade 12 – Officer</field>
+            <field name="base_salary">18000.0</field>
+        </record>
+
+        <record id="demo_grade_9" model="employee.grade">
+            <field name="grade_code">G09</field>
+            <field name="grade_name">Grade 9 – Associate</field>
+            <field name="base_salary">12000.0</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 4. JOB POSITIONS (hr.job)                                        -->
+        <!-- ================================================================ -->
+
+        <record id="demo_job_senior_software_engineer" model="hr.job">
+            <field name="name">Senior Software Engineer</field>
+            <field name="department_id" ref="demo_dept_it"/>
+            <field name="grade" ref="demo_grade_15"/>
+        </record>
+
+        <record id="demo_job_branch_manager" model="hr.job">
+            <field name="name">Branch Manager</field>
+            <field name="department_id" ref="demo_dept_operations"/>
+            <field name="grade" ref="demo_grade_15"/>
+        </record>
+
+        <record id="demo_job_credit_analyst" model="hr.job">
+            <field name="name">Senior Credit Analyst</field>
+            <field name="department_id" ref="demo_dept_credit"/>
+            <field name="grade" ref="demo_grade_12"/>
+        </record>
+
+        <record id="demo_job_cashier" model="hr.job">
+            <field name="name">Cashier</field>
+            <field name="department_id" ref="demo_dept_operations"/>
+            <field name="grade" ref="demo_grade_9"/>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 5. DEMO EMPLOYEES                                                 -->
+        <!-- ================================================================ -->
+
+        <!--
+        Employee 1: Solomon Kebede
+        - Star performer, clean discipline record
+        - Senior Software Engineer at IT Directorate
+        - Will demonstrate full Transfer Request eligibility
+        -->
+        <record id="demo_emp_solomon_kebede" model="hr.employee">
+            <field name="name">Solomon Kebede</field>
+            <field name="work_email">solomon.kebede@bunnabank.com</field>
+            <field name="work_phone">+251911223344</field>
+            <field name="department_id" ref="demo_dept_it"/>
+            <field name="job_id" ref="demo_job_senior_software_engineer"/>
+            <field name="default_operating_unit_id" ref="demo_ou_it_directorate"/>
+            <field name="first_contract_date">2021-01-15</field>
+            <field name="active">True</field>
+        </record>
+
+        <!--
+        Employee 2: Tigist Alemu
+        - Good performer, received a First Warning (Level 4, 5% score deduction)
+        - Cashier at Addis Main Branch → demonstrates penalty-based score reduction
+        -->
+        <record id="demo_emp_tigist_alemu" model="hr.employee">
+            <field name="name">Tigist Alemu</field>
+            <field name="work_email">tigist.alemu@bunnabank.com</field>
+            <field name="work_phone">+251922334455</field>
+            <field name="department_id" ref="demo_dept_operations"/>
+            <field name="job_id" ref="demo_job_cashier"/>
+            <field name="default_operating_unit_id" ref="demo_ou_addis_main_branch"/>
+            <field name="first_contract_date">2023-03-01</field>
+            <field name="active">True</field>
+        </record>
+
+        <!--
+        Employee 3: Dawit Tadesse
+        - Moderate performer, received a Second Warning (Level 3, 10% deduction)
+        - Credit Analyst at Hawassa Branch → demonstrates second_warning impact
+        -->
+        <record id="demo_emp_dawit_tadesse" model="hr.employee">
+            <field name="name">Dawit Tadesse</field>
+            <field name="work_email">dawit.tadesse@bunnabank.com</field>
+            <field name="work_phone">+251933445566</field>
+            <field name="department_id" ref="demo_dept_credit"/>
+            <field name="job_id" ref="demo_job_credit_analyst"/>
+            <field name="default_operating_unit_id" ref="demo_ou_hawassa_branch"/>
+            <field name="first_contract_date">2024-06-01</field>
+            <field name="active">True</field>
+        </record>
+
+        <!--
+        Employee 4: Meron Haile
+        - High performer PMS-wise, but received a Final Written Warning (Level 2)
+        - Demonstrates complete ineligibility (last_written_warning blocks transfer)
+        -->
+        <record id="demo_emp_meron_haile" model="hr.employee">
+            <field name="name">Meron Haile</field>
+            <field name="work_email">meron.haile@bunnabank.com</field>
+            <field name="work_phone">+251944556677</field>
+            <field name="department_id" ref="demo_dept_operations"/>
+            <field name="job_id" ref="demo_job_branch_manager"/>
+            <field name="default_operating_unit_id" ref="demo_ou_diredawa_branch"/>
+            <field name="first_contract_date">2022-09-10</field>
+            <field name="active">True</field>
+        </record>
+
+        <!--
+        Employee 5: Yohannes Tesfaye
+        - HR Officer who initiates and manages recruitment requests
+        - Clean record, demonstrates Recruitment Request approval workflow
+        -->
+        <record id="demo_emp_yohannes_tesfaye" model="hr.employee">
+            <field name="name">Yohannes Tesfaye</field>
+            <field name="work_email">yohannes.tesfaye@bunnabank.com</field>
+            <field name="work_phone">+251955667788</field>
+            <field name="department_id" ref="demo_dept_hr"/>
+            <field name="job_id" ref="demo_job_credit_analyst"/>
+            <field name="default_operating_unit_id" ref="demo_ou_it_directorate"/>
+            <field name="first_contract_date">2020-07-01</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 6. DISCIPLINARY CASES                                             -->
+        <!--    References offense levels from discipline_management module     -->
+        <!-- ================================================================ -->
+
+        <!--
+        Tigist Alemu: Level 4 – First Written Warning + 5% Penalty
+        (Attendance offense: unexcused absence)
+        State = enforced → score deduction applied in transfer ranking
+        -->
+        <record id="demo_case_tigist_first_warning" model="discipline.case">
+            <field name="employee_id" ref="demo_emp_tigist_alemu"/>
+            <field name="offense_id" ref="discipline_management.offense_level_4_first_warning"/>
+            <field name="incident_date">2026-02-10</field>
+            <field name="description">
+                Employee was absent without prior notification on three consecutive Mondays 
+                between January and February 2026. Despite two informal reminders, the 
+                employee failed to provide valid justification.
+            </field>
+            <field name="state">enforced</field>
+        </record>
+
+        <!--
+        Dawit Tadesse: Level 3 – Second Written Warning + 10% Penalty
+        (Conduct offense: insubordination toward branch manager directive)
+        State = enforced → 10% deduction applied in transfer ranking
+        -->
+        <record id="demo_case_dawit_second_warning" model="discipline.case">
+            <field name="employee_id" ref="demo_emp_dawit_tadesse"/>
+            <field name="offense_id" ref="discipline_management.offense_level_3_second_warning"/>
+            <field name="incident_date">2026-03-15</field>
+            <field name="description">
+                Employee publicly refused a documented directive from the Branch Manager 
+                regarding credit file preparation deadlines in front of department colleagues. 
+                This represents a repeated pattern following an earlier informal counseling session.
+            </field>
+            <field name="state">enforced</field>
+        </record>
+
+        <!--
+        Meron Haile: Level 2 – Final Written Warning + 20% Penalty
+        (Conduct offense: breach of customer data confidentiality)
+        State = enforced → employee is INELIGIBLE for transfer regardless of score
+        -->
+        <record id="demo_case_meron_final_warning" model="discipline.case">
+            <field name="employee_id" ref="demo_emp_meron_haile"/>
+            <field name="offense_id" ref="discipline_management.offense_level_2_final_warning"/>
+            <field name="incident_date">2026-04-20</field>
+            <field name="description">
+                Employee was found to have shared confidential customer financial statements 
+                with a third party outside the bank. The investigation confirmed the breach 
+                and recommended the issuance of a Final Written Warning in accordance with 
+                the bank's disciplinary policy.
+            </field>
+            <field name="state">enforced</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 7. BLACKLIST POOL                                                 -->
+        <!--    Demonstrates Section 6 – Blacklist Check on Applicants         -->
+        <!-- ================================================================ -->
+
+        <!-- Blacklisted: Ex-employee dismissed for fraud at a partner institution -->
+        <record id="demo_blacklist_tariku_mengistu" model="blacklist.pool">
+            <field name="candidate">Tariku Mengistu</field>
+            <field name="national_id">ETH-99887766</field>
+            <field name="gender">Male</field>
+            <field name="reason">Involved in documented financial fraud at a commercial bank partner institution. Dismissed in 2024 and flagged by the Ethiopian Banking Association.</field>
+            <field name="blacklisted_on">2025-11-01</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Blacklisted: Former contractor terminated for document falsification -->
+        <record id="demo_blacklist_selam_worku" model="blacklist.pool">
+            <field name="candidate">Selam Worku</field>
+            <field name="national_id">ETH-88776655</field>
+            <field name="gender">Female</field>
+            <field name="reason">Academic credential falsification discovered during employment verification. Applicant submitted forged university transcripts in 2025 application cycle.</field>
+            <field name="blacklisted_on">2025-06-15</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 8. DEFAULT EXTERNAL SHORTLIST CRITERIA                            -->
+        <!--    Section 7 of BRD – Default Shortlisting Criteria               -->
+        <!-- ================================================================ -->
+
+        <record id="demo_default_shortlist_criteria" model="external.default.shortlist.criteria">
+            <field name="name">Bunna Bank Standard Shortlist Criteria (FY 2026)</field>
+            <field name="minimum_cgpa">2.75</field>
+            <field name="minimum_education">bachelor</field>
+            <field name="minimum_experience_years">2.0</field>
+            <field name="minimum_banking_experience">1.0</field>
+            <field name="notes">
+                These are the standard Bank-wide shortlisting thresholds applicable to all 
+                external vacancy postings unless a specific vacancy overrides them. 
+                Approved by HR Director on 2026-01-10.
+            </field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 9. RECRUITMENT REQUESTS                                           -->
+        <!--    Section 3 of BRD – Manpower Requisition Process                -->
+        <!-- ================================================================ -->
+
+        <!--
+        Planned Request: IT Directorate requests 2 Senior Software Engineers
+        State = approved (demonstrates full workflow completion)
+        -->
+        <record id="demo_rr_planned_it" model="recruitment.request">
+            <field name="request_type">planned</field>
+            <field name="operating_unit_id" ref="demo_ou_it_directorate"/>
+            <field name="department_id" ref="demo_dept_it"/>
+            <field name="job_position_id" ref="demo_job_senior_software_engineer"/>
+            <field name="job_grade_id" ref="demo_grade_15"/>
+            <field name="employment_type">permanent</field>
+            <field name="required_headcount">2</field>
+            <field name="sourcing_type">both</field>
+            <field name="requested_by" ref="demo_emp_yohannes_tesfaye"/>
+            <field name="job_description">
+                Senior Software Engineer role for Core Banking System enhancement and Enterprise 
+                Application Development. Requires 3+ years experience with Java/.NET and 
+                banking system integration.
+            </field>
+            <field name="state">approved</field>
+        </record>
+
+        <!--
+        Unplanned Request: Addis Main Branch urgently needs a Credit Analyst replacement
+        State = submitted (demonstrates pending approval workflow)
+        -->
+        <record id="demo_rr_unplanned_credit" model="recruitment.request">
+            <field name="request_type">unplanned</field>
+            <field name="operating_unit_id" ref="demo_ou_addis_main_branch"/>
+            <field name="department_id" ref="demo_dept_credit"/>
+            <field name="job_position_id" ref="demo_job_credit_analyst"/>
+            <field name="job_grade_id" ref="demo_grade_12"/>
+            <field name="employment_type">permanent</field>
+            <field name="required_headcount">1</field>
+            <field name="sourcing_type">external</field>
+            <field name="requested_by" ref="demo_emp_yohannes_tesfaye"/>
+            <field name="justification">
+                Urgent replacement required due to sudden resignation of the branch's senior 
+                credit analyst following a competing offer. The position is critical for 
+                maintaining loan approval SLA during the high-demand Q3 period.
+            </field>
+            <field name="state">submitted</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 10. JOB VACANCIES                                                 -->
+        <!--     Section 4 of BRD – Job Vacancy Announcement                   -->
+        <!-- ================================================================ -->
+
+        <!--
+        External Vacancy: Senior Software Engineer (linked to approved RR)
+        State = posted (published externally on LinkedIn)
+        -->
+        <record id="demo_vacancy_software_engineer" model="job.vacancy">
+            <field name="job_position" ref="demo_job_senior_software_engineer"/>
+            <field name="operating_unit_id" ref="demo_ou_it_directorate"/>
+            <field name="sourcing_type">external</field>
+            <field name="internal_movement_type">external</field>
+            <field name="recruitment_type">External</field>
+            <field name="no_of_vacancies">2</field>
+            <field name="opening_date">2026-07-01</field>
+            <field name="last_date_to_apply">2026-07-31</field>
+            <field name="type_of_employment">Permanent</field>
+            <field name="minimum_education">bachelor</field>
+            <field name="minimum_cgpa">3.0</field>
+            <field name="minimum_experience_years">3.0</field>
+            <field name="banking_experience_required">0.0</field>
+            <field name="source_channel">linkedin</field>
+            <field name="responsible" ref="demo_emp_yohannes_tesfaye"/>
+            <field name="vacancy_description">
+                Bunna Bank is seeking experienced Senior Software Engineers to join our 
+                Enterprise Application Development Directorate. Successful candidates will 
+                work on core banking system modules, API integrations, and digital banking 
+                products. BSc/MSc in Computer Science, Information Systems, or related field 
+                required with minimum 3 years hands-on development experience.
+            </field>
+            <field name="state">posted</field>
+        </record>
+
+        <!--
+        Internal Vacancy: Branch Manager – Lateral Transfer opportunity
+        State = posted (announced internally)
+        -->
+        <record id="demo_vacancy_branch_manager_hawassa" model="job.vacancy">
+            <field name="job_position" ref="demo_job_branch_manager"/>
+            <field name="operating_unit_id" ref="demo_ou_hawassa_branch"/>
+            <field name="sourcing_type">internal</field>
+            <field name="internal_movement_type">lateral</field>
+            <field name="recruitment_type">Internal</field>
+            <field name="no_of_vacancies">1</field>
+            <field name="opening_date">2026-07-05</field>
+            <field name="last_date_to_apply">2026-08-05</field>
+            <field name="type_of_employment">Permanent</field>
+            <field name="responsible" ref="demo_emp_yohannes_tesfaye"/>
+            <field name="vacancy_description">
+                Branch Manager vacancy at Hawassa Regional Branch. Open to eligible internal 
+                candidates meeting grade requirements and minimum service criteria. Transfer 
+                eligibility rules apply per BRD Section 12.
+            </field>
+            <field name="state">posted</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 11. EXTERNAL ELIGIBLE CANDIDATES (from posted vacancy)            -->
+        <!--     Section 8 of BRD – External Candidate Profiles                -->
+        <!-- ================================================================ -->
+
+        <!--
+        Candidate 1: Biniyam Worku
+        - Qualifies on all shortlist criteria → CGPA 3.8, 4.5yr experience
+        - Clean background → will NOT match blacklist
+        - Represents a strong candidate expected to proceed to interview
+        -->
+        <record id="demo_ext_candidate_biniyam" model="external.recruitment.eligible.employees">
+            <field name="applicant_name" ref="demo_emp_solomon_kebede"/>
+            <field name="applicant_email">biniyam.worku@gmail.com</field>
+            <field name="applicant_phone">+251911001122</field>
+            <field name="gender">male</field>
+            <field name="date_of_birth">1996-03-12</field>
+            <field name="working_status">employed</field>
+            <field name="current_company">Awash Bank S.C.</field>
+            <field name="join_immediately">yes</field>
+            <field name="preferred_location">Addis Ababa</field>
+            <field name="ex_bunna">False</field>
+        </record>
+
+        <!--
+        Candidate 2: Helen Berhe
+        - CGPA 2.5, Diploma-level education → FAILS minimum criteria
+        - Demonstrates a candidate who should be filtered out during shortlisting
+        -->
+        <record id="demo_ext_candidate_helen" model="external.recruitment.eligible.employees">
+            <field name="applicant_email">helen.berhe@yahoo.com</field>
+            <field name="applicant_phone">+251922112233</field>
+            <field name="gender">female</field>
+            <field name="date_of_birth">2000-07-20</field>
+            <field name="working_status">unemployed</field>
+            <field name="join_immediately">yes</field>
+            <field name="preferred_location">Hawassa</field>
+            <field name="ex_bunna">False</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 12. TRANSFER REQUESTS                                             -->
+        <!--     Section 12 of BRD – Employee Transfer Process                 -->
+        <!-- ================================================================ -->
+
+        <!--
+        Transfer 1: Solomon Kebede → Hawassa Branch Manager vacancy
+        - Eligible: 5+ years service, clean record, PMS 88%
+        - disciplinary_status = none → no deduction
+        - Demonstrates full eligibility + high suitability score
+        -->
+        <record id="demo_transfer_solomon_to_hawassa" model="employee.transfer.request">
+            <field name="employee_id" ref="demo_emp_solomon_kebede"/>
+            <field name="target_vacancy_id" ref="demo_vacancy_branch_manager_hawassa"/>
+            <field name="request_date">2026-07-08</field>
+            <field name="date_in_current_position">2021-01-15</field>
+            <field name="date_in_current_location">2021-01-15</field>
+            <field name="pms_score">88.0</field>
+            <field name="supervisor_recommendation_score">92.0</field>
+            <field name="state">submitted</field>
+        </record>
+
+        <!--
+        Transfer 2: Tigist Alemu → Hawassa Branch Manager vacancy
+        - Eligible but score-deducted: First Warning → 5% penalty
+        - disciplinary_status = first_warning → 5% deducted from suitability score
+        - Lower than Solomon's score due to warning
+        -->
+        <record id="demo_transfer_tigist_to_hawassa" model="employee.transfer.request">
+            <field name="employee_id" ref="demo_emp_tigist_alemu"/>
+            <field name="target_vacancy_id" ref="demo_vacancy_branch_manager_hawassa"/>
+            <field name="request_date">2026-07-10</field>
+            <field name="date_in_current_position">2023-03-01</field>
+            <field name="date_in_current_location">2023-03-01</field>
+            <field name="pms_score">84.0</field>
+            <field name="supervisor_recommendation_score">78.0</field>
+            <field name="state">submitted</field>
+        </record>
+
+        <!--
+        Transfer 3: Meron Haile → Hawassa Branch Manager vacancy
+        - INELIGIBLE: Active Final Written Warning (last_written_warning)
+        - disciplinary_status = last_written_warning → complete ineligibility
+        - Demonstrates system blocking disqualified candidates from proceeding
+        -->
+        <record id="demo_transfer_meron_to_hawassa" model="employee.transfer.request">
+            <field name="employee_id" ref="demo_emp_meron_haile"/>
+            <field name="target_vacancy_id" ref="demo_vacancy_branch_manager_hawassa"/>
+            <field name="request_date">2026-07-12</field>
+            <field name="date_in_current_position">2022-09-10</field>
+            <field name="date_in_current_location">2022-09-10</field>
+            <field name="pms_score">91.0</field>
+            <field name="supervisor_recommendation_score">85.0</field>
+            <field name="state">draft</field>
+        </record>
+
+        <!-- ================================================================ -->
+        <!-- 13. TALENT ROSTER ENTRIES                                         -->
+        <!--     Section 9 of BRD – Reserve Pool / Talent Roster               -->
+        <!-- ================================================================ -->
+
+        <!--
+        Roster 1: Biniyam Worku – Strong external candidate added to reserve pool
+        after scoring well in the Software Engineer recruitment cycle.
+        Expiry = 6 months from date_added.
+        -->
+        <record id="demo_talent_biniyam_worku" model="talent.roster">
+            <field name="name">Biniyam Worku</field>
+            <field name="email">biniyam.worku@gmail.com</field>
+            <field name="phone">+251911001122</field>
+            <field name="gender">male</field>
+            <field name="application_type">External</field>
+            <field name="educational_qualification">Bachelor of Science in Computer Science</field>
+            <field name="field_of_study">Computer Science</field>
+            <field name="highest_cgpa">3.8</field>
+            <field name="total_experience">4.5</field>
+            <field name="banking_experience">2.5</field>
+            <field name="written_score">82.0</field>
+            <field name="interview_score">88.0</field>
+            <field name="final_score">86.4</field>
+            <field name="previous_rank">2</field>
+            <field name="date_added">2026-07-15</field>
+            <field name="status">active</field>
+            <field name="skills_summary">
+                Java, Spring Boot, REST API design, Oracle DB, Microservices architecture, 
+                T24 Core Banking integration experience, Agile/Scrum methodology.
+            </field>
+            <field name="notes">
+                Ranked 2nd in the Senior Software Engineer external recruitment cycle. 
+                Top candidate accepted position; Biniyam added to talent roster for 6-month 
+                reserve pool activation. Excellent interview performance and strong references.
+            </field>
+            <field name="source_vacancy_id" ref="demo_vacancy_software_engineer"/>
+        </record>
+
+        <!--
+        Roster 2: Aberash Tadesse – Internal candidate from a previous cycle
+        placed on roster following lateral transfer pool shortlisting.
+        -->
+        <record id="demo_talent_aberash_tadesse" model="talent.roster">
+            <field name="name">Aberash Tadesse</field>
+            <field name="employee_id" ref="demo_emp_dawit_tadesse"/>
+            <field name="email">aberash.tadesse@bunnabank.com</field>
+            <field name="phone">+251933445566</field>
+            <field name="gender">female</field>
+            <field name="application_type">Internal</field>
+            <field name="educational_qualification">Bachelor of Arts in Economics</field>
+            <field name="field_of_study">Economics</field>
+            <field name="highest_cgpa">3.4</field>
+            <field name="total_experience">6.0</field>
+            <field name="banking_experience">6.0</field>
+            <field name="written_score">78.0</field>
+            <field name="interview_score">81.0</field>
+            <field name="pms_score">85.0</field>
+            <field name="final_score">80.5</field>
+            <field name="previous_rank">3</field>
+            <field name="date_added">2026-06-01</field>
+            <field name="status">active</field>
+            <field name="notes">
+                Internal candidate from Hawassa Branch. Strong performance track record but 
+                ranked 3rd in the Branch Manager cycle. Retained in talent roster for 
+                consideration in next available suitable vacancy within 6 months.
+            </field>
+        </record>
+
+        <!--
+        Roster 3: Expired roster entry – demonstrates 6-month expiry rule enforcement
+        -->
+        <record id="demo_talent_expired_candidate" model="talent.roster">
+            <field name="name">Bekele Hailu (Expired)</field>
+            <field name="email">bekele.hailu@yahoo.com</field>
+            <field name="phone">+251977889900</field>
+            <field name="gender">male</field>
+            <field name="application_type">External</field>
+            <field name="educational_qualification">Master of Business Administration</field>
+            <field name="field_of_study">Business Administration</field>
+            <field name="highest_cgpa">3.6</field>
+            <field name="total_experience">8.0</field>
+            <field name="banking_experience">5.0</field>
+            <field name="final_score">79.2</field>
+            <field name="date_added">2025-12-01</field>
+            <field name="status">expired</field>
+            <field name="notes">
+                Candidate added to talent roster in December 2025. 6-month reserve pool 
+                window has elapsed (expiry: June 2026). Marked as expired by system cron job.
+            </field>
+        </record>
+
+    </data>
+</odoo>

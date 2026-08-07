@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_recruitment.RecruitmentDashboard">
+        <div class="o_recruitment_dashboard">
+
+            <!-- ── Header ── -->
+            <div class="o_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4">
+                <h2 class="o_dashboard_title mb-0">Recruitment Dashboard</h2>
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Period filter -->
+                    <select class="form-select o_period_select" style="width:150px;"
+                            t-on-change="onPeriodChange">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    <!-- Recruitment type filter -->
+                    <select class="form-select o_period_select" style="width:150px;"
+                            t-on-change="onTypeChange">
+                        <option value="all">All Vacancies</option>
+                        <option value="internal">Internal Only</option>
+                        <option value="external">External Only</option>
+                    </select>
+                    <!-- Custom date inputs -->
+                    <div t-if="state.period === 'custom'" class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateFrom"
+                               t-on-change="onDateFromChange"/>
+                        <span class="text-muted fw-bold">–</span>
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateTo"
+                               t-on-change="onDateToChange"/>
+                        <button class="btn btn-primary btn-sm" t-on-click="applyCustomRange">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-2x" style="color:#1d2632;"/>
+            </div>
+
+            <div t-else="" class="px-4 pb-4">
+
+                <!-- ── SECTION 1: Vacancy Stat Cards ── -->
+                <div class="o_dashboard_section_title mb-2">Job Vacancies</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_total" t-on-click="openVacancies" data-status="">
+                            <div class="o_stat_label">Total</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.stats.total"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="openVacancies" data-status="draft">
+                            <div class="o_stat_label">Draft</div>
+                            <div class="o_stat_value v-draft"><t t-esc="state.stats.draft"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="openVacancies" data-status="published">
+                            <div class="o_stat_label">Published</div>
+                            <div class="o_stat_value v-published"><t t-esc="state.stats.published"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_positive" t-on-click="openVacancies" data-status="closed">
+                            <div class="o_stat_label">Closed</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.stats.closed"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="openVacancies" data-status="">
+                            <div class="o_stat_label">Internal</div>
+                            <div class="o_stat_value v-internal"><t t-esc="state.stats.internal"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="openVacancies" data-status="">
+                            <div class="o_stat_label">External</div>
+                            <div class="o_stat_value v-external"><t t-esc="state.stats.external"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 2: Probation + Transfer ── -->
+                <div class="row g-3 mb-4">
+                    <!-- Probation -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">Probation Management</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_total" t-on-click="openProbation" data-state="">
+                                    <div class="o_stat_label">Total</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.probation_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openProbation" data-state="completed">
+                                    <div class="o_stat_label">Completed</div>
+                                    <div class="o_stat_value v-completed"><t t-esc="state.stats.probation_completed"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openProbation" data-state="in_progress">
+                                    <div class="o_stat_label">In Progress</div>
+                                    <div class="o_stat_value v-progress"><t t-esc="state.stats.probation_pending"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Transfer -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">Transfer Requests</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_total" t-on-click="openTransfer" data-state="">
+                                    <div class="o_stat_label">Total</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.transfer_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openTransfer" data-state="approved">
+                                    <div class="o_stat_label">Approved</div>
+                                    <div class="o_stat_value v-approved"><t t-esc="state.stats.transfer_approved"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openTransfer" data-state="submitted">
+                                    <div class="o_stat_label">Pending</div>
+                                    <div class="o_stat_value v-pending"><t t-esc="state.stats.transfer_pending"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 3: Charts ── -->
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title" t-if="state.recruitmentType === 'external'">Source Channel Distribution</div>
+                            <div class="o_chart_title" t-elif="state.recruitmentType === 'internal'">Movement Type Distribution</div>
+                            <div class="o_chart_title" t-else="">Vacancy Distribution</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="recruitmentPieChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title" t-if="state.recruitmentType === 'external'">Source Channel Comparison</div>
+                            <div class="o_chart_title" t-elif="state.recruitmentType === 'internal'">Internal Movement Comparison</div>
+                            <div class="o_chart_title" t-else="">Vacancy Comparison</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="recruitmentBarChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Vacancy Trend</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="recruitmentTrendChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

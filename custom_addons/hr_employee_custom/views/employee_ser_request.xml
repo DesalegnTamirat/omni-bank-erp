@@ -1,0 +1,110 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_employee_service_request_type" model="ir.actions.act_window">
+        <field name="name">Employee Service Request</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">employee.service.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">create!</p>
+        </field>
+    </record>
+
+    <record id="emp_service_request_type_tree_view" model="ir.ui.view">
+        <field name="name">employee.service.request.tree</field>
+        <field name="model">employee.service.request</field>
+        <field name="arch" type="xml">
+            <list string="Employee Service Request">
+                <field name="reference"/>
+                <field name="sr_type"/>
+				<field name="sr_category"/>
+                <field name="requestor"/>
+                <field name="requesting_work_unit"/>
+                <field name="authorizing_office"/>
+            </list>
+        </field>
+    </record>
+    <record id="emp_service_request_type_form_view" model="ir.ui.view">
+        <field name="name">employee.service.request.form</field>
+        <field name="model">employee.service.request</field>
+        <field name="arch" type="xml">
+            <form string="Employee Service Request">
+                <header>
+                    <button name="action_fetch_employee_data" string="Fetch" type="object" class="oe_highlight"/>
+                    <button name="notify" string="Notify" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+							<field name="sr_category"/>
+							<field name="letter_name" invisible="sr_category != 'Self Service Letter'"/>
+							<field name="sr_type" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
+                            <field name="requestor" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
+                            <field name="requesting_work_unit" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
+                        </group>
+                        <group>
+                            <field name="authorizing_office" readonly="sr_category == 'Self Service Letter'"/>
+                            <field name="sr_date" invisible="1"/>
+                            <field name="authorizer_id" invisible="1"/>
+                            <field name="expecting_date" invisible="sr_category == 'Self Service Letter'" required="sr_category != 'Self Service Letter'"/>
+                            <field name="sr_comments"/>
+                            <field name="attachment" widget="many2many_binary" invisible="sr_category == 'Self Service Letter'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                           <field name="employee_id"/>
+                            <field name="employee_manager"/>
+                            <field name="manager_user_id" invisible="1"/>
+                            <field name="employee_work_unit"/>
+                            <field name="employee_position"/>
+							 <field name="acting_vacant_position"/>
+							<field name="employee_grade"/>
+                            <field name="employee_category"/>
+                            <field name="employee_gender"/>
+                            <field name="employee_mail"/>
+                            <field name="employee_phone"/>
+                        </group>
+                        <group invisible="sr_category == 'Self Service Letter'">
+
+                            <field name="acting_suggested_employee"/>
+                            <field name="transfer_ou1"/>
+                            <field name="transfer_ou2"/>
+                            <field name="transfer_ou3"/>
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                        </group>
+						<group invisible="letter_name != 'Guarantee Letter'">
+
+                            <field name="name_of_the_external_person"/>
+                            <field name="name_of_the_organization"/>
+                            <field name="organization_address"/>
+                            <field name="organization_email_address"/>
+                            <field name="sub_city"/>
+                            <field name="woreda"/>
+							<field name="kebele"/>
+							<field name="phone_number"/>
+                        </group>
+						<group invisible="letter_name != 'Support Letter'">
+                            <field name="support"/>
+                            <field name="organization_name"/>
+                            <field name="salary"/>
+                            <field name="permanent_emp"/>
+                            <field name="job_position"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_emp_new_service_request_type" name="Employee Service request" parent="hr.menu_hr_employee_user" action="action_employee_service_request_type"/> -->
+</odoo>

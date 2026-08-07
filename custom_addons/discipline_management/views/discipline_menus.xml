@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Root Menu -->
+        <menuitem id="menu_discipline_root"
+                  name="Discipline Management"
+                  web_icon="discipline_management,static/description/icon.png"
+                  groups="discipline_management.group_discipline_user"
+                  sequence="75"/>
+
+        <!-- Dashboard Menu (Landing Page) -->
+        <menuitem id="menu_discipline_dashboard"
+                  name="Dashboard"
+                  parent="menu_discipline_root"
+                  action="action_discipline_dashboard"
+                  sequence="1"/>
+
+        <!-- Main Operations Submenus -->
+        <menuitem id="menu_discipline_cases"
+                  name="Disciplinary Cases"
+                  parent="menu_discipline_root"
+                  action="action_discipline_case"
+                  sequence="10"/>
+
+        <menuitem id="menu_discipline_investigations"
+                  name="Investigations"
+                  parent="menu_discipline_root"
+                  action="action_discipline_investigation"
+                  sequence="20"/>
+
+        <menuitem id="menu_discipline_committees"
+                  name="Committee Meetings"
+                  parent="menu_discipline_root"
+                  action="action_discipline_committee_meeting"
+                  sequence="30"/>
+
+        <menuitem id="menu_discipline_suspensions"
+                  name="Suspensions"
+                  parent="menu_discipline_root"
+                  action="action_discipline_suspension"
+                  sequence="40"/>
+
+        <menuitem id="menu_discipline_appeals"
+                  name="Appeals &amp; Reviews"
+                  parent="menu_discipline_root"
+                  action="action_discipline_appeal"
+                  sequence="50"/>
+
+        <menuitem id="menu_discipline_payroll_penalties"
+                  name="Payroll Deductions"
+                  parent="menu_discipline_root"
+                  action="action_discipline_payroll_penalty"
+                  groups="discipline_management.group_discipline_officer"
+                  sequence="60"/>
+
+        <!-- Configuration Menu -->
+        <menuitem id="menu_discipline_config"
+                  name="Configuration"
+                  parent="menu_discipline_root"
+                  groups="discipline_management.group_discipline_officer"
+                  sequence="100"/>
+
+        <menuitem id="menu_discipline_offenses"
+                  name="Offense Rules &amp; Penalties"
+                  parent="menu_discipline_config"
+                  action="action_discipline_offense"
+                  sequence="10"/>
+
+        <menuitem id="menu_discipline_offense_categories"
+                  name="Offense Categories"
+                  parent="menu_discipline_config"
+                  action="action_discipline_offense_category"
+                  sequence="20"/>
+
+        <menuitem id="menu_discipline_policy_versions"
+                  name="Policy Versions"
+                  parent="menu_discipline_config"
+                  action="action_discipline_policy_version"
+                  groups="discipline_management.group_discipline_admin"
+                  sequence="30"/>
+
+    </data>
+</odoo>

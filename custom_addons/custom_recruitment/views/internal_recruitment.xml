@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<!--    <record id="employee_recruitment_form" model="ir.ui.view">-->
+<!--        <field name="name">employee.recruitment.form</field>-->
+<!--        <field name="model">employee.recruitment</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <form string="Internal Recruitment" >-->
+<!--                <group colspan="4">-->
+<!--                    <group>-->
+<!--                        <field name="job_position"/>-->
+<!--                        <field name="job_location"/>-->
+
+<!--                    </group>-->
+<!--                     <group>-->
+<!--                        <field name="employee_grade"/>-->
+<!--                        <field name="employee_category"/>-->
+
+<!--                    </group>-->
+<!--                    <group>-->
+<!--                        <field name="vacancy_announced_on"/>-->
+<!--                    </group>-->
+<!--                    <group> <button name="notify" string="Notify Employees" type="object" class="oe_highlight"/></group>-->
+
+<!--                </group>-->
+<!--                <group>-->
+<!--                    <notebook>-->
+<!--                        <page string="Eligible Employees">-->
+<!--                            <field name="eligible_employees_details">-->
+<!--                                <list editable="bottom">-->
+<!--                                    <field name="emp_name"/>-->
+<!--                                    <field name="emp_number"/>-->
+<!--                                    <field name="emp_grade"/>-->
+<!--                                    <field name="emp_position"/>-->
+<!--                                    <field name="emp_location"/>-->
+<!--                                    <field name="emp_category"/>-->
+<!--&lt;!&ndash;                                    <field name="employment_type"/>&ndash;&gt;-->
+<!--                                    <field name="select_flag"/>-->
+<!--                                </list>-->
+<!--                            </field>-->
+<!--			            </page>-->
+<!--                    </notebook>-->
+<!--            </group>-->
+
+<!--            </form>-->
+<!--        </field>-->
+<!--    </record>-->
+<!--    <record id="employee_recruitment_tree" model="ir.ui.view">-->
+<!--        <field name="name">employee.recruitment.tree</field>-->
+<!--        <field name="model">employee.recruitment</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <list string="Internal Recruitment">-->
+<!--                <field name="job_position"/>-->
+<!--                <field name="job_location"/>-->
+<!--                <field name="employee_grade"/>-->
+<!--                <field name="employee_category"/>-->
+<!--                <field name="vacancy_announced_on"/>-->
+
+
+<!--&lt;!&ndash;                <field name="active"  invisible="inactive == True"/>&ndash;&gt;-->
+<!--&lt;!&ndash;                <field name="inactive"  invisible="active == True"/>&ndash;&gt;-->
+<!--            </list>-->
+<!--        </field>-->
+<!--    </record>-->
+<!--        <record id="employee_recruitment_form_tree" model="ir.actions.act_window">-->
+<!--        <field name="name">Internal Recruitment</field>-->
+<!--        <field name="res_model">employee.recruitment</field>-->
+<!--        <field name="context">{}</field>-->
+<!--        <field name="view_mode">tree,form</field>-->
+<!--    </record>-->
+<!--&lt;!&ndash;       <menuitem&ndash;&gt;-->
+<!--&lt;!&ndash;        id="menu_internal_recruitment_process"&ndash;&gt;-->
+<!--&lt;!&ndash;        name="Internal Recruitment Process"&ndash;&gt;-->
+<!--&lt;!&ndash;        parent="hr_recruitment.menu_hr_recruitment_root"&ndash;&gt;-->
+<!--&lt;!&ndash;        action="employee_recruitment_form_tree"&ndash;&gt;-->
+<!--&lt;!&ndash;        sequence="10"&ndash;&gt;-->
+<!--&lt;!&ndash;    />&ndash;&gt;-->
+</odoo>

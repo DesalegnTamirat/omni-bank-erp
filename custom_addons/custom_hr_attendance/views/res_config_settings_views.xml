@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+
+        <!-- Add fields to the settings form and restrict global settings -->
+        <record id="res_config_settings_view_form" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.inherit.custom.hr.attendance</field>
+            <field name="model">res.config.settings</field>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//app[@name='general_settings']" position="attributes">
+                    <attribute name="groups">base.group_system</attribute>
+                </xpath>
+                <xpath expr="//form" position="inside">
+                    <app data-string="Attendance Settings" string="Attendance Settings"
+                         name="custom_hr_attendance"
+                         groups="hr_attendance.group_hr_attendance_manager">
+
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 1: Feature Toggles                  -->
+                        <!-- ========================================= -->
+                        <block title="Attendance Features" name="custom_attendance_feature_toggles">
+                            <setting string="Check-in Time Restriction"
+                                     help="Enforce morning check-in time window. When OFF, employees can check in at any time.">
+                                <field name="enable_checkin_restriction"/>
+                            </setting>
+                            <setting string="Check-out Time Restriction"
+                                     help="Enforce shift-end check-out time restriction. When OFF, employees can check out freely.">
+                                <field name="enable_checkout_restriction"/>
+                            </setting>
+                            <setting string="Saturday Half-Day (Head Office)"
+                                     help="Apply reduced exit time on Saturdays for Head Office employees.">
+                                <field name="enable_saturday_halfday"/>
+                            </setting>
+                            <setting string="Lunch Break"
+                                     help="Enable Lunch-Out / Back-from-Lunch flow. Worked hours will exclude actual lunch break duration.">
+                                <field name="enable_lunch_break"/>
+                            </setting>
+                            <setting string="Automatic Absence Detection"
+                                     help="Enable automatic detection of unexcused absences">
+                                <field name="enable_auto_absence"/>
+                            </setting>
+                            <setting string="IP Address Tracking"
+                                     help="Track IP address of device used when employee checks in and checks out.">
+                                <field name="enable_ip_tracking"/>
+                            </setting>
+                            <setting string="ERP Access Gate (Requires Check-In)"
+                                     help="When enabled, employees must be checked in to access ERP modules.">
+                                <field name="enable_checkin_gate"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 2: Check-in / Check-out Timing      -->
+                        <!-- ========================================= -->
+                        <block title="Attendance Time Settings" name="custom_attendance_time_settings">
+                            <setting string="Morning Check-in Time"
+                                     help="The standard morning check-in time (24h format)"
+                                     invisible="not enable_checkin_restriction">
+                                <field name="morning_time"/>
+                            </setting>
+                            <setting string="Check-in Buffer (Hours)"
+                                     help="How early (in hours) employees are allowed to check in before shift start"
+                                     invisible="not enable_checkin_restriction">
+                                <field name="checkin_buffer"/>
+                            </setting>
+                            <setting string="Dead Time (Grace Period, Hours)"
+                                     help="Grace period in hours around check-in/out times before marking as late"
+                                     invisible="not enable_checkin_restriction">
+                                <field name="dead_time"/>
+                            </setting>
+                            <setting string="Exit Time"
+                                     help="The standard exit/check-out time (24h format)"
+                                     invisible="not enable_checkout_restriction">
+                                <field name="exit_time"/>
+                            </setting>
+                            <setting string="Saturday Head Office Exit Time"
+                                     help="Default exit time on Saturdays for Head Office staff (e.g., 14.75 for 2:45 PM)"
+                                     invisible="not enable_saturday_halfday">
+                                <field name="saturday_exit_time"/>
+                            </setting>
+                            <setting string="Force Checkout Threshold (Hours)"
+                                     help="Hours after check-in before automatic force checkout is performed">
+                                <field name="force_checkout_hours"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 3: Lunch Break Settings             -->
+                        <!-- ========================================= -->
+                        <block title="Lunch Break Settings" name="custom_lunch_break_settings"
+                               invisible="not enable_lunch_break">
+                            <setting string="Lunch Break Start Time"
+                                     help="Time when lunch break starts (24h format, e.g., 12.00 for noon)">
+                                <field name="lunch_out_time"/>
+                            </setting>
+                            <setting string="Lunch Break Duration (Hours)"
+                                     help="Duration of the lunch break (e.g., 1.0 = 1 hour, 0.5 = 30 minutes)">
+                                <field name="lunch_duration"/>
+                            </setting>
+                            <setting string="Lunch Grace Time (Hours)"
+                                     help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)">
+                                <field name="lunch_grace_time"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 4: Discipline Integration           -->
+                        <!-- ========================================= -->
+                        <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
+                            <setting string="Lateness Violation Threshold (Occurrences)"
+                                     help="Number of late check-ins that triggers an automatic discipline case.">
+                                <field name="lateness_violation_threshold"/>
+                            </setting>
+                            <setting string="Force Checkout Violation Threshold (Occurrences)"
+                                     help="Number of force checkouts that triggers an automatic discipline case.">
+                                <field name="force_checkout_violation_threshold"/>
+                            </setting>
+                        </block>
+
+                    </app>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Action to open settings -->
+        <record id="action_hr_attendance_configuration" model="ir.actions.act_window">
+            <field name="name">Attendance Settings</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_mode">form</field>
+            <field name="context">{'module': 'custom_hr_attendance', 'bin_size': False}</field>
+        </record>
+
+
+    </data>
+</odoo>

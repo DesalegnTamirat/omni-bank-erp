@@ -1,0 +1,67 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_permanent_letter">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                             <div class="col-4" style="float:left;">
+                                 <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <br/>
+                              </div>
+                        </div>
+                        <div class="row mt32">
+                              <div class="col-12">
+                                  <strong>Ref. No:</strong>
+                                <!-- <span t-field="o.probation_assessment_form.name_of_probationer.prob_sequence"/> -->
+                                <br/>
+                                  <br/>
+                                  <strong>Dear <span t-field="o.employee_id"/>,</strong>
+                            </div>
+                         </div>
+
+                        <br/>
+                        <p> It is to be recalled that, the Bank has employed you on <strong><span t-field="o.date_start"/></strong> as <strong><span t-field="o.job_id"/></strong> for a probation period of <strong><span t-field="o.probation_period"/></strong> working days. We are pleased to inform you that, you have successfully completed your probation period on <strong><span t-field="o.probation_end_date"/></strong> and have become a permanent staff member of Bunna Bank S.C.</p>
+<!--                        <t t-if="o.depreciation_line_ids">-->
+                        <br/>
+
+                            <p>Please note that your future progress in the Bank depends on your commitment to meet the Bank’s set objectives and your readiness to meet the demands of our customers.</p>
+                        <br/>
+
+
+
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <!-- <t t-foreach="o.cc_workunits" t-as="related_record"> -->
+                                    <!-- <li><t t-esc="related_record.name"/></li> -->
+                                    <!-- Add more fields as needed -->
+                                <!-- </t> -->
+
+
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

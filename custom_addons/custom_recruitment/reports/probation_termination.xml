@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_probation_revocation">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8"/>
+                            <div class="col-4">
+                                <strong>Date:</strong>
+                                <span t-esc="datetime.date.today"/>
+                            </div>
+                        </div>
+                        <div class="row mt32">
+                            <div class="col-12">
+                                <strong>Dear <span t-field="o.employee_id"/>,</strong>
+                            </div>
+                        </div>
+                        <br/>
+                        <p>
+                            It is to be recalled that, the Bank has employed you on
+                            <strong><span t-field="o.date_start"/></strong> as
+                            <strong><span t-field="o.job_id"/></strong>
+                            for a probation period of
+                            <strong><span t-field="o.probation_period"/></strong> working days.
+                        </p>
+                        <br/>
+                        <p>
+                            Following regular reviews, your performance, unfortunately, has not reached a satisfactory
+                            standard during your probationary period. Your probationary period ends on
+                            <strong><span t-field="o.probation_end_date"/></strong> and it has been decided to
+                            terminate your employment at this point.
+                        </p>
+                        <br/>
+                        <p>
+                            Before leaving the organisation you must ensure that you return all company property
+                            (e.g. books, laptop, phone, security pass).
+                        </p>
+                        <br/>
+                        <p>It is an unfortunate outcome, but I do wish you every success in the future.</p>
+                        <div class="row mt32">
+                            <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                <br/>
+                                <strong>CC:</strong>
+                                <ul>
+                                    <li>Finance Directorate</li>
+                                    <li>People Operations Directorate</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_probation_termination" model="ir.actions.report">
+        <field name="name">Probation Termination Letter</field>
+        <field name="model">hr.version</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">custom_recruitment.report_probation_revocation</field>
+        <field name="report_file">custom_recruitment.report_probation_revocation</field>
+        <field name="binding_model_id" ref="hr_employee_custom.model_hr_contract"/>
+
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

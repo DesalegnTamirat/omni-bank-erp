@@ -1,0 +1,674 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+
+        <record id="rule_transfer_request_user_own" model="ir.rule">
+            <field name="name">Transfer Request: User - Own Records</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_user'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- RECORD RULES FOR OFFICER GROUP -->
+        <!-- ============================================ -->
+
+        <record id="rule_transfer_request_officer_own" model="ir.rule">
+            <field name="name">Transfer Request: Officer - Own Records</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer'))]"/>
+        </record>
+
+        <record id="rule_recruitment_request_officer_own" model="ir.rule">
+            <field name="name">Recruitment Request: Officer - Own Records</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">['|', ('requested_by.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- RECORD RULES FOR MANAGER GROUP - Full Access -->
+        <!-- ============================================ -->
+
+        <record id="rule_recruitment_manager_transfer_request" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Request</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_request" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Request</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hr_job" model="ir.rule">
+            <field name="name">Recruitment: Manager - HR Job</field>
+            <field name="model_id" ref="hr.model_hr_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hr_applicant" model="ir.rule">
+            <field name="name">Recruitment: Manager - HR Applicant</field>
+            <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+        <record id="rule_transfer_request_user_own" model="ir.rule">
+            <field name="name">Transfer Request: User - Own Records</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_user'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- RECORD RULES FOR OFFICER GROUP - Transfer & Recruitment Requests -->
+        <!-- ============================================ -->
+
+        <!-- Officer: Can view/edit/create their own transfer requests -->
+        <record id="rule_transfer_request_officer_own" model="ir.rule">
+            <field name="name">Transfer Request: Officer - Own Records</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- Officer: Can view/create/edit their own recruitment requests -->
+        <record id="rule_recruitment_request_officer_own" model="ir.rule">
+            <field name="name">Recruitment Request: Officer - Own Records</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">['|', ('requested_by.user_id', '=', user.id), ('create_uid', '=', user.id)]
+            </field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- RECORD RULES FOR MANAGER GROUP - All Models (Full Access) -->
+        <!-- ============================================ -->
+
+        <!-- Manager: Full access to all recruitment models -->
+        <record id="rule_recruitment_manager_transfer_request" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Request</field>
+            <field name="model_id" ref="model_employee_transfer_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_request" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Request</field>
+            <field name="model_id" ref="model_recruitment_request"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hr_job" model="ir.rule">
+            <field name="name">Recruitment: Manager - HR Job</field>
+            <field name="model_id" ref="hr.model_hr_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hr_applicant" model="ir.rule">
+            <field name="name">Recruitment: Manager - HR Applicant</field>
+            <field name="model_id" ref="hr_recruitment.model_hr_applicant"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_skill" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Skill</field>
+            <field name="model_id" ref="model_recruitment_skill"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_certification" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Certification</field>
+            <field name="model_id" ref="model_recruitment_certification"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_penalty_deduction" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Penalty Deduction</field>
+            <field name="model_id" ref="model_recruitment_penalty_deduction"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_candidate_shortlist" model="ir.rule">
+            <field name="name">Recruitment: Manager - Candidate Shortlist</field>
+            <field name="model_id" ref="model_candidate_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_recruitment_internal" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Recruitment Internal</field>
+            <field name="model_id" ref="model_employee_recruitment_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_internal_recruitment_eligible_employees" model="ir.rule">
+            <field name="name">Recruitment: Manager - Internal Recruitment Eligible Employees</field>
+            <field name="model_id" ref="model_internal_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_internal_selected" model="ir.rule">
+            <field name="name">Recruitment: Manager - Internal Selected</field>
+            <field name="model_id" ref="model_internal_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_internal_selected_employees" model="ir.rule">
+            <field name="name">Recruitment: Manager - Internal Selected Employees</field>
+            <field name="model_id" ref="model_internal_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_applicant_shortlist" model="ir.rule">
+            <field name="name">Recruitment: Manager - Applicant Shortlist</field>
+            <field name="model_id" ref="model_applicant_shortlist"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_acting_role_assignment" model="ir.rule">
+            <field name="name">Recruitment: Manager - Acting Role Assignment</field>
+            <field name="model_id" ref="model_acting_role_assignment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_assessment_criteria" model="ir.rule">
+            <field name="name">Recruitment: Manager - Assessment Criteria</field>
+            <field name="model_id" ref="model_assessment_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_job_vacancy" model="ir.rule">
+            <field name="name">Recruitment: Manager - Job Vacancy</field>
+            <field name="model_id" ref="model_job_vacancy"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_vac_panel_members" model="ir.rule">
+            <field name="name">Recruitment: Manager - Vac Panel Members</field>
+            <field name="model_id" ref="model_vac_panel_members"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hiring_status" model="ir.rule">
+            <field name="name">Recruitment: Manager - Hiring Status</field>
+            <field name="model_id" ref="model_hiring_status"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_result_summary_rank" model="ir.rule">
+            <field name="name">Recruitment: Manager - Result Summary Rank</field>
+            <field name="model_id" ref="model_result_summary_rank"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_vacancy_delegation_team" model="ir.rule">
+            <field name="name">Recruitment: Manager - Vacancy Delegation Team</field>
+            <field name="model_id" ref="model_vacancy_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_bb_internal" model="ir.rule">
+            <field name="name">Recruitment: Manager - BB Internal</field>
+            <field name="model_id" ref="model_bb_internal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_bb_external" model="ir.rule">
+            <field name="name">Recruitment: Manager - BB External</field>
+            <field name="model_id" ref="model_bb_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_internal_recruitment_selected" model="ir.rule">
+            <field name="name">Recruitment: Manager - New Internal Recruitment Selected</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_recrt_delegation_team" model="ir.rule">
+            <field name="name">Recruitment: Manager - New Recrt Delegation Team</field>
+            <field name="model_id" ref="model_new_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_internal_recruitment_selected_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - New Internal Recruitment Selected Candidates</field>
+            <field name="model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_internal_recruitment_panel" model="ir.rule">
+            <field name="name">Recruitment: Manager - New Internal Recruitment Panel</field>
+            <field name="model_id" ref="model_new_internal_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_experience_weight_config" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Experience Weight Config</field>
+            <field name="model_id" ref="model_recruitment_experience_weight_config"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_applicant_qualification_line" model="ir.rule">
+            <field name="name">Recruitment: Manager - Applicant Qualification Line</field>
+            <field name="model_id" ref="model_applicant_qualification_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_applicant_experience_line" model="ir.rule">
+            <field name="name">Recruitment: Manager - Applicant Experience Line</field>
+            <field name="model_id" ref="model_applicant_experience_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_applicant_competency_line" model="ir.rule">
+            <field name="name">Recruitment: Manager - Applicant Competency Line</field>
+            <field name="model_id" ref="model_applicant_competency_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_hr_employee_probation" model="ir.rule">
+            <field name="name">Recruitment: Manager - HR Employee Probation</field>
+            <field name="model_id" ref="model_hr_employee_probation"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_transfer_committee_minutes" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Committee Minutes</field>
+            <field name="model_id" ref="model_transfer_committee_minutes"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_transfer_committee_minutes_line" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Committee Minutes Line</field>
+            <field name="model_id" ref="model_transfer_committee_minutes_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_recruitment_available" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Recruitment Available</field>
+            <field name="model_id" ref="model_employee_recruitment_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_vacancy_available" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Vacancy Available</field>
+            <field name="model_id" ref="model_employee_vacancy_available"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_job_vacancy_competency" model="ir.rule">
+            <field name="name">Recruitment: Manager - Job Vacancy Competency</field>
+            <field name="model_id" ref="model_job_vacancy_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_emp_probation_criteria" model="ir.rule">
+            <field name="name">Recruitment: Manager - Emp Probation Criteria</field>
+            <field name="model_id" ref="model_emp_probation_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_probation_assessment_form" model="ir.rule">
+            <field name="name">Recruitment: Manager - Probation Assessment Form</field>
+            <field name="model_id" ref="model_probation_assessment_form"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_probation_assessment_form_criteria" model="ir.rule">
+            <field name="name">Recruitment: Manager - Probation Assessment Form Criteria</field>
+            <field name="model_id" ref="model_probation_assessment_form_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_emp_probation_delegation_team" model="ir.rule">
+            <field name="name">Recruitment: Manager - Emp Probation Delegation Team</field>
+            <field name="model_id" ref="model_emp_probation_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_blacklist_pool" model="ir.rule">
+            <field name="name">Recruitment: Manager - Blacklist Pool</field>
+            <field name="model_id" ref="model_blacklist_pool"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_qualification" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Qualification</field>
+            <field name="model_id" ref="model_recruitment_qualification"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_recruitment_external" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Recruitment External</field>
+            <field name="model_id" ref="model_employee_recruitment_external"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_eligible_employees" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Eligible Employees</field>
+            <field name="model_id" ref="model_external_recruitment_eligible_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_applicant_work_history" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Applicant Work History</field>
+            <field name="model_id" ref="model_external_applicant_work_history"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_applicant_education" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Applicant Education</field>
+            <field name="model_id" ref="model_external_applicant_education"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_applicant_certification" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Applicant Certification</field>
+            <field name="model_id" ref="model_external_applicant_certification"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_applicant_skill" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Applicant Skill</field>
+            <field name="model_id" ref="model_external_applicant_skill"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_applicant_language" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Applicant Language</field>
+            <field name="model_id" ref="model_external_applicant_language"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_selected" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Selected</field>
+            <field name="model_id" ref="model_external_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_selected_employees" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Selected Employees</field>
+            <field name="model_id" ref="model_external_recruitment_selected_employees"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_recruitment" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Recruitment</field>
+            <field name="model_id" ref="model_employee_recruitment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_recruitment_job" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Recruitment Job</field>
+            <field name="model_id" ref="model_employee_recruitment_job"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_applicant_assessment" model="ir.rule">
+            <field name="name">Recruitment: Manager - Applicant Assessment</field>
+            <field name="model_id" ref="model_applicant_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_interview_assessment" model="ir.rule">
+            <field name="name">Recruitment: Manager - Interview Assessment</field>
+            <field name="model_id" ref="model_interview_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_candidate_score" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Candidate Score</field>
+            <field name="model_id" ref="model_recruitment_candidate_score"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_offer_letter" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Offer Letter</field>
+            <field name="model_id" ref="model_recruitment_offer_letter"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_application_window" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Application Window</field>
+            <field name="model_id" ref="model_recruitment_application_window"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_selected" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Selected</field>
+            <field name="model_id" ref="model_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_selected_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Selected Candidates</field>
+            <field name="model_id" ref="model_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_panel" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Panel</field>
+            <field name="model_id" ref="model_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recrt_delegation_team" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recrt Delegation Team</field>
+            <field name="model_id" ref="model_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_external_recruitment_selected" model="ir.rule">
+            <field name="name">Recruitment: Manager - New External Recruitment Selected</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_external_recrt_delegation_team" model="ir.rule">
+            <field name="name">Recruitment: Manager - New External Recrt Delegation Team</field>
+            <field name="model_id" ref="model_new_external_recrt_delegation_team"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_external_recruitment_panel" model="ir.rule">
+            <field name="name">Recruitment: Manager - New External Recruitment Panel</field>
+            <field name="model_id" ref="model_new_external_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_new_external_recruitment_selected_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - New External Recruitment Selected Candidates</field>
+            <field name="model_id" ref="model_new_external_recruitment_selected_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_transfer_assessment_config" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Assessment Config</field>
+            <field name="model_id" ref="model_transfer_assessment_config"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_transfer_assessment" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Assessment</field>
+            <field name="model_id" ref="model_transfer_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_employee_education" model="ir.rule">
+            <field name="name">Recruitment: Manager - Employee Education</field>
+            <field name="model_id" ref="model_employee_education"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_default_shortlist_criteria" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Default Shortlist Criteria</field>
+            <field name="model_id" ref="model_external_default_shortlist_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_shortlist_choice_wizard" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Shortlist Choice Wizard</field>
+            <field name="model_id" ref="model_external_shortlist_choice_wizard"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_recruitment_experience" model="ir.rule">
+            <field name="name">Recruitment: Manager - Recruitment Experience</field>
+            <field name="model_id" ref="model_recruitment_experience"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_talent_roster" model="ir.rule">
+            <field name="name">Recruitment: Manager - Talent Roster</field>
+            <field name="model_id" ref="model_talent_roster"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_transfer_request_config" model="ir.rule">
+            <field name="name">Recruitment: Manager - Transfer Request Config</field>
+            <field name="model_id" ref="model_transfer_request_config"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Wizards - Manager -->
+        <record id="rule_recruitment_manager_notify_internal_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - Notify Internal Candidates</field>
+            <field name="model_id" ref="model_notify_internal_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_notify_external_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - Notify External Candidates</field>
+            <field name="model_id" ref="model_notify_external_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_talent_roster_link_wizard" model="ir.rule">
+            <field name="name">Recruitment: Manager - Talent Roster Link Wizard</field>
+            <field name="model_id" ref="model_talent_roster_link_wizard"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_talent_roster_transfer_wizard" model="ir.rule">
+            <field name="name">Recruitment: Manager - Talent Roster Transfer Wizard</field>
+            <field name="model_id" ref="model_talent_roster_transfer_wizard"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_internal_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - Internal Candidates</field>
+            <field name="model_id" ref="model_internal_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_candidates" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Candidates</field>
+            <field name="model_id" ref="model_external_candidates"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <record id="rule_recruitment_manager_external_recruitment_shortlist_wizard" model="ir.rule">
+            <field name="name">Recruitment: Manager - External Recruitment Shortlist Wizard</field>
+            <field name="model_id" ref="model_external_recruitment_shortlist_wizard"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- NO RECORD RULES NEEDED FOR ADMINISTRATOR     -->
+        <!-- Administrators get full access via CSV      -->
+        <!-- ============================================ -->
+
+    </data>
+</odoo>

@@ -1,0 +1,83 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_recruitment_available_form" model="ir.ui.view">
+        <field name="name">employee.recruitment.available.form</field>
+        <field name="model">employee.recruitment.available</field>
+        <field name="arch" type="xml">
+            <form string="Internal Job Position">
+                <sheet>
+                    <group colspan="2">
+                        <group>
+                            <field name="vacancy_reference"/>
+                            <field name="job_position"/>
+                            <field name="employee_grade"/>
+                        </group>
+                        <group>
+                            <field name="employee_category"/>
+                            <field name="job_location"/>
+                            <field name="last_date_to_apply"/>
+                        </group>
+                    </group>
+                    <group colspan="2">
+                        <group>
+                            <field name="employee_applicant"/>
+                            <field name="job_description"/>
+                            <field name="application_status"/>
+                        </group>
+                        <group>
+                            <field name="vacancy_announced_on"/>
+                            <button name="apply" invisible="application_status in ('Applied','Replied','Selected for Promotion')" string="Apply Now" type="object" class="oe_highlight"/>
+                        </group>
+                    </group>
+                    <group colspan="2">
+                        <group>
+                            <button name="accept_promotion" invisible="application_status in ('New','Applied','Replied')" string="Accept Promotion" type="object" class="oe_highlight"/>
+                            <button name="reject_promotion" invisible="application_status in ('New','Applied','Replied')" string="Reject Promotion" type="object" class="oe_highlight"/>
+                        </group>
+                        <group>
+                            <field name="rejection_reason" invisible="application_status in ('New','Applied','Replied')"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Vacancies">
+                            <field name="employee_vacancy_ids">
+                                <list editable="bottom">
+                                    <field name="operating_unit" width="40%"/>
+                                    <field name="number_of_vacancies" width="30%"/>
+                                    <field name="location_preference" width="30%"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="employee_recruitment_available_list" model="ir.ui.view">
+        <field name="name">employee.recruitment.available.list</field>
+        <field name="model">employee.recruitment.available</field>
+        <field name="arch" type="xml">
+            <list string="Internal Job Position">
+                <field name="job_location"/>
+                <field name="job_position"/>
+                <field name="employee_grade"/>
+                <field name="employee_category"/>
+                <field name="number_of_vacancies"/>
+                <field name="vacancy_announced_on"/>
+                <field name="last_date_to_apply"/>
+                <field name="job_description"/>
+                <field name="application_reason"/>
+                <field name="application_status"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="internal_job_position_tree_form" model="ir.actions.act_window">
+        <field name="name">Internal Job Position</field>
+        <field name="res_model">employee.recruitment.available</field>
+        <field name="context">{}</field>
+        <field name="domain">['|', ('employee_user_id', '=', False), ('employee_user_id', '=', uid)]</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

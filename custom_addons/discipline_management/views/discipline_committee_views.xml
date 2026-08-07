@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_discipline_committee_meeting_tree" model="ir.ui.view">
+            <field name="name">discipline.committee.meeting.list</field>
+            <field name="model">discipline.committee.meeting</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="case_id"/>
+                    <field name="employee_id"/>
+                    <field name="meeting_date"/>
+                    <field name="committee_chair_id"/>
+                    <field name="is_quorum_met" widget="boolean"/>
+                    <field name="final_recommendation"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_committee_meeting_form" model="ir.ui.view">
+            <field name="name">discipline.committee.meeting.form</field>
+            <field name="model">discipline.committee.meeting</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <!-- DIS-5: Sequential sign-off flow -->
+                        <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
+                                invisible="state != 'in_progress'"
+                                help="FR-DIS-020: Submit agenda to Department Director for sign-off before voting."/>
+                        <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
+                                invisible="state != 'director_review'"
+                                help="FR-DIS-020: Director confirms review and opens voting for committee members."/>
+                        <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
+                                invisible="state not in ('voting', 'in_progress')"/>
+                        <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
+                                invisible="state != 'minutes_recorded'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,minutes_recorded,completed"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="not is_quorum_met"/>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        
+                            <group string="Meeting Schedule &amp; Case">
+                                <field name="case_id"/>
+                                <field name="employee_id"/>
+                                <field name="meeting_date"/>
+                                <field name="location"/>
+                            </group>
+                        <group>
+                            <group string="Committee &amp; Quorum">
+                                <field name="committee_chair_id"/>
+                                <field name="member_ids" widget="many2many_tags"/>
+                                <field name="total_expected_members"/>
+                                <field name="present_members_count"/>
+                                <field name="required_quorum_percentage"/>
+                                <field name="is_quorum_met" widget="boolean"/>
+                            </group>
+                            <!-- DIS-5: Director sign-off tracking -->
+                            <group string="Director Sign-off (FR-DIS-020)">
+                                <field name="director_signed_off" widget="boolean"/>
+                                <field name="director_signoff_by_id" readonly="1"/>
+                                <field name="director_signoff_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Agenda &amp; Minutes">
+                                <group>
+                                    <field name="agenda" placeholder="Meeting agenda topics..."/>
+                                    <field name="meeting_minutes" placeholder="Record official meeting minutes, discussion points, and evidence review..."/>
+                                    <field name="final_recommendation"/>
+                                </group>
+                            </page>
+                            <page string="Committee Member Votes">
+                                <group>
+                                    <group>
+                                        <field name="in_favor_count"/>
+                                        <field name="against_count"/>
+                                        <field name="abstain_count"/>
+                                    </group>
+                                </group>
+                                <field name="vote_ids">
+                                    <list editable="bottom">
+                                        <field name="member_id"/>
+                                        <field name="vote"/>
+                                        <field name="comments"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_committee_meeting" model="ir.actions.act_window">
+            <field name="name">Disciplinary Committee Meetings</field>
+            <field name="res_model">discipline.committee.meeting</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

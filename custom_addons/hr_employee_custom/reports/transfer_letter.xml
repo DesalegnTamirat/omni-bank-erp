@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_transfer_letter">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                            <div class="col-4" style="float:left;">
+                                 <strong>Date.:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref.No:</strong>
+									<span t-field="o.ref_num"/>
+                                  <br/>
+								  <strong>ID.No.:</strong>
+                                 <span t-field="o.employee_id"/>
+                                <br/>
+
+                            </div>
+                        </div>
+
+                         <div class="row mt32">
+                              <div class="col-12">
+                                     
+                                  <br/>
+<!--                                <strong><span t-field="o.partner_name"/></strong>-->
+                                <strong><span t-field="o.employee_name"/></strong>
+                                  <br/>
+                                <strong>Bunna Bank S.C</strong>
+                                  <br/>
+                                <strong>Addis Ababa</strong>
+                                <br/><br/><br/><br/>
+                                <strong>Dear <span t-field="o.employee_name"/>,</strong>
+<!--                                <strong>Dear <span t-field="o.partner_name"/>,</strong>-->
+                            </div>
+                             </div>
+                        <h6 class="text-center"><strong><u>Subject: -Transfer</u></strong></h6>
+                        <br/>
+                        <p>It is to be recalled that you have been assigned as <strong><span t-field="o.job_position"/></strong>at <strong><span t-field="o.operating_unit"/></strong>  </p>
+
+                        <br/>
+                        <p>However, this is to inform you that you are transferred to <strong><span t-field="o.requested_operating_unit"/></strong> effective <strong><span t-field="o.releiving_date"/></strong> maintaining your current position of <strong><span t-field="o.job_position"/></strong>, Job grade of <strong><span t-field="o.job_grade"/></strong>, monthly gross salary of <strong>Birr <span t-field="o.employee_name.contract_id.wage"/></strong> and other benefits attached to the post.</p>
+                        <br/>
+                        <p>By copy of this letter, <strong><span t-field="o.operating_unit"/></strong> is advised to release <strong><span t-field="o.employee_name"/></strong> and <strong>Finance Directorate </strong>also forward payroll related information, Outstanding Loan Account details, Leave Status and any other necessary information to <strong><span t-field="o.requested_operating_unit"/> and Talent Management Directorate.<br/></strong></p>
+                        <br/>
+                        <br/>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <t t-foreach="o.cc_workunits" t-as="related_record">
+                                    <li><t t-esc="related_record.name"/></li>
+                                    <!-- Add more fields as needed -->
+                                </t>
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

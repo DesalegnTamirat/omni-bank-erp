@@ -1,0 +1,215 @@
+
+/* =====================================================================
+ * hr_employee_custom — FULL-WIDTH Machine-Responsive Layout
+ *
+ * Overrides every Odoo base width constraint so the entire page
+ * stretches to fill the full browser window at ANY zoom level.
+ *
+ * Odoo base constraints overridden:
+ *   .o_form_renderer       { max-width: 2600px }  → 100%
+ *   .o_form_sheet_bg       { max-width: 1400px }  → 100%  (HR already unsets)
+ *   .o_form_sheet_bg       { margin-right: auto }  → 0
+ *   .o_form_view_container { no width rule }       → 100%
+ *   .o_content             { no width rule }       → 100%
+ *   .o_action              { no width rule }       → 100%
+ * ===================================================================== */
+
+/* ── 0. Full-window containers — remove ALL width caps ── */
+.o_action_manager,
+.o_action_manager > .o_action,
+.o_action .o_content,
+.o_action .o_content > .o_view_controller {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* ── 1. Form view — every wrapper fills the full window ── */
+.o_form_view {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.o_form_view .o_form_view_container {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.o_form_view .o_form_renderer {
+    max-width: 100% !important;       /* was 2600px */
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.o_form_view .o_form_sheet_bg {
+    max-width: 100% !important;       /* was 1400px (HR unsets it, but we force 100%) */
+    width: 100% !important;
+    margin-right: 0 !important;       /* was margin-right: auto (left-aligned) */
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+}
+
+.o_form_view .o_form_sheet {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+}
+
+/* ── 2. Employee avatar / presence pill row ── */
+.o_form_view .o_employee_avatar {
+    position: static !important;
+    inset: auto !important;
+}
+.o_form_view .o_hr_photo_status_row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    max-width: 100% !important;
+    gap: 0.5rem !important;
+}
+@media (min-width: 992px) {
+    .o_form_view .o_hr_photo_status_row {
+        position: absolute !important;
+        top: 0 !important;
+        right: 0 !important;
+        z-index: 1 !important;
+    }
+}
+@media (max-width: 991.98px) {
+    .o_form_view .o_hr_photo_status_row {
+        position: static !important;
+        margin-bottom: 1rem !important;
+        justify-content: flex-start !important;
+    }
+}
+.o_form_view .o_hr_photo_status_row .o_presence_status_pill_wrapper,
+.o_form_view .o_hr_photo_status_row .o_employee_avatar {
+    position: static !important;
+    float: none !important;
+    inset: auto !important;
+    margin: 0 !important;
+}
+.o_form_view .o_hr_photo_status_row .oe_avatar {
+    max-height: 90px !important;
+    height: auto !important;
+    max-width: 100% !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   ── 3. Notebook tab bar ──
+   • justify-content: flex-start → tabs COMPACT, NOT stretched
+   • flex: 0 0 auto per item    → tabs only as wide as their text
+   • margin-left: auto on ☰▾   → pins it to the far-right corner
+   ───────────────────────────────────────────────────────────────────── */
+.o_notebook {
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+}
+
+.o_form_view .o_notebook .o_notebook_headers,
+.o_form_view .o_notebook .nav-tabs,
+.o_notebook_headers,
+.o_notebook .nav-tabs {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    scroll-behavior: smooth !important;
+    border-bottom: 1px solid var(--border-color, #dee2e6) !important;
+    padding-bottom: 2px !important;
+    gap: 0 !important;
+}
+
+/* Scrollbar styling */
+.o_notebook_headers::-webkit-scrollbar,
+.o_notebook .nav-tabs::-webkit-scrollbar { height: 4px; }
+.o_notebook_headers::-webkit-scrollbar-thumb,
+.o_notebook .nav-tabs::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+.o_notebook_headers::-webkit-scrollbar-track,
+.o_notebook .nav-tabs::-webkit-scrollbar-track { background: transparent; }
+
+/* Each tab — compact, never grow, never stretch */
+.o_form_view .o_notebook .o_notebook_headers .nav-item,
+.o_form_view .o_notebook .nav-tabs .nav-item,
+.o_notebook_headers .nav-item,
+.o_notebook .nav-tabs .nav-item {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+/* Tab link text */
+.o_form_view .o_notebook .o_notebook_headers .nav-link,
+.o_form_view .o_notebook .nav-tabs .nav-link,
+.o_notebook_headers .nav-link,
+.o_notebook .nav-tabs .nav-link {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    font-size: clamp(0.72rem, 0.75vw + 0.3rem, 0.88rem) !important;
+    padding: 0.45rem 0.8rem !important;
+    transition: all 0.15s ease-in-out !important;
+    width: auto !important;
+    min-width: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+/* ── 4. ☰ ▾ tab — pinned to the FAR RIGHT END CORNER ── */
+.o_form_view .o_notebook .o_notebook_headers .nav-item:has(.nav-link[data-name="more_nested_lists"]),
+.o_form_view .o_notebook .nav-tabs .nav-item:has(.nav-link[data-name="more_nested_lists"]),
+.o_notebook_headers .nav-item:has(.nav-link[data-name="more_nested_lists"]),
+.o_notebook .nav-tabs .nav-item:has(.nav-link[data-name="more_nested_lists"]) {
+    margin-left: auto !important;
+    flex: 0 0 auto !important;
+    position: sticky !important;
+    right: 0 !important;
+    background-color: var(--o-view-background-color, #faf6f0) !important;
+    z-index: 2 !important;
+}
+
+/* Fallback: standard Odoo .o_notebook_more overflow */
+.o_notebook_headers .o_notebook_more,
+.o_notebook .nav-tabs .o_notebook_more {
+    margin-left: auto !important;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+}
+
+/* ── 5. Form groups — stretch to fill the full-width sheet ── */
+.o_form_view .o_group {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+.o_form_view .o_inner_group {
+    max-width: 100% !important;
+}
+.o_employee_org_chart_wrapper {
+    max-width: 100% !important;
+}
+
+@media (max-width: 991.98px) {
+    .o_form_view .o_group        { display: block !important; }
+    .o_form_view .o_inner_group  { width: 100% !important; display: block !important; }
+    .o_notebook_headers .nav-link,
+    .o_notebook .nav-tabs .nav-link {
+        padding: 0.35rem 0.5rem !important;
+        font-size: 0.72rem !important;
+    }
+}

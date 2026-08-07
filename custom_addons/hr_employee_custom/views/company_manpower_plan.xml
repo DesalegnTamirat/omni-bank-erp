@@ -1,0 +1,168 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="company_manpower_plan_form" model="ir.ui.view">
+        <field name="name">Company Manpower Plan</field>
+        <field name="model">manpower.plan</field>
+        <field name="arch" type="xml">
+            <form string="Company Manpower Plan">
+                <header>
+				    <field name="state" widget="statusbar"/>
+                    <button name="notify" invisible="state in ('notify', 'approve')" string="Notify" type="object" class="oe_highlight"/>
+                    <button name="approve" invisible="state in ('draft', 'approve')" string="Approve" type="object" class="oe_highlight"/>
+				    <button name="populate_values" invisible="status in ['Archived']" string="Populate Values" type="object" class="oe_highlight"/>
+				</header>
+				
+                <group colspan="2">
+
+                    <group>
+                        <field name="plan_version"/>
+						<field name="status"/>
+
+                    </group>
+                    <group>
+                        <!-- ACCOUNTING FISCAL YEAR MODULE NOT INSTALLED — fields removed from model, uncomment together
+                        <field name="fiscal_year"/>
+                        <field name="plan_start_date"/>
+                        <field name="plan_end_date"/>
+                        -->
+                    </group>
+                     <group>
+<!--                             <button name="populate_procurement_plan"  string="Populate Procurement Plan" type="object" class="oe_highlight"/>-->
+                        <!-- <button name="populate_recruitment"  string="Populate Recruitment" type="object" class="oe_highlight"/> -->
+                     </group>
+
+                    
+
+                </group>
+                
+                    <notebook>
+                        <page string="Requirements">
+
+                <field name="company_manpower_plan_id">
+                       <list editable="bottom">
+<!--                            <field name="work_unit"/>-->
+<!--                            <field name="department"/>-->
+
+                            <field name="position"/>
+							<field name="category"/>
+                            <field name="grade"/>
+                            <field name="plan_version" invisible="1"/>
+                            <field name="plan_start_date" invisible="1"/>
+                            <field name="plan_end_date" invisible="1"/>
+                            <field name="status" invisible="1"/>
+                            <field name="july"/>
+                            <field name="august"/>
+                            <field name="september"/>
+                            <field name="october"/>
+                            <field name="november"/>
+                            <field name="december"/>
+                            <field name="january"/>
+                            <field name="february"/>
+                            <field name="march"/>
+                            <field name="april"/>
+                            <field name="may"/>
+                            <field name="june"/>
+                            <field name="total"/>
+
+                            <button name="details" string="Details" type="object" class="oe_highlight">Details</button>
+                             <field name="position_cost"/>
+                             <field name="estimated_cost"/>
+
+                        </list>
+
+                    </field>
+			</page>
+			
+			<page string="Financial implications">
+
+                <field name="com_fin_imp_id">
+                       <list editable="bottom">
+              
+                            <field name="position" width="20%"/>                           
+                            <field name="grade" width="20%"/>
+                            <field name="category" width="20%"/>
+                            
+                            <field name="july" width="20%"/>
+                            <field name="august" width="20%"/>
+                            <field name="september" width="20%"/>
+                            <field name="october" width="20%"/>
+                            <field name="november" width="20%"/>
+                            <field name="december" width="20%"/>
+                            <field name="january" width="20%"/>
+                            <field name="february" width="20%"/>
+                            <field name="march" width="20%"/>
+                            <field name="april" width="20%"/>
+                            <field name="may" width="20%"/>
+                            <field name="june" width="20%"/>
+                            <field name="total" width="20%"/>
+                           <!-- <field name="position_cost" width="20%"/> -->
+                             <!-- <field name="estimated_cost" width="20%"/> -->
+                        </list>
+
+                    </field>
+			</page>
+			<page string="Company Manpower Plan Approval Team">
+                            <field name="company_manpwr_del_id">
+                                <list editable="bottom">
+                                        <field name="employee_name" width="20%"/>
+                                        <field name="operating_unit" width="20%"/>
+                                        <field name="approve" width="20%"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                
+            </form>
+        </field>
+    </record>
+    <record id="company_manpower_plan_tree" model="ir.ui.view">
+        <field name="name">Company Manpower Plan</field>
+        <field name="model">manpower.plan</field>
+        <field name="arch" type="xml">
+            <list string="Company Manpower Plan">
+                <field name="plan_version"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+    <record id="company_manpower_plan_form_tree" model="ir.actions.act_window">
+        <field name="name">Company Manpower Plan</field>
+        <field name="res_model">manpower.plan</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+	<!-- _____________________________________________________________________________
+	-->
+	<record id="company_manpower_plan_job_tree" model="ir.actions.act_window">
+        <field name="name">Manpower Plan Jobs</field>
+        <field name="res_model">manpower.plan.jobs</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+	<record id="company_manpower_plan_jobs_tree" model="ir.ui.view">
+        <field name="name">Manpower Plan Jobs</field>
+        <field name="model">manpower.plan.jobs</field>
+        <field name="arch" type="xml">
+            <list string="Manpower Plan Jobs" editable="bottom">
+                            <field name="position" width="20%"/>
+                            <field name="grade" width="20%"/>
+                            <field name="july" width="20%"/>
+                            <field name="august" width="20%"/>
+                            <field name="september" width="20%"/>
+                            <field name="october" width="20%"/>
+                            <field name="november" width="20%"/>
+                            <field name="december" width="20%"/>
+                            <field name="january" width="20%"/>
+                            <field name="february" width="20%"/>
+                            <field name="march" width="20%"/>
+                            <field name="april" width="20%"/>
+                            <field name="may" width="20%"/>
+                            <field name="june" width="20%"/>
+                            <field name="total" width="20%"/>
+                            <field name="position_cost" width="20%"/>
+                            <field name="estimated_cost" width="20%"/>
+
+            </list>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Offense Category Views -->
+        <record id="view_discipline_offense_category_tree" model="ir.ui.view">
+            <field name="name">discipline.offense.category.list</field>
+            <field name="model">discipline.offense.category</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="description"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_offense_category_form" model="ir.ui.view">
+            <field name="name">discipline.offense.category.form</field>
+            <field name="model">discipline.offense.category</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="code"/>
+                            </group>
+                            <group>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description" placeholder="Category definition and scope..."/>
+                            </page>
+                            <page string="Associated Offenses">
+                                <field name="offense_ids" readonly="1">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="severity_level"/>
+                                        <field name="punishment_type"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_offense_category" model="ir.actions.act_window">
+            <field name="name">Offense Categories</field>
+            <field name="res_model">discipline.offense.category</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Offense Definition Views -->
+        <record id="view_discipline_offense_tree" model="ir.ui.view">
+            <field name="name">discipline.offense.list</field>
+            <field name="model">discipline.offense</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="severity_level"/>
+                    <field name="name"/>
+                    <field name="category_id"/>
+                    <field name="punishment_type"/>
+                    <field name="penalty_percentage"/>
+                    <field name="approval_authority"/>
+                    <field name="active"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_offense_form" model="ir.ui.view">
+            <field name="name">discipline.offense.form</field>
+            <field name="model">discipline.offense</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <group>
+                            <group string="Offense Attributes">
+                                <field name="name"/>
+                                <field name="category_id"/>
+                                <field name="severity_level"/>
+                                <field name="policy_version_id"/>
+                            </group>
+                            <group string="Standard Punishment &amp; Approval Rules">
+                                <field name="punishment_type"/>
+                                <field name="penalty_percentage"/>
+                                <field name="approval_authority"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Guidelines &amp; Policy Description">
+                                <field name="description" placeholder="Enter policy guidelines, evidence requirements, and punishment rationale..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_offense" model="ir.actions.act_window">
+            <field name="name">Offense Classifications &amp; Rules</field>
+            <field name="res_model">discipline.offense</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Policy Version Views -->
+        <record id="view_discipline_policy_version_tree" model="ir.ui.view">
+            <field name="name">discipline.policy.version.list</field>
+            <field name="model">discipline.policy.version</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="version_number"/>
+                    <field name="name"/>
+                    <field name="effective_date"/>
+                    <field name="approved_by_id"/>
+                    <field name="state"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_discipline_policy_version_form" model="ir.ui.view">
+            <field name="name">discipline.policy.version.form</field>
+            <field name="model">discipline.policy.version</field>
+            <field name="arch" type="xml">
+                <form>
+                    <header>
+                        <button name="action_activate" string="Activate Policy Version" type="object" class="oe_highlight" invisible="state == 'active'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,active,archived"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="version_number"/>
+                            </group>
+                            <group>
+                                <field name="effective_date"/>
+                                <field name="approved_by_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Summary &amp; Changes">
+                                <field name="description" placeholder="Summary of changes in this policy version..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_policy_version" model="ir.actions.act_window">
+            <field name="name">Policy Version Control</field>
+            <field name="res_model">discipline.policy.version</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_hr_attendance_flag_wizard_form" model="ir.ui.view">
+            <field name="name">hr.attendance.flag.wizard.form</field>
+            <field name="model">hr.attendance.flag.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Flag Attendance for Discipline Review">
+                    <group>
+                        <group string="Attendance Record">
+                            <field name="attendance_id" readonly="1"/>
+                            <field name="employee_id" readonly="1"/>
+                            <field name="check_in" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="flag_reason" placeholder="Provide a detailed reason for flagging this attendance record for discipline review..." widget="text"/>
+                        <field name="create_discipline_case"/>
+                    </group>
+                    <footer>
+                        <button string="Confirm Flag" name="action_confirm_flag" type="object" class="btn-danger"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    </data>
+</odoo>

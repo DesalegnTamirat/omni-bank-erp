@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Audit Rule: List View ─────────────────────────────────────── -->
+    <record id="view_audit_rule_tree" model="ir.ui.view">
+        <field name="name">audit.rule.tree</field>
+        <field name="model">audit.rule</field>
+        <field name="arch" type="xml">
+            <list string="Audit Rules" editable="bottom">
+                <field name="name"/>
+                <field name="model_id" string="Model"/>
+                <field name="model_name" string="Technical Name" optional="show"/>
+                <field name="module" string="Module" optional="show"/>
+                <field name="log_create" string="Log Create" widget="boolean_toggle"/>
+                <field name="log_write"  string="Log Write"  widget="boolean_toggle"/>
+                <field name="log_unlink" string="Log Delete" widget="boolean_toggle"/>
+                <field name="active" string="Active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Audit Rule: Form View ─────────────────────────────────────── -->
+    <record id="view_audit_rule_form" model="ir.ui.view">
+        <field name="name">audit.rule.form</field>
+        <field name="model">audit.rule</field>
+        <field name="arch" type="xml">
+            <form string="Audit Rule">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_audit_log)d"
+                                type="action"
+                                icon="fa-list"
+                                string="View Logs"
+                                context="{'search_default_model_name': model_name}"/>
+                    </div>
+                    <widget name="web_ribbon" title="Inactive" bg_color="text-bg-danger"
+                            invisible="active == True"/>
+                    <group>
+                        <group string="Rule Configuration">
+                            <field name="name"/>
+                            <field name="model_id"/>
+                            <field name="model_name" readonly="1"/>
+                            <field name="module" readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Operations to Log">
+                            <field name="log_create" widget="boolean_toggle"/>
+                            <field name="log_write"  widget="boolean_toggle"/>
+                            <field name="log_unlink" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Field Restriction (optional)">
+                        <field name="field_ids"
+                               widget="many2many_tags"
+                               string="Audit only these fields (leave empty = ALL fields)"/>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        <strong>Tip:</strong>
+                        Leave "Audit only these fields" empty to track ALL field changes.
+                        Restrict to specific fields to reduce log volume on high-traffic models.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Action ────────────────────────────────────────────────────── -->
+    <record id="action_audit_rule" model="ir.actions.act_window">
+        <field name="name">Audit Rules</field>
+        <field name="res_model">audit.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No audit rules defined yet.
+            </p>
+            <p>
+                Create a rule for each model you want to audit.
+                For example, add <b>sale.order</b> to track all sales order changes.
+            </p>
+        </field>
+    </record>
+
+</odoo>

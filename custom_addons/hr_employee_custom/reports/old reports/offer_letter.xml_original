@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_offer_letter">
+       <t t-call="web.html_container">
+		<template id="report_header">
+			<div class="header">
+			<h3>Bunna Bank SC</h3>
+			<p>Bank of the Visionaries!</p>
+			<div class="colored-line"></div>
+			</div>
+			</template>
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page" style="margin-top:-3%;">
+                        <div class="row" >
+                             <div class="col-12">
+                                 <h5 class="text-center"><strong>OFFER LETTER</strong></h5>
+                                  <strong>Dear </strong>
+                                <span t-field="o.partner_name"/>
+                                  <br/>
+                                <br/>
+                                 <p>Greetings….!!!!!</p>
+                                 <p>We are very pleased to inform you that our selection panel has selected you for the position of   <strong><span t-field="o.job_id"/></strong>.Please, see the <strong>Job offer</strong> stated below. We believe you would agree with our offer and join our team. <Strong>Please, tell us when will be an ideal date for you to begin your work and please make it as early as possible.</Strong> </p>
+                              </div>
+                        </div>
+                        <br/>
+                        <table class="table table-bordered" style="border: 2px solid black;">
+<!--                            <h6 class="text-left"><u><strong>Bidder</strong></u></h6>-->
+                                <tbody>
+                                    <tr>
+                                        <th class="text-left">
+                                            <span>Benefit Types</span>
+                                        </th>
+                                        <th class="text-left">
+                                            <span>Benefit Package</span>
+                                        </th>
+                                    </tr>
+                                    <tr>
+                                        <td>Salary</td>
+                                        <td>Birr</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Fuel Allowance</td>
+                                        <td>Per litre</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Mobile Allowance</td>
+                                        <td>Birr</td>
+                                    </tr>
+                                    <tr>
+                                        <td>GPA Insurance</td>
+                                        <td>24 Hours’ Insurance Coverage for staff only</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Annual Leave Entitlement</td>
+                                        <td>Begins with 16 working days per year to a maximum of 30 working days</td>
+                                    </tr>
+                                </tbody>
+
+                            </table>
+                        <br/>
+                        <p>Please also make sure to bring the below list of requirements on your arrival.</p>
+                        <table class="table table-bordered" style="border: 2px solid black;">
+                           <h6 class="text-bottom"><strong>New Employee Document Requirements</strong></h6>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>Copy and Original documents of <strong>Academic credentials (degree, diploma….)</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>Copy and Original documents of <strong>Release (Clearance) paper from previous employer</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>3</td>
+                                        <td>Copy and Original documents of <strong>Work experience from previous employer</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>4</td>
+                                        <td>Copy and Original documents of <strong>Marriage certificate</strong>(if any)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>5</td>
+                                        <td>Copy and Original documents of <strong>Birth Certificate</strong>( if any)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>6</td>
+                                        <td>Copy and Original documents of <strong>Cost sharing</strong>( if any)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>7</td>
+                                        <td>passport size <strong>photographs</strong></td>
+                                    </tr>
+                                     <tr>
+                                        <td>8</td>
+                                         <td>1 passport size <strong>photographs of children</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>9</td>
+                                        <td>1 passport size photographs of Spouse (if any)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>10</td>
+                                        <td>Copy and Original of all documents written on your CV</td>
+                                    </tr>
+                                    <tr>
+                                        <td>11</td>
+                                        <td>Forensic and Medical Certificate (ECX support letter will be provided at the starting date of your employment)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>12</td>
+                                        <td>Tin Number</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        <br/>
+                        <p>Regards,</p>
+                        <p>Talent Management Team</p>
+                       </div>
+
+                </t>
+            </t>
+        </t>
+		<style>
+				.header {
+					background-color: #007bff;
+					color: white;
+					padding: 10px;
+					text-align: center;
+					position: relative;
+				}
+
+				.colored-line {
+					background-color: #ff0000; /* Red color */
+					height: 2px; /* Height of the line */
+					width: 100%; /* Full width of the header */
+					position: absolute;
+					bottom: 0;
+				}
+			</style>
+    </template>
+</odoo>

@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <template id="report_transfer_minute_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h5 class="text-center"><strong>Transfer Committee Minutes</strong></h5>
+                        <h6 class="text-center"><span t-field="o.name"/></h6>
+                        <br/>
+                        <div class="row mt32">
+                            <div class="col-6">
+                                <strong>Target Vacancy:</strong>
+                                <span t-field="o.target_vacancy_id.reference"/>
+                                (<span t-field="o.target_vacancy_id.job_position.name"/>)
+                            </div>
+                            <div class="col-6">
+                                <strong>Meeting Date:</strong>
+                                <span t-field="o.meeting_date"/>
+                            </div>
+                        </div>
+                        <br/>
+                        <table class="table table-sm o_main_table" name="ranked_candidates">
+                            <thead>
+                                <tr>
+                                    <th class="text-left"><span>Rank</span></th>
+                                    <th class="text-left"><span>Employee</span></th>
+                                    <th class="text-left"><span>App Date (20%)</span></th>
+                                    <th class="text-left"><span>Experience (20%)</span></th>
+                                    <th class="text-left"><span>Location Tenure (20%)</span></th>
+                                    <th class="text-left"><span>PMS (30%)</span></th>
+                                    <th class="text-left"><span>Supervisor Rec (10%)</span></th>
+                                    <th class="text-left"><span>Discipline Deduction</span></th>
+                                    <th class="text-left"><span>Final Score</span></th>
+                                    <th class="text-left"><span>Decision</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-foreach="o.ranking_line_ids" t-as="line">
+                                    <tr>
+                                        <td><span t-esc="line.rank"/></td>
+                                        <td><span t-field="line.employee_id.name"/></td>
+                                        <td><span t-esc="'%.2f' % line.application_date_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.experience_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.service_location_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.pms_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.recommendation_score"/></td>
+                                        <td><span t-esc="'%.2f' % line.discipline_deduction_percent"/></td>
+                                        <td><span t-esc="'%.2f' % line.final_score"/></td>
+                                        <td><span t-field="line.selection_decision"/></td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                        <br/>
+                        <div class="row mt32">
+                            <div class="col-12">
+                                <strong>Selection Decision / Committee Notes:</strong>
+                                <p t-field="o.selection_decision"/>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="action_report_transfer_minute" model="ir.actions.report">
+        <field name="name">Transfer Committee Minutes</field>
+        <field name="model">transfer.committee.minutes</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_transfer_minute_template</field>
+        <field name="report_file">custom_recruitment.report_transfer_minute_template</field>
+        <field name="binding_model_id" ref="model_transfer_committee_minutes"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

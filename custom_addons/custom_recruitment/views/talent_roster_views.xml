@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Talent Roster Search View ──────────────────────────────────────── -->
+    <record id="view_talent_roster_search" model="ir.ui.view">
+        <field name="name">talent.roster.search</field>
+        <field name="model">talent.roster</field>
+        <field name="arch" type="xml">
+            <search string="Search Talent Roster">
+                <field name="name"/>
+                <field name="email"/>
+                <field name="phone"/>
+                <field name="source_vacancy_id"/>
+                <field name="educational_qualification"/>
+                <field name="field_of_study"/>
+
+                <filter string="Active (Available)" name="status_active" domain="[('status', '=', 'active')]"/>
+                <filter string="Reused / Linked" name="status_reused" domain="[('status', '=', 'reused')]"/>
+                <filter string="Expired" name="status_expired" domain="[('status', '=', 'expired')]"/>
+                <separator/>
+                <filter string="External Candidates" name="type_external" domain="[('application_type', '=', 'External')]"/>
+                <filter string="Internal Employees" name="type_internal" domain="[('application_type', '=', 'Internal')]"/>
+                <separator/>
+                <filter string="High Scorers (Score 70 and Above)" name="high_score" domain="[('final_score', '&gt;=', 70)]"/>
+
+                <group>
+                    <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                    <filter string="Application Type" name="group_app_type" context="{'group_by': 'application_type'}"/>
+                    <filter string="Source Vacancy" name="group_source_vacancy" context="{'group_by': 'source_vacancy_id'}"/>
+                    <filter string="Qualification" name="group_qualification" context="{'group_by': 'educational_qualification'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Talent Roster List View ───────────────────────────────────────── -->
+    <record id="view_talent_roster_list" model="ir.ui.view">
+        <field name="name">talent.roster.list</field>
+        <field name="model">talent.roster</field>
+        <field name="arch" type="xml">
+            <list string="Talent Roster Candidate Pool"
+                  decoration-success="status == 'active'"
+                  decoration-muted="status == 'reused'"
+                  decoration-danger="status == 'expired'">
+                <header>
+                    <button name="action_sync_external_candidates" type="object" string="Import / Sync External Candidates" class="btn-primary" icon="fa-download"/>
+                </header>
+                <field name="name"/>
+                <field name="application_type" widget="badge"/>
+                <field name="email"/>
+                <field name="phone"/>
+                <field name="source_vacancy_id"/>
+                <field name="educational_qualification"/>
+                <field name="total_experience"/>
+                <field name="written_score"/>
+                <field name="interview_score"/>
+                <field name="final_score"/>
+                <field name="date_added"/>
+                <field name="expiry_date"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'active'"
+                       decoration-info="status == 'reused'"
+                       decoration-danger="status == 'expired'"/>
+                <button name="action_open_link_wizard" type="object"
+                        string="Link to New Vacancy" class="btn-primary"
+                        invisible="status != 'active'"/>
+                <button name="action_download_cv" type="object"
+                        string="Download CV" class="btn-secondary" icon="fa-download"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Talent Roster Form View ───────────────────────────────────────── -->
+    <record id="view_talent_roster_form" model="ir.ui.view">
+        <field name="name">talent.roster.form</field>
+        <field name="model">talent.roster</field>
+        <field name="arch" type="xml">
+            <form string="Talent Roster Candidate Profile">
+                <header>
+                    <button name="action_open_link_wizard" type="object"
+                            string="Link to New Vacancy" class="btn-primary"
+                            invisible="status != 'active'"/>
+                    <button name="action_download_cv" type="object"
+                            string="Download CV / Resume" class="btn-secondary" icon="fa-download"/>
+                    <field name="status" widget="statusbar" statusbar_visible="active,reused,expired"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Candidate Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Personal &amp; Contact Info">
+                            <field name="application_type"/>
+                            <field name="email" widget="email"/>
+                            <field name="phone" widget="phone"/>
+                            <field name="gender"/>
+                            <field name="applicant_id" invisible="application_type != 'External'"/>
+                            <field name="employee_id" invisible="application_type != 'Internal'"/>
+                        </group>
+                        <group string="Source &amp; Retention Status">
+                            <field name="source_vacancy_id"/>
+                            <field name="date_added"/>
+                            <field name="expiry_date"/>
+                            <field name="cv_attachment_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Qualifications &amp; Experience">
+                            <group>
+                                <group string="Education">
+                                    <field name="educational_qualification"/>
+                                    <field name="field_of_study"/>
+                                    <field name="highest_cgpa"/>
+                                </group>
+                                <group string="Experience">
+                                    <field name="total_experience"/>
+                                    <field name="banking_experience"/>
+                                </group>
+                            </group>
+                            <group string="Skills &amp; Competencies">
+                                <field name="skills_summary" placeholder="Summary of candidate key skills and qualifications..."/>
+                            </group>
+                        </page>
+                        <page string="Previous Evaluation &amp; Scores">
+                            <group>
+                                <group string="Assessment Scores">
+                                    <field name="pms_score" invisible="application_type != 'Internal'"/>
+                                    <field name="written_score"/>
+                                    <field name="interview_score"/>
+                                    <field name="final_score"/>
+                                    <field name="previous_rank"/>
+                                </group>
+                                <group string="Source Details">
+                                    <field name="candidate_score_id" readonly="1"/>
+                                    <field name="eligible_candidate_id" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="HR Notes &amp; History">
+                            <field name="notes" placeholder="Add internal HR evaluation remarks or recruitment notes..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Talent Roster Action ──────────────────────────────────────────── -->
+    <record id="action_talent_roster" model="ir.actions.act_window">
+        <field name="name">Talent Roster &amp; Candidate Reuse Pool</field>
+        <field name="res_model">talent.roster</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_talent_roster_search"/>
+        <field name="context">{'search_default_status_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No candidates in the Talent Roster yet!
+            </p>
+            <p>
+                HR can transfer unsuccessful or reserve candidates from completed recruitment processes
+                into the Talent Roster to re-use them for future job vacancies without recreating candidate profiles or credentials.
+            </p>
+        </field>
+    </record>
+
+</odoo>

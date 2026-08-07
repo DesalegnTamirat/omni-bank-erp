@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <record id="view_hr_timesheet_cost_history_list" model="ir.ui.view">
+            <field name="name">hr.timesheet.cost.history.list</field>
+            <field name="model">hr.timesheet.cost.history</field>
+            <field name="arch" type="xml">
+                <list string="Timesheet Cost Details">
+                    <field name="updated_on"/>
+                    <field name="current_cost"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_hr_timesheet_cost_history_form" model="ir.ui.view">
+            <field name="name">hr.timesheet.cost.history.form</field>
+            <field name="model">hr.timesheet.cost.history</field>
+            <field name="arch" type="xml">
+                <form string="Timesheet Cost Details">
+                    <group>
+                        <field name="employee_id"/>
+                        <field name="updated_on"/>
+                        <field name="current_cost"/>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_hr_timesheet_cost_history" model="ir.actions.act_window">
+            <field name="name">Timesheet Cost Details</field>
+            <field name="res_model">hr.timesheet.cost.history</field>
+            <field name="view_mode">list,form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

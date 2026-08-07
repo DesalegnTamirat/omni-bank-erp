@@ -1,0 +1,78 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_grade_form" model="ir.ui.view">
+        <field name="name">job.grade.form</field>
+        <field name="model">employee.grade</field>
+        <field name="arch" type="xml">
+            <form string="Employee Grade">
+                <group colspan="4">
+                    <group>
+                        <field name="grade_code"/>
+                        <field name="grade_name"/>
+                        <field name="category"/>
+                    </group>
+                    <group>
+                        <field name="base_salary"/>
+                        <field name="salary_factor"/>
+
+
+                    </group>
+                    <group>
+                        <field name="start_date"/>
+                        <field name="end_date"/>
+                    </group>
+                    <group>
+                        <!--                     <field name="status" type="checkbox"/>-->
+                        <!-- PAYROLL MODULE NOT INSTALLED — this button called a "salary_rule"
+                             object method that no longer exists (it depended on hr.salary.rule).
+                             Restore once the payroll module is installed and the method is added back.
+                        <button name="salary_rule" string="Salary Rule" type="object" class="oe_highlight"/>
+                        -->
+                    </group>
+                </group>
+
+                <!--                 <group>-->
+                <!--                    <notebook >-->
+                <!--                        <page string="Salary Details">-->
+
+                <!--                <field name="job_multi_id">-->
+                <!--                       <list editable="bottom">-->
+                <!--                            <field name="salary_rule"/>-->
+                <!--                            <field name="value"/>-->
+                <!--                            <field name="start_date"/>-->
+                <!--                            <field name="end_date"/>-->
+
+                <!--                        </list>-->
+
+                <!--                    </field>-->
+                <!--			</page>-->
+                <!--                    </notebook>-->
+                <!--                </group>-->
+
+            </form>
+        </field>
+    </record>
+    <record id="employee_grade_tree" model="ir.ui.view">
+        <field name="name">Job.grade.form</field>
+        <field name="model">employee.grade</field>
+        <field name="arch" type="xml">
+            <list string="Job Grade">
+                <field name="grade_code"/>
+                <field name="grade_name"/>
+
+                <field name="category"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <!--                 <field name="status" type="checkbox"/>-->
+                <!--                <field name="active"  invisible="inactive == True"/>-->
+                <!--                <field name="inactive"  invisible="active == True"/>-->
+            </list>
+        </field>
+    </record>
+    <record id="employee_grade_tree_action" model="ir.actions.act_window">
+        <field name="name">Job Grade Details</field>
+        <field name="res_model">employee.grade</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

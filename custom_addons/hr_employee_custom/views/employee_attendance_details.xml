@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_attendance_details_tree" model="ir.ui.view">
+        <field name="name">employee.attendance.details.form</field>
+        <field name="model">employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Employee Attendance Details">
+                <field name="employee_name"/>
+                <field name="emp_number"/>
+                <field name="job_position"/>
+                <!--field name="employee_name"/-->
+                <field name="emp_grade"/>
+                <field name="work_unit"/>
+                <field name="manager_name"/>
+                <field name="attendance_month"/>
+                <field name="checkin_date"/>
+                <field name="checkin_time"/>
+                <field name="checkout_time"/>
+                <field name="worked_hours"/>
+                <!-- <field name="checkout_remarks"/> -->
+
+            </list>
+        </field>
+    </record>
+        <record id="employee_attendance_details_form_tree" model="ir.actions.act_window">
+        <field name="name">Employee Attendance Details</field>
+        <field name="res_model">employee.attendance.details</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list</field>
+    </record>
+
+     <menuitem id="menu_employee_attendance_details" name="Employee Attendance Details" action="employee_attendance_details_form_tree" parent="hr_attendance.menu_hr_attendance_root" sequence="110"/>
+	 
+	 
+</odoo>

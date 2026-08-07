@@ -1,0 +1,76 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="hr_employee_probation_list_view" model="ir.ui.view">
+        <field name="name">hr.employee.probation.list</field>
+        <field name="model">hr.employee.probation</field>
+        <field name="arch" type="xml">
+            <list string="Employee Probations" decoration-warning="state=='notified'" decoration-success="outcome=='satisfactory'" decoration-danger="outcome=='unsatisfactory'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="job_position_id"/>
+                <field name="employee_category"/>
+                <field name="probation_start_date"/>
+                <field name="probation_end_date"/>
+                <field name="supervisor_id"/>
+                <field name="notification_sent"/>
+                <field name="outcome"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_employee_probation_form_view" model="ir.ui.view">
+        <field name="name">hr.employee.probation.form</field>
+        <field name="model">hr.employee.probation</field>
+        <field name="arch" type="xml">
+            <form string="Employee Probation">
+                <header>
+                    <button name="action_start" string="Start Probation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_notify_supervisor" string="Notify Supervisor" type="object" class="oe_highlight" invisible="state not in ('in_progress',) or notification_sent"/>
+                    <button name="action_record_outcome" string="Record Outcome" type="object" class="oe_highlight" invisible="state == 'completed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="job_position_id" readonly="1"/>
+                            <field name="operating_unit_id" readonly="1"/>
+                            <field name="supervisor_id"/>
+                        </group>
+                        <group>
+                            <field name="source_recruitment"/>
+                            <field name="recruitment_reference"/>
+                            <field name="employee_category"/>
+                            <field name="probation_start_date"/>
+                            <field name="duration_days" readonly="1"/>
+                            <field name="probation_end_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Supervisor Notification">
+                        <field name="notification_sent" readonly="1"/>
+                        <field name="notification_date" readonly="1"/>
+                    </group>
+                    <group string="Outcome">
+                        <field name="outcome"/>
+                        <field name="outcome_date" readonly="1"/>
+                        <field name="outcome_notes"/>
+                    </group>
+                </sheet>
+
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_employee_probation" model="ir.actions.act_window">
+        <field name="name">Employee Probation</field>
+        <field name="res_model">hr.employee.probation</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a Probation record!</p>
+        </field>
+    </record>
+</odoo>

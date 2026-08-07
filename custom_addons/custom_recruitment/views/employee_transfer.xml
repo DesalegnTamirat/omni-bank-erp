@@ -1,0 +1,346 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <!-- ================================================================ -->
+    <!-- Employee Transfer Request – List View                             -->
+    <!-- ================================================================ -->
+    <record id="employee_transfer_request_list_view" model="ir.ui.view">
+        <field name="name">employee.transfer.request.list</field>
+        <field name="model">employee.transfer.request</field>
+        <field name="arch" type="xml">
+            <list string="Employee Transfer Requests"
+                  decoration-danger="eligibility_status == 'ineligible'"
+                  decoration-success="eligibility_status == 'eligible'"
+                  decoration-muted="state in ('withdrawn','rejected','refused')">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="current_job_grade_id"/>
+                <field name="current_job_level" optional="hide"/>
+                <field name="current_job_position_id"/>
+                <field name="current_operating_unit_id"/>
+                <field name="requested_operating_unit_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="target_job_grade_id" optional="hide"/>
+                <field name="request_date"/>
+                <field name="disciplinary_status"/>
+                <field name="eligibility_status" widget="badge"
+                       decoration-success="eligibility_status == 'eligible'"
+                       decoration-danger="eligibility_status == 'ineligible'"/>
+                <field name="final_assessment_score"/>
+                <field name="current_ranking"/>
+                <field name="transfer_suitability_score" optional="hide"/>
+                <field name="is_exchange_transfer" optional="hide"/>
+                <field name="reporting_manager_id" optional="hide"/>
+                <field name="effective_transfer_date" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state in ('rejected','refused')"
+                       decoration-warning="state == 'withdrawn'"
+                       decoration-info="state in ('submitted','under_review')"
+                       decoration-muted="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Employee Transfer Request – Search View                           -->
+    <!-- ================================================================ -->
+    <record id="employee_transfer_request_search_view" model="ir.ui.view">
+        <field name="name">employee.transfer.request.search</field>
+        <field name="model">employee.transfer.request</field>
+        <field name="arch" type="xml">
+            <search string="Search Transfer Requests">
+                <field name="name" string="Reference"/>
+                <field name="employee_id"/>
+                <field name="target_vacancy_id"/>
+                <field name="requested_operating_unit_id" string="Requested Operating Unit"/>
+                <field name="current_operating_unit_id" string="Current Branch"/>
+                <field name="target_operating_unit_id" string="Target Branch"/>
+                <field name="current_job_grade_id" string="Job Grade"/>
+                <field name="current_job_level" string="Job Level"/>
+                <field name="reporting_manager_id" string="Reporting Manager"/>
+                <separator/>
+                <filter name="filter_unassigned_vacancy" string="Awaiting Vacancy Assignment"
+                        domain="[('target_vacancy_id', '=', False), ('state', 'in', ('submitted', 'under_review'))]"/>
+                <separator/>
+                <filter name="filter_eligible" string="Eligible" domain="[('eligibility_status','=','eligible')]"/>
+                <filter name="filter_ineligible" string="Ineligible" domain="[('eligibility_status','=','ineligible')]"/>
+                <separator/>
+                <filter name="filter_draft" string="Draft" domain="[('state','=','draft')]"/>
+                <filter name="filter_submitted" string="Submitted" domain="[('state','=','submitted')]"/>
+                <filter name="filter_under_review" string="Under Review" domain="[('state','=','under_review')]"/>
+                <filter name="filter_approved" string="Approved" domain="[('state','=','approved')]"/>
+                <filter name="filter_rejected" string="Rejected" domain="[('state','=','rejected')]"/>
+                <filter name="filter_withdrawn" string="Withdrawn" domain="[('state','=','withdrawn')]"/>
+                <filter name="filter_refused" string="Refused by Employee" domain="[('state','=','refused')]"/>
+                <separator/>
+                <filter name="filter_exchange" string="Exchange Transfers" domain="[('is_exchange_transfer','=',True)]"/>
+                <filter name="filter_flagged_hr" string="Flagged for HR" domain="[('is_flagged_for_hr','=',True)]"/>
+                <separator/>
+                <filter name="filter_missing_effective_date" string="Missing Effective Transfer Date"
+                        domain="[('effective_transfer_date', '=', False), ('state', 'in', ('submitted', 'under_review'))]"/>
+                <filter name="filter_missing_manager" string="Missing Reporting Manager"
+                        domain="[('reporting_manager_id', '=', False), ('state', 'in', ('submitted', 'under_review'))]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_by_employee" string="Employee" context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_grade" string="Job Grade" context="{'group_by': 'current_job_grade_id'}"/>
+                    <filter name="group_by_level" string="Job Level" context="{'group_by': 'current_job_level'}"/>
+                    <filter name="group_by_target_ou" string="Target Branch" context="{'group_by': 'target_operating_unit_id'}"/>
+                    <filter name="group_by_requested_ou" string="Requested Operating Unit" context="{'group_by': 'requested_operating_unit_id'}"/>
+                    <filter name="group_by_request_date" string="Request Date" context="{'group_by': 'request_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Employee Transfer Request – Form View                             -->
+    <!-- ================================================================ -->
+    <record id="employee_transfer_request_form_view" model="ir.ui.view">
+        <field name="name">employee.transfer.request.form</field>
+        <field name="model">employee.transfer.request</field>
+        <field name="arch" type="xml">
+            <form string="Employee Transfer Request">
+                <header>
+                    <button name="action_submit" string="Submit Request" type="object"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_start_review" string="Start Review" type="object"
+                            class="oe_highlight" invisible="state != 'submitted'"/>
+                    <!-- Step 3: Vacancy Matching -->
+                    <button name="action_search_matching_vacancies" string="Find Matching Vacancy" type="object"
+                            class="btn btn-secondary"
+                            invisible="state not in ('submitted', 'under_review') or target_vacancy_id"
+                            help="Scenario A: search existing published vacancies in the Requested Operating Unit."/>
+                    <button name="action_create_lateral_vacancy" string="Create Lateral Transfer Vacancy" type="object"
+                            class="btn btn-secondary"
+                            invisible="state not in ('submitted', 'under_review') or target_vacancy_id"
+                            confirm="No suitable existing vacancy? This will create and link a new Lateral Transfer Vacancy."
+                            help="Scenario B: no suitable existing vacancy is available."/>
+                    <button name="action_approve" string="Approve" type="object"
+                            class="oe_highlight" invisible="state != 'under_review'"/>
+                    <button name="action_reject" string="Reject" type="object"
+                            invisible="state not in ('submitted', 'under_review')"/>
+                    <button name="action_withdraw" string="Withdraw" type="object"
+                            invisible="state not in ('draft', 'submitted', 'under_review')"/>
+                    <button name="action_refuse_transfer" string="Refuse Transfer" type="object"
+                            invisible="state != 'approved'"
+                            confirm="Are you sure you wish to refuse this approved transfer? A 12-month ineligibility penalty will be applied and HR will be notified."/>
+                    <!-- : Mutual Exchange Matching -->
+                    <button name="action_find_exchange_matches" string="Find Exchange Match" type="object"
+                            class="btn btn-secondary"
+                            invisible="state not in ('submitted', 'under_review')"
+                            help="Search for a mutual exchange transfer partner "/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,submitted,under_review,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Eligibility Alert Banner -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="eligibility_status != 'ineligible'">
+                        <strong>⚠ Eligibility Issues:</strong>
+                        <field name="ineligibility_reason" readonly="1"/>
+                    </div>
+
+                    <!-- Refusal Penalty Alert -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not ineligible_until_date">
+                        <strong>⛔ Transfer Ineligibility Penalty:</strong>
+                        This employee is ineligible to apply for transfers until
+                        <field name="ineligible_until_date" readonly="1" class="oe_inline"/>.
+                    </div>
+
+                    <!-- Exchange Transfer Info Banner -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="not is_exchange_transfer">
+                        <strong>🔄 Mutual Exchange Transfer:</strong>
+                        This request is part of a mutual exchange transfer arrangement /.
+                    </div>
+
+                    <!-- Direct Transfer Info Banner (no vacancy link — this is a valid path) -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="target_vacancy_id or state not in ('submitted', 'under_review', 'approved')">
+                        <strong>ℹ Direct Transfer (No Vacancy Link):</strong>
+                        No Target Vacancy is linked to this request. This is expected for direct
+                        transfers — it can still be approved using the Requested Operating Unit and
+                        the employee's current position/grade. Use "Find Matching Vacancy" or
+                        "Create Lateral Transfer Vacancy" above only if you want to link this to a
+                        specific published vacancy instead.
+                    </div>
+
+                    <!-- Missing Job Level Banner (Non-Managerial requires Junior/Senior) -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="current_job_category != 'Non Managerial' or current_job_level">
+                        <strong>⚠ Job Level Could Not Be Determined:</strong>
+                        Job Category is Non Managerial, which requires a Job Level (Junior / Senior),
+                        but Current Grade has no Job Level set. Update the Job Level on the employee's
+                        Grade record.
+                    </div>
+
+                    <group string=" Employee Information">
+                        <group>
+                            <field name="employee_id" readonly="1"/>
+                            <field name="employee_name" invisible="1"/>
+                            <field name="department_id" readonly="1"/>
+                            <field name="current_job_position_id" readonly="1"/>
+                            <field name="current_job_grade_id" readonly="1"/>
+                            <field name="current_job_category" readonly="state != 'draft'"/>
+                            <field name="current_job_level" readonly="1"
+                                   invisible="current_job_category != 'Non Managerial'"/>
+                            <field name="employment_type" readonly="1"/>
+                            <field name="contract_start_date" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="gender" readonly="1"/>
+                            <field name="active_phone_number" readonly="1"/>
+                            <field name="active_email_address" readonly="1"/>
+                            <field name="current_operating_unit_id" readonly="1" string="Current Work Location"/>
+                            <field name="request_date" readonly="state != 'draft'" string="Transfer Request Date"/>
+                        </group>
+                    </group>
+
+                    <group string="Transfer Request Details">
+                        <group>
+                            <field name="requested_operating_unit_id" readonly="state != 'draft'"/>
+                            <field name="alternate_location_preference_id" readonly="state != 'draft'"/>
+                            <field name="reason_for_transfer" readonly="state != 'draft'"/>
+                            <!-- Grade Restriction (FR-REC-066): lateral transfers always
+                                 require the exact same grade/category/level as Current Job
+                                 Grade/Category/Level above — there is no separately-chosen
+                                 "preferred" grade, category, or level, so no additional
+                                 field is shown here. -->
+                        </group>
+                        <group>
+
+                            <field name="target_vacancy_id"
+                                   readonly="state not in ('submitted', 'under_review')"
+                                   invisible="state == 'draft'"
+                                   options="{'no_create': True}"
+                                   help="Optional. HR can link this to an existing published vacancy, or one created via 'Create Lateral Transfer Vacancy' — or leave empty for a direct transfer."/>
+                            <field name="target_job_position_id" readonly="1"/>
+                            <field name="target_job_grade_id" readonly="1"/>
+                            <field name="target_job_level" readonly="1"
+                                   invisible="current_job_category != 'Non Managerial'"/>
+                            <field name="target_operating_unit_id" readonly="1"/>
+                            <field name="grade_restriction_ok" readonly="1" widget="boolean"
+                                   decoration-danger="not grade_restriction_ok"/>
+                            <field name="eligibility_status" readonly="1" widget="badge"
+                                   decoration-success="eligibility_status == 'eligible'"
+                                   decoration-danger="eligibility_status == 'ineligible'"/>
+                        </group>
+                    </group>
+
+                    <group string="Service Tenure">
+                        <group>
+                            <field name="date_in_current_position" readonly="state != 'draft'"/>
+                            <field name="date_in_current_location" readonly="state != 'draft'"/>
+                            <field name="service_years_current_position" readonly="1"
+                                   decoration-danger="service_years_current_position &lt; 1"/>
+                            <field name="service_years_current_location" readonly="1"
+                                   decoration-danger="service_years_current_location &lt; 1"/>
+                        </group>
+                        <group>
+                            <field name="total_experience_years" readonly="state != 'draft'"/>
+                            <field name="service_rule_ok" readonly="1" widget="boolean"/>
+                        </group>
+                    </group>
+
+                    <group string="HR Assessment (Ranking Inputs)">
+                        <group>
+                            <field name="pms_score" readonly="state != 'draft'"
+                                   decoration-danger="pms_score &lt; 75"
+                                   help="Minimum 75.0% required for transfer eligibility"/>
+                            <field name="supervisor_recommendation_score"
+                                   readonly="state not in ('submitted', 'under_review')"
+                                   help="Score from 0 to 100 given by the immediate supervisor (weighted 10% in final score)."/>
+                        </group>
+                        <group>
+                            <field name="final_assessment_score" readonly="1"/>
+                            <field name="current_ranking" readonly="1"/>
+                            <field name="transfer_suitability_score" readonly="1"
+                                   help="Set by Transfer Committee Minutes, if used for this request."/>
+                        </group>
+                    </group>
+
+                    <!-- Selection Notification Details: used to fill in the
+                         Employee Transfer Selection Notification letter sent
+                         to the employee once this request is approved. -->
+                    <group string="Selection Notification Details"
+                           invisible="state not in ('submitted', 'under_review', 'approved')">
+                        <group>
+                            <field name="reporting_manager_id"
+                                   readonly="state not in ('submitted', 'under_review')"
+                                   help="Manager the employee will report to after the transfer. Shown on the Employee Transfer Selection Notification letter."/>
+                        </group>
+                        <group>
+                            <field name="effective_transfer_date"
+                                   readonly="state not in ('submitted', 'under_review')"
+                                   help="Date the employee is expected to report to the new position. Shown on the Employee Transfer Selection Notification letter."/>
+                        </group>
+                    </group>
+
+                    <!-- Discipline Section -->
+                    <group string="Disciplinary Status">
+                        <group>
+                            <field name="disciplinary_status" readonly="state != 'draft'"/>
+                            <field name="discipline_deduction_percent" readonly="1"
+                                   invisible="disciplinary_status == 'none'"/>
+                        </group>
+                        <group>
+                            <field name="is_exchange_transfer" readonly="state != 'draft'"/>
+                            <field name="exchange_partner_employee_id"
+                                   invisible="not is_exchange_transfer"
+                                   readonly="state != 'draft'"/>
+                            <field name="exchange_partner_request_id"
+                                   invisible="not is_exchange_transfer"
+                                   readonly="1"/>
+                            <field name="exchange_partner_disciplinary_status"
+                                   invisible="not is_exchange_transfer"
+                                   readonly="state != 'draft'"/>
+                            <field name="exchange_transfer_ok" readonly="1"
+                                   invisible="not is_exchange_transfer" widget="boolean"/>
+                        </group>
+                    </group>
+
+                    <!-- Refusal Section (only visible when refused) -->
+                    <group string="Refusal Details" invisible="state != 'refused'">
+                        <group>
+                            <field name="refusal_reason"
+                                   readonly="state == 'refused'"
+                                   placeholder="Enter reason for refusing the transfer..."/>
+                            <field name="ineligible_until_date" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="is_flagged_for_hr" readonly="1"/>
+                            <field name="hr_notified_on_refusal" readonly="1"/>
+                        </group>
+                    </group>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ================================================================ -->
+    <!-- Action                                                            -->
+    <!-- ================================================================ -->
+    <record id="action_employee_transfer_request" model="ir.actions.act_window">
+        <field name="name">Employee Transfer Requests</field>
+        <field name="res_model">employee.transfer.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="employee_transfer_request_search_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create a Transfer Request!</p>
+            <p>Employees can initiate transfer requests here. The system enforces eligibility rules
+               including grade matching, job level matching for Non-Managerial staff, minimum service
+               tenure, PMS score thresholds, and discipline checks in accordance with the ERP BRD
+               requirements
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,180 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="supplementary_role_form" model="ir.ui.view">
+        <field name="name">supplementary.role.form</field>
+        <field name="model">supplementary.role</field>
+        <field name="arch" type="xml">
+            <form string="Supplementary Role">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                    <button name="notify" invisible="state in ('notify', 'evaluate', 'populate_benefits', 'populate_acting_Allowance', 'approve', 'close_acting_position')" string="Notify" type="object" class="oe_highlight"/>
+                    <button name="evaluate" invisible="state in ('draft', 'evaluate', 'populate_benefits', 'populate_acting_Allowance', 'approve', 'close_acting_position')" string="Evaluate" type="object" class="oe_highlight"/>
+                    <button name="populate_benefits" invisible="state in 'approve'" string="Populate Benefits" type="object" class="oe_highlight"/>
+					<button name="populate_acting_Allowance" invisible="state in ('draft', 'populate_acting_Allowance', 'approve')" string="Populate Allowance Payouts" type="object" class="oe_highlight"/>
+                    <button name="approve" invisible="state in ('draft', 'populate_benefits', 'approve')" string="Approve" type="object" class="oe_highlight"/>
+                    <button name="close_acting_position" invisible="state in ('draft', 'populate_benefits', 'populate_acting_Allowance')" string="Close Acting Position" type="object" class="oe_highlight"/>
+					<!-- <button string="Print Employee Report" type="object" name="action_print_report"/> -->
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference" required="1"/>
+                        </h1>
+                    </div>
+                    <group colspan="4">
+                        <group name="Acting Role">
+						    <field name="sr_ref"/>
+							<field name="requesting_operating_unit"/>
+                            <field name="acting_position"/>
+                            <field name="acting_employee"/>
+                            <field name="acting_job_position"/>
+                            <field name="job_grade1"/>
+                            <field name="job_category1"/>
+                            <field name="acting_work_unit"/>
+                            <field name="acting_reason"/>
+							
+                        </group>
+                         <group name="Existing Role">
+<!--                            <field name="reference" required="1"/>-->
+                            <field name="employee_name" required="1"/>
+                            <field name="employee_id" invisible="1"/>
+                            <field name="current_job_position"/>
+                            <field name="current_work_unit"/>
+                            <field name="job_grade"/>
+                            <field name="job_category"/>
+                        </group>
+                        <group/>
+                        <group/>
+                        <group>
+                            <field name="start_date"/>
+							<field name="status"/>
+                        </group>
+                        <group>
+                            <field name="end_date"/>
+                            <!-- <field name="status1" invisible="1"/> -->
+							<field name="revoked_date"/>
+                        </group>
+
+                        <group name="Acting Allowance">
+                            <field name="acting_basic"/>
+                            <field name="base_salary"/>
+                            <field name="step_increment_value"/>
+                            <field name="existing_basic"/>
+                            <field name="basic_difference"/>
+                            <field name="acting_basic_per_month"/>
+                            
+                            <field name="allowance_difference"/>
+                        </group>
+
+                        <group name="Allowance Percentage">
+                            <field name="first_month"/>
+                            <field name="second_month"/>
+                            <field name="third_month"/>
+                            <field name="more_than_four"/>
+                        </group>
+
+                    </group>
+
+                    <group>
+                        <notebook>
+                            <page string="Supplementary Salary Details">
+                                <field name="supplementary_details">
+                                    <list editable="bottom">
+                                        <!-- PAYROLL MODULE NOT INSTALLED: <field name="salary_rule"/> -->
+                                        <field name="internal_name"/>
+                                        <field name="old_value"/>
+                                        <field name="new_value"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                        <notebook>
+                            <page string="Supplementary Allowance Payouts">
+                                <field name="supplementary_payouts">
+                                    <list editable="bottom">
+                                        <field name="hr_period_name"/>
+                                        <field name="start_date"/>
+                                        <field name="end_date"/>
+                                        <field name="effective_days"/>
+                                        <field name="factor"/>
+                                        <field name="payout_value"/>
+                                        <field name="status"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </group>
+                    <notebook>
+                        <page string="Supplementary Approval Members">
+                            <field name="sup_delg_team">
+                                <list editable="bottom">
+                                        <field name="role" width="20%"/>
+                                        <field name="employee_name" width="20%"/>
+                                        <field name="operating_unit" width="20%"/>
+                                        <field name="status" width="20%"/>
+                                        <field name="alternate_committee_member" width="20%"/>
+                                        <field name="alter_operating_unit" width="20%"/>
+                                        <field name="approve" width="20%"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook> 
+					<group>
+						<field name="cc_workunits" widget="many2many_tags"/>
+					</group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="supplementary_role_tree" model="ir.ui.view">
+        <field name="name">supplementary.role.tree</field>
+        <field name="model">supplementary.role</field>
+        <field name="arch" type="xml">
+            <list string="supplementary Role">
+                <field name="reference"/>
+                <field name="employee_name"/>
+                <field name="acting_position"/>
+                <field name="acting_reason"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="status"/>
+
+                <!--                <field name="active"  invisible="inactive == True"/>-->
+                <!--                <field name="inactive"  invisible="active == True"/>-->
+            </list>
+        </field>
+    </record>
+    <record id="employee_supplementary_role_tree" model="ir.actions.act_window">
+        <field name="name">Supplementary Role</field>
+        <field name="res_model">supplementary.role</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+	<!-- <record id="action_print_report" model="ir.actions.server"> -->
+    <!-- <field name="name">Print Employee Report</field> -->
+    <!-- <field name="model" ref="hr_employee_custom.acting"/> --> 
+    <!-- <field name="state">code</field> -->
+    <!-- <field name="code">action = self.action_print_report()</field> -->
+	<!-- </record> -->
+
+	<!-- <record id="action_print_report" model="ir.actions.server"> -->
+    <!-- <field name="name">Print Employee Report</field> -->
+    <!-- <field name="model" ref="supplementary.role"/> -->
+    <!-- <field name="state">code</field> -->
+    <!-- <field name="code"> -->
+        <!-- action = None -->
+        <!-- if self.employee_category == 'managerial': -->
+            <!-- action = self.env['report'].get_action(self, 'your_module.report_managerial') -->
+        <!-- elif self.employee_category == 'non-managerial': -->
+            <!-- action = self.env['report'].get_action(self, 'your_module.report_non_managerial') -->
+
+        <!-- if action: -->
+            <!-- return action -->
+        <!-- else: -->
+            <!-- raise UserError("Unsupported employee category") -->
+    <!-- </field> -->
+<!-- </record> -->
+
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_supplementary_role_list" name="Supplementary Role" parent="hr.menu_hr_employee_user" action="employee_supplementary_role_tree"/> -->
+</odoo>

@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_managerial_different_location">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+                            </div>
+                            <div class="col-4" style="float:left;">
+                                 <strong>Date.:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref. No.</strong>
+                                <span t-field="o.app_reference"/>
+                                  <br/>
+
+                                  <br/>
+                            </div>
+                        </div>
+                         <div class="row mt32">
+                              <div class="col-12">
+                                <strong><span t-field="o.partner_name"/></strong>
+                                <br/><br/><br/><br/>
+                                <strong>Dear <span t-field="o.partner_name"/>,</strong>
+                            </div>
+                             </div>
+                        <h6 class="text-center"><strong><u>Subject: - Promotion</u></strong></h6>
+                        <br/>
+                        <p>Following the new grading of branches of BB and by considering your individual performance, I am pleased to inform you that you are appointed as <strong><span t-field="o.job_id"/></strong>  (Job Grade <strong><span t-field="o.job_grade_id"/></strong>) and assigned at <strong><span t-field="o.final_work_unit"/></strong> effective <strong><span t-field="o.promotion_date"/>.</strong></p>
+                        <br/>
+                        <p>Commencing the same date, your monthly gross salary is raised to <strong>Birr <span t-field="o.job_grade_id.base_salary"/></strong>  and you are entitled to other benefits attached with your new position.</p>
+                        <br/>
+                        <p>Your assignment to this post is indeed a clear indication of the Banks confidence up on you that you will carry out your duties and responsibilities to its entire satisfaction with the expected standard of the bank. </p>
+                        <br/>
+                        <p>The job description for the position is attached herewith for your easy reference in discharging your responsibilities.</p>
+                        <br/>
+                        <p>I hope you will capitalize on your achievement to date and look forward to enhanced performance of the  <strong><span t-field="o.final_work_unit"/></strong> in all the responsibility areas bestowed upon you. </p>
+                        <br/>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <t t-foreach="o.cc_workunits" t-as="related_record">
+                                    <li><t t-esc="related_record.name"/></li>
+                                    <!-- Add more fields as needed -->
+                                </t>
+                                  <br/>
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

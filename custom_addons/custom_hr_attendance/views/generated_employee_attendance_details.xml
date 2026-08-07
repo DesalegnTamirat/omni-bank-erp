@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- 1. Manager Tree View: Daily Employee Attendance Detail (Per-Attendance Log View) -->
+    <record id="view_daily_employee_attendance_detail_tree" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.daily.tree</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <list string="Daily Employee Attendance Detail" editable="bottom" create="0" edit="0" delete="0">
+                <field name="employee_id" column_invisible="1"/>
+
+                <!-- Default Visible Columns matching Screenshot 1 (Manager View) -->
+                <field name="employee_identification" string="Emp Number"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="job_title" string="Job Position"/>
+                <field name="job_grade" string="Grade"/>
+                <field name="work_unit" string="Work Unit"/>
+                <field name="manager_name" string="Manager Name"/>
+                <field name="attendance_month" string="Attendance Month"/>
+                <field name="checkin_date" string="Checkin Date"/>
+                <field name="checkin_time" string="Checkin Time"/>
+                <field name="checkout_time" string="Checkout Time"/>
+                <field name="remarks" string="Remarks"/>
+
+                <!-- Optional Configurable Columns -->
+                <field name="place_of_assignment" string="Place of Assignment" optional="hide"/>
+                <field name="worked_hours" string="Worked Hours" optional="hide"/>
+                <field name="working_hours" string="Working Hours" optional="hide"/>
+                <field name="attendance_percentage" string="Attendance Percentage" optional="hide"/>
+                <field name="leave_hours" string="Leave Hours" optional="hide"/>
+                <field name="absent_hours" string="Absent Hours" optional="hide"/>
+                <field name="late_time_hour" string="Late Time (Hours)" optional="hide"/>
+                <field name="early_exit_hour" string="Early Exit (Hours)" optional="hide"/>
+                <field name="over_time_hour" string="Overtime (Hours)" optional="hide"/>
+                <field name="pre_defined" string="Pre-Defined Lateness" optional="hide"/>
+                <field name="acknowledged_lateness" string="Acknowledged Lateness" optional="hide"/>
+                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout" optional="hide"/>
+                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout" optional="hide"/>
+                <field name="force_checkout" string="Force Checkout" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Backward Compatibility Alias for Manager Tree View -->
+    <record id="employee_attendance_details_tree" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.tree.alias</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <list string="Daily Employee Attendance Detail" editable="bottom" create="0" edit="0" delete="0">
+                <field name="employee_id" column_invisible="1"/>
+                <field name="employee_identification" string="Emp Number"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="job_title" string="Job Position"/>
+                <field name="job_grade" string="Grade"/>
+                <field name="work_unit" string="Work Unit"/>
+                <field name="manager_name" string="Manager Name"/>
+                <field name="attendance_month" string="Attendance Month"/>
+                <field name="checkin_date" string="Checkin Date"/>
+                <field name="checkin_time" string="Checkin Time"/>
+                <field name="checkout_time" string="Checkout Time"/>
+                <field name="remarks" string="Remarks"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- 2. Reporting Tree View: Employee Attendance Summary (Aggregated Summary View) -->
+    <record id="view_employee_attendance_summary_tree" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.summary.tree</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <list string="Employee Attendance Summary" editable="bottom" create="0" edit="0" delete="0">
+                <field name="employee_id" column_invisible="1"/>
+
+                <!-- Default Visible Columns matching Screenshot 2 (Reporting View) -->
+                <field name="employee_identification" string="Employee ID"/>
+                <field name="employee_name" string="Employee Name"/>
+                <field name="place_of_assignment" string="Place of Assignment"/>
+                <field name="work_unit" string="Work Unit"/>
+                <field name="job_title" string="Job Title"/>
+                <field name="working_hours" string="Working Hours"/>
+                <field name="worked_hours" string="Worked Hours"/>
+                <field name="attendance_percentage" string="Attendance Percentage"/>
+                <field name="leave_hours" string="Leave Hours"/>
+                <field name="absent_hours" string="Absent Hours"/>
+                <field name="late_time_hour" string="Late Time (Hours)"/>
+                <field name="early_exit_hour" string="Early Exit (Hours)"/>
+                <field name="over_time_hour" string="Overtime (Hours)"/>
+                <field name="pre_defined" string="Pre-Defined Lateness"/>
+                <field name="acknowledged_lateness" string="Acknowledged Lateness"/>
+                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout"/>
+                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout"/>
+                <field name="force_checkout" string="Force Checkout"/>
+
+                <!-- Optional Configurable Columns -->
+                <field name="job_grade" string="Grade" optional="hide"/>
+                <field name="manager_name" string="Manager Name" optional="hide"/>
+                <field name="attendance_month" string="Attendance Month" optional="hide"/>
+                <field name="checkin_date" string="Checkin Date" optional="hide"/>
+                <field name="checkin_time" string="Checkin Time" optional="hide"/>
+                <field name="checkout_time" string="Checkout Time" optional="hide"/>
+                <field name="remarks" string="Remarks" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="employee_attendance_details_search" model="ir.ui.view">
+        <field name="name">generate.employee.attendance.details.search</field>
+        <field name="model">generate.employee.attendance.details</field>
+        <field name="arch" type="xml">
+            <search string="Search Employee Attendance Details">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="work_unit"/>
+                <field name="manager_name"/>
+                <separator/>
+                <filter string="Work Unit" name="group_by_work_unit" context="{'group_by':'work_unit'}"/>
+                <filter string="Job Position" name="group_by_job_title" context="{'group_by':'job_title'}"/>
+                <filter string="Manager" name="group_by_manager" context="{'group_by':'manager_name'}"/>
+                <filter string="Attendance Month" name="group_by_month" context="{'group_by':'attendance_month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action 1: Manager Action (Daily Detail) -->
+    <record id="generated_employee_attendance_details_action" model="ir.actions.act_window">
+        <field name="name">Daily Employee Attendance Detail</field>
+        <field name="res_model">generate.employee.attendance.details</field>
+        <field name="view_mode">list,search</field>
+        <field name="view_id" ref="view_daily_employee_attendance_detail_tree"/>
+    </record>
+
+    <!-- Action 2: Reporting Action (Summary) -->
+    <record id="action_reporting_employee_attendance_summary" model="ir.actions.act_window">
+        <field name="name">Employee Attendance Summary</field>
+        <field name="res_model">generate.employee.attendance.details</field>
+        <field name="view_mode">list,search</field>
+        <field name="view_id" ref="view_employee_attendance_summary_tree"/>
+    </record>
+
+</odoo>

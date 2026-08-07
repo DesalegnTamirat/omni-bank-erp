@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="report_promotion_revocation">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                              <div class="col-12" >
+                                  <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref. No.</strong>
+<!--                                <span t-field="o.reference"/>-->
+                                  <br/>
+                                  <br/>
+                                   <strong>ID.No.:</strong>
+<!--                                 <span t-field="o.employee_id"/>-->
+                                <br />
+                                <br/>
+                                 <strong>Ato  Amaniel Kidane Fitwi</strong>
+                                  <br/>
+                                  <strong>Bunna Bank S.C</strong>
+                                  <br/>
+                                  <strong>Addis Ababa</strong>
+                                  <br/>
+<!--                                <strong><span t-field="o.current_work_unit"/></strong>-->
+                                  <br/>
+                                    <br/>
+                                  <strong>Dear Ato Amanuel,</strong>
+<!--                                <strong>Dear <span t-field="o.employee_name"/>,</strong>-->
+                                  <br/>
+                            </div>
+
+                             </div>
+                        <h6 class="text-center"><strong><u>Re: - Revocation of Promotion</u></strong></h6>
+                        <br/>
+                        <p>It is to be recalled that you have been promoted to the post of  <strong>Customer Service Officer-III </strong>and assigned at <strong>Gerji Branch</strong> effective the date assuming to the new position, with a letter Ref.No.BB/TMD/8469/2022 dated December 22, 2022. </p>
+                        <br/>
+                        <p>However, with your application letter dated 25/04/2015 E.C, you have requested to revoke your Promotion. Consequently, please be informed that your promotion has been cancelled and the promotion letter has been revoked by this letter effective the date of promotion.</p>
+                        <br/>
+                        <p>This is, therefore, you are advised to continue working as  <strong>Customer Service Officer- II at Raguel Branch </strong>effective the date of promotion. </p>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6" >
+                                <p>Sincerely yours,</p>
+                                 <br/>
+
+
+
+                                 <strong>CC:</strong>
+                                 <ul>
+                                      <li>IT Security Management Directorate </li>
+                                 <li>Debre Berhan Area Office</li>
+                                 <li>Mehal Meda Branch</li>
+                                 <li>Ato Ayalew Wondie Mekonnen</li>
+                                 <li>Bunna Bank S.C </li>
+                                 </ul>
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br />
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

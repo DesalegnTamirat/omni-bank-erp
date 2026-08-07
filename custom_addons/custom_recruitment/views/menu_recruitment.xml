@@ -1,0 +1,290 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- ============================================ -->
+        <!-- ROOT RECRUITMENT MENUS                       -->
+        <!-- ============================================ -->
+
+        <!-- Root Recruitment menus - Using ONLY custom groups -->
+        <menuitem id="new_recruitment_menu"
+                  name="Recruitments"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  sequence="3"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_internal_recruitment"
+                  name="Recruitment Internal"
+                  parent="new_recruitment_menu"
+                  sequence="1"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_external_recruitment"
+                  name="External Recruitment"
+                  parent="new_recruitment_menu"
+                  sequence="4"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
+
+        <!-- ============================================ -->
+        <!-- DASHBOARD - User, Officer, Manager, Administrator -->
+        <!-- ============================================ -->
+        <menuitem id="menu_recruitment_dashboard"
+                  name="Dashboard"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  action="action_recruitment_dashboard"
+                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="1"/>
+
+        <!-- ============================================ -->
+        <!-- RECRUITMENT REQUEST MANAGEMENT - Officer, Manager, Administrator -->
+        <!-- ============================================ -->
+        <menuitem id="menu_recruitment_request_management"
+                  name="Recruitment Request Management"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="2"/>
+
+        <menuitem id="menu_all_recruitment_requests"
+                  name="All Requests"
+                  parent="menu_recruitment_request_management"
+                  action="action_recruitment_request"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="1"/>
+
+        <menuitem id="menu_my_recruitment_requests"
+                  name="My Requests"
+                  parent="menu_recruitment_request_management"
+                  action="action_recruitment_request"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="2"/>
+
+        <!-- ============================================ -->
+        <!-- TALENT ROSTER - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_talent_roster"
+                  name="Talent Roster"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  action="action_talent_roster"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="3"/>
+
+        <!-- ============================================ -->
+        <!-- INTERNAL RECRUITMENT - Officer, Manager, Administrator -->
+        <!-- ============================================ -->
+
+        <!-- Internal Job Position - Manager & Administrator only -->
+        <menuitem id="menu_hr_employee_custom_internal_job_position"
+                  name="Internal Job Position"
+                  parent="hr.menu_hr_employee_payroll"
+                  action="internal_job_position_tree_form"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="17"/>
+
+        <!-- Internal Recruitment Process - Manager & Administrator only -->
+        <menuitem id="new_recruitment_process_internal"
+                  name="Internal Recruitment Process"
+                  action="action_employee_recruitment_internal"
+                  parent="menu_internal_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="7"/>
+
+        <!-- Internal Recruitment Process Selected Candidates - Manager & Administrator only -->
+        <menuitem id="menu_new_internal_recruitment_selected"
+                  name="Internal Recruitment Process Selected Candidates"
+                  action="action_new_internal_recruitment_selected"
+                  parent="menu_internal_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="8"/>
+
+        <!-- Application Windows - Manager & Administrator only -->
+        <menuitem id="menu_application_windows"
+                  name="Application Windows"
+                  parent="menu_internal_recruitment"
+                  action="action_recruitment_application_window"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="9"/>
+
+        <!-- ============================================ -->
+        <!-- EXTERNAL RECRUITMENT - Officer, Manager, Administrator -->
+        <!-- ============================================ -->
+
+        <!-- External Recruitment Process - Manager & Administrator only -->
+        <menuitem id="new_recruitment_process_external"
+                  name="External Recruitment Process"
+                  action="action_employee_recruitment_external"
+                  parent="menu_external_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="2"/>
+
+        <!-- Application Windows - Manager & Administrator only -->
+        <menuitem id="menu_external_application_window"
+                  name="Application Windows"
+                  action="action_recruitment_application_window"
+                  parent="menu_external_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="3"/>
+
+        <!-- Eligible Candidates - Manager & Administrator only -->
+        <menuitem id="menu_external_eligible_candidates"
+                  name="Eligible Candidates (CV Review)"
+                  action="action_external_recruitment_eligible_employees"
+                  parent="menu_external_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="4"/>
+
+        <!-- External Recruitment Process Selected - Manager & Administrator only -->
+        <menuitem id="menu_external_recruitment_selected"
+                  name="External Recruitment Process Selected"
+                  action="action_external_recruitment_selected"
+                  parent="menu_external_recruitment"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="8"/>
+
+        <!-- Blacklist Pool - Manager & Administrator only -->
+        <menuitem id="menu_blacklist_pool_form"
+                  name="Blacklist Pool"
+                  sequence="12"
+                  parent="menu_external_recruitment"
+                  action="blacklist_pool_form_tree"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <!-- ============================================ -->
+        <!-- ASSESSMENT MENUS - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_applicant_assessment"
+                  name="Written Exam Assessment"
+                  parent="hr_recruitment.menu_crm_case_categ0_act_job"
+                  action="applicant_assessment_tree_form"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_interview_assessment"
+                  name="Interview Assessment"
+                  parent="hr_recruitment.menu_crm_case_categ0_act_job"
+                  action="interview_assessment_tree_form"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <!-- ============================================ -->
+        <!-- PROBATION MANAGEMENT - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_hr_employee_probation"
+                  name="Probation Management"
+                  parent="new_recruitment_menu"
+                  action="action_hr_employee_probation"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="10"/>
+
+        <!-- ============================================ -->
+        <!-- EMPLOYEE TRANSFERS - User, Officer, Manager, Administrator -->
+        <!-- ============================================ -->
+        <menuitem id="menu_employee_transfer"
+                  name="Employee Transfers"
+                  parent="new_recruitment_menu"
+                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="11"/>
+
+        <menuitem id="menu_employee_transfer_request"
+                  name="Transfer Requests"
+                  parent="menu_employee_transfer"
+                  action="action_employee_transfer_request"
+                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="1"/>
+
+        <menuitem id="menu_transfer_committee_minutes"
+                  name="Transfer Committee Minutes"
+                  parent="menu_employee_transfer"
+                  action="action_transfer_committee_minutes"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="2"/>
+
+        <menuitem id="menu_transfer_history_tracking"
+                  name="Transfer History"
+                  parent="menu_employee_transfer"
+                  action="hr_employee_custom.action_hr_employee_transfer_history"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="3"/>
+
+        <!-- ============================================ -->
+        <!-- TRANSFER SETTINGS (CONFIGURATION) - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_transfer_config_settings"
+                  name="Transfer Settings"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="transfer_config_settings_action"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="100"/>
+
+        <!-- ============================================ -->
+        <!-- CONFIGURATION MENUS - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_assessment_criteria"
+                  name="Assessment Criteria"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="assessment_criteria_tree_form"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_job_vacancy_list"
+                  name="Job Vacancy Form"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="job_vacancy_form_tree"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_bb_internal_list"
+                  name="BB Internal Form"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="bb_internal_form_tree"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_bb_external_list"
+                  name="BB external Form"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="bb_external_form_tree"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_hr_recruitment_skill"
+                  name="Skills"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_recruitment_skill"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_hr_recruitment_certification"
+                  name="Certifications"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_recruitment_certification"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <menuitem id="menu_employee_education"
+                  name="Education"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_employee_education"
+                  sequence="50"
+                  groups="group_recruitment_manager,group_recruitment_administrator"/>
+
+        <!-- ============================================ -->
+        <!-- WIZARD MENUS - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_internal_candidates_wizard"
+                  name="Shortlist Internal Candidates Wizard"
+                  parent="menu_internal_recruitment"
+                  action="action_internal_candidates_wizard"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="1"/>
+
+        <!-- ============================================ -->
+        <!-- CANDIDATE SCORES & OFFER LETTERS - Manager & Administrator only -->
+        <!-- ============================================ -->
+        <menuitem id="menu_candidate_scores"
+                  name="Candidate Scores"
+                  parent="new_recruitment_menu"
+                  action="action_recruitment_candidate_score"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="15"/>
+
+        <menuitem id="menu_offer_letters"
+                  name="Offer Letters"
+                  parent="new_recruitment_menu"
+                  action="action_recruitment_offer_letter"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="16"/>
+
+    </data>
+</odoo>

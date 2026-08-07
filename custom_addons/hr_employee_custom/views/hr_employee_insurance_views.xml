@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <record id="view_hr_employee_insurance_list" model="ir.ui.view">
+            <field name="name">hr.employee.insurance.list</field>
+            <field name="model">hr.employee.insurance</field>
+            <field name="arch" type="xml">
+                <list string="Insurance">
+                    <field name="employee_id"/>
+                    <field name="name_of_insurance"/>
+                    <field name="insurance_type"/>
+                    <field name="renewal_date"/>
+                    <field name="policy"/>
+                    <field name="policy_coverage"/>
+                    <field name="sum_insured"/>
+                    <field name="premium"/>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                    <field name="company_id"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_hr_employee_insurance_form" model="ir.ui.view">
+            <field name="name">hr.employee.insurance.form</field>
+            <field name="model">hr.employee.insurance</field>
+            <field name="arch" type="xml">
+                <form string="Insurance">
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="name_of_insurance"/>
+                            <field name="insurance_type"/>
+                            <field name="renewal_date"/>
+                            <field name="policy"/>
+                        </group>
+                        <group>
+                            <field name="policy_coverage"/>
+                            <field name="sum_insured"/>
+                            <field name="premium"/>
+                            <field name="date_from"/>
+                            <field name="date_to"/>
+                            <field name="company_id"/>
+                        </group>
+                    </group>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_hr_employee_insurance" model="ir.actions.act_window">
+            <field name="name">Insurance</field>
+            <field name="res_model">hr.employee.insurance</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Inherit employee form to add Insurance tab -->
+
+
+    </data>
+</odoo>

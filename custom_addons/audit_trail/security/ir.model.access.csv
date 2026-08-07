@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_audit_log_user,audit.log.user,model_audit_log,group_audit_user,1,0,0,0
+access_audit_log_manager,audit.log.manager,model_audit_log,group_audit_manager,1,0,1,1
+access_audit_rule_manager,audit.rule.manager,model_audit_rule,group_audit_manager,1,1,1,1
+access_audit_rule_user,audit.rule.user,model_audit_rule,group_audit_user,1,0,0,0

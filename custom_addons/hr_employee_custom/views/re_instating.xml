@@ -1,0 +1,76 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="re_instating_form" model="ir.ui.view">
+        <field name="name">Re.Instating.form</field>
+        <field name="model">re.instating</field>
+        <field name="arch" type="xml">
+            <form string="Re Instating">
+                <group colspan="2">
+                    <group>
+                        <field name="ref_num"/>
+                        <field name="employee_name"/>
+                    </group>
+                    <group>
+                        <field name="operating_unit"/>
+                         <field name="department"/>
+                    </group>
+
+                    <group>
+                        <field name="new_job_title"/>
+                        <field name="new_job_grade"/>
+                    </group>
+                    <group>
+                        <field name="salary"/>
+                        <field name="date_re_instated"/>
+                    </group>
+
+                     <group>
+                        <field name="responsible"/>
+                        <field name="reason"/>
+                         </group>
+                    <group>
+                         <field name="trial_date_end" invisible="True"/>
+                         <field name="status"/>
+                    </group>
+                        <group>
+<!--                            <field name="wage" invisible="1"/>-->
+                        <button name="Approve" invisible="status in ['approved']" string="Approve" type="object" class="btn-primary"/>
+                        </group>
+                    <group>
+                        <button name="re_instate" string="Re Instate" type="object" class="btn-primary"/>
+                    </group>
+                    </group>
+
+            </form>
+        </field>
+    </record>
+    <record id="re_instating_tree" model="ir.ui.view">
+        <field name="name">Re.Instating.form</field>
+        <field name="model">re.instating</field>
+        <field name="arch" type="xml">
+            <list string="Re Instating">
+                <field name="ref_num"/>
+                <field name="employee_name"/>
+                <field name="operating_unit"/>
+                <field name="department"/>
+                <field name="new_job_title"/>
+                <field name="new_job_grade"/>
+                <field name="salary"/>
+                <field name="date_re_instated"/>
+                <field name="responsible"/>
+                <field name="reason"/>
+
+<!--                <field name="active"  invisible="inactive == True"/>-->
+<!--                <field name="inactive"  invisible="active == True"/>-->
+            </list>
+        </field>
+    </record>
+        <record id="employee_re_instating_tree" model="ir.actions.act_window">
+        <field name="name">Re Instating Details</field>
+        <field name="res_model">re.instating</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_re_instating_list" name="Re Instating" parent="hr.menu_hr_employee_user" action="employee_re_instating_tree"/> -->
+</odoo>

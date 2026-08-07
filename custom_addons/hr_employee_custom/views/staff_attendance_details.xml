@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_staff_attendance_details" model="ir.actions.act_window">
+        <field name="name">Staff Attendance Detials</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">staff.attendance.details</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="staff_attendance_details_tree_view" model="ir.ui.view">
+        <field name="name">staff.attendance.details.tree</field>
+        <field name="model">staff.attendance.details</field>
+        <field name="arch" type="xml">
+            <list string="Staff Attendance" editable="bottom">
+                <field name="he_id"/>
+                <field name="emp_num"/>
+                <field name="employee_name"/>
+                <field name="manager_name"/>
+                <field name="job_position"/>
+                <field name="work_unit"/>
+                <field name="department_name"/>
+                <field name="checkin_time"/>
+                <field name="checkout_time"/>
+                <field name="worked_hours"/>
+            </list>
+        </field>
+    </record>
+    <!-- <menuitem id="new_staff_attendance_details" -->
+         <!-- name="Staff Attendance" action="action_staff_attendance_details" -->
+         <!-- parent="hr_attendance.menu_hr_attendance_manage_attendances" -->
+         <!-- sequence="100"/> -->
+</odoo>

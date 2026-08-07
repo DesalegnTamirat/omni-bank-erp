@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="report_non_managerial_same_location">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                            <div class="col-4" style="float:left;">
+                                 <strong>Date.:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <strong>Ref. No.</strong>
+                                <span t-field="o.app_reference"/>
+                                  <br />
+                                <strong>ID.No.:</strong>
+                                 <span t-field="o.employee_number"/>
+                                <br />
+                                  <br/>
+                            </div>
+                        </div>
+                         <div class="row mt32">
+                              <div class="col-12">
+                                <strong><span t-field="o.partner_name"/></strong>
+                                <br/>
+                                <strong>Dear <span t-field="o.partner_name"/>,</strong>
+                            </div>
+                             </div>
+                        <h6 class="text-center"><strong><u>Subject: - Promotion</u></strong></h6>
+                        <br/>
+                        <p>Considering your experience and remarkable contribution to the Bank, I am pleased to inform you that you are promoted to the post of  <strong><span t-field="o.job_id"/></strong>  (Job Grade<strong><span t-field="o.job_grade_id"/> </strong>) and assigned at <strong><span t-field="o.final_work_unit"/></strong> effective September 30,2022.</p>
+                        <br/>
+                        <p>Commencing the same date, your monthly gross salary raised to  <strong>Birr <span t-field="o.job_grade_id.base_salary"/></strong> and you are entitled other benefits attached with your new position. </p>
+                        <br/>
+                        <p>We hope you will continue to exert maximum effort to discharge the duties and responsibilities bestowed upon you. </p>
+                        <br/>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6" >
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <span t-field="o.operating_unit_tag" />
+                                  <br />
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br />
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

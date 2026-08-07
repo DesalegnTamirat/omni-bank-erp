@@ -1,0 +1,208 @@
+2026-07-31 07:19:07,550 94 WARNING ? odoo.tools.config: option addons_path, invalid addons directory '/mnt/extra-addons', skipped 
+2026-07-31 07:19:07,551 94 WARNING ? odoo.tools.config: option addons_path, invalid addons directory '/mnt/extra-addons', skipped 
+2026-07-31 07:19:07,551 94 WARNING ? odoo.tools.config: missing --http-interface/http_interface, using 0.0.0.0 by default, will change to 127.0.0.1 in 20.0 
+2026-07-31 07:19:07,574 94 INFO ? odoo: Odoo version 19.0-20260630 
+2026-07-31 07:19:07,577 94 INFO ? odoo: Using configuration file at /etc/odoo/odoo.conf 
+2026-07-31 07:19:07,577 94 INFO ? odoo: addons paths: _NamespacePath(['/usr/lib/python3/dist-packages/odoo/addons', '/var/lib/odoo/.local/share/Odoo/addons/19.0', '/mnt/custom-modules', '/usr/lib/python3/dist-packages/addons']) 
+2026-07-31 07:19:07,577 94 INFO ? odoo: database: odoo@odoo19-db:5432 
+2026-07-31 07:19:08,240 94 INFO odoo19 odoo.modules.loading: loading 1 modules... 
+2026-07-31 07:19:08,246 94 INFO odoo19 odoo.modules.loading: 1 modules loaded in 0.01s, 0 queries (+0 extra) 
+2026-07-31 07:19:08,280 94 INFO odoo19 odoo.modules.loading: updating modules list 
+2026-07-31 07:19:08,288 94 INFO odoo19 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on [] to user __system__ #1 via n/a 
+2026-07-31 07:19:14,967 94 INFO odoo19 odoo.addons.base.models.ir_module: ALLOW access to module.button_upgrade on ['HR Employee Custom Extensions'] to user __system__ #1 via n/a 
+2026-07-31 07:19:14,967 94 INFO odoo19 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on ['HR Employee Custom Extensions'] to user __system__ #1 via n/a 
+2026-07-31 07:19:20,726 94 INFO odoo19 odoo.addons.base.models.ir_module: ALLOW access to module.button_install on [] to user __system__ #1 via n/a 
+2026-07-31 07:19:20,934 94 INFO odoo19 odoo.modules.loading: loading 76 modules... 
+2026-07-31 07:19:21,319 94 INFO odoo19 odoo.addons.audit_trail.models.base_patch: audit_trail: ORM patch applied (create/write/unlink) 
+2026-07-31 07:19:21,325 94 WARNING odoo19 odoo.registry: Model attribute '_sql_constraints' is no longer supported, please define models.Constraint on the model. 
+2026-07-31 07:19:22,317 94 WARNING odoo19 odoo.registry: Model attribute '_sql_constraints' is no longer supported, please define models.Constraint on the model. 
+2026-07-31 07:19:22,317 94 WARNING odoo19 odoo.registry: Model attribute '_sql_constraints' is no longer supported, please define models.Constraint on the model. 
+2026-07-31 07:19:22,336 94 INFO odoo19 odoo.modules.loading: Loading module hr_employee_custom (72/76) 
+2026-07-31 07:19:22,496 94 WARNING odoo19 odoo.fields: Field discipline.offense.category.name: unknown parameter 'tracking', if this is an actual parameter you may want to override the method _valid_field_parameter on the relevant model in order to allow it 
+2026-07-31 07:19:23,633 94 WARNING odoo19 odoo.registry: The model employee.demotion has no _description 
+2026-07-31 07:19:23,633 94 WARNING odoo19 odoo.registry: The model salary.detail.demotion has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model employee.increment.setup has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model emp.probation.criteria has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model probation.assessment.form has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model probation.assessment.form.criteria has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model emp.probation.delegation.team has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model department.history has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model timesheet.cost has no _description 
+2026-07-31 07:19:23,634 94 WARNING odoo19 odoo.registry: The model salary.history has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model contract.history has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model transfer.history has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model training.history has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model re.instated.history has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: Model attribute '_sql_constraints' is no longer supported, please define models.Constraint on the model. 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model hr.ability.languages has no _description 
+2026-07-31 07:19:23,635 94 WARNING odoo19 odoo.registry: The model education.fee.sponsorship has no _description 
+2026-07-31 07:19:23,636 94 WARNING odoo19 odoo.registry: The model training.commitment has no _description 
+2026-07-31 07:19:23,637 94 WARNING odoo19 odoo.registry: The model employee.increment.setup has no _description 
+2026-07-31 07:19:23,637 94 WARNING odoo19 odoo.registry: The model hr_new_department_info_job has no _description 
+2026-07-31 07:19:23,638 94 WARNING odoo19 odoo.registry: Model attribute '_sql_constraints' is no longer supported, please define models.Constraint on the model. 
+2026-07-31 07:19:23,639 94 WARNING odoo19 odoo.registry: The model salary.detail.changes has no _description 
+2026-07-31 07:19:23,639 94 WARNING odoo19 odoo.registry: The model leave.request.manager.approval.team has no _description 
+2026-07-31 07:19:23,639 94 WARNING odoo19 odoo.registry: The model leave.request.types has no _description 
+2026-07-31 07:19:23,639 94 WARNING odoo19 odoo.registry: The model supplementary.delegation.team has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model transfer.delegation.team has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model generate.employee.attendance.report has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model call.api.b1 has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model increment.transfer.wizard has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model call.api.n has no _description 
+2026-07-31 07:19:23,640 94 WARNING odoo19 odoo.registry: The model call.api has no _description 
+2026-07-31 07:19:23,729 94 WARNING odoo19 odoo.fields: Field leave.request.types.request_id: unknown parameter 'invisible', if this is an actual parameter you may want to override the method _valid_field_parameter on the relevant model in order to allow it 
+2026-07-31 07:19:23,756 94 INFO odoo19 odoo.registry: module hr_employee_custom: creating or updating database tables 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (employee_identification, identification_id) of hr.employee() have the same label: Employee Identification. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (personal_email, private_email) of hr.employee() have the same label: Personal Email. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (personal_phone, phone_num) of hr.employee() have the same label: Personal Phone. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (father_name1, father_name) of hr.employee() have the same label: Father Name. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (grand_father_name1, grand_father_name) of hr.employee() have the same label: Grand Father Name. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (mother_name1, mother_name) of hr.employee() have the same label: Mother Name. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (details1, details) of hr.employee() have the same label: Details. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (language_ids, languages) of hr.employee() have the same label: Languages. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (service_start_date, start_date) of hr.employee() have the same label: Start Date. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (sex, gender) of hr.employee() have the same label: Gender. [Modules: None and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (phone_number, employee_phone) of employee.service.request() have the same label: Phone Number. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (union_member, member_of_labour_union) of hr.contract() have the same label: Member of Labour Union. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (alter_operating_unit, operating_unit) of emp.probation.delegation.team() have the same label: Operating Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (employee_name, employee_id) of department.history() have the same label: Employee Name. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (from_operating_unit2, from_operating_unit) of transfer.history() have the same label: From Operating Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (from_department2, from_department) of transfer.history() have the same label: From Department. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (from_position2, from_position) of transfer.history() have the same label: From Position. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (from_grade2, from_grade) of transfer.history() have the same label: From Grade . [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (date2, date) of transfer.history() have the same label: Date. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (to_operting_unit2, to_operting_unit) of transfer.history() have the same label: To Operting Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (to_department2, to_department) of transfer.history() have the same label: To Department. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,394 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (to_position2, to_position) of transfer.history() have the same label: To Position. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (to_grade2, to_grade) of transfer.history() have the same label: To Grade. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (employee_name, employee_id) of training.history() have the same label: Employee Id. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (employee_name, employee_id) of re.instated.history() have the same label: Employee Id. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (salary, new_salary) of re.instated.history() have the same label: New Salary. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (operating_unit, operating_unit_id) of hr.department() have the same label: Operating Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (survey_id2, survey_id) of hr.job() have the same label: Interview Form. [Modules: hr_employee_custom and hr_recruitment_survey] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (doc_attach_rel2, doc_attach_rel4) of ir.attachment() have the same label: Attachment. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (applicant_id, job_id) of hr_experience_info_job() have the same label: Employee. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,395 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (applicant_id, job_id) of hr_competencies_info_job() have the same label: Employee. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (apr_state, state) of leave.request.manager() have the same label: State. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (new_salary, salary) of re.instating() have the same label: Salary. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (job_grade1, job_grade) of supplementary.role() have the same label: Job Grade. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (job_category1, job_category) of supplementary.role() have the same label: Job Category. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (alter_operating_unit, operating_unit) of supplementary.delegation.team() have the same label: Operating Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (employee_category1, employee_category) of transfer.form() have the same label: Employee Category. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (department1, department) of transfer.form() have the same label: Department. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (job_title, job_position) of transfer.form() have the same label: Job Position. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (job_grade1, job_grade) of transfer.form() have the same label: Job Grade. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (job_category1, job_category) of transfer.form() have the same label: Job Category. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,396 94 WARNING odoo19 odoo.addons.base.models.ir_model: Two fields (alter_operating_unit, operating_unit) of transfer.delegation.team() have the same label: Operating Unit. [Modules: hr_employee_custom and hr_employee_custom] 
+2026-07-31 07:19:24,766 94 INFO odoo19 odoo.schema: column "operating_unit_id" of relation "hr_department" contains null values
+ 
+2026-07-31 07:19:24,780 94 INFO odoo19 odoo.schema: column "district" of relation "operating_unit" contains null values
+ 
+2026-07-31 07:19:24,784 94 INFO odoo19 odoo.schema: column "region" of relation "operating_unit" contains null values
+ 
+2026-07-31 07:19:24,936 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/security/security.xml 
+2026-07-31 07:19:25,020 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/security/operating_unit_security.xml 
+2026-07-31 07:19:25,200 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/security/security_hr_contract.xml 
+2026-07-31 07:19:25,207 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/security/ir.model.access.csv 
+2026-07-31 07:19:25,622 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/hr_contract_data.xml 
+2026-07-31 07:19:25,654 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_contract_views.xml 
+2026-07-31 07:19:25,788 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_contract_history_views.xml 
+2026-07-31 07:19:25,819 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/wizards/contract_wizard.xml 
+2026-07-31 07:19:25,853 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_department_views.xml 
+2026-07-31 07:19:25,901 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_operating_unit_views.xml 
+2026-07-31 07:19:25,953 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/operating_unit_data.xml 
+2026-07-31 07:19:25,966 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/res_users_operating_unit_views.xml 
+2026-07-31 07:19:26,041 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_employee_grade_views.xml 
+2026-07-31 07:19:26,086 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_job_history_views.xml 
+2026-07-31 07:19:26,122 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_job.xml 
+2026-07-31 07:19:26,163 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_grade.xml 
+2026-07-31 07:19:26,197 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/history_views.xml 
+2026-07-31 07:19:26,311 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_job.xml 
+2026-07-31 07:19:26,408 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/job_history.xml 
+2026-07-31 07:19:26,442 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_leave_allocation.xml 
+2026-07-31 07:19:26,625 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_leave_allocation_accruement.xml 
+2026-07-31 07:19:26,660 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/recruitment_qualifications.xml 
+2026-07-31 07:19:26,686 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/recruitment_competency.xml 
+2026-07-31 07:19:26,711 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/recruitment_experience.xml 
+2026-07-31 07:19:26,737 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/hr_job_data.xml 
+2026-07-31 07:19:26,746 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/security/security_service_request.xml 
+2026-07-31 07:19:26,760 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/employee_service_request_sequence.xml 
+2026-07-31 07:19:26,773 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/emp_service_req.xml 
+2026-07-31 07:19:26,788 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/employee_self_service_sequence.xml 
+2026-07-31 07:19:26,798 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/service_request_type_views.xml 
+2026-07-31 07:19:26,823 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/service_request_views.xml 
+2026-07-31 07:19:26,863 94 WARNING odoo19 odoo.addons.base.models.ir_ui_view: An alert (class alert-*) must have an alert, alertdialog or status role or an alert-link class. Please use alert and alertdialog only for what expects to stop any activity to be read immediately.
+View error context:
+{'file': '/mnt/custom-modules/hr_employee_custom/views/service_request_views.xml',
+ 'line': 82,
+ 'name': 'employee.service.request.form',
+ 'view': ir.ui.view(1807,),
+ 'view.model': 'employee.service.request',
+ 'view.parent': ir.ui.view(),
+ 'xmlid': 'emp_service_request_form_view'} 
+2026-07-31 07:19:26,866 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/service_request.xml 
+2026-07-31 07:19:26,896 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_ser_request.xml 
+2026-07-31 07:19:26,937 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/wizards/completion_wizard_views.xml 
+2026-07-31 07:19:26,961 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/wizards/rejection_wizard_views.xml 
+2026-07-31 07:19:26,983 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/guarentees_details_views.xml 
+2026-07-31 07:19:27,044 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/guarentee_details.xml 
+2026-07-31 07:19:27,085 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/supplementary.xml 
+2026-07-31 07:19:27,138 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/emp_transfer_form.xml 
+2026-07-31 07:19:27,151 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/transfer_form_views.xml 
+2026-07-31 07:19:27,201 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/transform_form.xml 
+2026-07-31 07:19:27,237 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_transfer_history_views.xml 
+2026-07-31 07:19:27,273 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/re_instating_views.xml 
+2026-07-31 07:19:27,316 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/re_instating.xml 
+2026-07-31 07:19:27,352 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_reinstated_history_views.xml 
+2026-07-31 07:19:27,409 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_demotion_views.xml 
+2026-07-31 07:19:27,457 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_demotion.xml 
+2026-07-31 07:19:27,492 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/part_time_employment_views.xml 
+2026-07-31 07:19:27,537 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/part_time_employement.xml 
+2026-07-31 07:19:27,569 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/prob_sequence.xml 
+2026-07-31 07:19:27,578 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/emp_probation.xml 
+2026-07-31 07:19:27,600 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/probation_assessment_form.xml 
+2026-07-31 07:19:27,641 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/increment.xml 
+2026-07-31 07:19:27,684 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_increment_setup.xml 
+2026-07-31 07:19:27,715 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/wizards/increment_transfer_wizard.xml 
+2026-07-31 07:19:27,742 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_employee_insurance_views.xml 
+2026-07-31 07:19:27,799 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_training_history_views.xml 
+2026-07-31 07:19:27,838 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/report_code_views.xml 
+2026-07-31 07:19:27,894 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/service_award.xml 
+2026-07-31 07:19:27,935 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/award_received.xml 
+2026-07-31 07:19:27,978 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/leave_request.xml 
+2026-07-31 07:19:27,991 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/data/supp_role.xml 
+2026-07-31 07:19:28,006 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_payroll_structure_views.xml 
+2026-07-31 07:19:28,063 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/acting_assignment.xml 
+2026-07-31 07:19:28,086 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/acting_assignment_managerial.xml 
+2026-07-31 07:19:28,110 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/acting_termination.xml 
+2026-07-31 07:19:28,136 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/mangerial_different_location.xml 
+2026-07-31 07:19:28,165 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/mangerial_same_location.xml 
+2026-07-31 07:19:28,193 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/non_mangerial_different_location.xml 
+2026-07-31 07:19:28,215 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/non_mangerial_same_location.xml 
+2026-07-31 07:19:28,236 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/permanent_letters.xml 
+2026-07-31 07:19:28,257 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/probation_termination.xml 
+2026-07-31 07:19:28,277 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/promotion_letter.xml 
+2026-07-31 07:19:28,306 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/promotion_revocation.xml 
+2026-07-31 07:19:28,327 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/release_format.xml 
+2026-07-31 07:19:28,347 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/report.xml 
+2026-07-31 07:19:28,386 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/transfer_letter.xml 
+2026-07-31 07:19:28,404 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/reports/employee_experience_letter.xml 
+2026-07-31 07:19:28,425 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/wizards/print_employee_report_views.xml 
+2026-07-31 07:19:28,454 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/employee_history.xml 
+2026-07-31 07:19:28,459 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/hr_employee_master_views.xml 
+2026-07-31 07:19:28,896 94 INFO odoo19 odoo.modules.loading: loading hr_employee_custom/views/menu.xml 
+2026-07-31 07:19:29,870 94 WARNING odoo19 odoo.modules.loading: The models ['department.history', 're.instated.history', 'leave.request', 'leave.request.manager.approval.team', 'leave.request.manager', 'leave.request.types', 'hr.leave.allocation.accrual.calculator.accruement', 'hr.leave.allocation.accrual.calculator', 'call.api.b1', 'call.api.n', 'call.api'] have no access rules in module hr_employee_custom, consider adding some, like:
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+hr_employee_custom.access_department_history,access_department_history,hr_employee_custom.model_department_history,base.group_user,1,0,0,0
+hr_employee_custom.access_re_instated_history,access_re_instated_history,hr_employee_custom.model_re_instated_history,base.group_user,1,0,0,0
+hr_employee_custom.access_leave_request,access_leave_request,hr_employee_custom.model_leave_request,base.group_user,1,0,0,0
+hr_employee_custom.access_leave_request_manager_approval_team,access_leave_request_manager_approval_team,hr_employee_custom.model_leave_request_manager_approval_team,base.group_user,1,0,0,0
+hr_employee_custom.access_leave_request_manager,access_leave_request_manager,hr_employee_custom.model_leave_request_manager,base.group_user,1,0,0,0
+hr_employee_custom.access_leave_request_types,access_leave_request_types,hr_employee_custom.model_leave_request_types,base.group_user,1,0,0,0
+hr_employee_custom.access_hr_leave_allocation_accrual_calculator_accruement,access_hr_leave_allocation_accrual_calculator_accruement,hr_employee_custom.model_hr_leave_allocation_accrual_calculator_accruement,base.group_user,1,0,0,0
+hr_employee_custom.access_hr_leave_allocation_accrual_calculator,access_hr_leave_allocation_accrual_calculator,hr_employee_custom.model_hr_leave_allocation_accrual_calculator,base.group_user,1,0,0,0
+hr_employee_custom.access_call_api_b1,access_call_api_b1,hr_employee_custom.model_call_api_b1,base.group_user,1,0,0,0
+hr_employee_custom.access_call_api_n,access_call_api_n,hr_employee_custom.model_call_api_n,base.group_user,1,0,0,0
+hr_employee_custom.access_call_api,access_call_api,hr_employee_custom.model_call_api,base.group_user,1,0,0,0 
+2026-07-31 07:19:29,934 94 INFO odoo19 odoo.modules.loading: Module hr_employee_custom loaded in 7.60s, 4009 queries (+4009 other) 
+2026-07-31 07:19:29,934 94 INFO odoo19 odoo.modules.loading: Loading module custom_hr_attendance (73/76) 

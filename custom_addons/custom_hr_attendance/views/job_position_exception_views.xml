@@ -1,0 +1,58 @@
+<odoo>
+
+    <record id="job_position_exception_view_tree" model="ir.ui.view">
+        <field name="name">Job Position Exception List</field>
+        <field name="model">job.position.exception</field>
+        <field name="arch" type="xml">
+            <list string="Job Position Exception" edit="0">
+                <field name="employee_id"/>
+                <field name="job_position"/>
+                <field name="shift_id"/>
+                <field name="time_range"/>
+                <field name="day_off"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+    <record id="job_position_exception_view_form" model="ir.ui.view">
+        <field name="name">Job Position Exception Form</field>
+        <field name="model">job.position.exception</field>
+        <field name="arch" type="xml">
+            <form string="Job Position Exception">
+                <header>
+                    <button name="notify"
+                            type="object"
+                            string="Notify"
+                            class="oe_highlight"
+                            invisible="status != 'active' or notify_status == 'notified'"/>
+
+                    <!--button string="Notified"
+                            type="object"
+                            invisible="status != 'active' or notify_status != 'notified'"
+                            class="btn btn-secondary"
+                            name="noop" /-->
+                </header>
+
+                <sheet>
+                    <group>
+                        <field name="employee_id"/>
+                        <field name="job_position"/>
+                        <field name="shift_id"/>
+                        <field name="time_range" readonly="1"/>
+                        <field name="day_off"/>
+                        <field name="status"/>
+                        <field name="notify_status" invisible="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <!-- Define the action for Job Position -->
+    <record id="action_job_position_exception" model="ir.actions.act_window">
+        <field name="name">Job Position Exception</field>
+        <field name="res_model">job.position.exception</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
+
+

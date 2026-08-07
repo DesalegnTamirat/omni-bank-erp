@@ -1,0 +1,74 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_probation_revocation">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                             <div class="col-4" style="float:left;">
+                                 <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                                  <br/>
+                              </div>
+                        </div>
+                        <div class="row mt32">
+                              <div class="col-12">
+                                  <strong>Ref. No:</strong>
+<!--                                <span t-field="o.reference"/>-->
+                                <br/>
+                                  <br/>
+                                  <strong>Dear <span t-field="o.employee_id"/>,</strong>
+                            </div>
+                         </div>
+
+                        <br/>
+                        <p> It is to be recalled that, the Bank has employed you on <strong><span t-field="o.date_start"/></strong> as <strong><span t-field="o.job_id"/></strong>for a probation period of <strong><span t-field="o.probation_period"/></strong> working days. </p>
+<!--                        <t t-if="o.depreciation_line_ids">-->
+
+
+                        <br/>
+                        <p>Following regular reviews, your performance, unfortunately, has not reached a satisfactory standard during your probationary period. Your probationary period ends on <strong><span t-field="o.probation_end_date"/></strong> and it has been decided to terminate your employment at this point.</p>
+                        <br/>
+                        <p>Before leaving the organisation you must ensure that you return all company property [e.g books, laptop, phone, security pass].</p>
+                        <br/>
+                        <p>It is an unfortunate outcome, but I do wish you every success in the future.</p>
+
+
+
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+
+
+                                 <strong>CC:</strong>
+                                 <ul>
+                                     <li>Finance Directorate</li>
+                                     <li>Adama Area Office</li>
+                                     <li>Main Branch</li>
+                                      <li>Adama Kelo Branch </li>
+                                     <li>Bunna Bank S.c</li>
+                                 </ul>
+
+
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

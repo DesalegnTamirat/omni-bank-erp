@@ -1,0 +1,124 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_employee_recruitment_external" model="ir.actions.act_window">
+        <field name="name">External Recruitment Process</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">employee.recruitment.external</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="employee_recruitment_external_tree_view" model="ir.ui.view">
+        <field name="name">employee.recruitment.external.tree</field>
+        <field name="model">employee.recruitment.external</field>
+        <field name="arch" type="xml">
+            <list string="External Recruitment">
+                <field name="vacancy_reference"/>
+                <field name="recruitment_reference"/>
+                <field name="job_position"/>
+                <field name="job_location"/>
+                <field name="vacancy_announced_on"/>
+                <field name="no_of_vacancies"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="employee_recruitment_external_form_view" model="ir.ui.view">
+        <field name="name">employee.recruitment.external.form</field>
+        <field name="model">employee.recruitment.external</field>
+        <field name="arch" type="xml">
+            <form string="External Recruitment">
+                <header>
+                    <field name="status" widget="statusbar"/>
+<!--                    <button name="populate_criteria" string="Populate Criteria" type="object" class="oe_highlight"/>-->
+                    <button name="action_open_shortlist_wizard"
+                            string="Shortlist Candidates"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-filter"
+                            groups="hr.group_hr_user"
+                            invisible="shortlisting_done"
+                            help="Define shortlisting criteria and auto-populate the External Selected Candidates record"/>
+                    <button name="notify" invisible="status in ['notify']" string="Notify Applicant" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <field name="shortlisting_done" invisible="1"/>
+                    <group>
+                        <group>
+                            <field name="vacancy_reference"/>
+                            <field name="recruitment_reference"/>
+                             <field name="vacancy_announced_on"/>
+                            <field name="no_of_vacancies"/>
+                            <field name="last_date_to_apply"/>
+                            <field name="job_position"/>
+                        </group>
+                        <group>
+
+                            <field name="job_location"/>
+                            <field name="relevant_experience"/>
+                            <field name="job_grade"/>
+                            <field name="job_category"/>
+                            <field name="highest_cgpa"/>
+                            <field name="responsible"/>
+
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Eligible Applicants">
+                            <field name="eligible_emp_external">
+                            <list string="Eligible Applicants">
+                                    <!-- Selection -->
+                                    <field name="select_flag"/>
+                                    <field name="applicant_name"/>
+                                    <!-- Personal -->
+                                    <field name="applicant_email"/>
+                                    <field name="applicant_phone"/>
+                                    <field name="date_of_birth"/>
+                                    <field name="gender"/>
+                                    <!-- Employment -->
+                                    <field name="working_status"/>
+                                    <field name="current_company"/>
+                                    <field name="join_immediately"/>
+                                    <field name="date_of_availability"/>
+                                    <field name="preferred_location"/>
+                                    <field name="ex_bunna"/>
+                                    <!-- Academic -->
+                                    <field name="educational_qualification"/>
+                                    <field name="field_of_study"/>
+                                     <field name="institution_name"/>
+                                     <field name="graduation_date"/>
+                                     <field name="highest_cgpa"/>
+                                    <!-- Experience -->
+                                    <field name="relevant_experience"/>
+                                    <field name="banking_experience"/>
+                                    <field name="non_banking_experience"/>
+                                    <field name="total_experience"/>
+                                    <field name="supervisory_experience"/>
+                                    <!-- Notes -->
+                                    <field name="recommendation"/>
+                                    <!-- Salary -->
+                                    <field name="current_salary" optional="show"/>
+                                    <field name="expected_salary" optional="show"/>
+                                    <!-- CV Attachment -->
+                                    <field name="cv_attachment_id" string="CV File" readonly="1"/>
+                                    <button name="action_download_cv" type="object"
+                                            string="Download CV" class="btn-secondary" icon="fa-download"
+                                            help="Download CV/Resume for this candidate"/>
+                                    <button name="action_transfer_to_talent_roster" type="object"
+                                            string="Add to Roster" class="btn-info" icon="fa-star"
+                                            help="Add this candidate to Talent Roster"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+
+            </form>
+        </field>
+    </record>
+</odoo>

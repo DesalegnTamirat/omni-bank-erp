@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="action_new_probation_assessment_form" model="ir.actions.act_window">
+        <field name="name">Probation Assessment Form</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">probation.assessment.form</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="probation_assessment_form_tree_view" model="ir.ui.view">
+        <field name="name">probation.assessment.form.tree</field>
+        <field name="model">probation.assessment.form</field>
+        <field name="arch" type="xml">
+            <list string="Employee Probation Assessment Form">
+                <field name="prob_sequence"/>
+                <field name="name_of_probationer"/>
+                <field name="position_title"/>
+                <field name="place_of_assessment"/>
+                <field name="employment_date"/>
+            </list>
+        </field>
+    </record>
+    <record id="probation_assessment_form_view" model="ir.ui.view">
+        <field name="name">probation.assessment.form</field>
+        <field name="model">probation.assessment.form</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                     <field name="state" widget="statusbar"/>
+                     <button name="notify_deligation" invisible="state in ('notify', 'evaluate', 'confirm_permenancy', 'reject', 'terminate_contract', 'inform_in_charge')" string="Notify Hr" type="object" class="oe_highlight"/>
+                     <button name="assess_evaluate" invisible="state in ('draft', 'evaluate', 'confirm_permenancy', 'reject', 'terminate_contract', 'inform_in_charge')" string="Evaluate" type="object" class="oe_highlight"/>  
+                     <button name="confirm_permenancy" invisible="state in ('draft', 'notify', 'confirm_permenancy', 'reject', 'terminate_contract', 'inform_in_charge')" string="Confirm Permenancy" type="object" class="oe_highlight"/>
+                     <button name="reject" invisible="state in ('draft', 'notify', 'confirm_permenancy', 'reject', 'terminate_contract', 'inform_in_charge')" string="Reject" type="object" class="oe_highlight"/>
+                     <button name="terminate_contract" invisible="state in ('draft', 'notify', 'evaluate', 'confirm_permenancy', 'terminate_contract', 'inform_in_charge')" string="Terminate Contract" type="object" class="oe_highlight"/>					 
+					 <button name="inform_in_charge" invisible="state in ('draft', 'notify', 'inform_in_charge')" string="Inform TDD" type="object" class="oe_highlight"/>
+                     <!-- <button name="inform_manager" string="Notify Manager" type="object" class="oe_highlight"/> -->
+
+<!--                     <button name="inform_in_charge"  invisible="state in &apos;inform_in_charge&apos;" string="Inform TDD" type="object" class="oe_highlight"/>-->
+<!--                     <button name="inform_manager"  invisible="state in (&apos;reject&apos;, &apos;approve&apos;, &apos;inform_manager&apos;, &apos;inform_in_charge&apos;)" string="Notify" type="object" class="oe_highlight"/>-->
+<!--                     <button name="approve"  invisible="state in (&apos;draft&apos;, &apos;reject&apos;, &apos;approve&apos;, &apos;inform_in_charge&apos;)" string="Approve" type="object" class="oe_highlight"/>-->
+<!--  invisible="status in (&apos;notify_deligation&apos;, &apos;assess_evaluate&apos;)"                    
+<button name="reject"  invisible="state in (&apos;draft&apos;, &apos;reject&apos;, &apos;approve&apos;, &apos;inform_in_charge&apos;)" string="Reject" type="object" class="oe_highlight"/>-->
+                </header>
+
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="prob_sequence" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name_of_probationer"/>
+                            <field name="position_title"/>
+                            <field name="place_of_assessment"/>
+                            <field name="employment_date"/>
+                            <field name="status" invisible="1"/>
+                            <field name="evaluation_period" widget="char" readonly="1" options="{&quot;no_create_edit&quot;: true}"/>
+							<field name="total"/>
+                        </group>
+                        <group>
+                            <field name="in_charge"/>
+                        </group>
+                    </group>
+                    <group>
+                        <notebook>
+                            <page string="Evaluation criteria">
+                                <field name="pro_assess_form">
+                                    <!-- Use a tree view to display multiple records for evaluation criteria -->
+                                    <list string="Evaluation Criteria" editable="bottom">
+                                        <field name="evaluation_criteria" width="20%"/>
+                                        <field name="rating" width="20%"/>
+                                        <field name="coefficient" width="20%"/>
+                                        <field name="score" width="20%"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Probation Assessment Approval Members">
+                            <field name="emp_prob_delig_team_id">
+                                <list editable="bottom">
+                                        <!-- <field name="role" width="20%"/> -->
+                                        <field name="employee_name" width="20%"/>
+                                        <field name="operating_unit" width="20%"/>
+                                        <field name="status" width="20%"/>
+                                        <field name="alternate_committee_member" width="20%"/>
+                                        <field name="alter_operating_unit" width="20%"/>
+                                        <field name="approve" width="20%"/>
+                                </list>
+                            </field>
+							</page>
+                        </notebook>
+                    </group>
+					<group>
+					
+					    <field name="assessment_comments" nolabel="1"/>
+					
+					</group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+<template id="report_acting_termination">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                              <div class="col-8" >
+                                  <strong>Ref. No.</strong>
+                                <span t-field="o.reference"/>
+                                  <br/>
+                                  <br/>
+                                   <strong>ID.No.:</strong>
+                                 <span t-field="o.employee_id"/>
+                                <br />
+                                <br/>
+                                 <strong><span t-field="o.employee_name"/></strong>
+                                  <br/>
+                                <strong><span t-field="o.current_work_unit"/></strong>
+                                  <br/>
+                                    <br/>
+                                <strong>Dear <span t-field="o.employee_name"/>,</strong>
+                                  <br/>
+                                  <br/>
+                            </div>
+                            <div class="col-4" style="float:left;">
+                                 <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                <br/>
+                            </div>
+                             </div>
+                        <h6 class="text-center"><strong><u>Re: - Termination of Acting Assignment</u></strong></h6>
+
+                        <br/>
+                        <br/>
+
+                        <p> It is to be recalled that you have been assigned as<strong> <span t-field="o.current_job_position"/> </strong>at <strong><span t-field="o.current_work_unit"/></strong> effective<strong><span t-field="o.start_date"/></strong> by letter Ref. No.<strong><span t-field="o.reference"/></strong> dated <strong><span t-field="o.start_date"/></strong> </p>
+<!--                        <t t-if="o.depreciation_line_ids">-->
+                        <br/>
+
+                        <p>However, this is to inform you that your acting assignment is terminated effective <strong><span t-field="o.end_date"/></strong>. Thus, you are advised to handover all documents, properties  and pending tasks to <strong><span t-field="o.acting_employee"/></strong> </p>
+
+                        <br/>
+
+                        <p>Further, we would like to thank you for discharging your acting responsibility.</p>
+
+
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6" >
+                                <p>Sincerely yours,</p>
+                                 <br/>
+
+                                <p>Berhanu Molla</p>
+                                 <p>Director-Talent Management Directorate</p>
+                                  <br />
+                                 <br/>
+
+                                 <strong>CC:</strong>
+                                 <ul>
+                                      <li>IT Security Management Directorate </li>
+                                 <li>Debre Berhan Area Office</li>
+                                 <li>Mehal Meda Branch</li>
+                                 <li>Ato Ayalew Wondie Mekonnen</li>
+                                 <li>Bunna Bank S.C </li>
+                                 </ul>
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br />
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

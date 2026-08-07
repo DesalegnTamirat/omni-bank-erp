@@ -1,0 +1,662 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+
+
+        <record id="menu_jobs" model="website.menu">
+            <field name="name">Jobs</field>
+            <field name="url">/jobs</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="51"/>
+        </record>
+
+        <record id="menu_courses" model="website.menu">
+            <field name="name">Courses</field>
+            <field name="url">/courses</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="52"/>
+        </record>
+
+        <record id="menu_tender" model="website.menu">
+            <field name="name">Tender</field>
+            <field name="url">/tender</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="53"/>
+        </record>
+
+        <record id="menu_policies" model="website.menu">
+            <field name="name">Policies and Documents</field>
+            <field name="url">/policies</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="55"/>
+        </record>
+
+        <record id="menu_faqs" model="website.menu">
+            <field name="name">FAQs</field>
+            <field name="url">/faq</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" eval="56"/>
+        </record>
+
+
+        <template id="custom_header_logo" inherit_id="website.navbar_nav" name="Bunna Header Realignment">
+
+            <!-- 1. Inject brand colors and fix link colors -->
+            <xpath expr="//ul" position="before">
+
+                <style>
+                    /* Style the navbar and ensure all links are white */
+                    .navbar { background-color: #1d2b32 !important; border-bottom: 3px solid #c17540; }
+                    .navbar .nav-link, .navbar .dropdown-toggle { color: #ffffff !important; }
+
+                    /* Hover/active state using the terracotta accent */
+                    .navbar .nav-link:hover, .navbar .nav-link.active {
+                    color: #c17540 !important;
+                    }
+
+                    /* Ensure the logo wrapper is properly padded */
+                    .logo-container { padding: 5px; }
+                </style>
+            </xpath>
+
+            <xpath expr="//ul" position="attributes">
+                <attribute name="t-attf-class">#{'nav navbar-nav d-flex flex-row flex-nowrap align-items-center w-100' if request.env.user._is_public() else 'd-none'}</attribute>
+            </xpath>
+
+            <xpath expr="//ul" position="after">
+                <style t-if="request.env.user._is_public()">
+                    .o_searchbar_form, .o_wsale_products_searchbar_form, .o_search_nav_item,
+                    a[href*='/search'], .o_nav_search_box, button[data-bs-target*='search'] { display: none !important; }
+                    #top_menu a[href*='/contactus'], #top_menu a[href*='/contact_us'] { display: none !important; }
+                </style>
+
+                <!-- Hide phone number for ALL users (logged in AND logged out) -->
+                <style>
+                    .o_header_phone, a[href^='tel:'], .fa-phone { display: none !important; }
+                </style>
+            </xpath>
+
+
+            <xpath expr="//ul" position="inside">
+                <li t-if="request.env.user._is_public()" class="nav-item dropdown mx-2">
+                    <!-- Changed text-dark to text-white for visibility -->
+                    <a class="nav-link dropdown-toggle text-white fw-medium"
+                       href="#"
+                       id="empServicesDropdown"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       style="font-size: 16px; white-space: nowrap;">
+                        Employee Service's
+                    </a>
+                    <ul class="dropdown-menu shadow border-0 p-3 mt-2"
+                        aria-labelledby="empServicesDropdown"
+                        style="min-width: 560px; border-radius: 4px;">
+                        <style>
+                            .emp-services-menu { display: flex; gap: 2rem; }
+                            .emp-services-section h6 {
+                            font-size: 11px;
+                            font-weight: 700;
+                            letter-spacing: 1px;
+                            text-transform: uppercase;
+                            color: #333;
+                            border-bottom: 2px solid #009688;
+                            padding-bottom: 6px;
+                            margin-bottom: 10px;
+                            }
+                            .emp-services-section a {
+                            display: block;
+                            color: #009688;
+                            font-size: 14px;
+                            padding: 4px 0;
+                            text-decoration: none;
+                            }
+                            .emp-services-section a:hover { text-decoration: underline; }
+                        </style>
+                        <li>
+                            <div class="emp-services-menu">
+                                <!-- SELF SERVICE -->
+                                <div class="emp-services-section" style="min-width: 160px;">
+                                    <h6>Self Service</h6>
+                                    <a href="/odoo/payslips">View Payslip</a>
+                                    <a href="/odoo/time-off">Request Leave</a>
+                                </div>
+                                <!-- SERVICE REQUEST -->
+                                <div class="emp-services-section" style="min-width: 220px;">
+                                    <h6>Service Request</h6>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Medical+Expense+Claim">Medical Expense Claim</a>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Guarantee+Letter">Guarantee Letter Request</a>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Support+Letter">Support Letter Request</a>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Marriage+Gift">Marriage Gift Request</a>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Transportation">Transportation</a>
+                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Tuition+Fee">Tuition Fee Request</a>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </li>
+            </xpath>
+        </template>
+
+
+        <template id="hello_page_template" name="Bunna Internal Portal">
+            <t t-call="website.layout">
+                <style>
+                    /* Hero Welcome Section */
+                    .hero-welcome {
+                    background: #ffffff;
+                    color: #4a1515;
+                    padding: 4rem 0;
+                    text-align: center;
+                    border-bottom: 5px solid #b38b59;
+                    }
+                    .hero-welcome h1 { font-size: 3rem; font-weight: 800; }
+                    .hero-welcome p { font-size: 1.25rem; opacity: 0.9; }
+
+
+                </style>
+
+                <div id="wrap">
+                    <!-- Hero Welcome Header -->
+                    <div class="hero-welcome">
+                        <div class="container">
+                            <h1 class="mb-3">Welcome to the Bunna Internal Portal</h1>
+                            <p>Empowering our team with seamless ERP solutions. Hello, <span t-esc="user_name"/>.</p>
+                        </div>
+                    </div>
+
+                    <div class="oe_structure py-5 bunna-gradient">
+                        <div class="container mb-5">
+                            <div class="row g-4">
+                                <!-- Vision -->
+                                <div class="col-md-6">
+                                    <div class="p-5 bg-white rounded-4 h-100 shadow-sm border-start border-5 border-danger card-hover">
+                                        <h2 class="fw-bold mb-3 bank-text"><i class="fa fa-eye me-2"></i> Our Vision</h2>
+                                        <p class="text-muted fs-5 lh-base mb-0">To Be One of the Top Three Financial Services Provider in Ethiopia by the year 2030.</p>
+                                    </div>
+                                </div>
+                                <!-- Mission -->
+                                <div class="col-md-6">
+                                    <div class="p-5 bg-white rounded-4 h-100 shadow-sm border-start border-5 border-danger card-hover">
+                                        <h2 class="fw-bold mb-3 bank-text"><i class="fa fa-rocket me-2"></i> Our Mission</h2>
+                                        <p class="text-muted fs-5 lh-base mb-0">To deliver platform-based financial services by collaborating with partners, elevating the value for stakeholders.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        <!-- Core Values Section -->
+                        <div class="container mb-5">
+                            <h2 class="text-center fw-bold mb-5 bank-text">Our Core Values</h2>
+                            <div class="row g-4 justify-content-center">
+
+                                <!-- Core Value 01 -->
+                                <div class="col-lg-2 col-md-4">
+                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
+                                        <h6 class="fw-bold text-uppercase bank-text mb-2">01 Winning</h6>
+                                        <small class="text-muted">Striving for excellence and professionalism with an ethical competitive edge.</small>
+                                    </div>
+                                </div>
+
+                                <!-- Core Value 02 -->
+                                <div class="col-lg-2 col-md-4">
+                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
+                                        <h6 class="fw-bold text-uppercase bank-text mb-2">02 Respect</h6>
+                                        <small class="text-muted">Valuing contributions from customers, shareholders, and our community.</small>
+                                    </div>
+                                </div>
+
+                                <!-- Core Value 03 -->
+                                <div class="col-lg-2 col-md-4">
+                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
+                                        <h6 class="fw-bold text-uppercase bank-text mb-2">03 Responsibility</h6>
+                                        <small class="text-muted">Acting with purpose to balance stakeholder interests and fiscal duties.</small>
+                                    </div>
+                                </div>
+
+                                <!-- Core Value 04 -->
+                                <div class="col-lg-2 col-md-4">
+                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
+                                        <h6 class="fw-bold text-uppercase bank-text mb-2">04 Collaboration</h6>
+                                        <small class="text-muted">Supporting our customers, regulatory bodies, and society through collective care.</small>
+                                    </div>
+                                </div>
+
+                                <!-- Core Value 05 -->
+                                <div class="col-lg-2 col-md-4">
+                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
+                                        <h6 class="fw-bold text-uppercase bank-text mb-2">05 Innovation</h6>
+                                        <small class="text-muted">Relentlessly pursuing groundbreaking ideas to shape the future of banking.</small>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="jobs_coming_soon_template" name="Jobs Coming Soon">
+            <t t-call="website.layout">
+                <style>
+                    .coming-soon-container {
+                    min-height: 70vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    }
+                    .glass-card {
+                    background: rgba(255, 255, 255, 0.95);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    padding: 4rem;
+                    border-radius: 2rem;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    text-align: center;
+                    max-width: 600px;
+                    }
+                    .animate-pulse { animation: pulse 2s infinite; }
+                    @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.6; }
+                    100% { opacity: 1; }
+                    }
+                </style>
+
+                <div id="wrap" class="coming-soon-container">
+                    <div class="glass-card">
+                        <div class="mb-4">
+                            <i class="fa fa-briefcase fa-4x" style="color: #4a1515;"></i>
+                        </div>
+                        <h1 class="fw-bold mb-3" style="color: #4a1515;">Career Opportunities</h1>
+                        <p class="lead text-muted mb-4">We are currently refining our recruitment portal. Exciting new roles at Bunna Bank are coming soon.</p>
+                        <div class="animate-pulse">
+                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
+                                Work in Progress
+                            </span>
+                        </div>
+                        <div class="mt-5">
+                            <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
+                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- COURSES COMING SOON TEMPLATE -->
+        <template id="courses_coming_soon_template" name="Courses Coming Soon">
+            <t t-call="website.layout">
+                <style>
+                    .coming-soon-container {
+                    min-height: 70vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    }
+                    .glass-card {
+                    background: rgba(255, 255, 255, 0.95);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    padding: 4rem;
+                    border-radius: 2rem;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    text-align: center;
+                    max-width: 600px;
+                    }
+                    .animate-pulse { animation: pulse 2s infinite; }
+                    @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.6; }
+                    100% { opacity: 1; }
+                    }
+                </style>
+
+                <div id="wrap" class="coming-soon-container">
+                    <div class="glass-card">
+                        <div class="mb-4">
+                            <i class="fa fa-graduation-cap fa-4x" style="color: #4a1515;"></i>
+                        </div>
+                        <h1 class="fw-bold mb-3" style="color: #4a1515;">Learning Academy</h1>
+                        <p class="lead text-muted mb-4">Our professional development and internal training courses are being curated for you. Coming soon.</p>
+                        <div class="animate-pulse">
+                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
+                                Preparing Content
+                            </span>
+                        </div>
+                        <div class="mt-5">
+                            <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
+                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- TENDER COMING SOON TEMPLATE -->
+        <template id="tender_coming_soon_template" name="Tender Coming Soon">
+            <t t-call="website.layout">
+                <style>
+                    .coming-soon-container {
+                    min-height: 70vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    }
+                    .glass-card {
+                    background: rgba(255, 255, 255, 0.95);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    padding: 4rem;
+                    border-radius: 2rem;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    text-align: center;
+                    max-width: 600px;
+                    }
+                    .animate-pulse { animation: pulse 2s infinite; }
+                    @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.6; }
+                    100% { opacity: 1; }
+                    }
+                </style>
+
+                <div id="wrap" class="coming-soon-container">
+                    <div class="glass-card">
+                        <div class="mb-4">
+                            <i class="fa fa-gavel fa-4x" style="color: #4a1515;"></i>
+                        </div>
+                        <h1 class="fw-bold mb-3" style="color: #4a1515;">Tender Portal</h1>
+                        <p class="lead text-muted mb-4">We are setting up our digital bidding and procurement system. New tender announcements will be published here shortly.</p>
+                        <div class="animate-pulse">
+                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
+                                System Integration
+                            </span>
+                        </div>
+                        <div class="mt-5">
+                            <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
+                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- POLICIES AND DOCUMENTS TEMPLATE -->
+        <template id="policies_page_template" name="Policies and Documents">
+            <t t-call="website.layout">
+                <style>
+                    .policy-card { transition: all 0.3s ease; border-left: 4px solid #4a1515; }
+                    .policy-card:hover { box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+                    .icon-box { color: #4a1515; width: 40px; }
+                </style>
+
+                <div id="wrap" class="py-5 bg-light">
+                    <div class="container">
+                        <h2 class="fw-bold mb-4" style="color: #4a1515;">Policies and Documents</h2>
+                        <p class="mb-5 text-muted">Access official bank policies, employee guidelines, and regulatory documentation.</p>
+
+                        <div class="row">
+                            <div class="col-lg-8 mx-auto">
+                                <!-- Document Item 1 -->
+                                <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <div class="icon-box"><i class="fa fa-file-pdf-o fa-2x"></i></div>
+                                        <div>
+                                            <h5 class="mb-1">HR Policy Handbook 2026</h5>
+                                            <small class="text-muted">Updated: June 2026 | PDF (2.4 MB)</small>
+                                        </div>
+                                    </div>
+                                    <a href="#" class="btn btn-outline-danger">Download</a>
+                                </div>
+
+                                <!-- Document Item 2 -->
+                                <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <div class="icon-box"><i class="fa fa-file-word-o fa-2x"></i></div>
+                                        <div>
+                                            <h5 class="mb-1">Code of Conduct</h5>
+                                            <small class="text-muted">Updated: January 2026 | Word (1.1 MB)</small>
+                                        </div>
+                                    </div>
+                                    <a href="#" class="btn btn-outline-danger">Download</a>
+                                </div>
+
+                                <!-- Document Item 3 -->
+                                <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center">
+                                        <div class="icon-box"><i class="fa fa-file-excel-o fa-2x"></i></div>
+                                        <div>
+                                            <h5 class="mb-1">Expense Claim Form</h5>
+                                            <small class="text-muted">Updated: May 2026 | Excel (0.5 MB)</small>
+                                        </div>
+                                    </div>
+                                    <a href="#" class="btn btn-outline-danger">Download</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- FAQ PAGE TEMPLATE -->
+        <template id="faq_page_template" name="FAQs">
+            <t t-call="website.layout">
+                <style>
+                    .faq-header { color: #4a1515; }
+                    .accordion-button:not(.collapsed) { background-color: #f8f9fa; color: #4a1515; font-weight: bold; }
+                    .accordion-button:focus { box-shadow: none; border-color: #4a1515; }
+                    .accordion-item { border: 1px solid #ddd; margin-bottom: 10px; border-radius: 8px !important; }
+                </style>
+
+                <div id="wrap" class="py-5 bg-white">
+                    <div class="container">
+                        <div class="row justify-content-center">
+                            <div class="col-lg-8">
+                                <h2 class="fw-bold mb-4 faq-header text-center">Frequently Asked Questions</h2>
+                                <p class="text-center text-muted mb-5">Find answers to common inquiries regarding bank internal services and IT operations.</p>
+
+                                <div class="accordion" id="faqAccordion">
+                                    <!-- Q1 -->
+                                    <div class="accordion-item shadow-sm">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#q1">
+                                                How do I report a system outage?
+                                            </button>
+                                        </h2>
+                                        <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                            <div class="accordion-body text-muted">
+                                                Please contact the IT Helpdesk immediately via your internal dashboard or by calling the extension 9030. Provide your terminal ID and a screenshot of the error.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Q2 -->
+                                    <div class="accordion-item shadow-sm">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q2">
+                                                When will the Odoo 19 migration be complete?
+                                            </button>
+                                        </h2>
+                                        <div id="q2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                            <div class="accordion-body text-muted">
+                                                The migration is currently in the validation phase. We expect full implementation by the end of Q3 2026. Updates will be posted on the portal homepage.
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Q3 -->
+                                    <div class="accordion-item shadow-sm">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q3">
+                                                How do I access my payroll documents?
+                                            </button>
+                                        </h2>
+                                        <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                            <div class="accordion-body text-muted">
+                                                Payroll slips are available through the "Employee Services" dropdown in the main navigation menu under the dedicated HR portal link.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <template id="custom_login_decor" inherit_id="web.login" name="Bunna Login Decor">
+            <xpath expr="//form" position="before">
+                <style>
+                    /* 1. Center only the login content area — header/footer stay in normal flow */
+                    main {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    min-height: calc(100vh - 64px - 220px) !important;
+                    padding: 2rem 0 !important;
+                    background: #f2f6f8 !important;
+                    }
+
+                    /* 2. Minimalist Card */
+                    .oe_login_form {
+                    background: #ffffff;
+                    padding: 2rem !important;
+                    border-radius: 1rem;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+                    border-top: 4px solid #1d2b32;
+                    max-width: 320px !important;
+                    width: 100% !important;
+                    }
+
+                    /* 3. Refined Input Fields */
+                    .oe_login_form input {
+                    border: 1px solid #dee2e6 !important;
+                    border-radius: 0.5rem !important;
+                    padding: 0.7rem !important;
+                    margin-bottom: 1rem !important;
+                    background-color: #fcfcfc !important;
+                    transition: border-color 0.3s ease;
+                    }
+                    .oe_login_form input:focus {
+                    border-color: #1d2b32 !important;
+                    box-shadow: 0 0 0 0.2rem rgba(29, 43, 50, 0.1) !important;
+                    }
+
+                    /* 3b. Fix password field + eye-toggle button alignment inside input-group */
+                    .oe_login_form .input-group {
+                    align-items: stretch !important;
+                    }
+                    .oe_login_form .input-group input {
+                    border-top-right-radius: 0 !important;
+                    border-bottom-right-radius: 0 !important;
+                    border-right: none !important;
+                    margin-bottom: 0 !important;
+                    }
+                    .oe_login_form .input-group .o_show_password {
+                    border: 1px solid #dee2e6 !important;
+                    border-left: none !important;
+                    border-top-right-radius: 0.5rem !important;
+                    border-bottom-right-radius: 0.5rem !important;
+                    background-color: #fcfcfc !important;
+                    padding: 0.7rem !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    }
+                    .oe_login_form .input-group:focus-within .o_show_password {
+                    border-color: #1d2b32 !important;
+                    }
+                    .oe_login_form input:focus {
+                    border-color: #1d2b32 !important;
+                    box-shadow: 0 0 0 0.2rem rgba(29, 43, 50, 0.1) !important;
+                    }
+
+                    /* 4. Primary Log In button */
+                    .oe_login_form .oe_login_buttons > button.btn-primary {
+                    background-color: #1d2b32 !important;
+                    color: #ffffff !important;
+                    border: none !important;
+                    border-radius: 0.5rem !important;
+                    padding: 0.7rem !important;
+                    font-weight: 600;
+                    width: 100%;
+                    transition: background-color 0.3s ease;
+                    }
+                    .oe_login_form .oe_login_buttons > button.btn-primary:hover {
+                    background-color: #c17540 !important;
+                    }
+
+                    /* 5. Cleanup: Remove Odoo defaults + superuser button */
+                    .o_login_header, .o_logo, .oe_logo, .o_login_auth, .oe_login_passkey,
+                    .o_login_passkey_section, div[class*='passkey'],
+                    .oe_login_form .oe_login_buttons button[name="redirect"] {
+                    display: none !important;
+                    }
+                </style>
+            </xpath>
+        </template>
+
+
+        <template id="custom_corporate_footer" inherit_id="website.layout" name="Bunna Custom Corporate Footer">
+            <xpath expr="//footer" position="replace">
+                <footer t-if="request.env.user._is_public() or request.httprequest.path == '/web/login'" class="bg-dark text-white pt-3" style="background-color: #1d2b32 !important;">
+                    <div class="container mb-1">
+                        <div class="row">
+                            <div class="col-md-3 mb-1">
+                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">Useful Links</h6>
+                                <ul class="list-unstyled text-white-50 small">
+                                    <li class="mb-1"><a href="/" class="text-white text-decoration-none opacity-75">Home</a></li>
+                                    <li class="mb-1"><a href="https://bunnabanksc.com/about-us/" class="text-white text-decoration-none opacity-75" target="_blank">About us</a></li>
+                                    <li class="mb-1"><a href="https://bunnabanksc.com/accounts/" class="text-white text-decoration-none opacity-75" target="_blank">Products and Services</a></li>
+                                    <li class="mb-1"><a href="https://onboardingportal.bunnabanksc.com/" class="text-white text-decoration-none opacity-75" target="_blank">Bunna Onboarding</a></li>
+                                    <li class="mb-1"><a href="https://bunnabanksc.com/contactus/" class="text-white text-decoration-none opacity-75" target="_blank">Contact us</a></li>
+                                </ul>
+                            </div>
+
+                            <div class="col-md-5 mb-1">
+                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">About us</h6>
+                                <p class="small text-white-50 lh-sm" style="opacity: 0.85; font-size: 0.85rem;">
+                                    Bunna Bank S.C. is one of Ethiopia's prominent private commercial banks, established in 2009. It operates a network of nearly 450 branches across the country.
+                                </p>
+                            </div>
+
+                            <div class="col-md-4 mb-1">
+                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">Connect with us</h6>
+                                <p class="mb-1 fw-semibold small">Contact us</p>
+                                <ul class="list-unstyled text-white-50 small">
+                                    <li class="mb-1 d-flex align-items-center">
+                                        <i class="fa fa-envelope me-2 text-white"></i>
+                                        <a href="mailto:info@bunnabanksc.com" class="text-white text-decoration-none">info@bunnabanksc.com</a>
+                                    </li>
+                                    <li class="mb-1 d-flex align-items-center">
+                                        <i class="fa fa-phone me-2 text-white"></i>
+                                        <a href="tel:+251918979030" class="text-white text-decoration-none">+251 918 979 030</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="footer_copyright" class="o_footer_copyright py-1" style="background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div class="container text-center">
+                            <p class="mb-0 small text-white-50" style="font-size: 0.75rem;">
+                                © 2026 Bunna Bank Share Company. All rights reserved.
+                            </p>
+                        </div>
+                    </div>
+                </footer>
+            </xpath>
+        </template>
+    </data>
+</odoo>

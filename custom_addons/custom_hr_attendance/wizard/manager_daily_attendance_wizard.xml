@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <!-- ============================================================
+         Manager Daily Attendance Wizard
+         A simple date-range picker that opens LIVE hr.attendance
+         records filtered to the manager's own subordinate employees.
+         Different from: generate.detail.employee.attendance.report
+         which writes to the generate_employee_attendance_details table
+         for bank-level summary reporting.
+         ============================================================ -->
+    <record id="manager_daily_attendance_wizard_form" model="ir.ui.view">
+        <field name="name">manager.daily.attendance.wizard.form</field>
+        <field name="model">manager.daily.attendance.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Employee Attendance Report Wizard">
+                <group>
+                    <field name="date_from" string="Date From"/>
+                    <field name="date_to" string="Date To"/>
+                </group>
+
+                <footer>
+                    <button name="action_generate_report"
+                            string="Generate"
+                            type="object"
+                            class="btn-primary"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_manager_daily_attendance_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Employee Attendance Report Wizard</field>
+        <field name="res_model">manager.daily.attendance.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="manager_daily_attendance_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

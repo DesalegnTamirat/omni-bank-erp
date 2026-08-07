@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<odoo>
+
+    <!-- Form View for Accruement Display -->
+    <record id="hr_leave_allocation_accruement_view_form" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.accruement.view.form</field>
+        <field name="model">hr.leave.allocation.accruement</field>
+        <field name="arch" type="xml">
+            <form string="Accruement Details" create="false" edit="false">
+                <group>
+                    <!-- Hidden reference to parent allocation -->
+                    <field name="leave_allocation_id" invisible="1"/>
+
+                    <!-- Accruement details -->
+                    <field name="days_accrued"/>
+                    <field name="accrued_on"/>
+                    <field name="reason"/>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View for Accruement List Display -->
+    <record id="hr_leave_allocation_accruement_view_tree" model="ir.ui.view">
+        <field name="name">hr.leave.allocation.accruement.view.tree</field>
+        <field name="model">hr.leave.allocation.accruement</field>
+        <field name="arch" type="xml">
+            <list string="Accruement Details" create="false" edit="false" delete="false">
+                <!-- Hidden reference to parent allocation -->
+                <field name="leave_allocation_id" invisible="1"/>
+
+                <!-- Accruement columns with running balance -->
+                <field name="accrued_on"/>
+                <field name="days_accrued" sum="Running Balance"/>
+                <field name="reason"/>
+            </list>
+        </field>
+    </record>
+
+</odoo>

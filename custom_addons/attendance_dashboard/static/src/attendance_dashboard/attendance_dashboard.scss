@@ -1,0 +1,99 @@
+.o_attendance_dashboard {
+    background-color: #f0f2f5;
+    padding: 25px;
+    min-height: 100%;
+
+    .o_ad_header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #ddd;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+    }
+
+    .o_ad_filter {
+        margin-bottom: 25px;
+        display: flex;
+        justify-content: flex-start;
+    }
+
+    .o_ad_filter_select {
+        width: auto;
+        min-width: 250px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        background-color: white;
+        font-size: 14px;
+        color: #2c3e50;
+        outline: none;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+
+        &:hover {
+            border-color: #3498db;
+        }
+    }
+
+    .o_ad_kpi {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+
+        .o_ad_kpi_card {
+            flex: 1;
+            min-width: 150px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .o_ad_kpi_value {
+            display: block;
+            font-size: 30px;
+            font-weight: 800;
+            margin-top: 8px;
+        }
+
+        .o_ad_kpi_total { color: #3498db; }
+        .o_ad_kpi_present { color: #2ecc71; }
+        .o_ad_kpi_late { color: #f39c12; }
+        .o_ad_kpi_leave { color: #f1c40f; }
+        .o_ad_kpi_absent { color: #e74c3c; }
+    }
+
+    .o_ad_charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+
+        .o_ad_chart_box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+
+            h3 {
+                font-size: 16px;
+                margin-bottom: 15px;
+                color: #2c3e50;
+                text-align: center;
+            }
+        }
+
+        .o_ad_full_width {
+            grid-column: span 2;
+        }
+
+        .o_ad_canvas_wrap {
+            height: 280px;
+            position: relative;
+        }
+    }
+}

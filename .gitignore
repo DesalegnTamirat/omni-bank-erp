@@ -1,0 +1,9 @@
+/.venv
+/.venv-1
+/base_module_copy
+/discip_extracted
+/odoo_core_reference
+/odoo-data
+/pgdata
+clear_today_attendance.py
+__pycache__/

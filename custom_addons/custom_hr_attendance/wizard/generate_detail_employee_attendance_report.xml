@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="generate_detail_employee_attendance_report_form" model="ir.ui.view">
+        <field name="name">Generate Detail Employee Attendance Report</field>
+        <field name="model">generate.detail.employee.attendance.report</field>
+        <field name="arch" type="xml">
+            <form string="Employee Attendance">
+                <group>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                    <field name="report_type"/>
+                </group>
+
+
+                <footer>
+                    <button name="generate" string="Generate" type="object" class="btn btn-primary"/>
+                    <button string="Cancel" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+
+        </field>
+    </record>
+
+    <record id="action_generate_detail_employee_attendance_report_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Detail Employee Attendance Report Wizard</field>
+        <field name="res_model">generate.detail.employee.attendance.report</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="generate_detail_employee_attendance_report_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>
+
+
+

@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Search View -->
+        <record id="view_discipline_case_search" model="ir.ui.view">
+            <field name="name">discipline.case.search</field>
+            <field name="model">discipline.case</field>
+            <field name="arch" type="xml">
+                <search string="Disciplinary Cases">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="offense_id"/>
+                    <field name="department_id"/>
+                    <filter string="SLA Breached" name="filter_sla_exceeded" domain="[('is_sla_exceeded', '=', True)]"/>
+                    <filter string="Level 1 (Dismissal)" name="filter_level_1" domain="[('severity_level', '=', 'level_1')]"/>
+                    <filter string="Enforced Cases" name="filter_enforced" domain="[('state', '=', 'enforced')]"/>
+                    <filter string="Revoked Cases" name="filter_revoked" domain="[('state', '=', 'revoked')]"/>
+                    <filter string="Employee" name="group_employee" context="{'group_by':'employee_id'}"/>
+                    <filter string="Severity Level" name="group_severity" context="{'group_by':'severity_level'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
+                    <filter string="Department" name="group_dept" context="{'group_by':'department_id'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- List View -->
+        <record id="view_discipline_case_tree" model="ir.ui.view">
+            <field name="name">discipline.case.list</field>
+            <field name="model">discipline.case</field>
+            <field name="arch" type="xml">
+                <list string="Disciplinary Cases" decoration-danger="is_sla_exceeded or severity_level == 'level_1'" decoration-muted="state in ('closed', 'revoked')">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="offense_id"/>
+                    <field name="severity_level"/>
+                    <field name="incident_date"/>
+                    <field name="sla_deadline"/>
+                    <field name="is_sla_exceeded" widget="boolean"/>
+                    <field name="penalty_percentage"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Form View -->
+        <record id="view_discipline_case_form" model="ir.ui.view">
+            <field name="name">discipline.case.form</field>
+            <field name="model">discipline.case</field>
+            <field name="arch" type="xml">
+                <form string="Disciplinary Case">
+                    <header>
+                        <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_start_investigation" string="Start Investigation" type="object" class="btn-info" invisible="state != 'initiated'"/>
+                        <button name="action_send_to_committee" string="Submit to Committee" type="object" class="btn-warning" invisible="state not in ('initiated', 'investigating')"/>
+                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="btn-primary" invisible="state not in ('investigating', 'committee_review')"/>
+                        <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success" invisible="state != 'pending_approval'"/>
+                        <!-- DIS-8: Submit Appeal button — only when window is open -->
+                        <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
+                                invisible="not is_appeal_window_open"
+                                help="FR-DIS-031: Submit an appeal within the 10-calendar-day window."/>
+                        <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,initiated,investigating,committee_review,pending_approval,enforced"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
+                        <widget name="web_ribbon" title="Enforced" bg_color="text-bg-success" invisible="state != 'enforced'"/>
+                        <!-- DIS-8: Appeal window open banner -->
+                        <div class="alert alert-warning" role="alert" invisible="not is_appeal_window_open">
+                            <strong>Appeal Window Open:</strong> This case can be appealed until <field name="appeal_deadline" readonly="1" nolabel="1"/>.
+                            Click "Submit Appeal" to file an appeal.
+                        </div>
+                        <!-- DIS-8: Smart buttons -->
+                        <div class="oe_button_box" name="button_box">
+                            <button type="object" name="action_view_appeals" class="oe_stat_button" icon="fa-gavel"
+                                    invisible="appeal_count == 0">
+                                <field name="appeal_count" widget="statinfo" string="Appeals"/>
+                            </button>
+                            <button type="object" name="action_open_revocation_wizard" class="oe_stat_button" icon="fa-ban"
+                                    invisible="not is_revoked" groups="discipline_management.group_discipline_admin">
+                                <span class="o_stat_text">Revoked</span>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Employee Information">
+                                <field name="employee_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="reported_by_id"/>
+                                <field name="department_id"/>
+                                <field name="job_id"/>
+                                <field name="work_location_id"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                            <group string="Misconduct &amp; Offense Classification">
+                                <field name="offense_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="offense_category_id"/>
+                                <field name="severity_level"/>
+                                <field name="punishment_type"/>
+                                <field name="penalty_percentage" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Workflow &amp; Governance (Segregation of Duties)">
+                                <field name="initiator_id"/>
+                                <field name="reviewer_id"/>
+                                <field name="approver_id"/>
+                                <!-- DIS-4: CEO/CPCO authority field for Level 1 Dismissals -->
+                                <field name="dismissal_authority_id"
+                                       invisible="severity_level != 'level_1'"
+                                       required="severity_level == 'level_1' and state == 'pending_approval'"
+                                       string="Dismissal Authority (CEO/CPCO)"/>
+                            </group>
+                            <group string="SLA &amp; Appeal Timelines">
+                                <field name="sla_target_days"/>
+                                <field name="sla_deadline"/>
+                                <field name="is_sla_exceeded" widget="boolean"/>
+                                <field name="final_decision_date"/>
+                                <field name="appeal_deadline"/>
+                                <field name="is_appeal_window_open" widget="boolean"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Detailed Incident Description">
+                                <field name="description" placeholder="Provide complete facts, dates, time, witnesses, and details of misconduct..." readonly="state in ('enforced', 'closed', 'revoked')"/>
+                            </page>
+                            <page string="Investigations &amp; Findings">
+                                <field name="investigation_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                                    <list string="Investigations">
+                                        <field name="name"/>
+                                        <field name="investigator_id"/>
+                                        <field name="investigation_date"/>
+                                        <field name="summary_findings"/>
+                                        <field name="state"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Committee Meetings">
+                                <field name="committee_meeting_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                                    <list string="Committee Meetings">
+                                        <field name="name"/>
+                                        <field name="meeting_date"/>
+                                        <field name="committee_chair_id"/>
+                                        <field name="is_quorum_met" widget="boolean"/>
+                                        <field name="final_recommendation"/>
+                                        <field name="state"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Suspensions">
+                                <field name="suspension_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                                    <list string="Suspensions">
+                                        <field name="name"/>
+                                        <field name="suspension_type"/>
+                                        <field name="start_date"/>
+                                        <field name="end_date"/>
+                                        <field name="working_days_count"/>
+                                        <field name="state"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Appeals">
+                                <field name="appeal_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                                    <list string="Appeals">
+                                        <field name="name"/>
+                                        <field name="submission_date"/>
+                                        <field name="decision_outcome"/>
+                                        <field name="state"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Payroll Deductions">
+                                <field name="payroll_penalty_ids" readonly="1">
+                                    <list string="Payroll Penalties">
+                                        <field name="name"/>
+                                        <field name="penalty_percentage"/>
+                                        <field name="calculated_amount"/>
+                                        <field name="effective_date"/>
+                                        <field name="state"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Revocation Details" invisible="not is_revoked">
+                                <group>
+                                    <field name="is_revoked"/>
+                                    <field name="revoked_by_id"/>
+                                    <field name="revocation_date"/>
+                                    <field name="revocation_reason"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_discipline_case" model="ir.actions.act_window">
+            <field name="name">Disciplinary Cases</field>
+            <field name="res_model">discipline.case</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

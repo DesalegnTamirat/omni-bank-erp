@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- ATT-021: Force Checkout History List View -->
+        <record id="view_hr_attendance_force_checkout_list" model="ir.ui.view">
+            <field name="name">hr.attendance.force.checkout.list</field>
+            <field name="model">hr.attendance</field>
+            <field name="arch" type="xml">
+                <list string="Force Checkout History" create="false" edit="false">
+                    <field name="employee_id"/>
+                    <field name="check_in"/>
+                    <field name="check_out"/>
+                    <field name="worked_hours" widget="float_time"/>
+                    <field name="check_in_status"/>
+                    <field name="check_out_status"/>
+                    <field name="is_force_checkout" widget="boolean"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ATT-021: Force Checkout History Pivot View -->
+        <record id="view_hr_attendance_force_checkout_pivot" model="ir.ui.view">
+            <field name="name">hr.attendance.force.checkout.pivot</field>
+            <field name="model">hr.attendance</field>
+            <field name="arch" type="xml">
+                <pivot string="Force Checkout Analysis">
+                    <field name="employee_id" type="row"/>
+                    <field name="check_in" interval="month" type="col"/>
+                    <field name="worked_hours" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- ATT-021: Force Checkout History Action -->
+        <record id="action_hr_attendance_force_checkout_history" model="ir.actions.act_window">
+            <field name="name">Force Checkout History</field>
+            <field name="res_model">hr.attendance</field>
+            <field name="view_mode">list,pivot</field>
+            <field name="domain">[('is_force_checkout', '=', True)]</field>
+            <field name="context">{'search_default_group_by_employee': 1}</field>
+            <field name="view_ids" eval="[(5, 0, 0),
+                (0, 0, {'view_mode': 'list', 'view_id': ref('view_hr_attendance_force_checkout_list')}),
+                (0, 0, {'view_mode': 'pivot', 'view_id': ref('view_hr_attendance_force_checkout_pivot')})]"/>
+        </record>
+    </data>
+</odoo>

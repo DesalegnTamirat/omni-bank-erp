@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!--    Tree View-->
+    <record id="view_job_position_exception_tree" model="ir.ui.view">
+        <field name="name">job.position.exception.report.tree</field>
+        <field name="model">job.position.exception.report</field>
+        <field name="arch" type="xml">
+            <list string="job Position Exception Report">
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="place_of_assignment"/>
+                <field name="work_unit"/>
+                <field name="job_title"/>
+                <field name="manager_name"/>
+                <field name="shift_name"/>
+                <field name="time_range"/>
+                <field name="day_off"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+
+    <!--Search View-->
+    <record id="view_job_position_exception_search" model="ir.ui.view">
+        <field name="name">job.position.exception.report.search</field>
+        <field name="model">job.position.exception.report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="employee_identification"/>
+                <field name="employee_name"/>
+                <field name="job_title"/>
+                <field name="place_of_assignment"/>
+
+                <separator/>
+                <filter string="Employee Name"
+                        name="group_by_employee_name"
+                        context="{'group_by':'employee_name'}"/>
+
+                <filter string="Job Title"
+                        name="group_by_job_title"
+                        context="{'group_by':'job_title'}"/>
+
+                <filter string="Place of Assignment"
+                        name="group_by_place_of_assignment"
+                        context="{'group_by':'place_of_assignment'}"/>
+
+                <filter string="Status"
+                        name="group_by_status"
+                        context="{'group_by':'status'}"/>
+
+            
+            </search>
+        </field>
+    </record>
+
+    <!--Action-->
+    <record id="action_job_position_exception_report" model="ir.actions.act_window">
+        <field name="name">Job Position Exceptions</field>
+        <field name="res_model">job.position.exception.report</field>
+        <field name="view_mode">list,search</field>
+    </record>
+
+
+</odoo>

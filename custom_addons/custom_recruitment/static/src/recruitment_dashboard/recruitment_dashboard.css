@@ -1,0 +1,135 @@
+/* ── Recruitment Dashboard ── */
+/* Brand colors from palette:
+   Primary Dark Teal : #1d2632
+   Primary Maroon    : #b47198  (last two from color card)
+*/
+
+:root {
+    --rd-primary:   #1d2632;   /* dark teal/navy  */
+    --rd-secondary: #b47198;   /* maroon/wine     */
+    --rd-bg:        #f4f1ee;
+    --rd-card-bg:   #ffffff;
+    --rd-border:    #e0d9d0;
+    --rd-text:      #2d1e0f;
+    --rd-muted:     #7a6f66;
+}
+
+.o_recruitment_dashboard {
+    background: var(--rd-bg);
+    min-height: 100%;
+    font-family: inherit;
+}
+
+/* ── Header ── */
+.o_dashboard_header {
+    border-bottom: 2px solid var(--rd-primary);
+    padding-bottom: 12px;
+}
+
+.o_dashboard_title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--rd-primary);
+}
+
+.o_period_select,
+.o_dashboard_header input[type="date"],
+.o_dashboard_header .btn-primary {
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid var(--rd-primary);
+}
+
+.o_dashboard_header .btn-primary {
+    background: var(--rd-primary);
+    border-color: var(--rd-primary);
+    color: #fff;
+    padding: 5px 14px;
+}
+
+.o_dashboard_header .btn-primary:hover {
+    background: #2a3a4d;
+    border-color: #2a3a4d;
+}
+
+/* ── Section titles ── */
+.o_dashboard_section_title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--rd-primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ── Stat Cards ── */
+.o_stat_card {
+    background: var(--rd-card-bg);
+    border-radius: 10px;
+    padding: 16px 16px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+    border-left: 4px solid var(--rd-border);
+    min-height: 86px;
+}
+
+.o_stat_card:hover {
+    box-shadow: 0 4px 18px rgba(29,38,50,0.15);
+    transform: translateY(-2px);
+}
+
+/* Total card — primary color accent */
+.o_stat_card.o_stat_total {
+    border-left-color: var(--rd-primary);
+}
+
+/* Approved / Completed — secondary maroon accent */
+.o_stat_card.o_stat_positive {
+    border-left-color: var(--rd-secondary);
+}
+
+.o_stat_label {
+    font-size: 11px;
+    color: var(--rd-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.o_stat_value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Stat value color scheme using palette */
+.o_stat_value.v-total     { color: var(--rd-primary); }
+.o_stat_value.v-draft     { color: #8a8a72; }
+.o_stat_value.v-published { color: #c17b3f; }   /* orange from palette */
+.o_stat_value.v-closed    { color: var(--rd-secondary); }
+.o_stat_value.v-internal  { color: var(--rd-primary); }
+.o_stat_value.v-external  { color: #2a6d5e; }   /* green from palette */
+.o_stat_value.v-completed { color: #2a6d5e; }
+.o_stat_value.v-progress  { color: #c17b3f; }
+.o_stat_value.v-approved  { color: var(--rd-primary); }
+.o_stat_value.v-pending   { color: var(--rd-secondary); }
+
+/* ── Chart Cards ── */
+.o_chart_card {
+    background: var(--rd-card-bg);
+    border-radius: 12px;
+    padding: 18px 16px 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border-top: 3px solid var(--rd-primary);
+    height: 100%;
+}
+
+.o_chart_title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--rd-primary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

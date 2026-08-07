@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="employee_demotion_form" model="ir.ui.view">
+        <field name="name">Employee Demotion</field>
+        <field name="model">employee.demotion</field>
+        <field name="arch" type="xml">
+            <form string="Employee Demotion">
+                <header>
+                    <field name="state" widget="statusbar"/>
+                    <button name="populate_benefits" invisible="state in ('populate_benefits', 'populate_payout', 'approve')" string="Populate Benefits" type="object" class="oe_highlight"/>
+                    <button name="populate_payout" invisible="state in ('draft', 'populate_payout', 'approve')" string="Populate Payouts" type="object" class="oe_highlight"/>
+                    <button name="approve" invisible="state in ('draft', 'populate_benefits', 'approve')" string="Approve" type="object" class="oe_highlight"/>
+
+                </header>
+                <sheet>
+                    <group colspan="2">
+                        <group>
+                            <field name="ref_num"/>
+                            <field name="employee_name"/>
+							<field name="current_work_unit"/>
+                            <field name="job_position"/>
+							<field name="job_grade"/>
+                        </group>
+                        <group>
+							<field name="new_job_title"/>
+							<field name="new_work_unit"/>
+                            <field name="change_date"/>
+							<field name="reason"/>
+                            <field name="status"/>
+                       </group>
+
+                    </group>
+                    <group>
+                        <notebook string="Salary Detail Changes">
+                            <page string="Salary Detail Changes">
+                                <field name="salary_det_demotion">
+                                    <list string="Demotion Employee Salary Details">
+                                        <!-- PAYROLL MODULE NOT INSTALLED: <field name="salary_rule" width="20%"/> -->
+                                        <field name="value" width="20%"/>
+                                        <field name="end_date" width="20%"/>
+                                        <field name="revised_value" width="20%"/>
+                                        <field name="start_date" width="20%"/>
+                                        <field name="total_value" width="20%"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="employee_demotion_tree" model="ir.ui.view">
+        <field name="name">Employee Demotion</field>
+        <field name="model">employee.demotion</field>
+        <field name="arch" type="xml">
+            <list string="Employee Demotion Form">
+                <field name="ref_num"/>
+                <field name="employee_name"/>
+                <field name="job_name"/>
+                <field name="job_grade"/>
+                <field name="new_job_title"/>
+               <field name="change_date"/>
+                <field name="reason"/>
+                <field name="status"/>
+            </list>
+        </field>
+    </record>
+    <record id="employee_demotion_form_tree" model="ir.actions.act_window">
+        <field name="name">Employee Demotion</field>
+        <field name="res_model">employee.demotion</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <!-- COMMENTED OUT: Parent menu 'hr.menu_hr_employee_user' doesn't exist in Odoo 19. Menu is defined in menu.xml -->
+    <!-- <menuitem id="menu_employee_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_user" action="employee_demotion_form_tree"/> -->
+</odoo>

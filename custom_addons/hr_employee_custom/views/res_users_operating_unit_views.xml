@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Merged from the standalone 'operating_unit' module (OCA/operating-unit)
+    so that hr_employee_custom no longer depends on a separate addon.
+-->
+<odoo>
+    <record id="view_users_form_operating_unit" model="ir.ui.view">
+        <field name="name">res.users.form.operating.unit</field>
+        <field name="model">res.users</field>
+        <field name="inherit_id" ref="base.view_users_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='access_rights']/group[1]" position="after">
+                <group string="Operating Units">
+                    <field
+                        name="operating_unit_ids"
+                        groups="hr_employee_custom.group_multi_operating_unit"
+                        widget="many2many_tags"
+                    />
+
+                    <field
+                        name="default_operating_unit_id"
+                        domain="[('id','in',operating_unit_ids)]"
+                    />
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

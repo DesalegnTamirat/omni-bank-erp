@@ -1,0 +1,79 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+<template id="report_acting_assignment_managerial">
+     <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="row mt32">
+                            <div class="col-8">
+
+                            </div>
+                             <div class="col-4" style="float:left;">
+                                 <strong>Date:</strong>
+                                <span t-esc="datetime.date.today()"/>
+                                
+                                  <br/>
+								  <strong>ID.No:</strong>
+                                 <span t-field="o.employee_id"/>
+                                
+								<br/>
+                                  <strong>Ref. No:</strong>
+                               <span t-field="o.reference"/>
+                                  <br/>
+                                  <br/>
+                              </div>
+                        </div>
+                         <div class="row mt32">
+                              <div class="col-12">
+                                   
+                                  <br/>
+                                <strong><span t-field="o.employee_name"/></strong>
+                                  <br/>
+
+                                <strong><span t-field="o.current_work_unit"/></strong><br/>
+								<strong>Bunna Bank S.C</strong>
+                                  
+                                  <br/><br/><br/><br/>
+								 
+
+                                <strong>Dear <span t-field="o.employee_name"/>,</strong><br/><br/>
+                            </div>
+                         </div>
+                        <h6 class="text-center"><strong><u>Re: -Acting Assignment</u></strong></h6>
+                        <br/><br/><br/>
+                        <p> This is to inform you that you are assigned as  <strong>Acting <span t-field="o.current_job_position"/></strong> at <strong><span t-field="o.acting_work_unit"/></strong> effective from <strong><span t-field="o.start_date"/></strong>. </p>
+                        <br/>
+						<p>As a result of the assignment you are entitled for acting allowance as per benefit scheme of the bank allotted for the position you assume.</p>
+						<br/>
+						<br/>
+                            <p>I am confident that you will exert utmost effort to discharge your responsibilities attached to this acting assignment.</p>
+                        <br/>
+                    </div>
+                <div>
+                               <div class="row mt32">
+                                   <br/>
+                             <div class="col-6">
+                                <p>Sincerely yours,</p>
+                                 <br/>
+                                 <br/>
+                                 
+                                 <strong>CC:</strong>
+								 <t t-foreach="o.cc_workunits" t-as="related_record">
+                                    <li><t t-esc="related_record.name"/></li>
+                                    <!-- Add more fields as needed -->
+                                </t>
+
+<!--                                <span t-field="o.resignation_type" />-->
+                                  <br/>
+                             </div>
+
+                        </div>
+
+                </div>
+
+                </t>
+            </t>
+        </t>
+</template>
+</odoo>

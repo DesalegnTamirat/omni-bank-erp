@@ -1,0 +1,418 @@
+.o_smart_attendance_wrapper {
+    min-height: 100%;
+    height: 100%;
+    overflow-y: auto;
+    /* Sleek gradient mesh background */
+    background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1e293b;
+
+    .o_smart_header {
+        background: transparent;
+        border: none !important;
+        margin-bottom: 2rem !important;
+
+        h4 {
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        .o_live_clock_pill {
+            /* Frosted glass pill */
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 9999px;
+            padding: 0.75rem 1.5rem;
+            
+            i { color: #3b82f6; }
+            .time-text { color: #0f172a; font-weight: 600; font-size: 1.1rem; }
+            .date-text { color: #64748b; font-weight: 500; }
+        }
+    }
+
+    /* Glassmorphism Cards */
+    .premium-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        border-radius: 1.5rem;
+    }
+
+    .o_smart_hero_card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        .o_smart_avatar_wrapper {
+            width: 130px;
+            height: 130px;
+            margin-bottom: 1.5rem;
+            position: relative;
+
+            .o_smart_avatar_img, .o_smart_avatar_placeholder {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 50%;
+                border: 4px solid #ffffff;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            }
+
+            .o_status_indicator_dot {
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                border: 4px solid #ffffff;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                
+                &.bg-success { background-color: #10b981 !important; }
+                &.bg-secondary { background-color: #94a3b8 !important; }
+            }
+        }
+
+        h4 { font-weight: 700; color: #0f172a; font-size: 1.5rem; letter-spacing: -0.01em; }
+        p.text-muted { color: #64748b !important; font-size: 0.95rem; font-weight: 500; }
+        .dept-badge { 
+            background: #f1f5f9; 
+            color: #475569; 
+            font-weight: 600; 
+            padding: 0.5rem 1rem; 
+            border-radius: 9999px;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Vibrant Action Button */
+        .o_smart_action_btn {
+            border-radius: 1rem;
+            padding: 1rem 0;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+
+            &::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0));
+                z-index: -1;
+            }
+
+            &:hover:not(:disabled) {
+                transform: translateY(-3px) scale(1.02);
+            }
+            
+            &:active:not(:disabled) {
+                transform: translateY(1px);
+            }
+
+            &.o_btn_checked_in {
+                background: linear-gradient(135deg, #541718 0%, #3a0f10 100%);
+                box-shadow: 0 10px 20px -5px rgba(84, 23, 24, 0.4);
+                color: white;
+                
+                &:hover { box-shadow: 0 15px 25px -5px rgba(84, 23, 24, 0.5); }
+            }
+
+            &.o_btn_checked_out {
+                background: linear-gradient(135deg, #425727 0%, #2f3e1c 100%);
+                box-shadow: 0 10px 20px -5px rgba(66, 87, 39, 0.4);
+                color: white;
+
+                &:hover { box-shadow: 0 15px 25px -5px rgba(66, 87, 39, 0.5); }
+            }
+        }
+
+        .o_timer_box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            
+            &.active-timer {
+                background: rgba(16, 185, 129, 0.05);
+                border-color: rgba(16, 185, 129, 0.2);
+                .h2 { color: #047857; }
+                .timer-title { color: #059669; }
+            }
+            
+            .h2 { font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+        }
+    }
+
+    .o_stat_card {
+        display: flex;
+        align-items: center;
+        padding: 1.5rem;
+
+        .o_stat_icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1.25rem;
+            
+            &.icon-weekly {
+                background: linear-gradient(135deg, #2b404a 0%, #1d2b32 100%);
+                color: white;
+                box-shadow: 0 8px 15px -3px rgba(29, 43, 50, 0.3);
+            }
+            
+            &.icon-daily {
+                background: linear-gradient(135deg, #d48756 0%, #c17540 100%);
+                color: white;
+                box-shadow: 0 8px 15px -3px rgba(193, 117, 64, 0.3);
+            }
+        }
+
+        .stat-label { color: #64748b; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+        .stat-value { color: #0f172a; font-weight: 800; font-size: 1.75rem; line-height: 1; letter-spacing: -0.02em; }
+        .stat-sub { color: #94a3b8; font-size: 0.85rem; font-weight: 500; margin-top: 0.25rem; }
+    }
+
+    .o_daily_breakdown_list {
+        .o_daily_row {
+            border-radius: 0.75rem;
+            margin-bottom: 0.5rem;
+            padding: 0.75rem 1rem;
+            
+            &:hover:not(.is-today) { background: rgba(241, 245, 249, 0.8); }
+            
+            &.is-today {
+                background: #f0f9ff;
+                border: 1px solid #bae6fd;
+            }
+
+            .day-name { font-weight: 700; color: #1e293b; font-size: 0.95rem; }
+            .day-date { color: #64748b; font-size: 0.8rem; font-weight: 500; }
+            .hours-val { font-weight: 700; color: #334155; font-variant-numeric: tabular-nums; }
+            
+            .progress {
+                height: 12px;
+                background-color: #e2e8f0;
+                border-radius: 999px;
+                overflow: hidden;
+                box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+                
+                .progress-bar {
+                    border-radius: 999px;
+                    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+                    
+                    &.bar-today { background: linear-gradient(90deg, #d48756, #c17540); }
+                    &.bar-past { background: linear-gradient(90deg, #877a3d, #726732); }
+                    &.bar-empty { background: transparent; }
+                }
+            }
+            
+            .today-badge {
+                background: #c17540;
+                color: white;
+                font-weight: 600;
+                padding: 0.25rem 0.75rem;
+                border-radius: 999px;
+                font-size: 0.75rem;
+            }
+            
+            .onduty-badge {
+                background: #425727;
+                color: white;
+                font-weight: 600;
+                padding: 0.25rem 0.75rem;
+                border-radius: 999px;
+                font-size: 0.75rem;
+                box-shadow: 0 2px 4px rgba(66, 87, 39, 0.2);
+            }
+        }
+    }
+
+    /* ========== SETTINGS GEAR BUTTON ========== */
+    .o_settings_gear_btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &:hover, &.active {
+            background: #c17540;
+            color: white;
+            border-color: #c17540;
+            box-shadow: 0 8px 15px -3px rgba(193, 117, 64, 0.3);
+            transform: rotate(45deg);
+        }
+    }
+
+    /* ========== SETTINGS OVERLAY ========== */
+    .o_settings_overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(4px);
+        z-index: 1040;
+        animation: fadeIn 0.2s ease;
+    }
+
+    /* ========== SETTINGS SLIDE-IN PANEL ========== */
+    .o_settings_panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 380px;
+        height: 100vh;
+        overflow-y: auto;
+        z-index: 1050;
+        border-radius: 1.5rem 0 0 1.5rem;
+        padding: 2rem;
+        animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-right: none;
+
+        .o_settings_panel_header {
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .settings-section-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+        }
+
+        .settings-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+
+            &:last-child { border-bottom: none; }
+
+            .settings-toggle-label {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: #334155;
+            }
+
+            .form-check-input {
+                width: 2.5em;
+                height: 1.3em;
+                cursor: pointer;
+
+                &:checked {
+                    background-color: #425727;
+                    border-color: #425727;
+                }
+
+                &:focus {
+                    box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.2);
+                }
+            }
+        }
+
+        .settings-input-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+
+            &:last-child { border-bottom: none; }
+
+            .settings-input-label {
+                font-size: 0.88rem;
+                font-weight: 600;
+                color: #334155;
+                margin: 0;
+                flex: 1;
+            }
+
+            .settings-input {
+                width: 90px;
+                border: 1px solid #e2e8f0;
+                border-radius: 0.5rem;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.88rem;
+                font-weight: 600;
+                color: #0f172a;
+                text-align: center;
+                background: #f8fafc;
+                transition: border-color 0.2s;
+
+                &:focus {
+                    outline: none;
+                    border-color: #c17540;
+                    box-shadow: 0 0 0 3px rgba(193, 117, 64, 0.1);
+                }
+            }
+        }
+
+        .o_settings_save_btn {
+            background: linear-gradient(135deg, #425727 0%, #2f3e1c 100%);
+            color: white;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 0.9rem;
+            border-radius: 0.75rem;
+            border: none;
+            box-shadow: 0 8px 15px -3px rgba(66, 87, 39, 0.3);
+            transition: all 0.25s ease;
+
+            &:hover:not(:disabled) {
+                transform: translateY(-2px);
+                box-shadow: 0 12px 20px -3px rgba(66, 87, 39, 0.4);
+                color: white;
+            }
+
+            &:disabled {
+                opacity: 0.7;
+            }
+        }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideInRight {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+}
+
+/* Hide top-left App Switcher (:::) icon when ERP Access Gate is active & employee is not checked in */
+body.o_gate_active {
+    .o_navbar_apps_menu,
+    .o_home_menu_toggle,
+    .o_menu_toggle,
+    .o_app_switcher_toggle,
+    [title="Apps"],
+    [title="Home Menu"] {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
+}
+

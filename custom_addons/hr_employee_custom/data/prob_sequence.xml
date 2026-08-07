@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record id="prob_assessment_form" model="ir.sequence">
+            <field name="name">ProbationAssessmentForm</field>
+            <field name="code">probation.assessment.form</field>
+            <field name="prefix">Probation-eval-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

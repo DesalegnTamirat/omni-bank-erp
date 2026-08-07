@@ -1,0 +1,284 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="transfer_committee_minutes_list_view" model="ir.ui.view">
+        <field name="name">transfer.committee.minutes.list</field>
+        <field name="model">transfer.committee.minutes</field>
+        <field name="arch" type="xml">
+            <list string="Transfer Committee Minutes"
+                  decoration-success="state == 'approved'"
+                  decoration-info="state == 'ranked'"
+                  decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="target_vacancy_id"/>
+                <field name="meeting_date"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-info="state == 'ranked'"
+                       decoration-muted="state == 'draft'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="transfer_committee_minutes_form_view" model="ir.ui.view">
+        <field name="name">transfer.committee.minutes.form</field>
+        <field name="model">transfer.committee.minutes</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Committee Minutes">
+                <header>
+                    <!-- Auto-sync considered requests with current vacancy / direct-transfer setting -->
+                    <button name="action_refresh_eligible_requests" string="Refresh Eligible Requests"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="state != 'draft'"
+                            help="Reload the list of eligible transfer requests based on the current Target Vacancy (or direct transfers if left empty). This overwrites any manually added/removed requests."/>
+                    <!-- /073/074: Compute the weighted ranking -->
+                    <button name="action_compute_ranking" string="Compute Ranking" type="object"
+                            class="oe_highlight"
+                            invisible="state == 'approved'"
+                            help="Calculate weighted Transfer Suitability Scores for all eligible candidates ."/>
+                    <!-- : Approve minutes and auto-approve selected candidates -->
+                    <button name="action_approve_minutes" string="Approve Minutes" type="object"
+                            class="oe_highlight"
+                            invisible="state != 'ranked'"
+                            confirm="Approving minutes will automatically approve the transfer requests of all candidates marked as 'Selected'. Proceed?"/>
+                    <!-- Print PDF Report -->
+                    <button name="%(action_report_transfer_minute)d" string="Print Minutes"
+                            type="action"
+                            invisible="state == 'draft'"
+                            help="Generate a printable Transfer Committee Minutes PDF report ."/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,ranked,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Info banner when approved -->
+                    <div class="alert alert-success" role="alert" invisible="state != 'approved'">
+                        <strong>✅ Minutes Approved</strong> – Selected candidates' transfer requests
+                        have been automatically approved and employee records updated.
+                    </div>
+
+                    <group>
+                        <field name="target_vacancy_id" readonly="state != 'draft'"
+                               options="{'no_create': True}"
+                               placeholder="Leave empty for direct transfers"/>
+                        <field name="meeting_date" readonly="state == 'approved'"/>
+                    </group>
+
+                    <notebook>
+                        <!-- Tab 1: Transfer Requests Considered -->
+                        <page string="Transfer Requests Considered">
+                            <field name="transfer_request_ids" readonly="state == 'approved'"
+                                   domain="[('target_vacancy_id', '=', target_vacancy_id), ('state', 'in', ['submitted', 'under_review', 'approved']), ('eligibility_status', '=', 'eligible')]">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="employee_id"/>
+                                    <field name="current_job_grade_id"/>
+                                    <field name="current_operating_unit_id"/>
+                                    <field name="request_date"/>
+                                    <field name="pms_score"
+                                           decoration-danger="pms_score &lt; 75"/>
+                                    <field name="total_experience_years"/>
+                                    <field name="service_years_current_location"/>
+                                    <field name="disciplinary_status"/>
+                                    <field name="eligibility_status" widget="badge"
+                                           decoration-success="eligibility_status == 'eligible'"
+                                           decoration-danger="eligibility_status == 'ineligible'"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 2: Ranked List  /  /  -->
+                        <page string="Ranked Candidates ">
+                            <field name="ranking_line_ids">
+                                <list editable="bottom"
+                                      decoration-success="selection_decision == 'selected'"
+                                      decoration-muted="selection_decision == 'not_selected'">
+                                    <field name="rank" readonly="1"/>
+                                    <field name="employee_id" readonly="1"/>
+                                    <field name="employee_gender" readonly="1" optional="hide"/>
+                                    <field name="application_date_score" readonly="1"
+                                           string="App Date (20%)"/>
+                                    <field name="experience_score" readonly="1"
+                                           string="Experience (20%)"/>
+                                    <field name="service_location_score" readonly="1"
+                                           string="Location (20%)"/>
+                                    <field name="pms_score" readonly="1"
+                                           string="PMS (30%)"/>
+                                    <field name="recommendation_score" readonly="1"
+                                           string="Rec (10%)"/>
+                                    <field name="discipline_deduction_percent" readonly="1"
+                                           string="Deduction (%)"/>
+                                    <field name="final_score" readonly="1"
+                                           string="Final Score"/>
+                                    <field name="selection_decision" widget="badge"
+                                           decoration-success="selection_decision == 'selected'"
+                                           decoration-muted="selection_decision == 'not_selected'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 3: Selection Decision / Committee Notes -->
+                        <page string="Committee Notes">
+                            <field name="selection_decision"
+                                   placeholder="Record the committee's final selection decision and any supporting notes..."
+                                   readonly="state == 'approved'"/>
+                        </page>
+                    </notebook>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+
+    <record id="action_transfer_committee_minutes" model="ir.actions.act_window">
+        <field name="name">Transfer Committee Minutes</field>
+        <field name="res_model">transfer.committee.minutes</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create Transfer Committee Minutes!</p>
+            <p>Use this form to compute the weighted Transfer Suitability Score for all eligible
+               transfer applicants, review the ranked list, record the committee's selection decision,
+               and generate a printable PDF report .
+            </p>
+        </field>
+    </record>
+
+
+    <record id="action_report_transfer_minute" model="ir.actions.report">
+        <field name="name">Transfer Selection Notification</field>
+        <field name="model">transfer.committee.minutes</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_transfer_selection_notification</field>
+        <field name="report_file">custom_recruitment.report_transfer_selection_notification</field>
+        <field name="print_report_name">'Transfer Selection Notification - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_transfer_committee_minutes"/>
+        <field name="binding_type">report</field>
+    </record>
+
+
+    <template id="report_transfer_selection_notification">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-set="selected_lines" t-value="o.ranking_line_ids.filtered(lambda l: l.selection_decision == 'selected')"/>
+
+                <t t-if="not selected_lines">
+                    <t t-call="web.external_layout">
+                        <div class="page">
+                            <h3>Transfer Committee Minutes: <span t-field="o.name"/></h3>
+                            <p>No candidates are currently marked "Selected" on this committee's
+                               ranked list. Compute the ranking and mark selections before printing
+                               the Selection Notification letters.</p>
+                        </div>
+                    </t>
+                </t>
+
+                <t t-foreach="selected_lines" t-as="line">
+                    <t t-set="req" t-value="line.transfer_request_id"/>
+                    <t t-set="emp" t-value="req.employee_id"/>
+                    <t t-set="is_last" t-value="line_last"/>
+
+                    <t t-call="web.external_layout">
+                        <div class="page" t-attf-style="#{'' if is_last else 'page-break-after: always;'}">
+
+                            <div class="text-end" style="margin-bottom: 24px;">
+                                <span>Date: </span>
+                                <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%B %d, %Y')"/>
+                            </div>
+
+                            <p>
+                                To: <span t-field="emp.name"/><br/>
+                                Employee ID:
+                                <span t-esc="emp.identification_id or ('EMP-%s' % emp.id)"/><br/>
+                                Current Position:
+                                <span t-esc="req.current_job_position_id.name or 'N/A'"/><br/>
+                                Current Department/Branch:
+                                <span t-esc="req.current_operating_unit_id.name or 'N/A'"/>
+                            </p>
+
+                            <p><strong>Subject: Successful Selection for Employee Transfer</strong></p>
+
+                            <p>Dear <span t-field="emp.name"/>,</p>
+
+                            <p>
+                                We are pleased to inform you that your request for an internal
+                                transfer has been successfully approved following the completion
+                                of the evaluation and selection process.
+                            </p>
+
+                            <p>
+                                Based on the approved transfer criteria, including performance
+                                evaluation, work experience, length of service, recommendation,
+                                and organizational requirements, you have been selected for
+                                transfer to the following position:
+                            </p>
+
+                            <ul>
+                                <li>New Position:
+                                    <span t-esc="req.target_job_position_id.name or 'N/A'"/></li>
+                                <li>New Department/Branch:
+                                    <span t-esc="req.target_operating_unit_id.name or 'N/A'"/></li>
+                                <li>Reporting Manager:
+                                    <span t-esc="req.reporting_manager_id.name or 'To be advised'"/></li>
+                                <li>Effective Transfer Date:
+                                    <span t-if="req.effective_transfer_date" t-field="req.effective_transfer_date"/>
+                                    <span t-if="not req.effective_transfer_date">To be advised</span>
+                                </li>
+                                <li>Work Location:
+                                    <span t-esc="req.target_operating_unit_id.name or 'N/A'"/></li>
+                            </ul>
+
+                            <p>
+                                Please report to your new department on the effective date stated
+                                above. Before your transfer becomes effective, you are required to:
+                            </p>
+
+                            <ol>
+                                <li>Complete all pending assignments and responsibilities.</li>
+                                <li>Obtain the necessary clearance from your current department.</li>
+                                <li>Return any company property, where applicable.</li>
+                                <li>Coordinate with Human Resources and your current supervisor to
+                                    ensure a smooth transition.</li>
+                            </ol>
+
+                            <p>
+                                Your salary, benefits, and employment terms shall continue in
+                                accordance with the organization's policies unless otherwise
+                                communicated in writing.
+                            </p>
+
+                            <p>
+                                Congratulations on your successful selection. We appreciate your
+                                continued commitment to the organization and wish you every
+                                success in your new role.
+                            </p>
+
+                            <p>
+                                If you require any clarification regarding your transfer, please
+                                contact the Human Resources Department.
+                            </p>
+
+                            <p>
+                                Sincerely,<br/>
+                                Human Resources Department
+                            </p>
+
+                            <div style="margin-top: 48px;">
+                                <p>Approved By: _______________________
+                                Name: _____________________________</p>
+                                <p>Title: ______________________________
+                                Signature: _________________________</p>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,263 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="job_vacancy_form" model="ir.ui.view">
+        <field name="name">Job.Vacancy.Form</field>
+        <field name="model">job.vacancy</field>
+        <field name="arch" type="xml">
+            <form string="Job Vacancy Form">
+                <header>
+                    <button name="notify"
+                            invisible="status in ('notify', 'evaluate')"
+                            string="Notify"
+                            type="object"
+                            class="btn-primary"/>
+                    <button name="vacancy_evaluate"
+                            invisible="vacancy_status != 'draft'"
+                            string="Evaluate"
+                            type="object"
+                            class="btn-primary"/>
+                    <button name="check_plan"
+                            string="Check Plan"
+                            type="object"
+                            class="btn-secondary"
+                            invisible="vacancy_status != 'draft'"/>
+                    <field name="vacancy_status" widget="statusbar"
+                           statusbar_visible="draft,evaluate,published,closed"
+                           readonly="1"/>
+                </header>
+
+                <sheet>
+                    <!-- Title -->
+                    <div class="oe_title">
+                        <h1>
+                            <field name="reference" readonly="1"/>
+                        </h1>
+                    </div>
+
+                    <field name="status" invisible="1"/>
+                    <field name="vacancy_status" invisible="1"/>
+
+                    <!-- Main two-column group — mirrors Odoo 14 layout -->
+                    <group>
+                        <!-- LEFT COLUMN -->
+                        <group string="Job Information">
+                            <field name="job_position" readonly="vacancy_status != 'draft'"/>
+                            <field name="job_grade" readonly="vacancy_status != 'draft'"/>
+                            <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
+                            <field name="job_level" invisible="employee_category != 'Non Managerial'"
+                                   required="employee_category == 'Non Managerial'" readonly="vacancy_status != 'draft'"/>
+                            <field name="recruitment_request_id" string="Recruitment Reference" readonly="vacancy_status != 'draft'"/>
+                            <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
+                            <!-- INTERNAL ONLY: movement type -->
+                            <field name="internal_movement_type" string="Movement Type"
+                                   invisible="sourcing_type not in ['internal', 'both']"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <!-- EXTERNAL ONLY: source channel -->
+                            <field name="source_channel" string="Source Channel"
+                                   invisible="sourcing_type not in ['external', 'both']"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="operating_unit_id" readonly="vacancy_status != 'draft'"/>
+                            <field name="type_of_employment" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                        <!-- RIGHT COLUMN -->
+                        <group string="Recruitment Details">
+                            <field name="responsible" readonly="vacancy_status != 'draft'"/>
+                            <field name="opening_date" readonly="vacancy_status != 'draft'"/>
+                            <field name="vacancy_announced_on" readonly="vacancy_status != 'draft'"/>
+                            <field name="no_of_vacancies" readonly="vacancy_status != 'draft'"/>
+                            <field name="last_date_to_apply" readonly="vacancy_status != 'draft'"/>
+                            <field name="vacancy_description" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- EXTERNAL REQUIREMENTS — only visible for external/both -->
+                    <group string="External Applicant Requirements"
+                           invisible="sourcing_type not in ['external', 'both']">
+                        <group string="Academic Requirements">
+                            <field name="minimum_education" readonly="vacancy_status != 'draft'"/>
+                            <field name="minimum_cgpa" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                        <group string="Experience Requirements">
+                            <field name="minimum_experience_years" readonly="vacancy_status != 'draft'"/>
+                            <field name="banking_experience_required" readonly="vacancy_status != 'draft'"/>
+                            <field name="ex_bunna_preferred" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- Website publishing status — only visible for external/both -->
+                    <group invisible="sourcing_type not in ['external', 'both']">
+                        <group string="Website Status">
+                            <field name="website_published" readonly="1"/>
+                        </group>
+                    </group>
+
+
+                    <div>
+                        <button name="publish_vacancy"
+                                invisible="vacancy_status in ['published', 'closed']"
+                                string="Publish Vacancy"
+                                type="object"
+                                class="btn-primary"/>
+                        <button name="close_vacancy"
+                                invisible="vacancy_status in ['draft', 'closed']"
+                                string="Close Vacancy"
+                                type="object"
+                                class="btn-secondary ms-2"/>
+                    </div>
+
+                    <!-- Tabs: Hiring Details + Vacancy Approval Members + Competencies -->
+                    <notebook>
+                        <page string="Hiring Details">
+                            <field name="hiring_details" readonly="vacancy_status != 'draft'">
+                                <list editable="bottom">
+                                    <field name="work_unit" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="responsible_employee" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="number_of_openings" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="planned_positions" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Vacancy Approval Members">
+                            <field name="vac_del_team_id" readonly="vacancy_status != 'draft'">
+                                <list editable="bottom">
+                                    <field name="role" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="employee_name" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="operating_unit"/>
+                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="alternate_committee_member"
+                                           readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="alter_operating_unit"/>
+                                    <field name="approve"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Competencies">
+                            <field name="competency_line_ids" readonly="vacancy_status != 'draft'">
+                                <list editable="bottom">
+                                    <field name="competency_id" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="required_level" readonly="parent.vacancy_status != 'draft'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                    <!-- Interview Schedule + Agenda side-by-side -->
+                    <group>
+                        <group string="Interview Schedule">
+                            <field name="place_of_interview" readonly="vacancy_status != 'draft'"/>
+                            <field name="date_of_interview" readonly="vacancy_status != 'draft'"/>
+                            <field name="time_begin" readonly="vacancy_status != 'draft'"/>
+                            <field name="morning" readonly="vacancy_status != 'draft'"/>
+                            <field name="afternoon" readonly="vacancy_status != 'draft'"/>
+                            <field name="time_end" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                        <group string="Agenda">
+                            <field name="total_number_of_applicant" readonly="vacancy_status != 'draft'"/>
+                            <field name="short_listed_applicant" readonly="vacancy_status != 'draft'"/>
+                            <field name="purpose_of_employment" readonly="vacancy_status != 'draft'"/>
+                            <field name="vacancy_announcement_no" string="Required Number"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="total_participant_on_the_assessment" string="Shortlisted for Interview"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="not_selected_applicants" readonly="vacancy_status != 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- Recruitment Approval Members -->
+                    <notebook>
+                        <page string="Recruitment Approval Members">
+                            <field name="memb_panel_vac" readonly="vacancy_status != 'draft'">
+                                <list editable="bottom">
+                                    <field name="role" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="panel_member_name" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Result Summary">
+                            <field name="hiring_rank_details" readonly="vacancy_status != 'draft'">
+                                <list editable="bottom">
+                                    <field name="no" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="applicant_name" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="result" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="rank" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="statues" readonly="parent.vacancy_status != 'draft'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                    <group string="Comment">
+                        <field name="comment" nolabel="1" readonly="vacancy_status != 'draft'"/>
+                    </group>
+
+                    <!-- Internal Placement Release Tracking — only relevant for internal/both vacancies -->
+                    <group string="Internal Placement &amp; Release"
+                           invisible="sourcing_type not in ['internal', 'both']">
+                        <group>
+                            <field name="release_date"/>
+                            <field name="release_notes" nolabel="1" placeholder="Optional release / handover notes..."/>
+                        </group>
+                    </group>
+                </sheet>
+
+            </form>
+        </field>
+    </record>
+    <record id="job_vacancy_tree" model="ir.ui.view">
+        <field name="name">Job Vacancy Tree</field>
+        <field name="model">job.vacancy</field>
+        <field name="arch" type="xml">
+            <list string="Job Vacancy Tree">
+                <field name="reference"/>
+                <field name="job_position"/>
+                <field name="recruitment_reference"/>
+                <field name="operating_unit_id"/>
+                <field name="vacancy_announced_on"/>
+                <field name="no_of_vacancies"/>
+                <field name="last_date_to_apply"/>
+            </list>
+        </field>
+    </record>
+    <record id="job_vacancy_form_tree" model="ir.actions.act_window">
+        <field name="name">Job Vacancy</field>
+        <field name="res_model">job.vacancy</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="bb_internal_form_tree" model="ir.actions.act_window">
+        <field name="name">BB Internal</field>
+        <field name="res_model">bb.internal</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="bb_internal_tree" model="ir.ui.view">
+        <field name="name">BB Internal Tree</field>
+        <field name="model">bb.internal</field>
+        <field name="arch" type="xml">
+            <list string="BB Internal Tree" editable="bottom">
+                <field name="int_reference"/>
+                <field name="applicant_id"/>
+                <field name="applicant_name"/>
+            </list>
+        </field>
+    </record>
+    <record id="bb_external_form_tree" model="ir.actions.act_window">
+        <field name="name">BB External</field>
+        <field name="res_model">bb.external</field>
+        <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="bb_external_tree" model="ir.ui.view">
+        <field name="name">BB external Tree</field>
+        <field name="model">bb.external</field>
+        <field name="arch" type="xml">
+            <list string="BB external Tree" editable="bottom">
+                <field name="ext_reference"/>
+                <field name="applicant_id"/>
+                <field name="applicant_name"/>
+            </list>
+        </field>
+    </record>
+</odoo>

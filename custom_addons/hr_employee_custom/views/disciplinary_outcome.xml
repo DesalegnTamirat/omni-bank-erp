@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+        <record id="disciplinary_outcome_view" model="ir.ui.view">
+             <field name="name">discipline.outcome.Form</field>
+        <field name="model">discipline.outcome</field>
+        <field name="arch" type="xml">
+            <form string="Disciplinary Outcomes">
+                     <group colspan="2">
+                        <group>
+                        <field name="disciplinary_action"/>
+                        <field name="status"/>
+                        </group>
+                        <group>
+                        <field name="start_date"/>
+                        <field name="end_date"/>
+                         </group>
+                    </group>
+                    <group>
+                    <notebook>
+                        <page string="Disciplinary Outcomes Count">
+                            <field name="outcome_details">
+                                <list editable="bottom">
+                                    <field name="action_count"/>
+                                    <field name="action_name"/>
+                                    <field name="salary_impact"/>
+									<field name="salary_impact_percent"/>
+                                    <field name="fine_imposed"/>
+                                    <field name="comments"/>
+                                    <field name="status"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+            </group>
+                </form>
+
+            </field>
+        </record>
+
+
+	<record id="disciplinary_outcome_view_tree" model="ir.ui.view">
+            <field name="name">discipline.outcome.tree</field>
+            <field name="model">discipline.outcome</field>
+            <field name="arch" type="xml">
+                <list string="Discipline Categories">
+                   <field name="disciplinary_action"/>
+                   <field name="status"/>
+                   <field name="start_date"/>
+                   <field name="end_date"/>
+                </list>
+            </field>
+        </record>
+
+
+
+
+	<record id="action_disciplinary_outcome_view_tree" model="ir.actions.act_window">
+            <field name="name">Discipline outcome</field>
+            <field name="res_model">discipline.outcome</field>
+            <field name="context">{}</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+
+
+</odoo>

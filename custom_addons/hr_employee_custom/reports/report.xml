@@ -1,0 +1,141 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="action_acting_assignment" model="ir.actions.report">
+        <field name="name">Acting Assignment</field>
+        <field name="model">supplementary.role</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_acting_assignment</field>
+        <field name="report_file">hr_employee_custom.report_acting_assignment</field>
+        <field name="binding_model_id" ref="model_supplementary_role"/>
+        <field name="binding_type">report</field>
+    </record>
+	<record id="action_acting_assignment_managerial" model="ir.actions.report">
+        <field name="name">Acting Assignment Managerial</field>
+        <field name="model">supplementary.role</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_acting_assignment_managerial</field>
+        <field name="report_file">hr_employee_custom.report_acting_assignment_managerial</field>
+        <field name="binding_model_id" ref="model_supplementary_role"/>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="action_acting_termination" model="ir.actions.report">
+        <field name="name">Acting Termination</field>
+        <field name="model">supplementary.role</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_acting_termination</field>
+        <field name="report_file">hr_employee_custom.report_acting_termination</field>
+        <field name="binding_model_id" ref="model_supplementary_role"/>
+        <field name="binding_type">report</field>
+    </record>
+	<record id="action_transfer_letter" model="ir.actions.report">
+        <field name="name">Employee Transfer</field>
+        <field name="model">transfer.form</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_transfer_letter</field>
+        <field name="report_file">hr_employee_custom.report_transfer_letter</field>
+        <field name="binding_model_id" ref="model_transfer_form"/>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="acting_permanent_letters" model="ir.actions.report">
+        <field name="name">Permanent Letters</field>
+        <field name="model">hr.version</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_permanent_letter</field>
+        <field name="report_file">hr_employee_custom.report_permanent_letter</field>
+        <field name="binding_model_id" ref="hr.model_hr_version"/>
+		<field name="binding_type">report</field>
+    </record>
+     <record id="acting_promotion_letters" model="ir.actions.report">
+        <field name="name">Promotion Letters</field>
+        <field name="model">hr.applicant</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_promotion_letter</field>
+        <field name="report_file">hr_employee_custom.report_promotion_letter</field>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="acting_promotion_revocation" model="ir.actions.report">
+        <field name="name">Promotion Revocation Letters</field>
+        <field name="model">hr.applicant</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_promotion_revocation</field>
+        <field name="report_file">hr_employee_custom.report_promotion_revocation</field>
+        <field name="binding_type">report</field>
+    </record>
+     <record id="acting_release_format" model="ir.actions.report">
+        <field name="name">Release Format</field>
+        <field name="model">hr.applicant</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_release_format</field>
+        <field name="report_file">hr_employee_custom.report_release_format</field>
+        <field name="binding_type">report</field>
+    </record>
+    <!-- <record id="acting_minute_template" model="ir.actions.report"> -->
+        <!-- <field name="name">Minute Template</field> -->
+        <!-- <field name="model">job.vacancy</field> -->
+        <!-- <field name="report_type">qweb-pdf</field> -->
+        <!-- <field name="report_name">hr_employee_custom.report_minute_template</field> -->
+        <!-- <field name="report_file">hr_employee_custom.report_minute_template</field> -->
+        <!-- <field name="binding_model_id" ref="model_job_vacancy"/> -->
+        <!-- <field name="binding_type">report</field> -->
+    <!-- </record> -->
+	<record id="acting_probation_revocation" model="ir.actions.report">
+        <field name="name">Probation Termination</field>
+        <field name="model">hr.version</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_employee_custom.report_probation_revocation</field>
+        <field name="report_file">hr_employee_custom.report_probation_revocation</field>
+        <field name="binding_model_id" ref="hr.model_hr_version"/>
+        <field name="binding_type">report</field>
+    </record>
+	<!-- <record id="action_increment_letter" model="ir.actions.report"> -->
+        <!-- <field name="name">Increment Letter</field> -->
+        <!-- <field name="model">employee.increment</field> -->
+        <!-- <field name="report_type">qweb-pdf</field> -->
+        <!-- <field name="report_name">hr_employee_custom.report_increment_letter</field> -->
+        <!-- <field name="report_file">hr_employee_custom.report_increment_letter</field> -->
+        <!-- <field name="binding_model_id" ref="model_employee_increment"/> -->
+        <!-- <field name="binding_type">report</field> -->
+    <!-- </record> -->
+	<!-- <record id="action_offer_letter" model="ir.actions.report"> -->
+		<!-- <field name="name">Offer Letter</field> -->
+		<!-- <field name="model">hr.applicant</field> -->
+		<!-- <field name="report_type">qweb-pdf</field> -->
+		<!-- <field name="report_name">hr_employee_custom.report_offer_letter</field> -->
+		<!-- <field name="report_file">hr_employee_custom.report_offer_letter</field> -->
+		<!-- -->
+		<!-- <field name="binding_type">report</field> -->
+	<!-- </record> -->
+	<record id="action_non_managerial_report" model="ir.actions.report">
+       <field name="name">Non managerial different location</field>
+       <field name="model">hr.applicant</field>
+       <field name="report_type">qweb-pdf</field>
+       <field name="report_name">hr_employee_custom.report_non_managerial_different</field>
+       <field name="report_file">hr_employee_custom.report_non_managerial_different</field>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="action_non_managerial_same_location" model="ir.actions.report">
+       <field name="name">Non managerial same location</field>
+       <field name="model">hr.applicant</field>
+       <field name="report_type">qweb-pdf</field>
+       <field name="report_name">hr_employee_custom.report_non_managerial_same_location</field>
+       <field name="report_file">hr_employee_custom.report_non_managerial_same_location</field>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="action_managerial_different_location" model="ir.actions.report">
+       <field name="name">Managerial different location</field>
+       <field name="model">hr.applicant</field>
+       <field name="report_type">qweb-pdf</field>
+       <field name="report_name">hr_employee_custom.report_managerial_different_location</field>
+       <field name="report_file">hr_employee_custom.report_managerial_different_location</field>
+        <field name="binding_type">report</field>
+    </record>
+    <record id="action_managerial_same_location" model="ir.actions.report">
+       <field name="name">Managerial same location</field>
+       <field name="model">hr.applicant</field>
+       <field name="report_type">qweb-pdf</field>
+       <field name="report_name">hr_employee_custom.report_managerial_same_location</field>
+       <field name="report_file">hr_employee_custom.report_managerial_same_location</field>
+       <field name="binding_type">report</field>
+    </record>
+	
+</odoo>

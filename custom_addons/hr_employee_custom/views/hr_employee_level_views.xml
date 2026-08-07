@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE LEVEL — Form view
+    ════════════════════════════════════════════ -->
+    <record id="view_hr_employee_level_form" model="ir.ui.view">
+        <field name="name">hr.employee.level.form</field>
+        <field name="model">hr.employee.level</field>
+        <field name="arch" type="xml">
+            <form string="Employee Level">
+                <header>
+                    <button name="action_save_level" string="Save Level" type="object" class="btn-primary" save="1"/>
+                    <button name="action_archive_level" string="Archive" type="object" class="btn-warning" invisible="not id or not active" confirm="Archive this Employee Level?"/>
+                    <button name="action_archive_level" string="Unarchive" type="object" class="btn-secondary" invisible="not id or active"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g. Junior Level" required="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="code" placeholder="e.g. LVL-1" required="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE LEVEL — Action
+    ════════════════════════════════════════════ -->
+    <record id="action_hr_employee_level" model="ir.actions.act_window">
+        <field name="name">Employee Levels</field>
+        <field name="res_model">hr.employee.level</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE LEVEL — Configuration Menu
+    ════════════════════════════════════════════ -->
+
+</odoo>

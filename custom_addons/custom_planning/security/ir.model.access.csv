@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_planning_fiscal_year_user,planning.fiscal.year.user,model_planning_fiscal_year,custom_planning.group_planning_user,1,0,0,0
+access_planning_fiscal_year_manager,planning.fiscal.year.manager,model_planning_fiscal_year,custom_planning.group_planning_manager,1,1,1,1
+access_planning_manpower_line_user,planning.manpower.line.user,model_planning_manpower_line,custom_planning.group_planning_user,1,1,1,1
+access_planning_manpower_line_manager,planning.manpower.line.manager,model_planning_manpower_line,custom_planning.group_planning_manager,1,1,1,1
+access_planning_work_unit_manpower_user,planning.work.unit.manpower.user,model_planning_work_unit_manpower,custom_planning.group_planning_user,1,1,1,0
+access_planning_work_unit_manpower_manager,planning.work.unit.manpower.manager,model_planning_work_unit_manpower,custom_planning.group_planning_manager,1,1,1,1
+access_planning_dashboard_user,planning.dashboard.user,model_planning_dashboard,custom_planning.group_planning_user,1,0,0,0
+access_planning_dashboard_manager,planning.dashboard.manager,model_planning_dashboard,custom_planning.group_planning_manager,1,1,1,1

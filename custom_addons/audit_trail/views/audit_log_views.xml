@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_audit_log_list" model="ir.ui.view">
+        <field name="name">audit.log.list</field>
+        <field name="model">audit.log</field>
+        <field name="arch" type="xml">
+            <list string="Audit Logs" create="false" edit="false" delete="false"
+                  decoration-danger="operation == 'unlink'"
+                  decoration-success="operation == 'create'"
+                  decoration-info="operation == 'write'">
+                <field name="create_date" string="Date and Time" widget="datetime"/>
+                <field name="user_name" string="User"/>
+                <field name="user_login" string="Login" optional="show"/>
+                <field name="ip_address" string="IP Address" optional="show"/>
+                <field name="module" string="Module"/>
+                <field name="model_description" string="Model"/>
+                <field name="model_name" string="Technical Model" optional="hide"/>
+                <field name="res_id" string="Record ID"/>
+                <field name="res_name" string="Record Name"/>
+                <field name="operation" string="Operation" widget="badge"
+                       decoration-danger="operation == 'unlink'"
+                       decoration-success="operation == 'create'"
+                       decoration-info="operation == 'write'"/>
+                <field name="field_description" string="Field" optional="show"/>
+                <field name="field_type" string="Field Type" optional="hide"/>
+                <field name="old_value" string="Old Value"/>
+                <field name="new_value" string="New Value"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_audit_log_form" model="ir.ui.view">
+        <field name="name">audit.log.form</field>
+        <field name="model">audit.log</field>
+        <field name="arch" type="xml">
+            <form string="Audit Log Entry" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group string="What Changed">
+                            <field name="module"/>
+                            <field name="model_description" string="Model"/>
+                            <field name="model_name" string="Technical Name"/>
+                            <field name="res_id" string="Record ID"/>
+                            <field name="res_name" string="Record Name"/>
+                            <field name="operation"/>
+                        </group>
+                        <group string="Who and When">
+                            <field name="user_id"/>
+                            <field name="user_name"/>
+                            <field name="user_login"/>
+                            <field name="ip_address"/>
+                            <field name="create_date" string="Date and Time"/>
+                        </group>
+                    </group>
+                    <group string="Field Detail" invisible="operation == 'create'">
+                        <field name="field_description" string="Field Label"/>
+                        <field name="field_name" string="Field Technical"/>
+                        <field name="field_type" string="Field Type"/>
+                        <field name="old_value" widget="text"/>
+                        <field name="new_value" widget="text"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_audit_log_search" model="ir.ui.view">
+        <field name="name">audit.log.search</field>
+        <field name="model">audit.log</field>
+        <field name="arch" type="xml">
+            <search string="Search Audit Logs">
+                <field name="user_name"/>
+                <field name="module"/>
+                <field name="res_name" string="Record Name"/>
+                <filter name="filter_create" string="Creates" domain="[('operation','=','create')]"/>
+                <filter name="filter_write" string="Updates" domain="[('operation','=','write')]"/>
+                <filter name="filter_unlink" string="Deletes" domain="[('operation','=','unlink')]"/>
+                <separator/>
+                <filter name="group_by_module" string="Group by Module" context="{'group_by': 'module'}"/>
+                <filter name="group_by_model" string="Group by Model" context="{'group_by': 'model_description'}"/>
+                <filter name="group_by_operation" string="Group by Operation" context="{'group_by': 'operation'}"/>
+                <filter name="group_by_user" string="Group by User" context="{'group_by': 'user_id'}"/>
+                <filter name="group_by_date" string="Group by Date" context="{'group_by': 'create_date:day'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_audit_log" model="ir.actions.act_window">
+        <field name="name">Audit Logs</field>
+        <field name="res_model">audit.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

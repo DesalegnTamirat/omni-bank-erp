@@ -1,0 +1,176 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <!-- ── Action Window ──────────────────────────────────────────────────── -->
+    <record id="action_external_recruitment_eligible_employees" model="ir.actions.act_window">
+        <field name="name">Eligible Candidates (CV Review)</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">external.recruitment.eligible.employees</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No eligible candidates yet!</p>
+            <p>Candidates submitted via the portal will appear here for CV review and shortlisting.</p>
+        </field>
+    </record>
+
+    <!-- ── List View ─────────────────────────────────────────────────────── -->
+    <record id="external_recruitment_eligible_employees_tree_view" model="ir.ui.view">
+        <field name="name">external.recruitment.eligible.employees.tree</field>
+        <field name="model">external.recruitment.eligible.employees</field>
+        <field name="arch" type="xml">
+            <list string="Eligible Candidates (CV Review)">
+                <header>
+                    <button name="action_transfer_to_talent_roster" type="object"
+                            string="Transfer Selected to Talent Roster" class="btn-primary"
+                            help="Transfer selected candidates to Talent Roster pool"/>
+                </header>
+                <field name="applicant_name" string="Applicant Name"/>
+                <field name="applicant_email"/>
+                <field name="applicant_phone"/>
+                <field name="gender"/>
+                <field name="educational_qualification"/>
+                <field name="field_of_study"/>
+                <field name="highest_cgpa"/>
+                <field name="total_experience"/>
+                <field name="select_flag" string="Selected"/>
+                <field name="cv_attachment_id" string="CV" readonly="1"/>
+                <button name="action_download_cv" type="object"
+                        string="Download CV" class="btn-secondary" icon="fa-download"
+                        help="Download CV / Resume for this candidate"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form View for CV Review ──────────────────────────────────────── -->
+    <record id="external_recruitment_eligible_employees_form_view" model="ir.ui.view">
+        <field name="name">external.recruitment.eligible.employees.form</field>
+        <field name="model">external.recruitment.eligible.employees</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Profile &amp; CV Review">
+                <header>
+                    <button name="action_download_cv" type="object"
+                            string="Download CV / Resume" class="btn-primary" icon="fa-download"/>
+                    <button name="action_transfer_to_talent_roster" type="object"
+                            string="Add to Talent Roster" class="btn-secondary" icon="fa-star"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="applicant_name" placeholder="Applicant Name"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Contact Information">
+                            <field name="applicant_email" widget="email"/>
+                            <field name="applicant_phone" widget="phone"/>
+                            <field name="date_of_birth"/>
+                            <field name="age" string="Age (Years)"/>
+                            <field name="gender"/>
+                            <field name="ex_bunna" string="Ex-Bunna Employee"/>
+                            <field name="last_position_held" invisible="not ex_bunna"/>
+                            <field name="last_department" invisible="not ex_bunna"/>
+                            <field name="reporting_manager" invisible="not ex_bunna"/>
+                            <field name="length_of_service" invisible="not ex_bunna"/>
+                            <field name="termination_reason" invisible="not ex_bunna"/>
+                        </group>
+                        <group string="CV &amp; Selection">
+                            <field name="cv_attachment_id" string="CV Attachment" readonly="1"/>
+                            <field name="select_flag" string="Selected for Next Stage"/>
+                            <field name="application_status" string="Application Status"/>
+                            <field name="recommendation" string="HR Notes"/>
+                            <field name="external_recruitment_id" string="Recruitment Process"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Qualifications &amp; Education">
+                            <field name="education_ids">
+                                <list string="Education" editable="bottom">
+                                    <field name="level"/>
+                                    <field name="field_of_study"/>
+                                    <field name="institution_name"/>
+                                    <field name="graduation_date"/>
+                                    <field name="cgpa" string="CGPA / GPA"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Experience Summary">
+                            <group>
+                                <group string="Experience (Years)">
+                                    <field name="relevant_experience"/>
+                                    <field name="banking_experience"/>
+                                    <field name="non_banking_experience"/>
+                                    <field name="total_experience"/>
+                                    <field name="supervisory_experience"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Employment Status">
+                            <group>
+                                <field name="working_status"/>
+                                <field name="current_company"/>
+                                <field name="join_immediately"/>
+                                <field name="date_of_availability"/>
+                                <field name="preferred_location"/>
+                            </group>
+                        </page>
+                        <page string="Work History">
+                            <field name="work_history_ids">
+                                <list string="Work History" editable="bottom">
+                                    <field name="company_name"/>
+                                    <field name="job_title"/>
+                                    <field name="employment_type"/>
+                                    <field name="start_date"/>
+                                    <field name="end_date"/>
+                                    <field name="is_current"/>
+                                    <field name="responsibilities"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Certifications">
+                            <field name="certification_ids">
+                                <list string="Certifications" editable="bottom"
+                                      decoration-danger="is_expired">
+                                    <field name="name"/>
+                                    <field name="issuing_institution"/>
+                                    <field name="issue_date"/>
+                                    <field name="has_expiry"/>
+                                    <field name="expiry_date" optional="show"/>
+                                    <field name="is_expired" widget="boolean" string="Expired?" readonly="1"/>
+                                    <field name="attachment_filename" string="Certificate File" readonly="1"/>
+                                    <field name="certificate_url" string="Certificate URL" widget="url" optional="show"/>
+                                    <button name="action_download_cert" type="object"
+                                            string="Download" class="btn-secondary" icon="fa-download"
+                                            invisible="not attachment_filename"/>
+                                    <button name="action_open_certificate_url" type="object"
+                                            string="Open URL" class="btn-info" icon="fa-external-link"
+                                            invisible="not certificate_url"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Skills">
+                            <field name="skill_ids">
+                                <list string="Skills" editable="bottom">
+                                    <field name="skill_name"/>
+                                    <field name="proficiency"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Languages">
+                            <field name="language_ids">
+                                <list string="Languages" editable="bottom">
+                                    <field name="language"/>
+                                    <field name="proficiency"/>
+                                    <field name="is_primary" string="Primary"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>

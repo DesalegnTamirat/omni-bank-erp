@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <record id="action_employee_recruitment_internal" model="ir.actions.act_window">
+        <field name="name">Internal Recruitment Process</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">employee.recruitment.internal</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create!!</p>
+        </field>
+    </record>
+
+    <record id="employee_recruitment_internal_tree_view" model="ir.ui.view">
+        <field name="name">employee.recruitment.internal.tree</field>
+        <field name="model">employee.recruitment.internal</field>
+        <field name="arch" type="xml">
+            <list string="Internal Recruitment">
+                <field name="vacancy_reference"/>
+                <field name="recruitment_reference"/>
+                <field name="job_position"/>
+                <field name="job_location"/>
+                <field name="vacancy_announced_on"/>
+                <field name="no_of_vacancies"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="employee_recruitment_internal_form_view" model="ir.ui.view">
+        <field name="name">employee.recruitment.internal.form</field>
+        <field name="model">employee.recruitment.internal</field>
+        <field name="arch" type="xml">
+            <form string="Internal Recruitment">
+                <header>
+                    <field name="status" widget="statusbar"/>
+                    <!-- <button name="populate_criteria" string="Populate Criteria" type="object" class="oe_highlight"/> -->
+					<!-- <button name="populate_promotion" string="Populate Promotion Details" type="object" class="oe_highlight"/> -->
+                    <button name="notify" invisible="status in 'notify'" string="Notify Employee" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="vacancy_reference"/>
+                            <field name="recruitment_reference"/>
+                            <field name="vacancy_announced_on"/>
+                            <field name="no_of_vacancies"/>
+                            <field name="last_date_to_apply"/>
+                            <field name="job_position"/>
+                            <field name="job_location"/>
+                            <field name="job_grade"/>
+
+
+                        </group>
+                        <group>
+                            <field name="job_category"/>
+                             <field name="emp_type"/>
+                            <field name="relevant_experience"/>
+                            <field name="minimum_number_years_in_company"/>
+                            <field name="no_of_months_since_last_written_notice"/>
+                            <field name="no_of_months_since_last_promotion"/>
+                            <field name="minimum_pms_score"/>
+                            <field name="responsible"/>
+
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Eligible Employees">
+                            <field name="eligible_emp">
+                                <list string="Eligible Employees" editable="top">
+                                    <field name="emp_name"/>
+                                     <field name="select_flag"/>
+                                    <field name="app_date"/>
+                                    <field name="emp_grade"/>
+                                    <field name="emp_position"/>
+                                    <field name="emp_category"/>
+                                    <field name="emp_type"/>
+                                    <field name="emp_gender"/>
+                                    <field name="current_work_unit"/>
+                                    <field name="current_department"/>
+									<field name="educational_qualification"/>
+                                    <field name="service_in_company"/>
+                                    <field name="relevant_experience"/>
+									<field name="employment_experience"/>
+									<field name="total_experience"/>
+                                    <field name="current_location_exp"/>
+                                    <field name="current_position_exp"/>
+                                    <field name="supervisory_experience"/>
+                                    <field name="last_promotion"/>
+                                    <field name="pms_score"/>
+                                    <field name="recommendation"/>
+                                    <field name="written_warning"/>
+                                    <field name="demoted"/>
+                                    <!-- FR-REC-056: Leave Status from Time Off module -->
+                                    <field name="active_leave_status" string="Leave Status" readonly="1"
+                                           optional="show"
+                                           decoration-danger="active_leave_status not in ('Active', 'N/A')"
+                                           decoration-success="active_leave_status == 'Active'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+
+            </form>
+        </field>
+    </record>
+</odoo>

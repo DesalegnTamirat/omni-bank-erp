@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View -->
+    <record id="employee_recruitment_available_tree" model="ir.ui.view">
+        <field name="name">employee.recruitment.available.tree</field>
+        <field name="model">employee.recruitment.available</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="vacancy_reference"/>
+                <field name="job_position"/>
+                <field name="job_location"/>
+                <field name="employee_grade"/>
+                <field name="employee_category"/>
+                <field name="type_of_employment"/>
+                <field name="number_of_vacancies"/>
+                <field name="vacancy_announced_on"/>
+                <field name="last_date_to_apply"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="employee_recruitment_available_form" model="ir.ui.view">
+        <field name="name">employee.recruitment.available.form</field>
+        <field name="model">employee.recruitment.available</field>
+        <field name="arch" type="xml">
+            <form string="Available Internal Vacancy">
+                <sheet>
+                    <group>
+                        <group string="Vacancy Details">
+                            <field name="vacancy_id"/>
+                            <field name="vacancy_reference"/>
+                            <field name="job_position"/>
+                            <field name="job_location"/>
+                        </group>
+                        <group string="Requirements">
+                            <field name="employee_grade"/>
+                            <field name="employee_category"/>
+                            <field name="type_of_employment"/>
+                            <field name="number_of_vacancies"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Dates">
+                            <field name="vacancy_announced_on"/>
+                            <field name="last_date_to_apply"/>
+                        </group>
+                    </group>
+                    <group string="Job Description">
+                        <field name="job_description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_employee_recruitment_available" model="ir.actions.act_window">
+        <field name="name">Available Vacancies</field>
+        <field name="res_model">employee.recruitment.available</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="xml">
+            <p class="o_view_nocontent_smiling_face">
+                No available vacancies yet. They appear automatically when internal vacancies are published.
+            </p>
+        </field>
+    </record>
+</odoo>

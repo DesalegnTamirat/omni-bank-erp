@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+  <data>
+    <!-- explicit list view definition -->
+<!--
+    <record model="ir.ui.view" id="hr_employee_custom.list">
+      <field name="name">hr_employee_custom list</field>
+      <field name="model">hr_employee_custom.hr_employee_custom</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="value"/>
+          <field name="value2"/>
+        </list>
+      </field>
+    </record>
+-->
+
+    <!-- actions opening views on models -->
+<!--
+    <record model="ir.actions.act_window" id="hr_employee_custom.action_window">
+      <field name="name">hr_employee_custom window</field>
+      <field name="res_model">hr_employee_custom.hr_employee_custom</field>
+      <field name="view_mode">list,form</field>
+    </record>
+-->
+
+    <!-- server action to the one above -->
+<!--
+    <record model="ir.actions.server" id="hr_employee_custom.action_server">
+      <field name="name">hr_employee_custom server</field>
+      <field name="model_id" ref="model_hr_employee_custom_hr_employee_custom"/>
+      <field name="state">code</field>
+      <field name="code">
+        action = {
+          "type": "ir.actions.act_window",
+          "view_mode": "list,form",
+          "res_model": model._name,
+        }
+      </field>
+    </record>
+-->
+
+    <!-- Top menu item -->
+<!--
+    <menuitem name="hr_employee_custom" id="hr_employee_custom.menu_root"/>
+-->
+    <!-- menu categories -->
+<!--
+    <menuitem name="Menu 1" id="hr_employee_custom.menu_1" parent="hr_employee_custom.menu_root"/>
+    <menuitem name="Menu 2" id="hr_employee_custom.menu_2" parent="hr_employee_custom.menu_root"/>
+-->
+    <!-- actions -->
+<!--
+    <menuitem name="List" id="hr_employee_custom.menu_1_list" parent="hr_employee_custom.menu_1"
+              action="hr_employee_custom.action_window"/>
+    <menuitem name="Server to list" id="hr_employee_custom" parent="hr_employee_custom.menu_2"
+              action="hr_employee_custom.action_server"/>
+-->
+  </data>
+</odoo>

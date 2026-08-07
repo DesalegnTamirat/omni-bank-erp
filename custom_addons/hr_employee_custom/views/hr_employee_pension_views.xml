@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- Inherit employee form to add Pension Information tab -->
+        <record id="view_hr_employee_pension_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.pension.inherit</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+                <notebook position="inside">
+                    <page string="Pension Information" name="pension_information">
+                        <group>
+                            <group>
+                                <field name="pension_fund"/>
+                                <field name="pension_reference"/>
+                                <field name="pension_start_date"/>
+                            </group>
+                            <group>
+                                <field name="pension_employee_percentage"/>
+                                <field name="pension_employer_percentage"/>
+                            </group>
+                        </group>
+                        <group>
+                            <field name="pension_notes" nolabel="1"/>
+                        </group>
+                    </page>
+                </notebook>
+            </field>
+        </record>
+
+    </data>
+</odoo>

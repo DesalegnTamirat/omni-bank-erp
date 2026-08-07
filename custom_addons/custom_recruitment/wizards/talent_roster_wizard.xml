@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Link Candidate to Vacancy Wizard Form ────────────────────────── -->
+    <record id="view_talent_roster_link_wizard_form" model="ir.ui.view">
+        <field name="name">talent.roster.link.wizard.form</field>
+        <field name="model">talent.roster.link.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Link Candidate to New Vacancy">
+                <sheet>
+                    <group>
+                        <field name="roster_id" readonly="1"/>
+                        <field name="target_vacancy_id" options="{'no_create': True}"/>
+                        <field name="notes" placeholder="Optional notes for this candidate re-assignment..."/>
+                    </group>
+                    <div class="alert alert-info" role="status">
+                        <strong>Note:</strong> Re-linking this candidate will create a new recruitment application for the target vacancy with their saved profile and CV attachment. Candidate account/password creation is NOT required.
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="confirm_link_to_vacancy" string="Confirm &amp; Link to Vacancy" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Transfer Candidates to Talent Roster Wizard Form ─────────────── -->
+    <record id="view_talent_roster_transfer_wizard_form" model="ir.ui.view">
+        <field name="name">talent.roster.transfer.wizard.form</field>
+        <field name="model">talent.roster.transfer.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Transfer Candidates to Talent Roster">
+                <sheet>
+                    <group>
+                        <field name="candidate_score_ids" widget="many2many_tags" readonly="1"/>
+                    </group>
+                    <p class="text-muted">
+                        Eligible candidates (Reserve / Rejected, non-disqualified) will be added to the Talent Roster pool with a 6-month retention period.
+                    </p>
+                </sheet>
+                <footer>
+                    <button name="action_transfer_candidates" string="Transfer to Talent Roster" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Action for Transfer Candidate Score to Talent Roster ───────────── -->
+    <record id="action_transfer_to_talent_roster_wizard" model="ir.actions.act_window">
+        <field name="name">Transfer to Talent Roster</field>
+        <field name="res_model">talent.roster.transfer.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="model_recruitment_candidate_score"/>
+        <field name="binding_view_types">list,form</field>
+    </record>
+
+</odoo>

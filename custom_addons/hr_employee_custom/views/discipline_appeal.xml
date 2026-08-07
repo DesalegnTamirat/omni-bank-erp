@@ -1,0 +1,76 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <record id="action_discipline_appeal" model="ir.actions.act_window">
+        <field name="name">Discipline Appeal</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">discipline.appeal</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{}</field>
+        <field name="domain">[]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Bid Here!</p>
+        </field>
+    </record>
+
+    <record id="disciplinary_tree_view" model="ir.ui.view">
+        <field name="name">discipline.appeal.tree</field>
+        <field name="model">discipline.appeal</field>
+        <field name="arch" type="xml">
+            <list string="Discipline Appeal">
+                <field name="employee_name"/>
+                <field name="operating_unit"/>
+                <field name="position"/>
+                <field name="breach"/>
+                <field name="breach_reference"/>
+                <field name="description"/>
+                <field name="breach_date"/>
+                <field name="breach_count"/>
+                <field name="disciplinary_measure"/>
+                <field name="appeal_date"/>
+                <field name="explanation"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="discipline_appeal_form_view" model="ir.ui.view">
+        <field name="name">discipline.appeal.form</field>
+        <field name="model">discipline.appeal</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"/>
+                    <button name="appeal" string="Appeal" invisible="state in ('appeal', 'approve', 'reject')" type="object" class="oe_highlight"/>
+                    <button name="approve" string="Approve" invisible="state in ('approve', 'reject')" type="object" class="oe_highlight"/>
+                    <button name="reject" invisible="state in ('approve', 'reject')" string="Reject" type="object" class="oe_highlight"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="employee_name" readonly="True"/>
+							<field name="disc_action_ref" readonly="True"/>
+                            <field name="operating_unit" readonly="True"/>
+                            <field name="position" readonly="True"/>
+                        </group>
+                        <group>
+                            <field name="breach" readonly="True"/>
+                            <field name="breach_reference" readonly="True"/>
+                            <field name="description" readonly="True"/>
+                            <field name="breach_date" readonly="True"/>
+                            <field name="breach_count" readonly="True"/>
+                            <field name="disciplinary_measure" readonly="True"/>
+                            <field name="appeal_date"/>
+                            <field name="explanation"/>
+                        </group>
+                        <group>
+						   <field name="penalty_effective_date"/>
+                        </group>
+                    </group>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids" widget="mail_followers" groups="base.group_user"/>
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+</odoo>

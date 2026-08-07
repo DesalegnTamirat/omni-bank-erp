@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_offer_letter">
+        <t t-call="web.html_container">
+			<template id="report_header">
+							<div class="header">
+							<h4>Bunna Bank SC</h4>
+							<p>Bank of the Visionaries!</p>
+							<div class="colored-line"></div>
+							</div>
+			</template>
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.external_layout">
+                    <div class="page">
+						
+                        <!-- Header section -->
+                        <!-- <div class="header"> -->
+                            <!-- <h1>Job Offer Letter</h1> -->
+                        <!-- </div> -->
+                        
+                        <!-- Content section -->
+                        <div class="content">
+							<strong>
+							<h5 class="text-center"><strong>OFFER LETTER</strong></h5>
+                            <p>Dear <span t-field="o.partner_name"/>,</p></strong>
+                            <p>Greetings...!!!!!</p>
+                            <p>We are very pleased to inform you that our selection panel has selected you for the position of <strong><span t-field="o.job_id"/></strong>. Please, see the <strong>Job offer</strong> stated below. We believe you would agree with our offer and join our team.<br/> <strong>Please, tell us when will be an ideal date for you to begin your work and please make it as early as possible.</strong></p>
+                            
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Benefit Types</th>
+                                        <th>Benefit Package</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Salary</td>
+                                        <td><span t-field="o.base_salary"/>Birr [Salary Amount]</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Fuel Allowance</td>
+                                        <td>[Fuel Allowance Amount] Per litre</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Mobile Allowance</td>
+                                        <td>Birr [Mobile Allowance Amount]</td>
+                                    </tr>
+                                    <tr>
+                                        <td>GPA Insurance</td>
+                                        <td>24 Hours’ Insurance Coverage for staff only</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Annual Leave Entitlement</td>
+                                        <td>Begins with 16 working days per year to a maximum of 30 working days</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <p>Please also make sure to bring the below list of requirements on your arrival:</p>
+                            <ul>
+                                <li>Copy and Original documents of Academic credentials (degree, diploma…)</li>
+                                <li>Copy and Original documents of Release (Clearance) paper from the previous employer</li>
+                                <li>Copy and Original documents of Work experience from the previous employer</li>
+                                <li>Copy and Original documents of Marriage certificate (if any)</li>
+                                <li>Copy and Original documents of Birth Certificate (if any)</li>
+                                <li>Copy and Original documents of Cost sharing (if any)</li>
+                                <li>7 passport size photographs</li>
+                                <li>1 passport size photograph of children (if any)</li>
+                                <li>1 passport size photograph of Spouse (if any)</li>
+                                <li>Copy and Original of all documents written on your CV</li>
+                                <li>Forensic and Medical Certificate (ECX support letter will be provided at the starting date of your employment)</li>
+                                <li>Tin Number</li>
+                            </ul>
+
+                            <p>Regards,</p>
+                            <p>Talent Management Team</p>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+        <record id="employee_self_service_sequence_form" model="ir.sequence">
+            <field name="name">Employee Self Service Sequence</field>
+            <field name="code">employee.self.service</field>
+            <field name="prefix">BB/TMD-</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

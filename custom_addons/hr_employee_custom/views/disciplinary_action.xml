@@ -1,0 +1,175 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+
+    <!-- ── Search View ── -->
+    <record id="disciplinary_search_view" model="ir.ui.view">
+        <field name="name">hr disciplinary search view</field>
+        <field name="model">disciplinary.action</field>
+        <field name="arch" type="xml">
+            <search string="Search information">
+                <field name="employee_name"/>
+<!--                <field name="contract_name"/>-->
+                <field name="department_name"/>
+                <field name="joined_date"/>
+                <field name="discipline_reason"/>
+                <filter string="Draft" name="draft" domain="[('state','=','draft')]"/>
+                <filter string="Waiting Explanation" name="explain" domain="[('state','=','explain')]"/>
+                <filter string="Waiting Action" name="submitted" domain="[('state','=','submitted')]"/>
+                <filter string="Action Validated" name="action" domain="[('state','=','action')]"/>
+                <filter string="Cancel" name="cancel" domain="[('state','=','cancel')]"/>
+                <separator/>
+                <group>
+                    <filter string="State" name="state" context="{'group_by': 'state'}"/>
+                    <filter string="Department" name="department_name" context="{'group_by': 'department_name'}"/>
+                    <filter string="Joined Date" name="joined_date" context="{'group_by': 'joined_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── List View ── -->
+    <record id="employee_disciplinary_tree" model="ir.ui.view">
+        <field name="name">disciplinary.action.list</field>
+        <field name="model">disciplinary.action</field>
+        <field name="arch" type="xml">
+            <list string="Disciplinary Action">
+                <field name="name"/>
+                <field name="employee_name" groups="hr.group_hr_manager"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Form View ── -->
+    <record id="employee_disciplinary_form" model="ir.ui.view">
+        <field name="name">disciplinary.action.form</field>
+        <field name="model">disciplinary.action</field>
+        <field name="arch" type="xml">
+            <form string="Disciplinary Action">
+                <header>
+<!--                    <button name="assign_function" type="object" string="Proceed"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'draft'"/>-->
+<!--                    <button name="explanation_function" type="object" string="Submit"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'explain'"/>-->
+<!--                    <button name="action_function" type="object" string="Validate Action"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'submitted'"-->
+<!--                            groups="hr.group_hr_manager"/>-->
+<!--                    <button name="cancel_function" type="object" string="Cancel"-->
+<!--                            invisible="state not in ('draft', 'submitted')"-->
+<!--                            groups="hr.group_hr_manager"/>-->
+<!--                    <button name="set_to_function" type="object" string="Set to Draft"-->
+<!--                            invisible="state != 'cancel'"-->
+<!--                            groups="hr.group_hr_manager"/>-->
+                    <field name="state" widget="statusbar" statusbar_visible="draft,explain,action"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <h2>
+                        <group colspan="4">
+                            <field name="employee_name" string="Employee" required="1" readonly="not read_only or state == 'action'" domain="[('contract_id.state','=','open')]"/>
+                        </group>
+                    </h2>
+                    <group>
+                        <group>
+                            <field name="department_name" required="1" readonly="state == 'action'" groups="hr.group_hr_manager"/>
+                            <field name="joined_date" string="Joined Date" readonly="state == 'action'" groups="hr.group_hr_manager"/>
+                            <field name="contract_name" string="Contract Name" readonly="state == 'action'" domain="[('state','=','open')]" groups="hr.group_hr_manager"/>
+                            <field name="job_grade"/>
+                            <field name="read_only" invisible="1"/>
+                            <field name="warning" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page name="disciplinary_information" string="Disciplinary Information">
+                            <group colspan="4">
+                                <group>
+                                    <field name="discipline_reason" string="Reason" required="1" readonly="not read_only" domain="[('category_type','=','disciplinary')]"/>
+                                </group>
+                                <group>
+                                    <field name="case_classification" string="Case Classification"/>
+                                </group>
+                                <group>
+                                    <field name="action_date" string="Action Date"/>
+                                </group>
+                                <group>
+                                    <field name="action_start_date" string="Action Start Date"/>
+                                </group>
+                                <group>
+                                    <field name="action_end_date" string="Action End Date"/>
+                                </group>
+                                <group>
+                                    <field name="explanation" invisible="state == 'draft'" readonly="state == 'action'"/>
+                                </group>
+                                <group>
+                                    <field name="attachment_ids" widget="many2many_binary" class="oe_inline" invisible="state == 'draft'" readonly="state == 'action'"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="note" readonly="state == 'action'"/>
+                            </group>
+                        </page>
+
+                        <page name="action_information" string="Action Information" invisible="state not in ('submitted', 'action')">
+                            <group>
+                                <field name="action" string="Action" invisible="state not in ('submitted', 'action')" readonly="state == 'action'" domain="[('category_type','=','action')]" groups="hr.group_hr_manager"/>
+                            </group>
+                            <group>
+                                <field name="warning_letter" invisible="warning != 1" readonly="state == 'action' or not read_only"/>
+                                <field name="suspension_letter" invisible="warning != 2" readonly="state == 'action' or not read_only"/>
+                                <field name="termination_letter" invisible="warning != 3" readonly="state == 'action' or not read_only"/>
+                                <field name="action_details" invisible="warning not in (4, 5)" readonly="state == 'action' or not read_only"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ── Actions ── -->
+    <record id="action_disciplinary_action" model="ir.actions.act_window">
+        <field name="name">Disciplinary Action</field>
+        <field name="res_model">disciplinary.action</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','in',['draft','explain','submitted','action','cancel'])]</field>
+    </record>
+
+    <record id="disciplinary_action_details" model="ir.actions.act_window">
+        <field name="name">Disciplinary Actions</field>
+        <field name="res_model">disciplinary.action</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','=','action'),('employee_name.id','=',active_id)]</field>
+    </record>
+
+    <record id="disciplinary_action_details_view" model="ir.actions.act_window">
+        <field name="name">Disciplinary Action Details</field>
+        <field name="res_model">disciplinary.action</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state','!=','draft')]</field>
+    </record>
+
+    <!-- ── Employee Form Inherit: Disciplinary Button ── -->
+    <record id="employee_form_inherit_disciplinary" model="ir.ui.view">
+        <field name="name">inherit.employee.form.view</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="%(disciplinary_action_details)d" class="oe_stat_button" icon="fa-info-circle" type="action">
+                    <field string="Disciplinary Action" name="discipline_count" widget="statinfo"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

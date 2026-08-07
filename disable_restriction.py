@@ -1,0 +1,8 @@
+params = env['ir.config_parameter'].sudo()
+params.set_param('hr_attendance.enable_checkin_restriction', 'False')
+params.set_param('hr_attendance.enable_checkout_restriction', 'False')
+env.cr.commit()
+print("Done - Check-in/Check-out time restrictions DISABLED for testing.")
+print("Current settings:")
+print("  enable_checkin_restriction:", params.get_param('hr_attendance.enable_checkin_restriction'))
+print("  enable_checkout_restriction:", params.get_param('hr_attendance.enable_checkout_restriction'))
