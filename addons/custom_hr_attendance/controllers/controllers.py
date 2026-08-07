@@ -179,9 +179,10 @@ class BunnaMyAttendance(http.Controller):
 
     @http.route('/custom_hr_attendance/get_settings', type='jsonrpc', auth='user', readonly=True)
     def get_settings(self):
-        """Return current attendance config parameters and whether the user is an admin."""
+        """Return current attendance config parameters and whether the user is an attendance admin."""
         params = request.env['ir.config_parameter'].sudo()
-        is_admin = request.env.user.has_group('base.group_system')
+        is_admin = request.env.user.has_group('hr_attendance.group_hr_attendance_manager') or request.env.user.has_group('base.group_system')
+
 
         def _bool(key, default=True):
             val = params.get_param(key)
@@ -224,9 +225,10 @@ class BunnaMyAttendance(http.Controller):
 
     @http.route('/custom_hr_attendance/save_settings', type='jsonrpc', auth='user')
     def save_settings(self, settings=None):
-        """Persist attendance config parameters. Admin only."""
-        if not request.env.user.has_group('base.group_system'):
+        """Persist attendance config parameters. Attendance Manager or Admin."""
+        if not (request.env.user.has_group('hr_attendance.group_hr_attendance_manager') or request.env.user.has_group('base.group_system')):
             return {'error': 'Permission denied'}
+
         if not settings:
             return {'error': 'No settings provided'}
         params = request.env['ir.config_parameter'].sudo()

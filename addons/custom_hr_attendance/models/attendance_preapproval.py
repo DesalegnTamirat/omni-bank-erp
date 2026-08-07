@@ -46,6 +46,27 @@ class AttendancePreApproval(models.Model):
         return True
     approved_by = fields.Many2one('res.users', string="Approved By", readonly=True)
     time_range = fields.Char(compute='_compute_time_range', store=True)
+    is_manager_or_admin = fields.Boolean(
+        compute='_compute_is_manager_or_admin',
+        string="Is Manager or Admin"
+    )
+
+    @api.depends('employee_id')
+    def _compute_is_manager_or_admin(self):
+        is_admin = self.env.user.has_group('hr_attendance.group_hr_attendance_manager')
+        current_uid = self.env.uid
+        for rec in self:
+            if is_admin:
+                rec.is_manager_or_admin = True
+            else:
+                emp = rec.employee_id
+                is_manager = False
+                if emp:
+                    if emp.parent_id and emp.parent_id.user_id and emp.parent_id.user_id.id == current_uid:
+                        is_manager = True
+                    elif emp.coach_id and emp.coach_id.user_id and emp.coach_id.user_id.id == current_uid:
+                        is_manager = True
+                rec.is_manager_or_admin = is_manager
 
     @api.depends('create_uid')
     def _compute_employee_id(self):
@@ -122,19 +143,43 @@ class AttendancePreApproval(models.Model):
         self.write({'state': 'requested'})
 
     def action_approve(self):
-        # self.write({'state': 'approved'})
+        is_admin = self.env.user.has_group('hr_attendance.group_hr_attendance_manager')
+        current_uid = self.env.uid
         for rec in self:
-
-            if rec.create_uid.id == self.env.uid:
+            if rec.create_uid.id == current_uid and not is_admin:
                 raise ValidationError("You are not allowed to approve your own request.")
+            emp = rec.employee_id
+            is_manager = False
+            if emp:
+                if emp.parent_id and emp.parent_id.user_id and emp.parent_id.user_id.id == current_uid:
+                    is_manager = True
+                elif emp.coach_id and emp.coach_id.user_id and emp.coach_id.user_id.id == current_uid:
+                    is_manager = True
+
+            if not (is_admin or is_manager):
+                raise ValidationError("Only the employee's manager or an administrator can approve this request.")
 
             rec.write({
                 'state': 'approved',
-                'approved_by': self.env.uid
+                'approved_by': current_uid
             })
 
     def action_reject(self):
-        self.write({'state': 'rejected'})
+        is_admin = self.env.user.has_group('hr_attendance.group_hr_attendance_manager')
+        current_uid = self.env.uid
+        for rec in self:
+            emp = rec.employee_id
+            is_manager = False
+            if emp:
+                if emp.parent_id and emp.parent_id.user_id and emp.parent_id.user_id.id == current_uid:
+                    is_manager = True
+                elif emp.coach_id and emp.coach_id.user_id and emp.coach_id.user_id.id == current_uid:
+                    is_manager = True
+
+            if not (is_admin or is_manager):
+                raise ValidationError("Only the employee's manager or an administrator can reject this request.")
+
+            rec.write({'state': 'rejected'})
 
     def write(self, vals):
         for rec in self:

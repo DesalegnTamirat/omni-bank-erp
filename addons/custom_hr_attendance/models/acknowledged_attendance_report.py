@@ -59,7 +59,6 @@ class AcknowledgedAttendanceReport(models.Model):
     )
 
     def init(self):
-        self.env.cr.execute(f"DROP TABLE IF EXISTS {self._table} CASCADE;")
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW acknowledged_attendance_report AS (

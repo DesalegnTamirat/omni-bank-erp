@@ -2,16 +2,20 @@
 <odoo>
     <data>
 
-        <!-- Add fields to the settings form -->
+        <!-- Add fields to the settings form and restrict global settings -->
         <record id="res_config_settings_view_form" model="ir.ui.view">
             <field name="name">res.config.settings.view.form.inherit.custom.hr.attendance</field>
             <field name="model">res.config.settings</field>
             <field name="inherit_id" ref="base.res_config_settings_view_form"/>
             <field name="arch" type="xml">
+                <xpath expr="//app[@name='general_settings']" position="attributes">
+                    <attribute name="groups">base.group_system</attribute>
+                </xpath>
                 <xpath expr="//form" position="inside">
                     <app data-string="Attendance Settings" string="Attendance Settings"
                          name="custom_hr_attendance"
                          groups="hr_attendance.group_hr_attendance_manager">
+
 
                         <!-- ========================================= -->
                         <!-- BLOCK 1: Feature Toggles                  -->
@@ -125,8 +129,9 @@
             <field name="name">Attendance Settings</field>
             <field name="res_model">res.config.settings</field>
             <field name="view_mode">form</field>
-            <field name="context">{'module': 'hr_attendance', 'bin_size': False}</field>
+            <field name="context">{'module': 'custom_hr_attendance', 'bin_size': False}</field>
         </record>
+
 
     </data>
 </odoo>

@@ -39,7 +39,7 @@ class LocationBasedException(models.Model):
             rec.write({'active': False})
         return True
 
-    @api.depends('operating_unit.name')
+    @api.depends('operating_unit')
     def _compute_schedule_name(self):
         for rec in self:
             rec.schedule_name = f"{rec.operating_unit.name} / Location Based" \

@@ -8,18 +8,23 @@
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
     </record>
 
-    <!-- Job Position Officer (Can check-in/out + manage Job Position Exceptions & Job Shifts) -->
-    <record id="group_hr_attendance_job_position_user" model="res.groups">
-        <field name="name">Job Position Officer</field>
-        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-        <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
+    <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances -->
+    <record id="hr_attendance.group_hr_attendance_user" model="res.groups">
+        <field name="name">Manager: Manage all attendances</field>
     </record>
 
-    <!-- IT and Driver Officer (Can check-in/out + manage Over Time) -->
-    <record id="group_hr_attendance_it_driver_user" model="res.groups">
-        <field name="name">IT and Driver Officer</field>
+    <!-- Job Position Manager (Manager + Job Position Exceptions & Job Shifts) -->
+    <record id="group_hr_attendance_job_position_user" model="res.groups">
+        <field name="name">Job Position Manager</field>
         <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
-        <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
+        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+    </record>
+
+    <!-- IT and Driver Manager (Manager + Over Time) -->
+    <record id="group_hr_attendance_it_driver_user" model="res.groups">
+        <field name="name">IT and Driver Manager</field>
+        <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
+        <field name="implied_ids" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
     </record>
 
 </odoo>

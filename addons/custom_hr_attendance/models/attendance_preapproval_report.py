@@ -22,7 +22,6 @@ class AttendancepreApprovalReport(models.Model):
     approved_by = fields.Char(string="Approved By", readonly=True)
 
     def init(self):
-        self.env.cr.execute(f"DROP TABLE IF EXISTS {self._table} CASCADE;")
         tools.drop_view_if_exists(self.env.cr, self._table)
         self.env.cr.execute("""
             CREATE OR REPLACE VIEW attendance_preapproval_report AS (

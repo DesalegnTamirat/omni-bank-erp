@@ -19,15 +19,16 @@
         <field name="model">attendance.preapproval</field>
         <field name="arch" type="xml">
             <form string="Predefined Attendance" create="false">
+                <field name="is_manager_or_admin" invisible="1"/>
                 <header>
                     <button name="action_submit" string="Submit" type="object"
                             invisible="state != 'draft'" class="btn-primary"/>
                     <button name="action_approve" string="Approve" type="object"
-			    invisible="state != 'requested'"
-			    class="oe_highlight"/>
+                            invisible="state != 'requested' or not is_manager_or_admin"
+                            class="oe_highlight"/>
                     <button name="action_reject" string="Reject" type="object"
-			    invisible="state != 'requested'" 
-			    class="oe_highlight"/>
+                            invisible="state != 'requested' or not is_manager_or_admin" 
+                            class="oe_highlight"/>
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>

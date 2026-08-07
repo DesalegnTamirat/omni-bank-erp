@@ -58,7 +58,7 @@ class ResConfigSettings(models.TransientModel):
         'res.users',
         string='HR Escalation Target User',
         config_parameter="hr_attendance.escalation_hr_user_id",
-        help="FR-ATT-029: User account to receive HR escalation activities when attendance violation thresholds are breached."
+        help="User account to receive HR escalation activities when attendance violation thresholds are breached."
     )
 
     #  Pluggable Authentication Method Framework
@@ -68,7 +68,7 @@ class ResConfigSettings(models.TransientModel):
         ('qr', 'Branch Kiosk QR Code'),
     ], string='Check-in Authentication Method', default='session',
         config_parameter="hr_attendance.checkin_auth_method",
-        help="FR-ATT-034: Configurable authentication method required before check-in is recorded.")
+        help="Configurable authentication method required before check-in is recorded.")
 
 
     # ----------------------------------------------------------
