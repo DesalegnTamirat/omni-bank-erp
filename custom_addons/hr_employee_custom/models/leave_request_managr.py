@@ -76,11 +76,11 @@ class LeaveRequest(models.Model):
         if com:
             # Validate job grade
            # self.env.cr.execute("""
-           #     SELECT COUNT(*) 
-            #    FROM hr_employee 
-             #   WHERE user_id = %s 
-              #  AND job_grade = '53'
-          #  """, (com.employee_name.id,))
+           # SELECT COUNT(*)
+            # FROM hr_employee
+             # WHERE user_id = %s
+              # AND job_grade = '53'
+          # """, (com.employee_name.id,))
             self.env.cr.execute("""
                  SELECT COUNT(*)
                  FROM hr_employee
@@ -203,7 +203,7 @@ class LeaveRequest(models.Model):
 
 
 
-   # def confirm_leave(self):
+   # def confirm_leave(self)
    # from odoo.exceptions import ValidationError
 
     def confirm_leave(self):
@@ -255,72 +255,72 @@ class LeaveRequest(models.Model):
                     self.start_date, self.end_date
                 )
 
-#        p_id = self.id
-#        self.env.cr.execute("""
-#    SELECT CASE
-#        WHEN %s = 'annual_leave' AND no_of_days <= (get_eligible_leave(he.id) + he.scheduled)
-#            THEN 1
-#        WHEN %s = 'schedule_leave' AND no_of_days <= get_eligible_leave(he.id)
-#            THEN 1
-#        ELSE 0
-#    END AS result
-#    FROM leave_request_manager lrm
-#    JOIN hr_employee he ON he.name = lrm.requester_name
-#    WHERE lrm.id = %s
-#""", (self.leave_reason, self.leave_reason, p_id))
+# p_id = self.id
+# self.env.cr.execute("""
+# SELECT CASE
+# WHEN %s = 'annual_leave' AND no_of_days <= (get_eligible_leave(he.id) + he.scheduled)
+# THEN 1
+# WHEN %s = 'schedule_leave' AND no_of_days <= get_eligible_leave(he.id)
+# THEN 1
+# ELSE 0
+# END AS result
+# FROM leave_request_manager lrm
+# JOIN hr_employee he ON he.name = lrm.requester_name
+# WHERE lrm.id = %s
+# """, (self.leave_reason, self.leave_reason, p_id))
 
         
     # Check for annual or schedule leave eligibility
-        #if self.leave_reason in ["annual_leave", "schedule_leave"]:
-         #   self.env.cr.execute("""
-          #      SELECT CASE
-           #         WHEN lrm.leave_reason  = 'annual_leave' AND no_of_days <= (get_eligible_leave(he.id) + he.scheduled)
-            #            THEN 1
-             #       WHEN lrm.leave_reason  = 'schedule_leave' AND no_of_days <= get_eligible_leave(he.id)
-              #          THEN 1
-               #     ELSE 0
-                #    END AS result
+        # if self.leave_reason in ["annual_leave", "schedule_leave"]
+         # self.env.cr.execute("""
+          # SELECT CASE
+           # WHEN lrm.leave_reason  = 'annual_leave' AND no_of_days <= (get_eligible_leave(he.id) + he.scheduled)
+            # THEN 1
+             # WHEN lrm.leave_reason  = 'schedule_leave' AND no_of_days <= get_eligible_leave(he.id)
+              # THEN 1
+               # ELSE 0
+                # END AS result
                # FROM leave_request_manager lrm
-                #    JOIN hr_employee he ON he.name = lrm.requester_name
-                #    WHERE lrm.id  = %s
-                #) AS eligibility_check
-                #LIMIT 1
+                # JOIN hr_employee he ON he.name = lrm.requester_name
+                # WHERE lrm.id  = %s
+                # ) AS eligibility_check
+                # LIMIT 1
            # """, (p_id, p_id))
 
-#        result = self.env.cr.fetchone()
-#        if not result or result[0] == 0:
-#            raise ValidationError("The leave request exceeds the eligible leave balance.")
-#
-#            if self.leave_reason == "leave_without_pay":
-#                if self.apr_state == "approve":
-#                    print("User  ID is ************************ ", p_id)
-#                    self.env.cr.execute('SELECT populate_confirmed_leaves(%s)', (p_id,))
-#                    print("Confirming the Leave ************************ ", p_id)
-#                    self.state = "confirm_leave"
-#                    if self.delegated_name:
-#                        usr = self.env["res.partner"].search([("name", "=", self.delegated_name.name)])
-#                        self.mail_channel_msgs_del(usr.id, self.delegated_name.name,
-#                                                   self.requester_name,
-#                                                   self.start_date, self.end_date)
-#                else:
-#                    raise ValidationError('Please complete Approval before confirming leave')
-#            else:
-#                print("User  ID is ************************ ", p_id)
-#                self.env.cr.execute('SELECT populate_confirmed_leaves(%s)', (p_id,))
-#                print("Confirming the Leave ************************ ", p_id)
-#                self.state = "confirm_leave"
-#                if self.delegated_name:
-#                    usr = self.env["res.partner"].search([("name", "=", self.delegated_name.name)])
-#                    self.mail_channel_msgs_del(usr.id, self.delegated_name.name,
-#                                               self.requester_name,
-#                                               self.start_date, self.end_date)	
+# result = self.env.cr.fetchone
+# if not result or result[0] == 0
+# raise ValidationError("The leave request exceeds the eligible leave balance.")
+
+# if self.leave_reason == "leave_without_pay"
+# if self.apr_state == "approve"
+# print("User  ID is ************************ ", p_id)
+# self.env.cr.execute('SELECT populate_confirmed_leaves(%s)', (p_id,))
+# print("Confirming the Leave ************************ ", p_id)
+# self.state = "confirm_leave"
+# if self.delegated_name
+# usr = self.env["res.partner"].search([("name", "=", self.delegated_name.name)])
+# self.mail_channel_msgs_del(usr.id, self.delegated_name.name
+# self.requester_name
+# self.start_date, self.end_date)
+# else
+# raise ValidationError('Please complete Approval before confirming leave')
+# else
+# print("User  ID is ************************ ", p_id)
+# self.env.cr.execute('SELECT populate_confirmed_leaves(%s)', (p_id,))
+# print("Confirming the Leave ************************ ", p_id)
+# self.state = "confirm_leave"
+# if self.delegated_name
+# usr = self.env["res.partner"].search([("name", "=", self.delegated_name.name)])
+# self.mail_channel_msgs_del(usr.id, self.delegated_name.name
+# self.requester_name
+# self.start_date, self.end_date)
 		
 		# usr = self.env["res.partner"].search([("name", "=", self.requester_name)])
         # msg = "Your leave request is accepted."
-        # self.mail_channel_msgs1(usr.id, self.reference,
-                                # self.requester_name,
+        # self.mail_channel_msgs1(usr.id, self.reference
+                                # self.requester_name
                                 # self.operating_unit, self.state, msg)
-        # for val in self.LeaveTypes_details:
+        # for val in self.LeaveTypes_details
             # # number_of_days = 0
             # print(val.leave_type.id)
             # print(val.start_date)
@@ -337,23 +337,23 @@ class LeaveRequest(models.Model):
             # print("details", self.requester_name, get_employee.name)
             # print("number_of_days", number_of_days)
             # val2 = {
-                # 'date_from': val.start_date,
-                # 'date_to': val.end_date,
-                # 'holiday_status_id': val.leave_type.id,
-                # 'job_position': self.job_position,
-                # 'job_category': self.job_category,
-                # # 'job_grade': self.job_grade.grade_code,
-                # 'request_date_from': val.start_date,
-                # # 'duration_display': no_days,
-                # 'request_date_to': val.end_date,
-                # 'name': self.reference,
-                # 'employee_id': get_id.id,
-                # # 'employee_id': get_employee.id,
+                # 'date_from': val.start_date
+                # 'date_to': val.end_date
+                # 'holiday_status_id': val.leave_type.id
+                # 'job_position': self.job_position
+                # 'job_category': self.job_category
+                # # 'job_grade': self.job_grade.grade_code
+                # 'request_date_from': val.start_date
+                # # 'duration_display': no_days
+                # 'request_date_to': val.end_date
+                # 'name': self.reference
+                # 'employee_id': get_id.id
+                # # 'employee_id': get_employee.id
                 # 'leave_request_description': val.approver_comments
             # }
             # print("val2==============", val2)
             # history = self.env["hr.leave"].create(val2)
-            # history.action_approve()
+            # history.action_approve
             # print("histryzzzzzzzzzzzzzzzzz", history)
 
 
@@ -379,55 +379,55 @@ class HrLeaveDetails(models.Model):
 
 
 # Add this class at the END of your file
-#class ResUsers(models.Model):
- #   _inherit = 'res.users'
-  #  
+# class ResUsers(models.Model)
+ # _inherit = 'res.users'
+
    # @api.model
-    #def name_search(self, name='', args=None, operator='ilike', limit=100):
-     #   """Filter users by employee's job_grade = '53' in our model"""
-      #  if args is None:
-       #     args = []
+    # def name_search(self, name='', args=None, operator='ilike', limit=100)
+     # """Filter users by employee's job_grade = '53' in our model"""
+      # if args is None
+       # args = []
         
         # TEMPORARY: Use hardcoded IDs from your screenshot to test
-        #user_ids = [
-         #   17315
+        # user_ids = [
+         # 17315
        # ]
         
         # Always filter by these IDs when in our model's context
-        #args.append(('id', 'in', user_ids))
+        # args.append(('id', 'in', user_ids))
         
-        #return super().name_search(name=name, args=args, operator=operator, limit=limit)
+        # return super.name_search(name=name, args=args, operator=operator, limit=limit)
 
-#class ResUsers(models.Model):
-#    _inherit = 'res.users'
+# class ResUsers(models.Model)
+# _inherit = 'res.users'
     
-#    @api.model
-#    def name_search(self, name='', args=None, operator='ilike', limit=100):
-#        """Your working version - just make it dynamic"""
-#        if args is None:
-#            args = []
+# @api.model
+# def name_search(self, name='', args=None, operator='ilike', limit=100)
+# """Your working version - just make it dynamic"""
+# if args is None
+# args = []
         
         # Your working query
-#        self.env.cr.execute("""
-#            select DISTINCT user_id
-#            FROM hr_employee
-#            WHERE job_grade ='54'
-#            AND user_id IS NOT null
-#            and department_id = '655'
-#            union          
-#            select DISTINCT user_id
-#            from hr_employee he 
-#            where job_grade = '53'
-#            and user_id is not null
-#            and department_id <> '655'
+# self.env.cr.execute("""
+# select DISTINCT user_id
+# FROM hr_employee
+# WHERE job_grade ='54'
+# AND user_id IS NOT null
+# and department_id = '655'
+# union
+# select DISTINCT user_id
+# from hr_employee he
+# where job_grade = '53'
+# and user_id is not null
+# and department_id <> '655'
 
-#        """)
-#        result = self.env.cr.fetchall()
-#        user_ids = [row[0] for row in result if row[0]]
+# """)
+# result = self.env.cr.fetchall
+# user_ids = [row[0] for row in result if row[0]]
         
         # Use the dynamic user_ids instead of hardcoded
-#        args.append(('id', 'in', user_ids))
+# args.append(('id', 'in', user_ids))
         
-#        return super().name_search(name=name, args=args, operator=operator, limit=limit)
+# return super.name_search(name=name, args=args, operator=operator, limit=limit)
 
 

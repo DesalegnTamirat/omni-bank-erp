@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+﻿# *- coding: utf-8 -*
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -57,7 +57,7 @@ class TalentRosterLinkWizard(models.TransientModel):
             'status': 'reused',
         })
         roster.message_post(body=_(
-            "Candidate re-linked to new vacancy <b>%s</b> (Ref: %s). New Applicant record #%d created."
+            "Candidate re-linked to new vacancy <b>%s</b> (Ref: %s). New Applicant record # %d created."
         ) % (vacancy.job_position.name if vacancy.job_position else vacancy.reference, vacancy.reference, applicant.id))
 
         return {

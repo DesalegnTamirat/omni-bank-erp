@@ -219,7 +219,7 @@ class DisciplinaryPenalty(models.Model):
     status = fields.Selection(
         [("draft", "Draft"), ("transferred", "Transferred")],
         string="Status", default="draft")
-#
+
 
 class BonusPenalty(models.Model):
     _name = "bonus.penalty"

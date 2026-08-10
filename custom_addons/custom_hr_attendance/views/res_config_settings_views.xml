@@ -18,7 +18,7 @@
 
 
                         <!-- ========================================= -->
-                        <!-- BLOCK 1: Feature Toggles                  -->
+                        <!-- BLOCK 1: Feature Toggles -->
                         <!-- ========================================= -->
                         <block title="Attendance Features" name="custom_attendance_feature_toggles">
                             <setting string="Check-in Time Restriction"
@@ -52,7 +52,7 @@
                         </block>
 
                         <!-- ========================================= -->
-                        <!-- BLOCK 2: Check-in / Check-out Timing      -->
+                        <!-- BLOCK 2: Check-in / Check-out Timing -->
                         <!-- ========================================= -->
                         <block title="Attendance Time Settings" name="custom_attendance_time_settings">
                             <setting string="Morning Check-in Time"
@@ -87,7 +87,7 @@
                         </block>
 
                         <!-- ========================================= -->
-                        <!-- BLOCK 3: Lunch Break Settings             -->
+                        <!-- BLOCK 3: Lunch Break Settings -->
                         <!-- ========================================= -->
                         <block title="Lunch Break Settings" name="custom_lunch_break_settings"
                                invisible="not enable_lunch_break">
@@ -106,7 +106,7 @@
                         </block>
 
                         <!-- ========================================= -->
-                        <!-- BLOCK 4: Discipline Integration           -->
+                        <!-- BLOCK 4: Discipline Integration -->
                         <!-- ========================================= -->
                         <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
                             <setting string="Lateness Violation Threshold (Occurrences)"

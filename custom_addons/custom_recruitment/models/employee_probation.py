@@ -40,11 +40,11 @@ class HrEmployeeProbation(models.Model):
     )
     recruitment_reference = fields.Char(string="Recruitment Reference")
 
-    #  ---------------------------------
+
     employee_category = fields.Selection(
         [("Managerial", "Managerial"), ("Non Managerial", "Non Managerial")],
         string="Employee Category", required=True, default="Non Managerial", tracking=True,
-        help="Drives the statutory probation duration: 60 days for Non-Managerial, "
+        help="Drives the statutory probation duration: 60 days for Non-Managerial"
              "75 days for Managerial.",
     )
     probation_start_date = fields.Date(string="Probation Start Date", required=True, default=fields.Date.context_today)
@@ -55,11 +55,11 @@ class HrEmployeeProbation(models.Model):
         string="Probation End Date", compute="_compute_probation_end_date", store=True, readonly=True,
     )
 
-    #  ---------------------------------
+
     notification_sent = fields.Boolean(string="Supervisor Notified", default=False, readonly=True, copy=False)
     notification_date = fields.Datetime(string="Notification Sent On", readonly=True, copy=False)
 
-    #  ---------------------------------
+
     outcome = fields.Selection(
         [
             ("pending", "Pending"),
@@ -144,7 +144,7 @@ class HrEmployeeProbation(models.Model):
         channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
 
     def action_notify_supervisor(self):
-        """: proactive notification to the Supervisor.
+        """proactive notification to the Supervisor.
         Can be triggered manually or by the scheduled action below."""
         for rec in self:
             if rec.notification_sent:
@@ -193,7 +193,7 @@ class HrEmployeeProbation(models.Model):
         records.action_notify_supervisor()
 
     def action_record_outcome(self):
-        """: record the probation outcome."""
+        """record the probation outcome."""
         for rec in self:
             if rec.outcome == "pending":
                 raise UserError(_("Please select an Outcome (Satisfactory, Unsatisfactory, or Discipline Issue) "

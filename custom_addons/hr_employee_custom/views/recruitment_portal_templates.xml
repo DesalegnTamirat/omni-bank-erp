@@ -33,7 +33,7 @@
     <template id="new_job_positions_submit_applications" name="Job positions Submit New Application" inherit_id="website_hr_recruitment.new">
         <xpath expr="//form" position="attributes">
             <attribute name="action">/jobs/application_submit/</attribute>
-            <!--             <attribute name="data-success_page">""</attribute> -->
+            <!-- <attribute name="data-success_page">""</attribute> -->
         </xpath>
 		
         <xpath expr="//*[@id='hr_recruitment_form']/div/div[8]" position="before">
@@ -63,17 +63,17 @@
                     </div>
                     <!-- <script> -->
                                     <!-- function removeSpacesss(inputElement) { -->
-                                    <!-- // Get the input value and remove spaces -->
+                                    <!-- Get the input value and remove spaces -->
                                     <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
 
-                                    <!-- // Check if the cleaned value contains only alphabets -->
+                                    <!-- Check if the cleaned value contains only alphabets -->
                                     <!-- if (/^[a-zA-Z]*$/.test(cleanedValue)) { -->
-                                    <!-- // Input is valid - set the cleaned value as the input value -->
+                                    <!-- Input is valid - set the cleaned value as the input value -->
                                     <!-- inputElement.value = cleanedValue; -->
                                     <!-- } else { -->
-                                    <!-- // Display an error message or take some other action to handle invalid input -->
+                                    <!-- Display an error message or take some other action to handle invalid input -->
                                     <!-- alert("Please enter only alphabets."); -->
-                                    <!-- // Clear the input or take other actions as needed -->
+                                    <!-- Clear the input or take other actions as needed -->
                                     <!-- inputElement.value = ''; -->
                                     <!-- } -->
                                     <!-- } -->
@@ -409,7 +409,7 @@ function removeSpaces(inputElement) {
         </xpath>
     </template>
     <template id="job_positions_submit_applications" name="Job positions Submit Application" inherit_id="website_hr_recruitment.apply">
-	    <!-- <xpath expr="//input[@name='Short Introduction']" position="after">  -->
+	    <!-- <xpath expr="//input[@name='Short Introduction']" position="after"> -->
            <!-- <div class="container"> -->
                         <!-- <div class="form-group row s_website_form_field s_website_form_required"> -->
                             <!-- <label class="col-form-label col-md-3" for="file_input1">Resume</label> -->
@@ -421,7 +421,7 @@ function removeSpaces(inputElement) {
                     <!-- </div> -->
         <!-- </xpath> -->
                     <!-- <script> -->
-                        <!-- document.getElementById("file_input1").addEventListener("change", function() { -->
+                        <!-- document.getElementById("file_input1").addEventListener("change", function { -->
                         <!-- const fileInput1 = this; -->
                         <!-- if (fileInput1.files.length > 0) { -->
                         <!-- const selectedFile = fileInput1.files[0]; -->
@@ -432,10 +432,10 @@ function removeSpaces(inputElement) {
                         <!-- } -->
                         <!-- } -->
                         <!-- }); -->
-                    <!-- </script>  -->
+                    <!-- </script> -->
         <xpath expr="//form" position="attributes">
             <attribute name="action">/jobs/application_submit/</attribute>
-            <!--            <attribute name="data-success_page">""</attribute>-->
+            <!-- <attribute name="data-success_page">""</attribute> -->
         </xpath>
         <!-- <xpath expr="//input[@name='Resume']" position="replace"> -->
             <!-- <input type="file" name="attachment" multiple="true" accept="image/*,application/pdf,video/*"/> -->
@@ -488,17 +488,17 @@ function removeSpaces(inputElement) {
                     </script>
 					<!-- <script> -->
                                     <!-- function removeSpacess(inputElement) { -->
-                                    <!-- // Get the input value and remove spaces -->
+                                    <!-- Get the input value and remove spaces -->
                                     <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
 
-                                    <!-- // Check if the cleaned value contains only alphabets -->
+                                    <!-- Check if the cleaned value contains only alphabets -->
                                     <!-- if (/^[a-zA-Z]*$/.test(cleanedValue)) { -->
-                                    <!-- // Input is valid - set the cleaned value as the input value -->
+                                    <!-- Input is valid - set the cleaned value as the input value -->
                                     <!-- inputElement.value = cleanedValue; -->
                                     <!-- } else { -->
-                                    <!-- // Display an error message or take some other action to handle invalid input -->
+                                    <!-- Display an error message or take some other action to handle invalid input -->
                                     <!-- alert("Please enter only alphabets."); -->
-                                    <!-- // Clear the input or take other actions as needed -->
+                                    <!-- Clear the input or take other actions as needed -->
                                     <!-- inputElement.value = ''; -->
                                     <!-- } -->
                                     <!-- } -->
@@ -856,17 +856,17 @@ function removeSpaces1(inputElement) {
 
 									<!-- <script> -->
                                         <!-- function validateInputs(inputElement) { -->
-                                        <!-- // Get the input value and remove spaces -->
+                                        <!-- Get the input value and remove spaces -->
                                         <!-- let cleanedValue = inputElement.value.replace(/\s/g, ''); -->
 
-                                        <!-- // Check if the cleaned value contains only alphabets -->
+                                        <!-- Check if the cleaned value contains only alphabets -->
                                         <!-- if (/^[a-zA-Z\s]*$/.test(cleanedValue)) { -->
-                                        <!-- // Input is valid - set the cleaned value as the input value -->
+                                        <!-- Input is valid - set the cleaned value as the input value -->
                                         <!-- inputElement.value = cleanedValue; -->
                                         <!-- } else { -->
-                                        <!-- // Display an error message or take some other action to handle invalid input -->
+                                        <!-- Display an error message or take some other action to handle invalid input -->
                                         <!-- alert("Please enter only alphabets and spaces."); -->
-                                        <!-- // Clear the input or take other actions as needed -->
+                                        <!-- Clear the input or take other actions as needed -->
                                         <!-- inputElement.value = ''; -->
                                         <!-- } -->
                                         <!-- } -->

@@ -14,14 +14,14 @@ class PlanningFiscalYear(models.Model):
     year_start = fields.Integer(
         string='Start Year',
         required=True,
-        help='Enter a 4-digit year, e.g. 2023 to represent the "2023-2024" fiscal year.',
+        help='Enter a 4-digit year, e.g. 2023 to represent the"2023-2024" fiscal year.',
     )
 
     name = fields.Char(
         string='Fiscal Year',
         compute='_compute_name',
         store=True,
-        help='Display label, e.g. "2023-2024".',
+        help='Display label, e.g."2023-2024".',
     )
 
     date_start = fields.Date(

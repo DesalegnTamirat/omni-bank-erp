@@ -23,7 +23,7 @@
             - Session-cached ERP access gate (optional)
             """,
 
-    'author': 'Abeza',
+    'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
     'license': 'LGPL-3',
 
@@ -63,9 +63,9 @@
         # Wizards
         'wizard/generate_detail_employee_attendance_report.xml',
         'wizard/manager_daily_attendance_wizard.xml',
-        # ATT-4: Discipline flag wizard
+        # Discipline flag wizard
         'wizard/hr_attendance_flag_wizard.xml',
-        # ATT-16: Manual attendance entry wizard
+        # Manual attendance entry wizard
         'wizard/hr_attendance_manual_wizard.xml',
         'views/generated_employee_attendance_details.xml',
         # Menus

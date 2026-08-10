@@ -44,12 +44,12 @@
                             groups="hr_recruitment.group_hr_recruitment_manager"
                             help="Transfer reserve/rejected candidates to Talent Roster pool."/>
                 </header>
-<!--                <div class="alert alert-info" role="alert"-->
-<!--                     invisible="selection_status != 'selected'">-->
-<!--                    <strong>✓ Auto-Selected:</strong>-->
-<!--                    This candidate was automatically selected based on ranking.-->
-<!--                    Manual changes are restricted.-->
-<!--                </div>-->
+<!-- <div class="alert alert-info" role="alert" -->
+<!-- invisible="selection_status != 'selected'"> -->
+<!-- <strong>✓ Auto-Selected:</strong> -->
+<!-- This candidate was automatically selected based on ranking. -->
+<!-- Manual changes are restricted. -->
+<!-- </div> -->
                 <field name="rank" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
                 <field name="vacancy_id" readonly="selection_status != 'pending'"/>
                 <field name="candidate_name" readonly="selection_status != 'pending'"/>
@@ -96,12 +96,12 @@
                     </div>
 
                     <!-- INFO BOX: Show auto-selection status -->
-                    <!--                    <div class="alert alert-info" role="alert"-->
-                    <!--                         invisible="selection_status != 'selected'">-->
-                    <!--                        <strong>✓ Auto-Selected:</strong>-->
-                    <!--                        This candidate was automatically selected based on ranking.-->
-                    <!--                        Manual changes are restricted.-->
-                    <!--                    </div>-->
+                    <!-- <div class="alert alert-info" role="alert" -->
+                    <!-- invisible="selection_status != 'selected'"> -->
+                    <!-- <strong>✓ Auto-Selected:</strong> -->
+                    <!-- This candidate was automatically selected based on ranking. -->
+                    <!-- Manual changes are restricted. -->
+                    <!-- </div> -->
 
                     <group>
                         <group string="Candidate">

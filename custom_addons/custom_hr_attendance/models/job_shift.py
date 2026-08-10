@@ -42,9 +42,9 @@ class JobShift(models.Model):
     )
 
 
-    # -------------------------
+
     # COMPUTE
-    # -------------------------
+
     @staticmethod
     def _float_to_time(float_time):
         hours = int(float_time)
@@ -62,9 +62,9 @@ class JobShift(models.Model):
             else:
                 record.time_range = f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
-    # -------------------------
+
     # CONSTRAINTS
-    # -------------------------
+
     @api.constrains('start_time', 'end_time', 'is_night_shift')
     def _check_time_validity(self):
         for record in self:

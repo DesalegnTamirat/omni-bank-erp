@@ -61,7 +61,7 @@
         </record>
 
         <!-- ============================================ -->
-        <!-- DISABLE BASE HR_RECRUITMENT GROUPS            -->
+        <!-- DISABLE BASE HR_RECRUITMENT GROUPS -->
         <!-- ============================================ -->
 
         <!-- Disable base hr_recruitment groups to avoid conflicts -->

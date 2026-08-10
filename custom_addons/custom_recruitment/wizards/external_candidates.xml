@@ -8,7 +8,7 @@
 
                     <group>
                         <field name="job_id"/>
-<!--                        <field name="fuel_rate"/>-->
+<!-- <field name="fuel_rate"/> -->
                     </group>
 
 

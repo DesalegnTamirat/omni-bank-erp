@@ -27,12 +27,12 @@
                     <header>
                         <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning" invisible="state != 'draft'"/>
                         <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success" invisible="state not in ('active', 'extended')"/>
-                        <!-- DIS-2: Convert active/extended suspension to dismissal (Admin only) -->
+                        <!-- Convert active/extended suspension to dismissal (Admin only) -->
                         <button name="action_convert_to_dismissal" string="Convert to Dismissal" type="object" class="btn-danger"
                                 invisible="state not in ('active', 'extended')"
                                 groups="discipline_management.group_discipline_admin"
                                 confirm="This will convert the suspension into a DISMISSAL. The employee will be permanently separated. Proceed?"
-                                help="FR-DIS-030: Escalate this suspension to a full dismissal action."/>
+                                help="Escalate this suspension to a full dismissal action."/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,active,completed,converted_dismissal"/>
                     </header>
                     <sheet>

@@ -118,8 +118,8 @@ class AdjustmentDetails(models.Model):
     # PAYROLL MODULE NOT INSTALLED — uncomment once hr.salary.rule exists.
     # adjustment_type = fields.Many2one("hr.salary.rule", string="Salary Element", domain=[('adjust_amount_manually', '=', 'Yes')])
     bank_account = fields.Char(string="Employee Bank Account")
-    #adjustment_amount = fields.Float(string="Adjustment Amount")
-    #adjustment_amount = fields.float_round(value, precision_digits=2)
+    # adjustment_amount = fields.Float(string="Adjustment Amount")
+    # adjustment_amount = fields.float_round(value, precision_digits=2)
     adjustment_amount = fields.Float(string="Adjustment Amount", digits=(6, 2))
     adjustment_comments = fields.Text(string="Comments")
     adj_det = fields.Many2one("hr.payroll.adjustments", string="Adjustment Details")

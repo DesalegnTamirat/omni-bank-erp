@@ -27,7 +27,7 @@ class Hr_Awards_received_Info(models.Model):
     def approve(self):
 
         # awards = self.env["hr.employee"].search(
-        #     [("user_id", "=", self.employee_id)]
+        # [("user_id", "=", self.employee_id)]
         # )
         vals = {
             "employee_id": self.employee_id.id,

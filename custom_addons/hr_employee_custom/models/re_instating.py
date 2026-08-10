@@ -15,7 +15,7 @@ class re_instating_details(models.Model):
     new_salary = fields.Integer(string='Salary', help="Salary")
     date_re_instated = fields.Date(string='Date Re Instated', help="Date Re Instated")
     responsible = fields.Many2one('hr.employee', 'Responsible')
-    reason = fields.Char(string='Reason ', help="Reason ")
+    reason = fields.Char(string='Reason ', help="Reason")
     status = fields.Char(string='Status', help="Status")
     trial_date_end = fields.Date(string='Trial Date End', help="Trial Date End")
     wage = fields.Monetary('Wage', required=True, help="Employee's monthly gross wage.")
@@ -55,15 +55,15 @@ class re_instating_details(models.Model):
                 # and val.salary_rule are both commented out elsewhere since they depend on
                 # hr.salary.rule. Uncomment this block (and remove the placeholder below)
                 # once the payroll module is installed.
-                # my_json = {"contract_salary_rule": val.salary_rule.id, "contract_internal_name": val.internal_name,
-                #            "contract_value": val.value, "contract_start_date": re_instating.date_re_instated,
-                #            "contract_end_date": val.end_date}
+                # my_json = {"contract_salary_rule": val.salary_rule.id, "contract_internal_name": val.internal_name
+                # "contract_value": val.value, "contract_start_date": re_instating.date_re_instated
+                # "contract_end_date": val.end_date}
                 my_json = {"contract_value": val.value, "contract_start_date": re_instating.date_re_instated,
                            "contract_end_date": val.end_date}
             salary_contract_list.append((0, 0, my_json))
             contract_info = self.env["hr.version"].search([('job_grade', '=', self.new_job_grade.id)])
             for job_val in contract_info:
-                # if not job_val.contract_multi_id:
+                # if not job_val.contract_multi_id
                 for val3 in job_val.contract_multi_id:
                     val3.unlink()
                 job_val.write({"contract_multi_id": salary_contract_list})

@@ -22,7 +22,7 @@
         </record>
 
         <!-- Contract-related subtypes for messaging / Chatter -->
-        <!-- xmlids match the ones referenced from hr_contract.py's _track_subtype() -->
+        <!-- xmlids match the ones referenced from hr_contract.py's _track_subtype -->
         <record id="mt_contract_pending" model="mail.message.subtype">
             <field name="name">To Renew</field>
             <field name="res_model">hr.version</field>
@@ -45,7 +45,7 @@
             <field name="description">Contract about to expire</field>
         </record>
 
-        <!-- Sequence used by hr.contract's create() to generate the Contract Reference -->
+        <!-- Sequence used by hr.contract's create to generate the Contract Reference -->
         <record id="seq_hr_contract" model="ir.sequence">
             <field name="name">HR Contract</field>
             <field name="code">hr.contract</field>

@@ -145,13 +145,13 @@ class EligibleEmployees(models.Model):
             rec.write({'active': False})
         return True
 
-    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # Leave Status — cross-reference with Time Off module (hr.leave)
     # No new model created; reads directly from hr.leave for the linked employee.
     active_leave_status = fields.Char(
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
              "if the employee has an approved leave covering today's date.",
     )
 
@@ -328,12 +328,12 @@ class InternalEligibleEmployees(models.Model):
             rec.write({'active': False})
         return True
 
-    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # Leave Status — cross-reference with Time Off module (hr.leave)
     active_leave_status = fields.Char(
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
              "if the employee has an approved leave covering today's date.",
     )
 

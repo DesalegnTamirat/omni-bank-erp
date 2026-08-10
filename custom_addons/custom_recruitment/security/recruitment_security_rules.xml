@@ -666,8 +666,8 @@
         </record>
 
         <!-- ============================================ -->
-        <!-- NO RECORD RULES NEEDED FOR ADMINISTRATOR     -->
-        <!-- Administrators get full access via CSV      -->
+        <!-- NO RECORD RULES NEEDED FOR ADMINISTRATOR -->
+        <!-- Administrators get full access via CSV -->
         <!-- ============================================ -->
 
     </data>

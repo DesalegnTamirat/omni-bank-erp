@@ -15,7 +15,7 @@ with registry.cursor() as cr:
         print("Rule Name:", rule.name)
         print("Rule Domain in DB:", rule.domain_force)
         
-        # Let's update the rule domain directly in DB to match what we need:
+        # Let's update the rule domain directly in DB to match what we need
         new_domain = "['|', '|', ('work_unit_id', '=', user.employee_id.default_operating_unit_id.id), ('create_uid', '=', user.id), ('approver_id.user_id', '=', user.id)]"
         if rule.domain_force != new_domain:
             print("Updating rule domain in DB...")

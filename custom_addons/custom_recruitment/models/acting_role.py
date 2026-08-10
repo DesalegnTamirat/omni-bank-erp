@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-# Acting / Supplementary Role – Module 2 BRD Requirements:
-#     Acting Role Request & District Director Approval Workflow
-#     Automated Employee Profile & Benefit Adjustment
-#     Acting Assignment Expiry & Termination Notification Workflow
+# Acting / Supplementary Role – Module 2 BRD Requirements
+# Acting Role Request & District Director Approval Workflow
+# Automated Employee Profile & Benefit Adjustment
+# Acting Assignment Expiry & Termination Notification Workflow
 
 from datetime import date
 
@@ -11,7 +11,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class ActingRoleAssignment(models.Model):
-    """: Acting / Supplementary Role assignment.
+    """Acting / Supplementary Role assignment.
 
     Distinct from a permanent Transfer/Promotion: this is a temporary
     assignment to a vacant post, approved by the District Director, with
@@ -34,7 +34,7 @@ class ActingRoleAssignment(models.Model):
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
 
-    # : Request Initiation ----------------------
+    # Request Initiation
     employee_id = fields.Many2one(
         "hr.employee", string="Acting Employee", required=True, tracking=True,
         help="The employee proposed to temporarily fill the vacant post.",
@@ -56,7 +56,7 @@ class ActingRoleAssignment(models.Model):
         related="target_vacancy_id.operating_unit_id", store=True, readonly=True,
     )
 
-    # : District Director Approval Workflow --------------
+    # District Director Approval Workflow
     district_director_id = fields.Many2one(
         "hr.employee", string="District Director",
         help="The District Director responsible for reviewing this Acting Role request.",
@@ -75,7 +75,7 @@ class ActingRoleAssignment(models.Model):
     approval_date = fields.Date(string="Approval Date", readonly=True, copy=False)
     rejection_reason = fields.Text(string="Rejection Reason")
 
-    # : Automated Employee Profile & Benefit Adjustment --------
+    # Automated Employee Profile & Benefit Adjustment
     acting_allowance_percent = fields.Float(
         string="Acting Allowance (%)",
         help="Percentage of the target position's pay used to compute the Acting Allowance .",
@@ -92,22 +92,22 @@ class ActingRoleAssignment(models.Model):
         "operating.unit", string="Substantive (Original) Work Unit", readonly=True, copy=False,
     )
 
-    # : Expiry & Termination -----------------------
+    # Expiry & Termination
     acting_start_date = fields.Date(string="Acting Start Date")
     acting_end_date = fields.Date(
         string="Acting End Date",
-        help="Planned end date of the acting period. The system alerts HR when this date is reached, "
+        help="Planned end date of the acting period. The system alerts HR when this date is reached"
              "a permanent candidate is assigned, or termination is initiated .",
     )
     permanent_candidate_assigned = fields.Boolean(
         string="Permanent Candidate Assigned", default=False,
-        help="Set to True once a permanent placement (Transfer/Promotion/External Hire) has filled the post, "
+        help="Set to True once a permanent placement (Transfer/Promotion/External Hire) has filled the post"
              "which also triggers automatic termination of the acting assignment .",
     )
     expiry_notified = fields.Boolean(string="Expiry Notification Sent", default=False, copy=False)
     termination_date = fields.Date(string="Termination Date", readonly=True, copy=False)
 
-    # ---------------------------------------
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -125,11 +125,11 @@ class ActingRoleAssignment(models.Model):
                 base_pay = 0.0
             rec.acting_allowance_amount = round(base_pay * (rec.acting_allowance_percent or 0.0) / 100.0, 2)
 
-    # ---------------------------------------
+
     # Workflow Actions
-    # ---------------------------------------
+
     def action_submit(self):
-        """: route the Acting Role request to the District Director."""
+        """route the Acting Role request to the District Director."""
         for rec in self:
             if not rec.target_vacancy_id:
                 raise ValidationError(_("Please select a vacant post before submitting."))
@@ -157,7 +157,7 @@ class ActingRoleAssignment(models.Model):
                 "approval_date": fields.Date.context_today(rec),
             })
 
-            # : Automated Employee Profile & Benefit Adjustment
+            # Automated Employee Profile & Benefit Adjustment
             if emp:
                 emp_vals = {}
                 if rec.target_job_position_id:
@@ -176,7 +176,7 @@ class ActingRoleAssignment(models.Model):
             )
 
     def action_reject(self):
-        """: District Director rejects the Acting Role request."""
+        """District Director rejects the Acting Role request."""
         for rec in self:
             if rec.state != "submitted":
                 raise UserError(_("Only submitted requests can be rejected."))
@@ -184,7 +184,7 @@ class ActingRoleAssignment(models.Model):
             rec.message_post(body=_("Acting Role request rejected. Reason: %s") % (rec.rejection_reason or _("N/A")))
 
     def action_terminate(self):
-        """: HR finalizes termination — revert employee profile, benefits,
+        """HR finalizes termination — revert employee profile, benefits,
         and system access to the substantive position."""
         for rec in self:
             if rec.state != "active":
@@ -211,12 +211,12 @@ class ActingRoleAssignment(models.Model):
                 )
             )
 
-    # ---------------------------------------
+
     # Scheduled Actions / Cron
-    # ---------------------------------------
+
     @api.model
     def _cron_check_acting_role_expiry(self):
-        """: track acting period duration and alert HR when the end
+        """track acting period duration and alert HR when the end
         date is reached or a permanent candidate has been assigned."""
         today = date.today()
 

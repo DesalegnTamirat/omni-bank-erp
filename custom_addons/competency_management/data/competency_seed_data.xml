@@ -2,7 +2,7 @@
 <odoo>
     <data noupdate="1">
 
-        <!-- Default 4-point rating model (FR-COM-012) -->
+        <!-- Default 4-point rating model -->
         <record id="rating_model_4_scale" model="competency.rating.model">
             <field name="name">4-Point Proficiency Scale</field>
             <field name="code">4SCALE</field>
@@ -48,7 +48,7 @@
             <field name="is_seed">True</field>
         </record>
 
-        <!-- Leadership Competencies (6) — BRD Module 12 -->
+        <!-- Leadership Competencies (6) — -->
         <record id="comp_lead_strategy_management" model="competency.competency">
             <field name="name">Strategy Management</field>
             <field name="code">LEAD-01</field>

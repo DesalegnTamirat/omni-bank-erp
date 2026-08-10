@@ -56,25 +56,25 @@
                     <group col="2">
                         <group name="contact_information_custom">
                             <field name="employee_identification"/>
-                            <!--                            <field name="mobile_phone" string="Work Mobile"/>-->
-                            <!--                            <field name="work_phone"/>-->
-                            <!--                            <field name="work_email"/>-->
+                            <!-- <field name="mobile_phone" string="Work Mobile"/> -->
+                            <!-- <field name="work_phone"/> -->
+                            <!-- <field name="work_email"/> -->
                             <field name="default_operating_unit_id"/>
                             <field name="department_id"/>
                             <field name="gender"/>
-                            <!--                            <field name="personal_email"/>-->
-                            <!--                            <field name="personal_phone"/>-->
-                            <!--                            <field name="languages"/>-->
-                            <!--                            <field name="payroll_status"/>-->
-                            <!--                            <field name="operating_unit_ids" widget="many2many_tags"/>-->
+                            <!-- <field name="personal_email"/> -->
+                            <!-- <field name="personal_phone"/> -->
+                            <!-- <field name="languages"/> -->
+                            <!-- <field name="payroll_status"/> -->
+                            <!-- <field name="operating_unit_ids" widget="many2many_tags"/> -->
                         </group>
                         <group name="job_information_custom">
                             <field name="start_date"/>
-                            <!--                            <field name="job_grade"/>-->
-                            <!--                            <field name="job_position"/>-->
+                            <!-- <field name="job_grade"/> -->
+                            <!-- <field name="job_position"/> -->
                             <field name="parent_id" string="Manager"/>
-                            <!--                            <field name="coach_id"/>-->
-                            <!--                            <field name="planning_parent_id"/>-->
+                            <!-- <field name="coach_id"/> -->
+                            <!-- <field name="planning_parent_id"/> -->
                             <field name="hr_officer_id"/>
                             <field name="validation_state" string="Employee Data Validation State" widget="badge"
                                    decoration-warning="validation_state == 'Under_review'"
@@ -182,45 +182,45 @@
                 </xpath>
 
 
-<!--                <xpath expr="//form/sheet/notebook/page[3]" position="after">-->
-<!--                    <group name="Recruitment_criteria" colspan="4">-->
-<!--                        <notebook>-->
-<!--                            <page string="Education Qualification">-->
-<!--                                <field name="qualification_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="qualification"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <xpath expr="//form/sheet/notebook/page[3]" position="after"> -->
+<!-- <group name="Recruitment_criteria" colspan="4"> -->
+<!-- <notebook> -->
+<!-- <page string="Education Qualification"> -->
+<!-- <field name="qualification_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="qualification"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Experience">-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Experience"> -->
 
 
-<!--                                <field name="experiance_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="experience"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <field name="experiance_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="experience"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Competencies ">-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Competencies "> -->
 
-<!--                                <field name="competencies_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="competencies"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <field name="competencies_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="competencies"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                        </notebook>-->
-<!--                    </group>-->
-<!--                </xpath>-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- </notebook> -->
+<!-- </group> -->
+<!-- </xpath> -->
 
 
                 <xpath expr="//group[@name='service_information_hire']" position="after">
@@ -330,9 +330,9 @@
                 </xpath>
 
                 <!-- 3. Rename Details tab → Recruitment, and hide Trackers tab -->
-<!--                <page name="recruitment_page" position="attributes">-->
-<!--                    <attribute name="string">Recruitment</attribute>-->
-<!--                </page>-->
+<!-- <page name="recruitment_page" position="attributes"> -->
+<!-- <attribute name="string">Recruitment</attribute> -->
+<!-- </page> -->
                 <page name="trackers_page" position="attributes">
                     <attribute name="invisible">1</attribute>
                 </page>
@@ -342,7 +342,7 @@
                     <!-- Two-column layout matching Odoo 14 image 3 -->
                     <group>
                         <group string="Job Information">
-                            <!--                            <field name="operating_unit"/>-->
+                            <!-- <field name="operating_unit"/> -->
                             <field name="department_id"/>
                             <field name="type_of_employment"/>
                             <field name="employee_category" string="Job Category"/>
@@ -364,35 +364,35 @@
                     </group>
 
                     <!-- Recruitment Criteria section with sub-tabs -->
-<!--                    <separator string="Recruitment Criteria"/>-->
+<!-- <separator string="Recruitment Criteria"/> -->
                     <notebook>
-<!--                        <page string="Education Qualification">-->
-<!--                            <field name="qualification_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="qualification"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
-<!--                        <page string="Experience">-->
-<!--                            <field name="experiance_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="experience"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
-<!--                        <page string="Competencies">-->
-<!--                            <field name="competencies_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="competencies"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
+<!-- <page string="Education Qualification"> -->
+<!-- <field name="qualification_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="qualification"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Experience"> -->
+<!-- <field name="experiance_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="experience"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Competencies"> -->
+<!-- <field name="competencies_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="competencies"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
+<!-- </field> -->
+<!-- </page> -->
                         <page string="Eligible Grades">
                             <field name="grade_recruitment_id">
                                 <list editable="bottom">
@@ -462,7 +462,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='name']" position="after">
                     <field name="grade"/>
-                    <!--               <field name="job_name"/>-->
+                    <!-- <field name="job_name"/> -->
                 </xpath>
             </field>
         </record>
@@ -620,43 +620,43 @@
 
 
                 <xpath expr="//page[@name='hr_settings']" position="after">
-<!--                    <page string="Recruitment Criteria" name="recruitment_criteria">-->
-<!--                        <notebook>-->
-<!--                            <page string="Education Qualification">-->
-<!--                                <field name="qualification_id">-->
-<!--                                    <list>-->
-<!--                                        <field name="qualification"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <page string="Recruitment Criteria" name="recruitment_criteria"> -->
+<!-- <notebook> -->
+<!-- <page string="Education Qualification"> -->
+<!-- <field name="qualification_id"> -->
+<!-- <list> -->
+<!-- <field name="qualification"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Experience">-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Experience"> -->
 
 
-<!--                                <field name="experiance_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="experience"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <field name="experiance_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="experience"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Competencies ">-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- <page string="Competencies "> -->
 
-<!--                                <field name="competencies_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="competencies"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
+<!-- <field name="competencies_id"> -->
+<!-- <list editable="bottom"> -->
+<!-- <field name="competencies"/> -->
+<!-- <field name="requirement"/> -->
+<!-- <field name="response"/> -->
+<!-- </list> -->
 
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                        </notebook>-->
-<!--                    </page>-->
+<!-- </field> -->
+<!-- </page> -->
+<!-- </notebook> -->
+<!-- </page> -->
                     <page name="award_ids" string="Awards Received">
                         <field name="award_ids" string="Awards Received">
                             <list>
@@ -724,46 +724,46 @@
                                         </div>
                                     </div>
                                 </div>
-<!--                                <div id="pane_insurance" class="custom_nested_pane d-none">-->
-<!--                                    <group>-->
-<!--                                        <field name="insurance_ids" nolabel="1">-->
-<!--                                            <list string="Insurance">-->
-<!--                                                <field name="employee_id"/>-->
-<!--                                                <field name="name_of_insurance"/>-->
-<!--                                                <field name="insurance_type"/>-->
-<!--                                                <field name="renewal_date"/>-->
-<!--                                                <field name="policy"/>-->
-<!--                                                <field name="policy_coverage"/>-->
-<!--                                                <field name="sum_insured"/>-->
-<!--                                                <field name="premium"/>-->
-<!--                                                <field name="date_from"/>-->
-<!--                                                <field name="date_to"/>-->
-<!--                                                <field name="company_id"/>-->
-<!--                                            </list>-->
-<!--                                        </field>-->
-<!--                                    </group>-->
-<!--                                </div>-->
-<!--                                <div id="pane_checklist" class="custom_nested_pane d-none">-->
-<!--                                    <group>-->
-<!--                                    </group>-->
-<!--                                </div>-->
+<!-- <div id="pane_insurance" class="custom_nested_pane d-none"> -->
+<!-- <group> -->
+<!-- <field name="insurance_ids" nolabel="1"> -->
+<!-- <list string="Insurance"> -->
+<!-- <field name="employee_id"/> -->
+<!-- <field name="name_of_insurance"/> -->
+<!-- <field name="insurance_type"/> -->
+<!-- <field name="renewal_date"/> -->
+<!-- <field name="policy"/> -->
+<!-- <field name="policy_coverage"/> -->
+<!-- <field name="sum_insured"/> -->
+<!-- <field name="premium"/> -->
+<!-- <field name="date_from"/> -->
+<!-- <field name="date_to"/> -->
+<!-- <field name="company_id"/> -->
+<!-- </list> -->
+<!-- </field> -->
+<!-- </group> -->
+<!-- </div> -->
+<!-- <div id="pane_checklist" class="custom_nested_pane d-none"> -->
+<!-- <group> -->
+<!-- </group> -->
+<!-- </div> -->
                                 <div id="pane_badges" class="custom_nested_pane d-none">
                                     <group>
                                     </group>
                                 </div>
-<!--                                <div id="pane_pension" class="custom_nested_pane d-none">-->
-<!--                                    <group>-->
-<!--                                        <group>-->
-<!--                                            <field name="pension_fund"/>-->
-<!--                                            <field name="pension_reference"/>-->
-<!--                                            <field name="pension_start_date"/>-->
-<!--                                        </group>-->
-<!--                                        <group>-->
-<!--                                            <field name="pension_employee_percentage"/>-->
-<!--                                            <field name="pension_employer_percentage"/>-->
-<!--                                        </group>-->
-<!--                                    </group>-->
-<!--                                </div>-->
+<!-- <div id="pane_pension" class="custom_nested_pane d-none"> -->
+<!-- <group> -->
+<!-- <group> -->
+<!-- <field name="pension_fund"/> -->
+<!-- <field name="pension_reference"/> -->
+<!-- <field name="pension_start_date"/> -->
+<!-- </group> -->
+<!-- <group> -->
+<!-- <field name="pension_employee_percentage"/> -->
+<!-- <field name="pension_employer_percentage"/> -->
+<!-- </group> -->
+<!-- </group> -->
+<!-- </div> -->
                             </div>
 
                             <div class="dropdown_vertical_menu"
@@ -776,22 +776,22 @@
                                     <i class="fa fa-history" title="Employee History" style="width: 20px;"/>
                                     Employee History
                                 </div>
-<!--                                <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_insurance')">-->
-<!--                                    <i class="fa fa-shield" title="Insurance Records" style="width: 20px;"/>-->
-<!--                                    Insurance Records-->
-<!--                                </div>-->
-<!--                                <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_checklist')">-->
-<!--                                    <i class="fa fa-check-square-o" title="Checklist" style="width: 20px;"/>-->
-<!--                                    Checklist-->
-<!--                                </div>-->
+<!-- <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_insurance')"> -->
+<!-- <i class="fa fa-shield" title="Insurance Records" style="width: 20px;"/> -->
+<!-- Insurance Records -->
+<!-- </div> -->
+<!-- <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_checklist')"> -->
+<!-- <i class="fa fa-check-square-o" title="Checklist" style="width: 20px;"/> -->
+<!-- Checklist -->
+<!-- </div> -->
                                 <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_badges')">
                                     <i class="fa fa-trophy" title="Received Badges" style="width: 20px;"/>
                                     Received Badges
                                 </div>
-<!--                                <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_pension')">-->
-<!--                                    <i class="fa fa-university" title="Pension Information" style="width: 20px;"/>-->
-<!--                                    Pension Information-->
-<!--                                </div>-->
+<!-- <div class="vertical_menu_item" onclick="switchNestedPane(this, 'pane_pension')"> -->
+<!-- <i class="fa fa-university" title="Pension Information" style="width: 20px;"/> -->
+<!-- Pension Information -->
+<!-- </div> -->
                             </div>
 
                         </div>

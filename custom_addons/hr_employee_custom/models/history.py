@@ -267,7 +267,7 @@ class DepartmentHistory(models.Model):
     new_job_title = fields.Many2one('hr.job', string='Position', help="Position")
     job_history_start_date = fields.Date(string='Job History Start Date', help="Job History Start Date")
     job_history_end_date = fields.Date(string='Job History End Date', help="Job History End Date")
-    reason = fields.Char(string='Reason for Change ', help="Reason for Change ")
+    reason = fields.Char(string='Reason for Change ', help="Reason for Change")
     officer_id = fields.Integer(string='Officer ID', help="Assigned Officer")
     operating_unit = fields.Many2one('operating.unit', string='Operating Unit', help="Operating Unit")
 
@@ -358,5 +358,5 @@ class Re_instated_History(models.Model):
     new_salary = fields.Char(string='New Salary', help="New Salary")
     salary = fields.Integer(string='New Salary', help="New Salary")
     date = fields.Date(string='Date', help="Date")
-    reason = fields.Char(string='Reason ', help="Reason ")
-    other_info = fields.Char(string='Other Info ', help="Other Info ")
+    reason = fields.Char(string='Reason ', help="Reason")
+    other_info = fields.Char(string='Other Info ', help="Other Info")

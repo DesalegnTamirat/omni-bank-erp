@@ -7,7 +7,7 @@ class projection_non_mangeriald_same_location_voucher(models.AbstractModel):
 
     @api.model
     def _get_report_values(self,docids,data=None):
-        #docs = self.env[model.model].search([])
+        # docs = self.env[model.model].search([])
         # docs = self.env["account.asset"].search([])
 
         docs = self.env["hr.applicant"].search([])
@@ -17,5 +17,5 @@ class projection_non_mangeriald_same_location_voucher(models.AbstractModel):
               'doc_model': "hr.applicant",
               'docs': docs,
               'data': data,
-              # 'compare_date':datetime.strptime(data["line_date"],"%Y-%m-%d").date(),
+              # 'compare_date':datetime.strptime(data["line_date"],"%Y-%m-%d").date
         }

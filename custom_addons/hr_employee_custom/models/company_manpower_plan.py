@@ -75,15 +75,15 @@ class CompanyManpowerPlan(models.Model):
     def populate_values(self):
         self.env.cr.execute('SELECT update_co_manpower_planning_cost()')
 
-    # def populate_procurement_plan(self):
-    #     print("Updating Prurement  Plan")
-    #     self.env.cr.execute('SELECT update_manpower_procurement_plan()')
+    # def populate_procurement_plan(self)
+    # print("Updating Prurement  Plan")
+    # self.env.cr.execute('SELECT update_manpower_procurement_plan')
 
     def populate_recruitment(self):
         self.env.cr.execute('SELECT update_manpower_recruitment_plan()')
-    #@api.model
-    # def name_create(self, name):
-    #     return self.create({'name': name}).name_get()[0]
+    # @api.model
+    # def name_create(self, name)
+    # return self.create({'name': name}).name_get[0]
     def unlink(self):
         for val in self.company_manpower_plan_id:
             val.unlink()
@@ -144,35 +144,35 @@ class Requirements(models.Model):
         for val in self:
             val.category = job_map.get(val.position.name, "") if val.position else ""
     # @api.depends('total', 'position_cost')
-    # def _compute_estimated_cost(self):
-        # for val in self:
-            # if val.total and val.position_cost:
+    # def _compute_estimated_cost(self)
+        # for val in self
+            # if val.total and val.position_cost
                 # val.estimated_cost= val.total*val.position_cost
                 # return val.estimated_cost
-            # else:
+            # else
               # val.estimated_cost= 0.0
               # return val.estimated_cost
-    # def _compute_total(self):
-    #     self.total=self.july+self.august+self.september+self.october+self.november+self.december+self.january+self.february+self.march+self.april+self.may+self.june
-    #     return self.total
+    # def _compute_total(self)
+    # self.total=self.july+self.august+self.september+self.october+self.november+self.december+self.january+self.february+self.march+self.april+self.may+self.june
+    # return self.total
     # # @api.model
-    # def create(self, vals):
-    #     print("vals=",vals)
-    #     get_manpower=self.env["manpower.plan"].search([("id","=",vals["company_manpower_id"])])
-    #     vals["plan_version"]=get_manpower.plan_version
-    #     return super(Requirements, self).create(vals)
+    # def create(self, vals)
+    # print("vals=",vals)
+    # get_manpower=self.env["manpower.plan"].search([("id","=",vals["company_manpower_id"])])
+    # vals["plan_version"]=get_manpower.plan_version
+    # return super(Requirements, self).create(vals)
 
     # @api.onchange("position")
-    # def _onchange_position(self):
-    #     print("grade",self.position.grade.grade_name)
-    #     self.grade = False
-    #     if self.position:
-    #         domain = [('grade', "=", self.position.grade.grade_name)]
-    #         return {'domain': {'grade': domain}}
+    # def _onchange_position(self)
+    # print("grade",self.position.grade.grade_name)
+    # self.grade = False
+    # if self.position
+    # domain = [('grade', "=", self.position.grade.grade_name)]
+    # return {'domain': {'grade': domain}}
 
     # @api.model
-    # def name_create(self, name):
-    #     return self.create({'name': name}).name_get()[0]
+    # def name_create(self, name)
+    # return self.create({'name': name}).name_get[0]
     def unlink(self):
         return super(Requirements, self).unlink()
 
@@ -187,13 +187,13 @@ class Requirements(models.Model):
             "target":"new"
         }
 
-    #
+
     # @api.onchange('product')
-    # def _onchange_product(self):
-    #     print("product=====================", self.product)
-    #     print("employee_name=====================", self.product.categ_id)
-    #     self.description =  self.product.description
-    #     self.category = self.product.categ_id
+    # def _onchange_product(self)
+    # print("product=====================", self.product)
+    # print("employee_name=====================", self.product.categ_id)
+    # self.description =  self.product.description
+    # self.category = self.product.categ_id
 
 
 class CompanyManpowerDelegation(models.Model):

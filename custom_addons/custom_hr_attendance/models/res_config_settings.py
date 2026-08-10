@@ -5,9 +5,9 @@ from odoo.exceptions import ValidationError
 class ResConfigSettings(models.TransientModel):
     _inherit = 'res.config.settings'
 
-    # ----------------------------------------------------------
+
     # PER-FEATURE TOGGLES
-    # ----------------------------------------------------------
+
     enable_checkin_restriction = fields.Boolean(
         string='Enable Check-in Time Restriction',
         default=True,
@@ -48,12 +48,12 @@ class ResConfigSettings(models.TransientModel):
         string='Enable ERP Access Gate (Requires Check-In)',
         default=False,
         config_parameter="hr_attendance.enable_checkin_gate",
-        help="When enabled, employees must be checked in to access ERP modules. "
+        help="When enabled, employees must be checked in to access ERP modules."
              "Exempt routes (Settings, Attendance, Discuss) are always accessible. "
              "Roll out branch-by-branch after load testing."
     )
 
-    # Target HR User for Escalation 
+    # Target HR User for Escalation
     escalation_hr_user_id = fields.Many2one(
         'res.users',
         string='HR Escalation Target User',
@@ -61,7 +61,7 @@ class ResConfigSettings(models.TransientModel):
         help="User account to receive HR escalation activities when attendance violation thresholds are breached."
     )
 
-    #  Pluggable Authentication Method Framework
+    # Pluggable Authentication Method Framework
     checkin_auth_method = fields.Selection([
         ('session', 'Odoo Web Session (Standard)'),
         ('pin', 'Employee Security PIN'),
@@ -71,9 +71,9 @@ class ResConfigSettings(models.TransientModel):
         help="Configurable authentication method required before check-in is recorded.")
 
 
-    # ----------------------------------------------------------
+
     # ATTENDANCE TIME SETTINGS
-    # ----------------------------------------------------------
+
     morning_time = fields.Float(
         string='Default Morning Check-in Time',
         default=8.00,
@@ -111,9 +111,9 @@ class ResConfigSettings(models.TransientModel):
         help="Default exit time on Saturdays for Head Office staff (e.g., 14.75 for 2:45 PM)"
     )
 
-    # ----------------------------------------------------------
+
     # LUNCH BREAK SETTINGS
-    # ----------------------------------------------------------
+
     lunch_out_time = fields.Float(
         string='Lunch Break Start Time',
         default=12.00,
@@ -133,21 +133,21 @@ class ResConfigSettings(models.TransientModel):
         help="Grace period around the lunch window in hours (e.g., 0.25 = 15 minutes before/after)"
     )
 
-    # ----------------------------------------------------------
+
     # DISCIPLINE INTEGRATION THRESHOLDS
-    # ----------------------------------------------------------
+
     lateness_violation_threshold = fields.Integer(
         string='Lateness Violation Threshold (Occurrences)',
         default=3,
         config_parameter="hr_attendance.lateness_violation_threshold",
-        help="Number of late check-ins that triggers an automatic discipline case (Repeated Lateness Violation). "
+        help="Number of late check-ins that triggers an automatic discipline case (Repeated Lateness Violation)."
              "Counter resets to zero after a case is created."
     )
     force_checkout_violation_threshold = fields.Integer(
         string='Force Checkout Violation Threshold (Occurrences)',
         default=2,
         config_parameter="hr_attendance.force_checkout_violation_threshold",
-        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout). "
+        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout)."
              "Counter resets to zero after a case is created."
     )
 

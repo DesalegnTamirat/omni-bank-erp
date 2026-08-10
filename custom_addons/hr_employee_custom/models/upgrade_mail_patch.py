@@ -30,7 +30,7 @@ _logger = logging.getLogger(__name__)
 
 # Cache: dbname -> bool (True = has real mail server, False = skip mail)
 # Populated once per process startup; cleared on registry reload via
-# _clear_mail_server_cache() called from registry setup.
+# _clear_mail_server_cache called from registry setup.
 _MAIL_SERVER_CACHE = {}
 
 

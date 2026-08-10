@@ -11,9 +11,9 @@ class OverTimeLeave(models.Model):
     leave_reason = fields.Selection(selection_add=[('over_time', 'Over Time')])
     over_time = fields.Float(string="Eligible Over Time (Hours)", readonly=True, store=True)
 
-    # -------------------------------
+
     # FETCH BUTTON
-    # -------------------------------
+
     def fetch(self):
         res = super().fetch()
 
@@ -21,7 +21,7 @@ class OverTimeLeave(models.Model):
             if rec.leave_reason == 'over_time':
                 overtime_lines = self.env['over.time'].sudo().search([
                     ('employee_id', '=', rec.requester_name.id),
-                    #('state', '=', 'approved'),
+                    # ('state', '=', 'approved')
                     ('remaining_hours', '>', 0)
                 ])
 
@@ -31,9 +31,9 @@ class OverTimeLeave(models.Model):
 
         return res
 
-    # -------------------------------
+
     # COMPUTE LEAVE INCLUDING OVERTIME
-    # -------------------------------
+
     def n_compute_leave(self):
         res = super().n_compute_leave()
         for record in self:
@@ -48,9 +48,9 @@ class OverTimeLeave(models.Model):
                     
                
 
-    # -------------------------------
+
     # CONFIRM / NOTIFY
-    # -------------------------------
+
     def notification(self):
         for rec in self:
             if rec.leave_reason == 'over_time':

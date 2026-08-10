@@ -25,6 +25,6 @@ class ComputeBonusWizard(models.TransientModel):
         cr.execute("SELECT populate_bonus()")
         cr.commit()
         print("Populate Bonus Executed")
-        # cr.close()
+        # cr.close
 
     

@@ -123,7 +123,7 @@
             groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
             sequence="40"/>
 
-    <!-- 5.5 Manual Attendance Entry Wizard (ATT-016) -->
+    <!-- 5.5 Manual Attendance Entry Wizard -->
     <menuitem
             id="menu_manual_attendance_wizard"
             name="Manual Attendance Entry"
@@ -197,7 +197,7 @@
             sequence="60"
             groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
 
-    <!-- 6.8 Force Checkout History (ATT-021) -->
+    <!-- 6.8 Force Checkout History -->
     <menuitem
             id="menu_force_checkout_history"
             name="Force Checkout History"

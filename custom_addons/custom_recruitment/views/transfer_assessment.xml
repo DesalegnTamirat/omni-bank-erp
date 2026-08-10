@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <!-- ================================================================ -->
-    <!-- Transfer Assessment Configuration –                     -->
+    <!-- Transfer Assessment Configuration – -->
     <!-- ================================================================ -->
     <record id="transfer_assessment_config_list_view" model="ir.ui.view">
         <field name="name">transfer.assessment.config.list</field>
@@ -61,7 +61,7 @@
               sequence="101"/>
 
     <!-- ================================================================ -->
-    <!-- Transfer Assessment – List View                                   -->
+    <!-- Transfer Assessment – List View -->
     <!-- ================================================================ -->
     <record id="transfer_assessment_list_view" model="ir.ui.view">
         <field name="name">transfer.assessment.list</field>
@@ -91,7 +91,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Transfer Assessment – Search View                                 -->
+    <!-- Transfer Assessment – Search View -->
     <!-- ================================================================ -->
     <record id="transfer_assessment_search_view" model="ir.ui.view">
         <field name="name">transfer.assessment.search</field>
@@ -118,7 +118,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Transfer Assessment – Form View                                   -->
+    <!-- Transfer Assessment – Form View -->
     <!-- ================================================================ -->
     <record id="transfer_assessment_form_view" model="ir.ui.view">
         <field name="name">transfer.assessment.form</field>
@@ -128,18 +128,18 @@
                 <header>
                     <button name="action_schedule" string="Schedule" type="object"
                             class="oe_highlight" invisible="state != 'draft'"
-                            help=": schedule the exam and/or interview."/>
+                            help="schedule the exam and/or interview."/>
                     <button name="action_mark_assessed" string="Mark Assessed" type="object"
                             class="oe_highlight" invisible="state != 'scheduled'"
-                            help=": finalize scores once exam and interview are completed."/>
+                            help="finalize scores once exam and interview are completed."/>
                     <button name="action_submit_for_approval" string="Submit for Approval" type="object"
                             class="oe_highlight" invisible="state != 'assessed'"
-                            help=": route the result for approval."/>
+                            help="route the result for approval."/>
                     <button name="action_approve" string="Approve" type="object"
                             class="oe_highlight" invisible="state != 'pending_approval'"/>
                     <button name="action_publish_result" string="Publish Result" type="object"
                             class="oe_highlight" invisible="state != 'approved'"
-                            help=": notify the applicant of their result."/>
+                            help="notify the applicant of their result."/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,scheduled,assessed,pending_approval,approved,published"/>
                 </header>
@@ -194,7 +194,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Action                                                            -->
+    <!-- Action -->
     <!-- ================================================================ -->
     <record id="action_transfer_assessment" model="ir.actions.act_window">
         <field name="name">Transfer Assessments</field>

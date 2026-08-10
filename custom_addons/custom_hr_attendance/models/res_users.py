@@ -42,7 +42,7 @@ class ResUsers(models.Model):
                     "Attendance Officer role."
                 )
 
-            #  IT & Driver Officer requires Attendance Officer
+            # IT & Driver Officer requires Attendance Officer
             if it_driver in groups and attendance_officer not in groups:
                 raise ValidationError(
                     "IT and Driver Officer role requires "

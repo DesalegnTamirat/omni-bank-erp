@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <odoo>
 
-    <!--        Tree View-->
+    <!-- Tree View -->
     <record id="view_attendance_preapproval_tree" model="ir.ui.view">
         <field name="name">attendance.preapproval.report.tree</field>
         <field name="model">attendance.preapproval.report</field>
@@ -11,7 +11,7 @@
                 <field name="employee_name"/>
 		<field name="place_of_assignment"/>
 		<field name="work_unit"/>	
-                <!--<field name="manager_name"/>-->
+                <!-- <field name="manager_name"/> -->
                 <field name="exception_type"/>
                 <field name="approval_reason"/>
                 <field name="date"/>
@@ -23,7 +23,7 @@
         </field>
     </record>
 
-    <!--Search View-->
+    <!-- Search View -->
     <record id="view_attendance_preapproval_search" model="ir.ui.view">
         <field name="name">attendance.preapproval.report.search</field>
         <field name="model">attendance.preapproval.report</field>
@@ -52,7 +52,7 @@
         </field>
     </record>
 
-    <!--    Action-->
+    <!-- Action -->
     <record id="action_attendance_preapproval_report" model="ir.actions.act_window">
         <field name="name">PreDefined Attendance Report</field>
         <field name="res_model">attendance.preapproval.report</field>

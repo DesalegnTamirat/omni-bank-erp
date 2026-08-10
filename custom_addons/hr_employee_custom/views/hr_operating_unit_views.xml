@@ -45,7 +45,7 @@
                             <field name="hardship_allowance"/>
                         </group>
                         <group>
-<!--                            <field name="company_id" context="{'res_partner_search_mode': 'customer'}"/>-->
+<!-- <field name="company_id" context="{'res_partner_search_mode': 'customer'}"/> -->
                             <field name="company_id"/>
                         </group>
                     </group>

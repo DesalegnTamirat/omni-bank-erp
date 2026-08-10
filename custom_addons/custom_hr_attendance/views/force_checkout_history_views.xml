@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- ATT-021: Force Checkout History List View -->
+        <!-- Force Checkout History List View -->
         <record id="view_hr_attendance_force_checkout_list" model="ir.ui.view">
             <field name="name">hr.attendance.force.checkout.list</field>
             <field name="model">hr.attendance</field>
@@ -18,7 +18,7 @@
             </field>
         </record>
 
-        <!-- ATT-021: Force Checkout History Pivot View -->
+        <!-- Force Checkout History Pivot View -->
         <record id="view_hr_attendance_force_checkout_pivot" model="ir.ui.view">
             <field name="name">hr.attendance.force.checkout.pivot</field>
             <field name="model">hr.attendance</field>
@@ -31,7 +31,7 @@
             </field>
         </record>
 
-        <!-- ATT-021: Force Checkout History Action -->
+        <!-- Force Checkout History Action -->
         <record id="action_hr_attendance_force_checkout_history" model="ir.actions.act_window">
             <field name="name">Force Checkout History</field>
             <field name="res_model">hr.attendance</field>

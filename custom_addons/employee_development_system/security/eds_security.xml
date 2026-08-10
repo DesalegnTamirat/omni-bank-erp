@@ -34,7 +34,7 @@
             <field name="sequence">20</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
-            <field name="comment">Can nominate team members and approve their training needs (FR-EDS-004).</field>
+            <field name="comment">Can nominate team members and approve their training needs .</field>
         </record>
 
         <!-- Group: Trainer -->
@@ -144,7 +144,7 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
-        <!-- Task 3: multi-company rules for course catalog, dev requests and curricula -->
+        <!-- multi-company rules for course catalog, dev requests and curricula -->
         <record id="rule_eds_course_multi_company" model="ir.rule">
             <field name="name">Course Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_course"/>
@@ -161,7 +161,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 4: trainer register + provider registry visible to the L&amp;D teams only -->
+        <!-- trainer register + provider registry visible to the L&amp;D teams only -->
         <record id="rule_eds_trainer_staff" model="ir.rule">
             <field name="name">Trainer Register L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_trainer"/>
@@ -175,7 +175,7 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
-        <!-- Task 4: multi-company rules for procurement documents -->
+        <!-- multi-company rules for procurement documents -->
         <record id="rule_eds_venue_requirement_multi_company" model="ir.rule">
             <field name="name">Venue Requirement Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_venue_requirement"/>
@@ -202,7 +202,7 @@
             <field name="domain_force">[('provider_id', '!=', False)]</field>
         </record>
 
-        <!-- Task 5: annual plan + sessions + venues are L&amp;D-team operational documents -->
+        <!-- annual plan + sessions + venues are L&amp;D-team operational documents -->
         <record id="rule_eds_annual_plan_staff" model="ir.rule">
             <field name="name">Annual Plan L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_annual_plan"/>
@@ -246,7 +246,7 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
-        <!-- Task 5: multi-company rules (module convention) -->
+        <!-- multi-company rules (module convention) -->
         <record id="rule_eds_annual_plan_multi_company" model="ir.rule">
             <field name="name">Annual Plan Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_annual_plan"/>
@@ -283,7 +283,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 6: nominations - employees see their own, line managers their team -->
+        <!-- nominations - employees see their own, line managers their team -->
         <record id="rule_eds_nomination_employee_own" model="ir.rule">
             <field name="name">Employee Own Nominations</field>
             <field name="model_id" ref="employee_development_system.model_eds_nomination"/>
@@ -333,8 +333,8 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: attendance - employees read their own records; trainers record on
-             their assigned sessions; L&D staff manage the full sheet (FREDS040) -->
+        <!-- attendance - employees read their own records; trainers record on
+             their assigned sessions; L&D staff manage the full sheet  -->
         <record id="rule_eds_session_attendance_employee_own" model="ir.rule">
             <field name="name">Employee Own Attendance</field>
             <field name="model_id" ref="employee_development_system.model_eds_session_attendance"/>
@@ -358,7 +358,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: daily feedback - employees read their own; trainers record (FREDS040) -->
+        <!-- daily feedback - employees read their own; trainers record -->
         <record id="rule_eds_feedback_employee_own" model="ir.rule">
             <field name="name">Employee Own Feedback</field>
             <field name="model_id" ref="employee_development_system.model_eds_feedback"/>
@@ -382,7 +382,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: assessments - employees read their own scores; trainers score (FREDS055) -->
+        <!-- assessments - employees read their own scores; trainers score -->
         <record id="rule_eds_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessments</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
@@ -406,7 +406,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: materials are L&D-internal documents (FREDS045) -->
+        <!-- materials are L&D-internal documents -->
         <record id="rule_eds_material_staff" model="ir.rule">
             <field name="name">Materials L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_material"/>
@@ -419,7 +419,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: international training documents (FREDS041) -->
+        <!-- international training documents -->
         <record id="rule_eds_international_training_staff" model="ir.rule">
             <field name="name">International Training L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_international_training"/>

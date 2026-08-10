@@ -59,7 +59,7 @@
                             <field name="approver_id" readonly="1"/>
                             <field name="initiator_id" readonly="1"/>
                             <field name="total_headcount"/>
-                            <!--                            <field name="company_id" groups="base.group_multi_company"/>-->
+                            <!-- <field name="company_id" groups="base.group_multi_company"/> -->
                         </group>
                     </group>
                     <notebook>
@@ -91,7 +91,7 @@
                         </page>
                     </notebook>
                 </sheet>
-<!--                <chatter/>-->
+<!-- <chatter/> -->
             </form>
         </field>
     </record>

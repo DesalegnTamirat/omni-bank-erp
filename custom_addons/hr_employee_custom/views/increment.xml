@@ -9,24 +9,24 @@
                     <field name="state" widget="statusbar"/>
                     <button name="populate_details" invisible="state in ('populated', 'computed')" string="Populate details" type="object" class="oe_highlight"/>
                    <button name="compute_payout" invisible="state in ('draft', 'computed')" string="Compute Payout" type="object" class="oe_highlight"/>
-<!--                    <button name="approve"-->
-<!--                             invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;approve&apos;, &apos;closed&apos;)"-->
-<!--                            string="Approve" type="object" class="oe_highlight"/>-->
-<!--                    <button name="close_acting_role"-->
-<!--                             invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;closed&apos;)"-->
-<!--                            string="Close Acting Role" type="object" class="oe_highlight"/>-->
+<!-- <button name="approve" -->
+<!-- invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;approve&apos;, &apos;closed&apos;)" -->
+<!-- string="Approve" type="object" class="oe_highlight"/> -->
+<!-- <button name="close_acting_role" -->
+<!-- invisible="state in (&apos;draft&apos;, &apos;populate_benefits&apos;, &apos;closed&apos;)" -->
+<!-- string="Close Acting Role" type="object" class="oe_highlight"/> -->
                 </header>
                 <sheet>
                     <div class="oe_title">
                             <!-- Invoice draft header -->
-<!--                            <span class="o_form_label"><field name="move_type"  invisible="move_type == &apos;entry&apos;" readonly="1" nolabel="1"/></span>-->
+<!-- <span class="o_form_label"><field name="move_type"  invisible="move_type == &apos;entry&apos;" readonly="1" nolabel="1"/></span> -->
                             <h1>
                                 <field name="reference" required="1"/>
                             </h1>
                     </div>
                     <group colspan="4">
                         <group name="Employee">
-<!--                            <field name="reference" readonly="1"/>-->
+<!-- <field name="reference" readonly="1"/> -->
                             <field name="employee_name" required="1"/>
                             <field name="increment_factor" required="1"/>
                             <field name="increment_effective_date" required="1"/>

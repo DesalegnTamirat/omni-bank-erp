@@ -85,10 +85,10 @@ class DisciplinaryAction(models.Model):
             vals['name'] = self.env['ir.sequence'].next_by_code('disciplinary.action')
         return super().create(vals_list)
     # @api.depends('employee_name')
-    # def get_running_employee(self):
-    #     print("self", self)
-    #     contract_info = self.env["hr.version"].search([('state', '=', 'open')])
-    #     print("contract_info=========================================", contract_info)
+    # def get_running_employee(self)
+    # print("self", self)
+    # contract_info = self.env["hr.version"].search([('state', '=', 'open')])
+    # print("contract_info=========================================", contract_info)
     # Check the user is a manager or employee
     @api.depends('read_only')
     def get_user(self):
@@ -125,21 +125,21 @@ class DisciplinaryAction(models.Model):
             raise ValidationError(_('You Can not edit a Validated Action !!'))
 
     # @api.depends('employee_id')
-    # def _compute_employee_contract(self):
-    #     for contract in self.filtered('employee_id'):
-    #         contract.job_id = contract.employee_id.job_id
-    #         contract.department_id = contract.employee_id.department_id
-    #         contract.resource_calendar_id = contract.employee_id.resource_calendar_id
-    #         contract.company_id = contract.employee_id.company_id
+    # def _compute_employee_contract(self)
+    # for contract in self.filtered('employee_id')
+    # contract.job_id = contract.employee_id.job_id
+    # contract.department_id = contract.employee_id.department_id
+    # contract.resource_calendar_id = contract.employee_id.resource_calendar_id
+    # contract.company_id = contract.employee_id.company_id
 
     # @api.onchange('contract_name')
     # @api.depends('contract_name')
-    # def onchange_contract_name(self):
-    #     contract = self.env['hr.version'].search([('name', '=', self.employee_id.name)])
-    #     self.contract_name = contract.name.id
-    #
-    #     if self.state == 'action':
-    #         raise ValidationError(_('You Can not edit a Validated Action !!'))
+    # def onchange_contract_name(self)
+    # contract = self.env['hr.version'].search([('name', '=', self.employee_id.name)])
+    # self.contract_name = contract.name.id
+
+    # if self.state == 'action'
+    # raise ValidationError(_('You Can not edit a Validated Action !!'))
 
     @api.onchange('discipline_reason')
     @api.depends('discipline_reason')
@@ -198,20 +198,20 @@ class DisciplinaryAction(models.Model):
                             # on hr.salary.rule. Restore the two commented blocks below (and remove
                             # the placeholders) once the payroll module is installed.
                             if val.internal_name !='wage':
-                                # my_json = {"contract_salary_rule": val.salary_rule.id,
-                                #            "contract_internal_name": val.internal_name,
-                                #            "contract_value": val.value, "contract_start_date": val.start_date,
-                                #            "contract_end_date": datetime.today()}
+                                # my_json = {"contract_salary_rule": val.salary_rule.id
+                                # "contract_internal_name": val.internal_name
+                                # "contract_value": val.value, "contract_start_date": val.start_date
+                                # "contract_end_date": datetime.today}
                                 my_json = {"contract_value": val.value, "contract_start_date": val.start_date,
                                            "contract_end_date": datetime.today()}
                                 salary_contract_list.append((0, 0, my_json))
                             else:
-                                # my_json = {"contract_salary_rule": val.salary_rule.id,
-                                #            "contract_internal_name": val.internal_name,
-                                #            "contract_value": val.value,
-                                #            "contract_start_date": val.start_date,
-                                #            "contract_end_date": val.end_date
-                                #            }
+                                # my_json = {"contract_salary_rule": val.salary_rule.id
+                                # "contract_internal_name": val.internal_name
+                                # "contract_value": val.value
+                                # "contract_start_date": val.start_date
+                                # "contract_end_date": val.end_date
+                                # }
                                 my_json = {"contract_value": val.value,
                                            "contract_start_date": val.start_date,
                                            "contract_end_date": val.end_date
@@ -219,7 +219,7 @@ class DisciplinaryAction(models.Model):
                                 salary_contract_list.append((0, 0, my_json))
                             contract_info = self.env["hr.version"].search([('job_grade', '=', self.job_grade.id)])
                             for job_val in contract_info:
-                                # if not job_val.contract_multi_id:
+                                # if not job_val.contract_multi_id
                                 for val3 in job_val.contract_multi_id:
                                     val3.unlink()
                                 job_val.write({"contract_multi_id": salary_contract_list})

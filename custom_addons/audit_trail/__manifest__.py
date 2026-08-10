@@ -15,7 +15,7 @@
         - Export to Excel / PDF
         - Access controlled by security groups
     """,
-    'author': 'Your Company',
+    'author': 'Desalegn & Abeza',
     'depends': ['base', 'mail'],
     'data': [
         'security/audit_security.xml',

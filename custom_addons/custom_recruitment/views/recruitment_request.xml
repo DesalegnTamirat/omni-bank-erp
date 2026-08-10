@@ -110,7 +110,7 @@
                             <field name="plan_remaining_headcount"
                                    invisible="request_type != 'planned' or not workforce_plan_id"/>
                         </group>
-                        <!-- RIGHT: Job Information  -->
+                        <!-- RIGHT: Job Information -->
                         <group string="Job Information">
                             <field name="job_position_id" domain="[('id', 'in', allowed_job_ids)]" readonly="state != 'draft'"/>
                             <field name="job_grade_id" domain="[('id', 'in', allowed_grade_ids)]" readonly="state != 'draft'"/>
@@ -127,7 +127,7 @@
                         </group>
                     </group>
 
-                    <!-- : Justification (Unplanned) -->
+                    <!-- Justification (Unplanned) -->
                     <group string="Business Justification"
                            invisible="request_type != 'unplanned'">
                         <field name="justification" nolabel="1"
@@ -136,7 +136,7 @@
                                placeholder="Provide business justification for this unplanned recruitment request..."/>
                     </group>
 
-                    <!-- : Replacement Hiring -->
+                    <!-- Replacement Hiring -->
                     <group string="Replacement Hiring">
                         <field name="is_replacement" readonly="state != 'draft'"/>
                         <field name="replaced_employee_id"

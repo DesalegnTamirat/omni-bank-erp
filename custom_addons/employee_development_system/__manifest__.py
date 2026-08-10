@@ -6,30 +6,25 @@
                "staff education and internship.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources/Employee Development',
-    'author': 'Bunna Bank / Antigravity AI',
+    'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',
     'license': 'LGPL-3',
     'description': """
-Employee Development System (EDS) - Classroom Training Management
-=================================================================
-Bunna Bank ERP HR Upgrade - Requirement2 Part 2.
-
-Complete implementation of all 15 weighted delivery tasks:
-  - [DONE] Task 1 - TNA Capture & Configuration (cycle + entries)
-  - [DONE] Task 2 - TNA Consolidation, Prioritization & Approval Workflow
-  - [DONE] Task 3 - Training Program & Course Catalog Setup
-  - [DONE] Task 4 - Trainer Profile & Qualification Management
-  - [DONE] Task 5 - Session Scheduling & Venue/Resource Booking
-  - [DONE] Task 6 - Nomination, Approval & Enrollment Workflow
-  - [DONE] Task 7 - Attendance & Delivery Tracking
-  - [DONE] Task 8 - Evaluation Engine - Level 1 & 2
-  - [DONE] Task 9 - Evaluation Engine - Level 3 & 4
-  - [DONE] Task 10 - Completion & Certification Engine
-  - [DONE] Task 11 - Budget & Cost Tracking
-  - [DONE] Task 12 - Reporting & Dashboards
-  - [DONE] Task 13 - System Integrations (LMS, PMS, Payroll, Finance)
-  - [DONE] Task 14 - Staff Education & Sponsorship Module
-  - [DONE] Task 15 - Internship Facilitation Module
+Employee Development System (EDS)
+=================================
+Classroom training and talent development management system covering:
+  - Training Needs Analysis (TNA) capture and consolidation
+  - Course catalog and curriculum management
+  - Trainer profile and qualification registry
+  - Session scheduling and venue booking
+  - Nomination, approval, and enrollment workflows
+  - Attendance and delivery tracking
+  - Multi-level evaluation engines (Levels 1 to 4)
+  - Completion and certification management
+  - Budget and cost tracking
+  - Reporting and analytics dashboards
+  - Staff education assistance and sponsorship
+  - Internship facilitation
     """,
     'depends': [
         'base',

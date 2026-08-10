@@ -7,7 +7,7 @@ from odoo.exceptions import UserError, ValidationError
 
 DISQUALIFICATION_THRESHOLD = 50.0  # Section 9.2
 OFFER_RESPONSE_DAYS = 3  # Section 11.2.2
-EXTERNAL_APPLICATION_DAYS = 5  # BRD FR-REC-018: 5 working-day window for external vacancies (flexible)
+EXTERNAL_APPLICATION_DAYS = 5  # BRD: 5 working-day window for external vacancies (flexible)
 
 # ── : Default weight matrix ────────────────────────────────────
 # Keyed by (recruitment_type, vacancy employee_category, job_level)
@@ -72,7 +72,7 @@ class RecruitmentCandidateScore(models.Model):
     job_level = fields.Selection(
         [("junior", "Junior"), ("senior", "Senior / Regular")],
         string="Job Level", related="vacancy_id.job_level", store=True, readonly=True,
-        help="Only applicable for Non-Managerial posts. Pulled directly "
+        help="Only applicable for Non-Managerial posts. Pulled directly"
              "from the Vacancy's Job Level — set it there, not here."
     )
 
@@ -131,7 +131,7 @@ class RecruitmentCandidateScore(models.Model):
     disqualification_reason = fields.Char(string="Disqualification Reason", readonly=True)
     disqualification_checked = fields.Boolean(
         string="Disqualification Checked", default=False, readonly=True, copy=False,
-        help="Set automatically when 'Check Disqualification' has been run on this "
+        help="Set automatically when'Check Disqualification' has been run on this "
              "candidate. Ranking requires this to be True for every eligible "
              "candidate in the vacancy, to guarantee the 50% gate always runs "
              "before ranking — never after or skipped."
@@ -163,7 +163,7 @@ class RecruitmentCandidateScore(models.Model):
     has_offer_letter = fields.Boolean(
         string="Has Offer Letter", default=False, copy=False, readonly=True,
         tracking=True,
-        help="Set automatically when an offer letter is created for this candidate. "
+        help="Set automatically when an offer letter is created for this candidate."
              "Prevents duplicate offer letters being issued."
     )
 
@@ -695,7 +695,7 @@ class JobVacancyOfferableCandidates(models.Model):
         string="Has Offerable Candidates",
         compute="_compute_has_offerable_candidates",
         search="_search_has_offerable_candidates",
-        help="True if this vacancy currently has at least one candidate "
+        help="True if this vacancy currently has at least one candidate"
              "who is Selected and does not already have an offer letter."
     )
 
@@ -735,7 +735,7 @@ class RecruitmentOfferLetter(models.Model):
 
     reference = fields.Char(string="Offer Reference", copy=False, readonly=True,
                             default=lambda self: _("New"))
-    # ── CHANGED: only vacancies that still have at least one Selected,
+    # ── CHANGED: only vacancies that still have at least one Selected
     # not-yet-offered candidate are selectable.
     vacancy_id = fields.Many2one(
         "job.vacancy", string="Vacancy", required=True, tracking=True,
@@ -948,7 +948,7 @@ class RecruitmentApplicationWindow(models.Model):
     @api.depends("notification_date", "vacancy_id", "vacancy_id.sourcing_type")
     def _compute_deadline(self):
         """
-        BRD FR-REC-018: 5 working-day window for external vacancies.
+        BRD: 5 working-day window for external vacancies.
         Internal application windows use the vacancy last_date_to_apply directly.
         This field is editable so HR can extend/shorten as per procedure.
         """
@@ -959,7 +959,7 @@ class RecruitmentApplicationWindow(models.Model):
                 rec.deadline = False
 
     def check_application_allowed(self, application_date=None):
-        """BRD FR-REC-019: Reject applications after deadline unless HR granted late inclusion."""
+        """BRD: Reject applications after deadline unless HR granted late inclusion."""
         self.ensure_one()
         today = application_date or fields.Date.today()
         if self.is_closed and not self.late_inclusion_allowed:
@@ -970,7 +970,7 @@ class RecruitmentApplicationWindow(models.Model):
 
     @api.model
     def _cron_close_expired_windows(self):
-        """BRD FR-REC-019: Auto-close vacancy at specified Closing Date."""
+        """BRD: Auto-close vacancy at specified Closing Date."""
         today = fields.Date.today()
         windows = self.search([
             ("is_closed", "=", False),

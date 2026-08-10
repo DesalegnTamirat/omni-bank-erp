@@ -27,12 +27,12 @@ class HrEmployee(models.Model):
         2) Location-based shift
         3) Default system shift (Full Day)
         """
-        #checkin_buffer = 0.50  # 30-minute buffer
+        # checkin_buffer = 0.50  # 30-minute buffer
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
-        # ----------------------------
+
         # 1. Job-position-based shifts
-        # ----------------------------
+
         for job in job_position_exceptions:
             shift = job.shift_id
             if not shift:
@@ -51,9 +51,9 @@ class HrEmployee(models.Model):
                     _logger.info("Using Job-Position shift: %.2f - %.2f", shift.start_time, shift.end_time)
                     return shift.start_time, shift.end_time
 
-        # ----------------------------
+
         # 2. Location-based shifts
-        # ----------------------------
+
         for loc in location_exceptions:
             _logger.info("Checking Location Exception: %.2f - %.2f", loc.start_time, loc.end_time)
             if (loc.start_time - checkin_buffer) <= current_float <= loc.end_time:
@@ -66,10 +66,10 @@ class HrEmployee(models.Model):
             _logger.info("Check-in Restriction Disabled: Returning default shift bounds.")
             return morning_start, exit_time
 
-        # ----------------------------
+
         # 3. Default system shifts (Full Day)
-        # ----------------------------
-        # if (morning_start - checkin_buffer) <= current_float <= exit_time or current_float >= exit_time:
+
+        # if (morning_start - checkin_buffer) <= current_float <= exit_time or current_float >= exit_time
         if current_float >= (morning_start - checkin_buffer):
             _logger.info("Using Default Full Day shift: %.2f - %.2f", morning_start, exit_time)
             return morning_start, exit_time
@@ -89,7 +89,7 @@ class HrEmployee(models.Model):
         status = 'Normal'
         late_time = 0.0
         pre_defined_lateness_hours = 0.0
-        #checkin_buffer = 0.50
+        # checkin_buffer = 0.50
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
         if predefined_late and current_float <= predefined_late.end_time:
@@ -188,8 +188,8 @@ class HrEmployee(models.Model):
         _logger.info("Action Triggered | Employee: %s | Time: %.2f", self.name, current_float)
 
         # Load Parameters
-        #def _get_param_float(key, default):
-        #    return float(self.env['ir.config_parameter'].sudo().get_param(key, default))
+        # def _get_param_float(key, default)
+        # return float(self.env['ir.config_parameter'].sudo.get_param(key, default))
 
         morning_start = self._get_param_float('hr_attendance.morning_time', 8.0)
         exit_time = self._get_param_float('hr_attendance.exit_time', 17.0)
@@ -198,9 +198,9 @@ class HrEmployee(models.Model):
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
         saturday_exit = self._get_param_float('hr_attendance.saturday_exit_time', 14.75)
 
-        # ----------------------------------------------------
+
         # Saturday Half Day Logic (Head Office Only)
-        # ----------------------------------------------------
+
         is_saturday = local_dt.weekday() == 5
         operating_unit = self.default_operating_unit_id
         enable_saturday_halfday = self.env['ir.config_parameter'].sudo().get_param(
@@ -211,9 +211,9 @@ class HrEmployee(models.Model):
             _logger.info("Saturday Half-Day Applied | Employee: %s", self.name)
             exit_time = saturday_exit
 
-        # ----------------------------------------------------
+
         # Separation / Offboarding Validation
-        # ----------------------------------------------------
+
         if hasattr(self, 'exit_date') and self.exit_date and self.exit_date <= today_date:
             raise UserError(_(
                 "Attendance cannot be recorded.\n\n"
@@ -226,7 +226,7 @@ class HrEmployee(models.Model):
                 "Employee account is archived or inactive."
             ))
 
-        # ATT-8: ORM-level dismissal block. Even if the employee is still
+        # ORM-level dismissal block. Even if the employee is still
         # technically 'active', a finalised Level-1 / dismissal discipline case
         # MUST prevent attendance. This stops API callers from bypassing the UI guard.
         if self.env.get('discipline.case'):
@@ -242,11 +242,11 @@ class HrEmployee(models.Model):
                     "Contact HR to resolve."
                 ) % (self.name, active_dismissal.name))
 
-        # ----------------------------------------------------
+
         # Disciplinary Suspension Validation
         # Checks is_suspended and suspension_type from discipline_management.
         # Employees under any active suspension are blocked from attendance.
-        # ----------------------------------------------------
+
         if hasattr(self, 'is_suspended') and self.is_suspended:
             suspension_label = dict(
                 self._fields.get('suspension_type', fields.Selection([])).selection
@@ -268,9 +268,9 @@ class HrEmployee(models.Model):
                 "You are currently on approved leave:\n%s"
             ) % (leave.holiday_status_id.name if leave else _('Unknown Leave')))
 
-        # ----------------------------------------------------
+
         # Pre-approval Exceptions
-        # ----------------------------------------------------
+
         predefined_late = self.env['attendance.preapproval'].search([
             ('employee_id', '=', self.id), ('date', '=', today_date),
             ('state', '=', 'approved'), ('exception_type', '=', 'predefined_late'),
@@ -281,24 +281,24 @@ class HrEmployee(models.Model):
             ('state', '=', 'approved'), ('exception_type', '=', 'predefined_early_exit'),
             ('active', '=', True)
         ], limit=1)
-        # ----------------------------------------------------
+
         # Location Exceptions
-        # ----------------------------------------------------
+
         location_exceptions = self.env['location.based.exception'].search([
             ('operating_unit', '=', self.default_operating_unit_id.id),
             ('active', '=', True)
         ])
-        # ----------------------------------------------------
+
         # Job Position Exceptions
-        # ----------------------------------------------------
+
         job_position_exceptions = self.env['job.position.exception'].search([
             ('employee_id', '=', self.id), ('status', '=', 'active'),
             ('active', '=', True)
         ])
 
-        # ----------------------------------------------------
+
         # Determine Shift
-        # ----------------------------------------------------
+
         shift_start, shift_end = self._select_applicable_shift(
             current_float, morning_start, exit_time, location_exceptions, job_position_exceptions
         )
@@ -309,9 +309,9 @@ class HrEmployee(models.Model):
             ('employee_id', '=', self.id), ('check_out', '=', False)
         ], limit=1)
 
-        # ----------------------------------------------------
+
         # CHECK-IN (when no open attendance exists)
-        # ----------------------------------------------------
+
         if not open_attendance and self.attendance_state != 'lunch_out':
             enable_checkin_restriction = self.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkin_restriction', 'True')
@@ -330,7 +330,7 @@ class HrEmployee(models.Model):
                 checkin_dt = utc_naive_dt
             vals = {
                 'employee_id': self.id,
-                # 'check_in': utc_naive_dt,
+                # 'check_in': utc_naive_dt
                 'check_in': checkin_dt,
                 # Real wall-clock check-in moment, kept separately so the
                 # live dashboard timer starts counting from 00:00:00 at the
@@ -350,9 +350,9 @@ class HrEmployee(models.Model):
             attendance._enqueue_attendance_side_effects()
             return attendance
 
-        # ----------------------------------------------------
+
         # LUNCH-OUT (employee going for lunch)
-        # ----------------------------------------------------
+
         elif self.attendance_state == 'checked_in' and self._is_lunch_break_enabled():
             # Check if we're inside the lunch window
             lunch_start, lunch_end = self._get_lunch_window()
@@ -371,9 +371,9 @@ class HrEmployee(models.Model):
                 # Outside lunch window → proceed to check-out flow below
                 pass
 
-        # ----------------------------------------------------
+
         # BACK FROM LUNCH
-        # ----------------------------------------------------
+
         if self.attendance_state == 'lunch_out':
             attendance = self.env['hr.attendance'].search([
                 ('employee_id', '=', self.id), ('check_out', '=', False),
@@ -386,9 +386,9 @@ class HrEmployee(models.Model):
             _logger.info("Back-from-Lunch recorded for %s at %.2f", self.name, current_float)
             return attendance
 
-        # ----------------------------------------------------
+
         # CHECK-OUT
-        # ----------------------------------------------------
+
         if open_attendance and self.attendance_state != 'lunch_out':
             attendance = open_attendance
 
@@ -424,7 +424,7 @@ class HrEmployee(models.Model):
                 )
 
             vals = {
-                # 'check_out': utc_naive_dt,
+                # 'check_out': utc_naive_dt
                 'check_out': checkout_dt,
                 'check_out_status': status,
                 'early_exit_hour': early_exit,

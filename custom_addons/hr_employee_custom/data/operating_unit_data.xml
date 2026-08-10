@@ -5,10 +5,10 @@
     hr_operating_unit.py makes both fields required on operating.unit.
 -->
 <odoo noupdate="1">
-    <!-- Basic Operating Unit  -->
+    <!-- Basic Operating Unit -->
     <record id="main_operating_unit" model="operating.unit">
         <field name="name">Main Operating Unit</field>
-<!--        <field name="old_code">OU1</field>-->
+<!-- <field name="old_code">OU1</field> -->
         <field name="sol_id">1</field>
         <field name="work_unit_type">head_office</field>
     </record>

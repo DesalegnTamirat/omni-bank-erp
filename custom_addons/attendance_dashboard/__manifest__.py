@@ -22,16 +22,16 @@
               a FILTERed aggregate, cutting one DB round trip per load.
     """,
     'category': 'Human Resources',
-    'author': 'Sewalew Setotaw',
+    'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
     'license': 'LGPL-3',
 
     # hr_holidays: hr.leave is queried directly by table name in the KPI
-    #   query, so it must be installed for that table to exist.
+    # query, so it must be installed for that table to exist.
     # custom_hr_attendance: provides hr.attendance.check_in_status (Late)
-    #   used by the Late KPI.
+    # used by the Late KPI.
     # hr_employee_custom: provides hr.employee.default_operating_unit_id
-    #   and the operating.unit model used by the work-unit breakdown chart.
+    # and the operating.unit model used by the work-unit breakdown chart.
     'depends': [
         'hr',
         'hr_attendance',

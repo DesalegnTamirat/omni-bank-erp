@@ -21,23 +21,23 @@
             <list string="Internal Recruitment Selected Candidates" editable="top" limit="500" multi_edit="1" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"> 
                                     <field name="emp_name"/>
 									<field name="select_flag"/>
-<!--                                    <field name="emp_grade"/>-->
+<!-- <field name="emp_grade"/> -->
                                     <field name="emp_position"/>
-<!--                                    <field name="emp_category"/>-->
-<!--                                    <field name="emp_type"/>-->
-<!--                                    <field name="emp_gender"/>-->
+<!-- <field name="emp_category"/> -->
+<!-- <field name="emp_type"/> -->
+<!-- <field name="emp_gender"/> -->
                                     <field name="current_work_unit"/>
                                     <field name="current_department"/>
-<!--                                    <field name="service_in_company"/>-->
-<!--                                    <field name="educational_qualification"/>-->
-<!--                                    <field name="cgpa"/>-->
-<!--                                    <field name="relevant_experience"/>-->
-<!--                                    <field name="supervisory_experience"/>-->
-<!--                                    <field name="last_promotion"/>-->
-<!--                                    <field name="pms_score"/>-->
+<!-- <field name="service_in_company"/> -->
+<!-- <field name="educational_qualification"/> -->
+<!-- <field name="cgpa"/> -->
+<!-- <field name="relevant_experience"/> -->
+<!-- <field name="supervisory_experience"/> -->
+<!-- <field name="last_promotion"/> -->
+<!-- <field name="pms_score"/> -->
                                     <field name="preferred_location"/>
-<!--                                    <field name="written_warning"/>-->
-<!--                                    <field name="demoted"/>-->
+<!-- <field name="written_warning"/> -->
+<!-- <field name="demoted"/> -->
 
                                     <field name="written_exam_score"/>
                                     <field name="interview_score"/>
@@ -45,7 +45,7 @@
                                     <field name="weighted_score"/>
                                     <field name="selection_type"/>
                                     
-                                    <!-- FR-REC-056: Leave Status from Time Off module -->
+                                    <!-- Leave Status from Time Off module -->
                                     <field name="active_leave_status" string="Leave Status" readonly="1" optional="show" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"/>
 
                                     <field name="remarks"/>
@@ -76,7 +76,7 @@
                 <field name="job_position"/>
                 <field name="written_exam_date"/>
                 <field name="interview_date"/>
-<!--                <field name="promotion_revocation_days"/>-->
+<!-- <field name="promotion_revocation_days"/> -->
             </list>
         </field>
     </record>
@@ -109,12 +109,12 @@
                             <field name="status" invisible="1"/>
 
 
-<!--                            <field name="job_location"/>-->
-<!--                            <field name="job_grade"/>-->
-<!--                            <field name="job_category"/>-->
-<!--                             <field name="emp_type"/>-->
-<!--                            <field name="vacancy_announced_on"/>-->
-<!--                            <field name="no_of_vacancies"/>-->
+<!-- <field name="job_location"/> -->
+<!-- <field name="job_grade"/> -->
+<!-- <field name="job_category"/> -->
+<!-- <field name="emp_type"/> -->
+<!-- <field name="vacancy_announced_on"/> -->
+<!-- <field name="no_of_vacancies"/> -->
                         </group>
                         <group>
                             <field name="job_position"/>
@@ -122,12 +122,12 @@
                             <field name="interview_date" widget="datetime"/>
                              <field name="interview_location"/>
                              <field name="interview_scheduled"/>
-<!--                            <field name="highest_cgpa"/>-->
-<!--                            <field name="relevant_experience"/>-->
-<!--                            <field name="minimum_number_years_in_company"/>-->
-<!--                            <field name="no_of_months_since_last_written_notice"/>-->
-<!--                            <field name="no_of_months_since_last_promotion"/>-->
-<!--                            <field name="minimum_pms_score"/>-->
+<!-- <field name="highest_cgpa"/> -->
+<!-- <field name="relevant_experience"/> -->
+<!-- <field name="minimum_number_years_in_company"/> -->
+<!-- <field name="no_of_months_since_last_written_notice"/> -->
+<!-- <field name="no_of_months_since_last_promotion"/> -->
+<!-- <field name="minimum_pms_score"/> -->
                         </group>
                     </group>
                     <notebook>
@@ -136,23 +136,23 @@
                                 <list string="Selected Employees" editable="bottom">
                                     <field name="emp_name"/>
 									<field name="select_flag"/>
-<!--                                    <field name="emp_grade"/>-->
+<!-- <field name="emp_grade"/> -->
                                     <field name="emp_position"/>
-<!--                                    <field name="emp_category"/>-->
-<!--                                    <field name="emp_type"/>-->
-<!--                                    <field name="emp_gender"/>-->
+<!-- <field name="emp_category"/> -->
+<!-- <field name="emp_type"/> -->
+<!-- <field name="emp_gender"/> -->
                                     <field name="current_work_unit"/>
                                     <field name="current_department"/>
-<!--                                    <field name="service_in_company"/>-->
-<!--                                    <field name="educational_qualification"/>-->
-<!--                                    <field name="cgpa"/>-->
-<!--                                    <field name="relevant_experience"/>-->
-<!--                                    <field name="supervisory_experience"/>-->
-<!--                                    <field name="last_promotion"/>-->
-<!--                                    <field name="pms_score"/>-->
+<!-- <field name="service_in_company"/> -->
+<!-- <field name="educational_qualification"/> -->
+<!-- <field name="cgpa"/> -->
+<!-- <field name="relevant_experience"/> -->
+<!-- <field name="supervisory_experience"/> -->
+<!-- <field name="last_promotion"/> -->
+<!-- <field name="pms_score"/> -->
                                     <field name="preferred_location"/>
-<!--                                    <field name="written_warning"/>-->
-<!--                                    <field name="demoted"/>-->
+<!-- <field name="written_warning"/> -->
+<!-- <field name="demoted"/> -->
 
                                     <field name="written_exam_score"/>
                                     <field name="interview_score"/>
@@ -168,7 +168,7 @@
                             <field name="new_int_rec_panel">
                                 <list string="Panel Members" editable="bottom">
                                     <field name="emp_name"/>
-<!--                                    <field name="emp_position"/>-->
+<!-- <field name="emp_position"/> -->
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
                                 </list>

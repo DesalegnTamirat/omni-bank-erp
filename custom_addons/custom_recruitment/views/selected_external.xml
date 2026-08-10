@@ -118,7 +118,7 @@
                             <field name="ext_rec_panel">
                                 <list string="Panel Members" editable="bottom">
                                     <field name="emp_name"/>
-<!--                                    <field name="emp_position"/>-->
+<!-- <field name="emp_position"/> -->
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
                                 </list>

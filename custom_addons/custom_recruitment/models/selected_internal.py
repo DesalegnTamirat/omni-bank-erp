@@ -89,7 +89,7 @@ class NewInternalRecruitmentSelected(models.Model):
 
     def evaluate(self):
         n=0
-        usr = self.env.user.name #  name of login user details
+        usr = self.env.user.name # name of login user details
         for val in self.recr_selected_team_id:
             if val.status=="unavailable":
                 if usr==val.employee_name:
@@ -335,14 +335,14 @@ class InternalRecruitmentSelectedCandidates(models.Model):
             rec.write({'active': False})
         return True
 
-    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # Leave Status — cross-reference with Time Off module (hr.leave)
     # Displays on Written Exam Selection Table and Interview Evaluation Dashboard.
     # No new model; reads directly from hr.leave for the linked employee.
     active_leave_status = fields.Char(
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
              "if the employee has an approved leave covering today's date.",
     )
 
@@ -387,7 +387,7 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     pms_score = fields.Float(string="PMS Score", readonly=True,compute="_compute_employee_details",
                                 store=True)
     preferred_location=fields.Char(string="Preferred Location")
-    #preferred_location = fields.Many2one( "operating.unit",  string="Preferred Location")
+    # preferred_location = fields.Many2one( "operating.unit",  string="Preferred Location")
     written_warning = fields.Float(string="Months since Written Warning")
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     written_exam_score = fields.Float(string="Written Exam Score")

@@ -12,7 +12,7 @@ class PostprocessingSalaryInformationDetails(models.TransientModel):
     # commented out: 'hr.period' model does not exist in this module (belongs to an uninstalled payroll module)
     # hr_period = fields.Many2one("hr.period", string='Payroll Period', domain=[('state','=','open')])
 
-    # def populate(self):
+    # def populate(self)
         # print("self Date : ", self.date)
         # print("self hr_period: ", self.hr_period)
 
@@ -31,4 +31,4 @@ class PostprocessingSalaryInformationDetails(models.TransientModel):
         cr.execute("SELECT post_payroll_process(%s)", (p_id,))
         cr.commit()
         print("Post Process Payroll Executed")
-        # cr.close()
+        # cr.close

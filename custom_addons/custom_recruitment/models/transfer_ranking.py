@@ -27,7 +27,7 @@ class TransferCommitteeMinutes(models.Model):
         string="Target Vacancy",
         tracking=True,
         required=False,
-        help="Optional. Leave empty for committees reviewing direct transfer "
+        help="Optional. Leave empty for committees reviewing direct transfer"
              "requests that are not linked to a specific vacancy.",
     )
 
@@ -192,13 +192,13 @@ class TransferCommitteeMinutes(models.Model):
 
             rec.ranking_line_ids.unlink()
 
-            # --- Determine number of open slots for auto-selection ---------
+            # Determine number of open slots for auto-selection
             if rec.target_vacancy_id:
                 slots = rec.target_vacancy_id.no_of_vacancies or 1
             else:
                 slots = 1
 
-            # --- Normalize each factor across the pool (0-100 scale) ---------
+            # Normalize each factor across the pool (0-100 scale)
             dates = eligible_requests.mapped("request_date")
             min_date = min(dates)
             max_date = max(dates)

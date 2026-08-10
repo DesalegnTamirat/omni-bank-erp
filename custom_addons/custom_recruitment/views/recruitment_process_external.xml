@@ -35,7 +35,7 @@
             <form string="External Recruitment">
                 <header>
                     <field name="status" widget="statusbar"/>
-<!--                    <button name="populate_criteria" string="Populate Criteria" type="object" class="oe_highlight"/>-->
+<!-- <button name="populate_criteria" string="Populate Criteria" type="object" class="oe_highlight"/> -->
                     <button name="action_open_shortlist_wizard"
                             string="Shortlist Candidates"
                             type="object"

@@ -26,7 +26,7 @@ class OperatingUnitJobPosition(models.Model):
         ondelete='cascade',
     )
     job_position_id = fields.Many2one(
-        # comodel_name='employee.job',
+        # comodel_name='employee.job'
         comodel_name='hr.job',
         string='Job Position',
         required=True,
@@ -65,17 +65,17 @@ class OperatingUnitJobPosition(models.Model):
     )
 
     # @api.depends('operating_unit_id', 'job_position_id')
-    # def _compute_active_employee_count(self):
-    #     Employee = self.env['hr.employee']
-    #     for rec in self:
-    #         if rec.operating_unit_id and rec.job_position_id:
-    #             rec.active_employee_count = Employee.search_count([
-    #                 ('active', '=', True),
-    #                 ('employee_job_id', '=', rec.job_position_id.id),
-    #                 ('operating_unit_ids', 'in', rec.operating_unit_id.id),
-    #             ])
-    #         else:
-    #             rec.active_employee_count = 0
+    # def _compute_active_employee_count(self)
+    # Employee = self.env['hr.employee']
+    # for rec in self
+    # if rec.operating_unit_id and rec.job_position_id
+    # rec.active_employee_count = Employee.search_count([
+    # ('active', '=', True)
+    # ('employee_job_id', '=', rec.job_position_id.id)
+    # ('operating_unit_ids', 'in', rec.operating_unit_id.id)
+    # ])
+    # else
+    # rec.active_employee_count = 0
     @api.depends('operating_unit_id', 'job_position_id')
     def _compute_active_employee_count(self):
         Employee = self.env['hr.employee']

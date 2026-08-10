@@ -34,7 +34,7 @@ class JobVacancy(models.Model):
     ], string='Status', required=True, readonly=True, copy=False, tracking=True,
         default='draft')
 
-    # : Sourcing designation — Internal Only / External Only / Both
+    # Sourcing designation — Internal Only / External Only / Both
     sourcing_type = fields.Selection(
         [('internal', 'Internal Only'), ('external', 'External Only'), ('both', 'Both')],
         string='Sourcing Type', default='internal',
@@ -104,7 +104,7 @@ class JobVacancy(models.Model):
                     rec.internal_movement_type = 'internal'
                 rec.recruitment_type = 'Internal'
             elif rec.sourcing_type == 'both':
-                # For a vacancy that can be sourced both internally and externally,
+                # For a vacancy that can be sourced both internally and externally
                 # keep the legacy recruitment_type as 'Internal' so internal records
                 # are treated as internal and external records are treated as external.
                 # The external recruitment view relies on the external model, not on
@@ -135,7 +135,7 @@ class JobVacancy(models.Model):
     job_level = fields.Selection(
         [('junior', 'Junior'), ('senior', 'Senior / Regular')],
         string='Job Level',
-        help="Only applicable for Non-Managerial vacancies. Drives the "
+        help="Only applicable for Non-Managerial vacancies. Drives the"
              "Job Level shown on every Candidate Score linked to this "
              "vacancy — no longer chosen per-candidate."
     )
@@ -147,11 +147,11 @@ class JobVacancy(models.Model):
     )
     recruitment_reference = fields.Char(string="Recruitment Reference String")
 
-    # /013: Opening and closing dates with validation
+    # 013: Opening and closing dates with validation
     opening_date = fields.Date(string="Opening Date", default=fields.Date.context_today, required=True,
-                               help=" Vacancy opening date.")
+                               help="Vacancy opening date.")
     last_date_to_apply = fields.Date(string="Last Date To Apply", required=True,
-                                     help=" Closing Date must be > Opening Date.")
+                                     help="Closing Date must be > Opening Date.")
 
     vacancy_description = fields.Text(string="Vacancy Description", required=True)
     vacancy_announced_on = fields.Date(string="Vacancy Announced on")
@@ -208,7 +208,7 @@ class JobVacancy(models.Model):
     # cleared from their current role and released to start the new placement.
     release_date = fields.Date(
         string="Release Date",
-        help="Date on which the selected internal candidate was officially released from "
+        help="Date on which the selected internal candidate was officially released from"
              "their current position to take up the new role (transfer/promotion placement).",
         tracking=True,
         copy=False,
@@ -222,7 +222,7 @@ class JobVacancy(models.Model):
 
     competency_line_ids = fields.One2many(
         'job.vacancy.competency', 'vacancy_id', string="Competencies",
-        help=" Required competencies with required level."
+        help="Required competencies with required level."
     )
 
 
@@ -520,7 +520,7 @@ class JobVacancy(models.Model):
         return f"BB/{type_code}/{str(start_year)[-2:]}-{str(end_year)[-2:]}/"
 
     def _get_next_reference(self):
-        """: auto-generate Unique Vacancy Reference Number."""
+        """auto-generate Unique Vacancy Reference Number."""
         movement_type = self.internal_movement_type or 'internal'
         type_code = JOB_VACANCY_TYPE_CODE_MAP.get(movement_type, 'INT')
         current_prefix = self._get_fiscal_year_prefix(type_code)
@@ -589,7 +589,7 @@ class JobVacancy(models.Model):
         }
 
     def check_plan(self):
-        """/007: validate against approved workforce plan."""
+        """007: validate against approved workforce plan."""
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -603,7 +603,7 @@ class JobVacancy(models.Model):
         }
 
     def publish_vacancy(self):
-        """: publish vacancy. Auto-posts to website for external vacancies."""
+        """publish vacancy. Auto-posts to website for external vacancies."""
         for val in self.vac_del_team_id:
             if not val.approve:
                 raise ValidationError(_("You cannot publish the vacancy until it is fully Approved."))
@@ -643,7 +643,7 @@ class JobVacancy(models.Model):
         }
 
     def close_vacancy(self):
-        """: close vacancy at closing date. Also unpublishes from website."""
+        """close vacancy at closing date. Also unpublishes from website."""
         self.write({"vacancy_status": "closed"})
 
         # Auto-unpublish from website when closing vacancies
@@ -665,7 +665,7 @@ class JobVacancy(models.Model):
 
     @api.model
     def _cron_auto_close_expired_vacancies(self):
-        """: automatically close vacancies when closing date is reached."""
+        """automatically close vacancies when closing date is reached."""
         today = fields.Date.today()
         expired = self.search([
             ('vacancy_status', '=', 'published'),

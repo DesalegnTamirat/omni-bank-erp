@@ -13,7 +13,7 @@ class VacancyWorkunit(models.Model):
     workunit_name=fields.Char(string="Workunit Name")
     _rec_name = 'workunit_name'
     
-    #@api.model_cr
+    # @api.model_cr
     def init(self):
             tools.drop_view_if_exists(self.env.cr, 'vacancy_workunit')
             self.env.cr.execute("""

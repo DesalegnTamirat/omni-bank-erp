@@ -15,7 +15,7 @@
     <data noupdate="1">
 
         <!-- ================================================================ -->
-        <!-- 1. OPERATING UNITS (Work Units)                                  -->
+        <!-- 1. OPERATING UNITS (Work Units) -->
         <!-- ================================================================ -->
 
         <record id="demo_ou_it_directorate" model="operating.unit">
@@ -51,7 +51,7 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 2. DEPARTMENTS                                                    -->
+        <!-- 2. DEPARTMENTS -->
         <!-- ================================================================ -->
 
         <record id="demo_dept_it" model="hr.department">
@@ -71,7 +71,7 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 3. EMPLOYEE GRADES                                                -->
+        <!-- 3. EMPLOYEE GRADES -->
         <!-- ================================================================ -->
 
         <record id="demo_grade_15" model="employee.grade">
@@ -93,7 +93,7 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 4. JOB POSITIONS (hr.job)                                        -->
+        <!-- 4. JOB POSITIONS (hr.job) -->
         <!-- ================================================================ -->
 
         <record id="demo_job_senior_software_engineer" model="hr.job">
@@ -121,7 +121,7 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 5. DEMO EMPLOYEES                                                 -->
+        <!-- 5. DEMO EMPLOYEES -->
         <!-- ================================================================ -->
 
         <!--
@@ -206,8 +206,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 6. DISCIPLINARY CASES                                             -->
-        <!--    References offense levels from discipline_management module     -->
+        <!-- 6. DISCIPLINARY CASES -->
+        <!-- References offense levels from discipline_management module -->
         <!-- ================================================================ -->
 
         <!--
@@ -263,8 +263,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 7. BLACKLIST POOL                                                 -->
-        <!--    Demonstrates Section 6 – Blacklist Check on Applicants         -->
+        <!-- 7. BLACKLIST POOL -->
+        <!-- Demonstrates Section 6 – Blacklist Check on Applicants -->
         <!-- ================================================================ -->
 
         <!-- Blacklisted: Ex-employee dismissed for fraud at a partner institution -->
@@ -288,8 +288,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 8. DEFAULT EXTERNAL SHORTLIST CRITERIA                            -->
-        <!--    Section 7 of BRD – Default Shortlisting Criteria               -->
+        <!-- 8. DEFAULT EXTERNAL SHORTLIST CRITERIA -->
+        <!-- Section 7 of BRD – Default Shortlisting Criteria -->
         <!-- ================================================================ -->
 
         <record id="demo_default_shortlist_criteria" model="external.default.shortlist.criteria">
@@ -307,8 +307,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 9. RECRUITMENT REQUESTS                                           -->
-        <!--    Section 3 of BRD – Manpower Requisition Process                -->
+        <!-- 9. RECRUITMENT REQUESTS -->
+        <!-- Section 3 of BRD – Manpower Requisition Process -->
         <!-- ================================================================ -->
 
         <!--
@@ -356,8 +356,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 10. JOB VACANCIES                                                 -->
-        <!--     Section 4 of BRD – Job Vacancy Announcement                   -->
+        <!-- 10. JOB VACANCIES -->
+        <!-- Section 4 of BRD – Job Vacancy Announcement -->
         <!-- ================================================================ -->
 
         <!--
@@ -414,8 +414,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 11. EXTERNAL ELIGIBLE CANDIDATES (from posted vacancy)            -->
-        <!--     Section 8 of BRD – External Candidate Profiles                -->
+        <!-- 11. EXTERNAL ELIGIBLE CANDIDATES (from posted vacancy) -->
+        <!-- Section 8 of BRD – External Candidate Profiles -->
         <!-- ================================================================ -->
 
         <!--
@@ -454,8 +454,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 12. TRANSFER REQUESTS                                             -->
-        <!--     Section 12 of BRD – Employee Transfer Process                 -->
+        <!-- 12. TRANSFER REQUESTS -->
+        <!-- Section 12 of BRD – Employee Transfer Process -->
         <!-- ================================================================ -->
 
         <!--
@@ -510,8 +510,8 @@
         </record>
 
         <!-- ================================================================ -->
-        <!-- 13. TALENT ROSTER ENTRIES                                         -->
-        <!--     Section 9 of BRD – Reserve Pool / Talent Roster               -->
+        <!-- 13. TALENT ROSTER ENTRIES -->
+        <!-- Section 9 of BRD – Reserve Pool / Talent Roster -->
         <!-- ================================================================ -->
 
         <!--

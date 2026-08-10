@@ -33,7 +33,7 @@ class RecruitmentExperienceWeightConfig(models.Model):
         string='Weight (%)',
         digits=(5, 2),
         default=100.0,
-        help="Percentage at which experience from this work unit is counted "
+        help="Percentage at which experience from this work unit is counted"
              "(e.g. 100 for full credit, 50 for half credit)."
     )
 

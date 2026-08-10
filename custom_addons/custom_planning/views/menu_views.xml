@@ -23,8 +23,8 @@
               groups="custom_planning.group_planning_manager"
               sequence="10"/>
 
-<!--    <menuitem id="menu_planning_work_unit" name="Work Units" parent="menu_planning_configuration"-->
-<!--              action="action_planning_work_unit" sequence="30"/>-->
+<!-- <menuitem id="menu_planning_work_unit" name="Work Units" parent="menu_planning_configuration" -->
+<!-- action="action_planning_work_unit" sequence="30"/> -->
 
     <!-- Planning -->
     <menuitem id="menu_planning_planning" name="Planning" parent="menu_planning_root"
@@ -33,8 +33,8 @@
     <menuitem id="menu_planning_manpower" name="Man Power" parent="menu_planning_planning"
               groups="custom_planning.group_planning_user"
               sequence="10"/>
-<!--    <menuitem id="menu_planning_company_manpower" name="Company Man Power" parent="menu_planning_manpower"-->
-<!--              action="action_planning_company_manpower" sequence="10"/>-->
+<!-- <menuitem id="menu_planning_company_manpower" name="Company Man Power" parent="menu_planning_manpower" -->
+<!-- action="action_planning_company_manpower" sequence="10"/> -->
     <menuitem id="menu_planning_work_unit_manpower" name="Work Unit Man Power" parent="menu_planning_manpower"
               action="action_planning_work_unit_manpower"
               groups="custom_planning.group_planning_user"

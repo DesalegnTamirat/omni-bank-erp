@@ -277,7 +277,7 @@
                   sequence="50"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Certification (Task 10) -->
+        <!-- Certification -->
         <menuitem id="menu_eds_certifications"
                   name="Certificates"
                   parent="menu_eds_root"
@@ -297,7 +297,7 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Budget & Finance (Task 11) -->
+        <!-- Budget & Finance -->
         <menuitem id="menu_eds_finance"
                   name="Budget &amp; Finance"
                   parent="menu_eds_root"
@@ -317,7 +317,7 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Sponsorship & Education (Task 14) -->
+        <!-- Sponsorship & Education -->
         <menuitem id="menu_eds_sponsorship_education"
                   name="Sponsorship &amp; Education"
                   parent="menu_eds_root"
@@ -337,7 +337,7 @@
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Internship Facilitation (Task 15) -->
+        <!-- Internship Facilitation -->
         <menuitem id="menu_eds_internships"
                   name="Internships"
                   parent="menu_eds_root"
@@ -345,7 +345,7 @@
                   sequence="86"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- System Integrations (Task 13) -->
+        <!-- System Integrations -->
         <menuitem id="menu_eds_integrations"
                   name="Integrations"
                   parent="menu_eds_root"
@@ -377,7 +377,7 @@
                   sequence="40"
                   groups="employee_development_system.group_eds_admin"/>
 
-        <!-- Reporting & Analytics (Task 12) -->
+        <!-- Reporting & Analytics -->
         <menuitem id="menu_eds_reports"
                   name="Reports &amp; Analytics"
                   parent="menu_eds_root"

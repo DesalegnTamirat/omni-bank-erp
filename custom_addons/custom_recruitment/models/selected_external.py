@@ -85,7 +85,7 @@ class ExternalRecruitmentSelected(models.Model):
                     raise ValidationError('Approver is not an Employee')
                 else:
                     self.mail_channel_msgs(usr.id, self.vacancy_reference, self.job_position)
-            # else:
+            # else
                 # raise ValidationError('Please check again')
         self.state = "notify_approver"
 
@@ -104,7 +104,7 @@ class ExternalRecruitmentSelected(models.Model):
 
     def evaluate(self):
         n=0
-        usr = self.env.user.name #  name of login user details
+        usr = self.env.user.name # name of login user details
         for val in self.recr_exter_selected_team_id:
             if val.status=="unavailable":
                 if usr==val.employee_name:

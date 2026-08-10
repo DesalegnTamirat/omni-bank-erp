@@ -7,9 +7,9 @@ from odoo import api, models
 class HrAttendance(models.Model):
     _inherit = 'hr.attendance'
 
-    # ------------------------------------------------------------------
+
     # Public entry point (called by the OWL client action)
-    # ------------------------------------------------------------------
+
     @api.model
     def get_attendance_dashboard(self, filter_type='today'):
         """Aggregate KPI/chart data for the Attendance Dashboard client action.
@@ -44,9 +44,9 @@ class HrAttendance(models.Model):
             'workunit': self._dashboard_workunit_breakdown(cr, start_date, end_date),
         }
 
-    # ------------------------------------------------------------------
+
     # Helpers
-    # ------------------------------------------------------------------
+
     def _dashboard_date_range(self, filter_type, today):
         if filter_type == 'yesterday':
             yesterday = today - timedelta(days=1)

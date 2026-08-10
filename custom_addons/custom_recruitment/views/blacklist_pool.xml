@@ -19,10 +19,10 @@
     </record>
 
 
-<!--        <menuitem-->
-<!--        id="menu_recruitment_qualification"-->
-<!--        name="Recruitment Qualifications"-->
-<!--        parent="menu_recruitment_criteria_configuration"-->
-<!--        action="recruitment_qualification_form_tree"-->
-<!--    />-->
+<!-- <menuitem -->
+<!-- id="menu_recruitment_qualification" -->
+<!-- name="Recruitment Qualifications" -->
+<!-- parent="menu_recruitment_criteria_configuration" -->
+<!-- action="recruitment_qualification_form_tree" -->
+<!-- > -->
 </odoo>

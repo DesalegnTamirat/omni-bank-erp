@@ -35,7 +35,7 @@
 							
                         </group>
                          <group name="Existing Role">
-<!--                            <field name="reference" required="1"/>-->
+<!-- <field name="reference" required="1"/> -->
                             <field name="employee_name" required="1"/>
                             <field name="employee_id" invisible="1"/>
                             <field name="current_job_position"/>
@@ -139,8 +139,8 @@
                 <field name="end_date"/>
                 <field name="status"/>
 
-                <!--                <field name="active"  invisible="inactive == True"/>-->
-                <!--                <field name="inactive"  invisible="active == True"/>-->
+                <!-- <field name="active"  invisible="inactive == True"/> -->
+                <!-- <field name="inactive"  invisible="active == True"/> -->
             </list>
         </field>
     </record>
@@ -154,7 +154,7 @@
     <!-- <field name="name">Print Employee Report</field> -->
     <!-- <field name="model" ref="hr_employee_custom.acting"/> --> 
     <!-- <field name="state">code</field> -->
-    <!-- <field name="code">action = self.action_print_report()</field> -->
+    <!-- <field name="code">action = self.action_print_report</field> -->
 	<!-- </record> -->
 
 	<!-- <record id="action_print_report" model="ir.actions.server"> -->
@@ -163,14 +163,14 @@
     <!-- <field name="state">code</field> -->
     <!-- <field name="code"> -->
         <!-- action = None -->
-        <!-- if self.employee_category == 'managerial': -->
+        <!-- if self.employee_category == 'managerial' -->
             <!-- action = self.env['report'].get_action(self, 'your_module.report_managerial') -->
-        <!-- elif self.employee_category == 'non-managerial': -->
+        <!-- elif self.employee_category == 'non-managerial' -->
             <!-- action = self.env['report'].get_action(self, 'your_module.report_non_managerial') -->
 
-        <!-- if action: -->
+        <!-- if action -->
             <!-- return action -->
-        <!-- else: -->
+        <!-- else -->
             <!-- raise UserError("Unsupported employee category") -->
     <!-- </field> -->
 <!-- </record> -->

@@ -92,7 +92,7 @@
                                     <field name="recommendation"/>
                                     <field name="written_warning"/>
                                     <field name="demoted"/>
-                                    <!-- FR-REC-056: Leave Status from Time Off module -->
+                                    <!-- Leave Status from Time Off module -->
                                     <field name="active_leave_status" string="Leave Status" readonly="1"
                                            optional="show"
                                            decoration-danger="active_leave_status not in ('Active', 'N/A')"

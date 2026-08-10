@@ -199,12 +199,12 @@ class EmployeeTransferRequest(models.Model):
 
     reporting_manager_id = fields.Many2one(
         "hr.employee", string="Reporting Manager (New Position)",
-        help="Manager the employee will report to after the transfer. "
+        help="Manager the employee will report to after the transfer."
              "Used in the Employee Transfer Selection Notification letter.",
     )
     effective_transfer_date = fields.Date(
         string="Effective Transfer Date",
-        help="Date the employee is expected to report to the new position. "
+        help="Date the employee is expected to report to the new position."
              "Used in the Employee Transfer Selection Notification letter.",
     )
 

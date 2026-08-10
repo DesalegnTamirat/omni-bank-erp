@@ -108,10 +108,10 @@ class HrEmployeeGrade(models.Model):
                 raise ValidationError("Grade Name must contain letters. Pure numbers are not allowed.")
 
     # @api.constrains('grade_code')
-    # def _check_grade_code_length(self):
-    #     for record in self:
-    #         if record.grade_code and len(record.grade_code) < 2:
-    #             raise ValidationError("Grade Code must be at least 2 characters long.")
+    # def _check_grade_code_length(self)
+    # for record in self
+    # if record.grade_code and len(record.grade_code) < 2
+    # raise ValidationError("Grade Code must be at least 2 characters long.")
 
     @api.model_create_multi
     def create(self, vals_list):

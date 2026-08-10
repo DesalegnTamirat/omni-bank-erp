@@ -76,9 +76,9 @@ class AttendancePreApproval(models.Model):
             ], limit=1)
             rec.employee_id = employee
 
-    # ---------------------------
+
     # Utilities
-    # ---------------------------
+
     @staticmethod
     def _float_to_time(float_time):
         h = int(float_time)
@@ -92,9 +92,9 @@ class AttendancePreApproval(models.Model):
             end = rec._float_to_time(rec.end_time)
             rec.time_range = f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
-    # ---------------------------
+
     # Validations
-    # ---------------------------
+
     @api.constrains('date', 'start_time', 'end_time')
     def _check_time_validity(self):
 
@@ -136,9 +136,9 @@ class AttendancePreApproval(models.Model):
             if conflict:
                 raise ValidationError("This time window overlaps with another pre-approval.")
 
-    # ---------------------------
+
     # Workflow
-    # ---------------------------
+
     def action_submit(self):
         self.write({'state': 'requested'})
 

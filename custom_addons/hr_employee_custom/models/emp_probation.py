@@ -38,7 +38,7 @@ class ProbationAssessmentForm(models.Model):
     state = fields.Selection([("draft", "Draft"), ("notify", "Notified Hr"), ("evaluate", "Evaluated"), ("confirm_permenancy", "Confirmed"), ("reject", "Rejected"), ('terminate_contract', 'Terminated'),
                  ("inform_in_charge", "Informed")], string="State", default="draft")
     status = fields.Selection([("draft", "Draft"), ("notify_deligation", "Notify"), ("assess_evaluate", "Evaluate")], string="Status", default="draft")
-    # status1 = fields.Selection([("draft", "Draft"), ("notify_deligation", "Notified Hr"), ("evaluate", "Evaluated"), ("Confirm Permenancy", "Confirmed"), ("reject", "Rejected"),
+    # status1 = fields.Selection([("draft", "Draft"), ("notify_deligation", "Notified Hr"), ("evaluate", "Evaluated"), ("Confirm Permenancy", "Confirmed"), ("reject", "Rejected")
                               # ("inform_in_charge", "Informed)], string="Status", default="draft")
     total = fields.Integer(string="Total", compute="_compute_total")
     emp_prob_delig_team_id = fields.One2many("emp.probation.delegation.team", 'new_emp_prob_del_id', string="Employee probation Assesment Delegation Team")
@@ -95,7 +95,7 @@ class ProbationAssessmentForm(models.Model):
 			
     def assess_evaluate(self):
         n=0
-        usr = self.env.user.name #  name of login user details
+        usr = self.env.user.name # name of login user details
         for val in self.emp_prob_delig_team_id:
             if val.status=="unavailable":
                 if usr==val.employee_name:
@@ -184,8 +184,8 @@ class ProbationAssessmentForm(models.Model):
         }
 
 
-    # def inform_manager(self):
-        # for rec in self:
+    # def inform_manager(self)
+        # for rec in self
             # rec.sender = self.env.user.name
             # mng = self.env["hr.employee"].search([("name", "=", rec.name_of_probationer.employee_id.name)])
             # print("*************parent_id", mng.parent_id)
@@ -194,15 +194,15 @@ class ProbationAssessmentForm(models.Model):
             # usr = self.env["res.partner"].search([("name", "=", mng_name.name)])
             # msg = "Dear Sir<br>Here are the details of Probation Assessment of <br>Employee:  "
             # msg2 = "Please Approve"
-            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer.name, rec.position_title,
+            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer.name, rec.position_title
                                     # rec.place_of_assessment, rec.evaluation_period, msg2)
         # self.state = "inform_manager"
     def confirm_permenancy(self):
-        # for rec in self:
+        # for rec in self
             # usr = self.env["res.partner"].search([("name", "=", rec.sender)])
             # msg = "Dear Team<br>Probation Assessment of <br>Employee:  "
             # msg2 = "is <b><u>Approved</u></b>"
-            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title,
+            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title
                                     # rec.place_of_assessment, rec.evaluation_period, msg2)
        val = self.env["hr.version"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])
        value = {
@@ -239,11 +239,11 @@ class ProbationAssessmentForm(models.Model):
 	    }
 
     def terminate_contract(self):
-        # for rec in self:
+        # for rec in self
             # usr = self.env["res.partner"].search([("name", "=", rec.sender)])
             # msg = "Dear Team<br>Probation Assessment of <br>Employee:  "
             # msg2 = "is <b><u>Rejected</u></b>"
-            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title,
+            # self.mail_channel_msgs1(usr.id, msg, rec.name_of_probationer, rec.position_title
                                     # rec.place_of_assessment, rec.evaluation_period, msg2)
         self.state = "terminate_contract"
         val = self.env["hr.version"].search([("employee_id", "=", self.name_of_probationer.employee_id.name)])

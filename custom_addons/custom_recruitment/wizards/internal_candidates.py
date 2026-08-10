@@ -16,7 +16,7 @@ class internal_candidate_details(models.TransientModel):
     _description = 'Internal Candidates'
 
 
-    #job_id = fields.Many2one("hr.job", string='Job Positions', domain=[('state', '=', 'recruit')])
+    # job_id = fields.Many2one("hr.job", string='Job Positions', domain=[('state', '=', 'recruit')])
     job_id = fields.Many2one(
         "job.vacancy",
         string='Job Positions',

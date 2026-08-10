@@ -8,7 +8,7 @@
 
                     <group>
                         <field name="hr_job"/>
-<!--                        <field name="fuel_rate"/>-->
+<!-- <field name="fuel_rate"/> -->
                     </group>
 
 
@@ -29,12 +29,12 @@
         <field name="target">new</field>
     </record>
 
-<!--     <menuitem-->
-<!--           id="menu_notify_internal_candidates_wizard"-->
-<!--           name="Notify Internal Candidates Wizard"-->
-<!--           parent="menu_internal_recruitment"-->
-<!--           action="action_notify_internal_candidates_wizard"-->
+<!-- <menuitem -->
+<!-- id="menu_notify_internal_candidates_wizard" -->
+<!-- name="Notify Internal Candidates Wizard" -->
+<!-- parent="menu_internal_recruitment" -->
+<!-- action="action_notify_internal_candidates_wizard" -->
 
-<!--     />-->
+<!-- > -->
 
 </odoo>

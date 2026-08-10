@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+﻿# *- coding: utf-8 -*
 """
 Recruitment criteria and Probation Assessment models — fully owned by custom_recruitment.
 

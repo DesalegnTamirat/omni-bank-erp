@@ -6,8 +6,8 @@ import requests
 from odoo import models, api
 
 
-# class GenerateToken(models.Model):
-#     _name = 'generate.token'
+# class GenerateToken(models.Model)
+# _name = 'generate.token'
 
 
 class CallApi(models.Model):

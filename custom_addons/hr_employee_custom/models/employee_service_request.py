@@ -8,7 +8,7 @@ _logger = logging.getLogger(__name__)
 
 
 # NOTE: the 'service.request.type' model previously defined here was removed
-# to avoid a duplicate _name declaration conflicting with service_request_type.py,
+# to avoid a duplicate _name declaration conflicting with service_request_type.py
 # which is the authoritative definition (see service_request_type.py).
 
 
@@ -92,9 +92,9 @@ class ServiceRequestEmployee(models.Model):
 
     authorizer_id = fields.Many2one("hr.employee", string="Authorizer", ondelete="set null")
 
-    # -------------------------------------------------------------------------
+
     # Employee information – all populated in default_get
-    # -------------------------------------------------------------------------
+
     employee_id = fields.Many2one("hr.employee", string="Employee Name", readonly=True)
 
     employee_manager   = fields.Char(string="Manager",       readonly=True)
@@ -109,9 +109,9 @@ class ServiceRequestEmployee(models.Model):
     employee_mail      = fields.Char(string="Email",     readonly=True)
     employee_phone     = fields.Char(string="Phone Number", readonly=True)
 
-    # -------------------------------------------------------------------------
+
     # Acting / Transfer
-    # -------------------------------------------------------------------------
+
     acting_vacant_position    = fields.Many2one("hr.job",       string="Vacant Position (Acting)")
     acting_suggested_employee = fields.Many2one("hr.employee",  string="Suggested Employee (Acting)")
     transfer_ou1 = fields.Many2one("operating.unit", string="Requested Operating Unit (Transfer)")
@@ -120,9 +120,9 @@ class ServiceRequestEmployee(models.Model):
     start_date = fields.Date(string="Start Date")
     end_date   = fields.Date(string="End Date")
 
-    # -------------------------------------------------------------------------
+
     # Guarantee Letter
-    # -------------------------------------------------------------------------
+
     name_of_the_external_person = fields.Char(string="Name of the external Person")
     name_of_the_organization    = fields.Char(string="Name of the Organization")
     organization_address        = fields.Char(string="Organization Address")
@@ -132,18 +132,18 @@ class ServiceRequestEmployee(models.Model):
     kebele       = fields.Char(string="Kebele")
     phone_number = fields.Char(string="Phone Number")
 
-    # -------------------------------------------------------------------------
+
     # Support Letter
-    # -------------------------------------------------------------------------
+
     support           = fields.Char(string="Support")
     organization_name = fields.Char(string="Organization Name")
     salary            = fields.Float(string="Salary")
     permanent_emp     = fields.Boolean(string="Permanent Employee")
     job_position      = fields.Char(string="Job Position")
 
-    # -------------------------------------------------------------------------
+
     # Extension Fields
-    # -------------------------------------------------------------------------
+
     rejection_reason = fields.Text(
         string="Reason for Rejection", readonly=True, copy=False
     )
@@ -400,7 +400,7 @@ class ServiceRequestEmployee(models.Model):
     def notify(self):
         self.ensure_one()
 
-        # ----- Step 1: Input/Limit Validation --------------------------------
+        # Step 1: Input/Limit Validation
         if self.sr_category == "Self Service Letter":
             if self.letter_name == "Guarantee Letter":
                 self._check_guarantee_fields()
@@ -447,10 +447,10 @@ class ServiceRequestEmployee(models.Model):
             if not self.transfer_ou1:
                 raise ValidationError('Requested Operating Unit is required.')
 
-        # ----- Step 2: Stamp reference number --------------------------------
+        # Step 2: Stamp reference number
         self._assign_reference_if_new()
 
-        # ----- Step 3: Resolve metadata values for the notification ---------
+        # Step 3: Resolve metadata values for the notification
         rec = self.sudo().browse(self.id)
 
         sr_type_label = ''
@@ -475,7 +475,7 @@ class ServiceRequestEmployee(models.Model):
 
         employee_name = rec.employee_id.name if rec.employee_id else requestor_name
 
-        # ----- Step 4: Resolve Recipient Partner IDs (Manager + HR List) -----
+        # Step 4: Resolve Recipient Partner IDs (Manager + HR List)
         partner_ids = []
 
         # 1. Fetch Requestor's Direct Line Manager Partner ID
@@ -522,7 +522,7 @@ class ServiceRequestEmployee(models.Model):
             self.id, rec.reference, partner_ids
         )
 
-        # ----- Step 5: Dispatch notifications (discuss.channel Direct Message) ---
+        # Step 5: Dispatch notifications (discuss.channel Direct Message)
         if partner_ids:
             for pid in partner_ids:
                 self._discuss_channel_msg(
@@ -538,7 +538,7 @@ class ServiceRequestEmployee(models.Model):
                 self.id,
             )
 
-        # ----- Step 6: Create or update Guarantees Details (for Guarantee Letters) -----
+        # Step 6: Create or update Guarantees Details (for Guarantee Letters)
         if self.letter_name == 'Guarantee Letter' and self.sr_category == 'Self Service Letter':
             try:
                 existing_guarantee = self.env['guarentees.details'].search([
@@ -569,7 +569,7 @@ class ServiceRequestEmployee(models.Model):
                     self.id, e
                 )
 
-        # ----- Step 7: Mark submitted and reload the form -------------------
+        # Step 7: Mark submitted and reload the form
         self.write({'status': 'submitted'})
 
         return {

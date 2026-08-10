@@ -26,7 +26,7 @@ class PlanningWorkUnitManpower(models.Model):
 
     available_fiscal_year_ids = fields.Many2many(
         'planning.fiscal.year', compute='_compute_available_fiscal_year_ids',
-        help="Technical field: Fiscal Years not already tied to an active "
+        help="Technical field: Fiscal Years not already tied to an active"
              "(Draft/Initiated/Approved) plan for the selected Work Unit. "
              "Used to filter the Fiscal Year dropdown.")
 
@@ -34,7 +34,7 @@ class PlanningWorkUnitManpower(models.Model):
     date_end = fields.Date(string='End Date', compute='_compute_dates', store=True, readonly=True)
 
     # company_id = fields.Many2one(
-    #     'res.company', string='Company', default=lambda self: self.env.company)
+    # 'res.company', string='Company', default=lambda self: self.env.company)
 
     manpower_line_ids = fields.One2many(
         'planning.manpower.line', 'work_unit_manpower_id', string='Man Power Details')
@@ -45,12 +45,12 @@ class PlanningWorkUnitManpower(models.Model):
     approver_id = fields.Many2one(
         'hr.employee', string='Approver', compute='_compute_approver_id',
         store=True, readonly=True,
-        help="The employee, resolved from the parent Work Unit hierarchy, who "
+        help="The employee, resolved from the parent Work Unit hierarchy, who"
              "is responsible for approving or rejecting this plan.")
 
     initiator_id = fields.Many2one(
         'hr.employee', string='Initiated By', readonly=True, copy=False, tracking=True,
-        help="The employee who initiated (submitted) this plan. This person "
+        help="The employee who initiated (submitted) this plan. This person"
              "is not permitted to also approve or reject it, to enforce "
              "segregation of duties.")
 
@@ -66,7 +66,7 @@ class PlanningWorkUnitManpower(models.Model):
         ('N', 'No'),
         ('Y', 'Yes'),
     ], string='Deleted', default='N', copy=False, tracking=True, required=True,
-        help="Soft-delete marker. 'Y' means this record is deleted and is "
+        help="Soft-delete marker.'Y' means this record is deleted and is "
              "hidden from normal views by the associated record rule, but "
              "the row itself is kept in the database.")
 
@@ -126,7 +126,7 @@ class PlanningWorkUnitManpower(models.Model):
                 ('id', '!=', rec._origin.id if rec._origin else rec.id),
             ])
             used_fiscal_year_ids = blocking.mapped('fiscal_year_id').ids
-            # Always keep the currently-set fiscal year selectable too,
+            # Always keep the currently-set fiscal year selectable too
             # so an existing record doesn't appear to lose its own value.
             available = all_fiscal_years.filtered(
                 lambda fy: fy.id not in used_fiscal_year_ids or fy == rec.fiscal_year_id

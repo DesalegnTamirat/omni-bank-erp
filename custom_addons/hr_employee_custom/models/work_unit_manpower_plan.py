@@ -108,10 +108,10 @@ class ManpowerPlan(models.Model):
         print("Updating Manpower  Plan")
         self.env.cr.execute('SELECT update_ou_manpower_planning_cost()')
 
-    # def submit(self):
-    #     print("self",self)
-    # def approve(self):
-    #     print(self)
+    # def submit(self)
+    # print("self",self)
+    # def approve(self)
+    # print(self)
     def unlink(self):
         for val in self.manpower_plan_id:
             val.unlink()
@@ -128,7 +128,7 @@ class ManpowerPlan(models.Model):
                     [("plan_version", "=", self.plan_version.plan_version)])
                 my_list = []
                 print("company_manpower_info======================", company_manpower_info.plan_version)
-                #####################raghu code##################
+                # ####################raghu code##################
                 if company_manpower_info.company_manpower_plan_id:
                     for val in self.manpower_plan_id:
                         if val.position:
@@ -179,12 +179,12 @@ class ManpowerPlan(models.Model):
                 raise ValidationError('Sorry! you can not confirm this work unit.')
         else:
             raise ValidationError('Please finish the Approval Process before confirming')
-####################################raghu code################################
+# ###################################raghu code################################
     @api.onchange('plan_version')
     def _onchange_plan_version(self):
         print("id================================================",self.plan_version.id)
         company_procruitment=self.env['manpower.plan'].search([("id","=",self.plan_version.id)])
-        # ACCOUNTING FISCAL YEAR MODULE NOT INSTALLED — manpower.plan.fiscal_year,
+        # ACCOUNTING FISCAL YEAR MODULE NOT INSTALLED — manpower.plan.fiscal_year
         # plan_start_date and plan_end_date are all commented out on that model
         # (they depend on account.fiscal.year). Restore these three lines once
         # that module is installed and the fields are uncommented.
@@ -193,40 +193,40 @@ class ManpowerPlan(models.Model):
         # self.plan_end_date=company_procruitment.plan_end_date
 
     # @api.onchange('plan_version')
-    # def _onchange_plan_version(self):
-	    # if self.plan_version:
+    # def _onchange_plan_version(self)
+	    # if self.plan_version
            # company_procruitment=self.env['manpower.plan'].search([("plan_version","=",self.plan_version)])
            # self.fiscal_year=company_procruitment.fiscal_year.name
            # self.plan_start_date=company_procruitment.plan_start_date
            # self.plan_end_date=company_procruitment.plan_end_date
 
     # @api.model
-    # def create(self, vals):
-    #     print("vals2=", vals)
-    #     mylist=[]
-    #     if "manpower_plan_id" in vals:
-    #         for val in vals["manpower_plan_id"]:
-    #             mylist.append(val[2]["position"])
-    #         for n, i in enumerate(mylist):
-    #                 if i in mylist[:n]:
-    #                     get_position=self.env["manpower.plan.jobs"].search([("id","=",i)])
-    #                     raise ValidationError(get_position.position.name+"already exists")
-    #
-    #     return super(ManpowerPlan, self).create(vals)
-    # def write(self,vals):
-    #     for val in self.manpower_plan_id:
-    #         if "manpower_plan_id" in vals:
-    #             for val2 in vals["manpower_plan_id"]:
-    #                 print("vals2=", val.position, val2)
-    #                 if val2[2] and "position" in val2[2]:
-    #                     if val.position.id==val2[2]["position"]:
-    #                         raise ValidationError(val.position.position.name + "  Position Already Exists")
-    #                 else:
-    #                     if val2[1]:
-    #                         get_position = self.env["manpower.plan.jobs"].search([("id", "=", val2[1])])
-    #                         if val.position.id == get_position.id:
-    #                             raise ValidationError(val.position.position.name + " Position Already Exists")
-    #     return super(ManpowerPlan, self).write(vals)
+    # def create(self, vals)
+    # print("vals2=", vals)
+    # mylist=[]
+    # if "manpower_plan_id" in vals
+    # for val in vals["manpower_plan_id"]
+    # mylist.append(val[2]["position"])
+    # for n, i in enumerate(mylist)
+    # if i in mylist[:n]
+    # get_position=self.env["manpower.plan.jobs"].search([("id","=",i)])
+    # raise ValidationError(get_position.position.name+"already exists")
+
+    # return super(ManpowerPlan, self).create(vals)
+    # def write(self,vals)
+    # for val in self.manpower_plan_id
+    # if "manpower_plan_id" in vals
+    # for val2 in vals["manpower_plan_id"]
+    # print("vals2=", val.position, val2)
+    # if val2[2] and "position" in val2[2]
+    # if val.position.id==val2[2]["position"]
+    # raise ValidationError(val.position.position.name + "  Position Already Exists")
+    # else
+    # if val2[1]
+    # get_position = self.env["manpower.plan.jobs"].search([("id", "=", val2[1])])
+    # if val.position.id == get_position.id
+    # raise ValidationError(val.position.position.name + " Position Already Exists")
+    # return super(ManpowerPlan, self).write(vals)
 
 
 
@@ -293,26 +293,26 @@ class Requirements2(models.Model):
             
          
     # @api.depends('total', 'position_cost')
-    # def _compute_estimated_cost(self):
-        # for val in self:
-            # if val.total and val.position_cost:
+    # def _compute_estimated_cost(self)
+        # for val in self
+            # if val.total and val.position_cost
                 # val.estimated_cost= val.total*val.position_cost
                 # return val.estimated_cost
-            # else:
+            # else
               # val.estimated_cost= 0.0
               # return val.estimated_cost
          
     
-    # def _compute_total(self):
-    #     self.total=self.july+self.august+self.september+self.october+self.november+self.december+self.january+self.february+self.march+self.april+self.may+self.june
-    #     return self.total
+    # def _compute_total(self)
+    # self.total=self.july+self.august+self.september+self.october+self.november+self.december+self.january+self.february+self.march+self.april+self.may+self.june
+    # return self.total
 
     # @api.onchange('product')
-    # def _onchange_product(self):
-    #     print("product=====================", self.product)
-    #     print("employee_name=====================", self.product.description)
-    #     self.description =  self.product
-    #     self.category = self.product.categ_id
+    # def _onchange_product(self)
+    # print("product=====================", self.product)
+    # print("employee_name=====================", self.product.description)
+    # self.description =  self.product
+    # self.category = self.product.categ_id
 
     @api.onchange('position')
     def _onchange_position(self):

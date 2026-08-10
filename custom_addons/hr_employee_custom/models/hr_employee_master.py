@@ -10,17 +10,17 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
     _description = "Employee information"
 
-    # ------------------------------------------------------------------
+
     # Identification
-    # ------------------------------------------------------------------
+
     identification_id = fields.Char(string="Employee Identification")
     # Kept distinct from identification_id above - different field, used by
     # the legacy hr_employee_view.xml (see module docstring above).
     employee_identification = fields.Char(string="Employee Identification", help="Employee Id")
 
-    # ------------------------------------------------------------------
+
     # Contact info
-    # ------------------------------------------------------------------
+
     mobile_phone = fields.Char(string="Work Mobile")
     work_phone = fields.Char(string="Work Phone")
     work_email = fields.Char(string="Work Email")
@@ -39,9 +39,9 @@ class HrEmployee(models.Model):
         string='Gender',
         store=True,
     )
-    # ------------------------------------------------------------------
+
     # Address / locality
-    # ------------------------------------------------------------------
+
     house_number = fields.Char(string="House Number", help="House Number")
     city = fields.Char(string="City", help="City")
     sub_city = fields.Char(string="Sub City", help="Sub City")
@@ -49,9 +49,9 @@ class HrEmployee(models.Model):
     woreda = fields.Char(string="Woreda", help="Woreda")
     kebele = fields.Char(string="Kebele", help="Kebele")
 
-    # ------------------------------------------------------------------
+
     # Family / personal
-    # ------------------------------------------------------------------
+
     short_name = fields.Char(string="Short  Name", related='resource_id.name', required=False, store=True,
                              readonly=False)
     father_name = fields.Char(string='Father Name')
@@ -75,9 +75,9 @@ class HrEmployee(models.Model):
     crime_no = fields.Char("Crime No")
     age = fields.Char(string="Age")
 
-    # ------------------------------------------------------------------
+
     # Languages
-    # ------------------------------------------------------------------
+
     languages = fields.Char(string="Languages")
     language_ids = fields.Many2many('res.lang', string="Languages")
     languages_ids = fields.One2many('hr.languages', 'employee_id', string='HR Languages', help='Languages Information')
@@ -103,9 +103,9 @@ class HrEmployee(models.Model):
     remarks = fields.Char("Remarks if any")
     releived_on = fields.Char("Releived on")
 
-    # ------------------------------------------------------------------
+
     # Probation
-    # ------------------------------------------------------------------
+
     probation_start_date = fields.Date(
         string="Probation Start date",
         help="Probation Start date",
@@ -191,9 +191,9 @@ class HrEmployee(models.Model):
             else:
                 employee.probationary_details = False
 
-    # ------------------------------------------------------------------
+
     # Pension
-    # ------------------------------------------------------------------
+
     pension_number = fields.Char(string="Pension Number", help="Pension Number")
     pension_no = fields.Char("Pension No")
 
@@ -211,9 +211,9 @@ class HrEmployee(models.Model):
     entry_progress = fields.Integer(string="Entry Progress", default=0)
     exit_progress = fields.Integer(string="Exit Progress", default=0)
 
-    # ------------------------------------------------------------------
+
     # Hierarchy / management
-    # ------------------------------------------------------------------
+
     hr_officer_id = fields.Many2one('res.users', string="HR Officer Assigned")
     alternate_parent = fields.Integer(string="Incharge Manager Partner ID")
     alternate_manager = fields.Integer(string="Incharge Manager")
@@ -243,9 +243,9 @@ class HrEmployee(models.Model):
             elif not employee.planning_parent_id:
                 employee.planning_parent_id = False
 
-    # ------------------------------------------------------------------
+
     # Related record lines (One2many)
-    # ------------------------------------------------------------------
+
     Supplementary_ids = fields.One2many('supplementary.multi.role', 'employee_id', string='supplementary Role',
                                         help='supplementary Role Information')
     fam_ids = fields.One2many('hr.employee.family', 'employee_id', string='Family', help='Family Information')
@@ -263,9 +263,9 @@ class HrEmployee(models.Model):
     pension_info = fields.One2many("pension.multi.record", 'employee_id', string="Pension Information",
                                    help='Pension Information')
     sponsorship_info = fields.One2many("education.fee.sponsorship", 'sponsorship_id',
-                                       string=" Education Fee Sponsorship", help=' Education Fee Sponsorship')
+                                       string=" Education Fee Sponsorship", help='Education Fee Sponsorship')
     commitment_info = fields.One2many("training.commitment", 'commitment_id', string="Training Commitment",
-                                      help=' Training Commitment')
+                                      help='Training Commitment')
 
     qualification_id = fields.One2many('hr.qualification.info.employee', 'employee_id', 'Education Qualification')
     experiance_id = fields.One2many('hr.experience.info.employee', 'employee_id', 'Experiance')
@@ -274,16 +274,16 @@ class HrEmployee(models.Model):
     # From employee_fields_application (hr_employee_hrMaster.py)
     responsible_user_id = fields.Many2one('res.users', "Responsible", default=lambda self: self.env.uid)
 
-    # ------------------------------------------------------------------
+
     # Compute methods
-    # ------------------------------------------------------------------
+
     def _compute_award_count(self):
         for employee in self:
             employee.award_count = len(employee.award_ids)
 
-    # ------------------------------------------------------------------
+
     # Actions
-    # ------------------------------------------------------------------
+
     def action_save_employee(self):
         self.ensure_one()
         return {

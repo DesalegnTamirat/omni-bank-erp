@@ -6,7 +6,7 @@ from datetime import date
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
-# : default configurable transfer assessment parameters.
+# default configurable transfer assessment parameters.
 # Kept as module-level defaults; each transfer.assessment.config record can
 # override them per policy update, consistent with the BRD note that
 # "assessment rules must be flexible when procedure changes."
@@ -16,7 +16,7 @@ DEFAULT_PASSING_SCORE = 50.0  # BRD 8.3: "Minimum score of 50% required in any i
 
 
 class TransferAssessmentConfig(models.Model):
-    """: Transfer Assessment Configuration.
+    """Transfer Assessment Configuration.
 
     Single active configuration record (similar to a settings singleton)
     that HR Administrators can adjust when assessment procedures change,
@@ -52,7 +52,7 @@ class TransferAssessmentConfig(models.Model):
 
 
 class TransferAssessment(models.Model):
-    """: Transfer Assessment record.
+    """Transfer Assessment record.
 
     One record per Employee Transfer Request (employee.transfer.request),
     covering written exam and interview scheduling, scoring, approval,
@@ -74,7 +74,7 @@ class TransferAssessment(models.Model):
 
     name = fields.Char(string="Reference", copy=False, readonly=True, default=lambda self: _("New"))
 
-    #  / : link back to the originating Transfer Request
+    # link back to the originating Transfer Request
     transfer_request_id = fields.Many2one(
         "employee.transfer.request", string="Transfer Request", required=True,
         ondelete="cascade", tracking=True,
@@ -91,12 +91,12 @@ class TransferAssessment(models.Model):
         help="Configurable weighting/passing-score parameters .",
     )
 
-    # : Transfer-specific written exam ----------------
+    # Transfer-specific written exam
     exam_scheduled_date = fields.Datetime(string="Written Exam Date")
     exam_score = fields.Float(string="Written Exam Score (%)", tracking=True)
     exam_completed = fields.Boolean(string="Exam Completed", default=False)
 
-    # : Transfer interview scheduling with configurable panel -----
+    # Transfer interview scheduling with configurable panel
     interview_scheduled_date = fields.Datetime(string="Interview Date")
     interview_panel_ids = fields.Many2many(
         "hr.employee", "transfer_assessment_panel_rel", "assessment_id", "employee_id",
@@ -106,31 +106,31 @@ class TransferAssessment(models.Model):
     interview_score = fields.Float(string="Interview Score (%)", tracking=True)
     interview_completed = fields.Boolean(string="Interview Completed", default=False)
 
-    # : Automatic score calculation ------------------
+    # Automatic score calculation
     weighted_assessment_score = fields.Float(
         string="Weighted Assessment Score (%)", compute="_compute_weighted_score", store=True,
         help="(Exam Score x Exam Weight) + (Interview Score x Interview Weight), per .",
     )
     passed_minimum_component_score = fields.Boolean(
         string="Passed Minimum Component Score", compute="_compute_weighted_score", store=True,
-        help="True only if both Exam Score and Interview Score individually meet the configured "
+        help="True only if both Exam Score and Interview Score individually meet the configured"
              "minimum passing score (BRD 8.3 / .",
     )
 
-    #  / : integration with Transfer Ranking Algorithm --
+    # integration with Transfer Ranking Algorithm
     transfer_suitability_score = fields.Float(
         related="transfer_request_id.transfer_suitability_score", string="Transfer Suitability Score (Ranking)",
         store=True, readonly=True,
-        help="Populated by the Transfer Committee Minutes ranking engine , "
+        help="Populated by the Transfer Committee Minutes ranking engine"
              "combined here with assessment results per .",
     )
     final_transfer_result = fields.Float(
         string="Final Transfer Result (%)", compute="_compute_final_result", store=True,
-        help="Combines Weighted Assessment Score with the Transfer Suitability Score "
+        help="Combines Weighted Assessment Score with the Transfer Suitability Score"
              "from the ranking engine .",
     )
 
-    #  / : Approval & Notification -------------
+    # Approval & Notification
     state = fields.Selection(
         [
             ("draft", "Draft"),
@@ -146,9 +146,9 @@ class TransferAssessment(models.Model):
     approved_date = fields.Datetime(string="Approval Date", readonly=True, copy=False)
     result_published_date = fields.Datetime(string="Result Published Date", readonly=True, copy=False)
 
-    # ---------------------------------------
+
     # Sequence
-    # ---------------------------------------
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -156,9 +156,9 @@ class TransferAssessment(models.Model):
                 vals["name"] = self.env["ir.sequence"].next_by_code("transfer.assessment") or _("New")
         return super().create(vals_list)
 
-    # ---------------------------------------
-    # Computations , 
-    # ---------------------------------------
+
+    # Computations
+
     @api.depends("exam_score", "interview_score", "config_id.exam_weight", "config_id.interview_weight",
                  "config_id.passing_score")
     def _compute_weighted_score(self):
@@ -180,9 +180,9 @@ class TransferAssessment(models.Model):
     @api.depends("weighted_assessment_score", "transfer_suitability_score")
     def _compute_final_result(self):
         for rec in self:
-            # : combine assessment results with the ranking-engine
+            # combine assessment results with the ranking-engine
             # Transfer Suitability Score. Weighted evenly by default; the
-            # ranking engine  already embeds PMS/experience/
+            # ranking engine  already embeds PMS/experience
             # service/recommendation/date, so this final figure represents
             # "assessment fitness" blended with "ranking suitability".
             if rec.transfer_suitability_score:
@@ -192,11 +192,11 @@ class TransferAssessment(models.Model):
             else:
                 rec.final_transfer_result = rec.weighted_assessment_score
 
-    # ---------------------------------------
+
     # Workflow Actions
-    # ---------------------------------------
+
     def action_schedule(self):
-        """: schedule interview/exam. Requires both dates set."""
+        """schedule interview/exam. Requires both dates set."""
         for rec in self:
             if not rec.exam_scheduled_date and not rec.interview_scheduled_date:
                 raise ValidationError(_("Please set a Written Exam Date and/or an Interview Date before scheduling."))
@@ -204,7 +204,7 @@ class TransferAssessment(models.Model):
             rec.message_post(body=_("Transfer assessment scheduled."))
 
     def action_mark_assessed(self):
-        """: lock in scores once both exam and interview are completed."""
+        """lock in scores once both exam and interview are completed."""
         for rec in self:
             if not rec.exam_completed or not rec.interview_completed:
                 raise ValidationError(
@@ -217,7 +217,7 @@ class TransferAssessment(models.Model):
             )
 
     def action_submit_for_approval(self):
-        """: route transfer assessment results for approval."""
+        """route transfer assessment results for approval."""
         for rec in self:
             if rec.state != "assessed":
                 raise UserError(_("Only completed (Assessed) records can be submitted for approval."))
@@ -225,7 +225,7 @@ class TransferAssessment(models.Model):
             rec.message_post(body=_("Transfer assessment result submitted for approval."))
 
     def action_approve(self):
-        """: approve the transfer assessment result."""
+        """approve the transfer assessment result."""
         for rec in self:
             if rec.state != "pending_approval":
                 raise UserError(_("Only results Pending Approval can be approved."))
@@ -237,7 +237,7 @@ class TransferAssessment(models.Model):
             rec.message_post(body=_("Transfer assessment result approved by %s.") % self.env.user.name)
 
     def action_publish_result(self):
-        """: notify the transfer applicant of their assessment results."""
+        """notify the transfer applicant of their assessment results."""
         for rec in self:
             if rec.state != "approved":
                 raise UserError(_("Only Approved results can be published to the applicant."))
@@ -262,14 +262,14 @@ class TransferAssessment(models.Model):
                     channel = self.env["discuss.channel"]._get_or_create_chat(partners_to=[partner.id])
                     channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
                 except Exception:
-                    pass  # : publication/archiving must not fail on notification errors
+                    pass  # publication/archiving must not fail on notification errors
 
-    # ---------------------------------------
-    # Bulk actions  / 
-    # ---------------------------------------
+
+    # Bulk actions
+
     @api.model
     def action_bulk_schedule(self, assessment_ids, exam_date=None, interview_date=None):
-        """: Bulk scheduling of assessments for multiple transfer applicants."""
+        """Bulk scheduling of assessments for multiple transfer applicants."""
         records = self.browse(assessment_ids)
         vals = {}
         if exam_date:
@@ -281,9 +281,9 @@ class TransferAssessment(models.Model):
         records.filtered(lambda r: r.state == "draft").action_schedule()
         return True
 
-    # ---------------------------------------
-    # Auto-trigger hook  / 
-    # ---------------------------------------
+
+    # Auto-trigger hook
+
     @api.model
     def create_for_transfer_request(self, transfer_request):
         """ / : automatically create (and assign) a Transfer

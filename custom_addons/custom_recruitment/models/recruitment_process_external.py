@@ -41,7 +41,7 @@ class RecruitmentProcessExternal(models.Model):
     shortlisting_done = fields.Boolean(
         string="Shortlisting Done", default=False, copy=False, readonly=True,
         tracking=True,
-        help="Set automatically when the Shortlist Candidates wizard completes. "
+        help="Set automatically when the Shortlist Candidates wizard completes."
              "Hides the Shortlist button to prevent duplicate shortlisting."
     )
     eligible_emp_external = fields.One2many("external.recruitment.eligible.employees", "external_recruitment_id",
@@ -160,7 +160,7 @@ class EligibleEmployeesexternal(models.Model):
     )
     length_of_service = fields.Char(
         string="Length of Service",
-        help='Duration the candidate previously worked at Bunna Bank (e.g. "2 years 3 months").'
+        help='Duration the candidate previously worked at Bunna Bank (e.g."2 years 3 months").'
     )
     termination_reason = fields.Selection(
         [('resignation', 'Resignation'),
@@ -433,7 +433,7 @@ class ExternalApplicantEducation(models.Model):
         for rec in self:
             level_label = level_labels.get(rec.level, '')
             parts = [p for p in [level_label, rec.field_of_study] if p]
-            rec.display_name = ' - '.join(parts) if parts else _('Education #%s') % rec.id
+            rec.display_name = ' - '.join(parts) if parts else _('Education # %s') % rec.id
 
 
 # ── Certification ────────────────────────────────────────────────────────────

@@ -59,27 +59,27 @@ class increment_details(models.Model):
     start_date = fields.Date("Start Date")
     end_date = fields.Date("End Date")
 # @api.onchange('salary_rule')
-    # def _onchange_salary_rule(self):
-    #     self.internal_name=self.salary_rule.internal_name
+    # def _onchange_salary_rule(self)
+    # self.internal_name=self.salary_rule.internal_name
 
 
 
 
 
 # PAYROLL MODULE NOT INSTALLED — uncomment once hr.salary.rule exists.
-# class salary_details(models.Model):
-#     _inherit = "hr.salary.rule"
-#     increment_date = fields.Date(string='Increment Date')
-#     grade_rules = fields.One2many('grade.salary.rule', 'grade_id', string='Grade')
-#     position_rules = fields.One2many('position.salary.rule', 'position_id', string='Grade')
-#     increment_rules1 = fields.One2many('increment.grade.salary.rule', 'increment_id', string='Increment', copy=True)
-#     increment_rules2 = fields.One2many('increment.position.salary.rule', 'increment_id2', string='Increment', copy=True)
-#
-#     def approve(self):
-#         print("self", self)
-#
-#     def propagate(self):
-#         print("self", self.grade_code)
+# class salary_details(models.Model)
+# _inherit = "hr.salary.rule"
+# increment_date = fields.Date(string='Increment Date')
+# grade_rules = fields.One2many('grade.salary.rule', 'grade_id', string='Grade')
+# position_rules = fields.One2many('position.salary.rule', 'position_id', string='Grade')
+# increment_rules1 = fields.One2many('increment.grade.salary.rule', 'increment_id', string='Increment', copy=True)
+# increment_rules2 = fields.One2many('increment.position.salary.rule', 'increment_id2', string='Increment', copy=True)
+
+# def approve(self)
+# print("self", self)
+
+# def propagate(self)
+# print("self", self.grade_code)
 
 class GradeSalaryRules(models.Model):
     _name='grade.salary.rule'

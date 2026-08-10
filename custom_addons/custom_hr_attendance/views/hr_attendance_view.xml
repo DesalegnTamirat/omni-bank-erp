@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <odoo>
-    <!--    HR ATTENDANCE FORM VIEW -->
+    <!-- HR ATTENDANCE FORM VIEW -->
     <record id="hr_attendance_view_inherit_form" model="ir.ui.view">
         <field name="name">hr.attendance.form.inherit</field>
         <field name="model">hr.attendance</field>
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="priority">500</field>
         <field name="arch" type="xml">
-            <!-- Header buttons for Flag for Discipline (ATT-4) and Approve Overtime for Payroll (ATT-7) -->
+            <!-- Header buttons for Flag for Discipline  and Approve Overtime for Payroll -->
             <sheet position="before">
                 <header>
                     <button name="action_flag_for_discipline" string="Flag for Discipline" type="object" class="btn-warning"
                             invisible="flagged_for_discipline"
-                            help="ATT-4: Flag this attendance record for HR discipline review."/>
+                            help="Flag this attendance record for HR discipline review."/>
                     <button name="action_approve_overtime_for_payroll" string="Approve Overtime for Payroll" type="object" class="btn-success"
                             invisible="over_time_hour &lt;= 0 or overtime_approved_for_payroll"
                             groups="hr_attendance.group_hr_attendance_manager"
-                            help="ATT-7: Approve overtime and transmit payload to payroll."/>
+                            help="Approve overtime and transmit payload to payroll."/>
                 </header>
             </sheet>
 
-            <!-- Smart button box for Discipline Cases (ATT-5) -->
+            <!-- Smart button box for Discipline Cases -->
             <sheet position="inside">
                 <div class="oe_button_box" name="button_box">
                     <button type="object" class="oe_stat_button" icon="fa-gavel"

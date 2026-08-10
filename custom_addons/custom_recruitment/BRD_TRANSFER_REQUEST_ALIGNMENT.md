@@ -235,7 +235,7 @@ Draft → Submitted → Under Review → Approved
 
 ## Integration Points
 
-### 1. Employee Master Data , FR-EMP-013)
+### 1. Employee Master Data , )
 
 Upon approval:
 - Update `hr.employee` with new operating unit, position

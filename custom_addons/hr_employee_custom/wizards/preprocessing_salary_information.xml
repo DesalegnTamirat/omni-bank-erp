@@ -29,13 +29,13 @@
         <field name="target">new</field>
     </record>
 
-<!--     <menuitem-->
-<!--           id="menu_Preprocessig_salary_Details_wizards"-->
-<!--           name="Preprocessing Salary Information Wizard"-->
-<!--           parent="menu_hr_wizards"-->
-<!--           action="action_Preprocessig_salary_details_wizard"-->
+<!-- <menuitem -->
+<!-- id="menu_Preprocessig_salary_Details_wizards" -->
+<!-- name="Preprocessing Salary Information Wizard" -->
+<!-- parent="menu_hr_wizards" -->
+<!-- action="action_Preprocessig_salary_details_wizard" -->
 
-<!-- />-->
+<!-- > -->
     net salary payment wizard
     <menuitem id="menu_Preprocessing_salary_Details_wizards" name="Preprocessing Salary Information Wizard" parent="hr_employee_custom.menu_hr_payroll_community_wizards_stub" action="action_Preprocessing_salary_details_wizard"/>
 </odoo>

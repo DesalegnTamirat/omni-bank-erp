@@ -18,10 +18,10 @@ class HrAttendanceReason(models.Model):
             rec.write({'active': False})
         return True
 
-    # sequence = fields.Integer()
+    # sequence = fields.Integer
     # company_id = fields.Many2one(
-    #     comodel_name="res.company",
-    #     string="Company",
+    # comodel_name="res.company"
+    # string="Company"
     # )
     name = fields.Char(
         string="Reason",
