@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencyRatingModel(models.Model):
-    """Evaluation scale attachable to competencies (FR-CFD-0172)."""
+    """Evaluation scale attachable to competencies ."""
     _name = 'competency.rating.model'
     _description = 'Competency Rating Model'
     _order = 'name'
@@ -23,7 +23,7 @@ class CompetencyRatingModel(models.Model):
 
 
 class CompetencyProficiencyLevel(models.Model):
-    """One proficiency level (Basic..Expert) with behavioral indicators (FR-COM-004/005)."""
+    """One proficiency level (Basic..Expert) with behavioral indicators (/005)."""
     _name = 'competency.proficiency.level'
     _description = 'Competency Proficiency Level'
     _order = 'competency_id, level'
@@ -47,7 +47,7 @@ class CompetencyProficiencyLevel(models.Model):
 
 
 class Competency(models.Model):
-    """Competency dictionary entry (FR-COM-002/003, FR-CFD-001/002)."""
+    """Competency dictionary entry (/003, /002)."""
     _name = 'competency.competency'
     _description = 'Competency'
     _inherit = ['mail.thread']

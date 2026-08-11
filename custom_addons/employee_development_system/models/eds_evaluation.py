@@ -193,7 +193,7 @@ class EdsEvaluationLevel2(models.Model):
                 rec._flag_tna_gap_candidate()
 
     def _flag_tna_gap_candidate(self):
-        # Implementation of BRD FR-EDS-041: feedback loop to TNA for low Level-2 scores
+        # Implementation of feedback loop to TNA for low Level-2 scores
         for comp in self.course_id.competency_line_ids.mapped('competency_id'):
             self.env['eds.tna.entry'].create({
                 'cycle_id': self.env['eds.tna.cycle'].search([('state', '=', 'collecting')], limit=1).id or False,

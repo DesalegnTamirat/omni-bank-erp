@@ -3,7 +3,7 @@ from odoo import api, fields, models
 
 
 class HrEmployeeCompetency(models.Model):
-    """hr.employee extension: competency profile smart buttons (FR-COM-INT-002/006)."""
+    """hr.employee extension: competency profile smart buttons (/006)."""
     _inherit = 'hr.employee'
 
     competency_assessment_ids = fields.One2many(

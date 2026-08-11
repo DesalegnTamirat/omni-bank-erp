@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Nominations (FREDS038, FR-EDS-024...030) ══════════════ -->
+        <!-- ══════════════ Nominations (, ...030) ══════════════ -->
 
         <record id="view_eds_nomination_list" model="ir.ui.view">
             <field name="name">eds.nomination.list</field>
@@ -106,13 +106,13 @@
                                 <field name="nominated_by" readonly="1"/>
                             </group>
                         </group>
-                        <group string="Capacity &amp; Waitlist (FR-EDS-027/028)">
+                        <group string="Capacity &amp; Waitlist (/028)">
                             <field name="waitlisted"/>
                             <field name="waitlist_position"/>
                             <field name="enrollment_id" readonly="1"/>
                         </group>
                         <notebook>
-                            <page string="Approval Chain (FR-EDS-026)" name="approval">
+                            <page string="Approval Chain " name="approval">
                                 <group>
                                     <group>
                                         <field name="line_manager_approved_by" readonly="1"/>

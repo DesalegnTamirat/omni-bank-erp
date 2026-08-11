@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Venues (FREDS020 / FR-EDS-019) ══════════════ -->
+        <!-- ══════════════ Venues ( EDS-019) ══════════════ -->
 
         <record id="view_eds_venue_list" model="ir.ui.view">
             <field name="name">eds.venue.list</field>
@@ -83,7 +83,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_venue_search"/>
         </record>
 
-        <!-- ══════════════ Venue Bookings (FR-EDS-019/020) ══════════════ -->
+        <!-- ══════════════ Venue Bookings (/020) ══════════════ -->
 
         <record id="view_eds_venue_booking_list" model="ir.ui.view">
             <field name="name">eds.venue.booking.list</field>
@@ -137,7 +137,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Batches / Cohorts (FREDS023) ══════════════ -->
+        <!-- ══════════════ Batches / Cohorts () ══════════════ -->
 
         <record id="view_eds_batch_list" model="ir.ui.view">
             <field name="name">eds.batch.list</field>
@@ -207,7 +207,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Sessions (FREDS020-023, FR-EDS-017...022) ══════════════ -->
+        <!-- ══════════════ Sessions (-023, ...022) ══════════════ -->
 
         <record id="view_eds_session_list" model="ir.ui.view">
             <field name="name">eds.session.list</field>
@@ -313,7 +313,7 @@
                                 <field name="date_start"/>
                                 <field name="date_end"/>
                                 <field name="start_time" widget="float_time"/>
-                                <field name="duration_hours"/>
+                                <field name="duration_hours" widget="float_time"/>
                                 <field name="recurrence"/>
                                 <field name="recurrence_details" invisible="recurrence == 'single'"/>
                             </group>
@@ -368,7 +368,7 @@
                                         <field name="employee_id"/>
                                         <field name="attendance_date"/>
                                         <field name="attended"/>
-                                        <field name="hours_attended"/>
+                                        <field name="hours_attended" widget="float_time"/>
                                         <field name="notes"/>
                                         <field name="attendance_percentage" string="Program %"/>
                                     </list>

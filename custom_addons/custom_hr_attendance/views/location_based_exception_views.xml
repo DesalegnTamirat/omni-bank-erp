@@ -9,7 +9,7 @@
                 <field name="operating_unit"/>
                 <field name="start_time" widget="float_time"/>
                 <field name="end_time"  widget="float_time"/>
-                <field name="duration"/>
+                <field name="duration" widget="float_time"/>
                 <field name="time_range"/>
             </list>
         </field>
@@ -30,7 +30,7 @@
                         <group>
                             <field name="start_time"   widget="float_time"/>
                             <field name="end_time" widget="float_time"/>
-                            <field name="duration"/>
+                            <field name="duration" widget="float_time"/>
                             <field name="time_range"/>
                         </group>
                     </group>

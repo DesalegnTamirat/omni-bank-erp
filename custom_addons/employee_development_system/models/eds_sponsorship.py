@@ -51,7 +51,7 @@ class EdsSponsorship(models.Model):
                 days = (today - start).days
                 months = int(days / 30.4375)
                 rec.service_months = months
-                rec.eligible = months >= 12 # FREDS062 requirement
+                rec.eligible = months >= 12 #  requirement
             else:
                 rec.service_months = 12
                 rec.eligible = True

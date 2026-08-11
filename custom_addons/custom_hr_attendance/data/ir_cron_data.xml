@@ -50,7 +50,7 @@
         </record>
 
         <!--
-            FR-Missing Check-In / Check-Out Notification Cron: scheduled at 17:30 PM (Addis Ababa time / 14:30 UTC) daily.
+            Missing Check-In / Check-Out Notification Cron: scheduled at 17:30 PM (Addis Ababa time / 14:30 UTC) daily.
             Runs at shift end to notify employees of missing check-in/out without impacting peak hours.
         -->
         <record id="ir_cron_notify_missing_attendance" model="ir.cron">

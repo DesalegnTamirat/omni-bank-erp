@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencyIDP(models.Model):
-    """Individual Development Plan derived from assessment gaps (FR-COM-020..028)."""
+    """Individual Development Plan derived from assessment gaps (..028)."""
     _name = 'competency.idp'
     _description = 'Competency Individual Development Plan'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -25,7 +25,7 @@ class CompetencyIDP(models.Model):
     checkpoint_ids = fields.One2many('competency.idp.checkpoint', 'idp_id', string='Review Checkpoints')
     mandatory = fields.Boolean(
         string='Mandatory IDP', compute='_compute_mandatory', store=True,
-        help='Auto-flagged when a competency gap exists (FR-COM-027).')
+        help='Auto-flagged when a competency gap exists .')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     notes = fields.Text(string='Notes')
@@ -38,7 +38,7 @@ class CompetencyIDP(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        # sudo(): employee-created IDPs (FR-COM-020) must not depend on the user
+        # sudo(): employee-created IDPs  must not depend on the user
         # having ir.sequence access.
         records = super().create(vals_list)
         for record in records:
@@ -55,7 +55,7 @@ class CompetencyIDP(models.Model):
             rec.message_post(body=_('IDP %s submitted for approval.') % rec.name)
 
     def action_approve(self):
-        """Supervisor approval (FR-COM-026)."""
+        """Supervisor approval ."""
         for rec in self:
             rec.write({
                 'state': 'approved',
@@ -74,7 +74,7 @@ class CompetencyIDP(models.Model):
 
 
 class CompetencyIDPActivity(models.Model):
-    """A development activity inside an IDP (FR-COM-021/022)."""
+    """A development activity inside an IDP (/022)."""
     _name = 'competency.idp.activity'
     _description = 'IDP Development Activity'
 
@@ -110,7 +110,7 @@ class CompetencyIDPActivity(models.Model):
 
 
 class CompetencyIDPCheckpoint(models.Model):
-    """Scheduled review checkpoint (FR-COM-024/025)."""
+    """Scheduled review checkpoint (/025)."""
     _name = 'competency.idp.checkpoint'
     _description = 'IDP Review Checkpoint'
 

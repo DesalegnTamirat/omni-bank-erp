@@ -12,7 +12,7 @@
                          name="employee_development_system"
                          groups="employee_development_system.group_eds_officer">
 
-                        <block title="TNA Cycle (FREDS001/002/009)" name="eds_tna_cycle">
+                        <block title="TNA Cycle (/002/009)" name="eds_tna_cycle">
                             <setting string="TNA Cycle Start Month"
                                      help="Month (1-12) when the annual TNA cycle starts. Default: 4 (April).">
                                 <field name="eds_tna_cycle_start_month"/>
@@ -28,7 +28,7 @@
                             </setting>
                         </block>
 
-                        <block title="Nomination Approval Chain (FR-EDS-026)" name="eds_nomination_chain">
+                        <block title="Nomination Approval Chain " name="eds_nomination_chain">
                             <setting string="Require Line Manager Approval Step"
                                      help="Whether the Line Manager approval step is part of the nomination chain (default on).">
                                 <field name="eds_nomination_require_line_manager"/>
@@ -39,7 +39,7 @@
                             </setting>
                         </block>
 
-                        <block title="Delivery Rules (FREDS039/040)" name="eds_delivery_rules">
+                        <block title="Delivery Rules (/040)" name="eds_delivery_rules">
                             <setting string="Default Session Capacity"
                                      help="Default class size for training sessions (BRD: 25-30).">
                                 <field name="eds_default_class_capacity"/>
@@ -73,7 +73,7 @@
                             </setting>
                         </block>
 
-                        <block title="Sponsorship &amp; Partnerships (FREDS062/069)" name="eds_finance">
+                        <block title="Sponsorship &amp; Partnerships (/069)" name="eds_finance">
                             <setting string="Sponsorship Minimum Service (Months)"
                                      help="Minimum continuous service for certification sponsorship eligibility (default 12).">
                                 <field name="eds_sponsorship_min_service_months"/>
@@ -84,17 +84,17 @@
                             </setting>
                         </block>
 
-                        <block title="Procurement &amp; Vendors (FREDS030/032/034)" name="eds_procurement">
+                        <block title="Procurement &amp; Vendors (/032/034)" name="eds_procurement">
                             <setting string="Minimum Providers per RFP"
-                                     help="Minimum number of qualified providers an RFP must be issued to (FREDS030, default >= 3).">
+                                     help="Minimum number of qualified providers an RFP must be issued to (, default >= 3).">
                                 <field name="eds_rfp_min_providers"/>
                             </setting>
                             <setting string="Technical Minimum Threshold (%)"
-                                     help="Minimum technical qualification threshold before the financial evaluation is permitted (FREDS032, default 70).">
+                                     help="Minimum technical qualification threshold before the financial evaluation is permitted (, default 70).">
                                 <field name="eds_technical_min_threshold"/>
                             </setting>
                             <setting string="Technical / Financial Weight (%)"
-                                     help="Weight of the technical score in the combined award score; financial is 100 minus this (FREDS034, default 70/30).">
+                                     help="Weight of the technical score in the combined award score; financial is 100 minus this (, default 70/30).">
                                 <field name="eds_technical_financial_blend"/>
                             </setting>
                         </block>

@@ -6,7 +6,7 @@ from odoo.exceptions import UserError
 
 
 class EdsTrainer(models.Model):
-    """Internal / external trainer register (FREDS028, FR-EDS-014...016).
+    """Internal / external trainer register (, ...016).
 
     A centralized internal trainer pool: profiles, competencies, ToT certification
     status, periodic review cycles (default every 2 years), participant feedback,
@@ -25,13 +25,13 @@ class EdsTrainer(models.Model):
     ], string='Trainer Type', default='internal', required=True, tracking=True)
     employee_id = fields.Many2one(
         'hr.employee', string='Internal Employee',
-        help='Set for internal trainers (FREDS028).')
+        help='Set for internal trainers ().')
     external_partner_id = fields.Many2one(
         'res.partner', string='External Trainer (Partner)',
         help='Set for external trainers.')
     external_provider_id = fields.Many2one(
         'eds.external.provider', string='External Provider',
-        help='The registered provider this external trainer belongs to (FREDS029).')
+        help='The registered provider this external trainer belongs to ().')
     job_title = fields.Char(string='Job Title / Specialization')
     phone = fields.Char(string='Phone')
     email = fields.Char(string='Email')
@@ -41,12 +41,12 @@ class EdsTrainer(models.Model):
              'constrain session trainer selection).')
     tot_certified = fields.Boolean(
         string='ToT Certified', tracking=True,
-        help='Training-of-Trainers certification status (FREDS028).')
+        help='Training-of-Trainers certification status ().')
     tot_certificate_ids = fields.One2many(
         'eds.trainer.certification', 'trainer_id', string='ToT Certificates')
     review_cycle_months = fields.Integer(
         string='Review Cycle (Months)', default=24, tracking=True,
-        help='Periodic review cycle - default every 2 years (FREDS028).')
+        help='Periodic review cycle - default every 2 years ().')
     last_review_date = fields.Date(string='Last Review Date', tracking=True)
     next_review_date = fields.Date(
         string='Next Review Date', compute='_compute_next_review')
@@ -63,7 +63,7 @@ class EdsTrainer(models.Model):
         string='Average Rating', compute='_compute_avg_rating', store=True,
         digits=(3, 2),
         help='Computed from Level-1/Level-3 participant feedback and quarterly '
-             'reviews (FREDS028).')
+             'reviews ().')
     rating_count = fields.Integer(string='Rating Count', compute='_compute_avg_rating', store=True)
     state = fields.Selection([
         ('active', 'Active'),
@@ -126,11 +126,11 @@ class EdsTrainer(models.Model):
             rec.message_post(body=_('Trainer %s deactivated.') % rec.name)
 
     def action_mark_reviewed(self):
-        """Record a periodic review (FREDS028: 2-year cycle by default)."""
+        """Record a periodic review (2-year cycle by default)."""
         for rec in self:
             rec.last_review_date = date.today()
             rec.next_review_date = date.today() + timedelta(days=rec.review_cycle_months * 30)
-            rec.message_post(body=_('Periodic review completed for trainer %s (FREDS028).') % rec.name)
+            rec.message_post(body=_('Periodic review completed for trainer %s ().') % rec.name)
 
     @api.model
     def _get_qualified_trainers(self, competency_ids=None, date_start=None, date_end=None):
@@ -138,7 +138,7 @@ class EdsTrainer(models.Model):
 
         Returns a recordset of `eds.trainer` whose competency set intersects the
         requested competencies and who have no blocking availability record in the
-        requested window (FR-EDS-019/020).
+        requested window (/020).
         """
         domain = [('state', '=', 'active')]
         trainers = self.search(domain)
@@ -156,7 +156,7 @@ class EdsTrainer(models.Model):
 
 
 class EdsTrainerCertification(models.Model):
-    """Training-of-Trainers (ToT) certification record (FREDS028)."""
+    """Training-of-Trainers (ToT) certification record ()."""
     _name = 'eds.trainer.certification'
     _description = 'Trainer ToT Certification'
     _order = 'issued_date desc'
@@ -187,7 +187,7 @@ class EdsTrainerCertification(models.Model):
 
 
 class EdsTrainerAvailability(models.Model):
-    """Trainer availability slot (FREDS028; consumed by Task 5 conflict checks)."""
+    """Trainer availability slot (; consumed by Task 5 conflict checks)."""
     _name = 'eds.trainer.availability'
     _description = 'Trainer Availability'
     _order = 'date_start'
@@ -208,7 +208,7 @@ class EdsTrainerAvailability(models.Model):
 
 
 class EdsTrainerQuarterlyReview(models.Model):
-    """Quarterly performance review of a trainer (FREDS028)."""
+    """Quarterly performance review of a trainer ()."""
     _name = 'eds.trainer.quarterly.review'
     _description = 'Trainer Quarterly Review'
     _order = 'period desc'
@@ -239,7 +239,7 @@ class EdsTrainerQuarterlyReview(models.Model):
 
 
 class EdsTrainerFeedback(models.Model):
-    """Participant feedback about a trainer (Level-1 reaction / Level-3 behaviour, FREDS028)."""
+    """Participant feedback about a trainer (Level-1 reaction / Level-3 behaviour, )."""
     _name = 'eds.trainer.feedback'
     _description = 'Trainer Participant Feedback'
     _order = 'date desc'

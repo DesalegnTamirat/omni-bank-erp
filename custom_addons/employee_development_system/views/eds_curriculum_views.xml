@@ -48,7 +48,7 @@
                                 <field name="course_id" readonly="state != 'draft'"/>
                                 <field name="version" readonly="1"/>
                             </group>
-                            <group string="Approval SLA (FREDS014)">
+                            <group string="Approval SLA ()">
                                 <field name="review_sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                                 <field name="approved_by_id"/>
@@ -69,13 +69,13 @@
                                     <list editable="bottom">
                                         <field name="sequence" widget="handle"/>
                                         <field name="name"/>
-                                        <field name="duration_hours"/>
+                                        <field name="duration_hours" widget="float_time"/>
                                     </list>
                                     <form>
                                         <group>
                                             <field name="sequence"/>
                                             <field name="name"/>
-                                            <field name="duration_hours"/>
+                                            <field name="duration_hours" widget="float_time"/>
                                         </group>
                                         <group string="Content / Materials">
                                             <field name="content_ids" widget="many2many_tags"

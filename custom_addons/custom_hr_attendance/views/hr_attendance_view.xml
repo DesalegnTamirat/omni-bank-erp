@@ -46,8 +46,8 @@
             <!-- Check-in related fields -->
             <xpath expr="//field[@name='check_in']" position="after">
                 <field name="check_in_status" readonly="1"/>
-		        <field name="late_time_hour" readonly="1"/>
-		        <field name="acknowledged_late" readonly="1"/>
+		        <field name="late_time_hour" readonly="1" widget="float_time"/>
+		        <field name="acknowledged_late" readonly="1" widget="float_time"/>
                 <field name="over_time_hour" readonly="1" widget="float_time"/>
             </xpath>
 
@@ -55,14 +55,14 @@
             <xpath expr="//field[@name='check_out']" position="before">
                 <field name="lunch_out" readonly="1"/>
                 <field name="lunch_in" readonly="1"/>
-                <field name="lunch_break_hours" readonly="1"/>
+                <field name="lunch_break_hours" readonly="1" widget="float_time"/>
             </xpath>
 
             <!-- Check-out related fields -->
             <xpath expr="//field[@name='check_out']" position="after">
                 <field name="check_out_status" readonly="1"/>
                 <field name="is_force_checkout" readonly="1"/>
-		        <field name="early_exit_hour" readonly="1"/>
+		        <field name="early_exit_hour" readonly="1" widget="float_time"/>
 		        <field name="acknowledged_exit" readonly="1"/>
                 <field name="active" readonly="1"/>
             </xpath>
@@ -91,15 +91,15 @@
             <!-- Insert Check-in Status, Late Time Hour, Acknowledged Late, Over Time Hour right after Check In -->
             <xpath expr="//field[@name='check_in']" position="after">
                 <field name="check_in_status" string="Check-in Status" readonly="1"/>
-                <field name="late_time_hour" string="Late Time Hour" readonly="1"/>
-                <field name="acknowledged_late" string="Acknowledged Late" readonly="1"/>
+                <field name="late_time_hour" string="Late Time Hour" readonly="1" widget="float_time"/>
+                <field name="acknowledged_late" string="Acknowledged Late" readonly="1" widget="float_time"/>
                 <field name="over_time_hour" string="Over Time Hour" readonly="1" widget="float_time"/>
             </xpath>
 
             <!-- Insert Check-Out Status, Early Exit Hour, Acknowledged Exit right after Check Out -->
             <xpath expr="//field[@name='check_out']" position="after">
                 <field name="check_out_status" string="Check-Out Status" readonly="1"/>
-                <field name="early_exit_hour" string="Early Exit Hour" readonly="1"/>
+                <field name="early_exit_hour" string="Early Exit Hour" readonly="1" widget="float_time"/>
                 <field name="acknowledged_exit" string="Acknowledged Exit" readonly="1"/>
             </xpath>
 
@@ -121,7 +121,7 @@
                 <field name="check_out_device_info" string="Check-out Device" optional="hide"/>
                 <field name="lunch_out" string="Lunch Out" optional="hide"/>
                 <field name="lunch_in" string="Lunch In" optional="hide"/>
-                <field name="lunch_break_hours" string="Lunch Break Hours" optional="hide"/>
+                <field name="lunch_break_hours" string="Lunch Break Hours" optional="hide" widget="float_time"/>
             </xpath>
         </field>
     </record>

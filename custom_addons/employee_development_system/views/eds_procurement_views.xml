@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Evaluation Criteria Templates (FREDS032/033) ══════════════ -->
+        <!-- ══════════════ Evaluation Criteria Templates (/033) ══════════════ -->
 
         <record id="view_eds_evaluation_criteria_list" model="ir.ui.view">
             <field name="name">eds.evaluation.criteria.list</field>
@@ -44,7 +44,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Venue Requirement Specification (FREDS037) ══════════════ -->
+        <!-- ══════════════ Venue Requirement Specification () ══════════════ -->
 
         <record id="view_eds_venue_requirement_list" model="ir.ui.view">
             <field name="name">eds.venue.requirement.list</field>
@@ -85,7 +85,7 @@
                                 <field name="capacity_required"/>
                                 <field name="location_preference"/>
                             </group>
-                            <group string="Approval (FREDS037)">
+                            <group string="Approval ()">
                                 <field name="approved_by_id" readonly="1"/>
                                 <field name="approval_date" readonly="1"/>
                             </group>
@@ -112,7 +112,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Vendor Proposal (Two-Envelope, FREDS031) ══════════════ -->
+        <!-- ══════════════ Vendor Proposal (Two-Envelope, ) ══════════════ -->
 
         <record id="view_eds_vendor_proposal_list" model="ir.ui.view">
             <field name="name">eds.vendor.proposal.list</field>
@@ -149,7 +149,7 @@
                     </header>
                     <sheet>
                         <group>
-                            <group string="Registration (FREDS031)">
+                            <group string="Registration ()">
                                 <field name="name" readonly="1"/>
                                 <field name="rfp_id"/>
                                 <field name="provider_id"/>
@@ -163,7 +163,7 @@
                                 <field name="financial_envelope_name" invisible="1"/>
                             </group>
                         </group>
-                        <group string="Evaluation Results (FREDS032/034)">
+                        <group string="Evaluation Results (/034)">
                             <field name="technical_score_id"/>
                             <field name="financial_score_id"/>
                             <field name="technical_score"/>
@@ -183,7 +183,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ Vendor Evaluation (FREDS032/033/034) ══════════════ -->
+        <!-- ══════════════ Vendor Evaluation (/033/034) ══════════════ -->
 
         <record id="view_eds_vendor_evaluation_list" model="ir.ui.view">
             <field name="name">eds.vendor.evaluation.list</field>
@@ -258,7 +258,7 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- ══════════════ RFP (FREDS030/031) ══════════════ -->
+        <!-- ══════════════ RFP (/031) ══════════════ -->
 
         <record id="view_eds_rfp_list" model="ir.ui.view">
             <field name="name">eds.rfp.list</field>
@@ -328,7 +328,7 @@
                                 <field name="venue_requirement_id"/>
                                 <field name="submission_deadline"/>
                             </group>
-                            <group string="Distribution (FREDS030)">
+                            <group string="Distribution ()">
                                 <field name="provider_ids" widget="many2many_tags"/>
                                 <field name="min_providers" readonly="1"/>
                                 <field name="min_providers_met"/>
@@ -367,7 +367,7 @@
                                 </field>
                             </page>
                         </notebook>
-                        <group string="Award (FREDS034)" invisible="state != 'evaluation'">
+                        <group string="Award ()" invisible="state != 'evaluation'">
                             <field name="awarded_proposal_id"
                                    domain="[('rfp_id', '=', id), ('state', '=', 'evaluated')]"/>
                         </group>
@@ -384,7 +384,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_rfp_search"/>
         </record>
 
-        <!-- ══════════════ Training Contract (FREDS035) ══════════════ -->
+        <!-- ══════════════ Training Contract () ══════════════ -->
 
         <record id="view_eds_training_contract_list" model="ir.ui.view">
             <field name="name">eds.training.contract.list</field>
@@ -443,7 +443,7 @@
                                 <field name="end_date"/>
                             </group>
                         </group>
-                        <group string="Legal Review (FREDS035)">
+                        <group string="Legal Review ()">
                             <field name="legal_comments"/>
                             <field name="legal_reviewer_id" readonly="1"/>
                             <field name="version" readonly="1"/>

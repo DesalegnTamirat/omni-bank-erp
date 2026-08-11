@@ -6,16 +6,16 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsNomination(models.Model):
-    """Training nomination & multi-level approval (FREDS038, FR-EDS-024...030).
+    """Training nomination & multi-level approval (, ...030).
 
-    Nominations originate from approved TNA needs (FR-EDS-024) or as documented
-    ad-hoc exceptions with mandatory justification and L&D approval (FR-EDS-025).
+    Nominations originate from approved TNA needs  or as documented
+    ad-hoc exceptions with mandatory justification and L&D approval .
     The approval chain is configurable (Line Manager -> L&D, with an optional
     Budget/HR gate) and enforces segregation of duties (nominator != final
-    approver). Capacity is capped per session (FR-EDS-027); excess nominations go
-    waitlisted and are auto-promoted FIFO when a seat frees (FR-EDS-028).
-    Participants are notified on every status change (FR-EDS-029) and can withdraw
-    before the session start with a mandatory reason (FR-EDS-030).
+    approver). Capacity is capped per session ; excess nominations go
+    waitlisted and are auto-promoted FIFO when a seat frees .
+    Participants are notified on every status change  and can withdraw
+    before the session start with a mandatory reason .
     """
     _name = 'eds.nomination'
     _description = 'Training Nomination'
@@ -46,10 +46,10 @@ class EdsNomination(models.Model):
         domain="[('state', 'in', ('approved', 'converted')), "
                "('delivery_mode', 'in', ('classroom', 'blended'))]",
         help='Required for TNA-based nominations - must reference an approved training '
-             'need (FR-EDS-024).')
+             'need .')
     justification = fields.Text(
         string='Justification',
-        help='Mandatory for ad-hoc nominations (FR-EDS-025, business rule).')
+        help='Mandatory for ad-hoc nominations (, business rule).')
     course_name = fields.Char(string='Program', related='session_id.program_name', readonly=True)
 
     state = fields.Selection([
@@ -63,7 +63,7 @@ class EdsNomination(models.Model):
         ('declined', 'Declined by Employee'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # Approval actors (audit of the chain, FR-EDS-026)
+    # Approval actors (audit of the chain, )
     line_manager_approved_by = fields.Many2one('res.users', string='Line Manager Approved By',
                                                readonly=True)
     lnd_approved_by = fields.Many2one('res.users', string='L&D Approved By', readonly=True)
@@ -72,14 +72,14 @@ class EdsNomination(models.Model):
     rejected_by = fields.Many2one('res.users', string='Rejected By', readonly=True)
     rejected_reason = fields.Text(string='Rejection Reason')
 
-    # Optional Budget/HR gate (FR-EDS-026 via settings or per-session approval flow)
+    # Optional Budget/HR gate ( via settings or per-session approval flow)
     budget_hr_required = fields.Boolean(
         string='Budget/HR Approval Required', compute='_compute_budget_hr_required')
     budget_hr_approved = fields.Boolean(string='Budget/HR Approved', readonly=True)
     budget_hr_approved_by = fields.Many2one('res.users', string='Budget/HR Approved By', readonly=True)
     budget_hr_approval_date = fields.Datetime(string='Budget/HR Approval Date', readonly=True)
 
-    # Capacity / waitlist (FR-EDS-027/028)
+    # Capacity / waitlist (/028)
     waitlisted = fields.Boolean(string='Waitlisted', default=False, tracking=True)
     waitlist_position = fields.Integer(string='Waitlist Position', default=0, readonly=True)
     enrollment_id = fields.Many2one('eds.enrollment', string='Enrollment', readonly=True)
@@ -132,25 +132,25 @@ class EdsNomination(models.Model):
 
     # ── Eligibility & guards ─────────────────────────────────────────────────
     def _check_submission_rules(self):
-        """FR-EDS-024/025: TNA-based needs an approved entry; ad-hoc needs a justification."""
+        """/025: TNA-based needs an approved entry; ad-hoc needs a justification."""
         self.ensure_one()
         if self.nomination_type == 'tna_based':
             if not self.tna_entry_id:
                 raise UserError(_('TNA-based nominations must reference an approved training '
-                                  'need (FR-EDS-024).'))
+                                  'need .'))
             if self.tna_entry_id.state not in ('approved', 'converted'):
-                raise UserError(_('The referenced training need is not approved yet (FR-EDS-024).'))
+                raise UserError(_('The referenced training need is not approved yet .'))
             if self.tna_entry_id.employee_id and self.tna_entry_id.employee_id != self.employee_id:
-                raise UserError(_('The training need belongs to a different employee (FR-EDS-024).'))
+                raise UserError(_('The training need belongs to a different employee .'))
         elif self.nomination_type == 'ad_hoc' and not self.justification:
             raise UserError(_('Ad-hoc nominations require a mandatory justification and L&D '
-                              'approval (FR-EDS-025).'))
+                              'approval .'))
 
     def _require_group(self, group_xml_id):
         if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)):
             raise UserError(_('You do not have the required authority for this step.'))
 
-    # ── Approval workflow (FR-EDS-026) ───────────────────────────────────────
+    # ── Approval workflow  ───────────────────────────────────────
     def action_submit(self):
         """Draft -> Submitted (opens the approval chain)."""
         for rec in self:
@@ -158,7 +158,7 @@ class EdsNomination(models.Model):
                 raise UserError(_('Only draft nominations can be submitted.'))
             rec._check_submission_rules()
             rec.state = 'submitted'
-            rec._notify(_('Nomination %s submitted for approval (FR-EDS-029).') % rec.name)
+            rec._notify(_('Nomination %s submitted for approval .') % rec.name)
 
     def action_line_manager_approve(self):
         """Submitted -> Line Manager Approved (skippable via settings)."""
@@ -173,7 +173,7 @@ class EdsNomination(models.Model):
     def action_lnd_approve(self):
         """(Submitted | Line Manager Approved) -> L&D Approved.
 
-        L&D is the segregation point against the nominator (FREDS008/FR-EDS-026).
+        L&D is the segregation point against the nominator (EDS-026).
         """
         for rec in self:
             rec._require_group('group_eds_officer')
@@ -181,7 +181,7 @@ class EdsNomination(models.Model):
                 raise UserError(_('Only submitted (or line-manager-approved) nominations can be '
                                   'approved by L&D.'))
             if rec.nominated_by == self.env.user:
-                raise UserError(_('Segregation of Duties (FR-EDS-026): the nominator cannot '
+                raise UserError(_('Segregation of Duties : the nominator cannot '
                                   'approve their own nomination at the L&D step.'))
             rec.write({'state': 'lnd_approved', 'lnd_approved_by': self.env.user.id})
             rec._notify(_('Nomination %s approved by L&D.') % rec.name)
@@ -200,22 +200,22 @@ class EdsNomination(models.Model):
             rec._notify(_('Nomination %s passed the Budget/HR gate.') % rec.name)
 
     def action_final_approve(self):
-        """L&D Approved -> Approved: segregation + capacity assignment (FR-EDS-026/027)."""
+        """L&D Approved -> Approved: segregation + capacity assignment (/027)."""
         for rec in self:
             rec._require_group('group_eds_officer')
             if rec.state != 'lnd_approved':
                 raise UserError(_('Only L&D-approved nominations can be finally approved.'))
             if rec.nominated_by == self.env.user:
-                raise UserError(_('Segregation of Duties (FR-EDS-026): the nominator cannot be '
+                raise UserError(_('Segregation of Duties : the nominator cannot be '
                                   'the final approver.'))
             if rec.budget_hr_required and not rec.budget_hr_approved:
                 raise UserError(_('This session requires Budget/HR approval before the final '
-                                  'approval (FR-EDS-026).'))
+                                  'approval .'))
             rec.write({'state': 'approved',
                        'approved_by': self.env.user.id,
                        'approved_date': fields.Datetime.now()})
             rec._assign_enrollment()
-            rec._notify(_('Nomination %s approved - seat assigned (FR-EDS-029).') % rec.name)
+            rec._notify(_('Nomination %s approved - seat assigned .') % rec.name)
 
     def action_reject(self):
         """Reject at any pre-approval stage (mandatory reason)."""
@@ -229,7 +229,7 @@ class EdsNomination(models.Model):
             rec._notify(_('Nomination %s rejected: %s') % (rec.name, rec.rejected_reason))
 
     def action_withdraw(self):
-        """Withdraw before the session starts - mandatory reason, frees the seat (FR-EDS-030).
+        """Withdraw before the session starts - mandatory reason, frees the seat .
 
         Allowed at any stage up to the session start (including after approval, which
         frees the seat for the next waitlisted participant).
@@ -239,9 +239,9 @@ class EdsNomination(models.Model):
                 raise UserError(_('This nomination cannot be withdrawn anymore.'))
             if rec.session_id.date_start and rec.session_id.date_start <= fields.Datetime.now():
                 raise UserError(_('Withdrawal is only allowed before the session starts '
-                                  '(FR-EDS-030).'))
+                                  '.'))
             if not rec.withdraw_reason:
-                raise UserError(_('A withdrawal reason is mandatory (FR-EDS-030).'))
+                raise UserError(_('A withdrawal reason is mandatory .'))
             rec.write({'state': 'withdrawn',
                        'withdrawn_by': self.env.user.id,
                        'withdrawn_date': fields.Datetime.now()})
@@ -289,10 +289,10 @@ class EdsNomination(models.Model):
             raise UserError(_('Only the nominated employee (or an EDS officer) can accept or '
                               'decline this nomination.'))
 
-    # ── Capacity & waitlist (FR-EDS-027/028) ─────────────────────────────────
+    # ── Capacity & waitlist (/028) ─────────────────────────────────
     def _assign_enrollment(self):
         """Create the enrollment: enrolled while seats are free, otherwise waitlisted
-        with the FIFO position (FR-EDS-027)."""
+        with the FIFO position ."""
         self.ensure_one()
         session = self.session_id
         enrolled = session.enrollment_ids.filtered(lambda e: e.state == 'enrolled')
@@ -315,10 +315,10 @@ class EdsNomination(models.Model):
         if waitlisted:
             self.message_post(
                 body=_('Session is at full capacity - %s placed on the waitlist at position %d '
-                       '(FR-EDS-027).') % (self.employee_id.name, position))
+                       '.') % (self.employee_id.name, position))
 
     def _promote_waitlisted(self):
-        """FIFO promotion for this nomination's session (FR-EDS-028)."""
+        """FIFO promotion for this nomination's session ."""
         self.ensure_one()
         self.env['eds.enrollment']._promote_waitlisted(self.session_id)
 
@@ -335,7 +335,7 @@ class EdsNomination(models.Model):
         }
 
     def _notify(self, body):
-        """FR-EDS-029: chatter notification to the employee (and their manager)."""
+        """chatter notification to the employee (and their manager)."""
         self.ensure_one()
         partner_ids = []
         if self.employee_id and self.employee_id.work_contact_id:
@@ -344,7 +344,7 @@ class EdsNomination(models.Model):
 
 
 class EdsEnrollment(models.Model):
-    """Enrollment / participation seat on a session (FR-EDS-027/028/030).
+    """Enrollment / participation seat on a session (/028/030).
 
     Created when a nomination is finally approved: `enrolled` when a seat is free,
     `waitlisted` with a FIFO position otherwise. Auto-promoted by the cron or on
@@ -398,14 +398,14 @@ class EdsEnrollment(models.Model):
             rec.write({'state': 'cancelled'})
             if rec.nomination_id:
                 rec.nomination_id.write({'waitlisted': False, 'waitlist_position': 0})
-            rec.message_post(body=_('Enrollment %s cancelled - seat released (FR-EDS-030).') % rec.name)
+            rec.message_post(body=_('Enrollment %s cancelled - seat released .') % rec.name)
         for session in sessions:
             self.env['eds.enrollment']._promote_waitlisted(session)
 
     @api.model
     def _cron_waitlist_promote(self):
         """Hourly cron: promote waitlisted participants FIFO wherever a seat is free
-        (FR-EDS-028)."""
+        ."""
         sessions = self.search([('state', '=', 'waitlisted')]).mapped('session_id')
         for session in sessions:
             self._promote_waitlisted(session)
@@ -431,6 +431,6 @@ class EdsEnrollment(models.Model):
             if enrollment.nomination_id:
                 enrollment.nomination_id.write({'waitlisted': False, 'waitlist_position': 0})
             enrollment.message_post(
-                body=_('Promoted from the waitlist - a seat became available (FR-EDS-028).'))
+                body=_('Promoted from the waitlist - a seat became available .'))
             enrolled |= enrollment
         return True

@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Unscheduled Training Requests (FREDS075/076) ══════════════ -->
+        <!-- ══════════════ Unscheduled Training Requests (/076) ══════════════ -->
 
         <record id="view_eds_unscheduled_request_list" model="ir.ui.view">
             <field name="name">eds.unscheduled.request.list</field>
@@ -80,7 +80,7 @@
                                 <field name="estimated_cost"/>
                             </group>
                         </group>
-                        <group string="Justification (mandatory for ad-hoc requests - FREDS075)">
+                        <group string="Justification (mandatory for ad-hoc requests - )">
                             <field name="justification"/>
                         </group>
                         <group string="Annual Plan Addendum">

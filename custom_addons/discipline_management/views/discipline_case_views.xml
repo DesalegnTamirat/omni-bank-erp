@@ -56,22 +56,22 @@
                         <button name="action_send_to_committee" string="Submit to Committee" type="object" class="btn-warning" invisible="state not in ('initiated', 'investigating')"/>
                         <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="btn-primary" invisible="state not in ('investigating', 'committee_review')"/>
                         <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success" invisible="state != 'pending_approval'"/>
-                        <!-- DIS-8: Submit Appeal button — only when window is open -->
+                        <!-- Submit Appeal button — only when window is open -->
                         <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
                                 invisible="not is_appeal_window_open"
-                                help="FR-DIS-031: Submit an appeal within the 10-calendar-day window."/>
+                                help="Submit an appeal within the 10-calendar-day window."/>
                         <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,initiated,investigating,committee_review,pending_approval,enforced"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
                         <widget name="web_ribbon" title="Enforced" bg_color="text-bg-success" invisible="state != 'enforced'"/>
-                        <!-- DIS-8: Appeal window open banner -->
+                        <!-- Appeal window open banner -->
                         <div class="alert alert-warning" role="alert" invisible="not is_appeal_window_open">
                             <strong>Appeal Window Open:</strong> This case can be appealed until <field name="appeal_deadline" readonly="1" nolabel="1"/>.
                             Click "Submit Appeal" to file an appeal.
                         </div>
-                        <!-- DIS-8: Smart buttons -->
+                        <!-- Smart buttons -->
                         <div class="oe_button_box" name="button_box">
                             <button type="object" name="action_view_appeals" class="oe_stat_button" icon="fa-gavel"
                                     invisible="appeal_count == 0">
@@ -110,7 +110,7 @@
                                 <field name="initiator_id"/>
                                 <field name="reviewer_id"/>
                                 <field name="approver_id"/>
-                                <!-- DIS-4: CEO/CPCO authority field for Level 1 Dismissals -->
+                                <!-- CEO/CPCO authority field for Level 1 Dismissals -->
                                 <field name="dismissal_authority_id"
                                        invisible="severity_level != 'level_1'"
                                        required="severity_level == 'level_1' and state == 'pending_approval'"

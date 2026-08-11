@@ -114,7 +114,7 @@
                                 <field name="approval_date"/>
                             </group>
                         </group>
-                        <group string="Segregation of Duties (FREDS008)">
+                        <group string="Segregation of Duties ()">
                             <group>
                                 <field name="validator_id" groups="employee_development_system.group_eds_officer"/>
                                 <field name="reviewer_id"/>
@@ -142,7 +142,7 @@
                                 </field>
                             </page>
                             <page string="Duplicates &amp; Non-Training">
-                                <group string="Duplicate Needs (FREDS007)">
+                                <group string="Duplicate Needs ()">
                                     <field name="duplicate_entry_ids" readonly="state == 'locked'">
                                         <list>
                                             <field name="name"/>

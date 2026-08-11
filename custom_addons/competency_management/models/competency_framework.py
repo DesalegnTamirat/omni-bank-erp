@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencyFramework(models.Model):
-    """Version-controlled competency framework (FR-COM-001..007, FR-CFD-004/005)."""
+    """Version-controlled competency framework (..007, /005)."""
     _name = 'competency.framework'
     _description = 'Competency Framework'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -24,7 +24,7 @@ class CompetencyFramework(models.Model):
     line_ids = fields.One2many('competency.framework.line', 'framework_id', string='Competency Lines')
     change_description = fields.Text(
         string='Change Description',
-        help='Reason for this version change (FR-COM-007).')
+        help='Reason for this version change .')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     approval_history_ids = fields.One2many(
@@ -43,7 +43,7 @@ class CompetencyFramework(models.Model):
                     _('An approved framework must contain at least one competency line.'))
 
     def action_submit_for_approval(self):
-        """Draft -> Under Approval (FR-COM-006 approval workflow)."""
+        """Draft -> Under Approval ( approval workflow)."""
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_('Add at least one competency line before submitting for approval.'))
@@ -52,7 +52,7 @@ class CompetencyFramework(models.Model):
             rec.message_post(body=_('Competency framework %s submitted for approval.') % rec.name)
 
     def action_approve(self):
-        """Under Approval -> Approved (FR-COM-006/007)."""
+        """Under Approval -> Approved (/007)."""
         for rec in self:
             rec.write({
                 'state': 'approved',
@@ -63,19 +63,19 @@ class CompetencyFramework(models.Model):
             rec.message_post(body=_('Competency framework %s approved.') % rec.name)
 
     def action_retire(self):
-        """Approved -> Retired (FR-CFD-0170 framework lifecycle)."""
+        """Approved -> Retired ( framework lifecycle)."""
         for rec in self:
             rec.write({'state': 'retired'})
             rec._log_approval_step('retired', 'Retired')
             rec.message_post(body=_('Competency framework %s retired.') % rec.name)
 
     def action_create_new_version(self):
-        """Deep-copy an approved framework with an incremented version (FR-COM-007, FR-CFD-004)."""
+        """Deep-copy an approved framework with an incremented version (, )."""
         self.ensure_one()
         if self.state != 'approved':
             raise ValidationError(_('Only approved frameworks can be versioned.'))
         # copy() automatically duplicates the One2many framework lines, but a new
-        # draft version must start with a CLEAN approval history (FR-COM-007).
+        # draft version must start with a CLEAN approval history .
         new_framework = self.copy(default={
             'name': self.name,
             'code': self.code,
@@ -128,7 +128,7 @@ class CompetencyFrameworkLine(models.Model):
 
 
 class CompetencyApprovalHistory(models.Model):
-    """Immutable approval trail for framework governance (FR-COM-007 audit)."""
+    """Immutable approval trail for framework governance ( audit)."""
     _name = 'competency.approval.history'
     _description = 'Competency Approval History'
     _order = 'create_date desc'
@@ -144,5 +144,5 @@ class CompetencyApprovalHistory(models.Model):
     comment = fields.Text(string='Comment')
 
     def unlink(self):
-        # Immutability: approval history is non-editable and non-deletable (FR-COM-057)
+        # Immutability: approval history is non-editable and non-deletable 
         raise ValidationError(_('Approval history entries cannot be deleted.'))

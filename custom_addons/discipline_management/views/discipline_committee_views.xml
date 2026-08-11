@@ -25,13 +25,13 @@
                 <form>
                     <header>
                         <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <!-- DIS-5: Sequential sign-off flow -->
+                        <!-- Sequential sign-off flow -->
                         <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
                                 invisible="state != 'in_progress'"
-                                help="FR-DIS-020: Submit agenda to Department Director for sign-off before voting."/>
+                                help="Submit agenda to Department Director for sign-off before voting."/>
                         <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
                                 invisible="state != 'director_review'"
-                                help="FR-DIS-020: Director confirms review and opens voting for committee members."/>
+                                help="Director confirms review and opens voting for committee members."/>
                         <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
                                 invisible="state not in ('voting', 'in_progress')"/>
                         <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
@@ -61,8 +61,8 @@
                                 <field name="required_quorum_percentage"/>
                                 <field name="is_quorum_met" widget="boolean"/>
                             </group>
-                            <!-- DIS-5: Director sign-off tracking -->
-                            <group string="Director Sign-off (FR-DIS-020)">
+                            <!-- Director sign-off tracking -->
+                            <group string="Director Sign-off ">
                                 <field name="director_signed_off" widget="boolean"/>
                                 <field name="director_signoff_by_id" readonly="1"/>
                                 <field name="director_signoff_date" readonly="1"/>

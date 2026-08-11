@@ -59,7 +59,7 @@ class DisciplineAppeal(models.Model):
     reviewer_id = fields.Many2one('res.users', string='Appeal Authority / Chair', tracking=True)
     review_date = fields.Date(string='Review Date', tracking=True)
 
-    # FR-DIS-034: Appeal Tracking & Decision Outcome
+    # Appeal Tracking & Decision Outcome
     decision_outcome = fields.Selection([
         ('upheld', 'Original Decision Upheld (Appeal Rejected)'),
         ('overturned', 'Decision Overturned (Exonerated)'),
@@ -85,7 +85,7 @@ class DisciplineAppeal(models.Model):
         ('rejected_expired', 'Rejected (Window Expired)'),
     ], string='Status', default='submitted', required=True, tracking=True)
 
-    # FR-DIS-032: Appeal Window Enforcement (10 Calendar Days)
+    # Appeal Window Enforcement (10 Calendar Days)
     @api.constrains('submission_date', 'case_id')
     def _check_appeal_window(self):
         for rec in self:

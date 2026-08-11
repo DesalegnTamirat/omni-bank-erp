@@ -5,7 +5,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsVenue(models.Model):
-    """Registered training venue (FREDS020/FR-EDS-019)."""
+    """Registered training venue (EDS-019)."""
     _name = 'eds.venue'
     _description = 'Training Venue'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -42,7 +42,7 @@ class EdsVenue(models.Model):
 
 
 class EdsVenueBooking(models.Model):
-    """Booking of a venue for a session with conflict protection (FR-EDS-019/020).
+    """Booking of a venue for a session with conflict protection (/020).
 
     A venue cannot be double-booked on overlapping slots: the constraint below
     blocks any second booking (or session) on the same venue with an overlapping
@@ -83,7 +83,7 @@ class EdsVenueBooking(models.Model):
 
     @api.constrains('venue_id', 'date_start', 'date_end', 'state')
     def _check_venue_conflict(self):
-        """No double-booking of a venue on overlapping slots (FR-EDS-019)."""
+        """No double-booking of a venue on overlapping slots ."""
         for rec in self:
             if rec.state == 'cancelled':
                 continue
@@ -96,7 +96,7 @@ class EdsVenueBooking(models.Model):
             ], limit=1)
             if conflicting:
                 raise ValidationError(_(
-                    'Venue Conflict (FR-EDS-019): %s is already booked from %s to %s '
+                    'Venue Conflict : %s is already booked from %s to %s '
                     '(booking %s). Choose a different slot or venue.')
                     % (rec.venue_id.name, conflicting.date_start, conflicting.date_end,
                        conflicting.name))
@@ -119,7 +119,7 @@ class EdsVenueBooking(models.Model):
 
 
 class EdsBatch(models.Model):
-    """Cohort / batch grouping sessions of a course (FREDS023)."""
+    """Cohort / batch grouping sessions of a course ()."""
     _name = 'eds.batch'
     _description = 'Training Batch / Cohort'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -178,13 +178,13 @@ class EdsBatch(models.Model):
 
 
 class EdsSession(models.Model):
-    """A scheduled delivery of a course (FREDS020-023, FR-EDS-017...022).
+    """A scheduled delivery of a course (-023, ...022).
 
     Carries the venue, trainers (constrained to the trainer register with matching
     competencies and availability - Task 4) and dates; enforces venue and trainer
-    conflict checks (FR-EDS-019/020), and notifies participants on reschedule or
-    cancellation (FR-EDS-022). Sessions are created from annual-plan lines on
-    publication (FREDS024) and feed the planned-vs-actual variance (FREDS025).
+    conflict checks (/020), and notifies participants on reschedule or
+    cancellation . Sessions are created from annual-plan lines on
+    publication () and feed the planned-vs-actual variance ().
     """
     _name = 'eds.session'
     _description = 'Training Session'
@@ -200,7 +200,7 @@ class EdsSession(models.Model):
     plan_line_id = fields.Many2one('eds.annual.plan.line', string='Annual Plan Line',
                                    ondelete='set null', index=True,
                                    help='Links the session to the annual plan for variance '
-                                        'monitoring (FREDS025).')
+                                        'monitoring ().')
     batch_id = fields.Many2one('eds.batch', string='Batch / Cohort', ondelete='set null')
     date_start = fields.Datetime(string='Start Date', required=True, tracking=True)
     date_end = fields.Datetime(string='End Date', required=True, tracking=True)
@@ -215,12 +215,12 @@ class EdsSession(models.Model):
         help='Only active trainers from the register may be assigned (Task 4 register).')
     capacity = fields.Integer(
         string='Capacity', default=lambda self: self._get_default_capacity(),
-        help='Maximum number of participants (default 25-30 from EDS settings, FREDS039).')
+        help='Maximum number of participants (default 25-30 from EDS settings, ).')
     approval_flow = fields.Selection([
         ('standard', 'Standard (Line Manager -> L&D)'),
         ('budget_hr', 'With Budget/HR Gate'),
     ], string='Approval Flow', default='standard',
-        help='Per-program approval chain override (FR-EDS-026): programs involving budget '
+        help='Per-program approval chain override : programs involving budget '
              'add an explicit Budget/HR approval step.')
     nomination_ids = fields.One2many('eds.nomination', 'session_id', string='Nominations')
     nomination_count = fields.Integer(string='Nominations', compute='_compute_nomination_count')
@@ -247,19 +247,19 @@ class EdsSession(models.Model):
     conflict_flag = fields.Boolean(
         string='Conflict', compute='_compute_conflict_flag', search='_search_conflict_flag',
         help='True when the venue or a trainer is already engaged on an overlapping slot '
-             '(FR-EDS-019/020).')
+             '(/020).')
     booking_ids = fields.One2many('eds.venue.booking', 'session_id', string='Venue Bookings')
     booking_id = fields.Many2one('eds.venue.booking', string='Current Booking',
                                  compute='_compute_booking_id')
 
-    # ── Task 7: attendance & delivery tracking (FREDS040/041/045) ─────────────
+    # ── Task 7: attendance & delivery tracking (/041/045) ─────────────
     attendance_ids = fields.One2many(
         'eds.session.attendance', 'session_id', string='Attendance Records')
     attendance_count = fields.Integer(string='Attendance', compute='_compute_delivery_counts')
     attendance_rate = fields.Float(
         string='Session Attendance %', compute='_compute_attendance_rate', store=True,
         digits=(5, 2),
-        help='Attended / recorded participants for this session (FREDS040).')
+        help='Attended / recorded participants for this session ().')
     feedback_ids = fields.One2many('eds.feedback', 'session_id', string='Daily Feedback')
     feedback_count = fields.Integer(string='Feedback', compute='_compute_delivery_counts')
     assessment_ids = fields.One2many('eds.assessment', 'session_id', string='Assessments')
@@ -281,7 +281,7 @@ class EdsSession(models.Model):
 
     @api.model
     def _get_default_capacity(self):
-        """Default class size from EDS settings (BRD: 25-30, FREDS039)."""
+        """Default class size from EDS settings (BRD: 25-30, )."""
         return self._get_int_param('eds.default_class_capacity', 30)
 
     @api.depends('date_start', 'venue_id', 'trainer_ids', 'status')
@@ -311,7 +311,7 @@ class EdsSession(models.Model):
 
     @api.depends('enrollment_ids', 'enrollment_ids.state')
     def _compute_enrollment_counts(self):
-        """FR-EDS-027: live enrolled / waitlisted counts from the enrollments."""
+        """live enrolled / waitlisted counts from the enrollments."""
         for rec in self:
             rec.enrolled_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'enrolled'))
             rec.waitlist_count = len(rec.enrollment_ids.filtered(lambda e: e.state == 'waitlisted'))
@@ -332,7 +332,7 @@ class EdsSession(models.Model):
 
     @api.depends('attendance_ids', 'attendance_ids.attended')
     def _compute_attendance_rate(self):
-        """Session-level attendance % (FREDS040)."""
+        """Session-level attendance % ()."""
         for rec in self:
             total = len(rec.attendance_ids)
             rec.attendance_rate = (
@@ -363,7 +363,7 @@ class EdsSession(models.Model):
 
     @api.onchange('date_start', 'date_end', 'venue_id', 'trainer_ids')
     def _onchange_conflict_check(self):
-        """Warn (but do not block) on venue/trainer conflicts during editing (FR-EDS-019/020)."""
+        """Warn (but do not block) on venue/trainer conflicts during editing (/020)."""
         if not self.date_start or not self.date_end or self.status in ('cancelled',):
             return
         conflicts = []
@@ -382,7 +382,7 @@ class EdsSession(models.Model):
         if conflicts:
             return {
                 'warning': {
-                    'title': _('Scheduling Conflict (FR-EDS-019/020)'),
+                    'title': _('Scheduling Conflict (/020)'),
                     'message': '\n'.join(conflicts),
                 },
             }
@@ -408,7 +408,7 @@ class EdsSession(models.Model):
         return res
 
     def _sync_plan_line_status(self):
-        """FREDS025: reflect the session status on its annual plan line."""
+        """reflect the session status on its annual plan line."""
         self.ensure_one()
         if not self.plan_line_id:
             return
@@ -421,7 +421,7 @@ class EdsSession(models.Model):
             if line.status in ('planned', 'delayed', 'cancelled'):
                 line.status = 'scheduled'
 
-    # ── Conflict detection (FR-EDS-019/020) ──────────────────────────────────
+    # ── Conflict detection (/020) ──────────────────────────────────
     def _get_venue_conflicts(self):
         """Other sessions using the same venue on an overlapping window."""
         self.ensure_one()
@@ -466,27 +466,27 @@ class EdsSession(models.Model):
 
     @api.constrains('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
     def _check_session_conflicts(self):
-        """Blocking enforcement of the venue + trainer conflict rules (FR-EDS-019/020)."""
+        """Blocking enforcement of the venue + trainer conflict rules (/020)."""
         for rec in self:
             if rec.status in ('cancelled', 'completed'):
                 continue
             venue = rec._get_venue_conflicts()
             if venue:
                 raise ValidationError(_(
-                    'Venue Conflict (FR-EDS-019): %s is already booked for session %s on an '
+                    'Venue Conflict : %s is already booked for session %s on an '
                     'overlapping slot.' % (rec.venue_id.name, venue[0].name)))
             trainers = rec._get_trainer_conflicts()
             if trainers:
                 raise ValidationError(_(
-                    'Trainer Conflict (FR-EDS-020): trainer(s) %s are already assigned to an '
+                    'Trainer Conflict : trainer(s) %s are already assigned to an '
                     'overlapping session.' % ', '.join(trainers.mapped('name'))))
             blocked = rec._get_blocked_trainer_availability()
             if blocked:
                 raise ValidationError(_(
-                    'Trainer Unavailable (FR-EDS-020): trainer(s) %s have a blocked availability '
+                    'Trainer Unavailable : trainer(s) %s have a blocked availability '
                     'record in this period.' % ', '.join(blocked.mapped('name'))))
 
-    # ── Session workflow (FREDS024/FR-EDS-022) ──────────────────────────────
+    # ── Session workflow (EDS-022) ──────────────────────────────
     def action_confirm(self):
         """Draft -> Scheduled: validate conflicts + material gate and book the venue."""
         for rec in self:
@@ -505,13 +505,13 @@ class EdsSession(models.Model):
                     'date_end': rec.date_end,
                     'state': 'confirmed',
                 })
-            rec.message_post(body=_('Session %s confirmed and scheduled (FREDS024).') % rec.name)
+            rec.message_post(body=_('Session %s confirmed and scheduled ().') % rec.name)
 
     def action_start(self):
         """Scheduled -> Ongoing: delivery has begun.
 
         Attendance records are auto-created for every enrolled participant so the
-        trainer only marks who attended (FREDS040).
+        trainer only marks who attended ().
         """
         for rec in self:
             if rec.status != 'scheduled':
@@ -519,7 +519,7 @@ class EdsSession(models.Model):
             rec.status = 'ongoing'
             rec._ensure_attendance_records()
             rec.message_post(body=_('Session %s started - attendance sheet opened for the '
-                                    'trainer (FREDS040).') % rec.name)
+                                    'trainer ().') % rec.name)
 
     def action_complete(self):
         """Ongoing -> Completed: delivery finished.
@@ -534,11 +534,11 @@ class EdsSession(models.Model):
             present = len(rec.attendance_ids.filtered('attended'))
             total = len(rec.attendance_ids)
             rec.message_post(
-                body=_('Session %s completed (FREDS025) - attendance %d/%d recorded '
-                       '(FREDS040).') % (rec.name, present, total))
+                body=_('Session %s completed () - attendance %d/%d recorded '
+                       '().') % (rec.name, present, total))
 
     def action_reschedule(self):
-        """Scheduled/Ongoing -> Rescheduled: allow date edits, then confirm again (FR-EDS-022)."""
+        """Scheduled/Ongoing -> Rescheduled: allow date edits, then confirm again ."""
         for rec in self:
             if rec.status not in ('scheduled', 'ongoing'):
                 raise UserError(_('Only scheduled or ongoing sessions can be rescheduled.'))
@@ -566,10 +566,10 @@ class EdsSession(models.Model):
                     'date_end': rec.date_end,
                     'state': 'confirmed',
                 })
-            rec.message_post(body=_('Session %s rescheduled and confirmed (FR-EDS-022).') % rec.name)
+            rec.message_post(body=_('Session %s rescheduled and confirmed .') % rec.name)
 
     def action_cancel(self):
-        """Cancel the session, release the venue, cancel enrollments and notify (FR-EDS-022)."""
+        """Cancel the session, release the venue, cancel enrollments and notify ."""
         for rec in self:
             if rec.status in ('completed', 'cancelled'):
                 raise UserError(_('Completed or cancelled sessions cannot be cancelled again.'))
@@ -582,7 +582,7 @@ class EdsSession(models.Model):
             rec._notify_participants(_('Session %s has been cancelled.') % rec.name)
 
     def _notify_participants(self, message):
-        """FR-EDS-022: notify enrolled participants on reschedule/cancel (FR-EDS-029)."""
+        """notify enrolled participants on reschedule/cancel ."""
         self.ensure_one()
         self.message_post(body=message)
         partner_ids = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled') \
@@ -591,7 +591,7 @@ class EdsSession(models.Model):
             self.message_post(body=message, partner_ids=partner_ids)
 
     def _promote_waitlisted(self):
-        """FR-EDS-028: FIFO promotion of this session's waitlist (delegates to enrollment)."""
+        """FIFO promotion of this session's waitlist (delegates to enrollment)."""
         self.ensure_one()
         if 'eds.enrollment' in self.env.registry:
             self.env['eds.enrollment']._promote_waitlisted(self)
@@ -608,7 +608,7 @@ class EdsSession(models.Model):
         }
 
     def action_nominate(self):
-        """Open the "Nominate for Session" wizard pre-filled with this session (FREDS038)."""
+        """Open the "Nominate for Session" wizard pre-filled with this session ()."""
         self.ensure_one()
         return {
             'name': _('Nominate for Session'),
@@ -630,9 +630,9 @@ class EdsSession(models.Model):
             'context': {'default_session_id': self.id},
         }
 
-    # ── Task 7: attendance & delivery helpers (FREDS040/041/045) ─────────────
+    # ── Task 7: attendance & delivery helpers (/041/045) ─────────────
     def _check_material_approval(self):
-        """FREDS045: a session whose course has materials cannot be confirmed until
+        """a session whose course has materials cannot be confirmed until
         at least one material version is approved (quality + Director PPDD)."""
         self.ensure_one()
         if not self.course_id or not self.course_id.material_ids:
@@ -640,11 +640,11 @@ class EdsSession(models.Model):
         if not self.course_id.material_ids.filtered('is_approved'):
             raise UserError(_(
                 'Training materials must be approved before the schedule is confirmed '
-                '(FREDS045). Approve the materials on training program %s first.')
+                '(). Approve the materials on training program %s first.')
                 % self.course_id.name)
 
     def _ensure_attendance_records(self):
-        """Auto-create the attendance sheet for all enrolled participants (FREDS040)."""
+        """Auto-create the attendance sheet for all enrolled participants ()."""
         self.ensure_one()
         existing = self.attendance_ids.mapped('employee_id')
         enrolled = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled')

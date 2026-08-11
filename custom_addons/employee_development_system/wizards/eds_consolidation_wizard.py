@@ -3,7 +3,7 @@ from odoo import api, fields, models, _
 
 
 class EdsTnaConsolidationWizard(models.TransientModel):
-    """Consolidate a TNA cycle (optionally per work unit) into one register (FREDS007)."""
+    """Consolidate a TNA cycle (optionally per work unit) into one register ()."""
     _name = 'eds.tna.consolidation.wizard'
     _description = 'TNA Consolidation Wizard'
 

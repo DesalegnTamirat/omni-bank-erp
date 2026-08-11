@@ -13,26 +13,26 @@ class DisciplinePayrollPenalty(models.Model):
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
 
-    # DIS-9: Penalty can be a percentage OR a day-count (for suspension without pay)
+    # Penalty can be a percentage OR a day-count (for suspension without pay)
     penalty_type = fields.Selection([
         ('percentage', 'Salary Percentage Deduction'),
         ('suspension_without_pay', 'Suspension Without Pay (Daily Rate)'),
         ('managerial', 'Managerial Day-Count Deduction'),
     ], string='Penalty Calculation Type', required=True, default='percentage', tracking=True,
-        help='FR-DIS-019: Percentage deduction for warning penalties. '
-             'FR-DIS-021: Daily deduction for suspension without pay. '
+        help='Percentage deduction for warning penalties. '
+             'Daily deduction for suspension without pay. '
              'Managerial: deducts based on working day count authorised by management.')
 
     penalty_percentage = fields.Float(string='Penalty Deduction (%)', tracking=True)
 
-    # DIS-9: For daily-rate based deductions
+    # For daily-rate based deductions
     suspension_id = fields.Many2one('discipline.suspension', string='Linked Suspension', tracking=True,
-                                    help='FR-DIS-021: Link to the suspension record to auto-fill days.')
+                                    help='Link to the suspension record to auto-fill days.')
     suspension_days = fields.Integer(string='Suspension Days Without Pay', tracking=True)
     managerial_days = fields.Integer(string='Managerial Deduction Days', tracking=True,
                                     help='Days authorised by management for penalty (e.g. annual leave offset).')
 
-    # DIS-9: Calculated amounts
+    # Calculated amounts
     calculated_amount = fields.Float(
         string='Calculated Gross Deduction (ETB)',
         compute='_compute_calculated_amount',
@@ -87,7 +87,7 @@ class DisciplinePayrollPenalty(models.Model):
                 rec.daily_rate = 0.0
                 continue
             wage = rec._get_employee_wage()
-            # FR-DIS-021: Bank policy assumes 30 working days per calendar month
+            # Bank policy assumes 30 working days per calendar month
             rec.daily_rate = wage / 30.0 if wage else 0.0
 
     @api.depends('employee_id', 'penalty_percentage', 'penalty_type',
@@ -102,10 +102,10 @@ class DisciplinePayrollPenalty(models.Model):
                 # Standard % of gross monthly basic wage
                 rec.calculated_amount = (wage * rec.penalty_percentage) / 100.0
             elif rec.penalty_type == 'suspension_without_pay':
-                # DIS-9 / FR-DIS-021: days × daily_rate
+                #  days × daily_rate
                 rec.calculated_amount = (rec.suspension_days or 0) * rec.daily_rate
             elif rec.penalty_type == 'managerial':
-                # DIS-9: HR-authorised day count × daily_rate
+                # HR-authorised day count × daily_rate
                 rec.calculated_amount = (rec.managerial_days or 0) * rec.daily_rate
             else:
                 rec.calculated_amount = 0.0
@@ -118,7 +118,7 @@ class DisciplinePayrollPenalty(models.Model):
             self.penalty_type = 'suspension_without_pay'
 
     def action_transmit_to_payroll(self):
-        """FR-DIS-023: Transmit penalty deduction data to Payroll."""
+        """Transmit penalty deduction data to Payroll."""
         for rec in self:
             if rec.calculated_amount <= 0:
                 raise UserError(_('Calculated deduction amount is zero. Verify contract wage and penalty settings.'))

@@ -7,7 +7,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsTnaCycle(models.Model):
-    """Annual Bank-wide Training Needs Assessment cycle (FREDS001/002/009).
+    """Annual Bank-wide Training Needs Assessment cycle (/002/009).
 
     Default start 1 April, submission window 10 working days,
     approval deadline 31 May - all configurable in EDS settings.
@@ -44,7 +44,7 @@ class EdsTnaCycle(models.Model):
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # Task 2: consolidations per cycle (FREDS006-010)
+    # Task 2: consolidations per cycle (-010)
     consolidation_ids = fields.One2many(
         'eds.tna.consolidation', 'cycle_id', string='Consolidations')
     consolidation_count = fields.Integer(
@@ -58,7 +58,7 @@ class EdsTnaCycle(models.Model):
 
     @api.model
     def _cron_tna_deadline_reminder(self):
-        """FREDS009: remind pending approvers before the approval deadline; escalate if breached.
+        """remind pending approvers before the approval deadline; escalate if breached.
 
         Runs daily (eds.cron_tna_deadline_reminder). Notifies the L&D Manager group via chatter
         once per 7-day window; once the deadline is breached the escalation text is used.
@@ -78,11 +78,11 @@ class EdsTnaCycle(models.Model):
             if cycle.last_reminder_date and (today - cycle.last_reminder_date).days < 7:
                 continue
             if days_left >= 0:
-                body = _('Reminder (FREDS009): TNA cycle %s must be approved by %s - %d days left.'
+                body = _('Reminder (): TNA cycle %s must be approved by %s - %d days left.'
                          ' Pending approvers: PPDD Validation, Director PPDD, CPCO, SMC.') % (
                     cycle.name, cycle.approval_deadline, days_left)
             else:
-                body = _('DEADLINE BREACHED (FREDS009): TNA cycle %s approval deadline (%s) has been'
+                body = _('DEADLINE BREACHED (): TNA cycle %s approval deadline (%s) has been'
                          ' missed by %d days. Escalated for senior management review.') % (
                     cycle.name, cycle.approval_deadline, -days_left)
             cycle.message_post(body=body, partner_ids=partner_ids)
@@ -146,15 +146,15 @@ class EdsTnaCycle(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         # sudo(): base security denies plain users direct ir.sequence access, which
-        # would break self-service record creation (FR-EDS-005).
+        # would break self-service record creation .
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('eds.tna.cycle') or _('New')
         return super().create(vals_list)
 
-    # ── Workflow (FREDS001/008/009/010) ──────────────────────────────────────
+    # ── Workflow (/008/009/010) ──────────────────────────────────────
     def action_start_collection(self):
-        """Draft -> Collecting (opens the submission window, FREDS001/002)."""
+        """Draft -> Collecting (opens the submission window, /002)."""
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft TNA cycles can start collection.'))
@@ -163,7 +163,7 @@ class EdsTnaCycle(models.Model):
                              % (rec.name, rec.start_date, rec.submission_end_date))
 
     def action_finish_collection(self):
-        """Collecting -> Consolidating (FREDS007)."""
+        """Collecting -> Consolidating ()."""
         for rec in self:
             if not rec.entry_ids:
                 raise UserError(_('No training needs were submitted for this cycle.'))
@@ -171,7 +171,7 @@ class EdsTnaCycle(models.Model):
             rec.message_post(body=_('TNA cycle %s moved to consolidation.') % rec.name)
 
     def action_submit_for_approval(self):
-        """Consolidating -> Under Approval (FREDS008: PPDD validation -> Director review ->
+        """Consolidating -> Under Approval (PPDD validation -> Director review ->
         CPCO endorsement -> SMC final approval; stages are tracked via chatter/approval log)."""
         for rec in self:
             if rec.state != 'consolidating':
@@ -182,7 +182,7 @@ class EdsTnaCycle(models.Model):
                 % rec.name)
 
     def action_approve(self):
-        """Under Approval -> Approved (FREDS010: approved TNA becomes the official source)."""
+        """Under Approval -> Approved (approved TNA becomes the official source)."""
         for rec in self:
             if rec.state != 'under_approval':
                 raise UserError(_('Only cycles under approval can be approved.'))
@@ -197,7 +197,7 @@ class EdsTnaCycle(models.Model):
                              % rec.name)
 
     def action_lock(self):
-        """Approved -> Locked (FREDS010 control)."""
+        """Approved -> Locked ( control)."""
         for rec in self:
             if rec.state != 'approved':
                 raise UserError(_('Only approved TNA cycles can be locked.'))
@@ -215,7 +215,7 @@ class EdsTnaCycle(models.Model):
 
 
 class EdsTnaEntry(models.Model):
-    """A single training need within a cycle (FREDS002/004, FR-EDS-001..005, FR-EDS-008)."""
+    """A single training need within a cycle (/004, ..005, )."""
     _name = 'eds.tna.entry'
     _description = 'TNA Training Need Entry'
     _inherit = ['mail.thread']
@@ -231,7 +231,7 @@ class EdsTnaEntry(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Employee', tracking=True)
     competency_id = fields.Many2one(
         'competency.competency', string='Competency',
-        help='Linked to the approved competency framework (FR-EDS-002).', tracking=True)
+        help='Linked to the approved competency framework .', tracking=True)
     gap_severity = fields.Selection([
         ('critical', 'Critical'),
         ('high', 'High'),
@@ -253,7 +253,7 @@ class EdsTnaEntry(models.Model):
         ('e_learning', 'E-Learning'),
         ('blended', 'Blended'),
     ], string='Delivery Mode', default='classroom', required=True, tracking=True,
-        help='Decided at TNA stage (FR-EDS-008): only Classroom (and the classroom part of '
+        help='Decided at TNA stage : only Classroom (and the classroom part of '
              'Blended) are actioned within EDS; E-Learning routes to the LMS.')
     priority_score = fields.Float(string='Priority Score', compute='_compute_priority_score', store=True)
     justification = fields.Text(string='Justification', required=True)
@@ -276,23 +276,23 @@ class EdsTnaEntry(models.Model):
     company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    # ── Task 2: Consolidation & Prioritization (FREDS006/007) ────────────────
+    # ── Task 2: Consolidation & Prioritization (/007) ────────────────
     consolidation_id = fields.Many2one(
         'eds.tna.consolidation', string='Consolidation',
         ondelete='set null', index=True, copy=False, tracking=True)
     is_duplicate = fields.Boolean(
         string='Duplicate Need', default=False, tracking=True,
         help='Auto-flagged during consolidation when the same employee+competency need appears '
-             'from multiple sources (FREDS007).')
+             'from multiple sources ().')
     duplicate_of_id = fields.Many2one('eds.tna.entry', string='Duplicate Of', ondelete='set null')
     exclusion_type = fields.Selection([
         ('process', 'Process Issue'),
         ('system', 'System Issue'),
         ('structural', 'Structural Issue'),
     ], string='Non-Training Item Type', tracking=True,
-        help='Flagged as a non-training item (process/system/structural) for review & exclusion (FREDS007).')
+        help='Flagged as a non-training item (process/system/structural) for review & exclusion ().')
 
-    # Priority scoring criteria (FREDS006) - each scored 0-100, weighted by eds.tna.priority.rule
+    # Priority scoring criteria () - each scored 0-100, weighted by eds.tna.priority.rule
     score_strategic_alignment = fields.Float(string='Strategic Alignment Score', default=50.0)
     score_tom_impact = fields.Float(string='TOM Impact Score', default=50.0)
     score_gap_severity = fields.Float(
@@ -304,7 +304,7 @@ class EdsTnaEntry(models.Model):
 
     @api.depends('gap_severity')
     def _compute_score_gap_severity(self):
-        """Map the gap severity selection onto the 0-100 scoring scale (FREDS006)."""
+        """Map the gap severity selection onto the 0-100 scoring scale ()."""
         weights = {'critical': 100.0, 'high': 75.0, 'medium': 50.0, 'low': 25.0}
         for rec in self:
             rec.score_gap_severity = weights.get(rec.gap_severity, 50.0)
@@ -316,7 +316,7 @@ class EdsTnaEntry(models.Model):
             rec.score_regulatory = 100.0 if rec.source == 'regulatory' else 0.0
 
     def _criterion_score(self, criteria):
-        """Return the 0-100 score for a priority criterion code (FREDS006)."""
+        """Return the 0-100 score for a priority criterion code ()."""
         mapping = {
             'strategic_alignment': 'score_strategic_alignment',
             'tom_impact': 'score_tom_impact',
@@ -330,7 +330,7 @@ class EdsTnaEntry(models.Model):
     @api.depends('score_strategic_alignment', 'score_tom_impact', 'score_gap_severity',
                  'score_risk_level', 'score_regulatory', 'score_future_capability')
     def _compute_priority_score(self):
-        """Weighted priority engine (FREDS006): weighted average of the active rule weights.
+        """Weighted priority engine (): weighted average of the active rule weights.
 
         score = sum(weight_i * score_i) / sum(weight_i), capped at 100.
         """
@@ -338,7 +338,7 @@ class EdsTnaEntry(models.Model):
             rec.priority_score = rec._get_weighted_priority_score()
 
     def _get_weighted_priority_score(self):
-        """Pure weighted-score computation (FREDS006) - shared by the ORM compute and by the
+        """Pure weighted-score computation () - shared by the ORM compute and by the
         priority-rule model so changing a rule weight re-scores every consolidated entry."""
         rules = self.env['eds.tna.priority.rule'].search([('active', '=', True)])
         total_weight = sum(rules.mapped('weight'))
@@ -383,7 +383,7 @@ class EdsTnaEntry(models.Model):
         return super().create(vals_list)
 
     def write(self, vals):
-        # FREDS010: a locked consolidation freezes its needs; edits require a documented
+        # a locked consolidation freezes its needs; edits require a documented
         # change request (unlock first). The state transition itself and the consolidation
         # engine (which flips flags on its own records) are allowed through sudo context.
         if self.env.context.get('eds_allow_locked_edit'):
@@ -392,11 +392,11 @@ class EdsTnaEntry(models.Model):
             if rec.consolidation_id and rec.consolidation_id.state == 'locked':
                 raise UserError(_(
                     'Training need %s belongs to the locked consolidation %s. Unlock the '
-                    'consolidation with a documented change request before editing (FREDS010).')
+                    'consolidation with a documented change request before editing ().')
                     % (rec.name, rec.consolidation_id.name))
         return super().write(vals)
 
-    # ── Workflow (FR-EDS-005: manager review; FREDS007: exclusion) ───────────
+    # ── Workflow (manager review; exclusion) ───────────
     def action_submit(self):
         for rec in self:
             if rec.state != 'draft':
@@ -405,7 +405,7 @@ class EdsTnaEntry(models.Model):
             rec.message_post(body=_('Training need %s submitted.') % rec.name)
 
     def action_validate(self):
-        """PPDD validation of a submitted entry (FREDS008)."""
+        """PPDD validation of a submitted entry ()."""
         for rec in self:
             if rec.state not in ('submitted', 'validated'):
                 raise UserError(_('Only submitted entries can be validated.'))
@@ -417,10 +417,10 @@ class EdsTnaEntry(models.Model):
             rec.message_post(body=_('Training need %s validated.') % rec.name)
 
     def action_exclude(self):
-        """Flag duplicate/invalid/non-training items for exclusion (FREDS007)."""
+        """Flag duplicate/invalid/non-training items for exclusion ()."""
         for rec in self:
             if not rec.excluded_reason:
-                raise UserError(_('An exclusion reason is required (FREDS007).'))
+                raise UserError(_('An exclusion reason is required ().'))
             rec.state = 'excluded'
             rec.message_post(body=_('Training need %s excluded: %s') % (rec.name, rec.excluded_reason))
 
@@ -429,12 +429,12 @@ class EdsTnaEntry(models.Model):
             rec.state = 'draft'
 
     def action_create_development_request(self):
-        """FREDS011: kick off course development for an approved need - opens a pre-filled
+        """kick off course development for an approved need - opens a pre-filled
         development request (pre-created so the wizard-less flow is instant)."""
         self.ensure_one()
         if self.state not in ('approved', 'converted'):
             raise UserError(_('Only approved training needs can be converted to a course '
-                              'development request (FREDS011).'))
+                              'development request ().'))
         existing = self.env['eds.course.development.request'].search(
             [('tna_entry_ids', 'in', [self.id])], limit=1)
         if existing:

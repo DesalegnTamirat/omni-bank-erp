@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-"""Task 7 - Attendance & Delivery Tracking (FREDS040/041/045, FR-EDS-043...045).
+"""Task 7 - Attendance & Delivery Tracking (/041/045, ...045).
 
 Delivery-time models consumed by the trainer and L&D officer:
   - eds.session.attendance   per-participant attendance with computed per-program %
                              (feeds the 80% certification rule, Task 10)
   - eds.material             course training material with quality review +
-                             Director PPDD approval gate (FREDS045)
-  - eds.feedback             daily participant feedback lines (FREDS040)
+                             Director PPDD approval gate ()
+  - eds.feedback             daily participant feedback lines ()
   - eds.assessment           pre/post assessment scores (shared with Task 8 L1/L2)
   - eds.international.training + .travel.line / .report   international flow with
                              entitlement validation (service years) and travel
-                             arrangements (FREDS041)
+                             arrangements ()
 """
 from datetime import date
 
@@ -19,7 +19,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsSessionAttendance(models.Model):
-    """Per-participant attendance on a session (FREDS040).
+    """Per-participant attendance on a session ().
 
     `attendance_percentage` is computed *per program* (all sessions of the same
     course) so it feeds directly into the certification eligibility rule
@@ -56,11 +56,11 @@ class EdsSessionAttendance(models.Model):
         string='Program Attendance %', compute='_compute_program_attendance', store=True,
         digits=(5, 2),
         help='Attended sessions / total sessions of this program for the participant '
-             '(FREDS040).')
+             '().')
     meets_min_attendance = fields.Boolean(
         string='Meets Minimum Attendance', compute='_compute_program_attendance', store=True,
         help='True when the program attendance % is >= the configurable threshold '
-             '(default 80%, FREDS040) - feeds certification eligibility (Task 10).')
+             '(default 80%, ) - feeds certification eligibility (Task 10).')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
 
@@ -79,7 +79,7 @@ class EdsSessionAttendance(models.Model):
 
     @api.depends('session_id.course_id', 'employee_id', 'attended')
     def _compute_program_attendance(self):
-        """Program (course) attendance % across all its sessions (FREDS040).
+        """Program (course) attendance % across all its sessions ().
 
         Total = attendance records of the participant on any session of the same
         course; attended = the subset marked as attended. A participant with no
@@ -110,7 +110,7 @@ class EdsSessionAttendance(models.Model):
 
 
 class EdsMaterial(models.Model):
-    """Training material with quality review + Director PPDD approval (FREDS045).
+    """Training material with quality review + Director PPDD approval ().
 
     A session whose course has materials cannot be confirmed until at least one
     material version is approved - enforced on `eds.session.action_confirm`.
@@ -140,7 +140,7 @@ class EdsMaterial(models.Model):
     filename = fields.Char(string='Filename')
     description = fields.Text(string='Description')
 
-    # Two-stage gate (FREDS045): L&D quality review first, then Director PPDD.
+    # Two-stage gate (): L&D quality review first, then Director PPDD.
     quality_state = fields.Selection([
         ('draft', 'Draft'),
         ('in_review', 'In Quality Review'),
@@ -157,7 +157,7 @@ class EdsMaterial(models.Model):
     is_approved = fields.Boolean(
         string='Approved', compute='_compute_is_approved', store=True,
         help='True when the quality review passed and (if submitted) the Director '
-             'PPDD approval is granted - the session confirmation gate (FREDS045).')
+             'PPDD approval is granted - the session confirmation gate ().')
 
     reviewed_by = fields.Many2one('res.users', string='Quality Reviewed By', readonly=True)
     reviewed_date = fields.Date(string='Quality Review Date', readonly=True)
@@ -186,7 +186,7 @@ class EdsMaterial(models.Model):
             raise UserError(_('You do not have the required authority for this step.'))
 
     def action_submit_quality_review(self):
-        """Draft -> In Quality Review (FREDS045: L&D quality check)."""
+        """Draft -> In Quality Review (L&D quality check)."""
         for rec in self:
             if rec.quality_state != 'draft':
                 raise UserError(_('Only draft materials can be submitted to quality review.'))
@@ -194,7 +194,7 @@ class EdsMaterial(models.Model):
                 raise UserError(_('Attach the material document before submitting it for '
                                   'quality review.'))
             rec.quality_state = 'in_review'
-            rec.message_post(body=_('Material %s submitted for quality review (FREDS045).')
+            rec.message_post(body=_('Material %s submitted for quality review ().')
                              % rec.title)
 
     def action_approve_quality(self):
@@ -206,20 +206,20 @@ class EdsMaterial(models.Model):
             rec.write({'quality_state': 'quality_approved',
                        'reviewed_by': self.env.user.id,
                        'reviewed_date': date.today()})
-            rec.message_post(body=_('Material %s passed the quality review (FREDS045).')
+            rec.message_post(body=_('Material %s passed the quality review ().')
                              % rec.title)
 
     def action_submit_director_approval(self):
-        """Quality Approved -> Submitted to Director PPDD (FREDS045)."""
+        """Quality Approved -> Submitted to Director PPDD ()."""
         for rec in self:
             if rec.quality_state != 'quality_approved':
                 raise UserError(_('Approve the quality review before the Director PPDD step '
-                                  '(FREDS045).'))
+                                  '().'))
             if rec.approval_state == 'director_approved':
                 continue
             rec.approval_state = 'submitted'
             rec.message_post(body=_('Material %s submitted for Director PPDD approval '
-                                    '(FREDS045).') % rec.title)
+                                    '().') % rec.title)
 
     def action_director_approve(self):
         """Submitted -> Director PPDD Approved (L&D Manager / Admin)."""
@@ -232,7 +232,7 @@ class EdsMaterial(models.Model):
                        'approved_by': self.env.user.id,
                        'approved_date': date.today()})
             rec.message_post(body=_('Material %s approved by Director PPDD - session '
-                                    'confirmation gate released (FREDS045).') % rec.title)
+                                    'confirmation gate released ().') % rec.title)
 
     def action_reject(self):
         """Reject at any pre-approval stage (mandatory feedback in chatter)."""
@@ -245,11 +245,11 @@ class EdsMaterial(models.Model):
                 rec.approval_state = 'rejected'
             else:
                 raise UserError(_('Only materials under review can be rejected.'))
-            rec.message_post(body=_('Material %s was rejected (FREDS045).') % rec.title)
+            rec.message_post(body=_('Material %s was rejected ().') % rec.title)
 
 
 class EdsFeedback(models.Model):
-    """Daily participant feedback line captured during delivery (FREDS040)."""
+    """Daily participant feedback line captured during delivery ()."""
     _name = 'eds.feedback'
     _description = 'Daily Participant Feedback'
     _order = 'feedback_date desc, id desc'
@@ -281,12 +281,12 @@ class EdsFeedback(models.Model):
 
 
 class EdsAssessment(models.Model):
-    """Pre/post training assessment score (FREDS055, FR-EDS-037).
+    """Pre/post training assessment score (, ).
 
     Single model shared by delivery (Task 7) and the Level-2 evaluation engine
     (Task 8): `eds.evaluation.level2` links pre/post records through this model
     and computes the learning gain. `passed` compares the score against the
-    configurable threshold (default 60%, FR-EDS-038).
+    configurable threshold (default 60%, ).
     """
     _name = 'eds.assessment'
     _description = 'Pre / Post Training Assessment'
@@ -308,13 +308,13 @@ class EdsAssessment(models.Model):
     score = fields.Float(string='Score (0-100)', digits=(5, 2), tracking=True)
     passed = fields.Boolean(string='Passed', compute='_compute_passed', store=True,
                             help='Score >= the configurable Level-2 pass threshold '
-                                 '(default 60%, FR-EDS-038).')
+                                 '(default 60%, ).')
     threshold = fields.Float(string='Pass Threshold %', compute='_compute_passed', store=True)
     assessment_date = fields.Date(string='Assessment Date', default=fields.Date.context_today)
     uploaded_by = fields.Many2one('res.users', string='Uploaded By',
                                   default=lambda self: self.env.user, readonly=True,
                                   help='External trainers may upload scores '
-                                       '(FR-EDS-016/037).')
+                                       '(/037).')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
@@ -344,7 +344,7 @@ class EdsAssessment(models.Model):
 
 
 class EdsInternationalTraining(models.Model):
-    """International training facilitation (FREDS041).
+    """International training facilitation ().
 
     Lightweight workflow covering entitlement validation (minimum service months),
     travel/per-diem arrangements, post-training reports and knowledge sharing.
@@ -378,7 +378,7 @@ class EdsInternationalTraining(models.Model):
     approved_by = fields.Many2one('res.users', string='Approved By', readonly=True)
     approved_date = fields.Date(string='Approval Date', readonly=True)
 
-    # Entitlement validation (FREDS062 service-years rule reused for international).
+    # Entitlement validation ( service-years rule reused for international).
     # Stored `entitlement_valid` and non-stored `entitlement_issues` use separate
     # compute methods to keep the store flags consistent for the ORM recomputation.
     entitlement_valid = fields.Boolean(
@@ -401,7 +401,7 @@ class EdsInternationalTraining(models.Model):
                                              compute='_compute_report_counts')
     workplace_application_tracking = fields.Text(
         string='Workplace Application Tracking',
-        help='How the participant applies the new skills at the workplace (FREDS041).')
+        help='How the participant applies the new skills at the workplace ().')
     workplace_application_completed = fields.Boolean(string='Application Verified')
     company_id = fields.Many2one('res.company', string='Company',
                                  default=lambda self: self.env.company)
@@ -477,16 +477,16 @@ class EdsInternationalTraining(models.Model):
             raise UserError(_('This step requires L&D Manager authority.'))
 
     def action_submit(self):
-        """Draft -> Submitted: enforce entitlement before the approval chain (FREDS041)."""
+        """Draft -> Submitted: enforce entitlement before the approval chain ()."""
         for rec in self:
             if rec.approval_state != 'draft':
                 raise UserError(_('Only draft international trainings can be submitted.'))
             if not rec.entitlement_valid:
-                raise UserError(_('Entitlement validation failed (FREDS041):\n%s')
+                raise UserError(_('Entitlement validation failed ():\n%s')
                                 % (rec.entitlement_issues or _('No enrolled participants.')))
             rec.approval_state = 'submitted'
             rec.message_post(body=_('International training %s submitted for approval '
-                                    '(FREDS041).') % rec.name)
+                                    '().') % rec.name)
 
     def action_approve(self):
         """Submitted -> Approved (L&D Manager / Admin)."""
@@ -497,19 +497,19 @@ class EdsInternationalTraining(models.Model):
             rec.write({'approval_state': 'approved',
                        'approved_by': self.env.user.id,
                        'approved_date': date.today()})
-            rec.message_post(body=_('International training %s approved (FREDS041).') % rec.name)
+            rec.message_post(body=_('International training %s approved ().') % rec.name)
 
     def action_complete(self):
-        """Approved -> Completed: requires the post-training deliverables (FREDS041)."""
+        """Approved -> Completed: requires the post-training deliverables ()."""
         for rec in self:
             if rec.approval_state != 'approved':
                 raise UserError(_('Only approved international trainings can be completed.'))
             if not rec.reports_ids:
                 raise UserError(_('Record at least the post-training report before '
-                                  'completing the international training (FREDS041).'))
+                                  'completing the international training ().'))
             rec.approval_state = 'completed'
             rec.message_post(body=_('International training %s completed - post-training '
-                                    'deliverables recorded (FREDS041).') % rec.name)
+                                    'deliverables recorded ().') % rec.name)
 
 
 class EdsInternationalTravelLine(models.Model):
@@ -544,7 +544,7 @@ class EdsInternationalTravelLine(models.Model):
 
 
 class EdsInternationalReport(models.Model):
-    """Post-training report or knowledge-sharing record (FREDS041)."""
+    """Post-training report or knowledge-sharing record ()."""
     _name = 'eds.international.report'
     _description = 'International Training Report / Knowledge Sharing'
     _order = 'report_date desc, id desc'

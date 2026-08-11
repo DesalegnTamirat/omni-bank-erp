@@ -5,7 +5,7 @@ from odoo.exceptions import UserError
 
 class HrAttendanceFlagWizard(models.TransientModel):
     """
-    / FR-Wizard for flagging an attendance record for discipline review.
+    Wizard for flagging an attendance record for discipline review.
     Allows a supervisor or HR officer to provide a mandatory reason before flagging.
     After saving, the wizard marks the attendance record and optionally pre-creates
     a discipline case for HR review.

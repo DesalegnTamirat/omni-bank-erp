@@ -4,7 +4,7 @@
     'summary': "Integrated Competency Framework: dictionary, role mapping, assessment, gap analysis and IDP.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources/Competency',
-    'author': 'Abeza & Desalegn',
+    'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',
     'license': 'LGPL-3',
     'description': """

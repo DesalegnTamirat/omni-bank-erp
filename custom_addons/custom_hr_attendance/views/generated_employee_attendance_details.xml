@@ -25,17 +25,17 @@
                 <!-- Optional Configurable Columns -->
                 <field name="place_of_assignment" string="Place of Assignment" optional="hide"/>
                 <field name="worked_hours" string="Worked Hours" optional="hide" widget="float_time"/>
-                <field name="working_hours" string="Working Hours" optional="hide"/>
+                <field name="working_hours" string="Working Hours" optional="hide" widget="float_time"/>
                 <field name="attendance_percentage" string="Attendance Percentage" optional="hide"/>
-                <field name="leave_hours" string="Leave Hours" optional="hide"/>
-                <field name="absent_hours" string="Absent Hours" optional="hide"/>
-                <field name="late_time_hour" string="Late Time (Hours)" optional="hide"/>
-                <field name="early_exit_hour" string="Early Exit (Hours)" optional="hide"/>
+                <field name="leave_hours" string="Leave Hours" optional="hide" widget="float_time"/>
+                <field name="absent_hours" string="Absent Hours" optional="hide" widget="float_time"/>
+                <field name="late_time_hour" string="Late Time (Hours)" optional="hide" widget="float_time"/>
+                <field name="early_exit_hour" string="Early Exit (Hours)" optional="hide" widget="float_time"/>
                 <field name="over_time_hour" string="Overtime (Hours)" optional="hide" widget="float_time"/>
                 <field name="pre_defined" string="Pre-Defined Lateness" optional="hide"/>
-                <field name="acknowledged_lateness" string="Acknowledged Lateness" optional="hide"/>
-                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout" optional="hide"/>
-                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout" optional="hide"/>
+                <field name="acknowledged_lateness" string="Acknowledged Lateness" optional="hide" widget="float_time"/>
+                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout" optional="hide" widget="float_time"/>
+                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout" optional="hide" widget="float_time"/>
                 <field name="force_checkout" string="Force Checkout" optional="hide"/>
             </list>
         </field>
@@ -77,18 +77,18 @@
                 <field name="place_of_assignment" string="Place of Assignment"/>
                 <field name="work_unit" string="Work Unit"/>
                 <field name="job_title" string="Job Title"/>
-                <field name="working_hours" string="Working Hours"/>
+                <field name="working_hours" string="Working Hours" widget="float_time"/>
                 <field name="worked_hours" string="Worked Hours" widget="float_time"/>
                 <field name="attendance_percentage" string="Attendance Percentage"/>
-                <field name="leave_hours" string="Leave Hours"/>
-                <field name="absent_hours" string="Absent Hours"/>
-                <field name="late_time_hour" string="Late Time (Hours)"/>
-                <field name="early_exit_hour" string="Early Exit (Hours)"/>
+                <field name="leave_hours" string="Leave Hours" widget="float_time"/>
+                <field name="absent_hours" string="Absent Hours" widget="float_time"/>
+                <field name="late_time_hour" string="Late Time (Hours)" widget="float_time"/>
+                <field name="early_exit_hour" string="Early Exit (Hours)" widget="float_time"/>
                 <field name="over_time_hour" string="Overtime (Hours)" widget="float_time"/>
                 <field name="pre_defined" string="Pre-Defined Lateness"/>
-                <field name="acknowledged_lateness" string="Acknowledged Lateness"/>
-                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout"/>
-                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout"/>
+                <field name="acknowledged_lateness" string="Acknowledged Lateness" widget="float_time"/>
+                <field name="pre_approved_early_checkout" string="Pre-Approved Early Checkout" widget="float_time"/>
+                <field name="acknowledged_early_checkout" string="Acknowledged Early Checkout" widget="float_time"/>
                 <field name="force_checkout" string="Force Checkout"/>
 
                 <!-- Optional Configurable Columns -->

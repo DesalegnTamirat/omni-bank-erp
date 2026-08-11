@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Trainer Register (FREDS028) ══════════════ -->
+        <!-- ══════════════ Trainer Register () ══════════════ -->
 
         <record id="view_eds_trainer_list" model="ir.ui.view">
             <field name="name">eds.trainer.list</field>
@@ -62,7 +62,7 @@
                             <button class="oe_stat_button" icon="fa-star" type="object"
                                     name="action_mark_reviewed"
                                     invisible="state != 'active'"
-                                    help="Record a periodic review (FREDS028).">
+                                    help="Record a periodic review ().">
                                 <div class="o_stat_info">
                                     <field name="avg_rating" widget="statinfo" string="Avg Rating"/>
                                     <span class="o_stat_text">Next review <field name="next_review_date"/></span>
@@ -84,7 +84,7 @@
                                 <field name="phone"/>
                                 <field name="email"/>
                             </group>
-                            <group string="Qualification (FREDS028)">
+                            <group string="Qualification ()">
                                 <field name="competency_ids" widget="many2many_tags"/>
                                 <field name="tot_certified"/>
                                 <field name="review_cycle_months"/>
@@ -152,7 +152,7 @@
             <field name="search_view_id" ref="employee_development_system.view_eds_trainer_search"/>
         </record>
 
-        <!-- ══════════════ External Provider Registry (FREDS029/036) ══════════════ -->
+        <!-- ══════════════ External Provider Registry (/036) ══════════════ -->
 
         <record id="view_eds_external_provider_list" model="ir.ui.view">
             <field name="name">eds.external.provider.list</field>
@@ -201,7 +201,7 @@
                             <field name="service_offerings"/>
                         </group>
                         <notebook>
-                            <page string="Performance History (FREDS036)" name="performance">
+                            <page string="Performance History ()" name="performance">
                                 <field name="performance_history_ids">
                                     <list editable="bottom">
                                         <field name="evaluation_date"/>

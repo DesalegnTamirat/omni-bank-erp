@@ -23,7 +23,7 @@
             - Session-cached ERP access gate (optional)
             """,
 
-    'author': 'Abeza & Desalegn',
+    'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
     'license': '',
 

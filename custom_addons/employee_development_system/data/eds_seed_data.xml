@@ -9,7 +9,7 @@
             <field name="facilities">Projector, whiteboard, tables &amp; chairs, catering area</field>
         </record>
 
-        <!-- Task 2: default priority-rule weights (FREDS006) - sum 100% -->
+        <!-- Task 2: default priority-rule weights () - sum 100% -->
         <record id="rule_priority_strategic" model="eds.tna.priority.rule">
             <field name="sequence">10</field>
             <field name="name">Strategic Alignment</field>

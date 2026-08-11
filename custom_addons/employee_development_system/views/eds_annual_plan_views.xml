@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- ══════════════ Annual L&amp;D Plan (FREDS020-026) ══════════════ -->
+        <!-- ══════════════ Annual L&amp;D Plan (-026) ══════════════ -->
 
         <record id="view_eds_annual_plan_list" model="ir.ui.view">
             <field name="name">eds.annual.plan.list</field>
@@ -49,7 +49,7 @@
                     <header>
                         <button name="action_generate_calendar" string="Generate Calendar"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"
-                                confirm="Generate the draft calendar from the approved TNA and curricula? (FREDS020)"/>
+                                confirm="Generate the draft calendar from the approved TNA and curricula? ()"/>
                         <button name="action_submit_director" string="Submit to Director PPDD"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_director_approve" string="Director PPDD Approve"
@@ -86,7 +86,7 @@
                             </div>
                             <div class="o_stat_info">
                                 <field name="amendment_count" widget="statinfo" string="Amendments"/>
-                                <span class="o_stat_text">Unscheduled addenda (FREDS026)</span>
+                                <span class="o_stat_text">Unscheduled addenda ()</span>
                             </div>
                         </div>
                         <group>
@@ -97,7 +97,7 @@
                                 <field name="calendar_sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                             </group>
-                            <group string="Approval (FREDS024)">
+                            <group string="Approval ()">
                                 <field name="reviewer_id" readonly="state not in ('director_review','cpco_endorsement','smc_approval','published','amended')"/>
                                 <field name="endorser_id" readonly="state not in ('cpco_endorsement','smc_approval','published','amended')"/>
                                 <field name="approver_id" readonly="state not in ('smc_approval','published','amended')"/>

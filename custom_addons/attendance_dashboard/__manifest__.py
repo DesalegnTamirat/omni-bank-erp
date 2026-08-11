@@ -22,7 +22,7 @@
               a FILTERed aggregate, cutting one DB round trip per load.
     """,
     'category': 'Human Resources',
-    'author': 'Abeza & Desalegn',
+    'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
     'license': 'LGPL-3',
 

@@ -61,7 +61,7 @@ class DisciplineOffense(models.Model):
 
     @api.onchange('severity_level')
     def _onchange_severity_level(self):
-        """Auto-populate default standard penalties based on FR-DIS-003."""
+        """Auto-populate default standard penalties based on ."""
         if self.severity_level == 'level_1':
             self.punishment_type = 'dismissal'
             self.penalty_percentage = 0.0
@@ -91,13 +91,13 @@ class DisciplineOffense(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        # FR-DIS-004: Modification Prevention - Only HR Admin can configure punishment rules
+        # Modification Prevention - Only HR Admin can configure punishment rules
         if not (self.env.su or self.env.user.has_group('discipline_management.group_discipline_admin')):
             raise UserError(_('Unauthorized modification: Only HR Administrators can create disciplinary offense configurations.'))
         return super().create(vals_list)
 
     def write(self, vals):
-        # FR-DIS-004: Modification Prevention
+        # Modification Prevention
         sensitive_fields = {'severity_level', 'punishment_type', 'penalty_percentage', 'approval_authority'}
         if set(vals.keys()).intersection(sensitive_fields):
             if not (self.env.su or self.env.user.has_group('discipline_management.group_discipline_admin')):

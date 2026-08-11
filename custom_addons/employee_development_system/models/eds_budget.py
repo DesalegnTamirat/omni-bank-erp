@@ -108,10 +108,10 @@ class EdsLearningPartner(models.Model):
         ('inbound', 'Inbound Provider Proposal'),
         ('ppdd_initiated', 'PPDD Initiated Strategic Request'),
     ], string='Proposal Type', default='inbound', required=True)
-    screening_score = fields.Float(string='Screening Score (%)', required=True, tracking=True, help="Minimum 70% threshold per FREDS069.")
+    screening_score = fields.Float(string='Screening Score (%)', required=True, tracking=True, help="Minimum 70% threshold per .")
     is_eligible = fields.Boolean(string='Meets 70% Threshold', compute='_compute_eligibility', store=True)
     effective_date = fields.Date(string='MoU Effective Date', tracking=True)
-    duration_years = fields.Integer(string='MoU Duration (Years)', default=2, help="Typically 2-3 years per FREDS071.")
+    duration_years = fields.Integer(string='MoU Duration (Years)', default=2, help="Typically 2-3 years per .")
     renewal_alert_date = fields.Date(string='Renewal Alert Date', compute='_compute_renewal_date', store=True)
     mou_document = fields.Binary(string='Signed MoU Document', attachment=True)
     mou_filename = fields.Char(string='MoU File Name')

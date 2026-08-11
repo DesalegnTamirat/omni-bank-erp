@@ -3,10 +3,10 @@ from odoo import api, fields, models, _
 
 
 class EdsExternalProvider(models.Model):
-    """Approved database of local / international training providers (FREDS029).
+    """Approved database of local / international training providers ().
 
     Carries accreditation, service offerings, pre-qualification, historical
-    performance rating (computed from post-training evaluations, FREDS036),
+    performance rating (computed from post-training evaluations, ),
     contractual information and eligibility records.
     """
     _name = 'eds.external.provider'
@@ -28,15 +28,15 @@ class EdsExternalProvider(models.Model):
     service_offerings = fields.Text(string='Service Offerings')
     pre_qualified = fields.Boolean(
         string='Pre-Qualified', tracking=True,
-        help='Pre-qualified vendors are eligible for RFP distribution (FREDS029).')
+        help='Pre-qualified vendors are eligible for RFP distribution ().')
     rating = fields.Float(
         string='Average Rating', compute='_compute_rating', store=True, digits=(3, 2),
-        help='Computed from the post-training performance history (FREDS036).')
+        help='Computed from the post-training performance history ().')
     rating_count = fields.Integer(string='Evaluations', compute='_compute_rating', store=True)
     performance_history_ids = fields.One2many(
         'eds.provider.performance.history', 'provider_id',
         string='Performance History',
-        help='Post-training vendor/venue evaluations (FREDS036).')
+        help='Post-training vendor/venue evaluations ().')
     contract_ids = fields.One2many('eds.training.contract', 'provider_id', string='Contracts')
     contract_count = fields.Integer(string='Contracts', compute='_compute_contract_count')
     trainer_ids = fields.One2many('eds.trainer', 'external_provider_id', string='External Trainers')
@@ -70,7 +70,7 @@ class EdsExternalProvider(models.Model):
 
 
 class EdsProviderPerformanceHistory(models.Model):
-    """Post-training evaluation of a provider or venue (FREDS036).
+    """Post-training evaluation of a provider or venue ().
 
     Feeds the provider's historical performance profile automatically.
     """
@@ -81,7 +81,7 @@ class EdsProviderPerformanceHistory(models.Model):
     provider_id = fields.Many2one('eds.external.provider', string='Provider',
                                   ondelete='cascade')
     # Venues are registered in Task 5 (eds.venue); this optional free-text keeps
-    # FREDS036 usable before then. session_id links in Task 5.
+    #  usable before then. session_id links in Task 5.
     venue_name = fields.Char(string='Venue', help='Venue evaluated (free text until Task 5).')
     course_id = fields.Many2one('eds.course', string='Training Program')
     evaluation_date = fields.Date(string='Evaluation Date', default=fields.Date.context_today)

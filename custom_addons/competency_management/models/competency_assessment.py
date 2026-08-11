@@ -4,7 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyAssessmentCycle(models.Model):
-    """Scheduled competency assessment cycle (FR-COM-009/010, FR-ASM-008)."""
+    """Scheduled competency assessment cycle (/010, )."""
     _name = 'competency.assessment.cycle'
     _description = 'Competency Assessment Cycle'
     _inherit = ['mail.thread']
@@ -51,7 +51,7 @@ class CompetencyAssessmentCycle(models.Model):
 
 
 class CompetencyAssessment(models.Model):
-    """A single employee assessment within a cycle (FR-COM-011..019, FR-ASM-001..006)."""
+    """A single employee assessment within a cycle (..019, ..006)."""
     _name = 'competency.assessment'
     _description = 'Competency Assessment'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -97,7 +97,7 @@ class CompetencyAssessment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        # sudo(): self-assessment creation (FR-COM-011/012) must not depend on the
+        # sudo(): self-assessment creation (/012) must not depend on the
         # employee having ir.sequence access.
         records = super().create(vals_list)
         for record in records:
@@ -107,7 +107,7 @@ class CompetencyAssessment(models.Model):
         return records
 
     def action_auto_fill_lines(self):
-        """Populate rating lines from the employee's approved role-competency mapping (FR-MAP-003)."""
+        """Populate rating lines from the employee's approved role-competency mapping ."""
         self.ensure_one()
         if self.line_ids:
             raise UserError(_('This assessment already has rating lines.'))
@@ -143,7 +143,7 @@ class CompetencyAssessment(models.Model):
         }
 
     def action_submit(self):
-        """Draft -> Submitted (FR-COM-018 workflow)."""
+        """Draft -> Submitted ( workflow)."""
         for rec in self:
             if not rec.line_ids:
                 raise UserError(_('Add at least one competency rating line before submitting.'))
@@ -157,30 +157,30 @@ class CompetencyAssessment(models.Model):
         self.write({'state': 'hr_verified'})
 
     def action_approve(self):
-        """Approved -> final approval (FR-COM-018)."""
+        """Approved -> final approval ."""
         for rec in self:
             rec.state = 'approved'
             rec.message_post(body=_('Assessment %s approved.') % rec.name)
 
     def action_lock(self):
-        """Lock finalized assessment against further modification (FR-COM-019)."""
+        """Lock finalized assessment against further modification ."""
         for rec in self:
             rec.state = 'locked'
             rec.message_post(body=_('Assessment %s locked.') % rec.name)
 
     def action_unlock(self):
-        """Authorized override with justification (FR-COM-019)."""
+        """Authorized override with justification ."""
         self.ensure_one()
         if not (self.env.su or self.env.user.has_group('competency_management.group_competency_admin')):
             raise UserError(_('Only Competency Administrators can unlock finalized assessments.'))
         if not self.notes:
-            raise UserError(_('Provide a justification in Notes before unlocking (FR-COM-019).'))
+            raise UserError(_('Provide a justification in Notes before unlocking .'))
         self.state = 'approved'
         self.message_post(body=_('Assessment %s unlocked by %s.') % (self.name, self.env.user.name))
 
 
 class CompetencyAssessmentLine(models.Model):
-    """One competency rating inside an assessment (FR-COM-013..017)."""
+    """One competency rating inside an assessment (..017)."""
     _name = 'competency.assessment.line'
     _description = 'Competency Assessment Line'
 

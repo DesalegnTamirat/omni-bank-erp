@@ -6,7 +6,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsTnaPriorityRule(models.Model):
-    """Configurable weighting for the TNA priority engine (FREDS006).
+    """Configurable weighting for the TNA priority engine ().
 
     Each active rule contributes `weight` % to the weighted average score of a
     training need. Scores per criterion are 0-100 (see eds.tna.entry criterion
@@ -36,7 +36,7 @@ class EdsTnaPriorityRule(models.Model):
     ]
 
     def write(self, vals):
-        """Re-score all consolidated entries when weights/rules change (FREDS006)."""
+        """Re-score all consolidated entries when weights/rules change ()."""
         res = super().write(vals)
         if 'weight' in vals or 'active' in vals:
             entries = self.env['eds.tna.entry'].search(
@@ -105,13 +105,13 @@ class EdsApprovalHistory(models.Model):
 
 
 class EdsTnaConsolidation(models.Model):
-    """Bank-wide TNA consolidation register (FREDS006-010).
+    """Bank-wide TNA consolidation register (-010).
 
     Gathers submitted/validated needs (optionally per work unit), auto-flags
-    duplicates and non-training items (FREDS007), computes weighted priority
-    (FREDS006), then routes through the four-step approval chain
+    duplicates and non-training items (), computes weighted priority
+    (), then routes through the four-step approval chain
     PPDD Validation -> Director PPDD -> CPCO Endorsement -> SMC Approval with
-    segregation of duties (FREDS008). Locks after SMC approval (FREDS010).
+    segregation of duties (). Locks after SMC approval ().
     """
     _name = 'eds.tna.consolidation'
     _description = 'TNA Consolidation'
@@ -132,7 +132,7 @@ class EdsTnaConsolidation(models.Model):
     duplicate_count = fields.Integer(string='Duplicates', compute='_compute_counts')
     non_training_count = fields.Integer(string='Non-Training Items', compute='_compute_counts')
     excluded_count = fields.Integer(string='Excluded', compute='_compute_counts')
-    # Review sub-tabs (FREDS007): computed subsets of entry_ids for the form pages
+    # Review sub-tabs (): computed subsets of entry_ids for the form pages
     duplicate_entry_ids = fields.One2many(
         'eds.tna.entry', 'consolidation_id', string='Duplicate Needs',
         compute='_compute_review_subsets')
@@ -160,7 +160,7 @@ class EdsTnaConsolidation(models.Model):
         ('locked', 'Locked'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # Segregation of duties (FREDS008): validator != reviewer != endorser != approver
+    # Segregation of duties (): validator != reviewer != endorser != approver
     validator_id = fields.Many2one('res.users', string='Validator (PPDD)', tracking=True)
     reviewer_id = fields.Many2one('res.users', string='Reviewer (Director PPDD)', tracking=True)
     endorser_id = fields.Many2one('res.users', string='Endorser (CPCO)', tracking=True)
@@ -216,17 +216,17 @@ class EdsTnaConsolidation(models.Model):
     def unlink(self):
         for rec in self:
             if rec.state in ('approved', 'locked'):
-                raise UserError(_('Approved/locked TNA consolidations cannot be deleted (FREDS010).'))
+                raise UserError(_('Approved/locked TNA consolidations cannot be deleted ().'))
             # Allow deleting draft consolidations: drop their immutable history first
             # (bypasses the history unlink guard) so the cascade does not raise.
             if rec.approval_history_ids:
                 rec.approval_history_ids.with_context(eds_bypass_history_guard=True).unlink()
         return super().unlink()
 
-    # ── Consolidation & Prioritization (FREDS006/007) ────────────────────────
+    # ── Consolidation & Prioritization (/007) ────────────────────────
     def action_consolidate(self):
         """Gather submitted/validated needs (per work unit when set) into the register,
-        auto-flag duplicates and non-training items for review & exclusion (FREDS007)."""
+        auto-flag duplicates and non-training items for review & exclusion ()."""
         self.ensure_one()
         domain = [('cycle_id', '=', self.cycle_id.id),
                   ('state', 'in', ('submitted', 'validated'))]
@@ -238,7 +238,7 @@ class EdsTnaConsolidation(models.Model):
         entries.write({'consolidation_id': self.id})
         self._flag_duplicates()
         self._flag_non_training()
-        self.message_post(body=_('Consolidation %s gathered %d training needs (FREDS007).')
+        self.message_post(body=_('Consolidation %s gathered %d training needs ().')
                           % (self.name, len(entries)))
         return {
             'type': 'ir.actions.act_window',
@@ -248,7 +248,7 @@ class EdsTnaConsolidation(models.Model):
         }
 
     def _flag_duplicates(self):
-        """Same employee + competency need appearing from multiple sources/modes (FREDS007).
+        """Same employee + competency need appearing from multiple sources/modes ().
 
         The entry-level guard already blocks exact (employee, competency, delivery mode)
         triples within a cycle, so a consolidation duplicate here means the same
@@ -278,22 +278,22 @@ class EdsTnaConsolidation(models.Model):
                 entry.write({'exclusion_type': 'process'})
 
     def action_compute_priority(self):
-        """Re-run the weighted scoring engine over all needs (FREDS006)."""
+        """Re-run the weighted scoring engine over all needs ()."""
         self.ensure_one()
         for entry in self.entry_ids.filtered(lambda e: e.state != 'excluded'):
             entry.priority_score = entry._get_weighted_priority_score()
-        self.message_post(body=_('Priority scores recomputed for consolidation %s (FREDS006).')
+        self.message_post(body=_('Priority scores recomputed for consolidation %s ().')
                           % self.name)
 
-    # ── Approval chain with segregation of duties (FREDS008) ────────────────
+    # ── Approval chain with segregation of duties () ────────────────
     def _check_segregation(self):
-        """Validator != Reviewer != Endorser != Approver (FREDS008)."""
+        """Validator != Reviewer != Endorser != Approver ()."""
         self.ensure_one()
         users = [self.validator_id.id, self.reviewer_id.id, self.endorser_id.id, self.approver_id.id]
         present = [u for u in users if u]
         if len(present) != len(set(present)):
             raise ValidationError(_(
-                'Segregation of Duties Violation (FREDS008): Validator, Reviewer, Endorser and '
+                'Segregation of Duties Violation (): Validator, Reviewer, Endorser and '
                 'Approver must all be different individuals.'))
 
     def _log_approval_step(self, state_from, state_to, comment=''):
@@ -305,13 +305,13 @@ class EdsTnaConsolidation(models.Model):
         })
 
     def _require_manager(self):
-        """Higher approval steps require at least the L&D Manager authority (FREDS008)."""
+        """Higher approval steps require at least the L&D Manager authority ()."""
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority (FREDS008).'))
+            raise UserError(_('This approval step requires L&D Manager authority ().'))
 
     def action_submit_ppdd(self):
-        """Draft -> PPDD Validation (starts the approval chain, FREDS008)."""
+        """Draft -> PPDD Validation (starts the approval chain, )."""
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft consolidations can be submitted to PPDD validation.'))
@@ -366,7 +366,7 @@ class EdsTnaConsolidation(models.Model):
                              % rec.name)
 
     def action_smc_approve(self):
-        """SMC Approval -> Approved (FREDS009/010)."""
+        """SMC Approval -> Approved (/010)."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'smc_approval':
@@ -393,7 +393,7 @@ class EdsTnaConsolidation(models.Model):
                 cycle.action_approve()
 
     def action_lock(self):
-        """Approved -> Locked (FREDS010): register is final; edits need a change request."""
+        """Approved -> Locked (): register is final; edits need a change request."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'approved':
@@ -407,7 +407,7 @@ class EdsTnaConsolidation(models.Model):
         """Locked -> Approved (admin only, documented change request)."""
         self.ensure_one()
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('Only EDS Administrators can unlock a locked consolidation (FREDS010).'))
+            raise UserError(_('Only EDS Administrators can unlock a locked consolidation ().'))
         self.state = 'approved'
         self._log_approval_step('locked', 'approved', _('Unlocked with documented change request'))
         self.message_post(body=_('Consolidation %s unlocked with a documented change request.') % self.name)

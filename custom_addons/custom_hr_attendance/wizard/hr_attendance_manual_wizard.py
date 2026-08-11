@@ -5,7 +5,7 @@ from odoo.exceptions import UserError, ValidationError
 
 class HrAttendanceManualWizard(models.TransientModel):
     """
-    / FR-Dedicated Manual Attendance Creation Wizard.
+    Dedicated Manual Attendance Creation Wizard.
     Allows HR officers and supervisors to create manual attendance records for
     employees who were unable to check in electronically.
     Requires mandatory justification and supervisor sign-off.

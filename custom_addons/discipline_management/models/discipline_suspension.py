@@ -15,7 +15,7 @@ class DisciplineSuspension(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Employee', related='case_id.employee_id', store=True, readonly=True)
     department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True, readonly=True)
 
-    # FR-DIS-027: Suspension Type
+    # Suspension Type
     suspension_type = fields.Selection([
         ('with_pay', 'Suspension With Pay'),
         ('without_pay', 'Suspension Without Pay'),
@@ -61,7 +61,7 @@ class DisciplineSuspension(models.Model):
             else:
                 rec.days_remaining = 0
 
-    # FR-DIS-028: Maximum Duration Enforcement (30 Working Days)
+    # Maximum Duration Enforcement (30 Working Days)
     @api.constrains('working_days_count', 'start_date', 'end_date')
     def _check_max_duration(self):
         for rec in self:
@@ -79,7 +79,7 @@ class DisciplineSuspension(models.Model):
 
     # Workflow Actions
     def action_activate_suspension(self):
-        """FR-DIS-030: Support employee suspension from work/salary pending investigation."""
+        """Support employee suspension from work/salary pending investigation."""
         for rec in self:
             rec.write({'state': 'active'})
             rec.employee_id.is_suspended = True
@@ -97,7 +97,7 @@ class DisciplineSuspension(models.Model):
 
     def action_convert_to_dismissal(self):
         """
-        FR-DIS-030 / DIS-2: Convert an active suspension to a dismissal.
+         / Convert an active suspension to a dismissal.
         Triggers the full dismissal workflow on the parent case.
         Restricted to HR Administrators only.
         """
@@ -122,7 +122,7 @@ class DisciplineSuspension(models.Model):
 
     @api.model
     def _cron_check_suspension_expiry(self):
-        """FR-DIS-029: Automated tracking & HR notification prior to expiry."""
+        """Automated tracking & HR notification prior to expiry."""
         today = fields.Date.context_today(self)
         alert_date = today + timedelta(days=3)
         expiring_suspensions = self.search([

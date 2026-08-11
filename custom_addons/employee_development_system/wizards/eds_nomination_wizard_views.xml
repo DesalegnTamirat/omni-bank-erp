@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- Nomination Wizard (FREDS038, FR-EDS-024...030) -->
+        <!-- Nomination Wizard (, ...030) -->
 
         <record id="view_eds_nomination_wizard_form" model="ir.ui.view">
             <field name="name">eds.nomination.wizard.form</field>

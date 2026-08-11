@@ -4,7 +4,7 @@ from odoo.exceptions import UserError
 
 
 class DisciplineInvestigationLiableEmployee(models.Model):
-    """DIS-6: FR-DIS-013 Part 4 — Child line for each employee found liable."""
+    """ Part 4 — Child line for each employee found liable."""
     _name = 'discipline.investigation.liable'
     _description = 'Liable Employee in Investigation'
 
@@ -31,7 +31,7 @@ class DisciplineInvestigation(models.Model):
     investigator_id = fields.Many2one('res.users', string='Lead Investigator / Auditor', required=True, default=lambda self: self.env.user, tracking=True)
     investigation_date = fields.Date(string='Investigation Date', required=True, default=fields.Date.context_today, tracking=True)
 
-    # FR-DIS-013 Part 1: Type of Misconduct
+    #  Part 1: Type of Misconduct
     misconduct_type = fields.Selection([
         ('attendance', 'Attendance Violation'),
         ('insubordination', 'Insubordination'),
@@ -42,33 +42,33 @@ class DisciplineInvestigation(models.Model):
     ], string='Type of Misconduct', required=True, tracking=True)
     misconduct_type_notes = fields.Char(string='Misconduct Type Details')
 
-    # FR-DIS-013 Part 2: Date of Examination
+    #  Part 2: Date of Examination
     examination_date = fields.Date(string='Date of Examination', required=True, default=fields.Date.context_today, tracking=True)
 
-    # FR-DIS-013 Part 3: Summary of Findings
+    #  Part 3: Summary of Findings
     summary_findings = fields.Text(string='Summary of Findings (Facts Established)', required=True, tracking=True)
 
-    # FR-DIS-013 Part 4: Liable Employees (child model)
+    #  Part 4: Liable Employees (child model)
     liable_employee_ids = fields.One2many('discipline.investigation.liable', 'investigation_id', string='Liable Employees')
 
-    # FR-DIS-013 Part 5: Applicable Policy / Rule Violated
+    #  Part 5: Applicable Policy / Rule Violated
     applicable_policy = fields.Char(string='Applicable Policy / Rule Violated', required=True,
                                     help='Reference the specific bank HR policy clause or regulation violated.')
     policy_clause = fields.Char(string='Policy Clause / Section Number')
 
-    # FR-DIS-013 Part 6: Witness Statements & Evidence
+    #  Part 6: Witness Statements & Evidence
     witness_statements = fields.Text(string='Witness Statements & Interviews')
     evidence_description = fields.Text(string='Evidence Description & Chain of Custody')
 
-    # FR-DIS-013 Part 7: Investigator Conclusion & Recommendation
+    #  Part 7: Investigator Conclusion & Recommendation
     investigator_recommendation = fields.Text(string='Investigator Conclusion & Recommendation', required=True)
 
-    # FR-DIS-013 Part 8: Management Review Sign-off
+    #  Part 8: Management Review Sign-off
     reviewed_by_id = fields.Many2one('res.users', string='Reviewed & Approved By (Management)', tracking=True)
     management_review_date = fields.Date(string='Management Review Date', tracking=True)
     management_review_notes = fields.Text(string='Management Review Notes / Approval Remarks')
 
-    # Document & Evidence Attachments (FR-DIS-014)
+    # Document & Evidence Attachments 
     report_file = fields.Binary(string='Investigation Report Document', attachment=True)
     report_filename = fields.Char(string='Report Filename')
     evidence_file = fields.Binary(string='Evidence File', attachment=True)
@@ -92,9 +92,9 @@ class DisciplineInvestigation(models.Model):
     def action_submit_findings(self):
         for rec in self:
             if not rec.liable_employee_ids:
-                raise UserError(_('FR-DIS-013: At least one Liable Employee must be recorded before submitting findings.'))
+                raise UserError(_('At least one Liable Employee must be recorded before submitting findings.'))
             if not rec.applicable_policy:
-                raise UserError(_('FR-DIS-013: The applicable policy / rule violated must be specified.'))
+                raise UserError(_('The applicable policy / rule violated must be specified.'))
             rec.write({'state': 'submitted'})
             rec.case_id.message_post(body=_(
                 'Investigation findings submitted by investigator %s. '

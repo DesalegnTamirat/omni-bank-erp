@@ -32,7 +32,7 @@
                 <sheet>
                     <div class="oe_title">
                         <h1>
-                            <field name="over_time" readonly="1"/>
+                            <field name="over_time" readonly="1" widget="float_time"/>
                         </h1>
                     </div>
                     <group>

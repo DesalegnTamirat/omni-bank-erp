@@ -50,7 +50,7 @@ class HrEmployee(models.Model):
         for emp in self:
             emp.discipline_case_count = len(emp.discipline_case_ids)
 
-    # FR-DIS-038: Recruitment & Promotion Eligibility Integration Method
+    # Recruitment & Promotion Eligibility Integration Method
     def check_discipline_eligibility(self):
         """
         Check if employee is eligible for promotion, transfer, or internal recruitment.

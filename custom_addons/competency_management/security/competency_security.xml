@@ -51,7 +51,7 @@
     <!-- Record Rules -->
     <data noupdate="1">
 
-        <!-- Assessment: employee sees only own records (FR-COM-057/058 confidentiality) -->
+        <!-- Assessment: employee sees only own records (/058 confidentiality) -->
         <record id="rule_competency_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>

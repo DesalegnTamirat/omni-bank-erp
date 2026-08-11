@@ -6,15 +6,15 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class EdsAnnualPlan(models.Model):
-    """Annual Learning & Development Plan and Calendar (FREDS020-026, FR-EDS-017...022).
+    """Annual Learning & Development Plan and Calendar (-026, ...022).
 
     The approved TNA needs and approved curricula are assembled into a draft annual
-    plan (FREDS018/FREDS020) within the calendar SLA, routed through the
-    Director PPDD -> CPCO -> SMC approval chain and published (FREDS024). Publishing
+    plan (/) within the calendar SLA, routed through the
+    Director PPDD -> CPCO -> SMC approval chain and published (). Publishing
     auto-activates the downstream sessions so nominations can start. Approved
     unscheduled training requests amend the published plan as addenda
-    (FREDS026, FREDS075/076). Delivery is monitored with planned-vs-actual variance
-    per line (FREDS025).
+    (, /076). Delivery is monitored with planned-vs-actual variance
+    per line ().
     """
     _name = 'eds.annual.plan'
     _description = 'Annual L&D Plan & Calendar'
@@ -36,11 +36,11 @@ class EdsAnnualPlan(models.Model):
                                          readonly=True)
     execution_rate = fields.Float(
         string='Execution Rate (%)', compute='_compute_execution_rate', store=True,
-        help='Share of plan lines whose sessions have been delivered (FREDS025).')
+        help='Share of plan lines whose sessions have been delivered ().')
     calendar_generation_date = fields.Date(string='Calendar Generated On', readonly=True)
     calendar_sla_deadline = fields.Date(
         string='Calendar SLA Deadline', compute='_compute_calendar_sla', store=True,
-        help='Computed from the calendar SLA in settings (default 5 working days, FREDS020).')
+        help='Computed from the calendar SLA in settings (default 5 working days, ).')
     sla_breached = fields.Boolean(
         string='SLA Breached', compute='_compute_calendar_sla', store=True, tracking=True)
     state = fields.Selection([
@@ -52,7 +52,7 @@ class EdsAnnualPlan(models.Model):
         ('amended', 'Amended'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # Segregation of duties (FREDS024): reviewer != endorser != approver
+    # Segregation of duties (): reviewer != endorser != approver
     reviewer_id = fields.Many2one('res.users', string='Reviewer (Director PPDD)', tracking=True)
     endorser_id = fields.Many2one('res.users', string='Endorser (CPCO)', tracking=True)
     approver_id = fields.Many2one('res.users', string='Approver (SMC)', tracking=True)
@@ -64,7 +64,7 @@ class EdsAnnualPlan(models.Model):
 
     amendment_ids = fields.One2many(
         'eds.unscheduled.request', 'annual_plan_id', string='Amendments',
-        help='Approved unscheduled training requests appended as addenda (FREDS026/075/076).')
+        help='Approved unscheduled training requests appended as addenda (/075/076).')
     amendment_count = fields.Integer(string='Amendments', compute='_compute_counts')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
@@ -119,9 +119,9 @@ class EdsAnnualPlan(models.Model):
                     'eds.annual.plan') or _('New')
         return super().create(vals_list)
 
-    # ── Calendar generation (FREDS018/020) ───────────────────────────────────
+    # ── Calendar generation (/020) ───────────────────────────────────
     def action_generate_calendar(self):
-        """FREDS020: build the draft calendar from the approved TNA + approved curricula.
+        """build the draft calendar from the approved TNA + approved curricula.
 
         Each approved curriculum contributes its course as a plan line; approved TNA
         needs that were not converted to a catalog course contribute a program line
@@ -147,7 +147,7 @@ class EdsAnnualPlan(models.Model):
             created += 1
         # Approved TNA needs not yet converted to a course (e.g. externally sourced).
         # Only Classroom (+ the classroom part of Blended) is actioned in EDS;
-        # pure e-learning needs route to the LMS instead (FR-EDS-008 business rule).
+        # pure e-learning needs route to the LMS instead ( business rule).
         for entry in self.env['eds.tna.entry'].search([
             ('state', '=', 'approved'),
             ('delivery_mode', 'in', ('classroom', 'blended')),
@@ -165,7 +165,7 @@ class EdsAnnualPlan(models.Model):
             created += 1
         self.calendar_generation_date = date.today()
         self.message_post(
-            body=_('Calendar generated for %s - %d programs added. SLA deadline: %s (FREDS020).')
+            body=_('Calendar generated for %s - %d programs added. SLA deadline: %s ().')
             % (self.name, created, self.calendar_sla_deadline))
         return {
             'type': 'ir.actions.act_window',
@@ -176,7 +176,7 @@ class EdsAnnualPlan(models.Model):
 
     @api.model
     def _add_approved_curriculum(self, curriculum):
-        """FREDS018 hook called when a curriculum is CPCO-approved: insert its course
+        """ hook called when a curriculum is CPCO-approved: insert its course
         into the current draft annual plan."""
         plan = self.search([
             ('fiscal_year', '=', str(date.today().year)),
@@ -192,15 +192,15 @@ class EdsAnnualPlan(models.Model):
             })]})
         return plan
 
-    # ── Approval chain with segregation of duties (FREDS024) ─────────────────
+    # ── Approval chain with segregation of duties () ─────────────────
     def _check_segregation(self):
-        """Reviewer != Endorser != Approver (FREDS024)."""
+        """Reviewer != Endorser != Approver ()."""
         self.ensure_one()
         users = [self.reviewer_id.id, self.endorser_id.id, self.approver_id.id]
         present = [u for u in users if u]
         if len(present) != len(set(present)):
             raise ValidationError(_(
-                'Segregation of Duties Violation (FREDS024): Reviewer, Endorser and '
+                'Segregation of Duties Violation (): Reviewer, Endorser and '
                 'Approver must all be different individuals.'))
 
     def _log_approval_step(self, state_from, state_to, comment=''):
@@ -214,7 +214,7 @@ class EdsAnnualPlan(models.Model):
     def _require_manager(self):
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_manager')
                 or self.env.user.has_group('employee_development_system.group_eds_admin')):
-            raise UserError(_('This approval step requires L&D Manager authority (FREDS024).'))
+            raise UserError(_('This approval step requires L&D Manager authority ().'))
 
     def action_submit_director(self):
         """Draft -> Director PPDD Review."""
@@ -227,7 +227,7 @@ class EdsAnnualPlan(models.Model):
             rec._check_segregation()
             rec.state = 'director_review'
             rec._log_approval_step('draft', 'director_review')
-            rec.message_post(body=_('Annual plan %s submitted to Director PPDD review (FREDS024).')
+            rec.message_post(body=_('Annual plan %s submitted to Director PPDD review ().')
                              % rec.name)
 
     def action_director_approve(self):
@@ -259,7 +259,7 @@ class EdsAnnualPlan(models.Model):
                              % rec.name)
 
     def action_publish(self):
-        """SMC Approval -> Published: activates the downstream sessions (FREDS024)."""
+        """SMC Approval -> Published: activates the downstream sessions ()."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'smc_approval':
@@ -274,7 +274,7 @@ class EdsAnnualPlan(models.Model):
             rec._log_approval_step('smc_approval', 'published', _('Published by SMC'))
             rec._activate_downstream()
             rec.message_post(body=_('Annual plan %s published - sessions are now open for nomination '
-                                    '(FREDS024).') % rec.name)
+                                    '().') % rec.name)
 
     def _activate_downstream(self):
         """Create a draft session for each planned line so scheduling/nomination can start."""
@@ -282,7 +282,7 @@ class EdsAnnualPlan(models.Model):
             line._create_default_session()
 
     def action_amend(self):
-        """Published -> Amended: reopens the plan for authorized addenda (FREDS026)."""
+        """Published -> Amended: reopens the plan for authorized addenda ()."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'published':
@@ -290,7 +290,7 @@ class EdsAnnualPlan(models.Model):
             rec.state = 'amended'
             rec._log_approval_step('published', 'amended', _('Plan reopened for addenda'))
             rec.message_post(body=_('Annual plan %s reopened for amendments - approved unscheduled '
-                                    'requests will be appended as addenda (FREDS026).') % rec.name)
+                                    'requests will be appended as addenda ().') % rec.name)
 
     def action_re_publish(self):
         """Amended -> Published: closes the amendment window again."""
@@ -304,7 +304,7 @@ class EdsAnnualPlan(models.Model):
             rec.message_post(body=_('Annual plan %s re-published after amendments.') % rec.name)
 
     def action_view_sessions(self):
-        """Open the sessions belonging to this plan (FREDS025 monitoring)."""
+        """Open the sessions belonging to this plan ( monitoring)."""
         self.ensure_one()
         session_ids = self.line_ids.mapped('session_ids').ids
         return {
@@ -318,14 +318,14 @@ class EdsAnnualPlan(models.Model):
     def unlink(self):
         for rec in self:
             if rec.state in ('published', 'amended'):
-                raise UserError(_('Published/amended annual plans cannot be deleted (FREDS024).'))
+                raise UserError(_('Published/amended annual plans cannot be deleted ().'))
             if rec.approval_history_ids:
                 rec.approval_history_ids.with_context(eds_bypass_history_guard=True).unlink()
         return super().unlink()
 
 
 class EdsAnnualPlanLine(models.Model):
-    """One program line of the annual plan (FREDS020/025).
+    """One program line of the annual plan (/025).
 
     Carries the scheduled month, delivery method, allocated budget and the delivery
     status used by the monthly/quarterly planned-vs-actual variance report.
@@ -340,11 +340,11 @@ class EdsAnnualPlanLine(models.Model):
                                 domain=[('status', 'in', ('draft', 'active'))])
     program_name = fields.Char(string='Program Name',
                                help='Used when the program is not in the course catalog '
-                                    '(e.g. unscheduled-request addenda, FREDS075/076).')
+                                    '(e.g. unscheduled-request addenda, /076).')
     scheduled_month = fields.Char(
         string='Scheduled Month (YYYY-MM)',
         help='Month the program is planned for, e.g. 2026-09. Free text keeps planning '
-             'flexible (FREDS020).')
+             'flexible ().')
     delivery_method = fields.Selection([
         ('internal', 'Internal Delivery'),
         ('local_external', 'Local External Provider'),
@@ -367,10 +367,10 @@ class EdsAnnualPlanLine(models.Model):
     planned_vs_actual = fields.Float(
         string='Planned vs Actual (%)', compute='_compute_planned_vs_actual', store=True,
         help='Percentage of this program\u2019s sessions that have actually been delivered '
-             '(FREDS025).')
+             '().')
     is_addendum = fields.Boolean(
         string='Addendum', default=False,
-        help='Added through an approved unscheduled training request (FREDS075/076).')
+        help='Added through an approved unscheduled training request (/076).')
     notes = fields.Text(string='Notes')
 
     @api.depends('session_ids')
@@ -392,7 +392,7 @@ class EdsAnnualPlanLine(models.Model):
             self.delivery_method = self.course_id.delivery_method
 
     def _create_default_session(self):
-        """Create one draft session for this line (used on publication, FREDS024)."""
+        """Create one draft session for this line (used on publication, )."""
         self.ensure_one()
         if self.session_ids:
             return self.session_ids[0]

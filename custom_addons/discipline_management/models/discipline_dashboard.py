@@ -32,11 +32,11 @@ class DisciplineCaseDashboard(models.Model):
 
         # ---- Related Model Counts ----
         inv_model = self.env.get('discipline.investigation')
-        # FR-BUG-DIS1: discipline.investigation valid states: draft/submitted/approved
+        # discipline.investigation valid states: draft/submitted/approved
         investigations = inv_model.search_count([('state', '!=', 'approved')]) if inv_model else 0
 
         comm_model = self.env.get('discipline.committee.meeting')
-        # FR-BUG-DIS1: discipline.committee.meeting valid terminal state: 'completed' (not 'concluded')
+        # discipline.committee.meeting valid terminal state: 'completed' (not 'concluded')
         committee_meetings = comm_model.search_count([
             ('state', 'not in', ['completed', 'cancelled'])
         ]) if comm_model else 0

@@ -108,7 +108,7 @@
                                     class="oe_stat_button" icon="fa-folder-open"
                                     groups="employee_development_system.group_eds_officer">
                                 <field name="material_count" widget="statinfo" string="Materials"/>
-                                <span class="o_stat_text">Approval gate (FREDS045)</span>
+                                <span class="o_stat_text">Approval gate ()</span>
                             </button>
                         </div>
                         <group>
@@ -127,7 +127,7 @@
                                 <field name="schedule"/>
                             </group>
                         </group>
-                        <group string="Sourcing Recommendation (FREDS027)">
+                        <group string="Sourcing Recommendation ()">
                             <field name="recommended_source"/>
                             <field name="sourcing_justification"/>
                             <field name="sourcing_state" readonly="1"/>
@@ -146,7 +146,7 @@
                             <field name="description"/>
                         </group>
                         <notebook>
-                            <page string="Competency Mapping (FREDS012)">
+                            <page string="Competency Mapping ()">
                                 <field name="competency_line_ids">
                                     <list editable="bottom">
                                         <field name="competency_id"/>
@@ -155,7 +155,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Training Materials (FREDS045)">
+                            <page string="Training Materials ()">
                                 <field name="material_ids">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>
@@ -255,7 +255,7 @@
                                 <field name="assigned_officer_id"/>
                                 <field name="course_id" readonly="1"/>
                             </group>
-                            <group string="SLA (FREDS014)">
+                            <group string="SLA ()">
                                 <field name="sla_deadline" readonly="1"/>
                                 <field name="sla_breached"/>
                             </group>

@@ -18,13 +18,13 @@ class DisciplineCommitteeMeeting(models.Model):
     committee_chair_id = fields.Many2one('res.users', string='Committee Chair', required=True, tracking=True)
     member_ids = fields.Many2many('res.users', 'discipline_committee_members_rel', 'meeting_id', 'user_id', string='Committee Members', required=True)
 
-    # Quorum Requirements (FR-DIS-020)
+    # Quorum Requirements 
     total_expected_members = fields.Integer(string='Total Expected Members', compute='_compute_quorum', store=True)
     present_members_count = fields.Integer(string='Members Present Count', required=True, default=0, tracking=True)
     required_quorum_percentage = fields.Float(string='Required Quorum (%)', default=50.0, required=True, help='Minimum percentage of members present required for valid decision')
     is_quorum_met = fields.Boolean(string='Quorum Validated', compute='_compute_quorum', store=True, tracking=True)
 
-    # Minutes & Decision Capture (FR-DIS-018 & FR-DIS-019)
+    # Minutes & Decision Capture ( & )
     agenda = fields.Text(string='Meeting Agenda')
     meeting_minutes = fields.Text(string='Official Meeting Minutes', tracking=True)
     final_recommendation = fields.Selection([
@@ -45,7 +45,7 @@ class DisciplineCommitteeMeeting(models.Model):
     state = fields.Selection([
         ('draft', 'Scheduled'),
         ('in_progress', 'Meeting In Progress'),
-        # DIS-5: Director must review agenda before voting is opened
+        # Director must review agenda before voting is opened
         ('director_review', 'Pending Director Review Sign-off'),
         ('voting', 'Voting in Progress'),
         ('minutes_recorded', 'Minutes & Votes Captured'),
@@ -53,12 +53,12 @@ class DisciplineCommitteeMeeting(models.Model):
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # DIS-5: FR-DIS-020 — Sequential sign-off tracking
+    #  — Sequential sign-off tracking
     director_signed_off = fields.Boolean(
         string='Director Sign-off Completed',
         default=False,
         tracking=True,
-        help='FR-DIS-020: Department Director must review and sign off before votes are opened.'
+        help='Department Director must review and sign off before votes are opened.'
     )
     director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
     director_signoff_by_id = fields.Many2one('res.users', string='Signed Off By (Director)', tracking=True)
@@ -88,7 +88,7 @@ class DisciplineCommitteeMeeting(models.Model):
         return super().create(vals_list)
 
     def action_schedule_and_notify(self):
-        """FR-DIS-016 & FR-DIS-017: Schedule meeting and notify members & employee."""
+        """ & Schedule meeting and notify members & employee."""
         for rec in self:
             rec.write({'state': 'in_progress'})
             # Post message and send notification to committee members and employee
@@ -103,7 +103,7 @@ class DisciplineCommitteeMeeting(models.Model):
             )
 
     def action_request_director_review(self):
-        """DIS-5: Send case packet to Department Director for sign-off before voting."""
+        """Send case packet to Department Director for sign-off before voting."""
         for rec in self:
             if rec.state != 'in_progress':
                 raise UserError(_('Meeting must be In Progress before requesting director review.'))
@@ -113,7 +113,7 @@ class DisciplineCommitteeMeeting(models.Model):
             )
 
     def action_director_signoff(self):
-        """DIS-5: Department Director approves; voting can now commence."""
+        """Department Director approves; voting can now commence."""
         for rec in self:
             if rec.state != 'director_review':
                 raise UserError(_('This action is only valid when pending Director Review.'))
@@ -141,13 +141,13 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.write({'state': 'minutes_recorded'})
 
     def action_finalize_meeting(self):
-        """FR-DIS-020: Quorum Validation + DIS-5 sequential sign-off check before final decision."""
+        """Quorum Validation +  sequential sign-off check before final decision."""
         for rec in self:
-            # DIS-5: Director must have signed off before finalisation
+            # Director must have signed off before finalisation
             if not rec.director_signed_off:
                 raise UserError(_(
                     'Sequential Sign-off Required: Department Director must sign off on the agenda '
-                    'before the committee meeting can be finalized (FR-DIS-020).'
+                    'before the committee meeting can be finalized .'
                 ))
 
             if not rec.is_quorum_met:
@@ -159,7 +159,7 @@ class DisciplineCommitteeMeeting(models.Model):
             if not rec.final_recommendation:
                 raise UserError(_('A final committee recommendation must be selected.'))
 
-            # DIS-5: Ensure all present members have cast a vote
+            # Ensure all present members have cast a vote
             cast_votes = len(rec.vote_ids)
             if cast_votes < rec.present_members_count:
                 raise UserError(_(

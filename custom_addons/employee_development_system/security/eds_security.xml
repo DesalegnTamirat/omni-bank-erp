@@ -34,7 +34,7 @@
             <field name="sequence">20</field>
             <field name="privilege_id" ref="employee_development_system.res_groups_privilege_eds"/>
             <field name="implied_ids" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
-            <field name="comment">Can nominate team members and approve their training needs (FR-EDS-004).</field>
+            <field name="comment">Can nominate team members and approve their training needs .</field>
         </record>
 
         <!-- Group: Trainer -->
@@ -334,7 +334,7 @@
         </record>
 
         <!-- Task 7: attendance - employees read their own records; trainers record on
-             their assigned sessions; L&D staff manage the full sheet (FREDS040) -->
+             their assigned sessions; L&D staff manage the full sheet () -->
         <record id="rule_eds_session_attendance_employee_own" model="ir.rule">
             <field name="name">Employee Own Attendance</field>
             <field name="model_id" ref="employee_development_system.model_eds_session_attendance"/>
@@ -358,7 +358,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: daily feedback - employees read their own; trainers record (FREDS040) -->
+        <!-- Task 7: daily feedback - employees read their own; trainers record () -->
         <record id="rule_eds_feedback_employee_own" model="ir.rule">
             <field name="name">Employee Own Feedback</field>
             <field name="model_id" ref="employee_development_system.model_eds_feedback"/>
@@ -382,7 +382,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: assessments - employees read their own scores; trainers score (FREDS055) -->
+        <!-- Task 7: assessments - employees read their own scores; trainers score () -->
         <record id="rule_eds_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessments</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment"/>
@@ -406,7 +406,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: materials are L&D-internal documents (FREDS045) -->
+        <!-- Task 7: materials are L&D-internal documents () -->
         <record id="rule_eds_material_staff" model="ir.rule">
             <field name="name">Materials L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_material"/>
@@ -419,7 +419,7 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Task 7: international training documents (FREDS041) -->
+        <!-- Task 7: international training documents () -->
         <record id="rule_eds_international_training_staff" model="ir.rule">
             <field name="name">International Training L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_international_training"/>

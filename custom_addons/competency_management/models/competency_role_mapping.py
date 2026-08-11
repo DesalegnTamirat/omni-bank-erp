@@ -4,7 +4,7 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencyRoleMapping(models.Model):
-    """Role-Competency mapping: master reference for assessment & gap analysis (FR-MAP-001..007).
+    """Role-Competency mapping: master reference for assessment & gap analysis (..007).
 
     Uses `hr.job` (Job Position) + `employee.grade` (Employee Grade), the same
     entities used everywhere else in this ERP.
@@ -47,7 +47,7 @@ class CompetencyRoleMapping(models.Model):
     ]
 
     def action_submit_for_approval(self):
-        """Draft -> Under Approval (FR-MAP-006 approval workflow)."""
+        """Draft -> Under Approval ( approval workflow)."""
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_('Add at least one competency line before submitting for approval.'))
@@ -68,7 +68,7 @@ class CompetencyRoleMapping(models.Model):
         self.write({'state': 'archived'})
 
     def action_create_new_version(self):
-        """Copy approved mapping into a new draft version (FR-MAP-005 version control)."""
+        """Copy approved mapping into a new draft version ( version control)."""
         self.ensure_one()
         if self.state != 'approved':
             raise ValidationError(_('Only approved mappings can be versioned.'))
@@ -100,7 +100,7 @@ class CompetencyRoleMapping(models.Model):
 
 
 class CompetencyRoleMappingLine(models.Model):
-    """Required competency + proficiency level for a role (FR-CFD-0174)."""
+    """Required competency + proficiency level for a role ."""
     _name = 'competency.role.mapping.line'
     _description = 'Role-Competency Mapping Line'
 

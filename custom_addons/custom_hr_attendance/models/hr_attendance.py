@@ -60,7 +60,7 @@ class HrAttendance(models.Model):
         default=False,
         index=True,
         tracking=True,
-        help='/ FR-HR or supervisor can flag this attendance record for discipline review.'
+        help='HR or supervisor can flag this attendance record for discipline review.'
     )
     flagged_reason = fields.Char(string='Flag Reason', tracking=True)
     flagged_by_id = fields.Many2one('res.users', string='Flagged By', readonly=True, tracking=True)
@@ -114,7 +114,7 @@ class HrAttendance(models.Model):
         for rec in self:
             if rec.lunch_out and rec.lunch_in and rec.lunch_in > rec.lunch_out:
                 delta = rec.lunch_in - rec.lunch_out
-                rec.lunch_break_hours = delta.total_seconds() / 3600.0
+                rec.lunch_break_hours = round(delta.total_seconds() / 3600.0, 2)
             else:
                 rec.lunch_break_hours = 0.0
 
@@ -208,10 +208,7 @@ class HrAttendance(models.Model):
                 rec.discipline_case_count = 0
 
     def action_flag_for_discipline(self):
-        """
-        / FR-Flag this attendance record for discipline review.
-        Opens a popup so the supervisor can enter a reason.
-        """
+        """Flag this attendance record for discipline review. Opens a popup so the supervisor can enter a reason."""
         self.ensure_one()
         return {
             'name': _('Flag for Discipline Review'),
@@ -688,9 +685,7 @@ class HrAttendance(models.Model):
 
     @api.model
     def cron_notify_missing_attendance(self):
-        """
-        FR-Missing check-in / check-out notification to employees.
-        Runs periodically during business hours (08:15–18:00).
+        """Sends missing check-in / check-out notifications to employees.
         Notifies employees who are missing check-in or check-out.
         Deduplicates via hr.attendance.notification.log.
         """

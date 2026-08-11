@@ -161,7 +161,7 @@
                                statusbar_visible="draft,submitted,validated,approved,converted,excluded"/>
                     </header>
                     <div class="alert alert-warning" role="alert" invisible="state == 'draft'">
-                        <i class="fa fa-arrow-right"/> Consolidated by <b>Priority Scoring</b> (FREDS006):
+                        <i class="fa fa-arrow-right"/> Consolidated by <b>Priority Scoring</b> ():
                         scores below are weighted by the active priority rules.
                     </div>
                     <sheet>
@@ -196,7 +196,7 @@
                             <field name="excluded_reason" invisible="state != 'excluded'"/>
                             <field name="converted_course_ref" invisible="state != 'converted'"/>
                         </group>
-                        <group string="Priority Scoring (FREDS006)"
+                        <group string="Priority Scoring ()"
                                invisible="state in ('draft','excluded')">
                             <group>
                                 <field name="score_strategic_alignment"/>
