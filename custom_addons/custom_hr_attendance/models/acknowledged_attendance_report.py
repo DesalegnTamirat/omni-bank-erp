@@ -75,12 +75,13 @@ class AcknowledgedAttendanceReport(models.Model):
                         WHEN pg_typeof(r.name)::text = 'jsonb' THEN COALESCE(r.name->>'en_US', r.name::text, '')
                         ELSE COALESCE(r.name::text, '')
                     END AS reason_name,
-                    COALESCE(usr.name::text, '') AS acknowledged_by,
+                    COALESCE(partner.name::text, '') AS acknowledged_by,
                     att.acknowledged_date AS acknowledged_date
                 FROM hr_attendance att
                 JOIN hr_employee emp ON att.employee_id = emp.id
                 LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
                 LEFT JOIN res_users usr ON att.acknowledged_by = usr.id
+                LEFT JOIN res_partner partner ON usr.partner_id = partner.id
                 LEFT JOIN hr_attendance_reason r ON (
                     r.id = (
                         SELECT hr_attendance_reason_id 
