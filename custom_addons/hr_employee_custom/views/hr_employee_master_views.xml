@@ -366,33 +366,33 @@
                     <!-- Recruitment Criteria section with sub-tabs -->
 <!--                    <separator string="Recruitment Criteria"/>-->
                     <notebook>
-<!--                        <page string="Education Qualification">-->
-<!--                            <field name="qualification_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="qualification"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
-<!--                        <page string="Experience">-->
-<!--                            <field name="experiance_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="experience"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
-<!--                        <page string="Competencies">-->
-<!--                            <field name="competencies_id">-->
-<!--                                <list editable="bottom">-->
-<!--                                    <field name="competencies"/>-->
-<!--                                    <field name="requirement"/>-->
-<!--                                    <field name="response"/>-->
-<!--                                </list>-->
-<!--                            </field>-->
-<!--                        </page>-->
+                        <page string="Education Qualification">
+                            <field name="qualification_id">
+                                <list editable="bottom">
+                                    <field name="qualification"/>
+                                    <field name="requirement"/>
+                                    <field name="response"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Experience">
+                            <field name="experiance_id">
+                                <list editable="bottom">
+                                    <field name="experience"/>
+                                    <field name="requirement"/>
+                                    <field name="response"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Competencies">
+                            <field name="competencies_id">
+                                <list editable="bottom">
+                                    <field name="competencies"/>
+                                    <field name="requirement"/>
+                                    <field name="response"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Eligible Grades">
                             <field name="grade_recruitment_id">
                                 <list editable="bottom">
@@ -620,43 +620,40 @@
 
 
                 <xpath expr="//page[@name='hr_settings']" position="after">
-<!--                    <page string="Recruitment Criteria" name="recruitment_criteria">-->
-<!--                        <notebook>-->
-<!--                            <page string="Education Qualification">-->
-<!--                                <field name="qualification_id">-->
-<!--                                    <list>-->
-<!--                                        <field name="qualification"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
-
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Experience">-->
-
-
-<!--                                <field name="experiance_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="experience"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
-
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                            <page string="Competencies ">-->
-
-<!--                                <field name="competencies_id">-->
-<!--                                    <list editable="bottom">-->
-<!--                                        <field name="competencies"/>-->
-<!--                                        <field name="requirement"/>-->
-<!--                                        <field name="response"/>-->
-<!--                                    </list>-->
-
-<!--                                </field>-->
-<!--                            </page>-->
-<!--                        </notebook>-->
-<!--                    </page>-->
+                    <page string="Qualifications &amp; Criteria" name="recruitment_criteria">
+                        <notebook>
+                            <page string="Education Qualification">
+                                <field name="edu_ids">
+                                    <list editable="bottom">
+                                        <field name="qualification" string="Qualification"/>
+                                        <field name="specialization" string="Specialization / Major"/>
+                                        <field name="university" string="University / College"/>
+                                        <field name="year_of_admission" string="Admission Year"/>
+                                        <field name="year_of_outcome" string="Graduation Year"/>
+                                        <field name="cgpa_percentage" string="CGPA / Percentage"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Experience">
+                                <field name="experiance_id">
+                                    <list editable="bottom">
+                                        <field name="experience" string="Experience" options="{'no_open': True}"/>
+                                        <field name="requirement" string="Requirement (Years)"/>
+                                        <field name="response" string="Response (Years)"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Competencies">
+                                <field name="competencies_id">
+                                    <list editable="bottom">
+                                        <field name="competencies" string="Competency" options="{'no_open': True}"/>
+                                        <field name="requirement" string="Requirement"/>
+                                        <field name="response" string="Response"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </page>
                     <page name="award_ids" string="Awards Received">
                         <field name="award_ids" string="Awards Received">
                             <list>
@@ -1064,6 +1061,76 @@
             </field>
         </record>
 
+        <!-- Form View for hr_experience_info_job (Recruitment Experience Criteria) -->
+        <record id="view_hr_experience_info_job_form" model="ir.ui.view">
+            <field name="name">hr.experience.info.job.form</field>
+            <field name="model">hr_experience_info_job</field>
+            <field name="arch" type="xml">
+                <form string="Experience Profile">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="job_id"/>
+                                <field name="experience"/>
+                                <field name="response"/>
+                            </group>
+                            <group>
+                                <field name="applicant_id"/>
+                                <field name="requirement"/>
+                                <field name="smart_search"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Form View for hr_qualification_info_job (Education Qualification Criteria) -->
+        <record id="view_hr_qualification_info_job_form" model="ir.ui.view">
+            <field name="name">hr.qualification.info.job.form</field>
+            <field name="model">hr_qualification_info_job</field>
+            <field name="arch" type="xml">
+                <form string="Qualification Profile">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="job_id"/>
+                                <field name="qualification"/>
+                                <field name="response"/>
+                            </group>
+                            <group>
+                                <field name="requirement"/>
+                                <field name="smart_search"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Form View for hr_competencies_info_job (Recruitment Competency Criteria) -->
+        <record id="view_hr_competencies_info_job_form" model="ir.ui.view">
+            <field name="name">hr.competencies.info.job.form</field>
+            <field name="model">hr_competencies_info_job</field>
+            <field name="arch" type="xml">
+                <form string="Competency Profile">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="job_id"/>
+                                <field name="competencies"/>
+                                <field name="response"/>
+                            </group>
+                            <group>
+                                <field name="applicant_id"/>
+                                <field name="requirement"/>
+                                <field name="smart_search"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
 
     </data>
 </odoo>

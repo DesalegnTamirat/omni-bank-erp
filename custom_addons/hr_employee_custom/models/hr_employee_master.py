@@ -267,12 +267,135 @@ class HrEmployee(models.Model):
     commitment_info = fields.One2many("training.commitment", 'commitment_id', string="Training Commitment",
                                       help=' Training Commitment')
 
-    qualification_id = fields.One2many('hr.qualification.info.employee', 'employee_id', 'Education Qualification')
-    experiance_id = fields.One2many('hr.experience.info.employee', 'employee_id', 'Experiance')
-    competencies_id = fields.One2many('hr.competencies.info.employee', 'employee_id', 'Competencies')
+    qualification_id = fields.One2many('hr_qualification_info_job', 'employee_id', 'Education Qualification')
+    experiance_id = fields.One2many('hr_experience_info_job', 'employee_id', 'Experiance')
+    competencies_id = fields.One2many('hr_competencies_info_job', 'employee_id', 'Competencies')
 
     # From employee_fields_application (hr_employee_hrMaster.py)
     responsible_user_id = fields.Many2one('res.users', "Responsible", default=lambda self: self.env.uid)
+
+    # ------------------------------------------------------------------
+    # Recruitment Criteria Synchronization
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        employees = super().create(vals_list)
+        employees._sync_criteria_from_job()
+        return employees
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'job_id' in vals or 'job_position' in vals:
+            self._sync_criteria_from_job()
+        return res
+
+    @api.onchange('job_id', 'job_position', 'edu_ids', 'education_detail_ids')
+    def _onchange_job_position_sync_criteria(self):
+        """Automatically populate recruitment criteria when job position or education records change."""
+        self._sync_criteria_from_job()
+
+    def action_sync_recruitment_criteria(self):
+        """Method retained for view compatibility."""
+        self._sync_criteria_from_job(force=True)
+        return True
+
+    def _sync_criteria_from_job(self, force=False):
+        """Helper to copy qualification, experience, and competency criteria from Job to Employee,
+        and sync education qualifications directly from Employee Education tables."""
+        for employee in self:
+            job = employee.job_id or employee.job_position
+
+            # Collect education responses from hr.employee.education (edu_ids) & employee.education (education_detail_ids)
+            edu_responses = {}
+            for edu in employee.edu_ids:
+                q_name = False
+                if edu.qualification and edu.specialization:
+                    q_name = f"{edu.qualification.strip()} - {edu.specialization.strip()}"
+                elif edu.qualification:
+                    q_name = edu.qualification.strip()
+                elif edu.specialization:
+                    q_name = edu.specialization.strip()
+
+                if q_name:
+                    edu_responses[q_name.lower()] = (q_name, edu.cgpa_percentage or 0.0)
+
+            for edu in employee.education_detail_ids:
+                q_name = (edu.qualification or edu.field or (dict(edu._fields['edu_type'].selection).get(edu.edu_type) if edu.edu_type else False))
+                if q_name:
+                    q_name_str = str(q_name).strip()
+                    edu_responses[q_name_str.lower()] = (q_name_str, edu.CGPA or 0.0)
+
+            # 1. Qualifications from Job Position
+            if job:
+                existing_qual_ids = set(employee.qualification_id.mapped('qualification.id'))
+                qual_cmds = []
+                for q in job.qualification_id:
+                    if q.qualification:
+                        q_name = q.qualification.name.strip().lower() if q.qualification.name else ''
+                        resp = edu_responses.get(q_name, (None, q.response))[1]
+                        if force or q.qualification.id not in existing_qual_ids:
+                            if q.qualification.id in existing_qual_ids and force:
+                                continue
+                            qual_cmds.append((0, 0, {
+                                'qualification': q.qualification.id,
+                                'requirement': q.requirement,
+                                'response': resp,
+                                'smart_search': q.smart_search or 'yes',
+                            }))
+                if qual_cmds:
+                    employee.qualification_id = qual_cmds
+
+            # 1b. Qualifications directly from Employee Education tables
+            for qual_key, (display_name, cgpa_val) in edu_responses.items():
+                rec_qual = self.env['recruitment.qualification'].search([('name', '=ilike', display_name)], limit=1)
+                if not rec_qual:
+                    rec_qual = self.env['recruitment.qualification'].create({'name': display_name})
+
+                existing_eq = employee.qualification_id.filtered(lambda r: r.qualification and r.qualification.id == rec_qual.id)
+                if existing_eq:
+                    for eq in existing_eq:
+                        eq.response = cgpa_val
+                else:
+                    employee.qualification_id = [(0, 0, {
+                        'qualification': rec_qual.id,
+                        'requirement': 0.0,
+                        'response': cgpa_val,
+                        'smart_search': 'yes',
+                    })]
+
+            # 2. Experience from Job Position
+            if job:
+                existing_exp_ids = set(employee.experiance_id.mapped('experience.id'))
+                exp_cmds = []
+                for e in job.experiance_id:
+                    if e.experience and (force or e.experience.id not in existing_exp_ids):
+                        if e.experience.id in existing_exp_ids and force:
+                            continue
+                        exp_cmds.append((0, 0, {
+                            'experience': e.experience.id,
+                            'requirement': e.requirement,
+                            'response': e.response,
+                            'smart_search': e.smart_search or 'yes',
+                        }))
+                if exp_cmds:
+                    employee.experiance_id = exp_cmds
+
+            # 3. Competencies from Job Position
+            if job:
+                existing_comp_ids = set(employee.competencies_id.mapped('competencies.id'))
+                comp_cmds = []
+                for c in job.competencies_id:
+                    if c.competencies and (force or c.competencies.id not in existing_comp_ids):
+                        if c.competencies.id in existing_comp_ids and force:
+                            continue
+                        comp_cmds.append((0, 0, {
+                            'competencies': c.competencies.id,
+                            'requirement': c.requirement,
+                            'response': c.response,
+                            'smart_search': c.smart_search or 'yes',
+                        }))
+                if comp_cmds:
+                    employee.competencies_id = comp_cmds
 
     # ------------------------------------------------------------------
     # Compute methods

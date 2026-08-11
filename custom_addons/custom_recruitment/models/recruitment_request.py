@@ -106,8 +106,14 @@ class RecruitmentRequest(models.Model):
         [("internal", "Internal"), ("external", "External"), ("both", "Both")],
         string="Sourcing Type", default="internal", required=True
     )
-    required_qualifications = fields.Text(string="Required Qualifications")
+    required_qualifications = fields.Text(string="Required Qualifications (Notes)")
+    qualification_id = fields.Many2one(
+        "recruitment.qualification", string="Required Qualification",
+        tracking=True,
+        help="Linked educational qualification level."
+    )
     job_description = fields.Text(string="Job Description")
+
     employee_category = fields.Selection(
         [("Managerial", "Managerial"), ("Non Managerial", "Non Managerial")],
         string="Job Category", default="Non Managerial", tracking=True,
@@ -150,6 +156,31 @@ class RecruitmentRequest(models.Model):
         invisible="not is_replacement"
     )
 
+    is_hr = fields.Boolean(
+        string="Is HR / People Team User",
+        compute="_compute_is_hr"
+    )
+
+    def _compute_is_hr(self):
+        for rec in self:
+            user = rec.env.user
+            has_hr_group = (
+                user.has_group("hr.group_hr_user") or
+                user.has_group("hr.group_hr_manager") or
+                user.has_group("hr_recruitment.group_hr_recruitment_user") or
+                user.has_group("hr_recruitment.group_hr_recruitment_manager")
+            )
+            emp = user.employee_id
+            ou_name = emp.default_operating_unit_id.name.lower() if emp and emp.default_operating_unit_id else ""
+            dept_name = emp.department_id.name.lower() if emp and emp.department_id else ""
+
+            is_people_team = (
+                has_hr_group or
+                "people" in ou_name or "people" in dept_name or
+                "culture" in ou_name or "hr" in ou_name or "hr" in dept_name
+            )
+            rec.is_hr = is_people_team
+
     allowed_job_ids = fields.Many2many(
         "hr.job", compute="_compute_allowed_jobs", string="Allowed Job Positions",
         help="Job positions available on the approved workforce plan for this Work Unit."
@@ -158,6 +189,7 @@ class RecruitmentRequest(models.Model):
         "employee.grade", compute="_compute_allowed_grades", string="Allowed Job Grades",
         help="Job grades available on the approved workforce plan for the selected Job Position."
     )
+
 
     @api.depends("operating_unit_id", "workforce_plan_id", "request_type")
     def _compute_allowed_jobs(self):
@@ -178,7 +210,7 @@ class RecruitmentRequest(models.Model):
     def _compute_allowed_grades(self):
         for rec in self:
             if not rec.job_position_id:
-                rec.allowed_grade_ids = self.env["employee.grade"]
+                rec.allowed_grade_ids = self.env["employee.grade"].search([])
                 continue
             lines = self.env["planning.manpower.line"]
             if rec.workforce_plan_id:
@@ -194,7 +226,13 @@ class RecruitmentRequest(models.Model):
                 lines = plans.mapped("manpower_line_ids").filtered(
                     lambda l: l.job_id == rec.job_position_id
                 )
-            rec.allowed_grade_ids = lines.mapped("grade_id")
+            grades = lines.mapped("grade_id")
+            if not grades and getattr(rec.job_position_id, 'grade', False):
+                grades = rec.job_position_id.grade
+            if not grades:
+                grades = self.env["employee.grade"].search([])
+            rec.allowed_grade_ids = grades
+
 
     # -- Workflow state ----------------------------------------------------
     state = fields.Selection(
@@ -456,18 +494,17 @@ class RecruitmentRequest(models.Model):
                     _(": Please specify the employee being replaced or the reason for replacement.")
                 )
 
-    @api.constrains("employee_category", "job_level")
+    @api.constrains("employee_category", "sourcing_type", "job_level")
     def _check_job_level_required(self):
-        """Job Level is required for Non-Managerial and must be empty for Managerial."""
+        """Job Level is only required for Non-Managerial when Sourcing Type is External or Both, and must be empty for Managerial."""
         for rec in self:
-            if rec.employee_category == "Non Managerial" and not rec.job_level:
+            if rec.employee_category == "Non Managerial" and rec.sourcing_type in ("external", "both") and not rec.job_level:
                 raise ValidationError(_(
-                    "Job Level (Junior / Senior) is required for Non-Managerial recruitment requests."
+                    "Job Level (Junior / Senior) is required for Non-Managerial requests when Sourcing Type is External or Both."
                 ))
             if rec.employee_category == "Managerial" and rec.job_level:
-                raise ValidationError(_(
-                    "Job Level does not apply to Managerial positions — please clear it before saving."
-                ))
+                rec.job_level = False
+
 
     # ---------------------------------------------------------------------
     # Onchange helpers (UX: clear plan / auto-sync fields from approved plan)
@@ -542,8 +579,11 @@ class RecruitmentRequest(models.Model):
         grades = lines.mapped("grade_id")
         if len(grades) == 1:
             self.job_grade_id = grades.id
+        elif getattr(self.job_position_id, 'grade', False):
+            self.job_grade_id = self.job_position_id.grade
         elif grades and self.job_grade_id not in grades:
             self.job_grade_id = False
+
 
     @api.onchange("workforce_plan_id", "job_position_id", "job_grade_id", "required_headcount")
     def _onchange_plan_headcount_warning(self):
@@ -582,14 +622,24 @@ class RecruitmentRequest(models.Model):
     # Security Helper Methods
     # ---------------------------------------------------------------------
     def _check_hr_role_or_raise(self):
-        is_hr = (
-                self.env.user.has_group("hr.group_hr_user") or
-                self.env.user.has_group("hr.group_hr_manager") or
-                self.env.user.has_group("hr_recruitment.group_hr_recruitment_user") or
-                self.env.user.has_group("hr_recruitment.group_hr_recruitment_manager")
+        """Verify that the current user belongs to group_recruitment_manager / Recruitment Manager group."""
+        user = self.env.user
+        if user.id in (1, 2) or self.env.is_admin():
+            return True
+
+        has_manager_group = (
+            user.has_group("custom_recruitment.group_recruitment_manager") or
+            user.has_group("custom_recruitment.group_recruitment_administrator") or
+            user.has_group("hr_recruitment.group_hr_recruitment_manager")
         )
-        if not is_hr:
-            raise UserError(_("Only users with HR roles can review, approve, reject, or convert recruitment requests."))
+
+        if not has_manager_group:
+            raise UserError(_(
+                "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to review, approve, or reject recruitment requests."
+            ))
+        return True
+
+
 
     def _check_submission_work_unit(self):
         self.ensure_one()

@@ -3,13 +3,7 @@ from odoo import fields, models, _
 
 
 class RecruitmentExperienceWeightConfig(models.Model):
-    """Per-operating-unit experience weighting configuration for internal
-    recruitment eligibility scoring.
 
-    Allows HR to specify that experience gained in certain work units counts
-    at a different percentage (e.g. 100% for head-office units, 50% for
-    branch units) when computing eligibility for internal vacancies.
-    """
     _name = 'recruitment.experience.weight.config'
     _description = 'Internal Recruitment Experience Weight Configuration'
     _rec_name = 'operating_unit_id'

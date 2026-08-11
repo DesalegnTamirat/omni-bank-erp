@@ -50,7 +50,7 @@ from . import operating_unit
 from . import resource_calendar
 from . import hr_employee_vehicle
 from . import res_users
-from . import hr_qualification_info_employee
+# from . import hr_qualification_info_employee
 from . import hr_reinstated_history
 # from . import hr_salary_history  # disabled: accounting/payroll feature not active
 # from . import hr_timesheet_cost_history  # disabled: accounting/payroll feature not active
@@ -78,4 +78,7 @@ from . import supplementary
 from . import transfer_form
 from . import vacancy_workunit
 from . import employee_category
-
+from . import hr_employee_document
+from . import hr_employee_relative
+from . import hr_employee_education_detail
+from . import hr_employee_previous_occupation

@@ -4,7 +4,7 @@
     'summary': "Adds Employee Grades and Levels configurations and mandatory fields.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Abeza & Desalegn',
+    'author': 'Bunna Bank',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -121,6 +121,10 @@
         # -- Misc utility wizards --
         'wizards/print_employee_report_views.xml',
         'views/employee_history.xml',
+        'views/hr_employee_document_views.xml',
+        'views/hr_employee_relative_views.xml',
+        'views/hr_employee_education_detail_views.xml',
+        'views/hr_employee_previous_occupation_views.xml',
         'views/hr_employee_master_views.xml',
         'views/menu.xml',
     ],

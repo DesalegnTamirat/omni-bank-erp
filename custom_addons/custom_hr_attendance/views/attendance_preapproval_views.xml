@@ -18,8 +18,9 @@
     <record id="attendance_preapproval_form" model="ir.ui.view">
         <field name="model">attendance.preapproval</field>
         <field name="arch" type="xml">
-            <form string="Predefined Attendance" create="false">
+            <form string="Predefined Attendance">
                 <field name="is_manager_or_admin" invisible="1"/>
+                <field name="state" invisible="1"/>
                 <header>
                     <button name="action_submit" string="Submit" type="object"
                             invisible="state != 'draft'" class="btn-primary"/>
@@ -32,18 +33,18 @@
                     <field name="state" widget="statusbar"/>
                 </header>
                 <sheet>
-                    <!--                    <field name="state" invisible="1"/>-->
-                    <group readonly="state != 'draft'">
-                        <field name="employee_id" options="{'no_open': True}"/>
-                        <field name="exception_type"/>
-                        <field name="approval_reason"/>
-                        <field name="date"/>
-                        <field name="start_time" widget="float_time"/>
-                        <field name="end_time" widget="float_time"/>
+                    <group>
+                        <field name="employee_id" options="{'no_open': True, 'no_create': True}" readonly="state != 'draft' or not is_manager_or_admin"/>
+                        <field name="exception_type" readonly="state != 'draft'"/>
+                        <field name="approval_reason" readonly="state != 'draft'"/>
+                        <field name="date" readonly="state != 'draft'"/>
+                        <field name="start_time" widget="float_time" readonly="state != 'draft'"/>
+                        <field name="end_time" widget="float_time" readonly="state != 'draft'"/>
                         <field name="time_range" readonly="1"/>
-                        <field name="approved_by" options="{'no_open': True}"/>
+                        <field name="approved_by" options="{'no_open': True}" readonly="1"/>
                     </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

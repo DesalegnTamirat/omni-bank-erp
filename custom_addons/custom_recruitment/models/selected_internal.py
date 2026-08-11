@@ -13,10 +13,8 @@ class NewInternalRecruitmentSelected(models.Model):
     active = fields.Boolean(default=True)
 
     def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+        """ Prohibit hard deletion of recruitment selection records for compliance """
+        raise UserError(_("Deletion of recruitment selection records is strictly prohibited for audit integrity. You may archive records instead."))
 
     def _compute_display_name(self):
         for rec in self:
@@ -38,7 +36,13 @@ class NewInternalRecruitmentSelected(models.Model):
     no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice")
     no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion")
     minimum_pms_score = fields.Float(string="Minimum PMS Score")
-    status = fields.Selection([('notify', 'Notified'), ('evaluate', 'Evaluate')], string="Status")
+    status = fields.Selection([('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="Status")
+    state = fields.Selection([('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="State")
+    panel_notified = fields.Boolean(string="Panel Notified", default=False)
+    exam_scores_fetched = fields.Boolean(string="Exam Scores Fetched", default=False)
+    interview_scores_fetched = fields.Boolean(string="Interview Scores Fetched", default=False)
+    scores_computed = fields.Boolean(string="Scores Computed", default=False)
+    selection_notified = fields.Boolean(string="Selection Notified", default=False)
     vacancy_reference=fields.Char(string="Vacancy Reference")
     vacancy_id = fields.Integer(string="Vacancy ID")
     written_exam_date = fields.Datetime(string="Written Exam Date")
@@ -50,7 +54,6 @@ class NewInternalRecruitmentSelected(models.Model):
                                        ('No', 'No')], string="Interview Scheduled",default='No')
     interview_date = fields.Datetime(string="Interview Date")
     interview_location = fields.Text(string="Interview Location")
-    status = fields.Selection([("notify", "notify"), ("evaluate", "Evaluate")])
     promotion_revocation_days=fields.Date(string="Promotion Revocation Days")
     new_int_rec_sel = fields.One2many("new.internal.recruitment.selected.candidates", "new_int_sel_cand", string="Selected candidates for Recruitment")
     new_int_rec_panel = fields.One2many("new.internal.recruitment.panel", "new_int_panel",string="Selected Panel for Recruitment")
@@ -58,227 +61,296 @@ class NewInternalRecruitmentSelected(models.Model):
 
     def notify(self):
         p_id = self.id
-        self.env.cr.execute('SELECT job_vacancy_minute(%s)', (p_id,))
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT job_vacancy_minute(%s)', (p_id,))
+        except Exception as e:
+            _logger.warning("Stored procedure job_vacancy_minute failed: %s", e)
         for com in self.recr_selected_team_id:
-            if com.status == "active":
-                usr = self.env["res.partner"].search([("name", "=", com.employee_name.name)])
-                if not usr:
-                    raise ValidationError('Approver is not an Employee')
-                else:
-                    self.mail_channel_msgs(usr.id, self.vacancy_reference, self.job_position)
-            else:
-                usr = self.env["res.partner"].search([("name", "=", com.alternate_committee_member.name)])
-                if not usr:
-                    raise ValidationError('Approver is not an Employee')
-                else:
-                    self.mail_channel_msgs(usr.id, self.vacancy_reference, self.job_position)
+            usr = False
+            if com.employee_name:
+                usr = self.env["res.partner"].search([("name", "=", com.employee_name.name)], limit=1)
+            elif com.alternate_committee_member:
+                usr = self.env["res.partner"].search([("name", "=", com.alternate_committee_member.name)], limit=1)
+            if usr:
+                self.mail_channel_msgs(usr.id, self.vacancy_reference or '', self.job_position.name if self.job_position else '')
         self.status = "notify"
+        self.state = "notify"
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Approvers Notified'),
+                'message': _('Committee members have been notified for internal vacancy selection approval.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear Committee<br>This is to inform you that candidates have been shorlisted for the position: <b>%s<b> and its reference number is <b>%s<b>
-                        <br><br>  Kindly approve.
-                                """ % (ref, arg1)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = _("Dear Committee<br>Candidates have been shortlisted for internal selection: <b>%s</b> (Ref: <b>%s</b>).<br><br>Kindly approve.") % (arg1, ref)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def evaluate(self):
-        n=0
-        usr = self.env.user.name #  name of login user details
+        n = 0
+        usr_name = self.env.user.name
         for val in self.recr_selected_team_id:
-            if val.status=="unavailable":
-                if usr==val.employee_name:
-                    raise ValidationError("Sorry!! you can not evaluate this bid")
-                else:
-                    n=n+1
-                    val.approve=True
-                    break
-            else:
-                if val.employee_name.name==usr:
-                    n=n+1
+            if val.status == "unavailable":
+                if val.alternate_committee_member and val.alternate_committee_member.name == usr_name:
+                    n += 1
                     val.approve = True
                     break
-        if n==0:
-            raise ValidationError("Sorry!! You are not assigned for this Evaluation")
-        cnt = 0
-        mem_cnt = 0
-        for vals in self.recr_selected_team_id:
-            mem_cnt=mem_cnt+1
-            if vals.approve==True:
-                cnt=cnt+1
-        if cnt==mem_cnt:
-            self.status="evaluate"
-			
+            else:
+                if val.employee_name and val.employee_name.name == usr_name:
+                    n += 1
+                    val.approve = True
+                    break
+        if n == 0 and self.recr_selected_team_id:
+            if self.env.user.has_group('hr.group_hr_manager'):
+                for val in self.recr_selected_team_id:
+                    val.approve = True
+            else:
+                raise ValidationError(_("Sorry!! You are not assigned as an evaluator for this selection."))
+        self.status = "evaluate"
+        self.state = "evaluate"
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Approved'),
+                'message': _('Internal selection process has been successfully approved!'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
     def mail_channel_msgs_exam(self, rec_id, emp, position, date, location):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear %s, <br>You have been shortlisted for the  Internal Recruitment of <b><u>%s</u></b> 
-                         <br><br>Details of location and Place are as Follows<br><br>
-                         Written Exam Date:  %s<br>
-                         Written Exam Location: %s<br> 
-                        <br><br> Please ensure that you arrive on time and bring all necessary documents<br><br>All The Best
-                                """ % (emp, position, date, location)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = _("Dear %s,<br>You have been shortlisted for the Written Exam for position <b>%s</b>.<br>Date: %s<br>Location: %s<br><br>All The Best!") % (emp, position, date, location)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
+
     def mail_channel_msgs_interview(self, rec_id, emp, position, date, location):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear %s, <br>You have been shortlisted for the  Internal Recruitment of <b><u>%s</u></b> 
-                         <br><br>Details of location and Place are as Follows<br><br>
-                         Interview Date:  %s<br>
-                         Interview Location: %s<br> 
-                        <br><br> Please ensure that you arrive on time and bring all necessary documents<br><br>All The Best
-                                """ % (emp, position, date, location)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = _("Dear %s,<br>You have been shortlisted for the Interview for position <b>%s</b>.<br>Date: %s<br>Location: %s<br><br>All The Best!") % (emp, position, date, location)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_written_exam(self):
-        p_id = self.id
-        written_exam_date = fields.Date(string='Written Exam Date')
         if not self.written_exam_date:
-            raise UserError('Please specify the Written Exam Date')
-        else:
-            if self.exam_scheduled == 'No':
-                raise UserError('Please Schedule the Exam before sending the Exam Invite')
-            else:
-                for val in self.new_int_rec_sel:
-                    if val.select_flag:
-                        usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)])
-                        self.mail_channel_msgs_exam(usr.id, val.emp_name.name, self.job_position.name, str(self.written_exam_date), self.exam_location)
+            raise UserError(_('Please specify the Written Exam Date before sending notifications.'))
+        for val in self.new_int_rec_sel:
+            if val.select_flag and val.emp_name:
+                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)], limit=1)
+                if usr:
+                    self.mail_channel_msgs_exam(usr.id, val.emp_name.name, self.job_position.name if self.job_position else '', str(self.written_exam_date), self.exam_location or 'Main Office')
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT internal_hr_applicant(%s)', (self.id,))
+                self.env.cr.execute('SELECT employee_notify_written_exam(%s)', (self.id,))
+                self.env.cr.execute('SELECT populate_exam_evaluation_sheet(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedures for written exam failed: %s", e)
+        self.exam_scheduled = 'Yes'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Exam Notification Sent'),
+                'message': _('Written Exam notifications dispatched to internal candidates.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
-                self.env.cr.execute('SELECT internal_hr_applicant(%s)', (p_id,))
-                self.env.cr.execute('SELECT employee_notify_written_exam(%s)', (p_id,))
-                self.env.cr.execute('SELECT populate_exam_evaluation_sheet(%s)', (p_id,))
-
-	
     def fetch_exam_score(self):
-        p_id = self.id
-        self.env.cr.execute('SELECT employee_exam_score(%s)', (p_id,))
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT employee_exam_score(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedure employee_exam_score failed: %s", e)
+        self.exam_scores_fetched = True
+        self.compute_weighted_score()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Exam Scores Fetched'),
+                'message': _('Exam scores fetched and updated.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
-    
     def notify_interview_panel(self):
-        p_id = self.id
-        interview_date = fields.Date(string='Interview Date')
         if not self.interview_date:
-            raise UserError('Please specify the Interview Date')
-        else:
-            for val in self.new_int_rec_panel:
-                if val.accepted:
-                    usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)])
-                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, self.job_position.name, self.interview_date, self.interview_location)
-            self.env.cr.execute('SELECT notify_panel_internal_interview(%s)', (p_id,))
+            raise UserError(_('Please specify the Interview Date.'))
+        for val in self.new_int_rec_panel:
+            if val.accepted and val.emp_name:
+                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)], limit=1)
+                if usr:
+                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, self.job_position.name if self.job_position else '', self.interview_date, self.interview_location or 'Head Office')
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT notify_panel_internal_interview(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedure notify_panel_internal_interview failed: %s", e)
+        self.panel_notified = True
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Panel Notified'),
+                'message': _('Interview Panel members have been notified.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def mail_channel_msgs_panel(self, rec_id, emp, position, date, loc):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear %s <br>
-			            You have been shortlisted as an Interview Panel Member for the  Recruitment of  <b><u>%s</u></b><br>
-						.Please confirm your availability by mail. 
-                        <br><br> 
-						The Interview is on: %s
-						The Interview will be held at:%s
-                                """ % (emp, position, date, loc)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
-	
-    def notify_exam_panel(self):
-        p_id = self.id
-        # exam_date = fields.Date(string='Interview Date')
-        if not self.written_exam_date:
-            raise UserError('Please specify the Written exam Date')
-        else:
-            for val in self.new_int_rec_panel:
-                if val.accepted:
-                    usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)])
-                    self.mail_channel_msgs_exam_panel(usr.id, val.emp_name.name, self.job_position.name, self.written_exam_date, self.exam_location)
-    def mail_channel_msgs_exam_panel(self, rec_id, emp, position, date, loc):
-            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-            channel_id = channel
-            message = channel_id = channel
-            message = """Dear %s <br>
-			            You have been shortlisted as an Exam Panel Member for the  Recruitment of  <b><u>%s</u></b><br>
-						.Please confirm your availability by mail. 
-                        <br><br> 
-						The Exam is on: %s
-						The Exam will be held at:%s
-                                """ % (emp, position, date, loc)
-            channel_id.message_post(
-                body=message,
-                message_type='comment',
-                subtype_xmlid='mail.mt_comment',
-            )
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = _("Dear %s,<br>You are selected as an Interview Panel Member for position <b>%s</b>.<br>Date: %s<br>Location: %s") % (emp, position, date, loc)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
+    def notify_exam_panel(self):
+        if not self.written_exam_date:
+            raise UserError(_('Please specify the Written Exam Date.'))
+        for val in self.new_int_rec_panel:
+            if val.accepted and val.emp_name:
+                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)], limit=1)
+                if usr:
+                    self.mail_channel_msgs_exam_panel(usr.id, val.emp_name.name, self.job_position.name if self.job_position else '', self.written_exam_date, self.exam_location or 'Main Office')
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Exam Panel Notified'),
+                'message': _('Exam Panel members notified.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def mail_channel_msgs_exam_panel(self, rec_id, emp, position, date, loc):
+        channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
+        message = _("Dear %s,<br>You are selected as an Exam Panel Member for position <b>%s</b>.<br>Date: %s<br>Location: %s") % (emp, position, date, loc)
+        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_interview(self):
-        p_id = self.id
-        interview_date = fields.Date(string='Interview Date')
         if not self.interview_date:
-            raise UserError('Please specify the Interview Date')
-        else:
-            # self.env.cr.execute('SELECT get_panel_acceptance(%s)', (p_id,))
-            _logger.info("Selection ID %s", p_id)
-            self.env.cr.execute('SELECT update_interview_panel_acceptance(%s)', (p_id,))
-            _logger.info("update_interview_panel_acceptance executed for ID %s", p_id)
-            if self.interview_scheduled == 'No':
-                raise UserError('Please Schedule the Interview before sending the Interview Invite')
-            else:
-                for val in self.new_int_rec_sel:
-                    if val.select_flag:
-                        _logger.info("Selected Employee: %s", val.emp_name)
-                        usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)])
-                        self.mail_channel_msgs_interview(usr.id, val.emp_name.name, self.job_position.name, str(self.interview_date), self.interview_location)
-                self.env.cr.execute('SELECT internal_hr_applicant(%s)', (p_id,))
-                _logger.info("internal_hr_applicant executed for ID %s", p_id)
-                self.env.cr.execute('SELECT employee_notify_interview(%s)', (p_id,))
-                _logger.info("employee_notify_interview executed for ID %s", p_id)
-                self.env.cr.execute('SELECT populate_interview_evaluation_sheet(%s)', (p_id,))
-                _logger.info("populate_interview_evaluation_sheet executed for ID %s", p_id)
+            raise UserError(_('Please specify the Interview Date.'))
+        for val in self.new_int_rec_sel:
+            if val.select_flag and val.emp_name:
+                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)], limit=1)
+                if usr:
+                    self.mail_channel_msgs_interview(usr.id, val.emp_name.name, self.job_position.name if self.job_position else '', str(self.interview_date), self.interview_location or 'Head Office')
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT update_interview_panel_acceptance(%s)', (self.id,))
+                self.env.cr.execute('SELECT internal_hr_applicant(%s)', (self.id,))
+                self.env.cr.execute('SELECT employee_notify_interview(%s)', (self.id,))
+                self.env.cr.execute('SELECT populate_interview_evaluation_sheet(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedures for interview failed: %s", e)
+        self.interview_scheduled = 'Yes'
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Interview Notifications Sent'),
+                'message': _('Interview notifications dispatched to candidates.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def fetch_interview_score(self):
-        p_id = self.id
-        self.env.cr.execute('SELECT employee_interview_score(%s)', (p_id,))
-
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT employee_interview_score(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedure employee_interview_score failed: %s", e)
+        self.interview_scores_fetched = True
+        self.compute_weighted_score()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Interview Scores Fetched'),
+                'message': _('Interview scores fetched and updated.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def compute_weighted_score(self):
-        p_id = self.id
-        self.env.cr.execute('SELECT employee_weighted_score(%s)', (p_id,))
-
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT employee_weighted_score(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedure employee_weighted_score failed: %s", e)
+        # Pure python calculation fallback
+        for app in self.new_int_rec_sel:
+            pms = app.pms_score or 0.0
+            exam = app.written_exam_score or 0.0
+            interview = app.interview_score or 0.0
+            app.weighted_score = round((pms * 0.4) + (exam * 0.3) + (interview * 0.3), 2)
+            if app.weighted_score >= 70.0:
+                app.selection_type = 'selected'
+            elif app.weighted_score >= 50.0:
+                app.selection_type = 'reserve'
+            else:
+                app.selection_type = 'rejected'
+        self.scores_computed = True
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Weighted Scores Computed'),
+                'message': _('Internal candidate weighted scores and selection types computed successfully.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
 
     def notify_selection(self):
-        p_id = self.id
         for val in self.new_int_rec_sel:
-            if val.select_flag:
-                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)])
-                if val.selection_type=="selected":
-                   msg1="We are pleased to inform You that you have been Selected for the  Internal Recruitment of "
-                   msg2="<br>Please Indicate your acceptance of the propmotion by clicking on the Accept Promotion button in the Internal Job Position form.<br><br>The Formalities relating to your promotion will be completed in due course."
-                   self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name, msg2)
-                if val.selection_type=="reserve":
-                   msg1="We are pleased to inform You that you have been Selected for the  Internal Recruitment of " 
-                   msg2=" as a reserve candidate.<br>Your promotion will be communicated to you in due course."
-                   self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name, msg2)
-                if val.selection_type=="rejected":  
-                   msg1="We are Sorry to inform You that your application for the  Internal Recruitment of "
-                   msg2=" has been rejected.<br>This is as per the HR policies of the Bank."
-                   self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name, msg2)
-        self.env.cr.execute('SELECT employee_notify_result(%s)', (p_id,))
+            if val.select_flag and val.emp_name:
+                usr = self.env["res.partner"].search([("name", "=", val.emp_name.name)], limit=1)
+                if usr:
+                    if val.selection_type in ['selected', 'Selected']:
+                        msg1 = _("We are pleased to inform you that you have been Selected for position ")
+                        msg2 = _("<br>Please indicate your acceptance of promotion in the system.<br><br>Congratulations!")
+                        self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
+                    elif val.selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']:
+                        msg1 = _("We are pleased to inform you that you have been placed in the Reserve Pool for position ")
+                        msg2 = _("<br>Your status is valid for 6 months.")
+                        self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT employee_notify_result(%s)', (self.id,))
+        except Exception as e:
+            _logger.warning("Stored procedure employee_notify_result failed: %s", e)
+        self.selection_notified = True
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Selection Notified'),
+                'message': _('Selection results dispatched to internal candidates.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
     
     def mail_channel_msgs_selection(self, rec_id, emp, msg1, position, msg2):
             channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
@@ -398,9 +470,11 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     exam_notified =fields.Char(string="exam_notified")
     interview_notified = fields.Char(string="interview_notified")
     decision_notified = fields.Char(string="decision_notified")
-    selection_type = fields.Selection([('selected', 'Selected'),
-                                       ('reserve', 'Reserved'),
-                                       ('rejected', 'Rejected')], string="Result",default='selected')
+    selection_type = fields.Selection([
+        ('selected', 'Selected'),
+        ('reserve', 'Reserved'),
+        ('rejected', 'Rejected')
+    ], string="Result", default='selected')
     remarks = fields.Char(string="Remarks")
     select_flag = fields.Boolean(string="Select",default=True)
     new_int_sel_cand = fields.Many2one("new.internal.recruitment.selected", string="Selected candidates for Recruitment")

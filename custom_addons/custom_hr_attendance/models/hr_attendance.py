@@ -14,7 +14,29 @@ class HrAttendance(models.Model):
     is_force_checkout = fields.Boolean(string="Force Checkout", default=False, index=True)
     attendance_reason_ids = fields.Many2many("hr.attendance.reason", string="Acknowledgement Reason")
     is_acknowledged = fields.Boolean(string="Manager Acknowledged", default=False, index=True)
-    late_by = fields.Char(string="Late By")
+    late_by = fields.Char(string="Late By", compute="_compute_late_by", store=True)
+
+    @api.depends('late_time_hour')
+    def _compute_late_by(self):
+        for rec in self:
+            if rec.late_time_hour and rec.late_time_hour > 0:
+                hours = int(rec.late_time_hour)
+                minutes = int(round((rec.late_time_hour - hours) * 60))
+                rec.late_by = f"{hours:02d}:{minutes:02d}"
+            else:
+                rec.late_by = "00:00"
+
+    @api.depends('check_in', 'check_out')
+    def _compute_extra_hours(self):
+        """ Completely disable standard Odoo extra hours computation.
+            Overtime is managed exclusively via the custom over.time model.
+        """
+        for rec in self:
+            rec.extra_hours = 0.0
+
+    def _update_overtime(self, *args, **kwargs):
+        """ Prevent standard Odoo from writing to the default overtime table. """
+        return True
     regularization = fields.Boolean(string="Regularization")
     reason_type = fields.Selection(
         [('check_in', 'Acknowledged Check In'),
@@ -98,11 +120,76 @@ class HrAttendance(models.Model):
 
     @api.depends('check_in', 'check_out', 'lunch_break_hours')
     def _compute_worked_hours(self):
-        """Override to subtract actual lunch break duration from worked hours."""
-        super()._compute_worked_hours()
+        """
+        Computes regular worked hours bounded strictly by shift start and shift end times.
+        - Effective Check-In = MAX(check_in, shift_start_time) (Early check-in before shift start is excluded).
+        - Effective Check-Out = MIN(check_out, shift_end_time) (Late check-out or force checkout after shift end is excluded).
+        - Worked Hours = MAX(0.0, Effective Check-Out - Effective Check-In - lunch_break_hours).
+        """
         for rec in self:
-            if rec.lunch_break_hours > 0:
-                rec.worked_hours = max(0.0, rec.worked_hours - rec.lunch_break_hours)
+            if not rec.check_in or not rec.check_out:
+                rec.worked_hours = 0.0
+                continue
+
+            emp = rec.employee_id
+            tz_name = (emp.user_id.tz or self.env.user.tz or 'Africa/Addis_Ababa') if emp else 'Africa/Addis_Ababa'
+            try:
+                local_tz = pytz.timezone(tz_name)
+            except Exception:
+                local_tz = pytz.utc
+
+            # 1. Resolve Shift Start & Shift End for this employee and date
+            params = self.env['ir.config_parameter'].sudo()
+            shift_start = float(params.get_param('hr_attendance.morning_time', 8.0))
+            shift_end = float(params.get_param('hr_attendance.exit_time', 17.0))
+
+            check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
+            enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
+            if enable_saturday and check_in_local and check_in_local.weekday() == 5:
+                ou = emp.default_operating_unit_id if emp else None
+                if ou and ou.work_unit_type == 'head_office':
+                    shift_end = float(params.get_param('hr_attendance.saturday_exit_time', 14.75))
+
+            if emp:
+                if emp.default_operating_unit_id:
+                    loc_ex = self.env['location.based.exception'].sudo().search(
+                        [('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
+                    )
+                    if loc_ex:
+                        if hasattr(loc_ex, 'start_time') and loc_ex.start_time:
+                            shift_start = loc_ex.start_time
+                        if hasattr(loc_ex, 'end_time') and loc_ex.end_time:
+                            shift_end = loc_ex.end_time
+
+                job_ex = self.env['job.position.exception'].sudo().search(
+                    [('employee_id', '=', emp.id), ('status', '=', 'active')], limit=1
+                )
+                if job_ex:
+                    if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
+                        shift_start = job_ex.shift_id.start_time or shift_start
+                        shift_end = job_ex.shift_id.end_time or shift_end
+
+            # 2. Build Shift Start & Shift End Datetimes in Local Time
+            start_hour = int(shift_start)
+            start_min = int(round((shift_start - start_hour) * 60))
+            end_hour = int(shift_end)
+            end_min = int(round((shift_end - end_hour) * 60))
+
+            shift_start_dt = check_in_local.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
+            shift_end_dt = check_in_local.replace(hour=end_hour, minute=end_min, second=0, microsecond=0)
+
+            # 3. Calculate Effective Check-In & Effective Check-Out
+            check_out_local = fields.Datetime.context_timestamp(emp, rec.check_out) if emp else rec.check_out
+
+            eff_check_in = max(check_in_local, shift_start_dt)
+            eff_check_out = min(check_out_local, shift_end_dt)
+
+            if eff_check_out > eff_check_in:
+                raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
+                lunch_hrs = rec.lunch_break_hours if hasattr(rec, 'lunch_break_hours') else 0.0
+                rec.worked_hours = max(0.0, round(raw_hours - lunch_hrs, 2))
+            else:
+                rec.worked_hours = 0.0
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing them from database """
@@ -278,16 +365,22 @@ class HrAttendance(models.Model):
         return param.lower() in ('true', '1')
 
     def _resolve_check_in_ip(self, vals=None):
-        """Resolve the IP for a check-in event."""
+        """Resolve the IP for a check-in event and sync with standard in_ip_address."""
         if not self._is_ip_tracking_enabled():
             return False
-        return self._resolve_request_ip(vals, context_key='attendance_check_in_ip')
+        ip = self._resolve_request_ip(vals, context_key='attendance_check_in_ip')
+        if vals is not None and ip:
+            vals['in_ip_address'] = ip
+        return ip
 
     def _resolve_check_out_ip(self, vals=None):
-        """Resolve the IP for a check-out event."""
+        """Resolve the IP for a check-out event and sync with standard out_ip_address."""
         if not self._is_ip_tracking_enabled():
             return False
-        return self._resolve_request_ip(vals, context_key='attendance_check_out_ip')
+        ip = self._resolve_request_ip(vals, context_key='attendance_check_out_ip')
+        if vals is not None and ip:
+            vals['out_ip_address'] = ip
+        return ip
 
     # ----------------------------------------------------------
     # PERMISSION HELPER
@@ -390,7 +483,7 @@ class HrAttendance(models.Model):
 
         for vals in vals_list:
             emp_id = vals.get('employee_id')
-            if emp_id and window_sec > 0:
+            if not self.env.context.get('skip_duplicate_check') and emp_id and window_sec > 0:
                 import datetime
                 recent = self.sudo().search([
                     ('employee_id', '=', emp_id),
@@ -411,6 +504,9 @@ class HrAttendance(models.Model):
                 ip = self._resolve_check_in_ip(vals)
                 if ip:
                     vals['check_in_ip'] = ip
+                    vals['in_ip_address'] = ip
+            elif vals.get('check_in_ip') and not vals.get('in_ip_address'):
+                vals['in_ip_address'] = vals['check_in_ip']
             if not vals.get('check_in_device_info'):
                 device_info = self._resolve_request_device_info()
                 if device_info:
@@ -437,6 +533,9 @@ class HrAttendance(models.Model):
                 ip = self._resolve_check_out_ip(vals)
                 if ip:
                     vals['check_out_ip'] = ip
+                    vals['out_ip_address'] = ip
+            elif vals.get('check_out_ip') and not vals.get('out_ip_address'):
+                vals['out_ip_address'] = vals['check_out_ip']
             if not vals.get('check_out_device_info'):
                 device_info = self._resolve_request_device_info()
                 if device_info:
@@ -467,6 +566,55 @@ class HrAttendance(models.Model):
                 if rec.attendance_reason_ids:
                     rec._compute_reason_type()
                     rec._apply_manager_logic()
+
+        # Send Manager Acknowledgement Notification
+        if 'is_acknowledged' in vals and vals['is_acknowledged']:
+            for rec in self:
+                emp_user = rec.employee_id.user_id
+                if emp_user and emp_user.partner_id:
+                    from markupsafe import Markup
+                    mgr_name = self.env.user.name
+                    reasons_str = ", ".join(rec.attendance_reason_ids.mapped('name')) if rec.attendance_reason_ids else "N/A"
+                    c_date_str = rec.check_in.strftime('%Y-%m-%d') if rec.check_in else ''
+                    body = Markup(
+                        f"ℹ️ <b>Attendance Exception Acknowledged</b><br/>"
+                        f"Your attendance exception for <b>{c_date_str}</b> "
+                        f"has been acknowledged by manager {mgr_name}.<br/>"
+                        f"<b>Reason(s):</b> {reasons_str}"
+                    )
+                    try:
+                        rec.message_post(
+                            body=body,
+                            partner_ids=[emp_user.partner_id.id],
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment'
+                        )
+                    except Exception as e:
+                        _logger.warning(f"Could not post acknowledgement notification: {e}")
+
+        # Send Discipline Flag Notification
+        if 'flagged_for_discipline' in vals and vals['flagged_for_discipline']:
+            for rec in self:
+                emp_user = rec.employee_id.user_id
+                if emp_user and emp_user.partner_id:
+                    from markupsafe import Markup
+                    c_date_str = rec.check_in.strftime('%Y-%m-%d') if rec.check_in else ''
+                    body = Markup(
+                        f"⚠️ <b>Attendance Flagged for Disciplinary Review</b><br/>"
+                        f"Your attendance for <b>{c_date_str}</b> "
+                        f"has been flagged for disciplinary review.<br/>"
+                        f"<b>Reason:</b> {rec.flagged_reason or 'Lateness / Early Exit'}"
+                    )
+                    try:
+                        rec.message_post(
+                            body=body,
+                            partner_ids=[emp_user.partner_id.id],
+                            message_type='comment',
+                            subtype_xmlid='mail.mt_comment'
+                        )
+                    except Exception as e:
+                        _logger.warning(f"Could not post discipline flag notification: {e}")
+
         return res
 
     # ----------------------------------------------------------
@@ -500,109 +648,34 @@ class HrAttendance(models.Model):
     @api.model
     def cron_automatic_force_checkout(self):
         """
-        Executes a set-based SQL update off-peak to automatically force check-out 
-        any employees who remained checked-in past the configured threshold (default 14h).
-        Runs cleanly without locking worker processes.
+        Executes the high-performance PostgreSQL function auto_checkout_all_employees()
+        off-peak to automatically force check-out any employees who remained checked-in
+        past their shift end (+ 15 min grace period).
+        Runs natively inside PostgreSQL on the DB server with zero app server load.
         """
-        threshold_hours = float(self.env['ir.config_parameter'].sudo().get_param('hr_attendance.force_checkout_hours', 14.0))
-        sql = """
-            UPDATE hr_attendance
-            SET check_out = check_in + (interval '1 hour' * %s),
-                check_out_status = 'Force Checkout',
-                is_force_checkout = TRUE,
-                write_date = NOW()
-            WHERE check_out IS NULL 
-              AND check_in <= NOW() - (interval '1 hour' * %s)
-              AND (active = TRUE OR active IS NULL);
-        """
-        self.env.cr.execute(sql, (threshold_hours, threshold_hours))
-        _logger.info("Executed off-peak automatic force checkout cron.")
+        self.env.cr.execute("SELECT auto_checkout_all_employees();")
+        _logger.info("Executed shift-aware automatic force checkout PostgreSQL function.")
 
     @api.model
     def cron_automatic_absence_detection(self):
         """
-        Off-peak cron to detect employees who had no attendance and no approved leave
-        on scheduled work days. For each absent employee:
-          1. Logs the absence
-          2. Creates an attendance.payroll.payload (type: absence) so payroll can deduct
-          3. Sends a discipline signal to the discipline module if the employee has
-             accumulated >= configured absence threshold
+        Executes the high-performance PostgreSQL function detect_daily_employee_absences()
+        daily at 09:30 AM to detect unexcused absences and create payroll payloads.
+        Runs natively inside PostgreSQL on the DB server with zero app server load.
         """
         enabled = self.env['ir.config_parameter'].sudo().get_param('hr_attendance.enable_auto_absence', 'True')
         if enabled.lower() not in ('true', '1'):
             return
 
-        today = fields.Date.context_today(self)
-        yesterday = fields.Date.subtract(today, days=1)
-
-        sql = """
-            SELECT emp.id, emp.name
-            FROM hr_employee emp
-            WHERE emp.active = TRUE
-              AND NOT EXISTS (
-                  SELECT 1 FROM hr_attendance att
-                  WHERE att.employee_id = emp.id
-                    AND att.check_in >= %s::timestamp
-                    AND att.check_in < %s::timestamp
-                    AND (att.active = TRUE OR att.active IS NULL)
-              )
-              AND NOT EXISTS (
-                  SELECT 1 FROM hr_leave l
-                  WHERE l.employee_id = emp.id
-                    AND l.state = 'validate'
-                    AND l.date_from <= %s
-                    AND l.date_to >= %s
-              );
-        """
-        self.env.cr.execute(sql, (yesterday, today, yesterday, yesterday))
-        absent_employees = self.env.cr.fetchall()
-        _logger.info(
-            "Absence cron found %d absent employees for date %s.",
-            len(absent_employees), yesterday
-        )
-
-        params = self.env['ir.config_parameter'].sudo()
-        absence_discipline_threshold = int(params.get_param(
-            'hr_attendance.absence_discipline_threshold', 3
-        ))
-
-        for emp_id, emp_name in absent_employees:
-            employee = self.env['hr.employee'].browse(emp_id)
-
-            # a: Create payroll payload for absence deduction
-            if self.env.get('attendance.payroll.payload'):
-                self.env['attendance.payroll.payload'].sudo().create_absence_payload(
-                    employee_id=emp_id,
-                    absence_date=yesterday,
-                    hours=8.0,
-                )
-
-            # b: Check absence counter and signal discipline if threshold reached
-            if hasattr(employee, 'consecutive_absence_count'):
-                employee.consecutive_absence_count = (employee.consecutive_absence_count or 0) + 1
-                if employee.consecutive_absence_count >= absence_discipline_threshold:
-                    # Signal the discipline module to create a case
-                    if self.env.get('discipline.case'):
-                        self.env['discipline.case'].sudo()._create_from_attendance(
-                            emp_id, 'absence', 0
-                        )
-                        employee.consecutive_absence_count = 0
-                        _logger.info(
-                            "Discipline signal sent for employee %s after %d consecutive absences.",
-                            emp_name, absence_discipline_threshold
-                        )
-            else:
-                _logger.info(
-                    "Employee %s absent on %s. No consecutive_absence_count field — discipline threshold not checked.",
-                    emp_name, yesterday
-                )
+        self.env.cr.execute("SELECT detect_daily_employee_absences();")
+        _logger.info("Executed daily absence detection PostgreSQL function.")
 
     @api.model
     def cron_job_abandonment_detection(self):
         """
-        Detect job abandonment — employees absent for 3+ consecutive working days
-        with no approved leave or explanation. Creates a discipline case automatically.
-        BRD definition: 3 consecutive working days = job abandonment trigger.
+        Executes the high-performance PostgreSQL function detect_job_abandonment_cases()
+        daily at 03:00 AM off-peak to detect 3+ consecutive absence days and create discipline cases.
+        Runs natively inside PostgreSQL on the DB server with zero app server load.
         """
         enabled = self.env['ir.config_parameter'].sudo().get_param(
             'hr_attendance.enable_job_abandonment_cron', 'True'
@@ -610,70 +683,8 @@ class HrAttendance(models.Model):
         if enabled.lower() not in ('true', '1'):
             return
 
-        today = fields.Date.context_today(self)
-        abandonment_days = int(self.env['ir.config_parameter'].sudo().get_param(
-            'hr_attendance.job_abandonment_days', 3
-        ))
-        # Look back abandonment_days working days (simple calendar days; refine with resource.calendar if needed)
-        from datetime import timedelta
-        check_from = today - timedelta(days=abandonment_days + 1)  # +1 for safety buffer
-
-        sql = """
-            SELECT emp.id, emp.name
-            FROM hr_employee emp
-            WHERE emp.active = TRUE
-              AND NOT EXISTS (
-                  SELECT 1 FROM discipline_case dc
-                  WHERE dc.employee_id = emp.id
-                    AND dc.reference LIKE 'JOB-ABANDON-%%'
-                    AND dc.state NOT IN ('revoked', 'closed')
-              )
-              AND (
-                  SELECT COUNT(DISTINCT att.check_in::date)
-                  FROM hr_attendance att
-                  WHERE att.employee_id = emp.id
-                    AND att.check_in >= %s
-                    AND (att.active = TRUE OR att.active IS NULL)
-              ) = 0
-              AND NOT EXISTS (
-                  SELECT 1 FROM hr_leave l
-                  WHERE l.employee_id = emp.id
-                    AND l.state = 'validate'
-                    AND l.date_from <= %s
-                    AND l.date_to >= %s
-              );
-        """
-        self.env.cr.execute(sql, (check_from, today, check_from))
-        abandoned_employees = self.env.cr.fetchall()
-
-        for emp_id, emp_name in abandoned_employees:
-            _logger.warning(
-                "Job abandonment detected for employee %s (%d). Creating discipline case.",
-                emp_name, emp_id
-            )
-            if self.env.get('discipline.case'):
-                offense_xmlid = 'custom_hr_attendance.offense_job_abandonment'
-                offense = self.env.ref(offense_xmlid, raise_if_not_found=False)
-                if not offense:
-                    # Fall back to creating a case without a specific offense
-                    _logger.warning("offense_job_abandonment not found. Skipping case creation for %s.", emp_name)
-                    continue
-                case = self.env['discipline.case'].sudo().create({
-                    'employee_id': emp_id,
-                    'offense_id': offense.id,
-                    'description': _(
-                        '/ Job Abandonment: Employee %s has been absent for %d+ consecutive working days '
-                        '(from %s to %s) with no approved leave on record. '
-                        'This case was auto-created by the attendance absence monitoring cron.'
-                    ) % (emp_name, abandonment_days, check_from, today),
-                    'reference': 'JOB-ABANDON-%s-%s' % (emp_id, today),
-                })
-                if hasattr(case, 'action_initiate'):
-                    case.action_initiate()
-                _logger.info(
-                    "Job abandonment discipline case %s created for employee %s.",
-                    case.name, emp_name
-                )
+        self.env.cr.execute("SELECT detect_job_abandonment_cases();")
+        _logger.info("Executed daily job abandonment detection PostgreSQL function.")
 
     @api.model
     def cron_notify_missing_attendance(self):

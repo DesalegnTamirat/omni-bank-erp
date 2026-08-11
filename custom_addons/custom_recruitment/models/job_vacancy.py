@@ -161,9 +161,13 @@ class JobVacancy(models.Model):
         [('Internal', 'Internal'), ('External', 'External')],
         string='Recruitment Type (Legacy)', default='Internal')
 
-    responsible = fields.Many2one('hr.employee', string="Responsible", required=True)
+    responsible = fields.Many2one(
+        'hr.employee', string="Responsible", required=True,
+        default=lambda self: self.env.user.employee_id,readonly=True
+    )
+
     no_of_vacancies = fields.Integer(string="Number of Vacancies")
-    operating_unit_id = fields.Many2one("operating.unit", string="Place Of Assignment", required=True)
+    operating_unit_id = fields.Many2one("operating.unit", string="Place Of Assignment", required=True,readonly=True)
     type_of_employment = fields.Selection(
         [('Permanent', 'Permanent'), ('Contractual', 'Contractual'), ("internship", "Internship")],
         string='Type of Employment', default='Permanent')
@@ -261,17 +265,19 @@ class JobVacancy(models.Model):
             if rec.employee_category == 'Managerial':
                 rec.job_level = False
 
-    @api.constrains('employee_category', 'job_level')
+    @api.constrains('employee_category', 'sourcing_type', 'job_level')
     def _check_job_level_required(self):
+        """Job Level is only required for Non-Managerial when Sourcing Type is External or Both, unless it is an internal vacancy."""
         for rec in self:
-            if rec.employee_category == 'Non Managerial' and not rec.job_level:
+            is_internal_ref = rec.reference and (rec.reference.startswith('BB/INT/') or rec.reference.startswith('BB/LAT/'))
+            if rec.employee_category == 'Non Managerial' and rec.sourcing_type in ('external', 'both') and not rec.job_level and not is_internal_ref:
                 raise ValidationError(_(
-                    "Job Level (Junior / Senior) is required for Non-Managerial vacancies."
+                    "Job Level (Junior / Senior) is required for Non-Managerial vacancies when Sourcing Type is External or Both."
                 ))
             if rec.employee_category == 'Managerial' and rec.job_level:
-                raise ValidationError(_(
-                    "Job Level does not apply to Managerial vacancies — clear it before saving."
-                ))
+                rec.job_level = False
+
+
 
     @api.constrains('opening_date', 'last_date_to_apply')
     def _check_dates(self):
@@ -334,13 +340,14 @@ class JobVacancy(models.Model):
         the parent's write when saved from an embedded list editor. Only the
         technical fields needed for the workflow itself still pass through."""
         for rec in self:
-            if rec._is_locked():
+            if rec._is_locked() and not self.env.context.get('skip_lock_check'):
                 blocked = set(vals.keys()) - LOCKED_ALLOWED_FIELDS
                 if blocked:
                     raise ValidationError(_(
                         "This vacancy is locked (Published/Closed) and can no "
                         "longer be edited, including its lines."
                     ))
+
         res = super().write(vals)
         if vals.get('vacancy_status') == 'published':
             for rec in self:
@@ -546,9 +553,28 @@ class JobVacancy(models.Model):
         """
         FIXED: Use ID-based comparison instead of name-based comparison.
         This ensures reliable user identification regardless of name formatting or duplicates.
+        Ensures only members of the Onboarding and Recruitment Division / Recruitment Managers can evaluate.
         """
+        user = self.env.user
+        if not (user.id in (1, 2) or self.env.is_admin()):
+            has_recruitment_group = (
+                user.has_group("custom_recruitment.group_recruitment_manager") or
+                user.has_group("custom_recruitment.group_recruitment_administrator") or
+                user.has_group("hr_recruitment.group_hr_recruitment_manager")
+            )
+            emp = user.employee_id
+            ou_name = emp.default_operating_unit_id.name.lower() if emp and emp.default_operating_unit_id else ""
+            
+            is_recruitment_division = (
+                has_recruitment_group or
+                "recruitment" in ou_name or "onboarding" in ou_name
+            )
+            if not is_recruitment_division:
+                raise ValidationError(_("Access Denied: Vacancies can only be evaluated by members of the Onboarding and Recruitment Division."))
+
         n = 0
         current_user_id = self.env.user.id
+
 
         for val in self.vac_del_team_id:
             if val.status == "unavailable":
@@ -603,7 +629,7 @@ class JobVacancy(models.Model):
         }
 
     def publish_vacancy(self):
-        """: publish vacancy. Auto-posts to website for external vacancies."""
+        """: publish vacancy. Auto-posts to website for external vacancies and sets hr.job to recruitment."""
         for val in self.vac_del_team_id:
             if not val.approve:
                 raise ValidationError(_("You cannot publish the vacancy until it is fully Approved."))
@@ -616,19 +642,34 @@ class JobVacancy(models.Model):
         self.write({"vacancy_status": "published"})
         self._sync_published_vacancy_records()
 
-        # Auto-publish external vacancies to the website
-        if self.sourcing_type in ('external', 'both'):
-            if self.job_position:
-                self.job_position.write({
+        # Auto-publish external vacancies to the website and always set hr.job state to 'recruit'
+        if self.job_position:
+            job_vals = {
+                'state': 'recruit',
+                'no_of_recruitment': self.no_of_vacancies or 1,
+            }
+            if self.sourcing_type in ('external', 'both'):
+                job_vals.update({
                     'website_published': True,
-                    'no_of_recruitment': self.no_of_vacancies or 1,
                     'description': self.vacancy_description or self.job_position.description or '',
                 })
-            self.write({'website_published': True})
-            msg = _('Vacancy %s has been published successfully and posted to the website.') % self.reference
+                self.write({'website_published': True})
+                msg = _('Vacancy %s has been published successfully and posted to the website.') % self.reference
+            else:
+                job_vals.update({
+                    'website_published': False,
+                })
+                self.write({'website_published': False})
+                msg = _('Internal vacancy %s has been published for internal recruitment.') % self.reference
+            
+            self.job_position.write(job_vals)
         else:
-            self.write({'website_published': False})
-            msg = _('Internal vacancy %s has been published for internal recruitment.') % self.reference
+            if self.sourcing_type in ('external', 'both'):
+                self.write({'website_published': True})
+                msg = _('Vacancy %s has been published successfully and posted to the website.') % self.reference
+            else:
+                self.write({'website_published': False})
+                msg = _('Internal vacancy %s has been published for internal recruitment.') % self.reference
 
         return {
             'type': 'ir.actions.client',
@@ -643,12 +684,15 @@ class JobVacancy(models.Model):
         }
 
     def close_vacancy(self):
-        """: close vacancy at closing date. Also unpublishes from website."""
+        """: close vacancy at closing date. Also unpublishes from website and stops recruitment."""
         self.write({"vacancy_status": "closed"})
 
-        # Auto-unpublish from website when closing vacancies
-        if self.sourcing_type in ('external', 'both') and self.job_position:
-            self.job_position.write({'website_published': False})
+        # Auto-unpublish and stop recruitment when closing vacancies
+        if self.job_position:
+            self.job_position.write({
+                'website_published': False,
+                'state': 'open',
+            })
         self.write({'website_published': False})
 
         return {
@@ -713,15 +757,28 @@ class Job_vacancy_hiring_status(models.Model):
     _rec_name = "work_unit"
     active = fields.Boolean(default=True)
     hiring_id = fields.Many2one("job.vacancy", 'Job Vacancy Hiring Status')
-    work_unit = fields.Many2one("operating.unit", string="Work Unit")
-    responsible_employee = fields.Many2one("hr.employee", string="Responsible Officer")
+    work_unit = fields.Many2one(
+        "operating.unit", string="Work Unit",
+        compute="_compute_work_unit", store=True, readonly=True
+    )
+    responsible_employee = fields.Many2one(
+        "hr.employee", string="Responsible Officer",
+        default=lambda self: self.env.user.employee_id,readonly=True
+    )
     number_of_openings = fields.Integer(string="Number Of Openings")
     planned_positions = fields.Integer(string="Planned Openings")
     status = fields.Char(string="Status")
 
+    @api.depends('hiring_id.operating_unit_id')
+    def _compute_work_unit(self):
+        for rec in self:
+            if rec.hiring_id.operating_unit_id:
+                rec.work_unit = rec.hiring_id.operating_unit_id
+
     def _compute_display_name(self):
         for rec in self:
             rec.display_name = rec.work_unit.name or str(rec.id)
+
 
     def _check_parent_lock(self):
         for rec in self:
@@ -796,27 +853,35 @@ class VacancyDelegation(models.Model):
     def _get_employee_domain(self):
         """
         Calculates valid User IDs by filtering through the Employee model.
+        Filters by Onboarding and Recruitment Division.
         """
         current_user_id = self.env.user.id
-        operating_unit_id = 7
+        
+        # Find Onboarding and Recruitment Division dynamically by name
+        ou = self.env['operating.unit'].search([('name', 'ilike', 'Onboarding and Recruitment')], limit=1)
+        if not ou:
+            ou = self.env['operating.unit'].search([('name', 'ilike', 'Recruitment')], limit=1)
+        ou_id = ou.id if ou else 22
 
-        # 1. Find all employees meeting the Operating Unit and Grade (Fetch IDs for the specific job positions (Principal, Manager, Director))
+        # Find all active employees in this division linked to a user
         valid_employees = self.env['hr.employee'].search([
-            ('default_operating_unit_id', '=', operating_unit_id),
-            ('job_position.grade', 'in', [3]),
+            ('default_operating_unit_id', '=', ou_id),
             ('active', '=', True),
-            ('user_id', '!=', False)  # Must be linked to a user
+            ('user_id', '!=', False)
         ])
 
-        # 2. Extract the User IDs from those employees
+        # Extract the User IDs
         valid_user_ids = valid_employees.mapped('user_id').ids
 
-        # 3. Filter out the current logged-in user if they are in the list
+        # Filter out the current logged-in user if they are in the list
         if current_user_id in valid_user_ids:
-            valid_user_ids.remove(current_user_id)
+            try:
+                valid_user_ids.remove(current_user_id)
+            except ValueError:
+                pass
 
-        # 4. Return a simple ID-based domain
         return [('id', 'in', valid_user_ids)]
+
 
     operating_unit = fields.Char(string="Operating Unit",
                                  related="employee_name.employee_id.default_operating_unit_id.name")

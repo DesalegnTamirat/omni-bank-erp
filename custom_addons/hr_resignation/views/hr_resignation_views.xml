@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- LIST VIEW -->
+    <record id="hr_resignation_view_tree" model="ir.ui.view">
+        <field name="name">hr.resignation.view.tree</field>
+        <field name="model">hr.resignation</field>
+        <field name="priority" eval="8"/>
+        <field name="arch" type="xml">
+            <list string="Employee Resignation">
+                <field name="employee_id" options="{'no_open': True}" class="fw-bold"/>
+                <field name="department_id" options="{'no_open': True}" class="fw-bold"/>
+                <field name="employee_contract" class="fw-bold"/>
+                <field name="joined_date" readonly="1" class="fw-bold"/>
+                <field name="resignation_applied_date" class="fw-bold"/>
+                <field name="expected_revealing_date" class="fw-bold"/>
+                <field name="resignation_type" class="fw-bold"/>
+                <field name="notice_period" class="fw-bold"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'confirm'"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- FORM VIEW -->
+    <record id="hr_resignation_view_form" model="ir.ui.view">
+        <field name="name">hr.resignation.view.form</field>
+        <field name="model">hr.resignation</field>
+        <field name="priority" eval="8"/>
+        <field name="arch" type="xml">
+            <form string="Employee Resignation">
+
+                <header>
+                    <button string="Save" type="object" name="action_save_notify"
+                            class="btn-primary" invisible="state != 'draft'"/>
+                    <button string="Confirm" type="object" name="action_confirm_resignation"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button string="Approve" type="object" name="action_approve_resignation"
+                            groups="hr.group_hr_user" class="oe_highlight"
+                            invisible="state != 'confirm'"/>
+                    <button string="Reject" type="object" name="action_reject"
+                            groups="hr.group_hr_user" invisible="state != 'confirm'"/>
+
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,confirm,approved,rejected"/>
+                </header>
+
+                <sheet>
+
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1" class="fw-bold"/></h1>
+                    </div>
+
+                    <group>
+                        <group>
+                            <label for="initiated_by" class="fw-bold"/>
+                            <field name="initiated_by" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+                        </group>
+                        <group/>
+                    </group>
+
+                    <group>
+                        <group string="Employee Details">
+                            <label for="employee_id" class="fw-bold"/>
+                            <field name="employee_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="job_grade" class="fw-bold"/>
+                            <field name="job_grade" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+
+                            <label for="job_category" class="fw-bold"/>
+                            <field name="job_category" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+
+                            <label for="job_id" string="Job Position" class="fw-bold"/>
+                            <field name="job_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="operating_unit_id" class="fw-bold"/>
+                            <field name="operating_unit_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="department_id" class="fw-bold"/>
+                            <field name="department_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="manager_id" class="fw-bold"/>
+                            <field name="manager_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="contract_id" class="fw-bold"/>
+                            <field name="contract_id" readonly="1" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
+
+                            <label for="employee_contract" class="fw-bold"/>
+                            <field name="employee_contract" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+                        </group>
+
+                        <group string="Dates &amp; Notice Period">
+                            <label for="joined_date" class="fw-bold"/>
+                            <field name="joined_date" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+
+                            <label for="expected_revealing_date" class="fw-bold"/>
+                            <field name="expected_revealing_date"
+                                   required="1"
+                                   readonly="state != 'draft'"
+                                   nolabel="1" class="fw-bold"/>
+
+                            <label for="resignation_applied_date" class="fw-bold"/>
+                            <field name="resignation_applied_date" readonly="1" nolabel="1" class="fw-bold"/>
+
+                            <label for="notice_period" class="fw-bold"/>
+                            <field name="notice_period" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+
+                            <label for="resign_confirm_date" class="fw-bold"
+                                   invisible="not resign_confirm_date"/>
+                            <field name="resign_confirm_date" readonly="1"
+                                   invisible="not resign_confirm_date" nolabel="1" class="fw-bold"/>
+                        </group>
+                    </group>
+
+                    <group string="Resignation Details">
+                        <label for="resignation_type" class="fw-bold"/>
+                        <field name="resignation_type" groups="hr.group_hr_user"
+                               readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+
+                        <label for="reason" class="fw-bold"/>
+                        <field name="reason"
+                               required="1"
+                               readonly="state != 'draft'"
+                               nolabel="1" class="fw-bold"/>
+                    </group>
+
+                </sheet>
+
+                <chatter/>
+
+            </form>
+        </field>
+    </record>
+
+    <!-- ACTIONS -->
+    <record id="hr_resignation_action" model="ir.actions.act_window">
+        <field name="name">Employee Resignation</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', 'in', ('draft','confirm','rejected'))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new resignation request
+            </p>
+        </field>
+    </record>
+
+    <record id="hr_resignation_approved_action" model="ir.actions.act_window">
+        <field name="name">Approved Resignation</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', '=', 'approved')]</field>
+    </record>
+
+    <!-- MENUS -->
+    <menuitem id="hr_resignation_menu_root"
+              name="Resignation"
+              groups="base.group_user"
+              sequence="21"/>
+
+    <menuitem id="hr_resignation_menu_request"
+              parent="hr_resignation_menu_root"
+              name="Resignation Request"
+              action="hr_resignation_action"
+              groups="base.group_user"
+              sequence="4"/>
+
+    <menuitem id="hr_resignation_menu_approved_request"
+              parent="hr_resignation_menu_root"
+              name="Approved Resignation"
+              action="hr_resignation_approved_action"
+              groups="hr.group_hr_user"
+              sequence="5"/>
+</odoo>

@@ -60,13 +60,14 @@ function updateGateBodyClass() {
  */
 function updateSettingsTabs() {
     if (!session.is_system_admin) {
-        const tabNodes = document.querySelectorAll(
-            ".o_settings_container .settings_tab, .o_setting_container .settings_tab, .settings .tab, [data-key]"
+        const tabs = document.querySelectorAll(
+            ".o_settings_container .settings_tab, .o_setting_container .settings_tab, .settings .tab, [data-key], .o_app_setting"
         );
-        tabNodes.forEach((tab) => {
-            const key = tab.getAttribute("data-key") || tab.getAttribute("name") || "";
-            if (key && key !== "custom_hr_attendance") {
-                tab.style.display = "none";
+        tabs.forEach((tab) => {
+            const key = tab.getAttribute("data-key") || tab.getAttribute("name") || tab.getAttribute("id") || "";
+            const text = (tab.textContent || "").trim();
+            if (key === "general_settings" || text.includes("General Settings") || (key && key !== "custom_hr_attendance" && key !== "hr_attendance" && !text.includes("Attendances"))) {
+                tab.style.setProperty("display", "none", "important");
             }
         });
     }
@@ -146,8 +147,12 @@ patch(actionService, {
                             }
                         );
                     }
-                    // Prevent execution of requested action and redirect cleanly to Check In / Check Out
-                    return originalDoAction.call(this, "custom_hr_attendance.action_my_attendance", { clearBreadcrumbs: true });
+                    // Prevent execution of requested action and redirect cleanly to Check In / Check Out client action
+                    return originalDoAction.call(
+                        this,
+                        { type: "ir.actions.client", tag: "custom_hr_attendance.my_attendance_action" },
+                        { clearBreadcrumbs: true }
+                    );
                 }
             }
             return originalDoAction.apply(this, arguments);

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!-- Remove empty placeholder option from Attendance privilege -->
+    <record id="hr_attendance.res_groups_privilege_attendances" model="res.groups.privilege">
+        <field name="placeholder">False</field>
+    </record>
+
     <!-- Manual Attendance (Basic Attendance Check-In / Check-Out permission) -->
     <record id="group_hr_attendance_manual_user" model="res.groups">
         <field name="name">Manual Attendance</field>
         <field name="privilege_id" ref="hr_attendance.res_groups_privilege_attendances"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <!-- Make Manual Attendance implied by Internal User (base.group_user) so it is default for all users -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
     </record>
 
     <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances -->

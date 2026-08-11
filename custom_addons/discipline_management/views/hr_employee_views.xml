@@ -4,7 +4,7 @@
         <record id="view_employee_form_discipline_inherit" model="ir.ui.view">
             <field name="name">hr.employee.form.discipline.inherit</field>
             <field name="model">hr.employee</field>
-            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="inherit_id" ref="hr_employee_custom.view_hr_employee_master_form"/>
             <field name="arch" type="xml">
 
                 <!-- Smart Button -->
@@ -24,9 +24,9 @@
                     </div>
                 </xpath>
 
-                <!-- Disciplinary History Tab -->
-                <xpath expr="//notebook" position="inside">
-                    <page string="Disciplinary Record" groups="discipline_management.group_discipline_user">
+                <!-- Disciplinary History Tab (Positioned BEFORE More ☰ ▾ Dropdown Tab) -->
+                <xpath expr="//notebook/page[@name='more_nested_lists']" position="before">
+                    <page name="disciplinary_record" string="Disciplinary Record" groups="discipline_management.group_discipline_user">
                         <group>
                             <group string="Disciplinary Summary Status">
                                 <field name="active_disciplinary_action" readonly="1"/>

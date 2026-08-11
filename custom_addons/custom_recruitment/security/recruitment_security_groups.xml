@@ -66,19 +66,19 @@
 
         <!-- Disable base hr_recruitment groups to avoid conflicts -->
         <record id="hr_recruitment.group_hr_recruitment_interviewer" model="res.groups">
-            <!-- <field name="active" eval="False"/> -->
+<!--            <field name="active" eval="False"/>-->
         </record>
 
         <record id="hr_recruitment.group_hr_recruitment_user" model="res.groups">
-            <!-- <field name="active" eval="False"/> -->
+<!--            <field name="active" eval="False"/>-->
         </record>
 
         <record id="hr_recruitment.group_hr_recruitment_manager" model="res.groups">
-            <!-- <field name="active" eval="False"/> -->
+<!--            <field name="active" eval="False"/>-->
         </record>
 
         <record id="hr_recruitment.group_applicant_cv_display" model="res.groups">
-            <!-- <field name="active" eval="False"/> -->
+<!--            <field name="active" eval="False"/>-->
         </record>
 
     </data>

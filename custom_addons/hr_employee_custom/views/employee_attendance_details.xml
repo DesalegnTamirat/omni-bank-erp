@@ -16,7 +16,7 @@
                 <field name="checkin_date"/>
                 <field name="checkin_time"/>
                 <field name="checkout_time"/>
-                <field name="worked_hours" widget="float_time"/>
+                <field name="worked_hours"/>
                 <!-- <field name="checkout_remarks"/> -->
 
             </list>

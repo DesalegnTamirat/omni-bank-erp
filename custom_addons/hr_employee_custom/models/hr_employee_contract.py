@@ -10,6 +10,14 @@ _logger = logging.getLogger(__name__)
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
+    def _search_version_id(self, operator, value):
+        if operator in ('in', 'not in', '=', '!=', 'any', 'any!'):
+            from odoo.orm.domains import Domain
+            return Domain('current_version_id', operator, value)
+        return super()._search_version_id(operator, value)
+
+
+
 
     contract_ids = fields.One2many(
         'hr.version', 'employee_id',
@@ -165,7 +173,7 @@ class HrEmployee(models.Model):
 
             for employee in self:
                 if employee.id in calendar_updates:
-                    super(HrEmployee, employee).write(
+                    employee.with_context(skip_calendar_sync=True).write(
                         {'resource_calendar_id': calendar_updates[employee.id]}
                     )
         return res

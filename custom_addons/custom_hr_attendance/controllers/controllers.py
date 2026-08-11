@@ -8,11 +8,7 @@ from odoo.addons.hr_attendance.controllers.main import HrAttendance
 
 
 class BunnaMyAttendance(http.Controller):
-    """Backs the full-page 'Check In / Check Out' screen (menu_check_in_out).
 
-    Provides enriched real-time attendance data including weekly hours summary,
-    daily breakdown, department/job position info, and punctuality status.
-    """
 
     def _enrich_attendance_data(self, employee, data):
         if not employee or not data:
@@ -128,6 +124,7 @@ class BunnaMyAttendance(http.Controller):
         data['daily_breakdown'] = daily_breakdown
         # Send completed-today hours as float hours so JS can format them
         data['hours_today_completed'] = round(today_completed_hours, 6)
+        data['hours_today'] = round(today_completed_hours, 6)
 
         # Determine real-time check-in state directly from active open attendance record
         open_att = request.env['hr.attendance'].sudo().search([

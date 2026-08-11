@@ -1,0 +1,1 @@
+docker exec -t odoo19-db pg_dump -U <username> -d <database_name> > backup.sql

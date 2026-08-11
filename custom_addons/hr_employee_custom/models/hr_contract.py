@@ -354,13 +354,16 @@ class HrContract(models.Model):
             for rec in self.filtered(lambda c: not c.contract_date_end):
                 rec.contract_date_end = max(date.today(), rec.contract_date_start or date.today())
         calendar = vals.get('resource_calendar_id')
-        if calendar:
-            self.filtered(
+        if calendar and not self.env.context.get('skip_calendar_sync'):
+            employees = self.filtered(
                 lambda c: c.state in ('open', 'probation')
                 or (c.state == 'draft' and c.kanban_state == 'done')
-            ).mapped('employee_id').write({'resource_calendar_id': calendar})
+            ).mapped('employee_id').filtered(lambda e: e.resource_calendar_id.id != calendar)
+            if employees:
+                employees.with_context(skip_calendar_sync=True).write({'resource_calendar_id': calendar})
+
         if 'state' in vals and 'kanban_state' not in vals:
-            super(HrContract, self).write({'kanban_state': 'normal'})
+            super().write({'kanban_state': 'normal'})
         if vals.get('contract_date_end') or vals.get('contract_date_start'):
             self.sudo()._remove_work_entries()
         if vals.get('state') in ['draft', 'cancel']:

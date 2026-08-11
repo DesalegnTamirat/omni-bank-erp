@@ -1,18 +1,5 @@
-﻿# -*- coding: utf-8 -*-
-"""
-Recruitment criteria and Probation Assessment models — fully owned by custom_recruitment.
+# -*- coding: utf-8 -*-
 
-Migrated from hr_employee_custom:
-  - recruitment.competency
-  - recruitment.experience
-  - recruitment.qualification
-  - vacancy.workunit  (SQL view)
-  - emp.probation.criteria
-  - probation.assessment.form + criteria + delegation team
-
-hr_employee_custom now depends on custom_recruitment so these models are
-available when hr_employee_hrMaster.py references them.
-"""
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError
 
@@ -25,8 +12,9 @@ class EmployeeProbationCriteria(models.Model):
     _name = "emp.probation.criteria"
     _rec_name = "emp_evaluation_criteria"
 
-    emp_evaluation_criteria = fields.Char(string="Evaluation Criteria")
-    coefficient = fields.Integer(string="Coefficient")
+    emp_evaluation_criteria = fields.Char(string="Evaluation Criteria", required=True)
+    description = fields.Text(string="Guideline Question / Description")
+    coefficient = fields.Integer(string="Coefficient", default=1)
 
 
 # ── Probation Assessment Form ─────────────────────────────────────────────────

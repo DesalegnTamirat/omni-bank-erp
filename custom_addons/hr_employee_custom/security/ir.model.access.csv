@@ -7,9 +7,6 @@ access_hr_award_manager,hr.awards manager,model_hr_awards,base.group_system,1,1,
 access_hr_awards_hr_awards,hr_awards.hr_awards,model_hr_awards,hr.group_hr_user,1,0,0,0
 access_hr_awards_hr_manager,hr_awards.hr_manager,model_hr_awards,hr.group_hr_manager,1,1,1,1
 access_service_award_service_award,service_award.service_award,model_service_award,hr.group_hr_manager,1,1,1,1
-access_hr_qualification_info_employee_hr_qualification_info_employee,hr_qualification_info_employee.hr_qualification_info_employee,model_hr_qualification_info_employee,hr.group_hr_user,1,0,0,0
-access_hr_experience_info_employee_hr_experience_info_employee,hr_experience_info_employee.hr_experience_info_employee,model_hr_experience_info_employee,hr.group_hr_user,1,0,0,0
-access_hr_competencies_info_employee_hr_competencies_info_employee,hr_competencies_info_employee.hr_competencies_info_employee,model_hr_competencies_info_employee,hr.group_hr_user,1,0,0,0
 access_recruitment_qualification,access.recruitment.qualification,model_recruitment_qualification,,1,1,1,0
 access_recruitment_experience,access.recruitment.experience,model_recruitment_experience,,1,1,1,0
 access_recruitment_competency,access.recruitment.competency,model_recruitment_competency,hr.group_hr_manager,1,1,1,1
@@ -157,3 +154,13 @@ access_hr_competencies_info_job_user,hr_competencies_info_job.user,model_hr_comp
 access_hr_competencies_info_job_manager,hr_competencies_info_job.manager,model_hr_competencies_info_job,hr.group_hr_manager,1,1,1,1
 access_vacancy_workunit_user,vacancy.workunit.user,model_vacancy_workunit,hr.group_hr_user,1,1,1,1
 access_employee_category_manager,employee.category.manager,model_employee_category,hr.group_hr_manager,1,1,1,1
+access_hr_employee_document_user,hr.employee.document.user,model_hr_employee_document,hr.group_hr_user,1,1,1,0
+access_hr_employee_document_manager,hr.employee.document.manager,model_hr_employee_document,hr.group_hr_manager,1,1,1,1
+access_hr_document_type_user,hr.document.type.user,model_hr_document_type,hr.group_hr_user,1,0,0,0
+access_hr_document_type_manager,hr.document.type.manager,model_hr_document_type,hr.group_hr_manager,1,1,1,1
+access_employee_relative_user,employee.relative.user,model_employee_relative,hr.group_hr_user,1,1,1,0
+access_employee_relative_manager,employee.relative.manager,model_employee_relative,hr.group_hr_manager,1,1,1,1
+access_employee_education_user,employee.education.user,model_employee_education,hr.group_hr_user,1,1,1,0
+access_employee_education_manager,employee.education.manager,model_employee_education,hr.group_hr_manager,1,1,1,1
+access_employee_previous_occupation_user,employee.previous.occupation.user,model_employee_previous_occupation,hr.group_hr_user,1,1,1,0
+access_employee_previous_occupation_manager,employee.previous.occupation.manager,model_employee_previous_occupation,hr.group_hr_manager,1,1,1,1

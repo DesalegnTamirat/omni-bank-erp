@@ -24,7 +24,7 @@ NOTE: This is a starter / sample scaffold intended to be reviewed and
 revalidated with the functional team before being extended further.
     """,
     'category': 'Human Resources/Planning',
-    'author': 'Abeza & Desalegn',
+    'author': 'Your Company',
     'website': '',
     'license': 'LGPL-3',
     'depends': ['base', 'hr', 'mail','hr_employee_custom'],

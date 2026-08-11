@@ -47,24 +47,27 @@
                             class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_start_review" string="Start Review" type="object"
                             class="btn-primary" invisible="state != 'submitted'"
-                            groups="hr.group_hr_user"/>
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
                     <button name="action_approve" string="Approve" type="object"
                             class="btn-primary" invisible="state != 'under_review'"
-                            groups="hr.group_hr_manager"/>
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
                     <button name="action_reject" string="Reject" type="object"
                             invisible="state not in ('submitted', 'under_review')"
-                            groups="hr.group_hr_manager"/>
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
                     <button name="action_create_vacancy" string="Create Vacancy" type="object"
                             class="btn-primary"
                             invisible="state != 'approved' or vacancy_id != False"
-                            groups="hr.group_hr_user,hr.group_hr_manager"/>
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
                     <button name="action_cancel" string="Cancel" type="object"
-                            invisible="state in ('approved', 'cancelled')"/>
+                            invisible="state != 'draft'"/>
                     <button name="action_reset_draft" string="Reset to Draft" type="object"
-                            invisible="state not in ('rejected', 'cancelled')"/>
+                            invisible="state not in ('rejected', 'cancelled')"
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,submitted,under_review,approved"/>
                 </header>
+
+
 
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -118,7 +121,7 @@
                             <field name="employee_category" readonly="state != 'draft'" widget="radio"/>
                             <field name="job_level"
                                    invisible="employee_category != 'Non Managerial'"
-                                   required="employee_category == 'Non Managerial'"
+                                   required="employee_category == 'Non Managerial' and sourcing_type in ('external', 'both')"
                                    readonly="state != 'draft'"/>
                             <field name="employment_type" readonly="state != 'draft'"/>
                             <field name="required_headcount" readonly="state != 'draft'"/>
@@ -150,14 +153,17 @@
                     <notebook>
                         <page string="Job Details">
                             <group>
-                                <field name="required_qualifications"
+                                <field name="qualification_id"
                                        readonly="state != 'draft'"
-                                       placeholder="Required qualifications, certifications, experience..."/>
+                                       options="{'no_create': True, 'no_create_edit': True}"
+                                       placeholder="Select Required Educational Qualification Level..."/>
                                 <field name="job_description"
                                        readonly="state != 'draft'"
                                        placeholder="Detailed job description and responsibilities..."/>
                             </group>
                         </page>
+
+
                         <page string="Approval History" groups="hr.group_hr_user">
                             <group>
                                 <field name="submitted_on" readonly="1"/>

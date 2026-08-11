@@ -11,6 +11,7 @@ class OverTime(models.Model):
     _name = "over.time"
     _rec_name = "over_time"
     _description = "Over Time"
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     active = fields.Boolean(string="Active", default=True, index=True)
     over_time = fields.Char(
@@ -30,11 +31,56 @@ class OverTime(models.Model):
     start_time = fields.Float(string="Start Time", required=True)
     end_time = fields.Float(string="End Time", required=True)
 
+    # Synchronized Employee Hierarchy Fields
+    department_id = fields.Many2one('hr.department', string="Department", related='employee_id.department_id', store=True, readonly=True)
+    job_id = fields.Many2one('hr.job', string="Job Position", related='employee_id.job_id', store=True, readonly=True)
+    operating_unit_id = fields.Many2one('operating.unit', string="Operating Unit", related='employee_id.default_operating_unit_id', store=True, readonly=True)
+
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
         for rec in self:
             rec.write({'active': False})
         return True
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            emp = rec.employee_id
+            mgr_user = False
+            if emp:
+                if emp.parent_id and emp.parent_id.user_id:
+                    mgr_user = emp.parent_id.user_id
+                elif emp.coach_id and emp.coach_id.user_id:
+                    mgr_user = emp.coach_id.user_id
+                elif emp.attendance_manager_id:
+                    mgr_user = emp.attendance_manager_id
+
+            if mgr_user and mgr_user.partner_id:
+                from markupsafe import Markup
+                body = Markup(
+                    f"⏰ <b>New Overtime Logged</b><br/>"
+                    f"<b>Employee:</b> {emp.name}<br/>"
+                    f"<b>Date:</b> {rec.date}<br/>"
+                    f"<b>Hours:</b> {rec.over_time_hour:.1f} hrs<br/>"
+                    f"<b>Reason:</b> {rec.over_time_reason or 'N/A'}"
+                )
+                try:
+                    rec.message_post(
+                        body=body,
+                        partner_ids=[mgr_user.partner_id.id],
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment'
+                    )
+                    rec.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        user_id=mgr_user.id,
+                        summary=f"Overtime Logged for {emp.name}",
+                        note=f"Overtime logged for {rec.date} ({rec.over_time_hour:.1f} hrs). Reason: {rec.over_time_reason or ''}"
+                    )
+                except Exception as e:
+                    _logger.warning(f"Could not send notification for overtime: {e}")
+        return records
 
     over_time_hour = fields.Float(
         string="Over Time Hour",
@@ -92,14 +138,23 @@ class OverTime(models.Model):
         )
     ]
 
-    # show only team members
+    # show team members under manager hierarchy
     @api.model
     def _get_team_member_domain(self):
-        employee = self.env['hr.employee'].search(
-            [('user_id', '=', self.env.uid)],
-            limit=1
-        )
-        return [('coach_id', '=', employee.id)] if employee else []
+        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
+            return []
+        employee = self.env.user.employee_id
+        if not employee:
+            employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        if employee:
+            return ['|', '|', '|',
+                ('user_id', '=', self.env.uid),
+                ('parent_id.user_id', '=', self.env.uid),
+                ('attendance_manager_id', '=', self.env.uid),
+                ('id', 'child_of', employee.id)
+            ]
+        return [('user_id', '=', self.env.uid)]
+
 
     # Compute: over_time display name
     @api.depends('employee_id', 'date')
@@ -126,12 +181,14 @@ class OverTime(models.Model):
     def _compute_remaining_hours(self):
         for rec in self:
             rec.remaining_hours = max(0.0, rec.over_time_hour - rec.used_hours)
-    @api.depends('remaining_hours', 'over_time_hour')
+    @api.depends('remaining_hours', 'over_time_hour', 'used_hours')
     def _compute_state(self):
         for rec in self:
-            if rec.remaining_hours <= 0:
+            if not rec.over_time_hour or rec.over_time_hour <= 0:
+                rec.state = 'draft'
+            elif rec.used_hours >= rec.over_time_hour or rec.remaining_hours <= 0:
                 rec.state = 'used'
-            elif rec.remaining_hours < rec.over_time_hour:
+            elif rec.used_hours > 0:
                 rec.state = 'partially_used'
             else:
                 rec.state = 'draft'
@@ -194,3 +251,12 @@ class OverTime(models.Model):
             ], limit=1)
             if duplicate:
                 raise ValidationError("Duplicate overtime entry is not allowed.")
+
+    def write(self, vals):
+        op_fields = {'employee_id', 'date', 'start_time', 'end_time', 'over_time_reason', 'compensation_type'}
+        is_op_change = bool(op_fields.intersection(vals.keys()))
+        for rec in self:
+            if rec.used_hours > 0 or rec.state != 'draft':
+                if is_op_change:
+                    raise ValidationError("Partially used or fully consumed overtime records cannot be modified.")
+        return super().write(vals)

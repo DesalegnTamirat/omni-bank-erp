@@ -36,8 +36,7 @@
                 <field name="start_date"/>
                 <field name="end_date"/>
 
-<!--                <field name="active"  invisible="inactive == True"/>-->
-<!--                <field name="inactive"  invisible="active == True"/>-->
+
             </list>
         </field>
     </record>

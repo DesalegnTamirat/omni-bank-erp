@@ -44,6 +44,7 @@
                         <field name="notify_status" invisible="1"/>
                     </group>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

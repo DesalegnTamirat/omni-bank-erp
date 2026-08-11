@@ -24,14 +24,16 @@ class external_candidate_details(models.TransientModel):
             ))
         p_id = self.job_id.id
         # Ensure vacancy is marked as external only for external shortlist
-        self.job_id.write({
+        self.job_id.with_context(skip_lock_check=True).write({
             'sourcing_type': 'external',
             'recruitment_type': 'External',
         })
+
         # Sync recruitment records (this will remove internal records for external sourcing)
         self.job_id._sync_published_vacancy_records
         # Run the external shortlist stored procedure
-        self.env.cr.execute('SELECT external_candidates(%s)', (p_id,))
+        self.env.cr.execute('SELECT public.external_candidates(%s)', (p_id,))
+
 
 
 # ── Shortlist Wizard ──────────────────────────────────────────────────────────

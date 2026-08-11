@@ -36,11 +36,13 @@ class internal_candidate_details(models.TransientModel):
             ))
         p_id = self.job_id.id
         # Ensure vacancy is marked as both internal and external for 'both' type shortlisting
-        self.job_id.write({
+        self.job_id.with_context(skip_lock_check=True).write({
             'sourcing_type': 'both',
             'recruitment_type': 'Internal',
         })
+
         # Sync recruitment records (creates both internal and external records if missing)
         self.job_id._sync_published_vacancy_records
         # Run the internal shortlist stored procedure
-        self.env.cr.execute('SELECT internal_candidates(%s)', (p_id,))
+        self.env.cr.execute('SELECT public.internal_candidates(%s)', (p_id,))
+

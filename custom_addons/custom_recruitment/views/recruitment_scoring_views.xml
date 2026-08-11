@@ -50,7 +50,7 @@
 <!--                    This candidate was automatically selected based on ranking.-->
 <!--                    Manual changes are restricted.-->
 <!--                </div>-->
-                <field name="rank" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
+                <field name="rank" readonly="selection_status != 'pending'"/>
                 <field name="vacancy_id" readonly="selection_status != 'pending'"/>
                 <field name="candidate_name" readonly="selection_status != 'pending'"/>
                 <field name="recruitment_type" readonly="selection_status != 'pending'"/>
@@ -59,11 +59,11 @@
                 <field name="gender" readonly="selection_status != 'pending'"/>
                 <field name="active_leave_status" string="Leave Status" readonly="1"/>
                 <field name="active_disciplinary_status" string="Discipline Status" readonly="1"/>
-                <field name="pms_score" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
+                <field name="pms_score" readonly="selection_status != 'pending'"/>
 
-                <field name="written_score" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
-                <field name="interview_score" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
-                <field name="final_score" readonly="selection_status != 'pending'" groups="hr_recruitment.group_hr_recruitment_manager"/>
+                <field name="written_score" readonly="selection_status != 'pending'"/>
+                <field name="interview_score" readonly="selection_status != 'pending'"/>
+                <field name="final_score" readonly="selection_status != 'pending'"/>
                 <field name="disqualified" readonly="selection_status != 'pending'"/>
                 <field name="vacancy_no_of_vacancies" string="Vacancy Slots" readonly="selection_status != 'pending'"/>
 
@@ -124,7 +124,7 @@
 
 
                         </group>
-                        <group string="Scores" groups="hr_recruitment.group_hr_recruitment_manager">
+                        <group string="Scores">
                             <field name="pms_score" readonly="selection_status != 'pending'"
                                    invisible="recruitment_type != 'internal'"/>
                             <field name="pms_weight" readonly="selection_status != 'pending'"

@@ -91,18 +91,15 @@ class RecruitmentCandidateScore(models.Model):
     pms_score = fields.Float(
         string="PMS Score", 
         digits=(5, 2), 
-        readonly=True,
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        readonly=True
     )
     written_score = fields.Float(
         string="Written Exam Score", 
-        digits=(5, 2),
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        digits=(5, 2)
     )
     interview_score = fields.Float(
         string="Interview Score", 
-        digits=(5, 2),
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        digits=(5, 2)
     )
 
     # ── Weights (auto-defaulted from matrix, but fully user-editable) ─────
@@ -110,20 +107,17 @@ class RecruitmentCandidateScore(models.Model):
     pms_weight = fields.Float(
         string="PMS Weight (%)", 
         default=0.0, 
-        digits=(5, 2),
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        digits=(5, 2)
     )
     written_weight = fields.Float(
         string="Exam Weight (%)", 
         default=50.0, 
-        digits=(5, 2),
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        digits=(5, 2)
     )
     interview_weight = fields.Float(
         string="Interview Weight (%)", 
         default=50.0, 
-        digits=(5, 2),
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        digits=(5, 2)
     )
 
     # ── Disqualification flags ────────────────────────────────────────────
@@ -142,13 +136,11 @@ class RecruitmentCandidateScore(models.Model):
         string="Final Score", 
         digits=(5, 2), 
         compute="_compute_final_score", 
-        store=True,
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        store=True
     )
     rank = fields.Integer(
         string="Rank", 
-        default=0,
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        default=0
     )
 
     # ── Selection outcome ─────────────────────────────────────────────────
@@ -175,12 +167,10 @@ class RecruitmentCandidateScore(models.Model):
 
     # ── Penalty Deductions ───────────────────────────────────────────────
     penalty_deduction_ids = fields.One2many(
-        'recruitment.penalty.deduction', 'candidate_score_id', string="Penalty Deductions",
-        groups="hr_recruitment.group_hr_recruitment_manager"
+        'recruitment.penalty.deduction', 'candidate_score_id', string="Penalty Deductions"
     )
     penalty_deduction_amount = fields.Float(
         string="Penalty Deduction (%)", compute="_compute_penalty_deduction", store=True,
-        groups="hr_recruitment.group_hr_recruitment_manager",
         help="Deduction percentage applied for active disciplinary written warnings (3% for 1st warning, 4% for 2nd warning)."
     )
 
@@ -247,11 +237,11 @@ class RecruitmentCandidateScore(models.Model):
             # If internal candidate has active discipline warnings in discipline.case, auto-add penalty deduction if none explicitly entered
             if rec.recruitment_type == 'internal' and rec.active_disciplinary_status != 'none' and amount == 0.0:
                 if rec.active_disciplinary_status == 'first_warning':
-                    amount = 5.0
+                    amount = 3.0
                 elif rec.active_disciplinary_status == 'second_warning':
-                    amount = 10.0
+                    amount = 4.0
                 elif rec.active_disciplinary_status == 'last_written_warning':
-                    amount = 20.0
+                    amount = 0.0
             rec.penalty_deduction_amount = amount
 
 
@@ -436,6 +426,8 @@ class RecruitmentCandidateScore(models.Model):
             if rec.recruitment_type == "internal":
                 if rec.active_disciplinary_status == 'last_written_warning':
                     reasons.append(_("Active Last Written Warning / Severe Disciplinary Record (Severity Level 1/2)"))
+                elif getattr(rec.vacancy_id, 'internal_movement_type', False) == 'lateral' and rec.active_disciplinary_status != 'none':
+                    reasons.append(_("Active Disciplinary Warning blocks Transfer Eligibility (FR-REC-022.2)"))
                 raw_final_score = (
                         (rec.pms_score * rec.pms_weight / 100.0) +
                         (rec.written_score * rec.written_weight / 100.0) +

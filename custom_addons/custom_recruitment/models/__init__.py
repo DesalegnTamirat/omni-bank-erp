@@ -38,3 +38,4 @@ from . import recruitment_offer_letter
 from . import recruitment_penalty_deduction
 from . import recruitment_qualifications
 from . import transfer_assessment
+from . import hr_onboarding

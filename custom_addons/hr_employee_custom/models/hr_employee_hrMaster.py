@@ -310,7 +310,7 @@ class Hr_contact_Fields(models.Model):
     _inherit = "hr.version"
     # company_name = fields.Char(string='Company Name',required=True)
 
-    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
+    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=False)
     job_category = fields.Many2one('employee.job', 'Job Name')
     probation_period = fields.Integer(string="Probation Period (months)", help="Probation Period")
     job_description = fields.Text(string="Job Description", help="Job Description")
@@ -455,12 +455,15 @@ class qualification_multi_record_job(models.Model):
     _name = "hr_qualification_info_job"
     _description = "qualification Profile "
     _rec_name = "qualification"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
 
     # qualification = fields.Char(string="Qualification")
     qualification = fields.Many2one('recruitment.qualification', string="Recruitment Qualification")
     requirement = fields.Float(string="Requirement(CGPA)")
     response = fields.Float(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class EligibleGrades(models.Model):
@@ -519,24 +522,28 @@ class experience_multi_record_job(models.Model):
     _name = "hr_experience_info_job"
     _description = "experience Profile"
     _rec_name = "experience"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     # experience = fields.Char(string="Experience")
-    experience = fields.Many2one('recruitment.experience', string="Recruitment Experience")
+    experience = fields.Many2one('recruitment.experience', string="Experience")
     requirement = fields.Float(string="Requirement(Years)")
     response = fields.Float(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class competencies_multi_record_job(models.Model):
     _name = "hr_competencies_info_job"
     _description = "Competencies Profile"
     _rec_name = "competencies"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     # competencies = fields.Char(string="Competencies")
-    competencies = fields.Many2one('recruitment.competency', string="Recruitment Competancy")
+    competencies = fields.Many2one('recruitment.competency', string="Competency")
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class hr_department_job(models.Model):
@@ -611,7 +618,7 @@ class hr_department_job(models.Model):
 class AllTimeOff(models.Model):
     _inherit = "hr.leave"
 
-    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
+    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=False)
     job_category = fields.Many2one('employee.job', 'Job Category')
     job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
     operating_unit = fields.Many2one('operating.unit', 'Operating Unit')

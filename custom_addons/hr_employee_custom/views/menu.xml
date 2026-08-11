@@ -49,7 +49,7 @@
 
         <menuitem id="menu_recruitment_criteria_configuration"
                   name="Recruitment Criteria"
-                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  parent="hr.menu_human_resources_configuration"
                   sequence="13"/>
         <menuitem id="menu_recruitment_qualification" name="Recruitment Qualifications"
                   parent="menu_recruitment_criteria_configuration" action="recruitment_qualification_form_tree"/>
@@ -69,17 +69,18 @@
                   action="employee_supplementary_role_tree" sequence="14"/>
         <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
                   action="employee_re_instating_tree" sequence="15"/>
-        <!-- <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="employee_transfer_form_tree" sequence="16"/> -->
         <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="custom_recruitment.action_employee_transfer_request" sequence="16"/>
-                  
+                  action="employee_transfer_form_tree" sequence="16"/>
+        <menuitem id="menu_hr_award_list" name="Awards Given Details" parent="hr.menu_hr_employee_payroll"
+                  action="employee_hr_award_tree" sequence="17"/>
+        <menuitem id="menu_hr_employee_document_all" name="Documents" parent="hr.menu_hr_employee_payroll"
+                  action="action_hr_employee_document_all" sequence="18"/>
         <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
-                  action="employee_demotion_action" sequence="18"/>
+                  action="employee_demotion_action" sequence="19"/>
         <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"
-                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="19"/>
+                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="20"/>
         <menuitem id="menu_job_form_list" name="Job History" parent="hr.menu_hr_employee_payroll"
-                  action="employee_job_form_tree" sequence="20"/>
+                  action="employee_job_form_tree" sequence="21"/>
 
         <!-- ── Reporting ── -->
         <record id="action_employee_presence_reporting" model="ir.actions.act_window">
@@ -97,6 +98,14 @@
                   action="action_employee_presence_reporting" sequence="4"/>
         <menuitem id="menu_employee_category" name="Employee category" parent="hr.menu_human_resources_configuration"
                   action="employee_category" sequence="17"/>
+
+        <!-- Document Types configuration -->
+        <menuitem id="menu_hr_document_type"
+                  name="Document Types"
+                  parent="hr.menu_human_resources_configuration"
+                  action="hr_employee_custom.act_hr_document_type"
+                  sequence="18"
+                  groups="hr.group_hr_manager"/>
 
         <menuitem id="menu_hr_payroll_structure_view"
                   name="Salary Structures"

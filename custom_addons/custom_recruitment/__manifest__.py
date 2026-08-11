@@ -47,7 +47,7 @@ dependency, so they were intentionally left in place.
     """,
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Abeza & Desalegn',
+    'author': 'Bunna Bank',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -109,6 +109,7 @@ dependency, so they were intentionally left in place.
         'views/selected_internal.xml',
         'views/hr_applicant_views.xml',
         'views/employee_probation.xml',
+        'views/hr_onboarding.xml',
         'views/employee_transfer.xml',
         'views/transfer_ranking.xml',
         'views/transfer_config_settings.xml',

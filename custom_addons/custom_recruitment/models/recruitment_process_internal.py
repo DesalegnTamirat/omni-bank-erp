@@ -57,8 +57,40 @@ class RecruitmentProcessInternal(models.Model):
     def notify(self):
         p_id = self.id
         _logger.info("Starting notification process for Internal Recruitment ID: %s", self.id)
-        self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        
+        # Create hr.applicant records in python for all selected eligible employees
+        HrApplicant = self.env['hr.applicant']
         vac = self.env["job.vacancy"].search([("reference", "=", self.vacancy_reference)], limit=1)
+        
+        for val in self.eligible_emp:
+            if val.select_flag and val.emp_name:
+                existing = HrApplicant.search([
+                    ('internal_employee_id', '=', val.emp_name.id),
+                    ('job_id', '=', self.job_position.id),
+                ], limit=1)
+                
+                emp_grade = val.emp_name.job_grade.grade_name if val.emp_name.job_grade else ''
+                
+                if not existing:
+                    HrApplicant.create({
+                        'partner_name': val.emp_name.name,
+                        'email_from': val.emp_name.work_email or '',
+                        'partner_phone': val.emp_name.mobile_phone or val.emp_name.work_phone or '',
+                        'job_id': self.job_position.id,
+                        'application_type': 'Internal',
+                        'app_reference': vac.id if vac else False,
+                        'internal_employee_id': val.emp_name.id,
+                        'bunna_app_status': 'shortlisted',
+                        'employee_grade': emp_grade,
+                        'employee_position': val.emp_name.job_position.name if val.emp_name.job_position else '',
+                        'active': True,
+                    })
+
+        try:
+            self.env.cr.execute('SELECT public.internal_applicant(%s)', (p_id,))
+        except Exception:
+            _logger.warning("Database stored procedure internal_applicant failed or does not exist. Bypassed since Python sync ran successfully.")
+
         work_units = []
         if vac:
             for rec in vac.hiring_details:

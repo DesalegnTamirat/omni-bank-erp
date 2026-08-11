@@ -6,12 +6,14 @@
             <list string="Over Time" decoration-info="state == 'draft'" decoration-warning="state == 'partially_used'"
                   decoration-success="state == 'used'">
                 <field name="employee_id"/>
+                <field name="department_id" optional="show" readonly="1"/>
+                <field name="job_id" optional="hide" readonly="1"/>
                 <field name="date"/>
                 <field name="over_time_hour" widget="float_time"/>
                 <field name="used_hours" widget="float_time"/>
                 <field name="remaining_hours" widget="float_time"/>
-		<field name="compensation_type"/>
-		<field name="over_time_reason"/>
+                <field name="compensation_type"/>
+                <field name="over_time_reason"/>
                 <field name="state" widget="badge" decoration-info="state == 'draft'"
                        decoration-warning="state == 'partially_used'" decoration-success="state == 'used'"/>
             </list>
@@ -23,6 +25,7 @@
         <field name="model">over.time</field>
         <field name="arch" type="xml">
             <form string="Over Time">
+                <field name="state" invisible="1"/>
                 <header>
                     <field name="state" widget="statusbar" statusbar_visible="draft,partially_used,used"/>
                 </header>
@@ -34,25 +37,39 @@
                     </div>
                     <group>
                         <group>
-                            <field name="employee_id" options="{'no_create': True}"/>
-                            <field name="date"/>
-			    <field name="compensation_type"/>
-           	            <field name="over_time_reason"/>
+                            <field name="employee_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                            <field name="department_id" readonly="1"/>
+                            <field name="job_id" readonly="1"/>
+                            <field name="operating_unit_id" readonly="1"/>
+                            <field name="date" readonly="state != 'draft'"/>
+                            <field name="compensation_type" readonly="state != 'draft'"/>
+                            <field name="over_time_reason" readonly="state != 'draft'"/>
                         </group>
                         <group>
                             <label for="start_time" string="Time Period"/>
                             <div class="o_row">
-                                <field name="start_time" widget="float_time"/>
+                                <field name="start_time" widget="float_time" readonly="state != 'draft'"/>
                                 <span>to</span>
-                                <field name="end_time" widget="float_time"/>
+                                <field name="end_time" widget="float_time" readonly="state != 'draft'"/>
                             </div>
-                            <field name="over_time_hour" widget="float_time"/>
-                            <field name="used_hours" widget="float_time"/>
-                            <field name="remaining_hours" widget="float_time" class="oe_read_only"/>
+                            <field name="over_time_hour" widget="float_time" readonly="1"/>
+                            <field name="used_hours" widget="float_time" readonly="1"/>
+                            <field name="remaining_hours" widget="float_time" readonly="1" class="oe_read_only"/>
                         </group>
                     </group>
 
+                    <notebook>
+                        <page string="Consumption History">
+                            <field name="consumption_ids" readonly="1">
+                                <list string="Leave Requests Used for Overtime Utilization">
+                                    <field name="leave_request_id" string="Leave Request"/>
+                                    <field name="hours" string="Hours Consumed" widget="float_time"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

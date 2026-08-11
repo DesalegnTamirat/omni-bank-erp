@@ -5,7 +5,7 @@
     <div class="o_smart_attendance_wrapper p-3 p-md-5">
         <t t-if="!state.loading">
             <t t-if="state.hasEmployee">
-                <!-- TOP HEADER BAR -->
+                    <!-- TOP HEADER BAR -->
                 <div class="o_smart_header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
                     <div>
                         <h4 class="mb-1">
@@ -19,7 +19,7 @@
                             <span class="time-text me-2" t-esc="state.currentClockTime"/>
                             <span class="date-text" t-esc="state.currentClockDate"/>
                         </div>
-                        <!-- Settings Gear - Admin Only -->
+                            <!-- Settings Gear - Admin Only -->
                         <button t-if="state.isAdmin"
                                 t-on-click="toggleSettings"
                                 t-attf-class="btn o_settings_gear_btn {{ state.showSettings ? 'active' : '' }}"
@@ -29,12 +29,12 @@
                     </div>
                 </div>
 
-                <!-- MAIN DASHBOARD CONTENT -->
+                    <!-- MAIN DASHBOARD CONTENT -->
                 <div class="row g-4 mt-2">
-                    <!-- LEFT COLUMN: HERO ACTION CARD -->
+                        <!-- LEFT COLUMN: HERO ACTION CARD -->
                     <div class="col-12 col-lg-5 col-xl-4">
                         <div class="o_smart_hero_card premium-card p-4 p-xl-5 h-100">
-                            <!-- AVATAR CONTAINER -->
+                                <!-- AVATAR CONTAINER -->
                             <div class="o_smart_avatar_wrapper">
                                 <img t-if="state.employeeAvatar"
                                      t-att-src="state.employeeAvatar"
@@ -54,7 +54,7 @@
                                 <t t-esc="state.departmentName"/>
                             </div>
 
-                            <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
+                                <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
                             <div class="w-100 mt-2 mb-4">
                                 <button t-on-click="onClickToggle"
                                         t-att-disabled="state.inProgress"
@@ -67,7 +67,7 @@
                                 </button>
                             </div>
 
-                            <!-- LIVE WORKED TIMER BADGE -->
+                                <!-- LIVE WORKED TIMER BADGE -->
                             <div class="w-100 mt-auto">
                                 <t t-if="state.checkedIn">
                                     <div class="o_timer_box active-timer p-4 text-center">
@@ -75,7 +75,9 @@
                                             <i class="fa fa-circle me-1 pulse-dot"/> ACTIVE SESSION TIME
                                         </div>
                                         <div class="h2 mb-1" t-esc="state.liveWorkedTimer"/>
-                                        <div class="text-muted small mt-1" style="font-weight: 500; font-size: 0.75rem;">Current session only (starts from 0)</div>
+                                            <!-- <div class="text-muted small mt-1"
+                                            style="font-weight: 500; font-size: 0.75rem;">Current
+                                            session only (starts from 0)</div> -->
                                         <div t-if="state.checkInTimeStr" class="text-muted small mt-2" style="font-weight: 500;">
                                             Checked in at <span class="text-dark fw-bold" t-esc="state.checkInTimeStr"/>
                                             <span t-if="state.checkInStatus"
@@ -97,9 +99,9 @@
                         </div>
                     </div>
 
-                    <!-- RIGHT COLUMN: METRICS & DAILY BREAKDOWN -->
+                        <!-- RIGHT COLUMN: METRICS & DAILY BREAKDOWN -->
                     <div class="col-12 col-lg-7 col-xl-8">
-                        <!-- STAT CARDS ROW -->
+                            <!-- STAT CARDS ROW -->
                         <div class="row g-4 mb-4">
                             <div class="col-12 col-sm-6">
                                 <div class="premium-card o_stat_card h-100">
@@ -132,7 +134,7 @@
                             </div>
                         </div>
 
-                        <!-- DAILY ATTENDANCE BREAKDOWN CHART CARD -->
+                            <!-- DAILY ATTENDANCE BREAKDOWN CHART CARD -->
                         <div class="premium-card p-4 p-xl-5">
                             <div class="d-flex align-items-center justify-content-between mb-4 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.05) !important;">
                                 <h5 class="fw-bold mb-0" style="color: #0f172a; font-size: 1.15rem;">
@@ -146,13 +148,13 @@
                             <div class="o_daily_breakdown_list">
                                 <t t-foreach="state.dailyBreakdown" t-as="day" t-key="day.day_name">
                                     <div t-attf-class="o_daily_row d-flex align-items-center gap-3 {{ day.is_today ? 'is-today' : '' }}">
-                                        <!-- DAY & DATE -->
+                                            <!-- DAY & DATE -->
                                         <div style="width: 80px;">
                                             <div class="day-name" t-esc="day.day_name"/>
                                             <div class="day-date" t-esc="day.date_str"/>
                                         </div>
 
-                                        <!-- PROGRESS BAR -->
+                                            <!-- PROGRESS BAR -->
                                         <div class="flex-grow-1">
                                             <div class="progress">
                                                 <div t-attf-class="progress-bar {{ day.is_today ? 'bar-today' : (day.hours > 0 ? 'bar-past' : 'bar-empty') }}"
@@ -164,12 +166,12 @@
                                             </div>
                                         </div>
 
-                                        <!-- HOURS VALUE -->
+                                            <!-- HOURS VALUE -->
                                         <div style="width: 80px;" class="text-end hours-val">
                                             <t t-esc="day.hours_formatted"/>
                                         </div>
 
-                                        <!-- TODAY BADGE -->
+                                            <!-- TODAY BADGE -->
                                         <div style="width: 80px;" class="text-end">
                                             <span t-if="day.is_today &amp;&amp; day.checkedIn" class="onduty-badge">On Duty</span>
                                             <span t-elif="day.is_today" class="today-badge">Today</span>
@@ -195,7 +197,7 @@
                 <div class="text-muted fw-bold fs-5">Loading Dashboard...</div>
             </div>
         </t>
-        <!-- SETTINGS SLIDE-IN PANEL (Admin Only) -->
+            <!-- SETTINGS SLIDE-IN PANEL (Admin Only) -->
         <t t-if="state.showSettings and state.isAdmin">
             <div class="o_settings_overlay" t-on-click="toggleSettings"/>
             <div class="o_settings_panel premium-card">
@@ -208,7 +210,7 @@
                     </button>
                 </div>
 
-                <!-- FEATURE TOGGLES -->
+                    <!-- FEATURE TOGGLES -->
                 <div class="settings-section mb-4">
                     <div class="settings-section-title">Feature Toggles</div>
                     <div class="settings-toggle-row">
@@ -261,7 +263,7 @@
                     </div>
                 </div>
 
-                <!-- TIME PARAMETERS -->
+                    <!-- TIME PARAMETERS -->
                 <div class="settings-section mb-4">
                     <div class="settings-section-title">Shift Time Parameters</div>
                     <div class="settings-input-row">
@@ -296,7 +298,7 @@
                     </div>
                 </div>
 
-                <!-- DISCIPLINE THRESHOLDS -->
+                    <!-- DISCIPLINE THRESHOLDS -->
                 <div class="settings-section mb-4">
                     <div class="settings-section-title">Discipline Thresholds</div>
                     <div class="settings-input-row">
@@ -313,7 +315,7 @@
                     </div>
                 </div>
 
-                <!-- SAVE BUTTON -->
+                    <!-- SAVE BUTTON -->
                 <button class="btn w-100 o_settings_save_btn"
                         t-att-disabled="state.settingsSaving"
                         t-on-click="saveSettings">

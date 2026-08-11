@@ -1,0 +1,135 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             FORM VIEW — matches Image 2 layout exactly
+             Left  : Relative Type, Date of Birth, Occupation
+             Right : Name, Place of Birth, Gender
+             Below : Phone, Email, National ID
+        ============================================================ -->
+        <record id="employee_relative_form_view" model="ir.ui.view">
+            <field name="name">employee.relative.form</field>
+            <field name="model">employee.relative</field>
+            <field name="arch" type="xml">
+                <form string="Relative">
+                    <sheet>
+                        <group col="2">
+                            <!-- Left column -->
+                            <group>
+                                <field name="relative_type"  string="Relative Type"/>
+                                <field name="birthday"       string="Date of Birth"/>
+                                <field name="occupation"     string="Occupation"/>
+                                <field name="employee_id"    string="Employee"/>
+                            </group>
+                            <!-- Right column -->
+                            <group>
+                                <field name="name"           string="Name"/>
+                                <field name="place_of_birth" string="Place of Birth"/>
+                                <field name="gender"         string="Gender"/>
+                                <field name="active"         string="Active"/>
+                            </group>
+                        </group>
+
+                        <!-- Contact & Identity -->
+                        <group string="Contact &amp; Identity">
+                            <group>
+                                <field name="reletive_phone"      string="Phone"/>
+                                <field name="relative_email_id"   string="Email"/>
+                            </group>
+                            <group>
+                                <field name="relative_national_id" string="National ID"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             LIST VIEW — matches Image 1 columns exactly
+             Relative Type | Name | Date of Birth | Place of Birth |
+             Occupation | Gender
+        ============================================================ -->
+        <record id="employee_relative_list_view" model="ir.ui.view">
+            <field name="name">employee.relative.list</field>
+            <field name="model">employee.relative</field>
+            <field name="arch" type="xml">
+                <list string="Relatives">
+                    <field name="relative_type"  string="Relative Type"/>
+                    <field name="name"           string="Name"/>
+                    <field name="birthday"       string="Date of Birth"/>
+                    <field name="place_of_birth" string="Place of Birth"/>
+                    <field name="occupation"     string="Occupation"/>
+                    <field name="gender"         string="Gender"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             SEARCH VIEW — Odoo 19 compatible (no expand="0")
+        ============================================================ -->
+        <record id="employee_relative_search_view" model="ir.ui.view">
+            <field name="name">employee.relative.search</field>
+            <field name="model">employee.relative</field>
+            <field name="arch" type="xml">
+                <search string="Search Relatives">
+                    <field name="name"          string="Name"/>
+                    <field name="employee_id"   string="Employee"/>
+                    <field name="relative_type" string="Relative Type"/>
+                    <separator/>
+                    <filter name="group_employee"
+                            string="Employee"
+                            context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_relative_type"
+                            string="Relative Type"
+                            context="{'group_by': 'relative_type'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             WINDOW ACTION — smart button (filtered to active employee)
+        ============================================================ -->
+        <record id="act_hr_employee_2_relatives" model="ir.actions.act_window">
+            <field name="name">Relatives</field>
+            <field name="res_model">employee.relative</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id', '=', active_id)]</field>
+            <field name="context">{
+                'search_default_employee_id': active_id,
+                'default_employee_id': active_id
+            }</field>
+        </record>
+
+        <!-- ============================================================
+             INJECT SMART BUTTON — placed AFTER the Documents button
+             so order is: In Contract Since | Documents | Relatives | …
+        ============================================================ -->
+        <record id="hr_employee_relative_smart_button" model="ir.ui.view">
+            <field name="name">hr.employee.relative.smart.button</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_employee_custom.hr_employee_document_smart_button"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='%(hr_employee_custom.act_hr_employee_2_documents)d']"
+                       position="after">
+                    <field name="relative_count" invisible="1"/>
+                    <button name="%(hr_employee_custom.act_hr_employee_2_relatives)d"
+                            class="oe_stat_button"
+                            icon="fa-users"
+                            type="action"
+                            context="{'search_default_employee_id': id,
+                                      'default_employee_id': id}">
+                        <div class="o_stat_info">
+                            <span class="o_stat_value">
+                                <field name="relative_count"/>
+                            </span>
+                            <span class="o_stat_text">Relatives</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

@@ -77,6 +77,17 @@
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
         <field name="priority">500</field>
         <field name="arch" type="xml">
+            <!-- Hide standard Odoo overtime fields in tree view -->
+            <xpath expr="//field[@name='overtime_hours']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='validated_overtime_hours']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='overtime_status']" position="attributes">
+                <attribute name="column_invisible">1</attribute>
+            </xpath>
+
             <!-- Insert Check-in Status, Late Time Hour, Acknowledged Late, Over Time Hour right after Check In -->
             <xpath expr="//field[@name='check_in']" position="after">
                 <field name="check_in_status" string="Check-in Status" readonly="1"/>

@@ -43,6 +43,7 @@
         # Security
         'security/hr_attendance_security.xml',
         'security/ir.model.access.csv',
+        'security/hr_attendance_record_rules.xml',
 
         # Views
         'views/attendance_preapproval_views.xml',

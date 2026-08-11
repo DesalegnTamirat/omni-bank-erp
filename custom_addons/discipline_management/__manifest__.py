@@ -28,6 +28,7 @@ Key Features:
         'base',
         'hr',
         'hr_attendance',
+        'hr_employee_custom',
         'mail',
     ],
     'data': [

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <!-- *****************************new external recruitmnt selected candidates form(it is one of notebook) -->
-	<record id="action_external_recruitment_selected_candidats" model="ir.actions.act_window">
+    <!-- Action for External Recruitment Selected Candidates -->
+    <record id="action_external_recruitment_selected_candidats" model="ir.actions.act_window">
         <field name="name">External Recruitment Selected Candidates</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">external.recruitment.selected.candidates</field>
@@ -9,7 +9,7 @@
         <field name="context">{}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create!!</p>
+            <p class="o_view_nocontent_smiling_face">Create External Selected Candidate Record!</p>
         </field>
     </record>
 
@@ -17,22 +17,21 @@
         <field name="name">external.recruitment.selected.candidates.tree</field>
         <field name="model">external.recruitment.selected.candidates</field>
         <field name="arch" type="xml">
-            <list string="External Recruitment Selected Candidates" editable="bottom">
-				                    <field name="applicant_name"/>
-                                    <field name="select_flag"/>
-									<field name="applicant_email"/>
-									<field name="preferred_location"/>
-                                    <field name="written_exam_score"/>
-                                    <field name="interview_score"/>
-                                    <field name="weighted_score"/>
-                                    <field name="selection_type"/>
-                                    
-                                    <field name="remarks"/>
+            <list string="External Recruitment Selected Candidates" editable="bottom" delete="0">
+                <field name="applicant_name"/>
+                <field name="select_flag"/>
+                <field name="applicant_email"/>
+                <field name="preferred_location"/>
+                <field name="written_exam_score"/>
+                <field name="interview_score"/>
+                <field name="weighted_score"/>
+                <field name="selection_type"/>
+                <field name="remarks"/>
             </list>
         </field>
     </record>
-<!-- ************************************************************************************************************************ -->
 
+    <!-- Action for External Recruitment Process Selected -->
     <record id="action_external_recruitment_selected" model="ir.actions.act_window">
         <field name="name">External Recruitment Process Selected</field>
         <field name="type">ir.actions.act_window</field>
@@ -41,7 +40,7 @@
         <field name="context">{}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create!!</p>
+            <p class="o_view_nocontent_smiling_face">Create External Recruitment Selection Process!</p>
         </field>
     </record>
 
@@ -49,8 +48,8 @@
         <field name="name">external.recruitment.selected.tree</field>
         <field name="model">external.recruitment.selected</field>
         <field name="arch" type="xml">
-            <list string="External Recruitment Selected Candidates">
-				<field name="vacancy_reference"/>
+            <list string="External Recruitment Selected Candidates" delete="0">
+                <field name="vacancy_reference"/>
                 <field name="job_position"/>
                 <field name="vacancy_announced_on"/>
                 <field name="no_of_vacancies"/>
@@ -62,86 +61,82 @@
         <field name="name">external.recruitment.selected.form</field>
         <field name="model">external.recruitment.selected</field>
         <field name="arch" type="xml">
-            <form string="External Recruitment Selected candidates">
+            <form string="External Recruitment Selected Candidates" delete="0">
                 <header>
-                    <field name="state" widget="statusbar"/>
-					<button name="notify_approver" invisible="state in 'evaluate'" string="Notify Approver" type="object" class="oe_highlight"/>
-                    <button name="evaluate" invisible="state in 'notify_approver'" string="Approve Selection" type="object" class="oe_highlight"/>
-                    <button name="notify_approver" invisible="state in ('notify_approver', 'evaluate')" string="Notify Approver" type="object" class="oe_highlight"/>
-                    <button name="evaluate" invisible="state in 'evaluate'" string="Evaluate" type="object" class="oe_highlight"/>
-                    <button name="notify_written_exam" string="Notify Written Exam" type="object" class="oe_highlight"/>
-                    <button name="fetch_exam_score" string="Fetch Exam Score" type="object" class="oe_highlight"/>
-                    <button name="notify_interview_panel" string="Notify Interview Panel" type="object" class="oe_highlight"/>
-                    <button name="notify_interview" string="Notify Interview" type="object" class="oe_highlight"/>
-                    <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="oe_highlight"/>
-                    <button name="compute_weighted_score" string="Compute Score" type="object" class="oe_highlight"/>
-                    <button name="notify_selection" string="Notify Selection" type="object" class="oe_highlight"/>
+                    <button name="notify_approver" invisible="state in ('notify_approver', 'evaluate', 'approved')" string="Notify Approver" type="object" class="btn-primary"/>
+                    <button name="evaluate" invisible="state in ('evaluate', 'approved')" string="Approve Selection" type="object" class="btn-primary"/>
+                    <button name="notify_written_exam" invisible="exam_scheduled == 'Yes'" string="Notify Written Exam" type="object" class="btn-secondary"/>
+                    <button name="fetch_exam_score" invisible="exam_scores_fetched == True or exam_scheduled != 'Yes'" string="Fetch Exam Score" type="object" class="btn-secondary"/>
+                    <button name="notify_interview_panel" invisible="panel_notified == True" string="Notify Interview Panel" type="object" class="btn-secondary"/>
+                    <button name="notify_interview" invisible="interview_scheduled == 'Yes'" string="Notify Interview" type="object" class="btn-secondary"/>
+                    <button name="fetch_interview_score" invisible="interview_scores_fetched == True or interview_scheduled != 'Yes'" string="Fetch Interview Score" type="object" class="btn-secondary"/>
+                    <button name="compute_weighted_score" invisible="scores_computed == True" string="Compute Score" type="object" class="btn-secondary"/>
+                    <button name="notify_selection" invisible="selection_notified == True" string="Notify Selection" type="object" class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="notify_approver,evaluate,approved"/>
                 </header>
                 <sheet>
+                    <div class="oe_title">
+                        <label for="vacancy_reference" string="Vacancy Reference"/>
+                        <h1>
+                            <field name="vacancy_reference" placeholder="e.g. BB/EXT/26-27/00001"/>
+                        </h1>
+                    </div>
                     <group>
-                        <group>
-                            <field name="vacancy_reference"/>
-							<!-- <field name="vacancy_announced_on"/> -->
-							<!-- <field name="no_of_vacancies"/> -->
+                        <group string="Vacancy &amp; Requisition Info">
                             <field name="recruitment_reference"/>
+                            <field name="job_position"/>
+                        </group>
+                        <group string="Exam &amp; Interview Schedules">
                             <field name="written_exam_date"/>
                             <field name="exam_location"/>
                             <field name="exam_scheduled"/>
-							<!-- <field name="state"/> -->
-                        </group>
-                        <group>
-                            <field name="job_position"/>
-							<!-- <field name="job_location"/> -->
                             <field name="interview_date" widget="datetime"/>
-                             <field name="interview_location"/>
+                            <field name="interview_location"/>
                             <field name="interview_scheduled"/>
                         </group>
                     </group>
+
+                    <!-- Consolidated Single Notebook Container -->
                     <notebook>
                         <page string="Eligible Applicants">
                             <field name="ext_rec_sel">
-                                <list string="Eligible Applicants" editable="bottom">
-                                    <field name="applicant_name"/>
-                                    <field name="select_flag"/>
-									<field name="applicant_email"/>
-									<field name="preferred_location"/>
-                                    <field name="written_exam_score"/>
-                                    <field name="interview_score"/>
-                                    <field name="weighted_score"/>
-                                    <field name="selection_type"/>
-                                    
+                                <list string="Eligible Applicants" editable="bottom" delete="0">
+                                    <field name="applicant_name" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="select_flag" readonly="parent.scores_computed == True"/>
+                                    <field name="applicant_email"/>
+                                    <field name="preferred_location"/>
+                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="weighted_score" readonly="1"/>
+                                    <field name="selection_type" readonly="parent.scores_computed == True"/>
                                     <field name="remarks"/>
                                 </list>
                             </field>
                         </page>
                         <page string="Panel Members">
                             <field name="ext_rec_panel">
-                                <list string="Panel Members" editable="bottom">
+                                <list string="Panel Members" editable="bottom" delete="0">
                                     <field name="emp_name"/>
-<!--                                    <field name="emp_position"/>-->
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
                                 </list>
                             </field>
                         </page>
-                    </notebook>
-                    <notebook>
-                        <page string="Approval Members">
+                        <page string="Approval Committee Members">
                             <field name="recr_exter_selected_team_id">
-                                <list string="Approval Members" editable="bottom">
-                                        <field name="role" width="20%"/>
-                                        <field name="employee_name" width="20%"/>
-                                        <field name="operating_unit" width="20%"/>
-                                        <field name="status" width="20%"/>
-                                        <field name="alternate_committee_member" width="20%"/>
-                                        <field name="alter_operating_unit" width="20%"/>
-                                        <field name="approve" width="20%"/>
+                                <list string="Approval Members" editable="bottom" delete="0">
+                                    <field name="role" width="20%"/>
+                                    <field name="employee_name" width="20%"/>
+                                    <field name="operating_unit" width="20%"/>
+                                    <field name="status" width="20%"/>
+                                    <field name="alternate_committee_member" width="20%"/>
+                                    <field name="alter_operating_unit" width="20%"/>
+                                    <field name="approve" width="20%"/>
                                 </list>
                             </field>
                         </page>
                     </notebook>
                 </sheet>
-
             </form>
         </field>
     </record>

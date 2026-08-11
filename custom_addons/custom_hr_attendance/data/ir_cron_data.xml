@@ -2,29 +2,28 @@
 <odoo>
     <data noupdate="1">
         <!--
-            Force Checkout Cron: runs every 4 hours off-peak.
-            Single-pass indexed SQL UPDATE; safe to run frequently because
-            it only touches open records (check_out IS NULL) older than the threshold.
+            Shift-Aware Auto Checkout Cron: runs daily at 23:15 (Addis Ababa time / 20:15 UTC).
+            Executes the native PostgreSQL stored function auto_checkout_all_employees()
+            on the dedicated DB server with 0ms network latency.
         -->
         <record id="ir_cron_automatic_force_checkout" model="ir.cron">
-            <field name="name">Attendance: Off-Peak Automatic Force Checkout</field>
+            <field name="name">Attendance: Daily Shift-Aware Auto Checkout (23:15)</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_automatic_force_checkout()</field>
-            <field name="interval_number">4</field>
-            <field name="interval_type">hours</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall">2024-01-01 20:15:00</field>
             <field name="active" eval="True"/>
         </record>
 
         <!--
-            Absence Detection Cron: scheduled at 09:30 AM daily.
-            Now also creates payroll payload and signals discipline module.
-            Runs strictly AFTER the 08:00–08:15 peak check-in window closes to
-            prevent any cron table-scan from contending with live check-in traffic.
-            nextcall is set to 09:30 as the first execution anchor.
+            Absence Detection Cron: scheduled at 09:30 AM (Addis Ababa time / 06:30 UTC) daily.
+            Executes the native PostgreSQL stored function detect_daily_employee_absences()
+            on the dedicated DB server to create payroll payload deductions.
         -->
         <record id="ir_cron_automatic_absence_detection" model="ir.cron">
-            <field name="name">Attendance: Daily Automatic Absence Detection</field>
+            <field name="name">Attendance: Daily Morning Absence Detection (09:30 AM)</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_automatic_absence_detection()</field>
@@ -35,33 +34,42 @@
         </record>
 
         <!--
-            Job Abandonment Cron.
-            Detects employees absent for 3+ consecutive working days with no approved leave.
-            Runs daily at 03:00 AM server time (off-peak, well before business hours).
-            Creates a discipline case automatically when triggered.
+            Job Abandonment Cron: scheduled at 03:00 AM (Addis Ababa time / 00:00 UTC) daily off-peak.
+            Executes the native PostgreSQL stored function detect_job_abandonment_cases()
+            to flag employees absent 3+ consecutive days and create discipline cases.
         -->
         <record id="ir_cron_job_abandonment_detection" model="ir.cron">
-            <field name="name">Attendance: Daily Job Abandonment Detection</field>
+            <field name="name">Attendance: Daily Job Abandonment Detection (03:00 AM)</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_job_abandonment_detection()</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
-            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=3, minute=0, second=0)"/>
+            <field name="nextcall">2024-01-01 00:00:00</field>
             <field name="active" eval="True"/>
         </record>
+
         <!--
-            FR-Missing Check-In / Check-Out Notification Cron.
-            Runs every 30 minutes during business hours to notify employees of missing check-in/out.
+            FR-Missing Check-In / Check-Out Notification Cron: scheduled at 17:30 PM (Addis Ababa time / 14:30 UTC) daily.
+            Runs at shift end to notify employees of missing check-in/out without impacting peak hours.
         -->
         <record id="ir_cron_notify_missing_attendance" model="ir.cron">
-            <field name="name">Attendance: Missing Check-In / Check-Out Notification (FR-)</field>
+            <field name="name">Attendance: End-of-Day Missing Attendance Reminders (17:30 PM)</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_notify_missing_attendance()</field>
-            <field name="interval_number">30</field>
-            <field name="interval_type">minutes</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall">2024-01-01 14:30:00</field>
             <field name="active" eval="True"/>
+        </record>
+
+        <!-- Deactivate redundant standard Odoo core crons -->
+        <record id="hr_attendance.hr_attendance_check_out_cron" model="ir.cron">
+            <field name="active" eval="False"/>
+        </record>
+        <record id="hr_attendance.hr_attendance_absence_cron" model="ir.cron">
+            <field name="active" eval="False"/>
         </record>
     </data>
 </odoo>
