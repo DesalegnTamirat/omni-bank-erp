@@ -25,7 +25,7 @@
 
     'author': 'Desalegn & Abeza',
     'website': 'https://bunnabanksc.com/',
-    'license': 'LGPL-3',
+    'license': '',
 
     'category': 'Human Resources',
     'version': '19.0.3.0.0',
@@ -43,6 +43,7 @@
         # Security
         'security/hr_attendance_security.xml',
         'security/ir.model.access.csv',
+        'security/hr_attendance_record_rules.xml',
 
         # Views
         'views/attendance_preapproval_views.xml',

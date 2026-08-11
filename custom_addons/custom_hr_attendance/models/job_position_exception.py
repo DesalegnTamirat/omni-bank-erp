@@ -27,6 +27,8 @@ class JobPositionException(models.Model):
         store=True,
         readonly=True
     )
+    department_id = fields.Many2one('hr.department', string="Department", related='employee_id.department_id', store=True, readonly=True)
+    operating_unit_id = fields.Many2one('operating.unit', string="Operating Unit", related='employee_id.default_operating_unit_id', store=True, readonly=True)
     shift_id = fields.Many2one(
         'job.shift',
         string="Schedule Name",
@@ -49,6 +51,29 @@ class JobPositionException(models.Model):
             rec.write({'active': False})
         return True
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            emp_user = rec.employee_id.user_id
+            if emp_user and emp_user.partner_id:
+                from markupsafe import Markup
+                body = Markup(
+                    f"📅 <b>Job Shift Exception Assigned</b><br/>"
+                    f"You have been assigned to shift schedule <b>{rec.shift_id.name}</b> ({rec.time_range or ''})."
+                )
+                try:
+                    rec.message_post(
+                        body=body,
+                        partner_ids=[emp_user.partner_id.id],
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment'
+                    )
+                except Exception as e:
+                    pass
+                rec.write({'notify_status': 'notified'})
+        return records
+
     @api.depends('employee_id', 'shift_id', 'job_position')
     def _compute_job_position_exception_name(self):
         for rec in self:
@@ -56,10 +81,20 @@ class JobPositionException(models.Model):
 
     @api.model
     def _get_team_member_domain(self):
-        current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
+            return []
+        current_employee = self.env.user.employee_id
+        if not current_employee:
+            current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
         if current_employee:
-            return [('coach_id', '=', current_employee.id)]
-        return []
+            return ['|', '|', '|',
+                ('user_id', '=', self.env.uid),
+                ('parent_id.user_id', '=', self.env.uid),
+                ('attendance_manager_id', '=', self.env.uid),
+                ('id', 'child_of', current_employee.id)
+            ]
+        return [('user_id', '=', self.env.uid)]
+
 
     @api.depends('employee_id')
     def _compute_job_position(self):

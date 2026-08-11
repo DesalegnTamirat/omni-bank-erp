@@ -23,9 +23,27 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
         required=True,
         default=fields.Date.context_today,
     )
+    @api.model
+    def _get_subordinate_domain(self):
+        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
+            return [('active', '=', True)]
+        user = self.env.user
+        manager_employee = user.employee_id
+        if manager_employee:
+            return [
+                ('active', '=', True),
+                '|', '|', '|',
+                ('user_id', '=', user.id),
+                ('parent_id.user_id', '=', user.id),
+                ('attendance_manager_id', '=', user.id),
+                ('id', 'child_of', manager_employee.id)
+            ]
+        return [('user_id', '=', user.id), ('active', '=', True)]
+
     employee_ids = fields.Many2many(
         'hr.employee',
         string='Employees',
+        domain=lambda self: self._get_subordinate_domain(),
         help="Leave empty to include all employees under your management.",
     )
     include_all = fields.Boolean(
@@ -43,22 +61,9 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
     def _get_subordinate_employee_ids(self):
         """
         Collect all employee IDs under this manager.
-        Falls back to all active employees if the manager has no subordinates configured.
         """
-        user = self.env.user
-        manager_employee = user.employee_id
-
-        if manager_employee:
-            # Use Odoo's built-in subordinate traversal (includes indirect reports)
-            subordinates = self.env['hr.employee'].search([
-                ('parent_id', 'child_of', manager_employee.id),
-                ('active', '=', True),
-            ])
-            if subordinates:
-                return subordinates.ids
-
-        # Fallback: all active employees (for top-level managers / HR)
-        return self.env['hr.employee'].search([('active', '=', True)]).ids
+        domain = self._get_subordinate_domain()
+        return self.env['hr.employee'].search(domain).ids
 
     def action_generate_report(self):
         """

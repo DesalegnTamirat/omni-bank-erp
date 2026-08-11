@@ -105,7 +105,7 @@ class OverTimeLeaveManager(models.Model):
     def reject(self):
         for rec in self:
             if rec.leave_reason == 'over_time':
-                # Simply deleting these records triggers the 'over.time'
+                # Simply deleting these records triggers the 'over.time' 
                 # recompute, restoring 'remaining_hours' automatically.
                 consumptions = self.env['over.time.consumption'].search([
                     ('leave_request_id', '=', rec.id)

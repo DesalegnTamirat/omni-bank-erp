@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- Tree View -->
+    <!--    Tree View-->
     <record id="view_job_position_exception_tree" model="ir.ui.view">
         <field name="name">job.position.exception.report.tree</field>
         <field name="model">job.position.exception.report</field>
@@ -21,7 +21,7 @@
         </field>
     </record>
 
-    <!-- Search View -->
+    <!--Search View-->
     <record id="view_job_position_exception_search" model="ir.ui.view">
         <field name="name">job.position.exception.report.search</field>
         <field name="model">job.position.exception.report</field>
@@ -54,7 +54,7 @@
         </field>
     </record>
 
-    <!-- Action -->
+    <!--Action-->
     <record id="action_job_position_exception_report" model="ir.actions.act_window">
         <field name="name">Job Position Exceptions</field>
         <field name="res_model">job.position.exception.report</field>

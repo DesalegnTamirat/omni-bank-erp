@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- List View -->
+    <!--  List View -->
     <record id="view_acknowledged_attendance_report_tree" model="ir.ui.view">
         <field name="name">acknowledged.attendance.report.tree</field>
         <field name="model">acknowledged.attendance.report</field>

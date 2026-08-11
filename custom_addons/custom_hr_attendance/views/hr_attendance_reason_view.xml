@@ -14,7 +14,7 @@
                             name="show_on_attendance_screen"
                             invisible="not action_type"
                         />
-<!-- <field name="company_id" groups="base.group_multi_company" /> -->
+<!--                        <field name="company_id" groups="base.group_multi_company" />-->
                     </group>
                 </sheet>
             </form>
@@ -25,12 +25,12 @@
         <field name="model">hr.attendance.reason</field>
         <field name="arch" type="xml">
             <list>
-<!-- <field name="sequence" widget="handle" /> -->
+<!--                <field name="sequence" widget="handle" />-->
                 <field name="name" />
                 <field name="code" />
                 <field name="action_type" />
                 <field name="show_on_attendance_screen" />
-<!-- <field name="company_id" groups="base.group_multi_company" /> -->
+<!--                <field name="company_id" groups="base.group_multi_company" />-->
             </list>
         </field>
     </record>

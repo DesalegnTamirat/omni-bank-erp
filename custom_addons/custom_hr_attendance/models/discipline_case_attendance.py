@@ -111,7 +111,7 @@ class HrAttendanceViolationProcessor(models.Model):
 
         notif_log = self.env['hr.attendance.notification.log']
 
-        # LATE CHECK-IN COUNTER
+        # --- LATE CHECK-IN COUNTER ---
         if self.check_in_status == 'Late':
             lateness_threshold = int(params.get_param(
                 'hr_attendance.lateness_violation_threshold', 3
@@ -122,7 +122,7 @@ class HrAttendanceViolationProcessor(models.Model):
                 employee.name, new_count, lateness_threshold
             )
 
-            # Notify Supervisor on late check-in violation
+            # otify Supervisor on late check-in violation
             if employee.parent_id and employee.parent_id.user_id:
                 if notif_log.log_and_check(employee.id, 'violation_supervisor'):
                     self.env['mail.activity'].sudo().create({
@@ -140,7 +140,7 @@ class HrAttendanceViolationProcessor(models.Model):
                     employee.id, 'lateness', self.id
                 )
 
-                # HR Escalation on threshold breach
+                #  Escalation on threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):
                     # Target configured HR user or fallback to managers
                     escalation_user_id = params.get_param('hr_attendance.escalation_hr_user_id')
@@ -155,7 +155,7 @@ class HrAttendanceViolationProcessor(models.Model):
                             'activity_type_id': self.env.ref('mail.mail_activity_data_warning', raise_if_not_found=False) or self.env.ref('mail.mail_activity_data_todo').id,
                         })
 
-        # FORCE CHECKOUT COUNTER
+        # --- FORCE CHECKOUT COUNTER ---
         if self.is_force_checkout:
             force_checkout_threshold = int(params.get_param(
                 'hr_attendance.force_checkout_violation_threshold', 2

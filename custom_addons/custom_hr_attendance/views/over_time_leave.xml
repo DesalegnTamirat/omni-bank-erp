@@ -5,7 +5,7 @@
         <field name="inherit_id" ref="cortex_hr_addons.leave_request_form"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='accrued']" position="after">
-		    <field name="over_time" readonly="1"  invisible="leave_reason != 'over_time'"/>
+		    <field name="over_time" readonly="1"  invisible="leave_reason != 'over_time'" widget="float_time"/>
             </xpath>
 
         </field>
