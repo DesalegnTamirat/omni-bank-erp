@@ -4,6 +4,7 @@ from . import hr_attendance
 from . import attendance_preapproval
 from . import job_shift
 from . import job_position_exception
+from . import job_position_weekly_roster
 from . import location_based_exception
 from . import hr_attendance_reason
 from . import over_time

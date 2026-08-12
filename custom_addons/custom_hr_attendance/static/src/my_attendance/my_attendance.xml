@@ -56,71 +56,102 @@
 
                                 <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
                             <div class="w-100 d-flex justify-content-center mt-2 mb-4">
-                                <button t-on-click="onClickToggle"
-                                        t-att-disabled="state.inProgress"
-                                        t-attf-class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 {{ state.checkedIn ? 'o_btn_checked_in' : 'o_btn_checked_out' }}">
-                                    <i t-attf-class="fa {{ state.checkedIn ? 'fa-sign-out' : 'fa-sign-in' }} fa-lg"/>
-                                    <span>
-                                        <t t-if="state.checkedIn">CHECK OUT</t>
-                                        <t t-else="">CHECK IN</t>
-                                    </span>
-                                </button>
+                                <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_day_off &amp;&amp; !state.checkedIn">
+                                    <button disabled="disabled"
+                                            class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
+                                            style="background: #f1f5f9 !important; color: #64748b !important; border: 1px solid #cbd5e1 !important; cursor: not-allowed;"
+                                            title="Today is your scheduled Day Off. Check-in is disabled.">
+                                        <i class="fa fa-coffee fa-lg text-secondary"/>
+                                        <span>SCHEDULED DAY OFF</span>
+                                    </button>
+                                </t>
+                                <t t-else="">
+                                    <button t-on-click="onClickToggle"
+                                            t-att-disabled="state.inProgress"
+                                            t-attf-class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 {{ state.checkedIn ? 'o_btn_checked_in' : 'o_btn_checked_out' }}">
+                                        <i t-attf-class="fa {{ state.checkedIn ? 'fa-sign-out' : 'fa-sign-in' }} fa-lg"/>
+                                        <span>
+                                            <t t-if="state.checkedIn">CHECK OUT</t>
+                                            <t t-else="">CHECK IN</t>
+                                        </span>
+                                    </button>
+                                </t>
                             </div>
 
                                 <!-- ASSIGNED WORK SHIFT HEADER CARD -->
                             <div t-if="state.shiftInfo" class="premium-card o_shift_info_card w-100 p-3 p-md-4 mb-4">
-                                <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.06) !important;">
+                                <t t-if="state.shiftInfo.is_day_off">
                                     <div class="d-flex align-items-center gap-3">
-                                        <div class="o_shift_icon_box d-flex align-items-center justify-content-center">
-                                            <i class="fa fa-calendar-o fa-lg text-primary"/>
+                                        <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #ecfdf5; color: #047857; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
+                                            <i class="fa fa-coffee fa-lg"/>
                                         </div>
                                         <div>
                                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                                 <h5 class="fw-bold mb-0 text-dark" t-esc="state.shiftInfo.name"/>
-                                                <span t-if="state.shiftInfo.is_custom_exception" class="badge rounded-pill px-2.5 py-1 small" style="background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; font-weight: 600;">
-                                                    <i class="fa fa-star me-1"/> Active Exception
-                                                </span>
-                                                <span t-else="" class="badge rounded-pill px-2.5 py-1 small" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 600;">
-                                                    <i class="fa fa-globe me-1"/> Default Global Shift
+                                                <span class="badge rounded-pill px-2.5 py-1 small" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-weight: 600;">
+                                                    🌴 Scheduled Rest Day
                                                 </span>
                                             </div>
                                             <div class="text-muted small mt-1" style="font-weight: 500;">
-                                                Schedule Window: <span class="fw-semibold text-dark" t-esc="state.shiftInfo.time_range"/>
+                                                No mandatory work shift scheduled for today (<t t-esc="state.shiftInfo.source_label"/>)
                                             </div>
                                         </div>
                                     </div>
-                                    <div t-if="state.shiftInfo.is_night_shift" class="badge bg-dark text-warning px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1">
-                                        <i class="fa fa-moon-o"/> Night Shift
+                                </t>
+                                <t t-else="">
+                                    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3 pb-3 border-bottom" style="border-color: rgba(0,0,0,0.06) !important;">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="o_shift_icon_box d-flex align-items-center justify-content-center">
+                                                <i class="fa fa-calendar-o fa-lg text-primary"/>
+                                            </div>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <h5 class="fw-bold mb-0 text-dark" t-esc="state.shiftInfo.name"/>
+                                                    <span t-if="state.shiftInfo.is_custom_exception" class="badge rounded-pill px-2.5 py-1 small" style="background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; font-weight: 600;">
+                                                        <i class="fa fa-star me-1"/> Active Exception
+                                                    </span>
+                                                    <span t-else="" class="badge rounded-pill px-2.5 py-1 small" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 600;">
+                                                        <i class="fa fa-globe me-1"/> Default Global Shift
+                                                    </span>
+                                                </div>
+                                                <div class="text-muted small mt-1" style="font-weight: 500;">
+                                                    Schedule Window: <span class="fw-semibold text-dark" t-esc="state.shiftInfo.time_range"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div t-if="state.shiftInfo.is_night_shift" class="badge bg-dark text-warning px-3 py-2 rounded-pill d-inline-flex align-items-center gap-1">
+                                            <i class="fa fa-moon-o"/> Night Shift
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- SHIFT TIMINGS & LUNCH BREAK PILLS -->
-                                <div class="row g-3 mt-2">
-                                    <div class="col-12 col-sm-4">
-                                        <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                            <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
-                                                <i class="fa fa-sign-in text-success me-1"/> Shift Start
+                                    <!-- SHIFT TIMINGS & LUNCH BREAK PILLS -->
+                                    <div class="row g-3 mt-2">
+                                        <div class="col-12 col-sm-4">
+                                            <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                                <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
+                                                    <i class="fa fa-sign-in text-success me-1"/> Shift Start
+                                                </div>
+                                                <div class="fw-bold text-dark" style="font-size: 1.1rem;" t-esc="state.shiftInfo.start_time_str"/>
                                             </div>
-                                            <div class="fw-bold text-dark" style="font-size: 1.1rem;" t-esc="state.shiftInfo.start_time_str"/>
+                                        </div>
+                                        <div class="col-12 col-sm-4">
+                                            <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                                <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
+                                                    <i class="fa fa-sign-out text-danger me-1"/> Shift End
+                                                </div>
+                                                <div class="fw-bold text-dark" style="font-size: 1.1rem;" t-esc="state.shiftInfo.end_time_str"/>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-sm-4">
+                                            <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                                <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
+                                                    <i class="fa fa-cutlery text-warning me-1"/> Lunch Break
+                                                </div>
+                                                <div class="fw-bold text-dark text-truncate" style="font-size: 0.95rem;" t-esc="state.shiftInfo.lunch_time_str" t-att-title="state.shiftInfo.lunch_time_str"/>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-12 col-sm-4">
-                                        <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                            <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
-                                                <i class="fa fa-sign-out text-danger me-1"/> Shift End
-                                            </div>
-                                            <div class="fw-bold text-dark" style="font-size: 1.1rem;" t-esc="state.shiftInfo.end_time_str"/>
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-sm-4">
-                                        <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                                            <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.725rem; letter-spacing: 0.5px;">
-                                                <i class="fa fa-cutlery text-warning me-1"/> Lunch Break
-                                            </div>
-                                            <div class="fw-bold text-dark text-truncate" style="font-size: 0.95rem;" t-esc="state.shiftInfo.lunch_time_str" t-att-title="state.shiftInfo.lunch_time_str"/>
-                                        </div>
-                                    </div>
-                                </div>
+                                </t>
                             </div>
 
                                 <!-- LIVE WORKED TIMER BADGE -->
@@ -131,9 +162,6 @@
                                             <i class="fa fa-circle me-1 pulse-dot"/> ACTIVE SESSION TIME
                                         </div>
                                         <div class="h2 mb-1" t-esc="state.liveWorkedTimer"/>
-                                            <!-- <div class="text-muted small mt-1"
-                                            style="font-weight: 500; font-size: 0.75rem;">Current
-                                            session only (starts from 0)</div> -->
                                         <div t-if="state.checkInTimeStr" class="text-muted small mt-2" style="font-weight: 500;">
                                             Checked in at <span class="text-dark fw-bold" t-esc="state.checkInTimeStr"/>
                                             <span t-if="state.checkInStatus"
@@ -225,8 +253,15 @@
                                         </div>
 
                                             <!-- HOURS VALUE -->
-                                        <div style="width: 80px;" class="text-end hours-val">
-                                            <t t-esc="day.hours_formatted"/>
+                                        <div style="width: 100px;" class="text-end hours-val">
+                                            <t t-if="day.is_day_off &amp;&amp; day.hours == 0">
+                                                <span class="badge rounded-pill px-2.5 py-1" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600;">
+                                                    🌴 DAY OFF
+                                                </span>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-esc="day.hours_formatted"/>
+                                            </t>
                                         </div>
 
                                             <!-- TODAY BADGE -->

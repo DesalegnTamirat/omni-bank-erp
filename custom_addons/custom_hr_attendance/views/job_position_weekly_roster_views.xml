@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- FORM VIEW -->
+    <record id="view_job_position_weekly_roster_form" model="ir.ui.view">
+        <field name="name">job.position.weekly.roster.form</field>
+        <field name="model">job.position.weekly.roster</field>
+        <field name="arch" type="xml">
+            <form string="Weekly Shift Roster Exception">
+                <sheet>
+                    <div class="oe_button_box" name="button_box"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Roster Name..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active" invisible="1"/>
+                            <field name="employee_id"/>
+                            <field name="job_position"/>
+                            <field name="department_id"/>
+                            <field name="operating_unit_id"/>
+                        </group>
+                        <group>
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                            <field name="status"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Weekly Schedule Matrix" name="matrix">
+                            <div class="alert alert-info shadow-sm rounded-3 mb-4" role="alert">
+                                <strong>Weekly Roster Matrix:</strong> Assign specific shift schedules or set multiple <strong>Days Off</strong> for each day of the week (Monday to Sunday).
+                            </div>
+                            <group string="Monday – Thursday">
+                                <group string="Monday">
+                                    <field name="mon_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="mon_shift_id" invisible="mon_type == 'day_off'" required="mon_type == 'shift'"/>
+                                </group>
+                                <group string="Tuesday">
+                                    <field name="tue_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="tue_shift_id" invisible="tue_type == 'day_off'" required="tue_type == 'shift'"/>
+                                </group>
+                                <group string="Wednesday">
+                                    <field name="wed_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="wed_shift_id" invisible="wed_type == 'day_off'" required="wed_type == 'shift'"/>
+                                </group>
+                                <group string="Thursday">
+                                    <field name="thu_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="thu_shift_id" invisible="thu_type == 'day_off'" required="thu_type == 'shift'"/>
+                                </group>
+                            </group>
+                            <group string="Friday – Sunday">
+                                <group string="Friday">
+                                    <field name="fri_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="fri_shift_id" invisible="fri_type == 'day_off'" required="fri_type == 'shift'"/>
+                                </group>
+                                <group string="Saturday">
+                                    <field name="sat_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="sat_shift_id" invisible="sat_type == 'day_off'" required="sat_type == 'shift'"/>
+                                </group>
+                                <group string="Sunday">
+                                    <field name="sun_type" widget="radio" options="{'horizontal': true}"/>
+                                    <field name="sun_shift_id" invisible="sun_type == 'day_off'" required="sun_type == 'shift'"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" placeholder="Additional instructions or roster notes..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- LIST VIEW -->
+    <record id="view_job_position_weekly_roster_tree" model="ir.ui.view">
+        <field name="name">job.position.weekly.roster.list</field>
+        <field name="model">job.position.weekly.roster</field>
+        <field name="arch" type="xml">
+            <list string="Weekly Shift Rosters" sample="1">
+                <field name="employee_id"/>
+                <field name="job_position"/>
+                <field name="department_id"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="status" widget="badge" decoration-success="status == 'active'" decoration-muted="status == 'inactive'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- SEARCH VIEW -->
+    <record id="view_job_position_weekly_roster_search" model="ir.ui.view">
+        <field name="name">job.position.weekly.roster.search</field>
+        <field name="model">job.position.weekly.roster</field>
+        <field name="arch" type="xml">
+            <search string="Search Weekly Shift Rosters">
+                <field name="employee_id"/>
+                <field name="department_id"/>
+                <field name="operating_unit_id"/>
+                <filter string="Active Rosters" name="active_filter" domain="[('status', '=', 'active'), ('active', '=', True)]"/>
+                <separator/>
+                <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                <filter string="Department" name="group_department" context="{'group_by': 'department_id'}"/>
+                <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ACTION FOR MANAGERS & OFFICERS -->
+    <record id="action_job_position_weekly_roster" model="ir.actions.act_window">
+        <field name="name">Weekly Shift Rosters</field>
+        <field name="res_model">job.position.weekly.roster</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_active_filter': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a Weekly Shift Roster Exception
+            </p>
+            <p>
+                Define daily shift schedules and assigned Days Off for employees working rotational or daily-variable shift schedules.
+            </p>
+        </field>
+    </record>
+
+    <!-- ACTION FOR MY ROSTER (EMPLOYEE VIEW) -->
+    <record id="action_my_weekly_roster" model="ir.actions.act_window">
+        <field name="name">My Weekly Shift Roster</field>
+        <field name="res_model">job.position.weekly.roster</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Weekly Shift Roster Assigned
+            </p>
+            <p>
+                Your weekly shift rosters will appear here once assigned by your manager or attendance officer.
+            </p>
+        </field>
+    </record>
+
+</odoo>

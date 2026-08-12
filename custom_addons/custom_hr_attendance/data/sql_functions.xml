@@ -350,6 +350,44 @@ BEGIN
           WHERE app.employee_id = emp.id
             AND app.effective_date = p_date
             AND app.payload_type = 'absence'
+      )
+      /* Exclude Days Off (Weekly Roster Day Off, Static Exception Day Off, or Default Sunday Day Off) */
+      AND NOT EXISTS (
+          SELECT 1 FROM job_position_weekly_roster r
+          WHERE r.employee_id = emp.id
+            AND r.active = TRUE
+            AND r.status = 'active'
+            AND r.start_date <= p_date
+            AND r.end_date >= p_date
+            AND (
+                (EXTRACT(ISODOW FROM p_date) = 1 AND r.mon_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 2 AND r.tue_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 3 AND r.wed_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 4 AND r.thu_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 5 AND r.fri_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 6 AND r.sat_type = 'day_off') OR
+                (EXTRACT(ISODOW FROM p_date) = 7 AND r.sun_type = 'day_off')
+            )
+      )
+      AND NOT EXISTS (
+          SELECT 1 FROM job_position_exception jpe
+          WHERE jpe.employee_id = emp.id
+            AND jpe.active = TRUE
+            AND jpe.status = 'active'
+            AND NOT EXISTS (
+                SELECT 1 FROM job_position_weekly_roster r2
+                WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
+            )
+            AND (EXTRACT(ISODOW FROM p_date) = 7 OR jpe.day_off = p_date)
+      )
+      AND NOT (
+          EXTRACT(ISODOW FROM p_date) = 7
+          AND NOT EXISTS (
+              SELECT 1 FROM job_position_weekly_roster r3 WHERE r3.employee_id = emp.id AND r3.active = TRUE AND r3.status = 'active' AND r3.start_date <= p_date AND r3.end_date >= p_date
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM job_position_exception jpe2 WHERE jpe2.employee_id = emp.id AND jpe2.active = TRUE AND jpe2.status = 'active'
+          )
       );
 
 END;

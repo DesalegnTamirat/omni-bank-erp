@@ -50,6 +50,7 @@
         'views/location_based_exception_views.xml',
         'views/job_shift_views.xml',
         'views/job_position_exception_views.xml',
+        'views/job_position_weekly_roster_views.xml',
         'views/hr_attendance_view.xml',
         'views/hr_attendance_reason_view.xml',
         'views/res_config_settings_views.xml',
