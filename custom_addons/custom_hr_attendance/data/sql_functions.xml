@@ -170,7 +170,7 @@ env.cr.execute(sql)
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="state">code</field>
             <field name="code"><![CDATA[
-# Shift-Aware High Performance Auto-Checkout PostgreSQL Function
+# Shift-Aware High Performance Auto-Checkout PostgreSQL Function (3-Hour Grace Period & Shift End Capping)
 sql = """
 CREATE OR REPLACE FUNCTION auto_checkout_all_employees()
 RETURNS void
@@ -181,82 +181,85 @@ BEGIN
     =========================================================
     Function: auto_checkout_all_employees()
     Purpose: Automatically checks out employees who forgot to check out
-             by assigning their exact shift-end checkout time.
+             past their shift end + 3-hour grace period, capping check_out 
+             at exact Shift End Time.
 
-    Execution: Triggered via Odoo 19 Scheduled Action daily at 23:15 (Addis Ababa time).
+    Shift Resolution Order:
+    1. Job Position Roster Exception Line (date-specific roster)
+    2. Job Position Exception (static shift exception)
+    3. Location Based Exception (operating unit default shift)
+    4. Default (08:00 AM to 05:00 PM)
 
-    Logic Preservation & Safety Rules:
-    1. Determine employee shift end time:
-       - Priority 1: Job Position Exception (job_shift.end_time)
-       - Priority 2: Location Based Exception (location_based_exception.end_time)
-       - Priority 3: Default 17.00 (5:00 PM)
-    2. Add 15 minutes grace period (+0.25 hours).
-    3. Convert to UTC dynamically considering Addis Ababa timezone (UTC+3).
-    4. CRITICAL SAFETY RULE:
-       - Only update records where check_in < calculated_checkout_time!
-       - If an employee checked in AFTER shift end time (e.g. 20:00 PM late evening check-in),
-         setting check_out to 17:15 would cause check_out < check_in (negative hours).
-         For such records, clamp check_out = check_in + INTERVAL '8 hours'.
-    5. Ensure worked_hours is ALWAYS >= 0.
+    Capping & Worked Hours:
+    - check_out is capped at exact shift_end.
+    - worked_hours = GREATEST(0, MIN(check_out, shift_end) - MAX(check_in, shift_start)).
     =========================================================
     */
+    WITH resolved_shifts AS (
+        SELECT 
+            ha.id AS att_id,
+            ha.check_in,
+            COALESCE(
+                js_roster.start_time,
+                js_static.start_time,
+                lbe.start_time,
+                8.0
+            ) AS resolved_start_time,
+            COALESCE(
+                js_roster.end_time,
+                js_static.end_time,
+                lbe.end_time,
+                17.0
+            ) AS resolved_end_time,
+            (
+                (
+                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
+                    + (COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
+                ) AT TIME ZONE 'Africa/Addis_Ababa'
+            ) AT TIME ZONE 'UTC' AS shift_start_utc,
+            (
+                (
+                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
+                    + (COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                ) AT TIME ZONE 'Africa/Addis_Ababa'
+            ) AT TIME ZONE 'UTC' AS shift_end_utc
+        FROM hr_attendance ha
+        JOIN hr_employee he ON ha.employee_id = he.id
+        LEFT JOIN job_position_roster_exception_line rline 
+            ON rline.employee_id = he.id 
+           AND rline.date = (ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date
+           AND rline.schedule_type = 'shift'
+        LEFT JOIN job_shift js_roster ON rline.shift_id = js_roster.id
+        LEFT JOIN job_position_exception jpe 
+            ON jpe.employee_id = he.id 
+           AND jpe.active = TRUE 
+           AND jpe.status = 'active'
+        LEFT JOIN job_shift js_static ON jpe.shift_id = js_static.id
+        LEFT JOIN location_based_exception lbe 
+            ON he.default_operating_unit_id = lbe.operating_unit 
+           AND lbe.active = TRUE
+        WHERE ha.check_out IS NULL
+          AND (ha.active = TRUE OR ha.active IS NULL)
+    )
     UPDATE hr_attendance ha
     SET 
+        /* Force checkout sets check_out to exact Shift End Time */
         check_out = CASE 
-            WHEN ha.check_in < (
-                (
-                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js.end_time, lbe.end_time, 17.0) + 0.25) * INTERVAL '1 hour'
-                ) AT TIME ZONE 'Africa/Addis_Ababa'
-            ) AT TIME ZONE 'UTC'
-            THEN (
-                (
-                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js.end_time, lbe.end_time, 17.0) + 0.25) * INTERVAL '1 hour'
-                ) AT TIME ZONE 'Africa/Addis_Ababa'
-            ) AT TIME ZONE 'UTC'
+            WHEN ha.check_in < rs.shift_end_utc THEN rs.shift_end_utc
             ELSE ha.check_in + INTERVAL '8 hours'
         END,
 
+        /* Payable Worked Hours: Capped between MAX(check_in, shift_start) and MIN(check_out, shift_end) */
         worked_hours = GREATEST(0.0, ROUND(
             (
                 EXTRACT(
                     EPOCH FROM (
-                        /* Effective Check-Out: MIN(check_out, shift_end) */
                         LEAST(
-                            CASE 
-                                WHEN ha.check_in < (
-                                    (
-                                        date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                        + (COALESCE(js.end_time, lbe.end_time, 17.0) + 0.25) * INTERVAL '1 hour'
-                                    ) AT TIME ZONE 'Africa/Addis_Ababa'
-                                ) AT TIME ZONE 'UTC'
-                                THEN (
-                                    (
-                                        date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                        + (COALESCE(js.end_time, lbe.end_time, 17.0) + 0.25) * INTERVAL '1 hour'
-                                    ) AT TIME ZONE 'Africa/Addis_Ababa'
-                                ) AT TIME ZONE 'UTC'
-                                ELSE ha.check_in + INTERVAL '8 hours'
-                            END,
-                            (
-                                (
-                                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                    + (COALESCE(js.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
-                                ) AT TIME ZONE 'Africa/Addis_Ababa'
-                            ) AT TIME ZONE 'UTC'
+                            CASE WHEN ha.check_in < rs.shift_end_utc THEN rs.shift_end_utc ELSE ha.check_in + INTERVAL '8 hours' END,
+                            rs.shift_end_utc
                         )
                         -
-                        /* Effective Check-In: MAX(check_in, shift_start) */
-                        GREATEST(
-                            ha.check_in,
-                            (
-                                (
-                                    date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                    + (COALESCE(js.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
-                                ) AT TIME ZONE 'Africa/Addis_Ababa'
-                            ) AT TIME ZONE 'UTC'
-                        )
+                        GREATEST(ha.check_in, rs.shift_start_utc)
                     )
                 ) / 3600.0
             )::numeric, 2
@@ -265,18 +268,10 @@ BEGIN
         check_out_status = 'Force Checkout',
         is_force_checkout = TRUE,
         write_date = NOW()
-    FROM hr_employee he
-    LEFT JOIN location_based_exception lbe 
-        ON he.default_operating_unit_id = lbe.operating_unit
-    LEFT JOIN job_position_exception jpe 
-        ON he.id = jpe.employee_id
-    LEFT JOIN job_shift js 
-        ON jpe.shift_id = js.id
-    WHERE ha.employee_id = he.id
-      AND ha.check_out IS NULL
-      AND (ha.active = TRUE OR ha.active IS NULL)
-      AND (ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date <= (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date
-      AND ha.check_in <= NOW() - INTERVAL '1 hour';
+    FROM resolved_shifts rs
+    WHERE ha.id = rs.att_id
+      /* 3-Hour Grace Period Verification: Current time must be past shift_end + 3 hours */
+      AND NOW() >= (rs.shift_end_utc + INTERVAL '3 hours');
 
 END;
 $$ LANGUAGE plpgsql;
