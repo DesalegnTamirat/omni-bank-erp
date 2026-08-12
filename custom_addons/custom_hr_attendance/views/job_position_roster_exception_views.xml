@@ -190,6 +190,7 @@
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_job_position_roster_exception_tree')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_job_position_roster_exception_form_employee')})]" />
         <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No Roster Exception Assigned
@@ -222,6 +223,7 @@
         <field name="res_model">job.position.roster.exception.line</field>
         <field name="view_mode">calendar,list</field>
         <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="context">{'create': False, 'edit': False, 'delete': False}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No Roster Schedule Assigned
