@@ -37,7 +37,8 @@
                     <group>
                         <field name="employee_id"/>
                         <field name="job_position"/>
-                        <field name="shift_id"/>
+                        <field name="allowed_shift_ids" invisible="1"/>
+                        <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
                         <field name="time_range" readonly="1"/>
                         <field name="day_off"/>
                         <field name="status"/>

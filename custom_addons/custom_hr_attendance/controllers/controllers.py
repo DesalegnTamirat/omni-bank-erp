@@ -9,6 +9,96 @@ from odoo.addons.hr_attendance.controllers.main import HrAttendance
 
 class BunnaMyAttendance(http.Controller):
 
+    def _float_to_time_str(self, float_time):
+        if float_time is None or float_time is False:
+            return ""
+        hours = int(float_time)
+        minutes = int(round((float_time - hours) * 60))
+        if minutes >= 60:
+            hours += 1
+            minutes = 0
+        hours_12 = hours % 12
+        if hours_12 == 0:
+            hours_12 = 12
+        period = "AM" if hours < 12 else "PM"
+        return f"{hours_12:02d}:{minutes:02d} {period}"
+
+    def _get_employee_shift_info(self, employee):
+        if not employee:
+            return None
+
+        # Search for active Job Position Exception
+        active_exception = request.env['job.position.exception'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('status', '=', 'active'),
+            ('active', '=', True)
+        ], limit=1)
+
+        if active_exception and active_exception.shift_id:
+            shift = active_exception.shift_id
+            start_str = self._float_to_time_str(shift.start_time)
+            end_str = self._float_to_time_str(shift.end_time)
+            
+            lunch_str = "No Lunch Break"
+            if shift.has_lunch_break:
+                l_start = self._float_to_time_str(shift.lunch_start_time)
+                l_end_float = shift.lunch_start_time + shift.lunch_duration
+                l_end = self._float_to_time_str(l_end_float)
+                lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
+
+            return {
+                'name': shift.name,
+                'code': shift.code or '',
+                'time_range': shift.time_range or f"{start_str} - {end_str}",
+                'start_time_str': start_str,
+                'end_time_str': end_str,
+                'is_night_shift': shift.is_night_shift,
+                'has_lunch_break': shift.has_lunch_break,
+                'lunch_time_str': lunch_str,
+                'is_custom_exception': True,
+                'source_label': 'Assigned Shift Exception'
+            }
+
+        # Fallback to Default Global Shift
+        params = request.env['ir.config_parameter'].sudo()
+        try:
+            std_start = float(params.get_param('custom_hr_attendance.standard_shift_start', '8.0'))
+        except Exception:
+            std_start = 8.0
+
+        try:
+            std_end = float(params.get_param('custom_hr_attendance.standard_shift_end', '17.0'))
+        except Exception:
+            std_end = 17.0
+
+        try:
+            std_lunch_start = float(params.get_param('custom_hr_attendance.standard_lunch_start', '12.0'))
+        except Exception:
+            std_lunch_start = 12.0
+
+        try:
+            std_lunch_duration = float(params.get_param('custom_hr_attendance.standard_lunch_duration', '1.0'))
+        except Exception:
+            std_lunch_duration = 1.0
+
+        start_str = self._float_to_time_str(std_start)
+        end_str = self._float_to_time_str(std_end)
+        l_start = self._float_to_time_str(std_lunch_start)
+        l_end = self._float_to_time_str(std_lunch_start + std_lunch_duration)
+        lunch_str = f"{l_start} - {l_end} ({std_lunch_duration:.1f}h)"
+
+        return {
+            'name': 'Default Global Shift',
+            'code': 'GLOBAL',
+            'time_range': f"{start_str} - {end_str}",
+            'start_time_str': start_str,
+            'end_time_str': end_str,
+            'is_night_shift': False,
+            'has_lunch_break': True,
+            'lunch_time_str': lunch_str,
+            'is_custom_exception': False,
+            'source_label': 'Default Global Shift'
+        }
 
     def _enrich_attendance_data(self, employee, data):
         if not employee or not data:
@@ -16,6 +106,7 @@ class BunnaMyAttendance(http.Controller):
 
         data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
         data['department_name'] = employee.department_id.name if employee.department_id else ""
+        data['shift_info'] = self._get_employee_shift_info(employee)
 
         today = fields.Date.context_today(request.env.user)
         # Week starts on Monday

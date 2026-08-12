@@ -26,6 +26,8 @@
                         <group>
                             <field name="schedule_name"/>
                             <field name="operating_unit"/>
+                            <field name="allowed_shift_ids" invisible="1"/>
+                            <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
                         </group>
                         <group>
                             <field name="start_time"   widget="float_time"/>

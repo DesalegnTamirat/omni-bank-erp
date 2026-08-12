@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="0">
+
+    <!-- ============================================================ -->
+    <!-- 1. DUMMY JOBS -->
+    <!-- ============================================================ -->
+    <record id="job_hr_director" model="hr.job">
+        <field name="name">HR &amp; Operations Director</field>
+        <field name="description">Executive leader managing bank human resources and operations.</field>
+    </record>
+
+    <record id="job_branch_manager" model="hr.job">
+        <field name="name">Branch Manager</field>
+        <field name="description">Manager overseeing branch operations, customer relations, and staff.</field>
+    </record>
+
+    <record id="job_senior_teller" model="hr.job">
+        <field name="name">Senior Customer Service Officer</field>
+        <field name="description">Senior teller handling high-value transactions and customer support.</field>
+    </record>
+
+    <record id="job_it_specialist" model="hr.job">
+        <field name="name">Senior IT Support Specialist</field>
+        <field name="description">Technical support officer maintaining core banking networks and servers.</field>
+    </record>
+
+    <record id="job_executive_driver" model="hr.job">
+        <field name="name">Executive Transport Driver</field>
+        <field name="description">Logistics driver for executive team and cash-in-transit support.</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 2. DUMMY OPERATING UNITS -->
+    <!-- ============================================================ -->
+    <record id="op_bole_branch" model="operating.unit">
+        <field name="name">Bole Branch</field>
+        <field name="sol_id">102</field>
+        <field name="work_unit_type">branch</field>
+    </record>
+
+    <record id="op_airport_branch" model="operating.unit">
+        <field name="name">Airport Branch</field>
+        <field name="sol_id">103</field>
+        <field name="work_unit_type">branch</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 3. DUMMY EMPLOYEES WITH HIERARCHY -->
+    <!-- ============================================================ -->
+    <!-- Level 1: Director / Top Manager -->
+    <record id="emp_abebe_bikila" model="hr.employee">
+        <field name="name">Abebe Bikila</field>
+        <field name="job_id" ref="job_hr_director"/>
+        <field name="job_position" ref="job_hr_director"/>
+        <field name="job_title">HR &amp; Operations Director</field>
+        <field name="default_operating_unit_id" ref="hr_employee_custom.main_operating_unit"/>
+        <field name="employee_identification">EMP-001</field>
+        <field name="work_email">abebe.bikila@bunnabank.com</field>
+    </record>
+
+    <!-- Level 2: Supervisor / Branch Manager (Reports to Abebe Bikila) -->
+    <record id="emp_bethlehem_tadesse" model="hr.employee">
+        <field name="name">Bethlehem Tadesse</field>
+        <field name="job_id" ref="job_branch_manager"/>
+        <field name="job_position" ref="job_branch_manager"/>
+        <field name="job_title">Branch Manager</field>
+        <field name="parent_id" ref="emp_abebe_bikila"/>
+        <field name="coach_id" ref="emp_abebe_bikila"/>
+        <field name="default_operating_unit_id" ref="op_bole_branch"/>
+        <field name="employee_identification">EMP-002</field>
+        <field name="work_email">bethlehem.tadesse@bunnabank.com</field>
+    </record>
+
+    <!-- Level 3: Subordinates (Report to Bethlehem Tadesse) -->
+    <record id="emp_tina_williamson" model="hr.employee">
+        <field name="name">Tina Williamson</field>
+        <field name="job_id" ref="job_senior_teller"/>
+        <field name="job_position" ref="job_senior_teller"/>
+        <field name="job_title">Senior Customer Service Officer</field>
+        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
+        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
+        <field name="default_operating_unit_id" ref="op_bole_branch"/>
+        <field name="employee_identification">EMP-003</field>
+        <field name="work_email">tina.williamson@bunnabank.com</field>
+    </record>
+
+    <record id="emp_dawit_yilma" model="hr.employee">
+        <field name="name">Dawit Yilma</field>
+        <field name="job_id" ref="job_it_specialist"/>
+        <field name="job_position" ref="job_it_specialist"/>
+        <field name="job_title">Senior IT Support Specialist</field>
+        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
+        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
+        <field name="default_operating_unit_id" ref="hr_employee_custom.main_operating_unit"/>
+        <field name="employee_identification">EMP-004</field>
+        <field name="work_email">dawit.yilma@bunnabank.com</field>
+    </record>
+
+    <record id="emp_chala_kebede" model="hr.employee">
+        <field name="name">Chala Kebede</field>
+        <field name="job_id" ref="job_executive_driver"/>
+        <field name="job_position" ref="job_executive_driver"/>
+        <field name="job_title">Executive Transport Driver</field>
+        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
+        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
+        <field name="default_operating_unit_id" ref="op_bole_branch"/>
+        <field name="employee_identification">EMP-005</field>
+        <field name="work_email">chala.kebede@bunnabank.com</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 4. JOB POSITION EXCEPTIONS (3 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: IT Night Shift Exception -->
+    <record id="jpe_dawit_night" model="job.position.exception">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="shift_id" ref="shift_night"/>
+        <field name="status">active</field>
+        <field name="notify_status">notified</field>
+    </record>
+
+    <!-- Scenario 2: Driver Early Shift Exception -->
+    <record id="jpe_chala_early" model="job.position.exception">
+        <field name="employee_id" ref="emp_chala_kebede"/>
+        <field name="shift_id" ref="shift_morning_1"/>
+        <field name="status">active</field>
+        <field name="notify_status">notified</field>
+    </record>
+
+    <!-- Scenario 3: Teller Morning Shift 2 Exception -->
+    <record id="jpe_tina_morning" model="job.position.exception">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="shift_id" ref="shift_morning_2"/>
+        <field name="day_off">2026-08-09</field>
+        <field name="status">active</field>
+        <field name="notify_status">not_notified</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 5. LOCATION BASED EXCEPTIONS (3 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: Head Office Early Opening (07:30 - 15:30) -->
+    <record id="lbe_head_office_early" model="location.based.exception">
+        <field name="operating_unit" ref="hr_employee_custom.main_operating_unit"/>
+        <field name="start_time">7.5</field>
+        <field name="end_time">15.5</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Scenario 2: Bole Branch Extended Hours (08:30 - 17:30) -->
+    <record id="lbe_bole_extended" model="location.based.exception">
+        <field name="operating_unit" ref="op_bole_branch"/>
+        <field name="start_time">8.5</field>
+        <field name="end_time">17.5</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- Scenario 3: Airport Branch Night Shift (22:00 - 06:00) -->
+    <record id="lbe_airport_night" model="location.based.exception">
+        <field name="operating_unit" ref="op_airport_branch"/>
+        <field name="start_time">22.0</field>
+        <field name="end_time">6.0</field>
+        <field name="active">True</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 6. ATTENDANCE PRE-APPROVALS (3 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: Approved Late Check-In Request -->
+    <record id="pa_tina_medical_approved" model="attendance.preapproval">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="exception_type">late_check_in</field>
+        <field name="requested_by" ref="emp_tina_williamson"/>
+        <field name="approved_by" ref="emp_bethlehem_tadesse"/>
+        <field name="reason">Scheduled Hospital Medical Appointment</field>
+        <field name="state">approved</field>
+    </record>
+
+    <!-- Scenario 2: Pending Early Exit Request -->
+    <record id="pa_dawit_audit_pending" model="attendance.preapproval">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="exception_type">early_exit</field>
+        <field name="requested_by" ref="emp_dawit_yilma"/>
+        <field name="reason">Emergency IT Network Maintenance at Data Center</field>
+        <field name="state">requested</field>
+    </record>
+
+    <!-- Scenario 3: Rejected Late Check-In Request -->
+    <record id="pa_chala_commute_rejected" model="attendance.preapproval">
+        <field name="employee_id" ref="emp_chala_kebede"/>
+        <field name="exception_type">late_check_in</field>
+        <field name="requested_by" ref="emp_chala_kebede"/>
+        <field name="approved_by" ref="emp_bethlehem_tadesse"/>
+        <field name="reason">Personal Commute Repair</field>
+        <field name="state">rejected</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 7. ATTENDANCE RECORDS (5 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: Normal On-Time Attendance -->
+    <record id="att_normal_tina" model="hr.attendance">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="check_in">2026-08-08 05:00:00</field>
+        <field name="check_out">2026-08-08 14:00:00</field>
+        <field name="worked_hours">8.0</field>
+        <field name="check_in_status">normal</field>
+        <field name="check_out_status">normal</field>
+        <field name="is_acknowledged">False</field>
+    </record>
+
+    <!-- Scenario 2: Late Check-In (Acknowledged with Reason) -->
+    <record id="att_late_dawit" model="hr.attendance">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="check_in">2026-08-08 05:45:00</field>
+        <field name="check_out">2026-08-08 14:15:00</field>
+        <field name="worked_hours">7.5</field>
+        <field name="late_time_hour">0.75</field>
+        <field name="check_in_status">late</field>
+        <field name="check_out_status">normal</field>
+        <field name="is_acknowledged">True</field>
+        <field name="acknowledged_by" ref="base.user_admin"/>
+        <field name="attendance_reason_ids" eval="[(6, 0, [ref('custom_hr_attendance.reason_technical_difficulties')])]"/>
+    </record>
+
+    <!-- Scenario 3: System Force Checkout (Flagged for Discipline) -->
+    <record id="att_force_chala" model="hr.attendance">
+        <field name="employee_id" ref="emp_chala_kebede"/>
+        <field name="check_in">2026-08-08 05:00:00</field>
+        <field name="check_out">2026-08-08 17:00:00</field>
+        <field name="worked_hours">12.0</field>
+        <field name="check_in_status">normal</field>
+        <field name="check_out_status">force_checkout</field>
+        <field name="is_force_checkout">True</field>
+        <field name="flagged_for_discipline">True</field>
+    </record>
+
+    <!-- Scenario 4: Overtime Attendance (3 hours Overtime) -->
+    <record id="att_overtime_tina" model="hr.attendance">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="check_in">2026-08-07 05:00:00</field>
+        <field name="check_out">2026-08-07 17:00:00</field>
+        <field name="worked_hours">11.0</field>
+        <field name="over_time_hour">3.0</field>
+        <field name="check_in_status">normal</field>
+        <field name="check_out_status">normal</field>
+    </record>
+
+    <!-- Scenario 5: Early Exit Attendance -->
+    <record id="att_early_exit_dawit" model="hr.attendance">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="check_in">2026-08-07 05:00:00</field>
+        <field name="check_out">2026-08-07 12:00:00</field>
+        <field name="worked_hours">6.0</field>
+        <field name="early_exit_hour">2.0</field>
+        <field name="check_in_status">normal</field>
+        <field name="check_out_status">early_exit</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 8. OVERTIME LEDGER RECORDS (3 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: Available Overtime Balance -->
+    <record id="ot_tina_available" model="over.time">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="over_time_date">2026-08-07</field>
+        <field name="over_time_hour">4.0</field>
+        <field name="used_hours">0.0</field>
+        <field name="state">available</field>
+    </record>
+
+    <!-- Scenario 2: Partially Used Overtime Balance -->
+    <record id="ot_dawit_partial" model="over.time">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="over_time_date">2026-08-06</field>
+        <field name="over_time_hour">6.0</field>
+        <field name="used_hours">2.0</field>
+        <field name="state">partially_used</field>
+    </record>
+
+    <!-- Scenario 3: Fully Used Overtime Balance -->
+    <record id="ot_chala_used" model="over.time">
+        <field name="employee_id" ref="emp_chala_kebede"/>
+        <field name="over_time_date">2026-08-05</field>
+        <field name="over_time_hour">3.0</field>
+        <field name="used_hours">3.0</field>
+        <field name="state">used</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- 9. PAYROLL PAYLOAD RECORDS (3 Scenarios) -->
+    <!-- ============================================================ -->
+    <!-- Scenario 1: Overtime Payload Pending -->
+    <record id="pay_tina_ot_pending" model="attendance.payroll.payload">
+        <field name="employee_id" ref="emp_tina_williamson"/>
+        <field name="payload_type">overtime</field>
+        <field name="hours">3.0</field>
+        <field name="state">pending</field>
+    </record>
+
+    <!-- Scenario 2: Unauthorized Absence Penalty Transferred -->
+    <record id="pay_chala_abs_transferred" model="attendance.payroll.payload">
+        <field name="employee_id" ref="emp_chala_kebede"/>
+        <field name="payload_type">unauthorized_absence</field>
+        <field name="hours">8.0</field>
+        <field name="state">transferred</field>
+    </record>
+
+    <!-- Scenario 3: Overtime Payload Processed -->
+    <record id="pay_dawit_ot_processed" model="attendance.payroll.payload">
+        <field name="employee_id" ref="emp_dawit_yilma"/>
+        <field name="payload_type">overtime</field>
+        <field name="hours">4.0</field>
+        <field name="state">processed</field>
+    </record>
+
+</odoo>

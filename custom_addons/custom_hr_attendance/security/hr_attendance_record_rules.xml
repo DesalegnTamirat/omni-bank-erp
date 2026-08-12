@@ -81,10 +81,21 @@
          4. Job Position Exception Record Rules
          ==================================================== -->
     <record id="job_position_exception_rule_manager_hierarchy" model="ir.rule">
-        <field name="name">Job Position Exception: Manager Subordinate Hierarchy</field>
+        <field name="name">Job Position Exception: Manager Subordinate Hierarchy Read-Only</field>
         <field name="model_id" ref="model_job_position_exception"/>
         <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="job_position_exception_rule_officer_team" model="ir.rule">
+        <field name="name">Job Position Exception: Job Position Officer Managed Team</field>
+        <field name="model_id" ref="model_job_position_exception"/>
+        <field name="domain_force">['|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id.parent_id.user_id', '=', user.id), ('employee_id.attendance_manager_id', '=', user.id), ('employee_id', 'child_of', user.employee_id.id)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_job_position_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>
@@ -215,6 +226,31 @@
         <field name="model_id" ref="model_acknowledged_attendance_report"/>
         <field name="domain_force">[(1, '=', 1)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+    </record>
+
+    <!-- ====================================================
+         7. Job Shift Record Rules
+         ==================================================== -->
+    <record id="job_shift_rule_non_admin_scoped_readonly" model="ir.rule">
+        <field name="name">Job Shift: Active Shifts Read-Only for All Internal Users</field>
+        <field name="model_id" ref="model_job_shift"/>
+        <field name="domain_force">[('active', '=', True)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="job_shift_rule_admin_full_access" model="ir.rule">
+        <field name="name">Job Shift: Administrator Full Access</field>
+        <field name="model_id" ref="model_job_shift"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
     </record>
 
 </odoo>

@@ -45,11 +45,12 @@ class AttendancepreApprovalReport(models.Model):
                     pa.start_time AS start_time,
                     pa.end_time AS end_time,
                     COALESCE(pa.state, '') AS status,
-                    COALESCE(usr.name::text, '') AS approved_by
+                    COALESCE(partner.name::text, '') AS approved_by
                 FROM attendance_preapproval pa
                 JOIN hr_employee emp ON pa.employee_id = emp.id
                 LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
                 LEFT JOIN res_users usr ON pa.approved_by = usr.id
+                LEFT JOIN res_partner partner ON usr.partner_id = partner.id
             )
         """)
 

@@ -12,6 +12,8 @@
                 <field name="start_time" widget="float_time"/>
                 <field name="end_time" widget="float_time"/>
                 <field name="is_night_shift"/>
+                <field name="has_lunch_break"/>
+                <field name="applies_to_branches"/>
                 <field name="time_range"/>
             </list>
         </field>
@@ -25,18 +27,30 @@
             <form string="Job Shift">
                 <sheet>
                     <group>
-                        <field name="name"/>
-                        <field name="code"/>
+                        <group string="Shift Details">
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="start_time" widget="float_time"/>
+                            <field name="end_time" widget="float_time"/>
+                            <field name="is_night_shift"/>
+                            <field name="time_range" readonly="1"/>
+                        </group>
+                        <group string="Shift Lunch Break">
+                            <field name="has_lunch_break"/>
+                            <field name="lunch_start_time" widget="float_time" invisible="not has_lunch_break" required="has_lunch_break"/>
+                            <field name="lunch_duration" invisible="not has_lunch_break" required="has_lunch_break"/>
+                        </group>
                     </group>
 
-                    <group>
-                        <field name="start_time" widget="float_time"/>
-                        <field name="end_time" widget="float_time"/>
-                        <field name="is_night_shift"/>
-                    </group>
-
-                    <group>
-                        <field name="time_range" readonly="1"/>
+                    <group string="Applicability Scope (Where Shift Can Be Assigned)">
+                        <group>
+                            <field name="applies_to_branches"/>
+                        </group>
+                        <group>
+                            <field name="department_ids" widget="many2many_tags" placeholder="Select Departments..."/>
+                            <field name="allowed_operating_unit_ids" invisible="1"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" placeholder="Select Operating Units..." domain="[('id', 'in', allowed_operating_unit_ids)]"/>
+                        </group>
                     </group>
                 </sheet>
             </form>

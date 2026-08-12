@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import models, fields
+from odoo import models, fields, api
 from odoo.exceptions import AccessError
 
 
@@ -89,4 +89,23 @@ class HrEmployeeAttendanceCounters(models.Model):
             (self.id,)
         )
         self.invalidate_recordset(['force_checkout_count_rolling'])
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        employees = super().create(vals_list)
+        managers = employees.mapped('parent_id')
+        if managers:
+            managers.mapped('user_id')._sync_attendance_manager_groups()
+        return employees
+
+    def write(self, vals):
+        old_parents = self.mapped('parent_id')
+        res = super().write(vals)
+        if 'parent_id' in vals or 'user_id' in vals:
+            new_parents = self.mapped('parent_id')
+            all_managers = (old_parents | new_parents)
+            all_managers.mapped('user_id')._sync_attendance_manager_groups()
+            self.mapped('user_id')._sync_attendance_manager_groups()
+        return res
+
 

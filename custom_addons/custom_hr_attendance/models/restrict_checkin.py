@@ -161,11 +161,16 @@ class HrEmployee(models.Model):
         param = self.env['ir.config_parameter'].sudo().get_param('hr_attendance.enable_lunch_break', 'False')
         return param.lower() in ('true', '1')
 
-    def _get_lunch_window(self):
-        """Return (lunch_start, lunch_end) as floats based on config."""
-        lunch_out_time = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
-        lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
+    def _get_lunch_window(self, applicable_shift=None):
+        """Return (lunch_start, lunch_end) as floats based on shift-specific config or global config."""
         lunch_grace = self._get_param_float('hr_attendance.lunch_grace_time', 0.25)
+        if applicable_shift and getattr(applicable_shift, 'has_lunch_break', False):
+            lunch_out_time = applicable_shift.lunch_start_time
+            lunch_duration = applicable_shift.lunch_duration
+        else:
+            lunch_out_time = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
+            lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
+
         return lunch_out_time - lunch_grace, lunch_out_time + lunch_duration + lunch_grace
 
     # Load Parameters
@@ -354,8 +359,14 @@ class HrEmployee(models.Model):
         # LUNCH-OUT (employee going for lunch)
         # ----------------------------------------------------
         elif self.attendance_state == 'checked_in' and self._is_lunch_break_enabled():
-            # Check if we're inside the lunch window
-            lunch_start, lunch_end = self._get_lunch_window()
+            # Check if employee has a shift-specific lunch break
+            active_shift = False
+            for job in job_position_exceptions:
+                if job.shift_id:
+                    active_shift = job.shift_id
+                    break
+
+            lunch_start, lunch_end = self._get_lunch_window(applicable_shift=active_shift)
             if lunch_start <= current_float <= lunch_end:
                 # Record lunch-out on the current open attendance record
                 attendance = self.env['hr.attendance'].search([
