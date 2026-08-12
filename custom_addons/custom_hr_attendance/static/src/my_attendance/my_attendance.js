@@ -43,6 +43,7 @@ export class MyAttendance extends Component {
             checkInRaw: false,
             hoursCompletedToday: 0.0,   // float hours of closed sessions today
             todayTotalFormatted: "00:00:00", // completed + live current session
+            shiftInfo: null,
             // Live clock & live timer
             currentClockTime: "",
             currentClockDate: "",
@@ -164,6 +165,7 @@ export class MyAttendance extends Component {
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;
         this.state.hoursCompletedToday = data.hours_today_completed || 0.0;
+        this.state.shiftInfo = data.shift_info || null;
 
         this.updateClock();
     }

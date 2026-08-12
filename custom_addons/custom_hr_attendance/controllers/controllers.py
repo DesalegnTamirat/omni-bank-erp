@@ -27,8 +27,10 @@ class BunnaMyAttendance(http.Controller):
         if not employee:
             return None
 
+        env = employee.env
+
         # Search for active Job Position Exception
-        active_exception = request.env['job.position.exception'].sudo().search([
+        active_exception = env['job.position.exception'].sudo().search([
             ('employee_id', '=', employee.id),
             ('status', '=', 'active'),
             ('active', '=', True)
@@ -60,7 +62,7 @@ class BunnaMyAttendance(http.Controller):
             }
 
         # Fallback to Default Global Shift
-        params = request.env['ir.config_parameter'].sudo()
+        params = env['ir.config_parameter'].sudo()
         try:
             std_start = float(params.get_param('custom_hr_attendance.standard_shift_start', '8.0'))
         except Exception:

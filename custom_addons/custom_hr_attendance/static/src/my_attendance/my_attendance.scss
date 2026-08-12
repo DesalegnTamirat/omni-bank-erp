@@ -42,6 +42,36 @@
         border-radius: 1.5rem;
     }
 
+    /* Shift Info Card Styling */
+    .o_shift_info_card {
+        border-left: 4px solid #4f46e5 !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        width: 100% !important;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px -5px rgba(79, 70, 229, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+        }
+
+        .o_shift_icon_box {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+
+        .shift-pill {
+            transition: all 0.2s ease;
+
+            &:hover {
+                background: #ffffff !important;
+                border-color: #cbd5e1 !important;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            }
+        }
+    }
+
     .o_smart_hero_card {
         display: flex;
         flex-direction: column;
