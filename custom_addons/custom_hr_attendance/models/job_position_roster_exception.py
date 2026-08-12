@@ -236,9 +236,14 @@ class JobPositionRosterException(models.Model):
                             ) % (rec.employee_id.name, day_label))
 
         res = super().write(vals)
-        if 'start_date' in vals or 'end_date' in vals:
+        if any(k in vals for k in ['start_date', 'end_date', 'status', 'line_ids']):
             for rec in self:
-                rec.generate_roster_lines()
+                if 'start_date' in vals or 'end_date' in vals:
+                    rec.generate_roster_lines()
+                if rec.employee_id and rec.employee_id.user_id:
+                    status_str = "Active" if rec.status == 'active' else "Inactive"
+                    body = f"📅 <b>Job Position Shift Roster Schedule Updated</b><br/>Your shift roster schedule ({rec.start_date} to {rec.end_date}) has been updated by HR. Current Status: <b>{status_str}</b>."
+                    rec._send_notification_to_employee(rec, body)
         return res
 
     def _send_notification_to_employee(self, record, body_html):

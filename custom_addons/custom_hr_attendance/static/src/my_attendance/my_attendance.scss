@@ -1,3 +1,13 @@
+/* Shift top navbar app brand title (Attendances) away from far left screen border */
+.o_main_navbar {
+    .o_menu_brand,
+    .o_navbar_apps_menu,
+    > a.o_menu_brand,
+    .o_menu_sections {
+        margin-left: 1.25rem !important;
+    }
+}
+
 .o_smart_attendance_wrapper {
     min-height: 100%;
     height: 100%;

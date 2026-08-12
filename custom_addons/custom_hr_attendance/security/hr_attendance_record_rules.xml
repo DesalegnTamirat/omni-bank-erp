@@ -253,4 +253,51 @@
         <field name="perm_unlink" eval="1"/>
     </record>
 
+    <!-- ====================================================
+         8. Job Position Roster Exception Record Rules
+         ==================================================== -->
+    <record id="job_position_roster_exception_rule_emp_own" model="ir.rule">
+        <field name="name">Job Position Roster Exception: Employee Sees Own Roster</field>
+        <field name="model_id" ref="model_job_position_roster_exception"/>
+        <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="job_position_roster_exception_line_rule_emp_own" model="ir.rule">
+        <field name="name">Job Position Roster Exception Line: Employee Sees Own Roster Lines</field>
+        <field name="model_id" ref="model_job_position_roster_exception_line"/>
+        <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="job_position_roster_exception_rule_admin_all" model="ir.rule">
+        <field name="name">Job Position Roster Exception: Officer and Admin Full Access</field>
+        <field name="model_id" ref="model_job_position_roster_exception"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_job_position_user')), (4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <record id="job_position_roster_exception_line_rule_admin_all" model="ir.rule">
+        <field name="name">Job Position Roster Exception Line: Officer and Admin Full Access</field>
+        <field name="model_id" ref="model_job_position_roster_exception_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_job_position_user')), (4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
 </odoo>

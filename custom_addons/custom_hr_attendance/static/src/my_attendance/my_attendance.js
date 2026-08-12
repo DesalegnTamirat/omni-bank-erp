@@ -24,6 +24,7 @@ export class MyAttendance extends Component {
 
     setup() {
         this.notification = useService("notification");
+        this.action = useService("action");
         this.formatFloatTime = registry.category("formatters").get("float_time");
 
         this.state = useState({
@@ -275,6 +276,10 @@ export class MyAttendance extends Component {
         }
         this.state.inProgress = true;
         await this._toggle();
+    }
+
+    onOpenMySchedule() {
+        this.action.doAction("custom_hr_attendance.action_my_roster_exception");
     }
 }
 

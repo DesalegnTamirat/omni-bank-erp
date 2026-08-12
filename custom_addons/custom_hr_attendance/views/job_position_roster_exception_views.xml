@@ -6,57 +6,65 @@
         <field name="name">job.position.roster.exception.form</field>
         <field name="model">job.position.roster.exception</field>
         <field name="arch" type="xml">
-            <form string="Job Position Roster Exception">
+            <form string="Job Position Roster Exception" class="o_chatter_position_bottom">
                 <header>
                     <button name="generate_roster_lines"
-                            type="object"
-                            string="Generate / Refresh Daily Lines"
-                            class="btn-primary"/>
+                        type="object"
+                        string="Sync Date Range"
+                        class="btn-primary"
+                        groups="custom_hr_attendance.group_hr_attendance_job_position_user,hr_attendance.group_hr_attendance_manager" />
                 </header>
                 <sheet>
-                    <div class="oe_button_box" name="button_box"/>
-                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_button_box" name="button_box" />
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
                     <div class="oe_title">
                         <h1>
-                            <field name="name" placeholder="Roster Name..."/>
+                            <field name="name" placeholder="Roster Name..." />
                         </h1>
                     </div>
                     <group>
                         <group>
-                            <field name="active" invisible="1"/>
-                            <field name="employee_id"/>
-                            <field name="job_position"/>
-                            <field name="department_id"/>
-                            <field name="operating_unit_id"/>
+                            <field name="active" invisible="1" />
+                            <field name="employee_id" />
+                            <field name="job_position" />
+                            <field name="department_id" />
+                            <field name="operating_unit_id" />
                         </group>
                         <group>
-                            <field name="start_date"/>
-                            <field name="end_date"/>
-                            <field name="status"/>
+                            <field name="start_date" />
+                            <field name="end_date" />
+                            <field name="status" />
                         </group>
                     </group>
 
                     <notebook>
                         <page string="Daily Roster Schedule" name="lines">
                             <div class="alert alert-info shadow-sm rounded-3 mb-3" role="alert">
-                                <strong>Daily Shift Schedule:</strong> The listing below starts directly on the <strong>Shift Start Date</strong> and continues day-by-day until the <strong>Shift End Date</strong>. Assign specific shift templates or set <strong>Day Off</strong> for any day.
-                            </div>
+                                <strong>Daily Shift Schedule:</strong> The listing below starts
+                                directly on the <strong>Shift Start Date</strong> and continues
+                                day-by-day until the <strong>Shift End Date</strong>. Assign
+                                specific shift templates or set <strong>Day Off</strong> for any
+                                day. </div>
                             <field name="line_ids">
                                 <list editable="bottom" create="0" delete="0">
-                                    <field name="date" readonly="1" force_save="1"/>
-                                    <field name="day_name" readonly="1" force_save="1"/>
-                                    <field name="display_date_str" readonly="1" force_save="1"/>
-                                    <field name="schedule_type" widget="radio" options="{'horizontal': true}"/>
-                                    <field name="shift_id" invisible="schedule_type == 'day_off'" required="schedule_type == 'shift'"/>
+                                    <field name="date" readonly="1" force_save="1" />
+                                    <field name="day_name" readonly="1" force_save="1" />
+                                    <field name="display_date_str" readonly="1" force_save="1" />
+                                    <field name="schedule_type" widget="radio"
+                                        options="{'horizontal': true}" />
+                                    <field name="shift_id" invisible="schedule_type == 'day_off'"
+                                        required="schedule_type == 'shift'" />
                                 </list>
                             </field>
                         </page>
                         <page string="Notes" name="notes">
-                            <field name="notes" placeholder="Additional instructions or roster notes..."/>
+                            <field name="notes"
+                                placeholder="Additional instructions or roster notes..." />
                         </page>
                     </notebook>
                 </sheet>
-                <chatter/>
+                <!-- <chatter/> -->
             </form>
         </field>
     </record>
@@ -67,12 +75,13 @@
         <field name="model">job.position.roster.exception</field>
         <field name="arch" type="xml">
             <list string="Job Position Roster Exceptions" sample="1">
-                <field name="employee_id"/>
-                <field name="job_position"/>
-                <field name="department_id"/>
-                <field name="start_date"/>
-                <field name="end_date"/>
-                <field name="status" widget="badge" decoration-success="status == 'active'" decoration-muted="status == 'inactive'"/>
+                <field name="employee_id" />
+                <field name="job_position" />
+                <field name="department_id" />
+                <field name="start_date" />
+                <field name="end_date" />
+                <field name="status" widget="badge" decoration-success="status == 'active'"
+                    decoration-muted="status == 'inactive'" />
             </list>
         </field>
     </record>
@@ -83,14 +92,17 @@
         <field name="model">job.position.roster.exception</field>
         <field name="arch" type="xml">
             <search string="Search Roster Exceptions">
-                <field name="employee_id"/>
-                <field name="department_id"/>
-                <field name="operating_unit_id"/>
-                <filter string="Active Exceptions" name="active_filter" domain="[('status', '=', 'active'), ('active', '=', True)]"/>
-                <separator/>
-                <filter string="Employee" name="group_employee" context="{'group_by': 'employee_id'}"/>
-                <filter string="Department" name="group_department" context="{'group_by': 'department_id'}"/>
-                <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                <field name="employee_id" />
+                <field name="department_id" />
+                <field name="operating_unit_id" />
+                <filter string="Active Exceptions" name="active_filter"
+                    domain="[('status', '=', 'active'), ('active', '=', True)]" />
+                <separator />
+                <filter string="Employee" name="group_employee"
+                    context="{'group_by': 'employee_id'}" />
+                <filter string="Department" name="group_department"
+                    context="{'group_by': 'department_id'}" />
+                <filter string="Status" name="group_status" context="{'group_by': 'status'}" />
             </search>
         </field>
     </record>
@@ -106,23 +118,116 @@
                 Create a Job Position Roster Exception
             </p>
             <p>
-                Assign date-based daily shift schedules and Days Off for employees starting on any Shift Start Date.
+                Assign date-based daily shift schedules and Days Off for employees starting on any
+                Shift Start Date.
             </p>
+        </field>
+    </record>
+
+    <!-- EMPLOYEE CLEAN FORM VIEW (NO CHATTER SIDEBAR) -->
+    <record id="view_job_position_roster_exception_form_employee" model="ir.ui.view">
+        <field name="name">job.position.roster.exception.form.employee</field>
+        <field name="model">job.position.roster.exception</field>
+        <field name="arch" type="xml">
+            <form string="My Shift Schedule" create="0" edit="0" delete="0">
+                <sheet>
+                    <div class="oe_button_box" name="button_box" />
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger"
+                        invisible="active" />
+                    <div class="oe_title">
+                        <span class="text-muted fw-bold">📅 SHIFT ROSTER SCHEDULE</span>
+                        <h1 class="mt-1">
+                            <field name="name" readonly="1" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="active" invisible="1" />
+                            <field name="employee_id" readonly="1" />
+                            <field name="job_position" readonly="1" />
+                            <field name="department_id" readonly="1" />
+                            <field name="operating_unit_id" readonly="1" />
+                        </group>
+                        <group>
+                            <field name="start_date" readonly="1" />
+                            <field name="end_date" readonly="1" />
+                            <field name="status" readonly="1" />
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Daily Roster Schedule" name="lines">
+                            <div class="alert alert-info shadow-sm rounded-3 mb-3" role="alert">
+                                <strong>Your Daily Shift Schedule:</strong> The schedule below
+                                details your assigned shifts and rest days from <strong>Shift Start
+                                Date</strong> to <strong>Shift End Date</strong>. </div>
+                            <field name="line_ids" readonly="1">
+                                <list create="0" delete="0">
+                                    <field name="date" />
+                                    <field name="day_name" />
+                                    <field name="display_date_str" />
+                                    <field name="schedule_type" />
+                                    <field name="shift_id" />
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes" name="notes">
+                            <field name="notes" readonly="1" />
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
         </field>
     </record>
 
     <!-- ACTION FOR MY ROSTER (EMPLOYEE VIEW) -->
     <record id="action_my_roster_exception" model="ir.actions.act_window">
-        <field name="name">My Shift Roster Schedule</field>
+        <field name="name">My Shift Schedule</field>
         <field name="res_model">job.position.roster.exception</field>
         <field name="view_mode">list,form</field>
+        <field name="view_ids"
+            eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_job_position_roster_exception_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_job_position_roster_exception_form_employee')})]" />
         <field name="domain">[('employee_id.user_id', '=', uid)]</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No Roster Exception Assigned
             </p>
             <p>
-                Your assigned roster exception schedules will appear here once configured by your manager or attendance officer.
+                Your assigned roster exception schedules will appear here once configured by your
+                manager or attendance officer.
+            </p>
+        </field>
+    </record>
+
+    <!-- CALENDAR VIEW FOR DAILY ROSTER LINES -->
+    <record id="view_job_position_roster_exception_line_calendar" model="ir.ui.view">
+        <field name="name">job.position.roster.exception.line.calendar</field>
+        <field name="model">job.position.roster.exception.line</field>
+        <field name="arch" type="xml">
+            <calendar string="Shift Schedule Calendar" date_start="date" date_stop="date"
+                color="schedule_type" mode="month">
+                <field name="employee_id" />
+                <field name="display_date_str" />
+                <field name="schedule_type" />
+                <field name="shift_id" />
+            </calendar>
+        </field>
+    </record>
+
+    <!-- ACTION FOR MY SHIFT SCHEDULE CALENDAR -->
+    <record id="action_my_roster_line_calendar" model="ir.actions.act_window">
+        <field name="name">My Shift Calendar</field>
+        <field name="res_model">job.position.roster.exception.line</field>
+        <field name="view_mode">calendar,list</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Roster Schedule Assigned
+            </p>
+            <p>
+                Your daily shift schedule lines will appear on this calendar once assigned.
             </p>
         </field>
     </record>

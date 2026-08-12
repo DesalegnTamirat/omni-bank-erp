@@ -19,14 +19,11 @@
     </record>
 
     <!-- ====================================================
-         1. Check In / Check Out
+         1. Check In / Check Out (Deactivated duplicate sub-menu, app root opens dashboard)
          ==================================================== -->
-    <menuitem id="menu_check_in_out"
-              name="Check In / Check Out"
-              parent="hr_attendance.menu_hr_attendance_root"
-              action="action_my_attendance"
-              groups="custom_hr_attendance.group_hr_attendance_manual_user,hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
-              sequence="1"/>
+    <record id="menu_check_in_out" model="ir.ui.menu">
+        <field name="active" eval="False"/>
+    </record>
 
     <!-- ====================================================
          2. Kiosk Mode (Deactivated per company specification)
@@ -41,8 +38,15 @@
     <menuitem id="menu_preapproval_root"
               name="Predefined Attendance"
               parent="hr_attendance.menu_hr_attendance_root"
-              groups="custom_hr_attendance.group_hr_attendance_manual_user,hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
+              groups="base.group_user"
               sequence="3"/>
+
+    <menuitem id="menu_my_shift_schedule"
+              name="My Shift Schedule"
+              parent="menu_preapproval_root"
+              action="action_my_roster_exception"
+              groups="base.group_user"
+              sequence="5"/>
 
     <menuitem id="menu_preapproval_my"
               name="My Requests"
