@@ -31,8 +31,8 @@ class BunnaMyAttendance(http.Controller):
         if not target_date:
             target_date = fields.Date.context_today(request.env.user)
 
-        # Tier 1: Check active Weekly Roster Exception (job.position.weekly.roster)
-        roster = env['job.position.weekly.roster'].sudo().search([
+        # Tier 1: Check active Roster Exception (job.position.roster.exception)
+        roster = env['job.position.roster.exception'].sudo().search([
             ('employee_id', '=', employee.id),
             ('status', '=', 'active'),
             ('active', '=', True),
@@ -40,53 +40,48 @@ class BunnaMyAttendance(http.Controller):
             ('end_date', '>=', target_date)
         ], order='start_date desc, id desc', limit=1)
 
-        if not roster:
-            roster = env['job.position.weekly.roster'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('status', '=', 'active'),
-                ('active', '=', True)
-            ], order='start_date desc, id desc', limit=1)
-
         if roster:
-            sched = roster.get_schedule_for_date(target_date)
-            if sched.get('is_day_off'):
-                return {
-                    'name': 'Scheduled Day Off',
-                    'code': 'DAY_OFF',
-                    'time_range': 'No mandatory shift today',
-                    'start_time_str': 'Day Off',
-                    'end_time_str': 'Day Off',
-                    'is_night_shift': False,
-                    'has_lunch_break': False,
-                    'lunch_time_str': 'No Lunch Break',
-                    'is_custom_exception': True,
-                    'is_day_off': True,
-                    'source_label': 'Weekly Shift Roster (Day Off)'
-                }
-            shift = sched.get('shift_id')
-            if shift:
-                start_str = self._float_to_time_str(shift.start_time)
-                end_str = self._float_to_time_str(shift.end_time)
-                lunch_str = "No Lunch Break"
-                if shift.has_lunch_break:
-                    l_start = self._float_to_time_str(shift.lunch_start_time)
-                    l_end_float = shift.lunch_start_time + shift.lunch_duration
-                    l_end = self._float_to_time_str(l_end_float)
-                    lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
+            line = roster.line_ids.filtered(lambda l: l.date == target_date)
+            if line:
+                line = line[0]
+                if line.schedule_type == 'day_off':
+                    return {
+                        'name': 'Scheduled Day Off',
+                        'code': 'DAY_OFF',
+                        'time_range': 'No mandatory shift today',
+                        'start_time_str': 'Day Off',
+                        'end_time_str': 'Day Off',
+                        'is_night_shift': False,
+                        'has_lunch_break': False,
+                        'lunch_time_str': 'No Lunch Break',
+                        'is_custom_exception': True,
+                        'is_day_off': True,
+                        'source_label': 'Roster Exception (Day Off)'
+                    }
+                shift = line.shift_id
+                if shift:
+                    start_str = self._float_to_time_str(shift.start_time)
+                    end_str = self._float_to_time_str(shift.end_time)
+                    lunch_str = "No Lunch Break"
+                    if shift.has_lunch_break:
+                        l_start = self._float_to_time_str(shift.lunch_start_time)
+                        l_end_float = shift.lunch_start_time + shift.lunch_duration
+                        l_end = self._float_to_time_str(l_end_float)
+                        lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
 
-                return {
-                    'name': shift.name,
-                    'code': shift.code or '',
-                    'time_range': shift.time_range or f"{start_str} - {end_str}",
-                    'start_time_str': start_str,
-                    'end_time_str': end_str,
-                    'is_night_shift': shift.is_night_shift,
-                    'has_lunch_break': shift.has_lunch_break,
-                    'lunch_time_str': lunch_str,
-                    'is_custom_exception': True,
-                    'is_day_off': False,
-                    'source_label': 'Weekly Shift Roster'
-                }
+                    return {
+                        'name': shift.name,
+                        'code': shift.code or '',
+                        'time_range': shift.time_range or f"{start_str} - {end_str}",
+                        'start_time_str': start_str,
+                        'end_time_str': end_str,
+                        'is_night_shift': shift.is_night_shift,
+                        'has_lunch_break': shift.has_lunch_break,
+                        'lunch_time_str': lunch_str,
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'source_label': 'Roster Exception'
+                    }
 
         # Tier 2: Search for active Static Job Position Exception (job.position.exception)
         active_exception = env['job.position.exception'].sudo().search([

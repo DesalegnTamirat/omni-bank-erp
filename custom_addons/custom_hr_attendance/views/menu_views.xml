@@ -239,10 +239,10 @@
             sequence="20"
             groups="custom_hr_attendance.group_hr_attendance_job_position_user,hr_attendance.group_hr_attendance_manager"/>
 
-    <menuitem id="menu_job_position_weekly_roster"
-            name="Weekly Shift Rosters"
+    <menuitem id="menu_job_position_roster_exception"
+            name="Job Position Roster Exceptions"
             parent="menu_bunna_attendance_configuration"
-            action="action_job_position_weekly_roster"
+            action="action_job_position_roster_exception"
             sequence="22"
             groups="custom_hr_attendance.group_hr_attendance_job_position_user,hr_attendance.group_hr_attendance_manager"/>
 

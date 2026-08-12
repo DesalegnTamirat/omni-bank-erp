@@ -273,3 +273,23 @@ class JobPositionException(models.Model):
 
             record._send_notification_to_employee(record, body)
             record.write({'notify_status': 'notified'})
+
+    def write(self, vals):
+        if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
+                self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
+                self.env.is_superuser()):
+            raise UserError(_("Only Job Position Officers or Attendance Administrators can edit Job Position Exceptions."))
+
+        if ('status' in vals and vals['status'] == 'inactive') or ('active' in vals and not vals['active']):
+            today = fields.Date.context_today(self.env.user)
+            is_today_sunday = (today.weekday() == 6)
+            for rec in self:
+                if rec.status == 'active' and rec.active:
+                    is_today_off = is_today_sunday or (rec.day_off == today)
+                    if not is_today_off:
+                        raise ValidationError(_(
+                            "Cannot Deactivate Exception: The static shift exception for '%s' (%s) is currently in use today (%s). "
+                            "Active ongoing shift exceptions cannot be set to inactive while in progress to protect live check-in and attendance integrity."
+                        ) % (rec.employee_id.name, rec.shift_id.name if rec.shift_id else "Shift", today.strftime('%A, %b %d, %Y')))
+
+        return super().write(vals)
