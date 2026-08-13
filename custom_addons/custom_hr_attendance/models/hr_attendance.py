@@ -810,3 +810,184 @@ class HrAttendance(models.Model):
         # The method is defined in discipline_case_attendance.py (Phase 5).
         if hasattr(self, '_process_attendance_violation_counters'):
             self._process_attendance_violation_counters()
+
+    def init(self):
+        super().init()
+        # Automatically compile all custom PostgreSQL functions during database init / module upgrade
+        # so new databases, developers, or devices never encounter UndefinedFunction errors.
+
+        # 1. auto_checkout_all_employees()
+        self.env.cr.execute("""
+            CREATE OR REPLACE FUNCTION auto_checkout_all_employees()
+            RETURNS void AS $$
+            BEGIN
+                WITH resolved_shifts AS (
+                    SELECT 
+                        ha.id AS att_id,
+                        ha.check_in,
+                        COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0) AS resolved_start_time,
+                        COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) AS resolved_end_time,
+                        (
+                            (
+                                date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
+                                + (COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
+                            ) AT TIME ZONE 'Africa/Addis_Ababa'
+                        ) AT TIME ZONE 'UTC' AS shift_start_utc,
+                        (
+                            (
+                                date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
+                                + (COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                            ) AT TIME ZONE 'Africa/Addis_Ababa'
+                        ) AT TIME ZONE 'UTC' AS shift_end_utc
+                    FROM hr_attendance ha
+                    JOIN hr_employee he ON ha.employee_id = he.id
+                    LEFT JOIN job_position_roster_exception_line rline 
+                        ON rline.employee_id = he.id 
+                       AND rline.date = (ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date
+                       AND rline.schedule_type = 'shift'
+                    LEFT JOIN job_shift js_roster ON rline.shift_id = js_roster.id
+                    LEFT JOIN job_position_exception jpe 
+                        ON jpe.employee_id = he.id 
+                       AND jpe.active = TRUE 
+                       AND jpe.status = 'active'
+                    LEFT JOIN job_shift js_static ON jpe.shift_id = js_static.id
+                    LEFT JOIN location_based_exception lbe 
+                        ON he.default_operating_unit_id = lbe.operating_unit 
+                       AND lbe.active = TRUE
+                    WHERE ha.check_out IS NULL
+                      AND (ha.active = TRUE OR ha.active IS NULL)
+                )
+                UPDATE hr_attendance ha
+                SET 
+                    check_out = CASE 
+                        WHEN ha.check_in < rs.shift_end_utc THEN rs.shift_end_utc
+                        ELSE ha.check_in + INTERVAL '8 hours'
+                    END,
+                    worked_hours = GREATEST(0.0, ROUND(
+                        (
+                            EXTRACT(
+                                EPOCH FROM (
+                                    LEAST(
+                                        CASE WHEN ha.check_in < rs.shift_end_utc THEN rs.shift_end_utc ELSE ha.check_in + INTERVAL '8 hours' END,
+                                        rs.shift_end_utc
+                                    )
+                                    -
+                                    GREATEST(ha.check_in, rs.shift_start_utc)
+                                )
+                            ) / 3600.0
+                        )::numeric, 2
+                    )),
+                    check_out_status = 'Force Checkout',
+                    is_force_checkout = TRUE,
+                    write_date = NOW()
+                FROM resolved_shifts rs
+                WHERE ha.id = rs.att_id
+                  AND NOW() >= (rs.shift_end_utc + INTERVAL '3 hours');
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+
+        # 2. detect_daily_employee_absences()
+        self.env.cr.execute("""
+            CREATE OR REPLACE FUNCTION detect_daily_employee_absences()
+            RETURNS void AS $$
+            DECLARE
+                p_date DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date - INTERVAL '1 day';
+            BEGIN
+                INSERT INTO attendance_payroll_payload (
+                    employee_id, effective_date, hours, payload_type, state, display_name, create_uid, write_uid, create_date, write_date
+                )
+                SELECT 
+                    emp.id AS employee_id, p_date AS effective_date, 8.0 AS hours, 'absence' AS payload_type, 'draft' AS state,
+                    'Absence Deduction - ' || emp.name || ' (' || p_date::text || ')' AS display_name,
+                    1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
+                FROM hr_employee emp
+                WHERE emp.active = TRUE
+                  AND NOT EXISTS (
+                      SELECT 1 FROM hr_attendance att
+                      WHERE att.employee_id = emp.id
+                        AND (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
+                        AND (att.active = TRUE OR att.active IS NULL)
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM hr_leave l
+                      WHERE l.employee_id = emp.id
+                        AND l.state = 'validate'
+                        AND l.date_from::date <= p_date
+                        AND l.date_to::date >= p_date
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM attendance_payroll_payload app
+                      WHERE app.employee_id = emp.id
+                        AND app.effective_date = p_date
+                        AND app.payload_type = 'absence'
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM job_position_roster_exception_line rl
+                      JOIN job_position_roster_exception r ON rl.roster_id = r.id
+                      WHERE rl.employee_id = emp.id
+                        AND r.active = TRUE AND r.status = 'active' AND rl.date = p_date AND rl.schedule_type = 'day_off'
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM job_position_exception jpe
+                      WHERE jpe.employee_id = emp.id AND jpe.active = TRUE AND jpe.status = 'active'
+                        AND NOT EXISTS (
+                            SELECT 1 FROM job_position_roster_exception r2
+                            WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
+                        )
+                        AND (EXTRACT(ISODOW FROM p_date) = 7 OR jpe.day_off = p_date)
+                  )
+                  AND NOT (
+                      EXTRACT(ISODOW FROM p_date) = 7
+                      AND NOT EXISTS (
+                          SELECT 1 FROM job_position_roster_exception r3 WHERE r3.employee_id = emp.id AND r3.active = TRUE AND r3.status = 'active' AND r3.start_date <= p_date AND r3.end_date >= p_date
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM job_position_exception jpe2 WHERE jpe2.employee_id = emp.id AND jpe2.active = TRUE AND jpe2.status = 'active'
+                      )
+                  );
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+
+        # 3. detect_job_abandonment_cases()
+        self.env.cr.execute("""
+            CREATE OR REPLACE FUNCTION detect_job_abandonment_cases()
+            RETURNS void AS $$
+            DECLARE
+                v_offense_id INT;
+                p_check_from DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date - INTERVAL '4 days';
+                p_today DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date;
+            BEGIN
+                SELECT id INTO v_offense_id FROM discipline_offense WHERE name ILIKE '%job abandonment%' OR name ILIKE '%unexcused absence%' LIMIT 1;
+                IF v_offense_id IS NOT NULL THEN
+                    INSERT INTO discipline_case (
+                        employee_id, offense_id, description, reference, state, incident_date, create_uid, write_uid, create_date, write_date
+                    )
+                    SELECT 
+                        emp.id AS employee_id, v_offense_id AS offense_id,
+                        'Automatically flagged by System Audit: Unexcused absence for 3+ consecutive working days.',
+                        'JOB-ABANDON-' || emp.id || '-' || TO_CHAR(p_today, 'YYYYMMDD'),
+                        'draft' AS state, p_today AS incident_date,
+                        1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
+                    FROM hr_employee emp
+                    WHERE emp.active = TRUE
+                      AND NOT EXISTS (
+                          SELECT 1 FROM discipline_case dc
+                          WHERE dc.employee_id = emp.id AND dc.reference LIKE 'JOB-ABANDON-%' AND dc.state NOT IN ('revoked', 'closed') AND dc.incident_date >= p_check_from
+                      )
+                      AND (
+                          SELECT COUNT(DISTINCT (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
+                          FROM hr_attendance att
+                          WHERE att.employee_id = emp.id AND (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date >= p_check_from AND (att.active = TRUE OR att.active IS NULL)
+                      ) = 0
+                      AND NOT EXISTS (
+                          SELECT 1 FROM hr_leave l
+                          WHERE l.employee_id = emp.id AND l.state = 'validate' AND l.date_from::date <= p_today AND l.date_to::date >= p_check_from
+                      );
+                END IF;
+            END;
+            $$ LANGUAGE plpgsql;
+        """)
+
+
