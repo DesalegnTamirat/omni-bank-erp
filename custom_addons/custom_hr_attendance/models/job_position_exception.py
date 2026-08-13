@@ -1,6 +1,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError, UserError
-from datetime import time
+import datetime
+from datetime import time, timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -47,6 +48,21 @@ class JobPositionException(models.Model):
     )
 
     time_range = fields.Char(string="Time Range", compute='_compute_time_range', store=True)
+    start_date = fields.Date(
+        string="Start Date",
+        required=True,
+        default=fields.Date.context_today,
+        index=True,
+        tracking=True,
+        help="Date when this shift exception starts taking effect."
+    )
+    end_date = fields.Date(
+        string="End Date",
+        required=False,
+        index=True,
+        tracking=True,
+        help="Optional end date. If left blank, shift holds indefinitely until changed. If set, shift reverts to default after this date."
+    )
     day_off = fields.Date(string="Day Off")
     status = fields.Selection(
         string="Status",
@@ -62,21 +78,28 @@ class JobPositionException(models.Model):
                 self.env.is_superuser()):
             raise UserError(_("Only Job Position Officers or Attendance Administrators can create Job Position Exceptions."))
 
+        today_date = fields.Date.context_today(self)
         for vals in vals_list:
             if vals.get('status', 'active') == 'active' and vals.get('employee_id'):
+                new_start = vals.get('start_date') or today_date
+                if isinstance(new_start, str):
+                    new_start = fields.Date.from_string(new_start)
                 other_actives = self.search([
                     ('employee_id', '=', vals['employee_id']),
                     ('status', '=', 'active'),
                     ('active', '=', True)
                 ])
-                if other_actives:
-                    other_actives.sudo().write({'status': 'inactive'})
+                for old in other_actives:
+                    if new_start > today_date:
+                        old.sudo().write({'end_date': new_start - datetime.timedelta(days=1)})
+                    else:
+                        old.sudo().write({'status': 'inactive'})
 
         records = super().create(vals_list)
         for rec in records:
             if rec.employee_id and rec.employee_id.user_id:
                 body = (
-                    f"???? <b>Job Shift Exception Assigned</b><br/>"
+                    f"📅 <b>Job Shift Exception Assigned</b><br/>"
                     f"You have been assigned to shift schedule <b>{rec.shift_id.name if rec.shift_id else 'N/A'}</b> "
                     f"({rec.time_range or ''})."
                 )
@@ -90,12 +113,35 @@ class JobPositionException(models.Model):
                 self.env.is_superuser()):
             raise UserError(_("Only Job Position Officers or Attendance Administrators can edit Job Position Exceptions."))
 
+        if 'employee_id' in vals:
+            for rec in self:
+                if rec.employee_id and vals['employee_id'] != rec.employee_id.id:
+                    raise UserError(_("Employee Name cannot be changed on an existing Shift Exception record. Please create a new Shift Exception record for the other employee."))
+
         if 'shift_id' in vals and 'status' not in vals:
             vals['status'] = 'active'
+
+        # Deactivation guard: only block setting status=inactive or active=False when in use today
+        if ('status' in vals and vals['status'] == 'inactive') or ('active' in vals and not vals['active']):
+            today = fields.Date.context_today(self.env.user)
+            is_today_sunday = (today.weekday() == 6)
+            for rec in self:
+                if rec.status == 'active' and rec.active:
+                    open_att = rec._get_open_attendance()
+                    if open_att:
+                        is_today_off = is_today_sunday or (rec.day_off == today)
+                        if not is_today_off:
+                            raise ValidationError(_(
+                                "Cannot Deactivate Exception: The static shift exception for '%s' (%s) is currently in use today (%s). "
+                                "Active ongoing shift exceptions cannot be set to inactive while in progress to protect live check-in and attendance integrity."
+                            ) % (rec.employee_id.name, rec.shift_id.name if rec.shift_id else "Shift", today.strftime('%A, %b %d, %Y')))
 
         if vals.get('status') == 'active':
             for rec in self:
                 emp_id = vals.get('employee_id', rec.employee_id.id)
+                new_start = vals.get('start_date', rec.start_date or fields.Date.context_today(self))
+                if isinstance(new_start, str):
+                    new_start = fields.Date.from_string(new_start)
                 if emp_id:
                     other_actives = self.search([
                         ('id', '!=', rec.id),
@@ -103,10 +149,74 @@ class JobPositionException(models.Model):
                         ('status', '=', 'active'),
                         ('active', '=', True)
                     ])
-                    if other_actives:
-                        other_actives.sudo().write({'status': 'inactive'})
+                    today_date = fields.Date.context_today(self)
+                    for old in other_actives:
+                        if old.start_date and old.start_date <= (new_start - datetime.timedelta(days=1)):
+                            old.sudo().write({'end_date': new_start - datetime.timedelta(days=1)})
+                        else:
+                            old.sudo().write({'status': 'inactive'})
 
         return super().write(vals)
+
+    def _get_open_attendance(self, emp_id=None):
+        target_emp_id = emp_id or (self.employee_id.id if self.employee_id else False)
+        if not target_emp_id:
+            return False
+        return self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', target_emp_id),
+            ('check_out', '=', False)
+        ], limit=1)
+
+    @api.onchange('shift_id', 'start_date', 'end_date', 'employee_id')
+    def _onchange_dates_and_employee(self):
+        today = fields.Date.context_today(self)
+        warning_msg = None
+
+        if self.start_date and self.start_date < today:
+            self.start_date = today
+            warning_msg = _("Start Date cannot be in the past. It has been set to today (%s).") % today.strftime('%Y-%m-%d')
+
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            self.end_date = self.start_date
+            warning_msg = _("End Date cannot be earlier than Start Date.")
+
+        if self.employee_id:
+            open_att = self._get_open_attendance()
+            if open_att and self.start_date and self.start_date <= today:
+                tomorrow = today + datetime.timedelta(days=1)
+                self.start_date = tomorrow
+                warning_msg = _(
+                    "Notice: Employee '%s' is currently checked in for today (%s).\n\n"
+                    "You cannot assign or change today's shift while they are actively working. "
+                    "The Start Date has been automatically set to TOMORROW (%s). "
+                    "You can keep tomorrow or set it to any future date."
+                ) % (self.employee_id.name, today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d'))
+
+        if warning_msg:
+            return {'warning': {'title': _("Active Attendance Notice"), 'message': warning_msg}}
+
+    @api.constrains('employee_id', 'shift_id', 'start_date', 'status', 'active')
+    def _check_open_attendance_blocking(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.active and rec.status == 'active' and rec.employee_id and rec.start_date and rec.start_date <= today:
+                open_att = rec._get_open_attendance()
+                if open_att:
+                    tomorrow = today + datetime.timedelta(days=1)
+                    raise ValidationError(_(
+                        "Employee '%s' is currently checked in for today (%s).\n\n"
+                        "You cannot assign or change a shift schedule starting today while the employee is actively working.\n\n"
+                        "Please change the Start Date to TOMORROW (%s) or a future date (e.g. next Sunday)."
+                    ) % (rec.employee_id.name, today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
+
+    @api.constrains('start_date', 'end_date')
+    def _check_dates_validity(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if rec.start_date and rec.start_date < today:
+                raise ValidationError(_("Start Date (%s) cannot be in the past. Please select today (%s) or a future date.") % (rec.start_date, today))
+            if rec.start_date and rec.end_date and rec.end_date < rec.start_date:
+                raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
     def unlink(self):
         if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
@@ -114,6 +224,13 @@ class JobPositionException(models.Model):
                 self.env.is_superuser()):
             raise UserError(_("Only Job Position Officers or Attendance Administrators can delete Job Position Exceptions."))
         for rec in self:
+            if rec.active and rec.status == 'active' and rec.employee_id:
+                open_att = rec._get_open_attendance()
+                if open_att:
+                    raise ValidationError(_(
+                        "Cannot delete or archive shift exception for '%s' while they have an active open attendance session.\n\n"
+                        "Employee checked in at %s. Please wait until the employee checks out before deleting their shift schedule."
+                    ) % (rec.employee_id.name, open_att.check_in))
             rec.write({'active': False})
         return True
 
@@ -151,10 +268,14 @@ class JobPositionException(models.Model):
         except Exception as e:
             _logger.warning(f"Could not send direct chat message: {e}")
 
-    @api.depends('employee_id', 'shift_id', 'job_position')
+    @api.depends('employee_id', 'shift_id', 'start_date', 'end_date')
     def _compute_job_position_exception_name(self):
         for rec in self:
-            rec.job_position_exception_name = f'{rec.employee_id.name} - {rec.shift_id.name} - Job Position'
+            emp = rec.employee_id.name or "Employee"
+            shift = rec.shift_id.name if rec.shift_id else "Shift"
+            s_date = rec.start_date.strftime('%Y-%m-%d') if rec.start_date else ""
+            e_date = rec.end_date.strftime('%Y-%m-%d') if rec.end_date else "Indefinite"
+            rec.job_position_exception_name = f"{emp} - {shift} ({s_date} to {e_date})"
 
     @api.model
     def _get_team_member_domain(self):
@@ -233,13 +354,33 @@ class JobPositionException(models.Model):
 
     @api.onchange('shift_id')
     def _onchange_shift_id_update_status(self):
+        warning = None
+        today = fields.Date.context_today(self)
         if self.shift_id:
             self.status = 'active'
         if self.employee_id:
+            open_att = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('check_out', '=', False)
+            ], limit=1)
+            if open_att and self.start_date and self.start_date <= today:
+                tomorrow = today + datetime.timedelta(days=1)
+                self.start_date = tomorrow
+                warning = {
+                    'title': _("Active Attendance Notice"),
+                    'message': _(
+                        "Notice: Employee '%s' is currently checked in for today (%s).\n\n"
+                        "You cannot assign or change today's shift while they are actively working. "
+                        "The Start Date has been automatically set to TOMORROW (%s)."
+                    ) % (self.employee_id.name, today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d'))
+                }
             ou_id = self.employee_id.default_operating_unit_id.id if self.employee_id.default_operating_unit_id else False
             dept_id = self.employee_id.department_id.id if self.employee_id.department_id else False
             allowed_ids = self.env['job.shift'].get_allowed_shift_ids(operating_unit_id=ou_id, department_id=dept_id)
-            return {'domain': {'shift_id': [('id', 'in', allowed_ids)]}}
+            res = {'domain': {'shift_id': [('id', 'in', allowed_ids)]}}
+            if warning:
+                res['warning'] = warning
+            return res
         return {'domain': {'shift_id': [('id', '=', False)]}}
 
     @api.onchange('employee_id')
@@ -274,22 +415,4 @@ class JobPositionException(models.Model):
             record._send_notification_to_employee(record, body)
             record.write({'notify_status': 'notified'})
 
-    def write(self, vals):
-        if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
-                self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
-                self.env.is_superuser()):
-            raise UserError(_("Only Job Position Officers or Attendance Administrators can edit Job Position Exceptions."))
 
-        if ('status' in vals and vals['status'] == 'inactive') or ('active' in vals and not vals['active']):
-            today = fields.Date.context_today(self.env.user)
-            is_today_sunday = (today.weekday() == 6)
-            for rec in self:
-                if rec.status == 'active' and rec.active:
-                    is_today_off = is_today_sunday or (rec.day_off == today)
-                    if not is_today_off:
-                        raise ValidationError(_(
-                            "Cannot Deactivate Exception: The static shift exception for '%s' (%s) is currently in use today (%s). "
-                            "Active ongoing shift exceptions cannot be set to inactive while in progress to protect live check-in and attendance integrity."
-                        ) % (rec.employee_id.name, rec.shift_id.name if rec.shift_id else "Shift", today.strftime('%A, %b %d, %Y')))
-
-        return super().write(vals)

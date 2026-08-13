@@ -42,9 +42,13 @@ class LocationBasedException(models.Model):
     def _compute_allowed_shift_ids(self):
         for rec in self:
             shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
-            if rec.operating_unit:
-                allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=rec.operating_unit, department=None))
+            manager_ou = self.env.user.employee_id.default_operating_unit_id if self.env.user.employee_id else False
+            target_ou = rec.operating_unit or manager_ou
+            if target_ou:
+                allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=target_ou, department=None))
                 rec.allowed_shift_ids = [(6, 0, allowed.ids)]
+            elif not self.env.is_superuser() and not self.env.user.has_group('base.group_system'):
+                rec.allowed_shift_ids = [(6, 0, [])]
             else:
                 rec.allowed_shift_ids = [(6, 0, shifts.ids)]
 
@@ -123,8 +127,8 @@ class LocationBasedException(models.Model):
             duration = rec.end_time - rec.start_time
             if duration < 0.5:
                 raise ValidationError("Shift duration must be at least 30 minutes")
-            if duration > 4:
-                raise ValidationError("Maximum allowed window is 4 hours.")
+            # if duration > 4:
+            #     raise ValidationError("Maximum allowed window is 4 hours.")
 
     @api.constrains('shift_id')
     def _check_shift_applicability(self):

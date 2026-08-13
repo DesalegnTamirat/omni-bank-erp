@@ -53,7 +53,9 @@
                                     <field name="display_date_str" readonly="1" force_save="1" />
                                     <field name="schedule_type" widget="radio"
                                         options="{'horizontal': true}" />
-                                    <field name="shift_id" invisible="schedule_type == 'day_off'"
+                                    <field name="allowed_shift_ids" column_invisible="1" />
+                                    <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"
+                                        invisible="schedule_type == 'day_off'"
                                         required="schedule_type == 'shift'" />
                                 </list>
                             </field>

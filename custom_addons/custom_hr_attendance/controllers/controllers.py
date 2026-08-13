@@ -87,8 +87,10 @@ class BunnaMyAttendance(http.Controller):
         active_exception = env['job.position.exception'].sudo().search([
             ('employee_id', '=', employee.id),
             ('status', '=', 'active'),
-            ('active', '=', True)
-        ], limit=1)
+            ('active', '=', True),
+            ('start_date', '<=', target_date),
+            '|', ('end_date', '=', False), ('end_date', '>=', target_date)
+        ], order='start_date desc, id desc', limit=1)
 
         if active_exception and active_exception.shift_id:
             is_sunday = (target_date.weekday() == 6)
@@ -316,8 +318,13 @@ class BunnaMyAttendance(http.Controller):
             check_in_local = fields.Datetime.context_timestamp(employee, open_att.check_in)
             data['check_in_time_str'] = check_in_local.strftime('%I:%M %p')
 
-            # Punctuality check (8:30 AM standard start)
-            if check_in_local.hour > 8 or (check_in_local.hour == 8 and check_in_local.minute > 30):
+            # Dynamic Shift Punctuality Check (Shift-Specific)
+            check_in_date = check_in_local.date()
+            shift_info = self._get_employee_shift_info(employee, check_in_date)
+            shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
+
+            check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
+            if check_in_float > shift_start:
                 data['check_in_status'] = 'Late'
             else:
                 data['check_in_status'] = 'On Time'
