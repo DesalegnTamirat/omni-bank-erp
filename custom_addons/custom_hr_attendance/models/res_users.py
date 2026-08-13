@@ -115,22 +115,26 @@ class ResUsers(models.Model):
 
     def _get_allowed_job_shift_ids(self, target_employee=None):
         """
-        Returns list of job.shift IDs allowed for the target employee (or logged-in user if target_employee is None).
-        Attendance Administrators see all shifts.
+        Returns list of job.shift IDs allowed for the target employee and/or the logged-in manager trying to assign a shift.
+        Only System Superusers / System Admins (base.group_system) see all active shifts.
+        Line managers & Job Position Officers only see shifts applicable to their operating unit / department.
         """
         self.ensure_one()
         user_sudo = self.sudo()
         shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
 
-        if user_sudo.has_group('hr_attendance.group_hr_attendance_manager') or self.env.is_superuser():
+        # Only System Superusers and System Admins see all active shifts
+        if self.env.is_superuser() or user_sudo.has_group('base.group_system'):
             return shifts.ids
 
-        emp = target_employee or user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
-        if not emp:
+        manager_emp = user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
+        emp = target_employee or manager_emp
+
+        if not emp and not manager_emp:
             return shifts.ids
 
-        emp_ou = emp.default_operating_unit_id
-        emp_dept = emp.department_id
+        emp_ou = (emp.default_operating_unit_id if emp else False) or (manager_emp.default_operating_unit_id if manager_emp else False)
+        emp_dept = (emp.department_id if emp else False) or (manager_emp.department_id if manager_emp else False)
 
         allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=emp_ou, department=emp_dept))
         return allowed.ids

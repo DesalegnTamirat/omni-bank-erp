@@ -298,8 +298,10 @@ class HrEmployee(models.Model):
         # ----------------------------------------------------
         job_position_exceptions = self.env['job.position.exception'].search([
             ('employee_id', '=', self.id), ('status', '=', 'active'),
-            ('active', '=', True)
-        ])
+            ('active', '=', True),
+            ('start_date', '<=', today_date),
+            '|', ('end_date', '=', False), ('end_date', '>=', today_date)
+        ], order='start_date desc, id desc')
 
         # ----------------------------------------------------
         # Determine Shift

@@ -164,9 +164,12 @@ class HrAttendance(models.Model):
                         if hasattr(loc_ex, 'shift_id') and loc_ex.shift_id:
                             active_shift = loc_ex.shift_id
 
-                job_ex = self.env['job.position.exception'].sudo().search(
-                    [('employee_id', '=', emp.id), ('status', '=', 'active')], limit=1
-                )
+                check_in_date = fields.Datetime.context_timestamp(emp, rec.check_in).date() if rec.check_in else fields.Date.context_today(self)
+                job_ex = self.env['job.position.exception'].sudo().search([
+                    ('employee_id', '=', emp.id), ('status', '=', 'active'),
+                    ('start_date', '<=', check_in_date),
+                    '|', ('end_date', '=', False), ('end_date', '>=', check_in_date)
+                ], order='start_date desc, id desc', limit=1)
                 if job_ex:
                     if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
                         shift_start = job_ex.shift_id.start_time or shift_start
@@ -850,6 +853,8 @@ class HrAttendance(models.Model):
                         ON jpe.employee_id = he.id 
                        AND jpe.active = TRUE 
                        AND jpe.status = 'active'
+                       AND jpe.start_date <= (ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date
+                       AND (jpe.end_date IS NULL OR jpe.end_date >= (ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date)
                     LEFT JOIN job_shift js_static ON jpe.shift_id = js_static.id
                     LEFT JOIN location_based_exception lbe 
                         ON he.default_operating_unit_id = lbe.operating_unit 

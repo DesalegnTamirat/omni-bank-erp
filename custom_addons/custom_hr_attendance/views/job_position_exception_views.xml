@@ -8,6 +8,8 @@
                 <field name="employee_id"/>
                 <field name="job_position"/>
                 <field name="shift_id"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
                 <field name="time_range"/>
                 <field name="day_off"/>
                 <field name="status"/>
@@ -25,24 +27,24 @@
                             string="Notify"
                             class="oe_highlight"
                             invisible="status != 'active' or notify_status == 'notified'"/>
-
-                    <!--button string="Notified"
-                            type="object"
-                            invisible="status != 'active' or notify_status != 'notified'"
-                            class="btn btn-secondary"
-                            name="noop" /-->
                 </header>
 
                 <sheet>
                     <group>
-                        <field name="employee_id"/>
-                        <field name="job_position"/>
-                        <field name="allowed_shift_ids" invisible="1"/>
-                        <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
-                        <field name="time_range" readonly="1"/>
-                        <field name="day_off"/>
-                        <field name="status"/>
-                        <field name="notify_status" invisible="1"/>
+                        <group>
+                            <field name="employee_id" readonly="id != False"/>
+                            <field name="job_position"/>
+                            <field name="allowed_shift_ids" invisible="1"/>
+                            <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
+                            <field name="time_range" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="start_date"/>
+                            <field name="end_date" placeholder="Leave blank to hold indefinitely"/>
+                            <field name="day_off"/>
+                            <field name="status"/>
+                            <field name="notify_status" invisible="1"/>
+                        </group>
                     </group>
                 </sheet>
                 <!-- <chatter/> -->
