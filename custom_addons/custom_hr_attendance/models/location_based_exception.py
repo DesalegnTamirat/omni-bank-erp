@@ -123,8 +123,8 @@ class LocationBasedException(models.Model):
             duration = rec.end_time - rec.start_time
             if duration < 0.5:
                 raise ValidationError("Shift duration must be at least 30 minutes")
-            if duration > 4:
-                raise ValidationError("Maximum allowed window is 4 hours.")
+            # if duration > 4:
+            #     raise ValidationError("Maximum allowed window is 4 hours.")
 
     @api.constrains('shift_id')
     def _check_shift_applicability(self):
