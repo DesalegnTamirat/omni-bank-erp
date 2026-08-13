@@ -66,7 +66,7 @@ class OverTime(models.Model):
                     f"<b>Reason:</b> {rec.over_time_reason or 'N/A'}"
                 )
                 try:
-                    rec.message_post(
+                    rec.sudo().message_post(
                         body=body,
                         partner_ids=[mgr_user.partner_id.id],
                         message_type='comment',

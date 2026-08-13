@@ -9,6 +9,186 @@ from odoo.addons.hr_attendance.controllers.main import HrAttendance
 
 class BunnaMyAttendance(http.Controller):
 
+    def _float_to_time_str(self, float_time):
+        if float_time is None or float_time is False:
+            return ""
+        hours = int(float_time)
+        minutes = int(round((float_time - hours) * 60))
+        if minutes >= 60:
+            hours += 1
+            minutes = 0
+        hours_12 = hours % 12
+        if hours_12 == 0:
+            hours_12 = 12
+        period = "AM" if hours < 12 else "PM"
+        return f"{hours_12:02d}:{minutes:02d} {period}"
+
+    def _get_employee_shift_info(self, employee, target_date=None):
+        if not employee:
+            return None
+
+        env = employee.env
+        if not target_date:
+            target_date = fields.Date.context_today(request.env.user)
+
+        # Tier 1: Check active Roster Exception (job.position.roster.exception)
+        roster = env['job.position.roster.exception'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('status', '=', 'active'),
+            ('active', '=', True),
+            ('start_date', '<=', target_date),
+            ('end_date', '>=', target_date)
+        ], order='start_date desc, id desc', limit=1)
+
+        if roster:
+            line = roster.line_ids.filtered(lambda l: l.date == target_date)
+            if line:
+                line = line[0]
+                if line.schedule_type == 'day_off':
+                    return {
+                        'name': 'Scheduled Day Off',
+                        'code': 'DAY_OFF',
+                        'time_range': 'No mandatory shift today',
+                        'start_time_str': 'Day Off',
+                        'end_time_str': 'Day Off',
+                        'is_night_shift': False,
+                        'has_lunch_break': False,
+                        'lunch_time_str': 'No Lunch Break',
+                        'is_custom_exception': True,
+                        'is_day_off': True,
+                        'source_label': 'Roster Exception (Day Off)'
+                    }
+                shift = line.shift_id
+                if shift:
+                    start_str = self._float_to_time_str(shift.start_time)
+                    end_str = self._float_to_time_str(shift.end_time)
+                    lunch_str = "No Lunch Break"
+                    if shift.has_lunch_break:
+                        l_start = self._float_to_time_str(shift.lunch_start_time)
+                        l_end_float = shift.lunch_start_time + shift.lunch_duration
+                        l_end = self._float_to_time_str(l_end_float)
+                        lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
+
+                    return {
+                        'name': shift.name,
+                        'code': shift.code or '',
+                        'time_range': shift.time_range or f"{start_str} - {end_str}",
+                        'start_time_str': start_str,
+                        'end_time_str': end_str,
+                        'is_night_shift': shift.is_night_shift,
+                        'has_lunch_break': shift.has_lunch_break,
+                        'lunch_time_str': lunch_str,
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'source_label': 'Roster Exception'
+                    }
+
+        # Tier 2: Search for active Static Job Position Exception (job.position.exception)
+        active_exception = env['job.position.exception'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('status', '=', 'active'),
+            ('active', '=', True)
+        ], limit=1)
+
+        if active_exception and active_exception.shift_id:
+            is_sunday = (target_date.weekday() == 6)
+            is_explicit_day_off = (active_exception.day_off == target_date)
+            if is_sunday or is_explicit_day_off:
+                return {
+                    'name': 'Scheduled Day Off',
+                    'code': 'DAY_OFF',
+                    'time_range': 'No mandatory shift today',
+                    'start_time_str': 'Day Off',
+                    'end_time_str': 'Day Off',
+                    'is_night_shift': False,
+                    'has_lunch_break': False,
+                    'lunch_time_str': 'No Lunch Break',
+                    'is_custom_exception': True,
+                    'is_day_off': True,
+                    'source_label': 'Assigned Shift Exception (Day Off)'
+                }
+
+            shift = active_exception.shift_id
+            start_str = self._float_to_time_str(shift.start_time)
+            end_str = self._float_to_time_str(shift.end_time)
+            
+            lunch_str = "No Lunch Break"
+            if shift.has_lunch_break:
+                l_start = self._float_to_time_str(shift.lunch_start_time)
+                l_end_float = shift.lunch_start_time + shift.lunch_duration
+                l_end = self._float_to_time_str(l_end_float)
+                lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
+
+            return {
+                'name': shift.name,
+                'code': shift.code or '',
+                'time_range': shift.time_range or f"{start_str} - {end_str}",
+                'start_time_str': start_str,
+                'end_time_str': end_str,
+                'is_night_shift': shift.is_night_shift,
+                'has_lunch_break': shift.has_lunch_break,
+                'lunch_time_str': lunch_str,
+                'is_custom_exception': True,
+                'is_day_off': False,
+                'source_label': 'Assigned Shift Exception'
+            }
+
+        # Tier 3: Fallback to Default Global Shift (Sunday is default Day Off)
+        if target_date.weekday() == 6:
+            return {
+                'name': 'Default Global Shift (Day Off)',
+                'code': 'GLOBAL_OFF',
+                'time_range': 'No mandatory shift today',
+                'start_time_str': 'Day Off',
+                'end_time_str': 'Day Off',
+                'is_night_shift': False,
+                'has_lunch_break': False,
+                'lunch_time_str': 'No Lunch Break',
+                'is_custom_exception': False,
+                'is_day_off': True,
+                'source_label': 'Default Global Shift (Sunday Off)'
+            }
+
+        params = env['ir.config_parameter'].sudo()
+        try:
+            std_start = float(params.get_param('custom_hr_attendance.standard_shift_start', '8.0'))
+        except Exception:
+            std_start = 8.0
+
+        try:
+            std_end = float(params.get_param('custom_hr_attendance.standard_shift_end', '17.0'))
+        except Exception:
+            std_end = 17.0
+
+        try:
+            std_lunch_start = float(params.get_param('custom_hr_attendance.standard_lunch_start', '12.0'))
+        except Exception:
+            std_lunch_start = 12.0
+
+        try:
+            std_lunch_duration = float(params.get_param('custom_hr_attendance.standard_lunch_duration', '1.0'))
+        except Exception:
+            std_lunch_duration = 1.0
+
+        start_str = self._float_to_time_str(std_start)
+        end_str = self._float_to_time_str(std_end)
+        l_start = self._float_to_time_str(std_lunch_start)
+        l_end = self._float_to_time_str(std_lunch_start + std_lunch_duration)
+        lunch_str = f"{l_start} - {l_end} ({std_lunch_duration:.1f}h)"
+
+        return {
+            'name': 'Default Global Shift',
+            'code': 'GLOBAL',
+            'time_range': f"{start_str} - {end_str}",
+            'start_time_str': start_str,
+            'end_time_str': end_str,
+            'is_night_shift': False,
+            'has_lunch_break': True,
+            'lunch_time_str': lunch_str,
+            'is_custom_exception': False,
+            'is_day_off': False,
+            'source_label': 'Default Global Shift'
+        }
 
     def _enrich_attendance_data(self, employee, data):
         if not employee or not data:
@@ -16,19 +196,13 @@ class BunnaMyAttendance(http.Controller):
 
         data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
         data['department_name'] = employee.department_id.name if employee.department_id else ""
+        data['shift_info'] = self._get_employee_shift_info(employee)
 
         today = fields.Date.context_today(request.env.user)
         # Week starts on Monday
         start_of_week = today - datetime.timedelta(days=today.weekday())
         end_of_week = start_of_week + datetime.timedelta(days=6)
 
-        # `check_in` is stored in UTC, but start_of_week/end_of_week are local
-        # calendar dates. Combining them naively and comparing directly against
-        # check_in silently drops/misattributes records near local midnight
-        # whenever the user's timezone has a non-zero UTC offset (e.g. a
-        # 1:29 AM local check-in in UTC+3 is stored as ~22:29 the previous day
-        # in UTC, so a naive "Monday 00:00" boundary would exclude it).
-        # Localize the boundaries in the user's timezone, then convert to UTC.
         tz_name = request.env.user.tz or 'UTC'
         try:
             local_tz = pytz.timezone(tz_name)
@@ -41,9 +215,6 @@ class BunnaMyAttendance(http.Controller):
             datetime.datetime.combine(end_of_week, datetime.time.max)
         ).astimezone(pytz.utc).replace(tzinfo=None)
 
-        # Search attendances spanning the week window in employee local time.
-        # Fetch records starting from 1 day prior to start_of_week to account
-        # for local timezone offsets (e.g. UTC+3 check-ins late Sunday UTC).
         search_start_utc = local_tz.localize(
             datetime.datetime.combine(start_of_week - datetime.timedelta(days=1), datetime.time.min)
         ).astimezone(pytz.utc).replace(tzinfo=None)
@@ -57,20 +228,17 @@ class BunnaMyAttendance(http.Controller):
             ('check_in', '<=', search_end_utc)
         ], order='check_in asc')
 
-        # Calculate weekly total and daily breakdown
         day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         daily_hours = {d: 0.0 for d in range(7)}
         daily_checked_in = {d: False for d in range(7)}
 
         total_weekly_hours = 0.0
-        today_completed_hours = 0.0   # closed sessions today only
+        today_completed_hours = 0.0
 
         for att in attendances:
-            # Convert UTC check_in to employee's local datetime
             check_in_local_dt = fields.Datetime.context_timestamp(employee, att.check_in)
             check_in_local_date = check_in_local_dt.date()
 
-            # Include only if the local check_in date falls inside this calendar week [start_of_week .. end_of_week]
             if not (start_of_week <= check_in_local_date <= end_of_week):
                 continue
 
@@ -83,7 +251,6 @@ class BunnaMyAttendance(http.Controller):
                     today_completed_hours += duration
             else:
                 now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
-                # Use actual_check_in if available for live session elapsed calculation
                 live_start_dt = fields.Datetime.context_timestamp(employee, att.actual_check_in or att.check_in)
                 duration = max(0.0, (now_dt - live_start_dt).total_seconds() / 3600.0)
                 daily_checked_in[day_idx] = True
@@ -103,17 +270,20 @@ class BunnaMyAttendance(http.Controller):
             hours_int = int(hrs)
             mins_int = int(round((hrs - hours_int) * 60))
 
-            # Progress bar percentage (capped relative to 9 hours standard max day)
+            day_shift = self._get_employee_shift_info(employee, target_date=cur_date)
+            is_day_off = day_shift.get('is_day_off', False) if day_shift else False
+
             pct = min(100, int((hrs / 9.0) * 100))
 
             daily_breakdown.append({
                 'day_name': day_names[d],
                 'date_str': cur_date.strftime('%b %d'),
                 'hours': hrs,
-                'hours_formatted': f"{hours_int:02d}h {mins_int:02d}m",
+                'hours_formatted': 'Day Off' if (is_day_off and hrs == 0) else f"{hours_int:02d}h {mins_int:02d}m",
                 'percentage': pct,
                 'is_today': cur_date == today,
-                'checked_in': daily_checked_in[d]
+                'checked_in': daily_checked_in[d],
+                'is_day_off': is_day_off
             })
 
         # Format weekly hours

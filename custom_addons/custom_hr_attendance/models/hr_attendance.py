@@ -150,6 +150,7 @@ class HrAttendance(models.Model):
                 if ou and ou.work_unit_type == 'head_office':
                     shift_end = float(params.get_param('hr_attendance.saturday_exit_time', 14.75))
 
+            active_shift = False
             if emp:
                 if emp.default_operating_unit_id:
                     loc_ex = self.env['location.based.exception'].sudo().search(
@@ -160,6 +161,8 @@ class HrAttendance(models.Model):
                             shift_start = loc_ex.start_time
                         if hasattr(loc_ex, 'end_time') and loc_ex.end_time:
                             shift_end = loc_ex.end_time
+                        if hasattr(loc_ex, 'shift_id') and loc_ex.shift_id:
+                            active_shift = loc_ex.shift_id
 
                 job_ex = self.env['job.position.exception'].sudo().search(
                     [('employee_id', '=', emp.id), ('status', '=', 'active')], limit=1
@@ -168,6 +171,7 @@ class HrAttendance(models.Model):
                     if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
                         shift_start = job_ex.shift_id.start_time or shift_start
                         shift_end = job_ex.shift_id.end_time or shift_end
+                        active_shift = job_ex.shift_id
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
             start_hour = int(shift_start)
@@ -186,7 +190,16 @@ class HrAttendance(models.Model):
 
             if eff_check_out > eff_check_in:
                 raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
-                lunch_hrs = rec.lunch_break_hours if hasattr(rec, 'lunch_break_hours') else 0.0
+                if hasattr(rec, 'lunch_out') and hasattr(rec, 'lunch_in') and rec.lunch_out and rec.lunch_in:
+                    lunch_hrs = (rec.lunch_in - rec.lunch_out).total_seconds() / 3600.0
+                elif hasattr(rec, 'lunch_break_hours') and rec.lunch_break_hours > 0:
+                    lunch_hrs = rec.lunch_break_hours
+                elif active_shift and active_shift.has_lunch_break:
+                    lunch_hrs = active_shift.lunch_duration
+                else:
+                    enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
+                    lunch_hrs = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+
                 rec.worked_hours = max(0.0, round(raw_hours - lunch_hrs, 2))
             else:
                 rec.worked_hours = 0.0
@@ -580,7 +593,7 @@ class HrAttendance(models.Model):
                         f"<b>Reason(s):</b> {reasons_str}"
                     )
                     try:
-                        rec.message_post(
+                        rec.sudo().message_post(
                             body=body,
                             partner_ids=[emp_user.partner_id.id],
                             message_type='comment',
@@ -603,7 +616,7 @@ class HrAttendance(models.Model):
                         f"<b>Reason:</b> {rec.flagged_reason or 'Lateness / Early Exit'}"
                     )
                     try:
-                        rec.message_post(
+                        rec.sudo().message_post(
                             body=body,
                             partner_ids=[emp_user.partner_id.id],
                             message_type='comment',

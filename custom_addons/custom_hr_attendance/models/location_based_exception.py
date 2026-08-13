@@ -30,6 +30,30 @@ class LocationBasedException(models.Model):
 
     operating_unit = fields.Many2one('operating.unit', string="Location", index=True)
 
+    allowed_shift_ids = fields.Many2many(
+        'job.shift',
+        compute='_compute_allowed_shift_ids',
+        string="Allowed Shifts"
+    )
+
+    shift_id = fields.Many2one('job.shift', string="Shift Template", help="Link to an applicable shift definition")
+
+    @api.depends('operating_unit')
+    def _compute_allowed_shift_ids(self):
+        for rec in self:
+            shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
+            if rec.operating_unit:
+                allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=rec.operating_unit, department=None))
+                rec.allowed_shift_ids = [(6, 0, allowed.ids)]
+            else:
+                rec.allowed_shift_ids = [(6, 0, shifts.ids)]
+
+    @api.onchange('shift_id')
+    def _onchange_shift_id(self):
+        if self.shift_id:
+            self.start_time = self.shift_id.start_time
+            self.end_time = self.shift_id.end_time
+
     duration = fields.Float(string="Duration (Hours)", compute='_compute_duration', store=True)
     time_range = fields.Char(string="Time Range", compute='_compute_time_range', store=True)
 
@@ -101,6 +125,26 @@ class LocationBasedException(models.Model):
                 raise ValidationError("Shift duration must be at least 30 minutes")
             if duration > 4:
                 raise ValidationError("Maximum allowed window is 4 hours.")
+
+    @api.constrains('shift_id')
+    def _check_shift_applicability(self):
+        for rec in self:
+            if rec.shift_id and not self.env.user.has_group('hr_attendance.group_hr_attendance_manager') and not self.env.is_superuser():
+                manager_emp = self.env.user.employee_id or (self.env.user.employee_ids[0] if self.env.user.employee_ids else False)
+                manager_ou = manager_emp.default_operating_unit_id if manager_emp else False
+                manager_dept = manager_emp.department_id if manager_emp else False
+                if not rec.shift_id.is_applicable_for(operating_unit=manager_ou, department=manager_dept):
+                    from odoo import _
+                    raise ValidationError(
+                        _(
+                            "The selected shift '%s' is not configured to apply to your "
+                            "operating unit (%s) or department (%s)."
+                        ) % (
+                            rec.shift_id.name,
+                            manager_ou.name if manager_ou else "N/A",
+                            manager_dept.name if manager_dept else "N/A"
+                        )
+                    )
 
     @api.constrains('start_time', 'end_time', 'operating_unit')
     def _check_duplicate_time_range(self):

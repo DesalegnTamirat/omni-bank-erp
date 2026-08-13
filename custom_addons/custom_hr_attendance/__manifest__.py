@@ -50,6 +50,7 @@
         'views/location_based_exception_views.xml',
         'views/job_shift_views.xml',
         'views/job_position_exception_views.xml',
+        'views/job_position_roster_exception_views.xml',
         'views/hr_attendance_view.xml',
         'views/hr_attendance_reason_view.xml',
         'views/res_config_settings_views.xml',
@@ -94,4 +95,5 @@
     },
 
     'installable': True,
+    'post_init_hook': 'post_init_hook',
 }

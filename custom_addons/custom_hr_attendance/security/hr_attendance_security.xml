@@ -3,7 +3,7 @@
 
     <!-- Remove empty placeholder option from Attendance privilege -->
     <record id="hr_attendance.res_groups_privilege_attendances" model="res.groups.privilege">
-        <field name="placeholder">False</field>
+        <field name="placeholder" eval="False"/>
     </record>
 
     <!-- Manual Attendance (Basic Attendance Check-In / Check-Out permission) -->
