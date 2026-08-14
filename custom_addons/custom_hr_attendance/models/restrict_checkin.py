@@ -85,23 +85,22 @@ class HrEmployee(models.Model):
     # ============================================================
     # Check-in Evaluation Logic
     # ============================================================
-    def _evaluate_checkin_status(self, current_float, shift_start, dead_time, predefined_late, is_manager=False):
+    def _evaluate_checkin_status(self, current_float, shift_start, dead_time, predefined_late, is_manager=False, allow_late=False):
         status = 'Normal'
         late_time = 0.0
         pre_defined_lateness_hours = 0.0
-        #checkin_buffer = 0.50
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
         if predefined_late and current_float <= predefined_late.end_time:
             status = 'Pre-Defined Lateness'
             pre_defined_lateness_hours = round((current_float - shift_start) * 60, 2)
-        elif (shift_start - checkin_buffer) <= current_float <= shift_start:
+        elif current_float <= shift_start:
             status = 'Normal'
         elif current_float <= shift_start + dead_time:
             status = 'Late'
             late_time = max(0, round((current_float - shift_start) * 60, 2))
-        elif is_manager:
-            # status = 'Late'
+        elif is_manager or allow_late:
+            status = 'Late'
             late_time = max(0, round((current_float - shift_start) * 60, 2))
         else:
             _logger.warning("Check-in rejected: Outside allowed grace period (%.2f)", current_float)
@@ -201,19 +200,23 @@ class HrEmployee(models.Model):
         dead_time = self._get_param_float('hr_attendance.dead_time', 0.25)
         min_work_hour = self._get_param_float('hr_attendance.min_working_hour', 7.0)
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
-        saturday_exit = self._get_param_float('hr_attendance.saturday_exit_time', 14.75)
+        saturday_exit = self._get_param_float('hr_attendance.saturday_exit_time', 12.00)
 
         # ----------------------------------------------------
-        # Saturday Half Day Logic (Head Office Only)
+        # Saturday Half Day Logic (Head Office & District Offices)
         # ----------------------------------------------------
         is_saturday = local_dt.weekday() == 5
         operating_unit = self.default_operating_unit_id
         enable_saturday_halfday = self.env['ir.config_parameter'].sudo().get_param(
-            'hr_attendance.enable_saturday_halfday', 'True')
+            'hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
+        enable_district_saturday = self.env['ir.config_parameter'].sudo().get_param(
+            'hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
 
-        if enable_saturday_halfday.lower() in ('true', '1') and \
-                operating_unit and operating_unit.work_unit_type != 'branch' and is_saturday:
-            _logger.info("Saturday Half-Day Applied | Employee: %s", self.name)
+        unit_type = operating_unit.work_unit_type if operating_unit else False
+        is_halfday_unit = (unit_type == 'head_office') or (unit_type == 'district' and enable_district_saturday)
+
+        if enable_saturday_halfday and is_halfday_unit and is_saturday:
+            _logger.info("Saturday Half-Day Applied | Employee: %s | Unit: %s", self.name, unit_type)
             exit_time = saturday_exit
 
         # ----------------------------------------------------
@@ -330,10 +333,10 @@ class HrEmployee(models.Model):
                 )
                 checkin_dt = utc_naive_dt if status == 'Late' else shift_start_utc
             else:
-                # Restriction disabled: no shift boundary to snap to, so
-                # credit the real wall-clock check-in time instead of
-                # always pinning to the official shift start.
-                status, late_time, ot, pre_late = 'Normal', 0.0, 0.0, 0.0
+                # Restriction disabled: do not block check-in, but still evaluate shift lateness
+                status, late_time, ot, pre_late = self._evaluate_checkin_status(
+                    current_float, shift_start, dead_time, predefined_late, allow_late=True
+                )
                 checkin_dt = utc_naive_dt
             vals = {
                 'employee_id': self.id,

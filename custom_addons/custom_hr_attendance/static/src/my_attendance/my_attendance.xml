@@ -328,11 +328,19 @@
                         </div>
                     </div>
                     <div class="settings-toggle-row">
-                        <div class="settings-toggle-label">Saturday Half-Day</div>
+                        <div class="settings-toggle-label">Saturday Half-Day (Head Office)</div>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="s_saturday"
                                    t-att-checked="state.settings.enable_saturday_halfday"
                                    t-on-change="onToggleSaturdayHalfday"/>
+                        </div>
+                    </div>
+                    <div class="settings-toggle-row" t-if="state.settings.enable_saturday_halfday">
+                        <div class="settings-toggle-label">Saturday Half-Day (District Offices)</div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="s_saturday_district"
+                                   t-att-checked="state.settings.saturday_halfday_district"
+                                   t-on-change="onToggleSaturdayDistrict"/>
                         </div>
                     </div>
                     <div class="settings-toggle-row">
@@ -377,22 +385,51 @@
                                t-on-input="onInputExitTime"/>
                     </div>
                     <div class="settings-input-row">
+                        <label class="settings-input-label">Dead Time / Grace (h)</label>
+                        <input type="number" class="settings-input" min="0" max="2" step="0.05"
+                               t-att-value="state.settings.dead_time"
+                               t-on-input="onInputDeadTime"/>
+                    </div>
+                    <div class="settings-input-row">
                         <label class="settings-input-label">Check-In Buffer (h)</label>
                         <input type="number" class="settings-input" min="0" max="2" step="0.25"
                                t-att-value="state.settings.checkin_buffer"
                                t-on-input="onInputCheckinBuffer"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Force Checkout After (h)</label>
-                        <input type="number" class="settings-input" min="8" max="24" step="0.5"
-                               t-att-value="state.settings.force_checkout_hours"
-                               t-on-input="onInputForceCheckoutHours"/>
+                        <label class="settings-input-label">Post-Shift Grace (h)</label>
+                        <input type="number" class="settings-input" min="0.5" max="8" step="0.5"
+                               t-att-value="state.settings.post_shift_grace_hours"
+                               t-on-input="onInputPostShiftGraceHours"/>
                     </div>
                     <div class="settings-input-row">
                         <label class="settings-input-label">Saturday Exit (h)</label>
                         <input type="number" class="settings-input" min="0" max="23" step="0.25"
                                t-att-value="state.settings.saturday_exit_time"
                                t-on-input="onInputSaturdayExitTime"/>
+                    </div>
+                </div>
+
+                    <!-- LUNCH BREAK PARAMETERS (CONDITIONAL) -->
+                <div t-if="state.settings.enable_lunch_break" class="settings-section mb-4">
+                    <div class="settings-section-title">Lunch Break Parameters</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Lunch Start (h)</label>
+                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
+                               t-att-value="state.settings.lunch_out_time"
+                               t-on-input="onInputLunchOutTime"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Lunch Duration (h)</label>
+                        <input type="number" class="settings-input" min="0.25" max="4" step="0.25"
+                               t-att-value="state.settings.lunch_duration"
+                               t-on-input="onInputLunchDuration"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Lunch Grace (h)</label>
+                        <input type="number" class="settings-input" min="0" max="2" step="0.05"
+                               t-att-value="state.settings.lunch_grace_time"
+                               t-on-input="onInputLunchGraceTime"/>
                     </div>
                 </div>
 
@@ -410,6 +447,12 @@
                         <input type="number" class="settings-input" min="1" max="30" step="1"
                                t-att-value="state.settings.force_checkout_violation_threshold"
                                t-on-input="onInputForceCheckoutThreshold"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Missing Lunch Taps Before Lateness</label>
+                        <input type="number" class="settings-input" min="1" max="10" step="1"
+                               t-att-value="state.settings.missing_lunch_tap_threshold"
+                               t-on-input="onInputMissingLunchTapThreshold"/>
                     </div>
                 </div>
 

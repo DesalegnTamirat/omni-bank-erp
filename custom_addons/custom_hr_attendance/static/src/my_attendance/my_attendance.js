@@ -62,11 +62,16 @@ export class MyAttendance extends Component {
                 enable_checkin_gate: false,
                 morning_time: 8.0,
                 exit_time: 17.0,
+                dead_time: 0.25,
                 checkin_buffer: 0.5,
-                force_checkout_hours: 14.0,
-                saturday_exit_time: 14.75,
+                post_shift_grace_hours: 3.0,
+                saturday_exit_time: 12.0,
+                lunch_out_time: 12.0,
+                lunch_duration: 1.0,
+                lunch_grace_time: 0.25,
                 lateness_violation_threshold: 3,
                 force_checkout_violation_threshold: 2,
+                missing_lunch_tap_threshold: 3,
             },
         });
 
@@ -236,20 +241,35 @@ export class MyAttendance extends Component {
     onInputExitTime(ev) {
         this.state.settings.exit_time = parseFloat(ev.target.value) || 0;
     }
+    onInputDeadTime(ev) {
+        this.state.settings.dead_time = parseFloat(ev.target.value) || 0;
+    }
     onInputCheckinBuffer(ev) {
         this.state.settings.checkin_buffer = parseFloat(ev.target.value) || 0;
     }
-    onInputForceCheckoutHours(ev) {
-        this.state.settings.force_checkout_hours = parseFloat(ev.target.value) || 0;
+    onInputPostShiftGraceHours(ev) {
+        this.state.settings.post_shift_grace_hours = parseFloat(ev.target.value) || 0;
     }
     onInputSaturdayExitTime(ev) {
         this.state.settings.saturday_exit_time = parseFloat(ev.target.value) || 0;
+    }
+    onInputLunchOutTime(ev) {
+        this.state.settings.lunch_out_time = parseFloat(ev.target.value) || 0;
+    }
+    onInputLunchDuration(ev) {
+        this.state.settings.lunch_duration = parseFloat(ev.target.value) || 0;
+    }
+    onInputLunchGraceTime(ev) {
+        this.state.settings.lunch_grace_time = parseFloat(ev.target.value) || 0;
     }
     onInputLatenessThreshold(ev) {
         this.state.settings.lateness_violation_threshold = parseInt(ev.target.value, 10) || 0;
     }
     onInputForceCheckoutThreshold(ev) {
         this.state.settings.force_checkout_violation_threshold = parseInt(ev.target.value, 10) || 0;
+    }
+    onInputMissingLunchTapThreshold(ev) {
+        this.state.settings.missing_lunch_tap_threshold = parseInt(ev.target.value, 10) || 0;
     }
     onToggleCheckinRestrict(ev) {
         this.state.settings.enable_checkin_restriction = ev.target.checked;
@@ -259,6 +279,9 @@ export class MyAttendance extends Component {
     }
     onToggleSaturdayHalfday(ev) {
         this.state.settings.enable_saturday_halfday = ev.target.checked;
+    }
+    onToggleSaturdayDistrict(ev) {
+        this.state.settings.saturday_halfday_district = ev.target.checked;
     }
     onToggleLunchBreak(ev) {
         this.state.settings.enable_lunch_break = ev.target.checked;

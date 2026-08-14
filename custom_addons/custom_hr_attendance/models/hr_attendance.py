@@ -145,10 +145,12 @@ class HrAttendance(models.Model):
 
             check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
             enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
+            enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
             if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                 ou = emp.default_operating_unit_id if emp else None
-                if ou and ou.work_unit_type == 'head_office':
-                    shift_end = float(params.get_param('hr_attendance.saturday_exit_time', 14.75))
+                unit_type = ou.work_unit_type if ou else False
+                if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                    shift_end = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
 
             active_shift = False
             if emp:

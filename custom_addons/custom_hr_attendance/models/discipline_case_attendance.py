@@ -134,13 +134,13 @@ class HrAttendanceViolationProcessor(models.Model):
                         'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
                     })
 
-            if new_count >= lateness_threshold:
+            if lateness_threshold > 0 and new_count >= lateness_threshold:
                 employee._reset_late_count()
                 self.env['discipline.case'].sudo()._create_from_attendance(
                     employee.id, 'lateness', self.id
                 )
 
-                #  Escalation on threshold breach
+                # Escalation on threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):
                     # Target configured HR user or fallback to managers
                     escalation_user_id = params.get_param('hr_attendance.escalation_hr_user_id')
@@ -178,7 +178,7 @@ class HrAttendanceViolationProcessor(models.Model):
                         'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
                     })
 
-            if new_count >= force_checkout_threshold:
+            if force_checkout_threshold > 0 and new_count >= force_checkout_threshold:
                 employee._reset_force_checkout_count()
                 self.env['discipline.case'].sudo()._create_from_attendance(
                     employee.id, 'force_checkout', self.id

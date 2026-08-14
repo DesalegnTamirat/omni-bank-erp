@@ -21,7 +21,8 @@ from . import acknowledged_attendance_report
 from . import res_users
 from . import restrict_checkin
 from . import attendance_payroll_payload
-# Rolling violation counters on hr.employee (must load before discipline_case_attendance)
+# Rolling violation counters (must load before discipline_case_attendance)
+from . import hr_employee_discipline_profile
 from . import hr_employee_counters
 # Discipline integration: case creation and violation counter processing
 from . import discipline_case_attendance

@@ -324,10 +324,7 @@ class BunnaMyAttendance(http.Controller):
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
 
             check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
-            if check_in_float > shift_start:
-                data['check_in_status'] = 'Late'
-            else:
-                data['check_in_status'] = 'On Time'
+            data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > (shift_start + dead_time) else 'Normal')
         else:
             data['attendance_state'] = 'checked_out'
             data['check_in_raw'] = False
@@ -384,16 +381,22 @@ class BunnaMyAttendance(http.Controller):
                 'enable_checkin_restriction': _bool('hr_attendance.enable_checkin_restriction', True),
                 'enable_checkout_restriction': _bool('hr_attendance.enable_checkout_restriction', True),
                 'enable_saturday_halfday': _bool('hr_attendance.enable_saturday_halfday', True),
+                'saturday_halfday_district': _bool('hr_attendance.saturday_halfday_district', True),
                 'enable_lunch_break': _bool('hr_attendance.enable_lunch_break', False),
                 'enable_auto_absence': _bool('hr_attendance.enable_auto_absence', True),
                 'enable_checkin_gate': _bool('hr_attendance.enable_checkin_gate', False),
                 'morning_time': _float('hr_attendance.morning_time', 8.0),
                 'exit_time': _float('hr_attendance.exit_time', 17.0),
+                'dead_time': _float('hr_attendance.dead_time', 0.25),
                 'checkin_buffer': _float('hr_attendance.checkin_buffer', 0.5),
-                'force_checkout_hours': _float('hr_attendance.force_checkout_hours', 14.0),
-                'saturday_exit_time': _float('hr_attendance.saturday_exit_time', 14.75),
+                'post_shift_grace_hours': _float('hr_attendance.post_shift_grace_hours', 3.0),
+                'saturday_exit_time': _float('hr_attendance.saturday_exit_time', 12.0),
+                'lunch_out_time': _float('hr_attendance.lunch_out_time', 12.0),
+                'lunch_duration': _float('hr_attendance.lunch_duration', 1.0),
+                'lunch_grace_time': _float('hr_attendance.lunch_grace_time', 0.25),
                 'lateness_violation_threshold': _int('hr_attendance.lateness_violation_threshold', 3),
                 'force_checkout_violation_threshold': _int('hr_attendance.force_checkout_violation_threshold', 2),
+                'missing_lunch_tap_threshold': _int('hr_attendance.missing_lunch_tap_threshold', 3),
             }
         }
 
@@ -408,11 +411,18 @@ class BunnaMyAttendance(http.Controller):
         params = request.env['ir.config_parameter'].sudo()
         bool_keys = [
             'enable_checkin_restriction', 'enable_checkout_restriction',
-            'enable_saturday_halfday', 'enable_lunch_break',
-            'enable_auto_absence', 'enable_checkin_gate',
+            'enable_saturday_halfday', 'saturday_halfday_district',
+            'enable_lunch_break', 'enable_auto_absence', 'enable_checkin_gate',
         ]
-        float_keys = ['morning_time', 'exit_time', 'checkin_buffer', 'force_checkout_hours', 'saturday_exit_time']
-        int_keys = ['lateness_violation_threshold', 'force_checkout_violation_threshold']
+        float_keys = [
+            'morning_time', 'exit_time', 'dead_time', 'checkin_buffer',
+            'post_shift_grace_hours', 'saturday_exit_time',
+            'lunch_out_time', 'lunch_duration', 'lunch_grace_time'
+        ]
+        int_keys = [
+            'lateness_violation_threshold', 'force_checkout_violation_threshold',
+            'missing_lunch_tap_threshold'
+        ]
         for key in bool_keys:
             if key in settings:
                 params.set_param(f'hr_attendance.{key}', str(bool(settings[key])))
