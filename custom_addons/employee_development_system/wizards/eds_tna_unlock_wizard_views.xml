@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- TNA Unlock Wizard Form View -->
+    <record id="view_eds_tna_unlock_wizard_form" model="ir.ui.view">
+        <field name="name">eds.tna.unlock.wizard.form</field>
+        <field name="model">eds.tna.unlock.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Unlock TNA Cycle">
+                <sheet>
+                    <group>
+                        <field name="cycle_id" readonly="1"/>
+                        <field name="change_justification" placeholder="Provide mandatory justification and change mandate reference..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_unlock" string="Confirm Unlock" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

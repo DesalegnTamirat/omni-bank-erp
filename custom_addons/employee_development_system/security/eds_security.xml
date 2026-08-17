@@ -432,5 +432,19 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
+        <!-- Confidential Assessment Center Record Rules -->
+        <record id="rule_eds_ac_result_assessor_and_staff" model="ir.rule">
+            <field name="name">Assessment Center Results: Assessors and L&amp;D Officers</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_center_result"/>
+            <field name="domain_force">['|', ('ac_id.assessor_ids.user_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
+        </record>
+        <record id="rule_eds_ac_result_admin_full" model="ir.rule">
+            <field name="name">Assessment Center Results: L&amp;D Staff Full Access</field>
+            <field name="model_id" ref="employee_development_system.model_eds_assessment_center_result"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+
     </data>
 </odoo>

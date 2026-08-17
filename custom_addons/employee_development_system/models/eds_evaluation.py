@@ -119,6 +119,15 @@ class EdsEvaluationLevel1(models.Model):
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_("Please fill in responses before submitting."))
+            nomination = self.env['eds.nomination'].sudo().search([
+                ('session_id', '=', rec.session_id.id),
+                ('employee_id', '=', rec.employee_id.id),
+            ], limit=1)
+            if nomination:
+                approvers = {nomination.lnd_approved_by, nomination.approved_by, nomination.line_manager_approved_by, nomination.nominated_by}
+                approver_user_ids = {u.id for u in approvers if u}
+                if self.env.user.id in approver_user_ids:
+                    raise UserError(_("Segregation of Duties Violation: You nominated or approved participant %s for session %s and cannot evaluate them.") % (rec.employee_id.name, rec.session_id.name))
             rec.state = 'submitted'
             rec.submitted_date = fields.Date.context_today(self)
             rec.message_post(body=_("Level 1 feedback submitted by %s with score %.1f%%.") % (rec.employee_id.name, rec.overall_score))
@@ -184,6 +193,15 @@ class EdsEvaluationLevel2(models.Model):
 
     def action_evaluate(self):
         for rec in self:
+            nomination = self.env['eds.nomination'].sudo().search([
+                ('session_id', '=', rec.session_id.id),
+                ('employee_id', '=', rec.employee_id.id),
+            ], limit=1)
+            if nomination:
+                approvers = {nomination.lnd_approved_by, nomination.approved_by, nomination.line_manager_approved_by}
+                approver_user_ids = {u.id for u in approvers if u}
+                if self.env.user.id in approver_user_ids:
+                    raise UserError(_("Segregation of Duties Violation: You nominated or approved participant %s for session %s and cannot evaluate them.") % (rec.employee_id.name, rec.session_id.name))
             rec.state = 'evaluated'
             rec.message_post(body=_("Level 2 evaluation completed: Pre %.1f%%, Post %.1f%%, Gain %.1f%%, Passed: %s.") % (
                 rec.pre_score, rec.post_score, rec.learning_gain, rec.passed

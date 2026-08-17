@@ -160,11 +160,8 @@
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,validated,approved,converted,excluded"/>
                     </header>
-                    <div class="alert alert-warning" role="alert" invisible="state == 'draft'">
-                        <i class="fa fa-arrow-right"/> Consolidated by <b>Priority Scoring</b> :
-                        scores below are weighted by the active priority rules.
-                    </div>
                     <sheet>
+                        <widget name="web_ribbon" title="Priority Scored" bg_color="text-bg-warning" invisible="state == 'draft'"/>
                         <group>
                             <group string="Training Need">
                                 <field name="name" readonly="1"/>

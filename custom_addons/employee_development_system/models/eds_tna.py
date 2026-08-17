@@ -205,13 +205,32 @@ class EdsTnaCycle(models.Model):
             rec.message_post(body=_('TNA cycle %s locked. Modifications require a documented change request.')
                              % rec.name)
 
+    unlock_history_ids = fields.One2many('eds.tna.unlock.history', 'cycle_id', string='Unlock Audit History', readonly=True)
+
     def action_unlock(self):
-        """Locked -> Approved (admin only, documented change request)."""
+        """Locked -> Approved (admin only, opens wizard requiring documented change request)."""
         self.ensure_one()
         if not (self.env.su or self.env.user.has_group('employee_development_system.group_eds_admin')):
             raise UserError(_('Only EDS Administrators can unlock a locked TNA cycle.'))
-        self.state = 'approved'
-        self.message_post(body=_('TNA cycle %s unlocked with a documented change request.') % self.name)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Unlock TNA Cycle'),
+            'res_model': 'eds.tna.unlock.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_cycle_id': self.id},
+        }
+
+
+class EdsTnaUnlockHistory(models.Model):
+    _name = 'eds.tna.unlock.history'
+    _description = 'TNA Cycle Unlock Audit Log'
+    _order = 'unlock_date desc, id desc'
+
+    cycle_id = fields.Many2one('eds.tna.cycle', string='TNA Cycle', required=True, ondelete='cascade')
+    unlocked_by_id = fields.Many2one('res.users', string='Unlocked By', required=True)
+    unlock_date = fields.Datetime(string='Unlock Timestamp', default=fields.Datetime.now, required=True)
+    justification = fields.Text(string='Justification & Mandate', required=True)
 
 
 class EdsTnaEntry(models.Model):

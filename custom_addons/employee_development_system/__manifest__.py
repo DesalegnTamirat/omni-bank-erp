@@ -64,6 +64,8 @@ Classroom training and talent development management system covering:
         'views/eds_integration_views.xml',
         'views/eds_report_views.xml',
         'views/hr_employee_views.xml',
+        'wizards/eds_tna_unlock_wizard_views.xml',
+        'views/eds_apply_stage_views.xml',
         'views/eds_menus.xml',
         'report/eds_tna_register.xml',
         'report/eds_certificate_template.xml',

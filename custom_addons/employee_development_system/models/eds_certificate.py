@@ -114,3 +114,12 @@ class EdsCertificate(models.Model):
         for rec in self:
             rec.state = 'void'
             rec.message_post(body=_("Certificate %s voided.") % rec.code)
+
+    @api.model
+    def _cron_auto_issue_certificates(self):
+        """Automated cron: Auto-issues pending certificates once attendance and Level 2 evaluations are passed."""
+        pending_certs = self.search([('state', '=', 'pending')])
+        for cert in pending_certs:
+            cert._compute_eligibility()
+            if cert.is_eligible:
+                cert.action_issue()

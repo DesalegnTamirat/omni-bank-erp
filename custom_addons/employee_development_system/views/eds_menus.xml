@@ -423,5 +423,59 @@
                   sequence="90"
                   groups="employee_development_system.group_eds_officer"/>
 
+        <!-- Apply-Stage Development Interventions -->
+        <menuitem id="menu_eds_apply_stage"
+                  name="Development Interventions"
+                  parent="menu_eds_root"
+                  sequence="66"/>
+
+        <menuitem id="menu_eds_ojt"
+                  name="On-the-Job Training (OJT)"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_ojt_assignment"
+                  sequence="10"/>
+
+        <menuitem id="menu_eds_coaching"
+                  name="Coaching Plans"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_coaching_plan"
+                  sequence="20"/>
+
+        <menuitem id="menu_eds_mentoring"
+                  name="Mentoring Programs"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_mentoring_program"
+                  sequence="30"/>
+
+        <menuitem id="menu_eds_induction"
+                  name="Induction &amp; Onboarding"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_induction_program"
+                  sequence="40"/>
+
+        <menuitem id="menu_eds_learning_events"
+                  name="Learning Events &amp; Workshops"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_learning_event"
+                  sequence="50"/>
+
+        <menuitem id="menu_eds_idp"
+                  name="Individual Development Plans (IDP)"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_individual_development_plan"
+                  sequence="60"/>
+
+        <menuitem id="menu_eds_self_dev"
+                  name="Self-Development Log"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_self_development_activity"
+                  sequence="70"/>
+
+        <menuitem id="menu_eds_assessment_center"
+                  name="Assessment Centers"
+                  parent="menu_eds_apply_stage"
+                  action="action_eds_assessment_center"
+                  sequence="80"/>
+
     </data>
 </odoo>

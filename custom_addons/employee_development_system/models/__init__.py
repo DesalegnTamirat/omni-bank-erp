@@ -21,3 +21,11 @@ from . import eds_education
 from . import eds_internship
 from . import eds_reporting
 from . import hr_employee
+from . import eds_ojt
+from . import eds_coaching
+from . import eds_mentoring
+from . import eds_induction
+from . import eds_knowledge_event
+from . import eds_idp
+from . import eds_self_development
+from . import eds_assessment_center

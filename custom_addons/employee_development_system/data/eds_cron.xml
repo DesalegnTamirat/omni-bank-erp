@@ -50,5 +50,29 @@
             <field name="active" eval="True"/>
         </record>
 
+        <!-- Daily IDP Review Reminder -->
+        <record id="cron_eds_idp_review_reminder" model="ir.cron">
+            <field name="name">EDS: IDP Periodic Review Reminder</field>
+            <field name="model_id" ref="employee_development_system.model_eds_individual_development_plan"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_idp_review_reminder()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=4, minute=0, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Automated Certificate Auto-Issuance -->
+        <record id="cron_eds_auto_issue_certificates" model="ir.cron">
+            <field name="name">EDS: Automated Certificate Auto-Issuance</field>
+            <field name="model_id" ref="employee_development_system.model_eds_certificate"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_auto_issue_certificates()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(hours=1)).replace(minute=15, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
+
     </data>
 </odoo>

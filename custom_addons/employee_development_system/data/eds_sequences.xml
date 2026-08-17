@@ -281,5 +281,68 @@
             <field name="company_id" eval="False"/>
         </record>
 
+        <!-- OJT Assignment -->
+        <record id="seq_eds_ojt_assignment" model="ir.sequence">
+            <field name="name">OJT Assignment Sequence</field>
+            <field name="code">eds.ojt.assignment</field>
+            <field name="prefix">OJT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Coaching Plan -->
+        <record id="seq_eds_coaching_plan" model="ir.sequence">
+            <field name="name">Coaching Plan Sequence</field>
+            <field name="code">eds.coaching.plan</field>
+            <field name="prefix">COACH/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Mentoring Program -->
+        <record id="seq_eds_mentoring_program" model="ir.sequence">
+            <field name="name">Mentoring Program Sequence</field>
+            <field name="code">eds.mentoring.program</field>
+            <field name="prefix">MENTOR/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Induction Program -->
+        <record id="seq_eds_induction_program" model="ir.sequence">
+            <field name="name">Induction Program Sequence</field>
+            <field name="code">eds.induction.program</field>
+            <field name="prefix">IND/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Learning Event -->
+        <record id="seq_eds_learning_event" model="ir.sequence">
+            <field name="name">Learning Event Sequence</field>
+            <field name="code">eds.learning.event</field>
+            <field name="prefix">EVENT/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Individual Development Plan -->
+        <record id="seq_eds_individual_development_plan" model="ir.sequence">
+            <field name="name">Individual Development Plan Sequence</field>
+            <field name="code">eds.individual.development.plan</field>
+            <field name="prefix">IDP/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Assessment Center -->
+        <record id="seq_eds_assessment_center" model="ir.sequence">
+            <field name="name">Assessment Center Sequence</field>
+            <field name="code">eds.assessment.center</field>
+            <field name="prefix">AC/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
     </data>
 </odoo>
