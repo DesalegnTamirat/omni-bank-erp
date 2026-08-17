@@ -20,44 +20,112 @@ class HrEmployee(models.Model):
     # Determine Applicable Shift (Continuous Full Day)
     # ============================================================
     def _select_applicable_shift(self, current_float, morning_start, exit_time,
-                                 location_exceptions, job_position_exceptions, is_manager=False):
+                                 location_exceptions, job_position_exceptions, target_date=None, is_manager=False):
         """
         Shift selection priority:
-        1) Job-position exception shift
-        2) Location-based shift
-        3) Default system shift (Full Day)
+        1) Date-based Roster Exception (job.position.roster.exception)
+        2) Job-position exception shift (job.position.exception)
+        3) Location-based shift (location.based.exception)
+        4) Default system shift (Full Day)
         """
-        #checkin_buffer = 0.50  # 30-minute buffer
+        if not target_date:
+            target_date = fields.Date.context_today(self)
+
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
-        # ----------------------------
-        # 1. Job-position-based shifts
-        # ----------------------------
-        for job in job_position_exceptions:
-            shift = job.shift_id
-            if not shift:
-                continue
+        # Helper to format float hours to clean AM/PM string
+        def _fmt(val):
+            hrs = int(val) % 24
+            mins = int(round((val - int(val)) * 60))
+            ampm = "AM" if hrs < 12 else "PM"
+            dh = hrs if hrs in (1, 12) else (hrs % 12)
+            if dh == 0:
+                dh = 12
+            return f"{dh:02d}:{mins:02d} {ampm}"
 
-            _logger.info(
-                "Job Position Exception | Shift: %s | Start: %.2f | End: %.2f | Night: %s",
-                job.job_position_exception_name, shift.start_time, shift.end_time, shift.is_night_shift,
-            )
+        # ----------------------------
+        # 1. Roster Exceptions (Date-Based)
+        # ----------------------------
+        roster_exceptions = self.env['job.position.roster.exception'].search([
+            ('employee_id', '=', self.id),
+            ('status', '=', 'active'),
+            ('active', '=', True),
+            ('start_date', '<=', target_date),
+            ('end_date', '>=', target_date)
+        ], order='start_date desc, id desc', limit=1)
 
-            if shift.is_night_shift:
-                if current_float >= (shift.start_time - checkin_buffer) or current_float <= shift.end_time:
-                    return shift.start_time, shift.end_time
-            else:
-                if (shift.start_time - checkin_buffer) <= current_float <= shift.end_time:
-                    _logger.info("Using Job-Position shift: %.2f - %.2f", shift.start_time, shift.end_time)
-                    return shift.start_time, shift.end_time
+        if roster_exceptions:
+            line = roster_exceptions.line_ids.filtered(lambda l: l.date == target_date)
+            if line:
+                line = line[0]
+                if line.schedule_type == 'day_off':
+                    raise UserError(_("Attendance cannot be recorded.\n\nYou have a scheduled Day Off today."))
+                shift = line.shift_id
+                if shift:
+                    _logger.info(
+                        "Roster Exception Shift | Shift: %s | Start: %.2f | End: %.2f | Night: %s",
+                        shift.name, shift.start_time, shift.end_time, shift.is_night_shift
+                    )
+                    earliest_checkin = shift.start_time - checkin_buffer
+                    if shift.is_night_shift:
+                        if current_float >= earliest_checkin or current_float <= shift.end_time:
+                            return shift.start_time, shift.end_time
+                    else:
+                        if earliest_checkin <= current_float <= shift.end_time:
+                            _logger.info("Using Roster shift: %.2f - %.2f", shift.start_time, shift.end_time)
+                            return shift.start_time, shift.end_time
+                        elif current_float < earliest_checkin:
+                            raise UserError(_(
+                                "Check-in is not allowed yet.\n\n"
+                                "You are too early for your scheduled shift (%s - %s).\n"
+                                "Check-in window opens at %s (Buffer: %d min)."
+                            ) % (_fmt(shift.start_time), _fmt(shift.end_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
+
+        # ----------------------------
+        # 2. Job-position-based shifts (Static)
+        # ----------------------------
+        if job_position_exceptions:
+            for job in job_position_exceptions:
+                shift = job.shift_id
+                if not shift:
+                    continue
+
+                _logger.info(
+                    "Job Position Exception | Shift: %s | Start: %.2f | End: %.2f | Night: %s",
+                    job.job_position_exception_name, shift.start_time, shift.end_time, shift.is_night_shift,
+                )
+
+                earliest_checkin = shift.start_time - checkin_buffer
+
+                if shift.is_night_shift:
+                    if current_float >= earliest_checkin or current_float <= shift.end_time:
+                        return shift.start_time, shift.end_time
+                else:
+                    if earliest_checkin <= current_float <= shift.end_time:
+                        _logger.info("Using Job-Position shift: %.2f - %.2f", shift.start_time, shift.end_time)
+                        return shift.start_time, shift.end_time
+                    elif current_float < earliest_checkin:
+                        # Employee has an active exception shift today, but is trying to check in before the buffer window opens
+                        raise UserError(_(
+                            "Check-in is not allowed yet.\n\n"
+                            "You are too early for your scheduled shift (%s - %s).\n"
+                            "Check-in window opens at %s (Buffer: %d min)."
+                        ) % (_fmt(shift.start_time), _fmt(shift.end_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
 
         # ----------------------------
         # 2. Location-based shifts
         # ----------------------------
         for loc in location_exceptions:
             _logger.info("Checking Location Exception: %.2f - %.2f", loc.start_time, loc.end_time)
-            if (loc.start_time - checkin_buffer) <= current_float <= loc.end_time:
+            earliest_checkin = loc.start_time - checkin_buffer
+            if earliest_checkin <= current_float <= loc.end_time:
                 return loc.start_time, loc.end_time
+            elif current_float < earliest_checkin:
+                raise UserError(_(
+                    "Check-in is not allowed yet.\n\n"
+                    "You are too early for your scheduled shift (%s - %s).\n"
+                    "Check-in window opens at %s (Buffer: %d min)."
+                ) % (_fmt(loc.start_time), _fmt(loc.end_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
 
         # If check-in restriction feature toggle is OFF, bypass shift boundary check
         enable_checkin_restriction = self.env['ir.config_parameter'].sudo().get_param(
@@ -69,8 +137,8 @@ class HrEmployee(models.Model):
         # ----------------------------
         # 3. Default system shifts (Full Day)
         # ----------------------------
-        # if (morning_start - checkin_buffer) <= current_float <= exit_time or current_float >= exit_time:
-        if current_float >= (morning_start - checkin_buffer):
+        earliest_checkin = morning_start - checkin_buffer
+        if current_float >= earliest_checkin:
             _logger.info("Using Default Full Day shift: %.2f - %.2f", morning_start, exit_time)
             return morning_start, exit_time
 
@@ -79,8 +147,11 @@ class HrEmployee(models.Model):
             _logger.info("Manager Override: Forcing default shift bounds.")
             return morning_start, exit_time
 
-        raise UserError(
-            _("Check-in/out is not allowed at this time. Expected shift: %.2f to %.2f") % (morning_start, exit_time))
+        raise UserError(_(
+            "Check-in is not allowed yet.\n\n"
+            "You are too early for your scheduled shift (%s - %s).\n"
+            "Check-in window opens at %s (Buffer: %d min)."
+        ) % (_fmt(morning_start), _fmt(exit_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
 
     # ============================================================
     # Check-in Evaluation Logic
