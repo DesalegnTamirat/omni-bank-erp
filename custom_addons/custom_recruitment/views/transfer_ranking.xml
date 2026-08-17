@@ -54,11 +54,7 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
 
-                    <!-- Info banner when approved -->
-                    <div class="alert alert-success" role="alert" invisible="state != 'approved'">
-                        <strong>✅ Minutes Approved</strong> – Selected candidates' transfer requests
-                        have been automatically approved and employee records updated.
-                    </div>
+                    <widget name="web_ribbon" title="Minutes Approved" bg_color="bg-success" invisible="state != 'approved'"/>
 
                     <group>
                         <field name="target_vacancy_id" readonly="state != 'draft'"

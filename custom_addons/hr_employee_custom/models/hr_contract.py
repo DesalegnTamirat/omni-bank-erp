@@ -354,8 +354,8 @@ class HrContract(models.Model):
             for rec in self.filtered(lambda c: not c.contract_date_end):
                 rec.contract_date_end = max(date.today(), rec.contract_date_start or date.today())
         calendar = vals.get('resource_calendar_id')
-        if calendar:
-            self.filtered(
+        if calendar and not self.env.context.get('syncing_resource_calendar'):
+            self.with_context(syncing_resource_calendar=True).filtered(
                 lambda c: c.state in ('open', 'probation')
                 or (c.state == 'draft' and c.kanban_state == 'done')
             ).mapped('employee_id').write({'resource_calendar_id': calendar})

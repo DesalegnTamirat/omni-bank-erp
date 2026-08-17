@@ -90,10 +90,7 @@
                            statusbar_visible="pending,selected,reserve,rejected"/>
                 </header>
                 <sheet>
-                    <div class="alert alert-danger" role="alert" invisible="not disqualified">
-                        <strong>Disqualified:</strong>
-                        <field name="disqualification_reason" readonly="1" nolabel="1"/>
-                    </div>
+                    <widget name="web_ribbon" title="Disqualified" bg_color="bg-danger" invisible="not disqualified"/>
 
                     <!-- INFO BOX: Show auto-selection status -->
                     <!-- <div class="alert alert-info" role="alert" -->

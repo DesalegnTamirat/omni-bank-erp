@@ -23,7 +23,8 @@ class HrEmployee(models.Model):
         string='Contract Count')
     contract_warning = fields.Boolean(
         string='Contract Warning',
-        compute='_compute_contract_warning')
+        compute='_compute_contract_warning',
+        store=True)
     first_contract_date = fields.Date(
         compute='_compute_first_contract_date')
 

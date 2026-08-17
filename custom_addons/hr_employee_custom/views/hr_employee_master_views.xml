@@ -112,12 +112,8 @@
                         >
                             <field name="service_hire_date"/>
                             <field name="service_start_date"/>
-                            <field
-                                    name="service_termination_date"
-                                    invisible="active"
-                            />
-                            <field name="service_duration" invisible="1"/>
-                            <label for="service_duration" string="Service Duration"/>
+                            <field name="service_termination_date" invisible="active"/>
+                            <label for="service_duration_years" string="Service Duration"/>
                             <div>
                                 <field name="service_duration_years" nolabel="1"/>
                                 <span class="ms-2 me-2">year(s)</span>
@@ -549,14 +545,7 @@
                                     <field name="payroll_status"/>
                                     <field name="language_ids" widget="many2many_tags"/>
                                     <field name="operating_unit_ids" widget="many2many_tags"/>
-                                    <label for="resource_calendar_id"/>
-                                    <div class="d-flex align-items-center">
-                                        <field name="resource_calendar_id" required="1" class="oe_inline"/>
-                                        <field name="calendar_mismatch" invisible="1"/>
-                                        <span invisible="not calendar_mismatch"
-                                              class="fa fa-exclamation-triangle text-danger ps-2"
-                                              title="Calendar Mismatch"/>
-                                    </div>
+                                    <field name="resource_calendar_id" required="1"/>
                                 </group>
                                 <group>
                                     <field name="parent_id"/>
@@ -923,31 +912,9 @@
 
                 <!-- 2. Contracts smart button in button_box -->
                 <xpath expr="//div[@name='button_box']" position="inside">
-                    <field name="contract_warning" invisible="1"/>
-                    <field name="first_contract_date" invisible="1"/>
-                    <field name="contracts_count" invisible="1"/>
                     <button name="%(hr_employee_custom.act_hr_employee_2_hr_contract)d" class="oe_stat_button"
                             icon="fa-book" type="action" groups="hr_employee_custom.group_hr_contract_manager">
-                        <!-- Has at least one contract -->
-                        <div invisible="not first_contract_date" class="o_stat_info">
-                            <span class="o_stat_text text-success" invisible="contract_warning">In Contract Since
-                            </span>
-                            <span class="o_stat_value text-success" invisible="contract_warning">
-                                <field name="first_contract_date" readonly="1"/>
-                            </span>
-                            <span class="o_stat_text text-danger" invisible="not contract_warning">In Contract Since
-                            </span>
-                            <span class="o_stat_value text-danger" invisible="not contract_warning">
-                                <field name="first_contract_date" readonly="1"/>
-                            </span>
-                        </div>
-                        <!-- No contracts yet -->
-                        <div invisible="first_contract_date" class="o_stat_info">
-                            <span class="o_stat_value text-danger">
-                                <field name="contracts_count"/>
-                            </span>
-                            <span class="o_stat_text text-danger">Contracts</span>
-                        </div>
+                        <field name="contracts_count" widget="statinfo" string="Contracts"/>
                     </button>
 
                     <!-- Guarantee Details smart button -->

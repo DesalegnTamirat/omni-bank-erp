@@ -72,7 +72,7 @@
         <!-- <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
                   action="employee_transfer_form_tree" sequence="16"/> -->
         <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="custom_recruitment.action_employee_transfer_request" sequence="16"/>
+                  action="employee_transfer_form_tree" sequence="16"/>
                   
         <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
                   action="employee_demotion_action" sequence="18"/>
