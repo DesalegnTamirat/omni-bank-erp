@@ -124,7 +124,7 @@
                         <th>CGPA</th>
                     </thead>
                     <tbody class="text-center" style="font-size:12px;">
-                        <tr required="">
+                        <tr>
                             <td>
                                 <select name="admission" id="admission" required="">
                                 <option value="Regular">Regular</option>

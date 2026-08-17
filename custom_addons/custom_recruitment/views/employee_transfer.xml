@@ -139,47 +139,11 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
 
-                    <!-- Eligibility Alert Banner -->
-                    <div class="alert alert-danger" role="alert"
-                         invisible="eligibility_status != 'ineligible'">
-                        <strong>⚠ Eligibility Issues:</strong>
-                        <field name="ineligibility_reason" readonly="1"/>
-                    </div>
-
-                    <!-- Refusal Penalty Alert -->
-                    <div class="alert alert-warning" role="alert"
-                         invisible="not ineligible_until_date">
-                        <strong>⛔ Transfer Ineligibility Penalty:</strong>
-                        This employee is ineligible to apply for transfers until
-                        <field name="ineligible_until_date" readonly="1" class="oe_inline"/>.
-                    </div>
-
-                    <!-- Exchange Transfer Info Banner -->
-                    <div class="alert alert-info" role="alert"
-                         invisible="not is_exchange_transfer">
-                        <strong>🔄 Mutual Exchange Transfer:</strong>
-                        This request is part of a mutual exchange transfer arrangement /.
-                    </div>
-
-                    <!-- Direct Transfer Info Banner (no vacancy link — this is a valid path) -->
-                    <div class="alert alert-info" role="alert"
-                         invisible="target_vacancy_id or state not in ('submitted', 'under_review', 'approved')">
-                        <strong>ℹ Direct Transfer (No Vacancy Link):</strong>
-                        No Target Vacancy is linked to this request. This is expected for direct
-                        transfers — it can still be approved using the Requested Operating Unit and
-                        the employee's current position/grade. Use "Find Matching Vacancy" or
-                        "Create Lateral Transfer Vacancy" above only if you want to link this to a
-                        specific published vacancy instead.
-                    </div>
-
-                    <!-- Missing Job Level Banner (Non-Managerial requires Junior/Senior) -->
-                    <div class="alert alert-warning" role="alert"
-                         invisible="current_job_category != 'Non Managerial' or current_job_level">
-                        <strong>⚠ Job Level Could Not Be Determined:</strong>
-                        Job Category is Non Managerial, which requires a Job Level (Junior / Senior),
-                        but Current Grade has no Job Level set. Update the Job Level on the employee's
-                        Grade record.
-                    </div>
+                    <!-- Eligibility & Status Widgets -->
+                    <widget name="web_ribbon" title="Ineligible for Transfer" bg_color="text-bg-danger" invisible="eligibility_status != 'ineligible'"/>
+                    <widget name="web_ribbon" title="Mutual Exchange" bg_color="text-bg-info" invisible="not is_exchange_transfer"/>
+                    <field name="ineligibility_reason" string="Eligibility Issues" readonly="1" invisible="eligibility_status != 'ineligible'"/>
+                    <field name="ineligible_until_date" string="Ineligible Until Date" readonly="1" invisible="not ineligible_until_date"/>
 
                     <group string=" Employee Information">
                         <group>

@@ -79,12 +79,8 @@
                         <h1><field name="reference" readonly="1"/></h1>
                     </div>
 
-                    <!-- Rejection reason banner -->
-                    <div class="alert alert-danger" role="alert"
-                         invisible="state != 'rejected' or not rejection_reason">
-                        <strong>Rejection Reason: </strong>
-                        <field name="rejection_reason" readonly="1" nolabel="1"/>
-                    </div>
+                    <!-- Rejection reason field -->
+                    <field name="rejection_reason" string="Rejection Reason" readonly="1" invisible="state != 'rejected' or not rejection_reason"/>
 
                     <field name="allowed_job_ids" invisible="1"/>
                     <field name="allowed_grade_ids" invisible="1"/>

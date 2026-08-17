@@ -336,10 +336,7 @@
                         <field name="approval_state" widget="statusbar"/>
                     </header>
                     <sheet>
-                        <div class="alert alert-info" role="alert"
-                             invisible="entitlement_valid or approval_state == 'draft'">
-                            <field name="entitlement_issues" class="text-break"/>
-                        </div>
+                        <field name="entitlement_issues" string="Entitlement Issues" readonly="1" invisible="entitlement_valid or approval_state == 'draft'"/>
                         <group>
                             <group string="Training">
                                 <field name="name" readonly="1"/>
