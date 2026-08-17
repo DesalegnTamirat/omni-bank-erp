@@ -88,10 +88,10 @@
                 <attribute name="column_invisible">1</attribute>
             </xpath>
 
-            <!-- Insert Check-in Status, Late Time Hour, Acknowledged Late, Over Time Hour right after Check In -->
+            <!-- Insert Check-in Status, Late By, Acknowledged Late, Over Time Hour right after Check In -->
             <xpath expr="//field[@name='check_in']" position="after">
                 <field name="check_in_status" string="Check-in Status" readonly="1"/>
-                <field name="late_time_hour" string="Late Time Hour" readonly="1" widget="float_time"/>
+                <field name="late_time_hour" string="Late By" readonly="1" widget="float_time"/>
                 <field name="acknowledged_late" string="Acknowledged Late" readonly="1" widget="float_time"/>
                 <field name="over_time_hour" string="Over Time Hour" readonly="1" widget="float_time"/>
             </xpath>
@@ -103,11 +103,10 @@
                 <field name="acknowledged_exit" string="Acknowledged Exit" readonly="1"/>
             </xpath>
 
-            <!-- Insert Acknowledged, Reason Type, Late By right after Worked Hours -->
+            <!-- Insert Acknowledged, Reason Type right after Worked Hours -->
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="is_acknowledged" string="Acknowledged" readonly="1"/>
                 <field name="reason_type" string="Reason Type" readonly="1"/>
-                <field name="late_by" string="Late By" readonly="1"/>
 
                 <!-- Configurable Optional Columns (Manager can enable/disable via column picker) -->
                 <field name="attendance_reason_ids" string="Reasons" widget="many2many_tags" optional="hide"/>

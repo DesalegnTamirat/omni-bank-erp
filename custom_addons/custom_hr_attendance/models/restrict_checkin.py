@@ -164,15 +164,15 @@ class HrEmployee(models.Model):
 
         if predefined_late and current_float <= predefined_late.end_time:
             status = 'Pre-Defined Lateness'
-            pre_defined_lateness_hours = round((current_float - shift_start) * 60, 2)
+            pre_defined_lateness_hours = round(current_float - shift_start, 4)
         elif current_float <= shift_start:
             status = 'Normal'
         elif current_float <= shift_start + dead_time:
             status = 'Late'
-            late_time = max(0, round((current_float - shift_start) * 60, 2))
+            late_time = max(0.0, round(current_float - shift_start, 4))
         elif is_manager or allow_late:
             status = 'Late'
-            late_time = max(0, round((current_float - shift_start) * 60, 2))
+            late_time = max(0.0, round(current_float - shift_start, 4))
         else:
             _logger.warning("Check-in rejected: Outside allowed grace period (%.2f)", current_float)
             raise UserError(_("Check-in is not allowed. You are past the allowed late threshold."))
@@ -199,12 +199,12 @@ class HrEmployee(models.Model):
 
         if predefined_early_exit and current_float >= predefined_early_exit.start_time:
             status = 'Pre-Defined Early Exit'
-            pre_approved_early = round((shift_end - current_float) * 60, 2)
+            pre_approved_early = round(shift_end - current_float, 4)
         elif current_float >= shift_end:
             status = 'Normal'
         elif current_float < shift_end:
             status = 'Unauthorized Early Exit'
-            early_exit = round((shift_end - current_float) * 60, 2)
+            early_exit = round(shift_end - current_float, 4)
         else:
             raise UserError(_("Early check-out is not allowed.\n\n"
                               "If you need to leave early, please submit an Early Exit request to your manager."))
@@ -544,4 +544,100 @@ class HrEmployee(models.Model):
             ('date_from', '<=', date),
             ('date_to', '>=', date),
         ], limit=1))
+
+    def _get_employee_shift_info(self, target_date=None):
+        self.ensure_one()
+        if not target_date:
+            target_date = fields.Date.context_today(self)
+
+        morning_start = self._get_param_float('hr_attendance.morning_time', 8.0)
+        exit_time = self._get_param_float('hr_attendance.exit_time', 17.0)
+
+        # 1. Roster Exception
+        roster = self.env['job.position.roster.exception'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('status', '=', 'active'),
+            ('active', '=', True),
+            ('start_date', '<=', target_date),
+            ('end_date', '>=', target_date)
+        ], order='start_date desc, id desc', limit=1)
+
+        if roster:
+            line = roster.line_ids.filtered(lambda l: l.date == target_date)
+            if line:
+                line = line[0]
+                if line.schedule_type == 'day_off':
+                    return {
+                        'name': 'Scheduled Day Off',
+                        'is_day_off': True,
+                        'has_lunch_break': False,
+                        'start_time': 8.0,
+                        'end_time': 17.0,
+                    }
+                shift = line.shift_id
+                if shift:
+                    return {
+                        'name': shift.name,
+                        'is_day_off': False,
+                        'has_lunch_break': shift.has_lunch_break,
+                        'start_time': shift.start_time,
+                        'end_time': shift.end_time,
+                        'lunch_start_time': shift.lunch_start_time,
+                        'lunch_duration': shift.lunch_duration,
+                    }
+
+        # 2. Position Exception
+        active_exception = self.env['job.position.exception'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('status', '=', 'active'),
+            ('active', '=', True),
+            ('start_date', '<=', target_date),
+            '|', ('end_date', '=', False), ('end_date', '>=', target_date)
+        ], order='start_date desc, id desc', limit=1)
+
+        if active_exception and active_exception.shift_id:
+            is_sunday = (target_date.weekday() == 6)
+            is_explicit_day_off = (active_exception.day_off == target_date)
+            if is_sunday or is_explicit_day_off:
+                return {
+                    'name': 'Scheduled Day Off',
+                    'is_day_off': True,
+                    'has_lunch_break': False,
+                    'start_time': 8.0,
+                    'end_time': 17.0,
+                }
+            shift = active_exception.shift_id
+            return {
+                'name': shift.name,
+                'is_day_off': False,
+                'has_lunch_break': shift.has_lunch_break,
+                'start_time': shift.start_time,
+                'end_time': shift.end_time,
+                'lunch_start_time': shift.lunch_start_time,
+                'lunch_duration': shift.lunch_duration,
+            }
+
+        # 3. Default Global Shift (Sunday is Day Off)
+        if target_date.weekday() == 6:
+            return {
+                'name': 'Default Global Shift (Day Off)',
+                'is_day_off': True,
+                'has_lunch_break': False,
+                'start_time': morning_start,
+                'end_time': exit_time,
+            }
+
+        enable_lunch = self._is_lunch_break_enabled() if hasattr(self, '_is_lunch_break_enabled') else False
+        lunch_start = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
+        lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
+
+        return {
+            'name': 'Default Global Shift',
+            'is_day_off': False,
+            'has_lunch_break': enable_lunch,
+            'start_time': morning_start,
+            'end_time': exit_time,
+            'lunch_start_time': lunch_start,
+            'lunch_duration': lunch_duration,
+        }
 

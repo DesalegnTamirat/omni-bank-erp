@@ -57,6 +57,7 @@
         'views/res_config_settings_views.xml',
         'views/over_time_views.xml',
         'views/hr_employee_views.xml',
+        'views/hr_attendance_batch_request_views.xml',
         # Reports
         'views/overtime_report_views.xml',
         'views/job_position_exception_report_views.xml',

@@ -11,6 +11,7 @@ from . import over_time
 from . import over_time_consumption
 from . import over_time_leave
 from . import over_time_leave_manager
+from . import hr_attendance_batch_request
 
 
 from . import generate_employee_attendance_details

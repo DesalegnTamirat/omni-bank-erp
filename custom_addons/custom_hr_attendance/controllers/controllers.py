@@ -205,23 +205,28 @@ class BunnaMyAttendance(http.Controller):
         start_of_week = today - datetime.timedelta(days=today.weekday())
         end_of_week = start_of_week + datetime.timedelta(days=6)
 
+        # Month calculation
+        start_of_month = today.replace(day=1)
+        if today.month == 12:
+            next_month = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month = today.replace(month=today.month + 1, day=1)
+        end_of_month = next_month - datetime.timedelta(days=1)
+
+        search_start_date = min(start_of_week, start_of_month) - datetime.timedelta(days=1)
+        search_end_date = max(end_of_week, end_of_month) + datetime.timedelta(days=1)
+
         tz_name = request.env.user.tz or 'UTC'
         try:
             local_tz = pytz.timezone(tz_name)
         except Exception:
             local_tz = pytz.utc
-        week_start_utc = local_tz.localize(
-            datetime.datetime.combine(start_of_week, datetime.time.min)
-        ).astimezone(pytz.utc).replace(tzinfo=None)
-        week_end_utc = local_tz.localize(
-            datetime.datetime.combine(end_of_week, datetime.time.max)
-        ).astimezone(pytz.utc).replace(tzinfo=None)
 
         search_start_utc = local_tz.localize(
-            datetime.datetime.combine(start_of_week - datetime.timedelta(days=1), datetime.time.min)
+            datetime.datetime.combine(search_start_date, datetime.time.min)
         ).astimezone(pytz.utc).replace(tzinfo=None)
         search_end_utc = local_tz.localize(
-            datetime.datetime.combine(end_of_week + datetime.timedelta(days=1), datetime.time.max)
+            datetime.datetime.combine(search_end_date, datetime.time.max)
         ).astimezone(pytz.utc).replace(tzinfo=None)
 
         attendances = request.env['hr.attendance'].sudo().search([
@@ -235,13 +240,19 @@ class BunnaMyAttendance(http.Controller):
         daily_checked_in = {d: False for d in range(7)}
 
         total_weekly_hours = 0.0
+        total_monthly_hours = 0.0
         today_completed_hours = 0.0
+        weekly_completed_hours = 0.0
+        monthly_completed_hours = 0.0
 
         for att in attendances:
             check_in_local_dt = fields.Datetime.context_timestamp(employee, att.check_in)
             check_in_local_date = check_in_local_dt.date()
 
-            if not (start_of_week <= check_in_local_date <= end_of_week):
+            in_week = (start_of_week <= check_in_local_date <= end_of_week)
+            in_month = (start_of_month <= check_in_local_date <= end_of_month)
+
+            if not (in_week or in_month):
                 continue
 
             day_idx = check_in_local_dt.weekday()
@@ -251,13 +262,21 @@ class BunnaMyAttendance(http.Controller):
                 duration = att.worked_hours or 0.0
                 if is_today_att:
                     today_completed_hours += duration
+                if in_week:
+                    weekly_completed_hours += duration
+                if in_month:
+                    monthly_completed_hours += duration
             else:
                 now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
                 live_start_dt = fields.Datetime.context_timestamp(employee, att.actual_check_in or att.check_in)
                 duration = max(0.0, (now_dt - live_start_dt).total_seconds() / 3600.0)
-                daily_checked_in[day_idx] = True
+                if in_week:
+                    daily_checked_in[day_idx] = True
 
-            daily_hours[day_idx] += duration
+            if in_week:
+                daily_hours[day_idx] += duration
+            if in_month:
+                total_monthly_hours += duration
 
         total_weekly_hours = sum(daily_hours.values())
 
@@ -288,14 +307,22 @@ class BunnaMyAttendance(http.Controller):
                 'is_day_off': is_day_off
             })
 
-        # Format weekly hours
+        # Format weekly & monthly hours
         wk_hours_int = int(total_weekly_hours)
         wk_mins_int = int(round((total_weekly_hours - wk_hours_int) * 60))
         data['weekly_hours_formatted'] = f"{wk_hours_int:02d}h {wk_mins_int:02d}m"
         data['weekly_hours_float'] = round(total_weekly_hours, 2)
+
+        mo_hours_int = int(total_monthly_hours)
+        mo_mins_int = int(round((total_monthly_hours - mo_hours_int) * 60))
+        data['monthly_hours_formatted'] = f"{mo_hours_int:02d}h {mo_mins_int:02d}m"
+        data['monthly_hours_float'] = round(total_monthly_hours, 2)
+
         data['daily_breakdown'] = daily_breakdown
-        # Send completed-today hours as float hours so JS can format them
+        # Send completed hours as float hours so JS can format live timer accurately
         data['hours_today_completed'] = round(today_completed_hours, 6)
+        data['hours_weekly_completed'] = round(weekly_completed_hours, 6)
+        data['hours_monthly_completed'] = round(monthly_completed_hours, 6)
         data['hours_today'] = round(today_completed_hours, 6)
 
         # Determine real-time check-in state directly from active open attendance record

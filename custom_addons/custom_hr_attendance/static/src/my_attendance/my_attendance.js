@@ -38,11 +38,14 @@ export class MyAttendance extends Component {
             departmentName: "",
             hoursToday: "00:00",
             weeklyHoursFormatted: "00h 00m",
+            monthlyHoursFormatted: "00h 00m",
             dailyBreakdown: [],
             checkInTimeStr: "",
             checkInStatus: "",
             checkInRaw: false,
             hoursCompletedToday: 0.0,   // float hours of closed sessions today
+            hoursCompletedWeek: 0.0,    // float hours of closed sessions this week
+            hoursCompletedMonth: 0.0,   // float hours of closed sessions this month
             todayTotalFormatted: "00:00:00", // completed + live current session
             shiftInfo: null,
             // Live clock & live timer
@@ -118,15 +121,33 @@ export class MyAttendance extends Component {
                             String(secs).padStart(2, '0');
 
                         // TODAY'S TOTAL = completed sessions + live elapsed
-                        const completedSecs = Math.round((this.state.hoursCompletedToday || 0) * 3600);
-                        const totalSecs = completedSecs + diffSecs;
-                        const tHrs = Math.floor(totalSecs / 3600);
-                        const tMins = Math.floor((totalSecs % 3600) / 60);
-                        const tSecs = totalSecs % 60;
+                        const completedSecsToday = Math.round((this.state.hoursCompletedToday || 0) * 3600);
+                        const totalSecsToday = completedSecsToday + diffSecs;
+                        const tHrs = Math.floor(totalSecsToday / 3600);
+                        const tMins = Math.floor((totalSecsToday % 3600) / 60);
+                        const tSecs = totalSecsToday % 60;
                         this.state.todayTotalFormatted =
                             String(tHrs).padStart(2, '0') + ":" +
                             String(tMins).padStart(2, '0') + ":" +
                             String(tSecs).padStart(2, '0');
+
+                        // WEEKLY TOTAL = completed sessions this week + live elapsed
+                        const completedSecsWeek = Math.round((this.state.hoursCompletedWeek || 0) * 3600);
+                        const totalSecsWeek = completedSecsWeek + diffSecs;
+                        const wHrs = Math.floor(totalSecsWeek / 3600);
+                        const wMins = Math.floor((totalSecsWeek % 3600) / 60);
+                        this.state.weeklyHoursFormatted =
+                            String(wHrs).padStart(2, '0') + "h " +
+                            String(wMins).padStart(2, '0') + "m";
+
+                        // MONTHLY TOTAL = completed sessions this month + live elapsed
+                        const completedSecsMonth = Math.round((this.state.hoursCompletedMonth || 0) * 3600);
+                        const totalSecsMonth = completedSecsMonth + diffSecs;
+                        const mHrs = Math.floor(totalSecsMonth / 3600);
+                        const mMins = Math.floor((totalSecsMonth % 3600) / 60);
+                        this.state.monthlyHoursFormatted =
+                            String(mHrs).padStart(2, '0') + "h " +
+                            String(mMins).padStart(2, '0') + "m";
                     } else {
                         this.state.liveWorkedTimer = "00:00:00";
                         this.state.todayTotalFormatted = "00:00:00";
@@ -166,11 +187,14 @@ export class MyAttendance extends Component {
         this.state.departmentName = data.department_name || "";
         this.state.hoursToday = this.formatFloatTime(data.hours_today || 0);
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
+        this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];
         this.state.checkInTimeStr = data.check_in_time_str || "";
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;
         this.state.hoursCompletedToday = data.hours_today_completed || 0.0;
+        this.state.hoursCompletedWeek = data.hours_weekly_completed || 0.0;
+        this.state.hoursCompletedMonth = data.hours_monthly_completed || 0.0;
         this.state.shiftInfo = data.shift_info || null;
 
         this.updateClock();

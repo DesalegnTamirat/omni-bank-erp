@@ -192,9 +192,9 @@
                     <div class="col-12 col-lg-7 col-xl-7">
 
 
-                            <!-- STAT CARDS ROW -->
+                        <!-- STAT CARDS ROW -->
                         <div class="row g-4 mb-4">
-                            <div class="col-12 col-sm-6">
+                            <div class="col-12 col-md-4">
                                 <div class="premium-card o_stat_card h-100">
                                     <div class="o_stat_icon icon-daily">
                                         <i class="fa fa-clock-o fa-2x"/>
@@ -211,7 +211,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-sm-6">
+                            <div class="col-12 col-md-4">
                                 <div class="premium-card o_stat_card h-100">
                                     <div class="o_stat_icon icon-weekly">
                                         <i class="fa fa-calendar-check-o fa-2x"/>
@@ -220,6 +220,18 @@
                                         <div class="stat-label">THIS WEEK'S TOTAL</div>
                                         <div class="stat-value" t-esc="state.weeklyHoursFormatted"/>
                                         <div class="stat-sub">Mon - Sun accumulation</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="premium-card o_stat_card h-100">
+                                    <div class="o_stat_icon icon-monthly">
+                                        <i class="fa fa-calendar fa-2x"/>
+                                    </div>
+                                    <div>
+                                        <div class="stat-label">THIS MONTH'S TOTAL</div>
+                                        <div class="stat-value" t-esc="state.monthlyHoursFormatted"/>
+                                        <div class="stat-sub">Monthly accumulation</div>
                                     </div>
                                 </div>
                             </div>

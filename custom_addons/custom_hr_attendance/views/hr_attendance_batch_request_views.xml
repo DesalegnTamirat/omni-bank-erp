@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Form View -->
+        <record id="view_hr_attendance_batch_request_form" model="ir.ui.view">
+            <field name="name">hr.attendance.batch.request.form</field>
+            <field name="model">hr.attendance.batch.request</field>
+            <field name="arch" type="xml">
+                <form string="Batch Attendance Entry Request" duplicate="0" delete="0">
+                    <field name="is_responsible_approver" invisible="1"/>
+                    <field name="is_creator" invisible="1"/>
+                    <header>
+                        <button name="action_approve" string="Approve &amp; Generate Attendance" type="object" class="btn-success" invisible="state != 'to_approve' or not is_responsible_approver"/>
+                        <button name="action_reject" string="Reject Request" type="object" class="btn-danger" invisible="state != 'to_approve' or not is_responsible_approver"/>
+                        <field name="state" widget="statusbar" statusbar_visible="to_approve,approved,rejected"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Request Info">
+                                <field name="manager_id" readonly="1"/>
+                                <field name="coach_id" readonly="1"/>
+                                <field name="operating_unit_id" readonly="1"/>
+                                <field name="rest_type" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                            </group>
+                            <group string="Date Range &amp; Duration">
+                                <field name="start_date" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                                <field name="end_date" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                                <field name="duration_days" readonly="1"/>
+                                <field name="overwrite_existing" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                            </group>
+                        </group>
+                        <group string="Employees Included">
+                            <field name="employee_ids" widget="many2many_tags" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                        </group>
+                        <group string="Reason &amp; Justification">
+                            <field name="attendance_reason_ids" widget="many2many_tags" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                            <field name="justification" readonly="state in ('approved', 'rejected') or not is_creator"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- List View -->
+        <record id="view_hr_attendance_batch_request_tree" model="ir.ui.view">
+            <field name="name">hr.attendance.batch.request.list</field>
+            <field name="model">hr.attendance.batch.request</field>
+            <field name="arch" type="xml">
+                <list string="Batch Attendance Entry Requests" duplicate="0" delete="0">
+                    <field name="name"/>
+                    <field name="manager_id"/>
+                    <field name="coach_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="start_date"/>
+                    <field name="end_date"/>
+                    <field name="duration_days"/>
+                    <field name="rest_type"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Action -->
+        <record id="action_hr_attendance_batch_request" model="ir.actions.act_window">
+            <field name="name">Batch Attendance Requests</field>
+            <field name="res_model">hr.attendance.batch.request</field>
+            <field name="view_mode">list,form</field>
+            <field name="target">current</field>
+        </record>
+    </data>
+</odoo>

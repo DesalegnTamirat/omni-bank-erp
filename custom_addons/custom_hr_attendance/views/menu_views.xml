@@ -129,6 +129,15 @@
             sequence="50"
             groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
 
+    <!-- 5.6 Batch Attendance Requests (Coach Approval) -->
+    <menuitem
+            id="menu_batch_attendance_requests"
+            name="Batch Attendance Requests"
+            parent="hr_attendance.menu_hr_attendance_view_attendances_management"
+            action="action_hr_attendance_batch_request"
+            sequence="55"
+            groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
+
     <!-- ====================================================
          6. Reporting Menu
          ==================================================== -->

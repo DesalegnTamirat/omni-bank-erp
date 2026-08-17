@@ -7,10 +7,21 @@
     <record id="hr_employee_rule_manager_hierarchy" model="ir.rule">
         <field name="name">HR Employee: Manager Subordinate Hierarchy</field>
         <field name="model_id" ref="hr.model_hr_employee"/>
-        <field name="domain_force">['|', '|', '|', ('user_id', '=', user.id), ('parent_id.user_id', '=', user.id), ('attendance_manager_id', '=', user.id), ('id', 'child_of', user.employee_id.id)]</field>
+        <field name="domain_force">['|', '|', '|', '|', '|', '|', ('user_id', '=', user.id), ('parent_id.user_id', '=', user.id), ('attendance_manager_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('id', '=', user.employee_id.coach_id.id), ('id', '=', user.employee_id.parent_id.id), ('default_operating_unit_id', '=', user.employee_id.default_operating_unit_id.id)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="0"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
+
+    <record id="hr_employee_rule_read_attendance_user" model="ir.rule">
+        <field name="name">HR Employee: Attendance User Read All Employee Names</field>
+        <field name="model_id" ref="hr.model_hr_employee"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
         <field name="perm_create" eval="0"/>
         <field name="perm_unlink" eval="0"/>
     </record>
@@ -294,6 +305,31 @@
         <field name="model_id" ref="model_job_position_roster_exception_line"/>
         <field name="domain_force">[(1, '=', 1)]</field>
         <field name="groups" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_job_position_user')), (4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <!-- ====================================================
+         Batch Attendance Request Record Rules
+         ==================================================== -->
+    <record id="batch_attendance_request_rule_user" model="ir.rule">
+        <field name="name">Batch Request: Creator or Assigned Coach Access Only</field>
+        <field name="model_id" ref="model_hr_attendance_batch_request"/>
+        <field name="domain_force">['|', '|', ('manager_id', '=', user.id), ('coach_id.user_id', '=', user.id), ('coach_id.attendance_manager_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+    </record>
+
+    <record id="batch_attendance_request_rule_admin" model="ir.rule">
+        <field name="name">Batch Request: Attendance Admin Full Access</field>
+        <field name="model_id" ref="model_hr_attendance_batch_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="1"/>
         <field name="perm_create" eval="1"/>

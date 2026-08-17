@@ -20,8 +20,9 @@ class HrAttendance(models.Model):
     def _compute_late_by(self):
         for rec in self:
             if rec.late_time_hour and rec.late_time_hour > 0:
-                hours = int(rec.late_time_hour)
-                minutes = int(round((rec.late_time_hour - hours) * 60))
+                late_val = rec.late_time_hour / 60.0 if rec.late_time_hour > 12.0 else rec.late_time_hour
+                hours = int(late_val)
+                minutes = int(round((late_val - hours) * 60))
                 rec.late_by = f"{hours:02d}:{minutes:02d}"
             else:
                 rec.late_by = "00:00"
