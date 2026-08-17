@@ -108,7 +108,6 @@
                                     class="oe_stat_button" icon="fa-folder-open"
                                     groups="employee_development_system.group_eds_officer">
                                 <field name="material_count" widget="statinfo" string="Materials"/>
-                                <span class="o_stat_text">Approval gate </span>
                             </button>
                         </div>
                         <group>

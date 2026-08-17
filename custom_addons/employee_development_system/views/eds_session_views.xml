@@ -40,10 +40,7 @@
                         <div class="oe_button_box">
                             <button class="oe_stat_button" type="object"
                                     name="action_view_bookings" icon="fa-calendar">
-                                <div class="o_stat_info">
-                                    <field name="booking_count" widget="statinfo" string="Bookings"/>
-                                    <span class="o_stat_text">View venue bookings</span>
-                                </div>
+                                <field name="booking_count" widget="statinfo" string="Bookings"/>
                             </button>
                         </div>
                         <group>
@@ -281,24 +278,15 @@
                         <div class="oe_button_box">
                             <button class="oe_stat_button" type="object"
                                     name="action_view_nominations" icon="fa-list-alt">
-                                <div class="o_stat_info">
-                                    <field name="nomination_count" widget="statinfo" string="Nominations"/>
-                                    <span class="o_stat_text">Review / approve</span>
-                                </div>
+                                <field name="nomination_count" widget="statinfo" string="Nominations"/>
                             </button>
                             <button class="oe_stat_button" type="object"
                                     name="action_view_enrollments" icon="fa-users">
-                                <div class="o_stat_info">
-                                    <field name="enrolled_count" widget="statinfo" string="Enrolled"/>
-                                    <span class="o_stat_text">of capacity <field name="capacity"/> (waitlist <field name="waitlist_count"/>)</span>
-                                </div>
+                                <field name="enrolled_count" widget="statinfo" string="Enrolled"/>
                             </button>
                             <button class="oe_stat_button" type="object"
                                     name="action_view_attendance" icon="fa-check-square-o">
-                                <div class="o_stat_info">
-                                    <field name="attendance_count" widget="statinfo" string="Attendance"/>
-                                    <span class="o_stat_text">Session rate <field name="attendance_rate"/>%</span>
-                                </div>
+                                <field name="attendance_count" widget="statinfo" string="Attendance"/>
                             </button>
                         </div>
                         <group>

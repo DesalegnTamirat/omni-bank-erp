@@ -74,9 +74,7 @@
                                 <field name="appeal_count" widget="statinfo" string="Appeals"/>
                             </button>
                             <button type="object" name="action_open_revocation_wizard" class="oe_stat_button" icon="fa-ban"
-                                    invisible="not is_revoked" groups="discipline_management.group_discipline_admin">
-                                <span class="o_stat_text">Revoked</span>
-                            </button>
+                                    string="Revoked" invisible="not is_revoked" groups="discipline_management.group_discipline_admin"/>
                         </div>
                         <div class="oe_title">
                             <h1>

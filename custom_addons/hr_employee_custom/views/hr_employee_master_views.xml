@@ -918,42 +918,24 @@
                     </button>
 
                     <!-- Guarantee Details smart button -->
-                    <field name="guarantee_count" invisible="1"/>
                     <button name="%(hr_employee_custom.act_hr_employee_2_guarentees_details)d" class="oe_stat_button"
                             icon="fa-shield" type="action"
                             context="{'search_default_employee_id': id, 'default_employee_id': id}">
-                        <div class="o_stat_info">
-                            <span class="o_stat_value">
-                                <field name="guarantee_count"/>
-                            </span>
-                            <span class="o_stat_text">Guarantees</span>
-                        </div>
+                        <field name="guarantee_count" widget="statinfo" string="Guarantees"/>
                     </button>
 
                     <!-- Supplementary Role smart button -->
-                    <field name="supplementary_count" invisible="1"/>
                     <button name="%(hr_employee_custom.employee_supplementary_role_tree)d" class="oe_stat_button"
                             icon="fa-users" type="action"
                             context="{'search_default_employee_name': id, 'default_employee_name': id}">
-                        <div class="o_stat_info">
-                            <span class="o_stat_value">
-                                <field name="supplementary_count"/>
-                            </span>
-                            <span class="o_stat_text">Supplementary</span>
-                        </div>
+                        <field name="supplementary_count" widget="statinfo" string="Supplementary"/>
                     </button>
 
                     <!-- Awards Given smart button -->
-                    <field name="award_count" invisible="1"/>
                     <button name="%(hr_employee_custom.employee_hr_award_tree)d" class="oe_stat_button" icon="fa-trophy"
                             type="action" groups="hr.group_hr_user"
                             context="{'search_default_employee_id': id, 'default_employee_id': id}">
-                        <div class="o_stat_info">
-                            <span class="o_stat_value">
-                                <field name="award_count"/>
-                            </span>
-                            <span class="o_stat_text">Awards</span>
-                        </div>
+                        <field name="award_count" widget="statinfo" string="Awards"/>
                     </button>
                 </xpath>
 

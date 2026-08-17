@@ -63,15 +63,11 @@
                                     name="action_mark_reviewed"
                                     invisible="state != 'active'"
                                     help="Record a periodic review .">
-                                <div class="o_stat_info">
-                                    <field name="avg_rating" widget="statinfo" string="Avg Rating"/>
-                                    <span class="o_stat_text">Next review <field name="next_review_date"/></span>
-                                </div>
+                                <field name="avg_rating" widget="statinfo" string="Avg Rating"/>
                             </button>
-                            <div class="o_stat_info">
+                            <button class="oe_stat_button" icon="fa-certificate">
                                 <field name="tot_certified" widget="statinfo" string="ToT Certified"/>
-                                <span class="o_stat_text">Certifications</span>
-                            </div>
+                            </button>
                         </div>
                         <group>
                             <group string="Trainer">

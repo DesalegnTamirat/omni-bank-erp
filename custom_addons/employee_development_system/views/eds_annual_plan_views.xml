@@ -68,26 +68,18 @@
                         <div class="oe_button_box">
                             <button class="oe_stat_button" type="object"
                                     name="action_view_sessions" icon="fa-calendar-check-o">
-                                <div class="o_stat_info">
-                                    <field name="line_count" widget="statinfo" string="Programs"/>
-                                    <span class="o_stat_text">Sessions of this plan</span>
-                                </div>
+                                <field name="line_count" widget="statinfo" string="Programs"/>
                             </button>
                             <button class="oe_stat_button" type="object"
                                     name="action_view_sessions" icon="fa-bar-chart">
-                                <div class="o_stat_info">
-                                    <field name="execution_rate" widget="statinfo" string="Execution"/>
-                                    <span class="o_stat_text">Delivered <field name="delivered_count"/> of <field name="line_count"/></span>
-                                </div>
+                                <field name="execution_rate" widget="statinfo" string="Execution Rate"/>
                             </button>
-                            <div class="o_stat_info">
-                                <field name="budget_total" widget="statinfo" string="Budget"/>
-                                <span class="o_stat_text">Allocated across lines</span>
-                            </div>
-                            <div class="o_stat_info">
+                            <button class="oe_stat_button" icon="fa-money">
+                                <field name="budget_total" widget="statinfo" string="Total Budget"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-pencil-square-o">
                                 <field name="amendment_count" widget="statinfo" string="Amendments"/>
-                                <span class="o_stat_text">Unscheduled addenda </span>
-                            </div>
+                            </button>
                         </div>
                         <group>
                             <group string="Plan">

@@ -83,10 +83,7 @@
                             <button class="oe_stat_button" type="object"
                                     name="action_open_enrollment" icon="fa-user"
                                     invisible="not enrollment_id">
-                                <div class="o_stat_info">
-                                    <field name="waitlist_position" widget="statinfo" string="Waitlist Pos"/>
-                                    <span class="o_stat_text">Enrollment seat</span>
-                                </div>
+                                <field name="waitlist_position" widget="statinfo" string="Waitlist Pos"/>
                             </button>
                         </div>
                         <group>
