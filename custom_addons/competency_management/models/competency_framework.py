@@ -47,27 +47,47 @@ class CompetencyFramework(models.Model):
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_('Add at least one competency line before submitting for approval.'))
-            rec.write({'state': 'under_approval'})
+            rec.with_context(force_write=True).write({'state': 'under_approval'})
             rec._log_approval_step('submitted', 'Submitted for approval')
             rec.message_post(body=_('Competency framework %s submitted for approval.') % rec.name)
 
     def action_approve(self):
-        """Under Approval -> Approved /007)."""
+        """Under Approval -> Approved (FR-COM-007, FR-COM-052)."""
         for rec in self:
-            rec.write({
+            rec.with_context(force_write=True).write({
                 'state': 'approved',
                 'approved_by_id': self.env.user.id,
                 'approval_date': fields.Datetime.now(),
             })
             rec._log_approval_step('approved', 'Approved')
-            rec.message_post(body=_('Competency framework %s approved.') % rec.name)
+            rec.message_post(body=_('Competency framework %s (Version %s) approved.') % (rec.name, rec.version))
+            
+            # Framework update notification (FR-COM-052)
+            employees = self.env['hr.employee'].search([('user_id', '!=', False)])
+            for emp in employees[:50]:  # Notify active user employees
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('Competency Framework Updated: %s') % rec.name,
+                    note=_('Competency Framework %s (Version %s) has been approved and is now active.') % (rec.name, rec.version),
+                    user_id=emp.user_id.id,
+                )
 
     def action_retire(self):
         """Approved -> Retired framework lifecycle)."""
         for rec in self:
-            rec.write({'state': 'retired'})
+            rec.with_context(force_write=True).write({'state': 'retired'})
             rec._log_approval_step('retired', 'Retired')
             rec.message_post(body=_('Competency framework %s retired.') % rec.name)
+
+    def write(self, vals):
+        force_write = self.env.context.get('force_write')
+        for rec in self:
+            if rec.state != 'draft' and not force_write and not self.env.su:
+                locked_fields = {'name', 'code', 'version', 'effective_date', 'description', 'line_ids', 'change_description'}
+                if set(vals.keys()) & locked_fields:
+                    raise ValidationError(_("This framework (%s - Version %s) is finalized and cannot be edited. Use 'Create New Version' instead.") % (rec.name, rec.version))
+        return super().write(vals)
+
 
     def action_create_new_version(self):
         """Deep-copy an approved framework with an incremented version ."""
@@ -125,6 +145,28 @@ class CompetencyFrameworkLine(models.Model):
         ('framework_competency_uniq', 'unique(framework_id, competency_id)',
          'This competency is already part of the framework!'),
     ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        lines = super().create(vals_list)
+        for line in lines:
+            if line.framework_id and line.framework_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
+                raise ValidationError(_('Cannot add competency lines to a framework (%s) that is not in Draft state. Please create a new version.') % line.framework_id.name)
+        return lines
+
+    def write(self, vals):
+        res = super().write(vals)
+        for line in self:
+            if line.framework_id and line.framework_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
+                raise ValidationError(_('Cannot modify competency lines on a framework (%s) that is not in Draft state. Please create a new version.') % line.framework_id.name)
+        return res
+
+    @api.ondelete(at_uninstall=False)
+    def _prevent_unlink_on_approved(self):
+        for line in self:
+            if line.framework_id and line.framework_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
+                raise ValidationError(_('Cannot delete competency lines from a framework (%s) that is not in Draft state. Please create a new version.') % line.framework_id.name)
+
 
 
 class CompetencyApprovalHistory(models.Model):

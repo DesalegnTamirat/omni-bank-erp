@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Team Competency Gap Dashboard - Pivot View (FR-GAP-006) -->
+        <record id="view_competency_team_gap_pivot" model="ir.ui.view">
+            <field name="name">competency.assessment.line.team.gap.pivot</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <pivot string="Team Competency Gap Analysis">
+                    <field name="assessment_id" type="row"/>
+                    <field name="competency_id" type="col"/>
+                    <field name="gap" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Team Competency Gap Dashboard - Graph View (FR-GAP-006) -->
+        <record id="view_competency_team_gap_graph" model="ir.ui.view">
+            <field name="name">competency.assessment.line.team.gap.graph</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <graph string="Team Competency Gaps by Competency" type="bar">
+                    <field name="competency_id"/>
+                    <field name="gap" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="action_competency_team_gap_dashboard" model="ir.actions.act_window">
+            <field name="name">Team Competency Gap Dashboard</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">pivot,graph</field>
+            <field name="context">{'search_default_below_required': 1}</field>
+        </record>
+    </data>
+</odoo>

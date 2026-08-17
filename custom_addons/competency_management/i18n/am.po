@@ -1,0 +1,51 @@
+# Amharic translation for Competency Management System (Bunna Bank ERP).
+# Copyright (C) 2026 Bunna Bank S.C.
+# This file is distributed under the same license as the competency_management package.
+# Bunna Bank Localization Team <hr@bunnabanksc.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-15 11:00+0000\n"
+"PO-Revision-Date: 2026-08-15 11:00+0000\n"
+"Last-Translator: Bunna Bank Localization Team <hr@bunnabanksc.com>\n"
+"Language-Team: Amharic <am@li.org>\n"
+"Language: am\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__name
+msgid "Competency Name"
+msgstr "የብቃት ስም"
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__code
+msgid "Competency Code"
+msgstr "የብቃት መለያ ኮድ"
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__pillar
+msgid "Pillar"
+msgstr "የብቃት ዘርፍ"
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_assessment.py:0
+#, python-format
+msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."
+msgstr "የራስዎን ምዘና ወይም IDP ማጽደቅ አይችሉም። ይህ ተግባር በሌላ በተፈቀደለት ተጠቃሚ መከናወን አለበት (FR-COM-055)።"
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_role_mapping.py:0
+#, python-format
+msgid "A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead."
+msgstr "ለዚህ የሥራ መደብ በዚህ ስሪት የተዘጋጀ ካርታ ቀደም ብሎ ይገኛል። እባክዎን ያለውን ያሻሽሉ ወይም አዲስ ስሪት ይፍጠሩ።"
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_competency.py:0
+#, python-format
+msgid "Behavioral Indicators are required for each proficiency level (FR-COM-003, FR-COM-004)."
+msgstr "ለእያንዳንዱ የብቃት ደረጃ የባህሪ ማሳያዎች መሞላት አለባቸው (FR-COM-003, FR-COM-004)።"

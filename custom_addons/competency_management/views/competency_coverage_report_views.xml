@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_competency_coverage_report_list" model="ir.ui.view">
+            <field name="name">competency.coverage.report.list</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <list create="false" edit="false" delete="false">
+                    <field name="job_name"/>
+                    <field name="department_id"/>
+                    <field name="mapping_status" widget="badge"/>
+                    <field name="active_version"/>
+                    <field name="mapped_competencies_count"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_coverage_report_pivot" model="ir.ui.view">
+            <field name="name">competency.coverage.report.pivot</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <pivot string="Competency Mapping Coverage">
+                    <field name="department_id" type="row"/>
+                    <field name="mapping_status" type="col"/>
+                    <field name="mapped_competencies_count" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="action_competency_coverage_report" model="ir.actions.act_window">
+            <field name="name">Competency Coverage Report</field>
+            <field name="res_model">competency.coverage.report</field>
+            <field name="view_mode">list,pivot</field>
+        </record>
+    </data>
+</odoo>

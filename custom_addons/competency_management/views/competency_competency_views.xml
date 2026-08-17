@@ -47,11 +47,11 @@
                         <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="status != 'retired'"/>
                         <group>
                             <group string="Identity">
-                                <field name="name"/>
-                                <field name="code"/>
-                                <field name="pillar"/>
-                                <field name="functional_domain"/>
-                                <field name="rating_model_id"/>
+                                <field name="name" readonly="status == 'retired'"/>
+                                <field name="code" readonly="status == 'retired'"/>
+                                <field name="pillar" readonly="status == 'retired'"/>
+                                <field name="functional_domain" readonly="status == 'retired'"/>
+                                <field name="rating_model_id" readonly="status == 'retired'"/>
                             </group>
                             <group string="Status">
                                 <field name="status"/>
@@ -60,21 +60,33 @@
                             </group>
                         </group>
                         <group string="Definition">
-                            <field name="definition" placeholder="Define the competency and what it covers..."/>
+                            <field name="definition" readonly="status == 'retired'" placeholder="Define the competency and what it covers..."/>
                         </group>
                         <notebook>
                             <page string="Proficiency Levels">
-                                <field name="proficiency_level_ids">
+                                <field name="proficiency_level_ids" readonly="status == 'retired'">
                                     <list editable="bottom">
                                         <field name="level"/>
-                                        <field name="name"/>
+                                        <field name="name" readonly="1"/>
                                         <field name="definition"/>
-                                        <field name="behavioral_indicators"/>
+                                        <field name="behavioral_indicators" required="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Applicable Job Positions">
                                 <field name="applicable_job_ids" widget="many2many_tags"/>
+                            </page>
+                            <page string="Definition Change History" groups="competency_management.group_competency_admin">
+                                <field name="change_log_ids">
+                                    <list>
+                                        <field name="effective_date"/>
+                                        <field name="user_id"/>
+                                        <field name="level_id"/>
+                                        <field name="old_definition"/>
+                                        <field name="new_definition"/>
+                                        <field name="change_description"/>
+                                    </list>
+                                </field>
                             </page>
                         </notebook>
                     </sheet>
@@ -91,6 +103,7 @@
                 <search>
                     <field name="name"/>
                     <field name="code"/>
+                    <filter string="Active Competencies" name="active_status" domain="[('status','=','active')]"/>
                     <filter string="Core" name="pillar_core" domain="[('pillar','=','core')]"/>
                     <filter string="Leadership" name="pillar_leadership" domain="[('pillar','=','leadership')]"/>
                     <filter string="Technical" name="pillar_technical" domain="[('pillar','=','technical')]"/>
@@ -107,6 +120,7 @@
             <field name="name">Competency Dictionary</field>
             <field name="res_model">competency.competency</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_active_status': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_competency_search"/>
         </record>
 

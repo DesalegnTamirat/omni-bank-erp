@@ -1,0 +1,48 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* competency_management
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-15 11:00+0000\n"
+"PO-Revision-Date: 2026-08-15 11:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: Bunna Bank Localization Team <hr@bunnabanksc.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__name
+msgid "Competency Name"
+msgstr ""
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__code
+msgid "Competency Code"
+msgstr ""
+
+#. module: competency_management
+#: model:ir.model.fields,field_description:competency_management.field_competency_competency__pillar
+msgid "Pillar"
+msgstr ""
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_assessment.py:0
+#, python-format
+msgid "You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."
+msgstr ""
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_role_mapping.py:0
+#, python-format
+msgid "A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead."
+msgstr ""
+
+#. module: competency_management
+#: code:addons/competency_management/models/competency_competency.py:0
+#, python-format
+msgid "Behavioral Indicators are required for each proficiency level (FR-COM-003, FR-COM-004)."
+msgstr ""

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Daily Cron: Pending Assessment Reminders -->
+        <record id="cron_pending_assessment_reminders" model="ir.cron">
+            <field name="name">Competency Management: Pending Assessment Reminders</field>
+            <field name="model_id" ref="model_competency_assessment"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_pending_assessment_reminders()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Daily Cron: IDP Checkpoint Reminders -->
+        <record id="cron_idp_checkpoint_reminders" model="ir.cron">
+            <field name="name">Competency Management: IDP Checkpoint Reminders</field>
+            <field name="model_id" ref="model_competency_idp"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_idp_checkpoint_reminders()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Daily Cron: Mandatory IDP Escalation -->
+        <record id="cron_escalate_mandatory_idps" model="ir.cron">
+            <field name="name">Competency Management: Mandatory IDP Escalation</field>
+            <field name="model_id" ref="model_competency_idp"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_escalate_mandatory_idps()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Daily Cron: Data Quality & Governance Audit (FR-DQ-COM-001..003) -->
+        <record id="cron_competency_data_quality_audit" model="ir.cron">
+            <field name="name">Competency Management: Data Quality &amp; Governance Audit</field>
+            <field name="model_id" ref="model_competency_data_validator"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_validate_competency_data_quality()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+    </data>
+</odoo>

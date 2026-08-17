@@ -39,18 +39,18 @@
                         <group>
                             <group>
                                 <field name="name" readonly="1"/>
-                                <field name="employee_id"/>
-                                <field name="assessment_id"/>
+                                <field name="employee_id" readonly="state == 'completed'"/>
+                                <field name="assessment_id" readonly="state == 'completed'"/>
                             </group>
                             <group>
-                                <field name="mandatory" widget="boolean_toggle"/>
+                                <field name="mandatory" widget="boolean_toggle" readonly="state == 'completed'"/>
                                 <field name="approved_by_id"/>
                                 <field name="approval_date"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Development Activities">
-                                <field name="goal_ids">
+                                <field name="goal_ids" readonly="state == 'completed'">
                                     <list editable="bottom">
                                         <field name="goal"/>
                                         <field name="activity_type"/>
@@ -63,7 +63,7 @@
                                 </field>
                             </page>
                             <page string="Review Checkpoints">
-                                <field name="checkpoint_ids">
+                                <field name="checkpoint_ids" readonly="state == 'completed'">
                                     <list editable="bottom">
                                         <field name="scheduled_date"/>
                                         <field name="status"/>
@@ -73,7 +73,7 @@
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes"/>
+                                <field name="notes" readonly="state == 'completed'"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -89,6 +89,7 @@
             <field name="arch" type="xml">
                 <search>
                     <field name="employee_id"/>
+                    <filter string="My IDPs" name="my_idps" domain="[('employee_id.user_id','=',uid)]"/>
                     <filter string="Mandatory IDPs" name="mandatory_only" domain="[('mandatory','=',True)]"/>
                     <filter string="Active" name="active_only" domain="[('state','in',('approved','active'))]"/>
                     <separator/>
@@ -103,6 +104,15 @@
             <field name="name">Development Plans (IDP)</field>
             <field name="res_model">competency.idp</field>
             <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="competency_management.view_competency_idp_search"/>
+        </record>
+
+        <record id="action_my_competency_idp" model="ir.actions.act_window">
+            <field name="name">My Development Plans (IDP)</field>
+            <field name="res_model">competency.idp</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="context">{'search_default_my_idps': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_idp_search"/>
         </record>
 

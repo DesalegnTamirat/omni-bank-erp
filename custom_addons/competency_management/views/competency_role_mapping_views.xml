@@ -12,6 +12,7 @@
                     <field name="job_position_id"/>
                     <field name="grade_id"/>
                     <field name="version"/>
+                    <field name="record_type" widget="badge"/>
                     <field name="state" widget="badge"/>
                     <field name="effective_date"/>
                 </list>
@@ -38,10 +39,11 @@
                     <sheet>
                         <group>
                             <group>
-                                <field name="job_position_id"/>
-                                <field name="grade_id"/>
-                                <field name="version"/>
-                                <field name="effective_date"/>
+                                <field name="job_position_id" readonly="state != 'draft'"/>
+                                <field name="grade_id" readonly="state != 'draft'"/>
+                                <field name="version" readonly="state != 'draft'"/>
+                                <field name="record_type" readonly="state != 'draft'"/>
+                                <field name="effective_date" readonly="state != 'draft'"/>
                             </group>
                             <group>
                                 <field name="last_review_date"/>
@@ -50,8 +52,11 @@
                                 <field name="approval_date"/>
                             </group>
                         </group>
+                        <group string="Version Governance &amp; Change Log">
+                            <field name="change_description" readonly="state != 'draft'" placeholder="Describe changes introduced in this version..."/>
+                        </group>
                         <group string="Required Competencies">
-                            <field name="line_ids">
+                            <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
                                     <field name="competency_id"/>
                                     <field name="required_proficiency"/>
@@ -73,8 +78,16 @@
                 <search>
                     <field name="job_position_id"/>
                     <field name="grade_id"/>
+                    <field name="version"/>
+                    <filter string="Production Mappings" name="production_records" domain="[('record_type','=','production')]"/>
                     <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
                     <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                    <filter string="Demo / Test Records" name="demo_test_records" domain="[('record_type','in',['demo','test'])]"/>
+                    <group>
+                        <filter string="Job Position" name="group_job" context="{'group_by':'job_position_id'}"/>
+                        <filter string="Record Type" name="group_record_type" context="{'group_by':'record_type'}"/>
+                        <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
+                    </group>
                 </search>
             </field>
         </record>
@@ -83,6 +96,7 @@
             <field name="name">Role-Competency Mapping</field>
             <field name="res_model">competency.role.mapping</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_production_records': 1, 'search_default_state_approved': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_role_mapping_search"/>
         </record>
 

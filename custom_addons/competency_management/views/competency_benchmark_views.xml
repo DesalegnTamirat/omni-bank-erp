@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Competency Benchmark List View -->
+        <record id="view_competency_benchmark_list" model="ir.ui.view">
+            <field name="name">competency.benchmark.list</field>
+            <field name="model">competency.benchmark</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="competency_id"/>
+                    <field name="source"/>
+                    <field name="benchmark_level"/>
+                    <field name="effective_date"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Competency Benchmark Form View -->
+        <record id="view_competency_benchmark_form" model="ir.ui.view">
+            <field name="name">competency.benchmark.form</field>
+            <field name="model">competency.benchmark</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="competency_id"/>
+                                <field name="benchmark_level"/>
+                            </group>
+                            <group>
+                                <field name="source"/>
+                                <field name="effective_date"/>
+                            </group>
+                        </group>
+                        <group string="Benchmark Details &amp; Rationale">
+                            <field name="notes" placeholder="Enter benchmark rationale and standards reference..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_benchmark" model="ir.actions.act_window">
+            <field name="name">Competency Benchmarks</field>
+            <field name="res_model">competency.benchmark</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <!-- Competency Benchmark Comparison List View (FR-GAP-009) -->
+        <record id="view_competency_benchmark_comparison_list" model="ir.ui.view">
+            <field name="name">competency.benchmark.comparison.list</field>
+            <field name="model">competency.benchmark.comparison</field>
+            <field name="arch" type="xml">
+                <list create="false" edit="false" delete="false">
+                    <field name="employee_name"/>
+                    <field name="department_name"/>
+                    <field name="competency_id"/>
+                    <field name="current_level"/>
+                    <field name="required_level"/>
+                    <field name="benchmark_level"/>
+                    <field name="gap_vs_required"/>
+                    <field name="gap_vs_benchmark"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Competency Benchmark Comparison Pivot View (FR-GAP-009) -->
+        <record id="view_competency_benchmark_comparison_pivot" model="ir.ui.view">
+            <field name="name">competency.benchmark.comparison.pivot</field>
+            <field name="model">competency.benchmark.comparison</field>
+            <field name="arch" type="xml">
+                <pivot string="Benchmark Comparison Analysis">
+                    <field name="department_id" type="row"/>
+                    <field name="competency_id" type="col"/>
+                    <field name="gap_vs_benchmark" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="action_competency_benchmark_comparison" model="ir.actions.act_window">
+            <field name="name">Competency Benchmarking Comparison</field>
+            <field name="res_model">competency.benchmark.comparison</field>
+            <field name="view_mode">list,pivot</field>
+        </record>
+    </data>
+</odoo>

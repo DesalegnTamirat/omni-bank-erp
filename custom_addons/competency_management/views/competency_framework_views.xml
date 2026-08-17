@@ -38,10 +38,10 @@
                     <sheet>
                         <group>
                             <group>
-                                <field name="name"/>
-                                <field name="code"/>
-                                <field name="version"/>
-                                <field name="effective_date"/>
+                                <field name="name" readonly="state in ('approved','retired')"/>
+                                <field name="code" readonly="state in ('approved','retired')"/>
+                                <field name="version" readonly="state in ('approved','retired')"/>
+                                <field name="effective_date" readonly="state in ('approved','retired')"/>
                             </group>
                             <group>
                                 <field name="approved_by_id"/>
@@ -49,11 +49,11 @@
                             </group>
                         </group>
                         <group string="Change Description" invisible="not change_description">
-                            <field name="change_description"/>
+                            <field name="change_description" readonly="state in ('approved','retired')"/>
                         </group>
                         <notebook>
                             <page string="Competencies">
-                                <field name="line_ids">
+                                <field name="line_ids" readonly="state in ('approved','retired')">
                                     <list editable="bottom">
                                         <field name="competency_id"/>
                                         <field name="notes"/>
