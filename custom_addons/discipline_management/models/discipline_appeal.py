@@ -102,10 +102,14 @@ class DisciplineAppeal(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.appeal') or _('New')
+            if not vals.get('reviewer_id'):
+                admin_group = self.env.ref('discipline_management.group_discipline_admin', raise_if_not_found=False)
+                if admin_group and admin_group.user_ids:
+                    vals['reviewer_id'] = admin_group.user_ids[0].id
         appeals = super().create(vals_list)
         for app in appeals:
             if app.case_id:
-                app.case_id.write({'state': 'appealed'})
+                app.case_id.with_context(force_write=True).write({'state': 'appealed'})
                 app.case_id.message_post(body=_('Appeal %s submitted by employee against Case decision.') % app.name)
         return appeals
 

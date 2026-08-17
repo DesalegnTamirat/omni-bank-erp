@@ -13,6 +13,7 @@ class DisciplineCommitteeMeeting(models.Model):
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Affected Employee', related='case_id.employee_id', store=True, readonly=True)
     meeting_date = fields.Datetime(string='Scheduled Meeting Time', required=True, tracking=True)
+    meeting_end_time = fields.Datetime(string='Scheduled Meeting End Time', tracking=True)
     location = fields.Char(string='Meeting Room / Location', default='Main HR Conference Room')
 
     committee_chair_id = fields.Many2one('res.users', string='Committee Chair', required=True, tracking=True)
