@@ -261,6 +261,48 @@ class EdsEvaluationLevel3(models.Model):
             rec.completed_date = fields.Date.context_today(self)
             rec.message_post(body=_("Level 3 behavioral evaluation completed by manager %s with score %.1f%%.") % (rec.manager_id.name, rec.behavior_score))
 
+    @api.model
+    def _cron_generate_level_3_evaluations(self):
+        """Cron action: Auto-generates Level 3 Behavior Evaluations for sessions completed 30, 60, or 90 days ago."""
+        today = fields.Date.context_today(self)
+        target_dates = [
+            today - timedelta(days=30),
+            today - timedelta(days=60),
+            today - timedelta(days=90),
+        ]
+        completed_sessions = self.env['eds.session'].search([
+            ('status', '=', 'completed'),
+            ('date_end', '!=', False)
+        ])
+        for session in completed_sessions:
+            session_end_date = session.date_end.date()
+            if session_end_date in target_dates:
+                days_ago = (today - session_end_date).days
+                for enrollment in session.enrollment_ids.filtered(lambda e: e.state == 'enrolled'):
+                    emp = enrollment.employee_id
+                    manager = emp.parent_id
+                    if not manager or not manager.user_id:
+                        continue
+                    existing = self.search([
+                        ('session_id', '=', session.id),
+                        ('employee_id', '=', emp.id),
+                        ('followup_period_days', '=', days_ago),
+                    ], limit=1)
+                    if not existing:
+                        eval_rec = self.create({
+                            'session_id': session.id,
+                            'employee_id': emp.id,
+                            'manager_id': manager.id,
+                            'followup_period_days': days_ago,
+                            'status': 'draft',
+                        })
+                        eval_rec.activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary=_('%d-Day Level 3 Behavioral Follow-Up: %s') % (days_ago, emp.name),
+                            note=_('Level 3 behavioral evaluation for %s following %s is now due.') % (emp.name, session.name),
+                            user_id=manager.user_id.id,
+                        )
+
 class EdsEvaluationLevel3Line(models.Model):
     _name = 'eds.evaluation.level3.line'
     _description = 'EDS Level 3 Competency Observation Line'

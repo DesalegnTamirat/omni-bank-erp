@@ -101,14 +101,26 @@ class EdsCertificate(models.Model):
             rec.is_eligible = eligible
             rec.eligibility_reason = "\n".join(reasons)
 
-    def action_issue(self):
+    is_manual_override = fields.Boolean(
+        string='Manual Override (L&D Admin)',
+        help='Allows L&D Admin to manually bypass attendance (80%) and Level 2 assessment gates.'
+    )
+
+    def action_generate_certificate(self):
+        """Validates attendance and Level 2 score gates before generating certificate."""
         for rec in self:
             rec._compute_eligibility()
-            if not rec.is_eligible:
-                raise ValidationError(_("Cannot issue certificate: participant is not eligible.\n%s") % rec.eligibility_reason)
+            if not rec.is_eligible and not rec.is_manual_override:
+                raise UserError(_(
+                    "Certificate Generation Blocked:\n\n%s\n\n"
+                    "Only an L&D Administrator can check 'Manual Override' to bypass policy gates."
+                ) % rec.eligibility_reason)
             rec.state = 'issued'
             rec.issue_date = fields.Date.context_today(self)
-            rec.message_post(body=_("Certificate %s successfully issued to %s.") % (rec.code, rec.employee_id.name))
+            rec.message_post(body=_("Certificate %s generated for %s (Manual override: %s).") % (rec.code, rec.employee_id.name, rec.is_manual_override))
+
+    def action_issue(self):
+        return self.action_generate_certificate()
 
     def action_void(self):
         for rec in self:

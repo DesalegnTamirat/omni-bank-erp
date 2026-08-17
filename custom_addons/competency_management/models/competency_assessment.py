@@ -281,6 +281,42 @@ class CompetencyAssessment(models.Model):
             rec._check_segregation_of_duties()
             rec.with_context(force_write=True).write({'state': 'approved'})
             rec.message_post(body=_('Assessment %s approved.') % rec.name)
+            
+            # Auto-generate mandatory IDP for negative gaps
+            gap_lines = rec.line_ids.filtered(lambda l: int(l.current_level or 1) < int(l.required_level or 1))
+            if gap_lines:
+                existing_idp = self.env['competency.idp'].search([
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('assessment_id', '=', rec.id),
+                    ('state', 'in', ['draft', 'submitted', 'approved', 'active'])
+                ], limit=1)
+                if not existing_idp:
+                    self.env['competency.idp'].create({
+                        'employee_id': rec.employee_id.id,
+                        'assessment_id': rec.id,
+                        'mandatory': True,
+                        'state': 'draft',
+                        'notes': _('Mandatory IDP auto-generated for %d competency gap(s) identified in Assessment %s.') % (len(gap_lines), rec.name)
+                    })
+                    
+            # Auto-feed TNA entry into EDS cycle if EDS is available
+            if 'eds.tna.entry' in self.env:
+                cycle = self.env['eds.tna.cycle'].search([('state', 'in', ['draft', 'collecting'])], limit=1)
+                if cycle:
+                    for line in gap_lines:
+                        existing_tna = self.env['eds.tna.entry'].search([
+                            ('cycle_id', '=', cycle.id),
+                            ('employee_id', '=', rec.employee_id.id),
+                            ('competency_id', '=', line.competency_id.id),
+                        ], limit=1)
+                        if not existing_tna:
+                            self.env['eds.tna.entry'].create({
+                                'cycle_id': cycle.id,
+                                'employee_id': rec.employee_id.id,
+                                'competency_id': line.competency_id.id,
+                                'source': 'competency_gap',
+                                'justification': _('Auto-generated from Competency Assessment %s gap.') % rec.name,
+                            })
 
     def action_lock(self):
         """Lock finalized assessment against further modification."""

@@ -294,6 +294,21 @@ class EdsTnaEntry(models.Model):
     converted_course_ref = fields.Char(string='Converted Program Reference')
     company_currency_id = fields.Many2one('res.currency', related='company_id.currency_id', readonly=True)
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
+    nomination_ids = fields.One2many('eds.nomination', 'tna_entry_id', string='Nominations')
+    is_fulfilled = fields.Boolean(
+        string='Is Fulfilled',
+        compute='_compute_is_fulfilled',
+        store=True,
+        help='True when a linked nomination reaches completed or certified state.'
+    )
+
+    @api.depends('nomination_ids', 'nomination_ids.state', 'nomination_ids.enrollment_id.state')
+    def _compute_is_fulfilled(self):
+        for rec in self:
+            rec.is_fulfilled = any(
+                n.state in ('approved', 'completed', 'certified') or (n.enrollment_id and n.enrollment_id.state == 'completed')
+                for n in rec.nomination_ids
+            )
 
     # ── Consolidation & Prioritization /007) ────────────────
     consolidation_id = fields.Many2one(

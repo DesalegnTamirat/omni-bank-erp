@@ -24,6 +24,8 @@ class EdsSponsorship(models.Model):
     bond_start_date = fields.Date(string='Bond Start Date', tracking=True)
     bond_end_date = fields.Date(string='Bond End Date', tracking=True)
     bond_duration_months = fields.Integer(string='Bond Period (Months)', default=24)
+    sponsorship_amount = fields.Monetary(string='Sponsorship Amount', related='approved_amount', store=True, readonly=False)
+    repayment_liability = fields.Monetary(string='Repayment Liability', compute='_compute_obligation', currency_field='currency_id', store=True, help='Prorated financial amount owed if bond is breached within active service period.')
     outstanding_obligation = fields.Monetary(string='Outstanding Bond Obligation', compute='_compute_obligation', currency_field='currency_id', store=True)
     repayment_line_ids = fields.One2many('eds.sponsorship.repayment.line', 'sponsorship_id', string='Repayment Lines')
     state = fields.Selection([
@@ -59,19 +61,25 @@ class EdsSponsorship(models.Model):
     @api.depends('approved_amount', 'bond_start_date', 'bond_end_date', 'state')
     def _compute_obligation(self):
         for rec in self:
-            if rec.state == 'active' and rec.bond_start_date and rec.bond_end_date:
+            amt = rec.sponsorship_amount or rec.approved_amount or 0.0
+            if rec.bond_start_date and rec.bond_end_date:
                 today = fields.Date.context_today(self)
                 if today >= rec.bond_end_date:
-                    rec.outstanding_obligation = 0.0
+                    val = 0.0
+                elif today < rec.bond_start_date:
+                    val = amt
                 else:
                     total_days = (rec.bond_end_date - rec.bond_start_date).days or 1
-                    elapsed_days = (today - rec.bond_start_date).days
-                    remaining_ratio = max(0.0, (total_days - elapsed_days) / float(total_days))
-                    rec.outstanding_obligation = rec.approved_amount * remaining_ratio
+                    remaining_days = max(0, (rec.bond_end_date - today).days)
+                    val = (remaining_days / float(total_days)) * amt
+                rec.outstanding_obligation = val
+                rec.repayment_liability = val
             elif rec.state == 'breached':
-                rec.outstanding_obligation = rec.approved_amount
+                rec.outstanding_obligation = amt
+                rec.repayment_liability = amt
             else:
-                rec.outstanding_obligation = rec.approved_amount
+                rec.outstanding_obligation = amt
+                rec.repayment_liability = amt
 
     def action_verify_eligibility(self):
         for rec in self:

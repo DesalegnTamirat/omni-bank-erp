@@ -35,6 +35,18 @@ class HrAttendance(models.Model):
                     "Please resolve the disciplinary case before recording attendance."
                 ) % att.employee_id.name)
 
+    def _check_attendance_discipline_threshold(self):
+        """Per-record threshold check for attendance violations."""
+        for att in self:
+            rolling_days = 30
+            date_from = fields.Date.context_today(self) - timedelta(days=rolling_days)
+            recent_count = self.search_count([
+                ('employee_id', '=', att.employee_id.id),
+                ('check_in', '>=', date_from),
+            ])
+            if recent_count >= 3:
+                self._cron_escalate_attendance_violations()
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
