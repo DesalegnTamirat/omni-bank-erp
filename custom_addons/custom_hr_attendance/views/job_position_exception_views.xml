@@ -12,7 +12,6 @@
                 <field name="end_date"/>
                 <field name="time_range"/>
                 <field name="day_off"/>
-                <field name="status"/>
             </list>
         </field>
     </record>
@@ -26,7 +25,7 @@
                             type="object"
                             string="Notify"
                             class="oe_highlight"
-                            invisible="status != 'active' or notify_status == 'notified'"/>
+                            invisible="notify_status == 'notified'"/>
                 </header>
 
                 <sheet>
@@ -41,7 +40,6 @@
                             <field name="start_date"/>
                             <field name="end_date" placeholder="Leave blank to hold indefinitely"/>
                             <field name="day_off"/>
-                            <field name="status"/>
                             <field name="notify_status" invisible="1"/>
                         </group>
                         <group string="Timing Overview">

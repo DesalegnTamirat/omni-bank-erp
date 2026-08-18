@@ -16,7 +16,6 @@
                 <field name="shift_name"/>
                 <field name="time_range"/>
                 <field name="day_off"/>
-                <field name="status"/>
             </list>
         </field>
     </record>
