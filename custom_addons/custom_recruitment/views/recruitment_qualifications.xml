@@ -5,9 +5,12 @@
         <field name="model">recruitment.qualification</field>
         <field name="arch" type="xml">
             <list editable="bottom" create="1" delete="1" multi_edit="1" string="Recruitment Qualifications">
+                <field name="display_name" string="Full Qualification" readonly="1"/>
                 <field name="qualification"/>
+                <field name="specialization"/>
                 <field name="status"/>
             </list>
+
         </field>
     </record>
         <record id="recruitment_qualification_form_tree" model="ir.actions.act_window">

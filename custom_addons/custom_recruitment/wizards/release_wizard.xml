@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Release Wizard Form View (Modal Window) -->
+    <record id="view_internal_recruitment_release_wizard_form" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.release.wizard.form</field>
+        <field name="model">new.internal.recruitment.release.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Release Form (Different Work Unit Placement)">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>
+                            <field name="employee_id" readonly="1"/>
+                        </h2>
+                        <span class="text-muted">Authorizing candidate transfer &amp; promotion across work units</span>
+                    </div>
+
+                    <group>
+                        <group string="Current Placement Info">
+                            <field name="current_position"/>
+                            <field name="current_work_unit"/>
+                        </group>
+                        <group string="New Placement Requisition">
+                            <field name="new_job_position_id"/>
+                            <field name="new_job_grade"/>
+                            <field name="target_work_unit"/>
+                        </group>
+                    </group>
+
+                    <group string="Coach / Manager Release Authorization">
+                        <group>
+                            <field name="coach_id" options="{'no_create': True}"/>
+                            <field name="release_date"/>
+                        </group>
+                        <group>
+                            <field name="handover_status"/>
+                        </group>
+                    </group>
+
+                    <group string="Handover &amp; Clearance Remarks">
+                        <field name="release_remarks" placeholder="Enter clearance notes, handover details, or comments..."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_release" string="✅ Confirm &amp; Release Employee" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Dedicated Release Form Candidate List View -->
+    <record id="view_candidate_release_form_list" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.candidates.release.list</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="arch" type="xml">
+            <list string="Candidate Release Forms" create="0" delete="0">
+                <field name="emp_name"/>
+                <field name="coach_id" string="Releasing Coach/Manager"/>
+                <field name="current_work_unit" string="Current Work Unit"/>
+                <field name="preferred_location" string="Target Placement Unit"/>
+                <field name="emp_position" string="Current Position"/>
+                <field name="rank"/>
+                <field name="promotion_type"/>
+                <field name="promotion_status" widget="badge" decoration-info="promotion_status == 'draft'" decoration-warning="promotion_status == 'pending_release'" decoration-success="promotion_status in ('promoted', 'released')"/>
+                <field name="release_date"/>
+                <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="promotion_status in ('promoted', 'released')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Dedicated Release Form Candidate Detail View -->
+    <record id="view_candidate_release_form_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.candidates.release.form</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Release Form" create="0" delete="0">
+                <header>
+                    <button name="action_open_release_wizard" string="📋 Complete Release Form" type="object" class="btn-warning" invisible="promotion_status in ('promoted', 'released')"/>
+                    <field name="promotion_status" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="emp_name" readonly="1"/>
+                        </h1>
+                        <span class="text-muted">Promotion Candidate Work Unit Transfer &amp; Release Authorization</span>
+                    </div>
+
+                    <group>
+                        <group string="Employee Current Info">
+                            <field name="emp_position" readonly="1"/>
+                            <field name="current_work_unit" readonly="1"/>
+                            <field name="current_department" readonly="1"/>
+                            <field name="coach_id" readonly="1"/>
+                        </group>
+                        <group string="New Placement Requisition">
+                            <field name="preferred_location" string="Target Placement Unit" readonly="1"/>
+                            <field name="weighted_score" readonly="1"/>
+                            <field name="rank" readonly="1"/>
+                            <field name="selection_type" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Release &amp; Transfer Clearance Details" invisible="promotion_status != 'released'">
+                        <group>
+                            <field name="release_date" readonly="1"/>
+                            <field name="release_handover" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="release_remarks" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action for Release Form Menu -->
+    <record id="action_candidate_release_forms" model="ir.actions.act_window">
+        <field name="name">Release Form</field>
+        <field name="res_model">new.internal.recruitment.selected.candidates</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('selection_type', '=', 'selected'), ('promotion_type', '=', 'diff_unit')]</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_candidate_release_form_list')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_candidate_release_form_view')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No candidates pending release for different work unit placement.
+            </p>
+            <p>
+                This menu lists internal candidates selected for promotion to a different work unit.
+                Coaches and Managers can authorize candidate releases and complete placement transfers.
+            </p>
+        </field>
+    </record>
+</odoo>

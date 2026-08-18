@@ -41,7 +41,7 @@ class CandidateShortlist(models.Model):
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
              "if the employee has an approved leave covering today's date.",
     )
 

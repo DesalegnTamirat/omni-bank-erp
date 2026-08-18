@@ -41,12 +41,16 @@
                     <group>
                         <!-- LEFT COLUMN -->
                         <group string="Job Information">
+                            <field name="recruitment_request_id" string="Recruitment Reference"
+                                   readonly="vacancy_status != 'draft'"/>
+
                             <field name="job_position" readonly="vacancy_status != 'draft'"/>
                             <field name="job_grade" readonly="vacancy_status != 'draft'"/>
                             <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
                             <field name="job_level" invisible="employee_category != 'Non Managerial'"
-                                   required="employee_category == 'Non Managerial'" readonly="vacancy_status != 'draft'"/>
-                            <field name="recruitment_request_id" string="Recruitment Reference" readonly="vacancy_status != 'draft'"/>
+                                   required="employee_category == 'Non Managerial' and sourcing_type in ('external', 'both')"
+                                   readonly="vacancy_status != 'draft'"/>
+
                             <field name="sourcing_type" string="Sourcing Type" readonly="vacancy_status != 'draft'"/>
                             <!-- INTERNAL ONLY: movement type -->
                             <field name="internal_movement_type" string="Movement Type"
@@ -94,7 +98,7 @@
 
                     <div>
                         <button name="publish_vacancy"
-                                invisible="vacancy_status in ['published', 'closed']"
+                                invisible="vacancy_status != 'evaluate'"
                                 string="Publish Vacancy"
                                 type="object"
                                 class="btn-primary"/>
@@ -110,11 +114,11 @@
                         <page string="Hiring Details">
                             <field name="hiring_details" readonly="vacancy_status != 'draft'">
                                 <list editable="bottom">
-                                    <field name="work_unit" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="responsible_employee" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="number_of_openings" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="planned_positions" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="work_unit" string="Work Unit" style="min-width: 250px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="responsible_employee" string="Responsible Officer" style="min-width: 180px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="number_of_openings" string="Number of Openings" style="min-width: 160px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="planned_positions" string="Planned Openings" style="min-width: 160px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="status" string="Status" style="min-width: 100px;" readonly="parent.vacancy_status != 'draft'"/>
                                 </list>
                             </field>
                         </page>

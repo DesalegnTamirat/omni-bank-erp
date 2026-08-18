@@ -6,22 +6,70 @@
             <field name="model">hr.attendance.manual.wizard</field>
             <field name="arch" type="xml">
                 <form string="Manual Attendance Entry">
+                    <div class="alert alert-info" role="alert">
+                        <strong>Manual Attendance &amp; Finacle Rest Manager Entry</strong><br/>
+                        Select mode: Individual employee correction, Batch Operating Unit entry (multi-date / outage), or Finacle EOD Compensatory Rest. Note: Manual entry is strictly allowed for past dates or today.
+                    </div>
                     <group>
+                        <field name="entry_type" widget="radio" class="oe_inline"/>
+                    </group>
+
+                    <!-- INDIVIDUAL MODE -->
+                    <group invisible="entry_type != 'individual'">
                         <group string="Employee &amp; Date">
-                            <field name="employee_id"/>
-                            <field name="work_date"/>
+                            <field name="employee_id" required="entry_type == 'individual'"/>
+                            <field name="work_date" required="entry_type == 'individual'"/>
                         </group>
-                        <group string="Timestamps">
-                            <field name="check_in"/>
-                            <field name="check_out"/>
+                        <group string="Timestamps (Time &amp; Date)">
+                            <field name="check_in" required="entry_type == 'individual'"/>
+                            <field name="check_out" placeholder="Leave blank for Check-In only..."/>
                         </group>
                     </group>
+
+                    <!-- BATCH OPERATING UNIT MODE -->
+                    <group invisible="entry_type != 'batch'">
+                        <group string="Operating Unit &amp; Date Range">
+                            <field name="operating_unit_id" readonly="1"/>
+                            <field name="start_date" required="entry_type == 'batch'"/>
+                            <field name="end_date" required="entry_type == 'batch'"/>
+                            <field name="duration_days" readonly="1"/>
+                        </group>
+                        <group string="Shift Configuration &amp; Overwrite Options">
+                            <field name="use_employee_shifts"/>
+                            <field name="overwrite_existing"/>
+                            <field name="check_in_time_only" widget="float_time" invisible="use_employee_shifts"/>
+                            <field name="check_out_time_only" widget="float_time" invisible="use_employee_shifts"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-warning" role="alert" invisible="entry_type != 'batch' or not overwrite_existing">
+                        <i class="fa fa-exclamation-triangle me-2"/> <strong>Overwrite Warning:</strong> Enabling 'Overwrite Existing Attendances' will replace existing attendance records for the selected employees on these dates.
+                    </div>
+
+                    <group string="Select Employees Under Management" invisible="entry_type == 'individual'">
+                        <field name="employee_ids" widget="many2many_tags" placeholder="Select 2 or more employees..."/>
+                    </group>
+
+                    <!-- FINACLE EOD REST MODE -->
+                    <group invisible="entry_type != 'finacle_rest'">
+                        <group string="Target Date &amp; Rest Type">
+                            <field name="work_date" string="Target Rest Date" required="entry_type == 'finacle_rest'"/>
+                            <field name="rest_type" required="entry_type == 'finacle_rest'"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-warning" role="alert" invisible="entry_type != 'batch' or duration_days &lt;= 3">
+                        <i class="fa fa-exclamation-triangle me-2"/> <strong>Coach Approval Required:</strong> Batch requests for more than 3 days (%s days) will be submitted to your Coach / Supervisor for formal approval before attendance records are generated.
+                    </div>
+
+                    <!-- REASON & JUSTIFICATION -->
                     <group string="Reason &amp; Justification">
                         <field name="attendance_reason_ids" widget="many2many_tags"/>
-                        <field name="justification" placeholder="Mandatory explanation for manual entry..." widget="text"/>
+                        <field name="justification" placeholder="Mandatory explanation for manual attendance entry..." widget="text" required="1"/>
                     </group>
+
                     <footer>
-                        <button string="Create Attendance" name="action_create_manual_attendance" type="object" class="btn-primary"/>
+                        <button string="Create / Submit Attendance" name="action_create_manual_attendance" type="object" class="btn-primary"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

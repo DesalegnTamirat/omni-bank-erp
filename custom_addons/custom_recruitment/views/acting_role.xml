@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <!-- ================================================================ -->
-    <!-- Acting Role Assignment – List View -->
+    <!-- Acting Role Assignment – List View                                -->
     <!-- ================================================================ -->
     <record id="acting_role_assignment_list_view" model="ir.ui.view">
         <field name="name">acting.role.assignment.list</field>
@@ -29,7 +29,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Acting Role Assignment – Search View -->
+    <!-- Acting Role Assignment – Search View                              -->
     <!-- ================================================================ -->
     <record id="acting_role_assignment_search_view" model="ir.ui.view">
         <field name="name">acting.role.assignment.search</field>
@@ -54,7 +54,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Acting Role Assignment – Form View -->
+    <!-- Acting Role Assignment – Form View                                -->
     <!-- ================================================================ -->
     <record id="acting_role_assignment_form_view" model="ir.ui.view">
         <field name="name">acting.role.assignment.form</field>
@@ -64,16 +64,16 @@
                 <header>
                     <button name="action_submit" string="Submit for Approval" type="object"
                             class="oe_highlight" invisible="state != 'draft'"
-                            help="route to the District Director."/>
+                            help=": route to the District Director."/>
                     <button name="action_approve" string="Approve" type="object"
                             class="oe_highlight" invisible="state != 'submitted'"
-                            help="080: approve and auto-update employee profile and benefits."/>
+                            help="/080: approve and auto-update employee profile and benefits."/>
                     <button name="action_reject" string="Reject" type="object"
                             invisible="state != 'submitted'"/>
                     <button name="action_terminate" string="Terminate / Revert" type="object"
                             invisible="state != 'active'"
                             confirm="This will revert the employee's profile, benefits, and access rights to their substantive position. Proceed?"
-                            help="finalize termination and revert to substantive position."/>
+                            help=": finalize termination and revert to substantive position."/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,active,expired"/>
                 </header>
                 <sheet>
@@ -120,7 +120,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Action -->
+    <!-- Action                                                            -->
     <!-- ================================================================ -->
     <record id="action_acting_role_assignment" model="ir.actions.act_window">
         <field name="name">Acting / Supplementary Role</field>

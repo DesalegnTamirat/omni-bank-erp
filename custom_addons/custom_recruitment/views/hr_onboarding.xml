@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="hr_onboarding_plan_view_tree" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.list</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <list string="Onboarding &amp; Induction Plans"
+                  decoration-info="state=='induction'"
+                  decoration-warning="state=='work_unit_onboarding' or state=='midterm_review'"
+                  decoration-success="state=='completed'"
+                  decoration-danger="state=='escalated'">
+                <field name="name"/>
+                <field name="employee_id" string="New Hire"/>
+                <field name="job_position_id"/>
+                <field name="operating_unit_id"/>
+                <field name="supervisor_id"/>
+                <field name="buddy_id"/>
+                <field name="start_date"/>
+                <field name="progress_percentage" widget="progressbar"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="hr_onboarding_plan_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.form</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <form string="Onboarding &amp; Induction Management Plan">
+                <header>
+                    <button name="action_start_pre_boarding" string="Start Pre-Boarding" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_trigger_provisioning_alert" string="Trigger IT 7-Day Alert" type="object" class="oe_highlight" invisible="state not in ('pre_boarding', 'induction')"/>
+                    <button name="action_mark_induction_completed" string="Mark Induction Completed" type="object" class="oe_highlight" invisible="state not in ('induction', 'pre_boarding')"/>
+                    <button name="action_dispatch_midterm_eval" string="Dispatch 4-Week Mid-Term Form" type="object" invisible="state not in ('work_unit_onboarding',)"/>
+                    <button name="action_close_onboarding" string="Digital Sign-off &amp; Close File" type="object" class="oe_highlight" invisible="state not in ('midterm_review', 'work_unit_onboarding')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pre_boarding,induction,work_unit_onboarding,midterm_review,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                    </div>
+
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold" style="letter-spacing: 1px;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase">Onboarding &amp; Induction Management System</h3>
+                        <h5 class="text-muted">POMD &amp; PPDD Integrated Talent Integration Framework</h5>
+                    </div>
+
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Onboarding Plan Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Header Card -->
+                    <div class="card p-3 mb-4 bg-light">
+                        <group>
+                            <group>
+                                <field name="employee_id" string="NEW HIRE EMPLOYEE" readonly="state != 'draft'"/>
+                                <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
+                                <field name="operating_unit_id" string="WORK UNIT / LOCATION" readonly="1"/>
+                                <field name="department_id" string="DEPARTMENT" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="supervisor_id" string="IMMEDIATE SUPERVISOR" readonly="state in ('completed',)"/>
+                                <field name="start_date" string="EXPECTED START DATE" readonly="state != 'draft'"/>
+                                <field name="employee_category" string="JOB CATEGORY" readonly="state != 'draft'"/>
+                                <field name="progress_percentage" widget="progressbar" string="PROGRESS (/100%)"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <notebook>
+                        <!-- Tab 1: Pre-Boarding Formalities Gate -->
+                        <page string="Pre-Boarding Gate">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Pre-Boarding Gatekeeper Rule:</strong> Work unit onboarding cannot initiate until POMD verifies all critical pre-employment documentation.
+                            </div>
+                            <group>
+                                <group string="Mandatory Document Checklists">
+                                    <field name="doc_medical_certificate" string="Medical Certificate Verified"/>
+                                    <field name="doc_police_clearance" string="Police Clearance / Forensic Certificate"/>
+                                    <field name="doc_guarantor_contract" string="Guarantor Contract &amp; ID Documents"/>
+                                    <field name="doc_code_of_conduct" string="Signed Code of Conduct &amp; Ethics"/>
+                                    <field name="doc_job_description" string="Signed Job Description (JD)"/>
+                                    <field name="doc_offer_letter" string="Signed Offer / Acceptance Letter"/>
+                                </group>
+                                <group string="Tax &amp; Pension Formalities">
+                                    <field name="doc_tin_number" string="TIN Number"/>
+                                    <field name="doc_pension_number" string="Pension Card / Reference No."/>
+                                    <field name="pre_boarding_verified" string="Pre-Boarding Gate Passed" widget="boolean_toggle" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 2: IT & Workstation Provisioning -->
+                        <page string="IT &amp; Workstation Alert">
+                            <div class="alert alert-warning" role="alert">
+                                <strong>Automated Provisioning Alert:</strong> Triggers 7-day pre-arrival alerts to Supervisor and IT/Facilities for PC, tools, and Finacle/ERP accounts.
+                            </div>
+                            <group>
+                                <group>
+                                    <field name="provisioning_status" string="IT Setup Status" widget="badge"/>
+                                    <field name="provisioning_alert_date" string="Alert Sent On" readonly="1"/>
+                                    <button name="action_trigger_provisioning_alert" string="Send 7-Day Pre-Arrival IT Alert Now" type="object" class="btn btn-primary"/>
+                                </group>
+                                <group>
+                                    <field name="it_notes" string="IT &amp; Facilities Configuration Notes" placeholder="Enter PC serial number, Finacle user ID, email account details..."/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 3: PPDD Induction & LMS Orientation -->
+                        <page string="POMD/PPDD Induction">
+                            <group>
+                                <group>
+                                    <field name="induction_status" widget="badge"/>
+                                    <field name="induction_completed_date" readonly="1"/>
+                                </group>
+                                <group>
+                                    <button name="action_mark_induction_completed" string="Mark General Induction Completed" type="object" class="btn btn-success" invisible="induction_status == 'induction_completed'"/>
+                                </group>
+                            </group>
+                            <h4 class="fw-bold mt-3">PPDD Mandatory Orientation &amp; System LMS Trainings</h4>
+                            <field name="lms_task_ids">
+                                <list editable="bottom">
+                                    <field name="name" string="Training / Video Title"/>
+                                    <field name="training_type" string="Type"/>
+                                    <field name="is_mandatory" string="Mandatory"/>
+                                    <field name="state" string="Status" widget="badge"/>
+                                    <field name="completed_date" string="Completed On"/>
+                                    <button name="action_mark_completed" string="Complete" type="object" icon="fa-check-circle"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 4: Onboarding Buddy Support -->
+                        <page string="Onboarding Buddy Support">
+                            <div class="alert alert-secondary" role="alert">
+                                <strong>Buddy Mentorship Handoff:</strong> Immediate supervisor selects and assigns an Onboarding Buddy upon receiving induction completion notification.
+                            </div>
+                            <group>
+                                <group>
+                                    <field name="buddy_id" string="Assigned Onboarding Buddy"/>
+                                    <field name="buddy_user_id" string="Buddy User Account" readonly="1"/>
+                                    <field name="buddy_assigned_date" string="Assigned Date" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="buddy_notes" string="Buddy Guidance Notes &amp; Weekly Check-ins" placeholder="Log mentorship advice, daily check-in notes, questions..."/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 5: Daily/Weekly Task Progress Tracker -->
+                        <page string="Interactive Task Tracker">
+                            <field name="task_ids">
+                                <list editable="bottom">
+                                    <field name="week_stage" string="Stage"/>
+                                    <field name="name" string="Task Description"/>
+                                    <field name="assigned_to_role" string="Assigned Role"/>
+                                    <field name="state" string="Status" widget="badge"/>
+                                    <field name="completed_date" string="Completed Date"/>
+                                    <field name="completed_by_user_id" string="Completed By"/>
+                                    <field name="notes" string="Comments"/>
+                                    <button name="action_mark_done" string="Done" type="object" icon="fa-check-square-o"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 6: 4-Week Mid-Term Review -->
+                        <page string="4-Week Mid-Term Review">
+                            <group>
+                                <group>
+                                    <field name="midterm_eval_sent" readonly="1"/>
+                                    <field name="midterm_eval_date" readonly="1"/>
+                                    <field name="midterm_score" string="Mid-Term Score (/100)"/>
+                                </group>
+                                <group>
+                                    <button name="action_dispatch_midterm_eval" string="Dispatch 4-Week Form" type="object" class="btn btn-info"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="midterm_employee_feedback" string="New Hire 4-Week Feedback"/>
+                                <field name="midterm_supervisor_feedback" string="Supervisor 4-Week Feedback"/>
+                            </group>
+                        </page>
+
+                        <!-- Tab 7: 2-Month Program Closure & Sign-off -->
+                        <page string="Program Closure &amp; Sign-off">
+                            <group>
+                                <group string="Digital Sign-off Gate">
+                                    <field name="final_eval_sent" readonly="1"/>
+                                    <field name="final_eval_date" readonly="1"/>
+                                    <field name="final_employee_signoff" string="Employee Digital Sign-off"/>
+                                    <field name="final_supervisor_signoff" string="Supervisor Digital Sign-off"/>
+                                    <field name="final_onboarding_score" string="Overall Onboarding Score (/100)"/>
+                                </group>
+                                <group string="Probation Period Linkage">
+                                    <field name="probation_id" string="Linked Probation Evaluation Record" readonly="1"/>
+                                    <field name="is_escalated" string="Milestone Escalated" readonly="1"/>
+                                    <field name="escalation_reason" string="Escalation Notes" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="hr_onboarding_plan_view_search" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.search</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <search string="Search Onboarding Plans">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="job_position_id"/>
+                <field name="supervisor_id"/>
+                <field name="buddy_id"/>
+                <separator/>
+                <filter name="filter_pre_boarding" string="Pre-Boarding" domain="[('state', '=', 'pre_boarding')]"/>
+                <filter name="filter_induction" string="Induction" domain="[('state', '=', 'induction')]"/>
+                <filter name="filter_work_unit" string="Work Unit Onboarding" domain="[('state', '=', 'work_unit_onboarding')]"/>
+                <filter name="filter_completed" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <filter name="filter_escalated" string="Escalated Milestones" domain="[('is_escalated', '=', True)]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_category" string="Job Category" context="{'group_by': 'employee_category'}"/>
+                    <filter name="group_unit" string="Work Unit" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter name="group_supervisor" string="Supervisor" context="{'group_by': 'supervisor_id'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action -->
+    <record id="action_hr_onboarding_plan" model="ir.actions.act_window">
+        <field name="name">Onboarding &amp; Induction Plans</field>
+        <field name="res_model">hr.onboarding.plan</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Create an Onboarding &amp; Induction Plan!</p>
+            <p>Automate pre-boarding administrative checks, workstation IT alerts, PPDD general induction LMS trainings, buddy assignments, daily/weekly progress tracking, mid-term reviews, and 2-month program closure.</p>
+        </field>
+    </record>
+
+    <!-- Menu Item under Recruitment -->
+    <menuitem id="menu_hr_onboarding_root"
+              name="Onboarding &amp; Induction"
+              parent="hr_recruitment.menu_hr_recruitment_root"
+              sequence="12"/>
+
+    <menuitem id="menu_hr_onboarding_plan"
+              name="Onboarding Plans"
+              parent="menu_hr_onboarding_root"
+              action="action_hr_onboarding_plan"
+              sequence="1"/>
+</odoo>

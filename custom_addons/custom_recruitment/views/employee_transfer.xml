@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <!-- ================================================================ -->
-    <!-- Employee Transfer Request – List View -->
+    <!-- Employee Transfer Request – List View                             -->
     <!-- ================================================================ -->
     <record id="employee_transfer_request_list_view" model="ir.ui.view">
         <field name="name">employee.transfer.request.list</field>
@@ -42,7 +42,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Employee Transfer Request – Search View -->
+    <!-- Employee Transfer Request – Search View                           -->
     <!-- ================================================================ -->
     <record id="employee_transfer_request_search_view" model="ir.ui.view">
         <field name="name">employee.transfer.request.search</field>
@@ -95,7 +95,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Employee Transfer Request – Form View -->
+    <!-- Employee Transfer Request – Form View                             -->
     <!-- ================================================================ -->
     <record id="employee_transfer_request_form_view" model="ir.ui.view">
         <field name="name">employee.transfer.request.form</field>
@@ -126,11 +126,11 @@
                     <button name="action_refuse_transfer" string="Refuse Transfer" type="object"
                             invisible="state != 'approved'"
                             confirm="Are you sure you wish to refuse this approved transfer? A 12-month ineligibility penalty will be applied and HR will be notified."/>
-                    <!-- Mutual Exchange Matching -->
+                    <!-- : Mutual Exchange Matching -->
                     <button name="action_find_exchange_matches" string="Find Exchange Match" type="object"
                             class="btn btn-secondary"
                             invisible="state not in ('submitted', 'under_review')"
-                            help="Search for a mutual exchange transfer partner"/>
+                            help="Search for a mutual exchange transfer partner "/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,submitted,under_review,approved"/>
                 </header>
@@ -139,11 +139,47 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
 
-                    <!-- Eligibility & Status Widgets -->
-                    <widget name="web_ribbon" title="Ineligible for Transfer" bg_color="text-bg-danger" invisible="eligibility_status != 'ineligible'"/>
-                    <widget name="web_ribbon" title="Mutual Exchange" bg_color="text-bg-info" invisible="not is_exchange_transfer"/>
-                    <field name="ineligibility_reason" string="Eligibility Issues" readonly="1" invisible="eligibility_status != 'ineligible'"/>
-                    <field name="ineligible_until_date" string="Ineligible Until Date" readonly="1" invisible="not ineligible_until_date"/>
+                    <!-- Eligibility Alert Banner -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="eligibility_status != 'ineligible'">
+                        <strong>⚠ Eligibility Issues:</strong>
+                        <field name="ineligibility_reason" readonly="1"/>
+                    </div>
+
+                    <!-- Refusal Penalty Alert -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not ineligible_until_date">
+                        <strong>⛔ Transfer Ineligibility Penalty:</strong>
+                        This employee is ineligible to apply for transfers until
+                        <field name="ineligible_until_date" readonly="1" class="oe_inline"/>.
+                    </div>
+
+                    <!-- Exchange Transfer Info Banner -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="not is_exchange_transfer">
+                        <strong>🔄 Mutual Exchange Transfer:</strong>
+                        This request is part of a mutual exchange transfer arrangement /.
+                    </div>
+
+                    <!-- Direct Transfer Info Banner (no vacancy link — this is a valid path) -->
+                    <div class="alert alert-info" role="alert"
+                         invisible="target_vacancy_id or state not in ('submitted', 'under_review', 'approved')">
+                        <strong>ℹ Direct Transfer (No Vacancy Link):</strong>
+                        No Target Vacancy is linked to this request. This is expected for direct
+                        transfers — it can still be approved using the Requested Operating Unit and
+                        the employee's current position/grade. Use "Find Matching Vacancy" or
+                        "Create Lateral Transfer Vacancy" above only if you want to link this to a
+                        specific published vacancy instead.
+                    </div>
+
+                    <!-- Missing Job Level Banner (Non-Managerial requires Junior/Senior) -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="current_job_category != 'Non Managerial' or current_job_level">
+                        <strong>⚠ Job Level Could Not Be Determined:</strong>
+                        Job Category is Non Managerial, which requires a Job Level (Junior / Senior),
+                        but Current Grade has no Job Level set. Update the Job Level on the employee's
+                        Grade record.
+                    </div>
 
                     <group string=" Employee Information">
                         <group>
@@ -172,7 +208,7 @@
                             <field name="requested_operating_unit_id" readonly="state != 'draft'"/>
                             <field name="alternate_location_preference_id" readonly="state != 'draft'"/>
                             <field name="reason_for_transfer" readonly="state != 'draft'"/>
-                            <!-- Grade Restriction : lateral transfers always
+                            <!-- Grade Restriction (FR-REC-066): lateral transfers always
                                  require the exact same grade/category/level as Current Job
                                  Grade/Category/Level above — there is no separately-chosen
                                  "preferred" grade, category, or level, so no additional
@@ -184,7 +220,7 @@
                                    readonly="state not in ('submitted', 'under_review')"
                                    invisible="state == 'draft'"
                                    options="{'no_create': True}"
-                                   help="Optional. HR can link this to an existing published vacancy, or one created via'Create Lateral Transfer Vacancy' — or leave empty for a direct transfer."/>
+                                   help="Optional. HR can link this to an existing published vacancy, or one created via 'Create Lateral Transfer Vacancy' — or leave empty for a direct transfer."/>
                             <field name="target_job_position_id" readonly="1"/>
                             <field name="target_job_grade_id" readonly="1"/>
                             <field name="target_job_level" readonly="1"
@@ -291,7 +327,7 @@
     </record>
 
     <!-- ================================================================ -->
-    <!-- Action -->
+    <!-- Action                                                            -->
     <!-- ================================================================ -->
     <record id="action_employee_transfer_request" model="ir.actions.act_window">
         <field name="name">Employee Transfer Requests</field>

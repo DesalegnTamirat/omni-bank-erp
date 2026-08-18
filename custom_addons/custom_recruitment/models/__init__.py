@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from . import candidate_profile
 from . import applicant_assessment
 from . import applicant_shortlist
 from . import assessment_criteria
@@ -7,6 +8,7 @@ from . import blacklist_pool
 from . import candidate_shortlist
 from . import internal_job_position
 from . import internal_recruitment
+from . import interview_rate_sheet
 from . import interview_assessment
 from . import job_vacancy_competency
 from . import job_vacancy
@@ -38,3 +40,7 @@ from . import recruitment_offer_letter
 from . import recruitment_penalty_deduction
 from . import recruitment_qualifications
 from . import transfer_assessment
+from . import hr_onboarding
+from . import ats_news
+from . import recruitment_selection_minute
+

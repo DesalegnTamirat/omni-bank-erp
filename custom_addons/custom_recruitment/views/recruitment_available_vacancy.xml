@@ -59,6 +59,7 @@
         <field name="name">Available Vacancies</field>
         <field name="res_model">employee.recruitment.available</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">['!', ('vacancy_reference', 'ilike', 'EXT')]</field>
         <field name="help" type="xml">
             <p class="o_view_nocontent_smiling_face">
                 No available vacancies yet. They appear automatically when internal vacancies are published.

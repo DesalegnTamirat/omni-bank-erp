@@ -160,7 +160,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     SELECT SUM(
                         CASE 
                             WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                            WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type = 'head_office' THEN 4.0 ELSE 8.0 END)
+                            WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
                             ELSE 0.0
                         END
                     ) AS total_wh

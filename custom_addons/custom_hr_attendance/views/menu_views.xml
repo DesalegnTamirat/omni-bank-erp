@@ -63,13 +63,18 @@
               sequence="15"/>
 
     <!-- ====================================================
-         4. Attendance Dashboard
+         4. Attendance Dashboard (Bunna Bank Executive Platform)
          ==================================================== -->
+    <record id="action_executive_attendance_dashboard" model="ir.actions.client">
+        <field name="name">Attendance Dashboard</field>
+        <field name="tag">custom_hr_attendance.attendance_dashboard</field>
+    </record>
+
     <menuitem
             id="menu_bunna_attendance_dashboard"
             name="Attendance Dashboard"
             parent="hr_attendance.menu_hr_attendance_root"
-            action="hr_attendance.hr_attendance_action"
+            action="action_executive_attendance_dashboard"
             sequence="4"
             groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
 
@@ -127,6 +132,15 @@
             parent="hr_attendance.menu_hr_attendance_view_attendances_management"
             action="action_hr_attendance_manual_wizard"
             sequence="50"
+            groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
+
+    <!-- 5.6 Batch Attendance Requests (Coach Approval) -->
+    <menuitem
+            id="menu_batch_attendance_requests"
+            name="Batch Attendance Requests"
+            parent="hr_attendance.menu_hr_attendance_view_attendances_management"
+            action="action_hr_attendance_batch_request"
+            sequence="55"
             groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
 
     <!-- ====================================================
@@ -255,6 +269,13 @@
             parent="menu_bunna_attendance_configuration"
             action="action_location_based_exception"
             sequence="25"
+            groups="hr_attendance.group_hr_attendance_manager"/>
+
+    <menuitem id="menu_hr_employee_discipline_profile"
+            name="Discipline Profiles"
+            parent="menu_bunna_attendance_configuration"
+            action="action_hr_employee_discipline_profile"
+            sequence="35"
             groups="hr_attendance.group_hr_attendance_manager"/>
 
     <menuitem id="menu_over_time"

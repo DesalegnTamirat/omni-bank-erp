@@ -133,3 +133,46 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+/* ── Prevent List Table Header Truncation (Ellipsis) ── */
+.o_list_table th,
+.o_list_table th .o_column_title,
+.o_list_renderer .o_list_table th {
+    white-space: normal !important;
+    text-overflow: clip !important;
+    word-break: normal !important;
+    overflow: visible !important;
+    vertical-align: bottom !important;
+    min-width: 120px !important;
+}
+
+.o_list_table th.o_list_number_th,
+.o_list_table th[data-name="number_of_openings"],
+.o_list_table th[data-name="planned_positions"] {
+    min-width: 140px !important;
+}
+
+/* ── Bunna Bank Coffee Brand Palette (#4A2E1A) ── */
+.btn-success,
+button.btn-success,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active {
+    background-color: #4A2E1A !important;
+    border-color: #4A2E1A !important;
+    color: #FFFFFF !important;
+}
+
+.btn-success:hover {
+    background-color: #361E0B !important;
+    border-color: #361E0B !important;
+}
+
+.bg-success,
+.text-bg-success,
+.badge.text-bg-success,
+.badge.bg-success {
+    background-color: #4A2E1A !important;
+    color: #FFFFFF !important;
+}
+

@@ -26,6 +26,12 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_saturday_halfday",
         help="Apply Saturday half-day exit time for Head Office employees."
     )
+    saturday_halfday_district = fields.Boolean(
+        string='Apply Saturday Half-Day to District Offices',
+        default=True,
+        config_parameter="hr_attendance.saturday_halfday_district",
+        help="Apply Saturday half-day exit time to District Office staff in addition to Head Office."
+    )
     enable_lunch_break = fields.Boolean(
         string='Enable Lunch Break',
         default=False,
@@ -99,16 +105,16 @@ class ResConfigSettings(models.TransientModel):
         help="Allowed early check-in buffer before shift start (e.g., 0.5 = 30 minutes)"
     )
     force_checkout_hours = fields.Float(
-        string='Force Checkout Threshold (Hours)',
-        default=14.00,
-        config_parameter="hr_attendance.force_checkout_hours",
-        help="Hours after check-in before automatic force checkout is performed (e.g., 14.0)"
+        string='Post-Shift Force Checkout Grace (Hours)',
+        default=3.00,
+        config_parameter="hr_attendance.post_shift_grace_hours",
+        help="Grace period in hours after official shift end time before force checkout is executed (e.g., 3.0)"
     )
     saturday_exit_time = fields.Float(
         string='Saturday Head Office Exit Time',
-        default=14.75,
+        default=12.00,
         config_parameter="hr_attendance.saturday_exit_time",
-        help="Default exit time on Saturdays for Head Office staff (e.g., 14.75 for 2:45 PM)"
+        help="Default exit time on Saturdays for Head Office staff (e.g., 12.00 for 12:00 PM Noon)"
     )
 
     # ----------------------------------------------------------
@@ -149,6 +155,12 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.force_checkout_violation_threshold",
         help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout). "
              "Counter resets to zero after a case is created."
+    )
+    missing_lunch_tap_threshold = fields.Integer(
+        string='Missing Lunch Taps Before Lateness (Occurrences)',
+        default=3,
+        config_parameter="hr_attendance.missing_lunch_tap_threshold",
+        help="Number of missing lunch taps that automatically converts to 1 Lateness Violation (Discipline Parity Rule)."
     )
 
     def get_values(self):

@@ -82,7 +82,7 @@ BEGIN
             SELECT SUM(
                 CASE 
                     WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                    WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type = 'head_office' THEN 4.0 ELSE 8.0 END)
+                    WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
                     ELSE 0.0
                 END
             ) AS total_wh
@@ -176,25 +176,19 @@ CREATE OR REPLACE FUNCTION auto_checkout_all_employees()
 RETURNS void
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_grace_hours NUMERIC := 3.0;
 BEGIN
-    /*
-    =========================================================
-    Function: auto_checkout_all_employees()
-    Purpose: Automatically checks out employees who forgot to check out
-             past their shift end + 3-hour grace period, capping check_out 
-             at exact Shift End Time.
+    /* Read dynamic post-shift grace period from ir_config_parameter, defaulting to 3.0 hours if unconfigured */
+    SELECT COALESCE(value::numeric, 3.0) INTO v_grace_hours
+    FROM ir_config_parameter
+    WHERE key = 'hr_attendance.post_shift_grace_hours'
+    LIMIT 1;
 
-    Shift Resolution Order:
-    1. Job Position Roster Exception Line (date-specific roster)
-    2. Job Position Exception (static shift exception)
-    3. Location Based Exception (operating unit default shift)
-    4. Default (08:00 AM to 05:00 PM)
+    IF v_grace_hours IS NULL OR v_grace_hours <= 0 THEN
+        v_grace_hours := 3.0;
+    END IF;
 
-    Capping & Worked Hours:
-    - check_out is capped at exact shift_end.
-    - worked_hours = GREATEST(0, MIN(check_out, shift_end) - MAX(check_in, shift_start)).
-    =========================================================
-    */
     WITH resolved_shifts AS (
         SELECT 
             ha.id AS att_id,
@@ -270,8 +264,8 @@ BEGIN
         write_date = NOW()
     FROM resolved_shifts rs
     WHERE ha.id = rs.att_id
-      /* 3-Hour Grace Period Verification: Current time must be past shift_end + 3 hours */
-      AND NOW() >= (rs.shift_end_utc + INTERVAL '3 hours');
+      /* Dynamic Grace Period Verification: Current time must be past shift_end + v_grace_hours */
+      AND NOW() >= (rs.shift_end_utc + (v_grace_hours || ' hours')::interval);
 
 END;
 $$ LANGUAGE plpgsql;

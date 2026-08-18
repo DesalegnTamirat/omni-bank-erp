@@ -32,12 +32,12 @@
                             class="btn-secondary"
                             invisible="state != 'draft'"
                             help="Reload the list of eligible transfer requests based on the current Target Vacancy (or direct transfers if left empty). This overwrites any manually added/removed requests."/>
-                    <!-- 073/074: Compute the weighted ranking -->
+                    <!-- /073/074: Compute the weighted ranking -->
                     <button name="action_compute_ranking" string="Compute Ranking" type="object"
                             class="oe_highlight"
                             invisible="state == 'approved'"
                             help="Calculate weighted Transfer Suitability Scores for all eligible candidates ."/>
-                    <!-- Approve minutes and auto-approve selected candidates -->
+                    <!-- : Approve minutes and auto-approve selected candidates -->
                     <button name="action_approve_minutes" string="Approve Minutes" type="object"
                             class="oe_highlight"
                             invisible="state != 'ranked'"
@@ -54,7 +54,11 @@
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
 
-                    <widget name="web_ribbon" title="Minutes Approved" bg_color="bg-success" invisible="state != 'approved'"/>
+                    <!-- Info banner when approved -->
+                    <div class="alert alert-success" role="alert" invisible="state != 'approved'">
+                        <strong>✅ Minutes Approved</strong> – Selected candidates' transfer requests
+                        have been automatically approved and employee records updated.
+                    </div>
 
                     <group>
                         <field name="target_vacancy_id" readonly="state != 'draft'"
@@ -87,7 +91,7 @@
                             </field>
                         </page>
 
-                        <!-- Tab 2: Ranked List -->
+                        <!-- Tab 2: Ranked List  /  /  -->
                         <page string="Ranked Candidates ">
                             <field name="ranking_line_ids">
                                 <list editable="bottom"

@@ -1,4 +1,4 @@
-﻿# *- coding: utf-8 -*
+# -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -15,7 +15,7 @@ class TalentRosterLinkWizard(models.TransientModel):
     notes = fields.Text(string='Re-linking Notes')
 
     def confirm_link_to_vacancy(self):
-        self.ensure_one
+        self.ensure_one()
         roster = self.roster_id
         vacancy = self.target_vacancy_id
 
@@ -57,7 +57,7 @@ class TalentRosterLinkWizard(models.TransientModel):
             'status': 'reused',
         })
         roster.message_post(body=_(
-            "Candidate re-linked to new vacancy <b>%s</b> (Ref: %s). New Applicant record # %d created."
+            "Candidate re-linked to new vacancy <b>%s</b> (Ref: %s). New Applicant record #%d created."
         ) % (vacancy.job_position.name if vacancy.job_position else vacancy.reference, vacancy.reference, applicant.id))
 
         return {
@@ -88,7 +88,7 @@ class TalentRosterTransferWizard(models.TransientModel):
         return res
 
     def action_transfer_candidates(self):
-        self.ensure_one
+        self.ensure_one()
         if not self.candidate_score_ids:
             raise UserError(_("Please select candidates to transfer to Talent Roster."))
 

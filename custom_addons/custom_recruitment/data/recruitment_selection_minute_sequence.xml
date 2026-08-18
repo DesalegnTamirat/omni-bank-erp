@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sequence for Recruitment Selection Minute -->
+        <record id="seq_recruitment_selection_minute" model="ir.sequence">
+            <field name="name">Recruitment Selection Minute Sequence</field>
+            <field name="code">recruitment.selection.minute</field>
+            <field name="prefix">BB/MIN/26-27/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

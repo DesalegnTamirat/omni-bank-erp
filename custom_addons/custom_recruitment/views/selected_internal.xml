@@ -1,8 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-    <!-- ******************************************************************************************************************** -->
-	
-	 <record id="action_new_internal_recruit_select_cand" model="ir.actions.act_window">
+    <record id="action_new_internal_recruit_select_cand" model="ir.actions.act_window">
         <field name="name">Internal Recruitment Process Selected Candidates</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">new.internal.recruitment.selected.candidates</field>
@@ -10,7 +8,7 @@
         <field name="context">{}</field>
         <field name="domain">[]</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create!!</p>
+            <p class="o_view_nocontent_smiling_face">Create Internal Selected Candidate Record!</p>
         </field>
     </record>
 
@@ -18,51 +16,34 @@
         <field name="name">new.internal.recruitment.selected.candidates.tree</field>
         <field name="model">new.internal.recruitment.selected.candidates</field>
         <field name="arch" type="xml">
-            <list string="Internal Recruitment Selected Candidates" editable="top" limit="500" multi_edit="1" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"> 
-                                    <field name="emp_name"/>
-									<field name="select_flag"/>
-<!-- <field name="emp_grade"/> -->
-                                    <field name="emp_position"/>
-<!-- <field name="emp_category"/> -->
-<!-- <field name="emp_type"/> -->
-<!-- <field name="emp_gender"/> -->
-                                    <field name="current_work_unit"/>
-                                    <field name="current_department"/>
-<!-- <field name="service_in_company"/> -->
-<!-- <field name="educational_qualification"/> -->
-<!-- <field name="cgpa"/> -->
-<!-- <field name="relevant_experience"/> -->
-<!-- <field name="supervisory_experience"/> -->
-<!-- <field name="last_promotion"/> -->
-<!-- <field name="pms_score"/> -->
-                                    <field name="preferred_location"/>
-<!-- <field name="written_warning"/> -->
-<!-- <field name="demoted"/> -->
-
-                                    <field name="written_exam_score"/>
-                                    <field name="interview_score"/>
-                                    <field name="pms_score"/>
-                                    <field name="weighted_score"/>
-                                    <field name="selection_type"/>
-                                    
-                                    <!-- Leave Status from Time Off module -->
-                                    <field name="active_leave_status" string="Leave Status" readonly="1" optional="show" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"/>
-
-                                    <field name="remarks"/>
+            <list string="Internal Recruitment Selected Candidates" editable="top" limit="500" multi_edit="1" delete="0" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"> 
+                <field name="emp_name"/>
+                <field name="select_flag"/>
+                <field name="emp_position"/>
+                <field name="current_work_unit"/>
+                <field name="current_department"/>
+                <field name="preferred_location"/>
+                <field name="written_exam_score"/>
+                <field name="interview_score"/>
+                <field name="pms_score"/>
+                <field name="weighted_score"/>
+                <field name="rank" readonly="1"/>
+                <field name="selection_type"/>
+                <field name="active_leave_status" string="Leave Status" readonly="1" optional="show" decoration-danger="active_leave_status not in ('Active', 'N/A')" decoration-success="active_leave_status == 'Active'"/>
+                <field name="remarks"/>
             </list>
         </field>
     </record>
 
-<!-- ********************************************************************************************************************** -->
     <record id="action_new_internal_recruitment_selected" model="ir.actions.act_window">
         <field name="name">Internal Recruitment Process Selected Candidates</field>
         <field name="type">ir.actions.act_window</field>
         <field name="res_model">new.internal.recruitment.selected</field>
         <field name="view_mode">list,form</field>
         <field name="context">{}</field>
-        <field name="domain">[]</field>
+        <field name="domain">['|', ('vacancy_reference', '=', False), ('vacancy_reference', 'not ilike', 'EXT')]</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create!!</p>
+            <p class="o_view_nocontent_smiling_face">Create Internal Recruitment Selection Process!</p>
         </field>
     </record>
 
@@ -70,13 +51,12 @@
         <field name="name">new.internal.recruitment.selected.tree</field>
         <field name="model">new.internal.recruitment.selected</field>
         <field name="arch" type="xml">
-            <list string="Internal Recruitment Selected Candidates">
+            <list string="Internal Recruitment Selected Candidates" delete="0">
                 <field name="vacancy_reference"/>
-				<field name="recruitment_reference"/>
+                <field name="recruitment_reference"/>
                 <field name="job_position"/>
                 <field name="written_exam_date"/>
                 <field name="interview_date"/>
-<!-- <field name="promotion_revocation_days"/> -->
             </list>
         </field>
     </record>
@@ -85,114 +65,125 @@
         <field name="name">new.internal.recruitment.selected.form</field>
         <field name="model">new.internal.recruitment.selected</field>
         <field name="arch" type="xml">
-            <form string="Internal Recruitment Selected candidates">
+            <form string="Internal Recruitment Selected Candidates" delete="0">
                 <header>
-                    <field name="status" widget="statusbar"/>
-					<button name="notify" invisible="status in ('notify', 'evaluate')" string="Notify Approvers" type="object" class="oe_highlight"/>
-                    <button name="evaluate" invisible="status in 'evaluate'" string="Approve Selection" type="object" class="oe_highlight"/>
-                   <button name="notify_written_exam" string="Notify Written Exam" type="object" class="oe_highlight"/>
-                    <button name="fetch_exam_score" string="Fetch Exam Score" type="object" class="oe_highlight"/>
-                    <button name="notify_interview_panel" string="Notify Interview Panel" type="object" class="oe_highlight"/>
-                    <button name="notify_interview" string="Notify Interview" type="object" class="oe_highlight"/>
-                    <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="oe_highlight"/>
-                    <button name="compute_weighted_score" string="Compute Score" type="object" class="oe_highlight"/>
-                    <button name="notify_selection" string="Notify Selection" type="object" class="oe_highlight"/>
+                    <button name="notify_written_exam" invisible="exam_scheduled == 'Yes'" string="Notify Written Exam" type="object" class="btn-secondary" icon="fa-paper-plane"/>
+                    <button name="fetch_exam_score" string="Fetch Exam Score" type="object" class="btn-secondary" icon="fa-download" invisible="exam_scores_fetched == True"/>
+                    <button name="notify_interview_panel" invisible="panel_notified == True" string="Notify Interview Panel" type="object" class="btn-secondary" icon="fa-users"/>
+                    <button name="action_open_reschedule_wizard" string="Reschedule Interview" type="object" class="btn-warning" icon="fa-clock-o" invisible="not show_reschedule_button"/>
+                    <button name="notify_interview" invisible="interview_scheduled == 'Yes'" string="Notify Interview" type="object" class="btn-secondary" icon="fa-calendar"/>
+                    <button name="fetch_interview_score" string="Fetch Interview Score" type="object" class="btn-secondary" icon="fa-download" invisible="interview_scores_fetched == True"/>
+                    <button name="action_compute_and_rank" string="Compute &amp; Rank Scores" type="object" class="btn-primary" icon="fa-calculator" confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
+                    <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o"/>
+                    <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
+                    <button name="action_promote_selected_employees" string="Promote Selected Employees" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-rocket" invisible="not scores_computed"/>
+                    <button name="notify_selection" invisible="selection_notified == True" string="Notify Selection" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-trophy"/>
+                    <field name="state" widget="statusbar" statusbar_visible="notify,evaluate,approved"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" icon="fa-users">
+                            <field name="total_candidates_count" string="Applicants" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-check-circle" style="color: #4A2E1A;">
+                            <field name="selected_candidates_count" string="Selected" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-clock-o" style="color: #e0a800;">
+                            <field name="reserve_candidates_count" string="Reserve Pool" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-times-circle" style="color: #dc3545;">
+                            <field name="disqualified_candidates_count" string="Disqualified" widget="statinfo"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="vacancy_reference" string="Vacancy Reference"/>
+                        <h1>
+                            <field name="vacancy_reference" placeholder="e.g. BB/INT/26-27/00001" readonly="scores_computed == True"/>
+                        </h1>
+                    </div>
                     <group>
-                        <group>
-                            <field name="vacancy_reference"/>
-                            <field name="recruitment_reference"/>
-                            <field name="written_exam_date"/>
-                            <field name="exam_location"/>
-                            <field name="exam_scheduled"/>
-                            <field name="status" invisible="1"/>
-
-
-<!-- <field name="job_location"/> -->
-<!-- <field name="job_grade"/> -->
-<!-- <field name="job_category"/> -->
-<!-- <field name="emp_type"/> -->
-<!-- <field name="vacancy_announced_on"/> -->
-<!-- <field name="no_of_vacancies"/> -->
+                        <group string="Vacancy &amp; Evaluation Setup">
+                            <field name="recruitment_reference" readonly="scores_computed == True"/>
+                            <field name="job_position" readonly="scores_computed == True"/>
+                            <field name="job_category" readonly="scores_computed == True"/>
+                            <field name="no_of_vacancies" readonly="scores_computed == True"/>
+                            <field name="pms_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="written_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="interview_weight" widget="float" readonly="scores_computed == True"/>
                         </group>
-                        <group>
-                            <field name="job_position"/>
-							<field name="job_category"/>
-                            <field name="interview_date" widget="datetime"/>
-                             <field name="interview_location"/>
-                             <field name="interview_scheduled"/>
-<!-- <field name="highest_cgpa"/> -->
-<!-- <field name="relevant_experience"/> -->
-<!-- <field name="minimum_number_years_in_company"/> -->
-<!-- <field name="no_of_months_since_last_written_notice"/> -->
-<!-- <field name="no_of_months_since_last_promotion"/> -->
-<!-- <field name="minimum_pms_score"/> -->
+                        <group string="Exam &amp; Interview Schedules">
+                            <field name="written_exam_date" readonly="scores_computed == True"/>
+                            <field name="exam_location" readonly="scores_computed == True"/>
+                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'"/>
+                            <field name="interview_date" widget="datetime" readonly="scores_computed == True"/>
+                            <field name="interview_location" readonly="scores_computed == True"/>
+                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'"/>
                         </group>
                     </group>
+
+                    <!-- Consolidated Single Notebook Container -->
                     <notebook>
                         <page string="Selected Employees">
-                            <field name="new_int_rec_sel">
-                                <list string="Selected Employees" editable="bottom">
-                                    <field name="emp_name"/>
-									<field name="select_flag"/>
-<!-- <field name="emp_grade"/> -->
-                                    <field name="emp_position"/>
-<!-- <field name="emp_category"/> -->
-<!-- <field name="emp_type"/> -->
-<!-- <field name="emp_gender"/> -->
-                                    <field name="current_work_unit"/>
-                                    <field name="current_department"/>
-<!-- <field name="service_in_company"/> -->
-<!-- <field name="educational_qualification"/> -->
-<!-- <field name="cgpa"/> -->
-<!-- <field name="relevant_experience"/> -->
-<!-- <field name="supervisory_experience"/> -->
-<!-- <field name="last_promotion"/> -->
-<!-- <field name="pms_score"/> -->
-                                    <field name="preferred_location"/>
-<!-- <field name="written_warning"/> -->
-<!-- <field name="demoted"/> -->
-
-                                    <field name="written_exam_score"/>
-                                    <field name="interview_score"/>
-                                    <field name="pms_score"/>
-                                    <field name="weighted_score"/>
-                                    <field name="selection_type"/>
-                                    
+                            <field name="new_int_rec_sel" readonly="scores_computed == True">
+                                <list string="Selected Employees" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']">
+                                    <field name="emp_name" readonly="parent.scores_computed == True"/>
+                                    <field name="select_flag" readonly="parent.scores_computed == True"/>
+                                    <field name="emp_position" readonly="parent.scores_computed == True"/>
+                                    <field name="current_work_unit" readonly="parent.scores_computed == True"/>
+                                    <field name="current_department" readonly="parent.scores_computed == True"/>
+                                    <field name="preferred_location" readonly="parent.scores_computed == True"/>
+                                    <field name="pms_score" readonly="parent.scores_computed == True"/>
+                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="weighted_score" readonly="1" class="fw-bold"/>
+                                    <field name="rank" readonly="1"/>
+                                    <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
+                                    <field name="promotion_type" readonly="1" optional="show"/>
+                                    <field name="promotion_status" readonly="1" optional="show"/>
+                                    <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or promotion_status in ('promoted', 'released')"/>
                                     <field name="remarks"/>
                                 </list>
                             </field>
                         </page>
                         <page string="Panel Members">
                             <field name="new_int_rec_panel">
-                                <list string="Panel Members" editable="bottom">
+                                <list string="Panel Members" editable="bottom" delete="0">
                                     <field name="emp_name"/>
-<!-- <field name="emp_position"/> -->
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
+                                    <field name="response_status"
+                                           decoration-info="response_status == 'pending'"
+                                           decoration-success="response_status == 'accepted'"
+                                           decoration-danger="response_status == 'unavailable'"
+                                           decoration-warning="response_status in ['reschedule_requested', 'delegation_requested']"/>
+                                    <field name="delegate_employee_id" column_invisible="not parent.has_delegation_requests" optional="show"/>
+                                    <field name="delegation_state" column_invisible="not parent.has_delegation_requests" optional="show"
+                                           decoration-warning="delegation_state == 'pending_hr'"
+                                           decoration-success="delegation_state == 'approved'"
+                                           decoration-danger="delegation_state == 'rejected'"/>
+                                    <field name="response_reason" optional="show"/>
+                                    <button name="action_open_response_wizard" string="Respond" type="object" class="btn-sm btn-secondary"/>
+                                    <button name="action_approve_delegation" string="Approve Delegation" type="object" class="btn-sm btn-success" invisible="delegation_state != 'pending_hr'"/>
+                                    <button name="action_reject_delegation" string="Reject Delegation" type="object" class="btn-sm btn-danger" invisible="delegation_state != 'pending_hr'"/>
                                 </list>
                             </field>
                         </page>
-						
-                    </notebook>
-					<notebook>
-						<page string="Recruitment Approval Members">
+                        <page string="Recruitment Approval Committee">
                             <field name="recr_selected_team_id">
-                                <list editable="bottom">
-                                        <field name="role" width="20%"/>
-                                        <field name="employee_name" width="20%"/>
-                                        <field name="operating_unit" width="20%"/>
-                                        <field name="status" width="20%"/>
-                                        <field name="alternate_committee_member" width="20%"/>
-                                        <field name="alter_operating_unit" width="20%"/>
-                                        <field name="approve" width="20%"/>
+                                <list editable="bottom" delete="0">
+                                    <field name="role" width="20%"/>
+                                    <field name="employee_name" width="20%"/>
+                                    <field name="operating_unit" width="20%"/>
+                                    <field name="status" width="20%"/>
+                                    <field name="alternate_committee_member" width="20%"/>
+                                    <field name="alter_operating_unit" width="20%"/>
+                                    <field name="approve" width="20%"/>
                                 </list>
                             </field>
                         </page>
-					</notebook>
+                    </notebook>
                 </sheet>
-
             </form>
         </field>
     </record>

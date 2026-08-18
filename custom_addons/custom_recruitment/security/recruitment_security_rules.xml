@@ -153,18 +153,16 @@
             <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
-        <record id="rule_recruitment_manager_employee_recruitment_internal" model="ir.rule">
-            <field name="name">Recruitment: Manager - Employee Recruitment Internal</field>
+        <record id="rule_employee_recruitment_internal_global" model="ir.rule">
+            <field name="name">Employee Recruitment Internal: Global Access</field>
             <field name="model_id" ref="model_employee_recruitment_internal"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
-        <record id="rule_recruitment_manager_internal_recruitment_eligible_employees" model="ir.rule">
-            <field name="name">Recruitment: Manager - Internal Recruitment Eligible Employees</field>
+        <record id="rule_internal_recruitment_eligible_employees_global" model="ir.rule">
+            <field name="name">Internal Recruitment Eligible Employees: Global Access</field>
             <field name="model_id" ref="model_internal_recruitment_eligible_employees"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
         <record id="rule_recruitment_manager_internal_selected" model="ir.rule">
@@ -286,26 +284,26 @@
             <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
-        <record id="rule_recruitment_manager_applicant_qualification_line" model="ir.rule">
-            <field name="name">Recruitment: Manager - Applicant Qualification Line</field>
-            <field name="model_id" ref="model_applicant_qualification_line"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
+<!--        <record id="rule_recruitment_manager_applicant_qualification_line" model="ir.rule">-->
+<!--            <field name="name">Recruitment: Manager - Applicant Qualification Line</field>-->
+<!--            <field name="model_id" ref="model_applicant_qualification_line"/>-->
+<!--            <field name="domain_force">[(1, '=', 1)]</field>-->
+<!--            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>-->
+<!--        </record>-->
 
-        <record id="rule_recruitment_manager_applicant_experience_line" model="ir.rule">
-            <field name="name">Recruitment: Manager - Applicant Experience Line</field>
-            <field name="model_id" ref="model_applicant_experience_line"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
+<!--        <record id="rule_recruitment_manager_applicant_experience_line" model="ir.rule">-->
+<!--            <field name="name">Recruitment: Manager - Applicant Experience Line</field>-->
+<!--            <field name="model_id" ref="model_applicant_experience_line"/>-->
+<!--            <field name="domain_force">[(1, '=', 1)]</field>-->
+<!--            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>-->
+<!--        </record>-->
 
-        <record id="rule_recruitment_manager_applicant_competency_line" model="ir.rule">
-            <field name="name">Recruitment: Manager - Applicant Competency Line</field>
-            <field name="model_id" ref="model_applicant_competency_line"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
+<!--        <record id="rule_recruitment_manager_applicant_competency_line" model="ir.rule">-->
+<!--            <field name="name">Recruitment: Manager - Applicant Competency Line</field>-->
+<!--            <field name="model_id" ref="model_applicant_competency_line"/>-->
+<!--            <field name="domain_force">[(1, '=', 1)]</field>-->
+<!--            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>-->
+<!--        </record>-->
 
         <record id="rule_recruitment_manager_hr_employee_probation" model="ir.rule">
             <field name="name">Recruitment: Manager - HR Employee Probation</field>
@@ -531,34 +529,6 @@
             <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
         </record>
 
-        <record id="rule_recruitment_manager_new_external_recruitment_selected" model="ir.rule">
-            <field name="name">Recruitment: Manager - New External Recruitment Selected</field>
-            <field name="model_id" ref="model_new_external_recruitment_selected"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
-
-        <record id="rule_recruitment_manager_new_external_recrt_delegation_team" model="ir.rule">
-            <field name="name">Recruitment: Manager - New External Recrt Delegation Team</field>
-            <field name="model_id" ref="model_new_external_recrt_delegation_team"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
-
-        <record id="rule_recruitment_manager_new_external_recruitment_panel" model="ir.rule">
-            <field name="name">Recruitment: Manager - New External Recruitment Panel</field>
-            <field name="model_id" ref="model_new_external_recruitment_panel"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
-
-        <record id="rule_recruitment_manager_new_external_recruitment_selected_candidates" model="ir.rule">
-            <field name="name">Recruitment: Manager - New External Recruitment Selected Candidates</field>
-            <field name="model_id" ref="model_new_external_recruitment_selected_candidates"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('group_recruitment_manager'))]"/>
-        </record>
-
         <record id="rule_recruitment_manager_transfer_assessment_config" model="ir.rule">
             <field name="name">Recruitment: Manager - Transfer Assessment Config</field>
             <field name="model_id" ref="model_transfer_assessment_config"/>
@@ -666,8 +636,25 @@
         </record>
 
         <!-- ============================================ -->
-        <!-- NO RECORD RULES NEEDED FOR ADMINISTRATOR -->
-        <!-- Administrators get full access via CSV -->
+        <!-- DIGITAL SELECTION MINUTE RECORD RULES       -->
+        <!-- ============================================ -->
+        <record id="rule_recruitment_manager_recruitment_selection_minute" model="ir.rule">
+            <field name="name">Recruitment: Manager/Officer - Selection Minute</field>
+            <field name="model_id" ref="model_recruitment_selection_minute"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_officer')), (4, ref('group_recruitment_manager')), (4, ref('group_recruitment_administrator'))]"/>
+        </record>
+
+        <record id="rule_recruitment_user_recruitment_selection_minute" model="ir.rule">
+            <field name="name">Recruitment: Panel Member - Assigned Selection Minute</field>
+            <field name="model_id" ref="model_recruitment_selection_minute"/>
+            <field name="domain_force">['|', '|', '|', ('committee_signature_ids.user_id', '=', user.id), ('vacancy_id.responsible.user_id', '=', user.id), ('vacancy_id.memb_panel_vac.user_id', '=', user.id), ('vacancy_id.memb_panel_vac.employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_recruitment_user')), (4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- ============================================ -->
+        <!-- NO RECORD RULES NEEDED FOR ADMINISTRATOR     -->
+        <!-- Administrators get full access via CSV      -->
         <!-- ============================================ -->
 
     </data>

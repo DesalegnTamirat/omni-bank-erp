@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="ats_bulk_communication_wizard_view_form" model="ir.ui.view">
+            <field name="name">ats.bulk.communication.wizard.form</field>
+            <field name="model">ats.bulk.communication.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Send Bulk Candidate Communication">
+                    <group col="2">
+                        <group string="Candidate Target Selection">
+                            <field name="vacancy_id" options="{'no_create': True}"/>
+                            <field name="bunna_app_status"/>
+                            <field name="applicant_count" class="fw-bold text-primary"/>
+                        </group>
+                        <group string="Message Configuration">
+                            <field name="subject"/>
+                        </group>
+                    </group>
+                    <group string="Message Content">
+                        <field name="body" widget="html" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Selected Candidates" name="applicants_page">
+                            <field name="applicant_ids" readonly="1">
+                                <list>
+                                    <field name="partner_name" string="Candidate Name"/>
+                                    <field name="email_from" string="Email Address"/>
+                                    <field name="partner_phone" string="Phone"/>
+                                    <field name="bunna_app_status" string="Status"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                    <footer>
+                        <button name="action_send_bulk_communication" string="Send Bulk Email" type="object" class="btn-primary"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_ats_bulk_communication_wizard" model="ir.actions.act_window">
+            <field name="name">Bulk Candidate Communication</field>
+            <field name="res_model">ats.bulk.communication.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <menuitem id="menu_ats_bulk_communication"
+                  name="Bulk Communication"
+                  parent="menu_external_recruitment"
+                  action="action_ats_bulk_communication_wizard"
+                  sequence="36"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
+
+    </data>
+</odoo>

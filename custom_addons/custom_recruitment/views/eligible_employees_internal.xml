@@ -45,31 +45,31 @@
         </field>
     </record>
 
-<!-- <record id='internal_recruitment_eligible_employees_form_view' model='ir.ui.view'> -->
-<!-- <field name="name">internal.recruitment.eligible.employees.form</field> -->
-<!-- <field name="model">internal.recruitment.eligible.employees</field> -->
-<!-- <field name="arch" type="xml"> -->
-<!-- <form string="Internal Recruitment Eligible Employees"> -->
+<!--    <record id='internal_recruitment_eligible_employees_form_view' model='ir.ui.view'>-->
+<!--        <field name="name">internal.recruitment.eligible.employees.form</field>-->
+<!--        <field name="model">internal.recruitment.eligible.employees</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <form string="Internal Recruitment Eligible Employees">-->
 
-<!-- <sheet> -->
-<!-- <group> -->
-<!-- <group> -->
-<!-- <field name="emp_name"/> -->
-<!-- <field name="emp_grade"/> -->
-<!-- <field name="emp_position"/> -->
-<!-- </group> -->
-<!-- <group> -->
-<!-- <field name="emp_location"/> -->
-<!-- <field name="emp_category"/> -->
-<!-- <field name="employment_type"/> -->
-<!-- <field name="select"/> -->
-<!-- </group> -->
-<!-- </group> -->
+<!--                <sheet>-->
+<!--                    <group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_name"/>-->
+<!--                            <field name="emp_grade"/>-->
+<!--                            <field name="emp_position"/>-->
+<!--                        </group>-->
+<!--                        <group>-->
+<!--                            <field name="emp_location"/>-->
+<!--                            <field name="emp_category"/>-->
+<!--                            <field name="employment_type"/>-->
+<!--                            <field name="select"/>-->
+<!--                        </group>-->
+<!--                    </group>-->
 
 
-<!-- </sheet> -->
-<!-- </form> -->
-<!-- </field> -->
-<!-- </record> -->
+<!--                </sheet>-->
+<!--            </form>-->
+<!--        </field>-->
+<!--    </record>-->
 
 </odoo>

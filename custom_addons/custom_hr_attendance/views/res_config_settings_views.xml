@@ -69,7 +69,7 @@
                                 <field name="exit_time" widget="float_time"/>
                             </setting>
                             <setting string="Saturday Head Office Exit Time"
-                                     help="Default exit time on Saturdays for Head Office staff (e.g., 14.75 for 2:45 PM)"
+                                     help="Default exit time on Saturdays for Head Office staff (e.g., 12.00 for 12:00 PM Noon)"
                                      invisible="not enable_saturday_halfday">
                                 <field name="saturday_exit_time" widget="float_time"/>
                             </setting>

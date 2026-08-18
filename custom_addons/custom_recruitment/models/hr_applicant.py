@@ -13,66 +13,66 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-# ── Applicant qualification line ───────────────────────────────────────────
-class ApplicantQualificationLine(models.Model):
-    _name = 'applicant.qualification.line'
-    _description = 'Applicant Qualification Line'
-
-    applicant_id = fields.Many2one(
-        'hr.applicant', string='Applicant',
-        required=True, ondelete='cascade', index=True,
-    )
-    qualification = fields.Many2one(
-        'recruitment.qualification', string='Qualification',
-    )
-    requirement = fields.Char(string='Requirement')
-    response = fields.Char(string='Response / Achieved')
-    active = fields.Boolean(default=True)
-
-    def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
-
-
-# ── Applicant experience line ──────────────────────────────────────────────
-class ApplicantExperienceLine(models.Model):
-    _name = 'applicant.experience.line'
-    _description = 'Applicant Experience Line'
-
-    applicant_id = fields.Many2one(
-        'hr.applicant', string='Applicant',
-        required=True, ondelete='cascade', index=True,
-    )
-    experience = fields.Many2one(
-        'recruitment.experience', string='Experience',
-    )
-    requirement = fields.Char(string='Requirement')
-    response = fields.Char(string='Response / Achieved')
-
-
-# ── Applicant competency line ──────────────────────────────────────────────
-class ApplicantCompetencyLine(models.Model):
-    _name = 'applicant.competency.line'
-    _description = 'Applicant Competency Line'
-
-    applicant_id = fields.Many2one(
-        'hr.applicant', string='Applicant',
-        required=True, ondelete='cascade', index=True,
-    )
-    competencies = fields.Many2one(
-        'recruitment.competency', string='Competency',
-    )
-    requirement = fields.Char(string='Requirement')
-    response = fields.Char(string='Response / Achieved')
-    active = fields.Boolean(default=True)
-
-    def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+# # ── Applicant qualification line ───────────────────────────────────────────
+# class ApplicantQualificationLine(models.Model):
+#     _name = 'applicant.qualification.line'
+#     _description = 'Applicant Qualification Line'
+# 
+#     applicant_id = fields.Many2one(
+#         'hr.applicant', string='Applicant',
+#         required=True, ondelete='cascade', index=True,
+#     )
+#     qualification = fields.Many2one(
+#         'recruitment.qualification', string='Qualification',
+#     )
+#     requirement = fields.Char(string='Requirement')
+#     response = fields.Char(string='Response / Achieved')
+#     active = fields.Boolean(default=True)
+# 
+#     def unlink(self):
+#         """ Soft delete: Archive records instead of removing from DB """
+#         for rec in self:
+#             rec.write({'active': False})
+#         return True
+# 
+# 
+# # ── Applicant experience line ──────────────────────────────────────────────
+# class ApplicantExperienceLine(models.Model):
+#     _name = 'applicant.experience.line'
+#     _description = 'Applicant Experience Line'
+# 
+#     applicant_id = fields.Many2one(
+#         'hr.applicant', string='Applicant',
+#         required=True, ondelete='cascade', index=True,
+#     )
+#     experience = fields.Many2one(
+#         'recruitment.experience', string='Experience',
+#     )
+#     requirement = fields.Char(string='Requirement')
+#     response = fields.Char(string='Response / Achieved')
+# 
+# 
+# # ── Applicant competency line ──────────────────────────────────────────────
+# class ApplicantCompetencyLine(models.Model):
+#     _name = 'applicant.competency.line'
+#     _description = 'Applicant Competency Line'
+# 
+#     applicant_id = fields.Many2one(
+#         'hr.applicant', string='Applicant',
+#         required=True, ondelete='cascade', index=True,
+#     )
+#     competencies = fields.Many2one(
+#         'recruitment.competency', string='Competency',
+#     )
+#     requirement = fields.Char(string='Requirement')
+#     response = fields.Char(string='Response / Achieved')
+#     active = fields.Boolean(default=True)
+# 
+#     def unlink(self):
+#         """ Soft delete: Archive records instead of removing from DB """
+#         for rec in self:
+#             rec.write({'active': False})
+#         return True
 
 
 # ── hr.applicant extension ─────────────────────────────────────────────────
@@ -102,6 +102,27 @@ class HrApplicantCustom(models.Model):
     candidate_score_id = fields.Many2one(
         'recruitment.candidate.score', string='Candidate Score',
         help='Link to the candidate score record for this applicant.',
+    )
+
+    # ── External ATS Candidate Profile Link ─────────────────────────────────
+    candidate_profile_id = fields.Many2one(
+        'candidate.profile',
+        string='Candidate Master Profile',
+        ondelete='set null',
+        index=True,
+        help='Link to the applicant\'s master candidate profile / electronic CV.',
+    )
+    cover_letter = fields.Text(
+        string='Cover Letter',
+        help='Vacancy-specific cover letter submitted by candidate.',
+    )
+    expected_salary = fields.Float(
+        string='Expected Salary',
+        help='Expected monthly salary in ETB.',
+    )
+    notice_period_days = fields.Integer(
+        string='Notice Period (Days)',
+        help='Notice period required with current employer.',
     )
 
     # ── Bunna-specific application status tracking ────────────────────────
@@ -317,15 +338,15 @@ class HrApplicantCustom(models.Model):
 
     # ── Qualifications / Experience / Competency tabs ─────────────────────
     qualification_id = fields.One2many(
-        'applicant.qualification.line', 'applicant_id',
+        'hr_qualification_info_job', 'applicant_id',
         string='Education Qualifications',
     )
     experiance_id = fields.One2many(
-        'applicant.experience.line', 'applicant_id',
+        'hr_experience_info_job', 'applicant_id',
         string='Experience',
     )
     competencies_id = fields.One2many(
-        'applicant.competency.line', 'applicant_id',
+        'hr_competencies_info_job', 'applicant_id',
         string='Competencies',
     )
     hr_new_department_ids = fields.One2many(
@@ -377,6 +398,7 @@ class HrApplicantCustom(models.Model):
                 'message': _('Contract has been created for %s.') % self.partner_name,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -391,6 +413,7 @@ class HrApplicantCustom(models.Model):
                 'message': _('Promotion has been initiated for %s.') % self.partner_name,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -405,5 +428,192 @@ class HrApplicantCustom(models.Model):
                 'message': _('Offer Letter has been sent for %s.') % self.partner_name,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
+
+    @api.onchange('job_id')
+    def _onchange_job_id_sync_criteria(self):
+        if not self.job_id:
+            return
+        
+        # Clear existing lines first
+        self.qualification_id = [(5, 0, 0)]
+        self.experiance_id = [(5, 0, 0)]
+        self.competencies_id = [(5, 0, 0)]
+        
+        # Inherit qualifications
+        qual_lines = []
+        for line in self.job_id.qualification_id:
+            qual_lines.append((0, 0, {
+                'qualification': line.qualification.id,
+                'requirement': str(line.requirement or ''),
+                'response': str(line.response or ''),
+            }))
+        self.qualification_id = qual_lines
+        
+        # Inherit experiences
+        exp_lines = []
+        for line in self.job_id.experiance_id:
+            exp_lines.append((0, 0, {
+                'experience': line.experience.id,
+                'requirement': str(line.requirement or ''),
+                'response': str(line.response or ''),
+            }))
+        self.experiance_id = exp_lines
+        
+        # Inherit competencies
+        comp_lines = []
+        for line in self.job_id.competencies_id:
+            comp_lines.append((0, 0, {
+                'competencies': line.competencies.id,
+                'requirement': str(line.requirement or ''),
+                'response': str(line.response or ''),
+            }))
+        self.competencies_id = comp_lines
+
+
+    def _auto_sync_external_recruitment_eligible(self):
+        for app in self:
+            if app.app_reference:
+                rec_ext = self.env['employee.recruitment.external'].sudo().search([('vacancy_id', '=', app.app_reference.id)], limit=1)
+                if not rec_ext:
+                    rec_ext = self.env['employee.recruitment.external'].sudo().create({
+                        'vacancy_id': app.app_reference.id,
+                        'job_position': app.app_reference.job_position.id if app.app_reference.job_position else False,
+                        'vacancy_reference': app.app_reference.reference,
+                        'responsible': app.app_reference.responsible.id if app.app_reference.responsible else self.env.user.employee_id.id,
+                    })
+                
+                existing = self.env['external.recruitment.eligible.employees'].sudo().search([
+                    ('external_recruitment_id', '=', rec_ext.id),
+                    ('applicant_name', '=', app.id),
+                ], limit=1)
+                
+                if not existing:
+                    cand = app.candidate_profile_id
+                    self.env['external.recruitment.eligible.employees'].sudo().create({
+                        'external_recruitment_id': rec_ext.id,
+                        'applicant_name': app.id,
+                        'applicant_email': app.email_from or (cand.email if cand else ''),
+                        'applicant_phone': cand.phone if cand else (app.partner_phone or ''),
+                        'date_of_birth': getattr(cand, 'dob', False) if cand else False,
+                        'gender': getattr(cand, 'gender', False) if cand else False,
+                        'highest_cgpa': getattr(cand, 'cgpa', 0.0) if cand else 0.0,
+                        'total_experience': getattr(cand, 'total_experience', 0.0) if cand else 0.0,
+                    })
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('job_id') and not vals.get('qualification_id') and not vals.get('experiance_id') and not vals.get('competencies_id'):
+                job = self.env['hr.job'].browse(vals['job_id'])
+                
+                # Qualifications
+                qual_lines = []
+                for line in job.qualification_id:
+                    qual_lines.append((0, 0, {
+                        'qualification': line.qualification.id,
+                        'requirement': str(line.requirement or ''),
+                        'response': str(line.response or ''),
+                    }))
+                if qual_lines:
+                    vals['qualification_id'] = qual_lines
+                    
+                # Experiences
+                exp_lines = []
+                for line in job.experiance_id:
+                    exp_lines.append((0, 0, {
+                        'experience': line.experience.id,
+                        'requirement': str(line.requirement or ''),
+                        'response': str(line.response or ''),
+                    }))
+                if exp_lines:
+                    vals['experiance_id'] = exp_lines
+                    
+                # Competencies
+                comp_lines = []
+                for line in job.competencies_id:
+                    comp_lines.append((0, 0, {
+                        'competencies': line.competencies.id,
+                        'requirement': str(line.requirement or ''),
+                        'response': str(line.response or ''),
+                    }))
+                if comp_lines:
+                    vals['competencies_id'] = comp_lines
+                    
+        res = super().create(vals_list)
+        res._auto_sync_external_recruitment_eligible()
+
+        # Guarantee every applicant record is stored and linked under Master Candidate Profiles (CVs)
+        for app in res:
+            if not app.candidate_profile_id:
+                email = (app.email_from or '').strip().lower()
+                phone = (app.partner_phone or '').strip()
+                name = app.partner_name or app.name or 'Unnamed Candidate'
+
+                candidate = False
+                if email:
+                    candidate = self.env['candidate.profile'].sudo().search([('email', '=ilike', email)], limit=1)
+                if not candidate and phone:
+                    candidate = self.env['candidate.profile'].sudo().search([('phone', '=', phone)], limit=1)
+                if not candidate and app.partner_id:
+                    candidate = self.env['candidate.profile'].sudo().search([('partner_id', '=', app.partner_id.id)], limit=1)
+
+                if not candidate:
+                    partner = app.partner_id
+                    if not partner and email:
+                        partner = self.env['res.partner'].sudo().search([('email', '=ilike', email)], limit=1)
+                    if not partner:
+                        partner = self.env['res.partner'].sudo().create({
+                            'name': name,
+                            'email': email or False,
+                            'phone': phone or False,
+                        })
+                    candidate = self.env['candidate.profile'].sudo().create({
+                        'name': name,
+                        'email': email or f'candidate_{app.id}@placeholder.com',
+                        'phone': phone or '',
+                        'partner_id': partner.id,
+                    })
+
+                app.sudo().write({'candidate_profile_id': candidate.id})
+                candidate.sync_from_application(app)
+
+        return res
+
+    def write(self, vals):
+        if 'job_id' in vals and vals.get('job_id'):
+            job = self.env['hr.job'].browse(vals['job_id'])
+            
+            # Qualifications
+            qual_lines = [(5, 0, 0)]
+            for line in job.qualification_id:
+                qual_lines.append((0, 0, {
+                    'qualification': line.qualification.id,
+                    'requirement': str(line.requirement or ''),
+                    'response': str(line.response or ''),
+                }))
+            vals['qualification_id'] = qual_lines
+                
+            # Experiences
+            exp_lines = [(5, 0, 0)]
+            for line in job.experiance_id:
+                exp_lines.append((0, 0, {
+                    'experience': line.experience.id,
+                    'requirement': str(line.requirement or ''),
+                    'response': str(line.response or ''),
+                }))
+            vals['experiance_id'] = exp_lines
+                
+            # Competencies
+            comp_lines = [(5, 0, 0)]
+            for line in job.competencies_id:
+                comp_lines.append((0, 0, {
+                    'competencies': line.competencies.id,
+                    'requirement': str(line.requirement or ''),
+                    'response': str(line.response or ''),
+                }))
+            vals['competencies_id'] = comp_lines
+
+        return super().write(vals)

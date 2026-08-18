@@ -72,6 +72,7 @@ class ExternalDefaultShortlistCriteria(models.Model):
                 'message': _('"%s" is now the active default shortlisting criteria.') % self.name,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -130,7 +131,7 @@ class ExternalShortlistChoiceWizard(models.TransientModel):
 
     @api.model
     def default_get(self, fields_list):
-        res = super(ExternalShortlistChoiceWizard, self).default_get(fields_list)
+        res = super().default_get(fields_list)
         if 'default_criteria_id' in fields_list:
             active = self.env['external.default.shortlist.criteria'].search(
                 [('active', '=', True)], limit=1

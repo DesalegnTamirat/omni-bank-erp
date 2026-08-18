@@ -216,6 +216,12 @@
                 color: white;
                 box-shadow: 0 8px 15px -3px rgba(193, 117, 64, 0.3);
             }
+
+            &.icon-monthly {
+                background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                color: white;
+                box-shadow: 0 8px 15px -3px rgba(29, 78, 216, 0.3);
+            }
         }
 
         .stat-label { color: #64748b; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em; margin-bottom: 0.25rem; }

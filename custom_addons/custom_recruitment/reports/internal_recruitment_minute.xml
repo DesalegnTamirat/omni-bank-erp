@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_internal_rec_minute" model="report.paperformat">
+        <field name="name">Internal Selection Committee Minute Paperformat</field>
+        <field name="default" eval="False"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="margin_top">10</field>
+        <field name="margin_bottom">12</field>
+        <field name="margin_left">12</field>
+        <field name="margin_right">12</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">90</field>
+    </record>
+
+    <record id="action_report_internal_recruitment_minute" model="ir.actions.report">
+        <field name="name">Internal Selection Committee Minute</field>
+        <field name="model">new.internal.recruitment.selected</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_internal_rec_minute</field>
+        <field name="report_file">custom_recruitment.report_internal_rec_minute</field>
+        <field name="binding_model_id" ref="model_new_internal_recruitment_selected"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="paperformat_internal_rec_minute"/>
+    </record>
+
+    <template id="report_internal_rec_minute">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="web.basic_layout">
+                    <div class="page" style="font-size: 13px; font-family: Arial, sans-serif; line-height: 1.5; margin-top: 0px; padding-top: 0px;">
+                        <t t-set="stats" t-value="doc_stats.get(o.id, {})"/>
+                        
+                        <div class="text-center mb-3">
+                            <div class="mb-2">
+                                <t t-if="bunna_logo_data_uri">
+                                    <img t-att-src="bunna_logo_data_uri" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
+                                </t>
+                                <t t-elif="res_company and res_company.logo">
+                                    <img t-att-src="image_data_uri(res_company.logo)" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
+                                </t>
+                                <t t-elif="env.company and env.company.logo">
+                                    <img t-att-src="image_data_uri(env.company.logo)" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
+                                </t>
+                                <t t-else="">
+                                    <img src="/custom_recruitment/static/src/img/bunna_logo.jpg" style="max-height: 90px; max-width: 260px;" alt="Bunna Bank Logo"/>
+                                </t>
+                            </div>
+                            <h4 class="font-weight-bold mb-1">Executive Management Committee/ Head Office Promotion and Recruitment Committee</h4>
+                            <h5 class="font-weight-bold">Minute No. <span t-field="o.vacancy_reference"/></h5>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-4">
+                                <strong>Place of Interview:</strong> <span t-field="o.interview_location"/>
+                            </div>
+                            <div class="col-4 text-center">
+                                <strong>Date of Interview:</strong> <span t-field="o.interview_date" t-options='{"widget": "date"}'/>
+                            </div>
+                            <div class="col-4 text-right">
+                                <strong>Time of Interview:</strong> <span t-field="o.interview_date" t-options='{"widget": "datetime", "format": "HH:mm"}'/>
+                            </div>
+                        </div>
+
+                        <!-- List of committee members -->
+                        <h6 class="font-weight-bold mt-3 mb-2">List of committee members</h6>
+                        <table class="table table-bordered table-sm mb-4">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th style="width: 10%;" class="text-center">S.N</th>
+                                    <th style="width: 45%;">Committee Members</th>
+                                    <th style="width: 25%;">Role</th>
+                                    <th style="width: 20%;" class="text-center">Signature</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="sn" t-value="1"/>
+                                <t t-if="o.recr_selected_team_id">
+                                    <t t-foreach="o.recr_selected_team_id" t-as="member">
+                                        <tr>
+                                            <td class="text-center"><t t-esc="sn"/></td>
+                                            <td>
+                                                <t t-if="member.employee_name">
+                                                    <span t-field="member.employee_name.name"/>
+                                                </t>
+                                                <t t-if="not member.employee_name and member.alternate_committee_member">
+                                                    <span t-field="member.alternate_committee_member.name"/> (Alternate)
+                                                </t>
+                                            </td>
+                                            <td><span t-field="member.role"/></td>
+                                            <td></td>
+                                        </tr>
+                                        <t t-set="sn" t-value="sn + 1"/>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <tr><td class="text-center">1</td><td></td><td>Chairperson</td><td></td></tr>
+                                    <tr><td class="text-center">2</td><td></td><td>Member</td><td></td></tr>
+                                    <tr><td class="text-center">3</td><td></td><td>Secretary</td><td></td></tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Agenda & Metrics -->
+                        <table class="table table-bordered table-sm mb-4">
+                            <tbody>
+                                <tr>
+                                    <td class="font-weight-bold" style="width: 45%;">Agenda</td>
+                                    <td style="width: 55%;">Internal Vacancy Promotion &amp; Recruitment Selection</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Vacancy announcement no.</td>
+                                    <td><span t-field="o.vacancy_reference"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Position</td>
+                                    <td><span t-field="o.job_position.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Job Grade:</td>
+                                    <td><span t-field="o.job_grade"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Place of Assignment</td>
+                                    <td><span t-field="o.job_location"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">No. of vacant posts</td>
+                                    <td><span t-field="o.no_of_vacancies"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Purpose for promotion (Reason)</td>
+                                    <td><span t-field="o.recruitment_reference"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">No. of Applicants</td>
+                                    <td><t t-esc="stats.get('total_applicants', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Short listed applicants</td>
+                                    <td><t t-esc="stats.get('shortlisted_applicants', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Total participants for Written Exam</td>
+                                    <td><t t-esc="stats.get('written_participants', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Not selected</td>
+                                    <td><t t-esc="stats.get('not_selected', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">No. of applicants who are absent from written exam</td>
+                                    <td><t t-esc="stats.get('written_absents', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">No. of applicants who passed written exam</td>
+                                    <td><t t-esc="stats.get('written_passed', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">Total participants for Interview</td>
+                                    <td><t t-esc="stats.get('interview_participants', 0)"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="font-weight-bold">No. of applicants who are absent from Interview</td>
+                                    <td><t t-esc="stats.get('interview_absents', 0)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Result Summary and Rank -->
+                        <h6 class="font-weight-bold mt-4 mb-2">Result Summary and Rank</h6>
+                        <table class="table table-bordered table-sm mb-4">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="text-center" style="width: 7%;">No.</th>
+                                    <th style="width: 28%;">Applicant Name</th>
+                                    <th class="text-center" style="width: 13%;">PMS</th>
+                                    <th class="text-center" style="width: 15%;">Written Exam</th>
+                                    <th class="text-center" style="width: 14%;">Interview</th>
+                                    <th class="text-center" style="width: 10%;">Rank</th>
+                                    <th class="text-center" style="width: 13%;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="all_cands" t-value="doc_all_candidates.get(o.id, [])"/>
+                                <t t-if="all_cands">
+                                    <t t-set="row_num" t-value="1"/>
+                                    <t t-foreach="all_cands" t-as="cand">
+                                        <tr>
+                                            <td class="text-center"><t t-esc="row_num"/>.</td>
+                                            <td><span t-field="cand.emp_name.name"/></td>
+                                            <td class="text-center"><span t-field="cand.pms_score"/></td>
+                                            <td class="text-center"><span t-field="cand.written_exam_score"/></td>
+                                            <td class="text-center"><span t-field="cand.interview_score"/></td>
+                                            <td class="text-center font-weight-bold"><span t-field="cand.rank"/></td>
+                                            <td class="text-center font-weight-bold">
+                                                <t t-if="cand.selection_type in ('selected', 'Selected')">
+                                                    <span style="color: #28a745;">Selected</span>
+                                                </t>
+                                                <t t-elif="cand.selection_type in ('reserve', 'Reserved')">
+                                                    <span style="color: #fd7e14;">Reserved</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span style="color: #dc3545;">Disqualified</span>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                        <t t-set="row_num" t-value="row_num + 1"/>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-3">
+                                            No candidates recorded yet.
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Decision / Comment -->
+                        <div class="mt-4 mb-4" style="text-align: justify;">
+                            <p class="font-weight-bold mb-1">Decision/ Comment-</p>
+                            <p>
+                                The committee has decided to promote the top-ranked employee, 
+                                <strong><t t-esc="stats.get('top_cand_salutation', 'Ato/Wy')"/> <t t-esc="stats.get('top_cand_name', '____________')"/></strong> 
+                                on the position of <strong><span t-field="o.job_position.name"/></strong> 
+                                (Job Grade <strong><span t-field="o.job_grade"/></strong>) at 
+                                <strong><t t-esc="stats.get('top_cand_unit', '____________')"/></strong> (work unit). 
+                                Regarding the salary, in accordance with the bank’s procedure, 
+                                <strong><t t-esc="stats.get('top_cand_salutation', 'Ato/Wy')"/> <t t-esc="stats.get('top_cand_name', '____________')"/></strong> 
+                                will be entitled a base salary of Birr________(figure) (Words). 
+                                <t t-if="stats.get('res_rank_start') and stats.get('res_rank_end')">
+                                    Employees ranked from <strong><t t-esc="stats.get('res_rank_start')"/></strong> 
+                                    to <strong><t t-esc="stats.get('res_rank_end')"/></strong> 
+                                    will be placed on a reserve list for the next six months and will be considered for promotion when vacant positions arise.
+                                </t>
+                                <t t-else="">
+                                    Employees ranked beyond the selected vacancy slots will be placed on a reserve list for the next six months and will be considered for promotion when vacant positions arise.
+                                </t>
+                            </p>
+                            <p class="mt-3">
+                                The meeting was adjourned at ______(time).
+                            </p>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

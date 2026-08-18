@@ -5,15 +5,18 @@
         <field name="name">recruitment.offer.letter.tree</field>
         <field name="model">recruitment.offer.letter</field>
         <field name="arch" type="xml">
-            <list>
+            <list string="Offer Letters">
+                <field name="reference"/>
                 <field name="vacancy_id"/>
-                <field name="candidate_score_id"/>
+                <field name="ext_candidate_id"/>
+                <field name="applicant_id"/>
                 <field name="offer_date"/>
                 <field name="expiry_date"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'accepted'"
                        decoration-warning="state == 'sent'"
-                       decoration-danger="state == 'declined'"
+                       decoration-danger="state in ('declined', 'expired')"
+                       decoration-info="state == 'cascaded'"
                        decoration-muted="state == 'draft'"/>
             </list>
         </field>
@@ -27,33 +30,47 @@
             <form string="Offer Letter">
                 <header>
                     <button name="action_send" string="Send Offer" type="object"
-                            class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_accept" string="Accept" type="object"
-                            class="oe_highlight" invisible="state != 'sent'"/>
-                    <button name="action_decline" string="Decline" type="object"
-                            invisible="state != 'sent'"/>
+                            class="oe_highlight" icon="fa-paper-plane" invisible="state != 'draft'"/>
+                    <button name="action_accept" string="Accept Offer" type="object"
+                            class="btn-success" icon="fa-check" invisible="state != 'sent'"/>
+                    <button name="action_decline" string="Decline Offer" type="object"
+                            class="btn-danger" icon="fa-times" invisible="state != 'sent'"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,sent,accepted,declined"/>
+                           statusbar_visible="draft,sent,accepted,declined,expired"/>
                 </header>
                 <sheet>
+                    <div class="oe_title">
+                        <label for="reference" string="Offer Reference"/>
+                        <h1>
+                            <field name="reference" readonly="1"/>
+                        </h1>
+                    </div>
                     <group>
-                        <group string="Vacancy &amp; Candidate">
-                            <field name="vacancy_id"/>
-                            <field name="candidate_score_id"/>
-                            <field name="applicant_id"/>
-                            <field name="employee_id"/>
+                        <group string="External Vacancy &amp; Candidate Selection">
+                            <field name="vacancy_id"
+                                   domain="[('reference', 'ilike', 'EXT')]"
+                                   options="{'no_create': True}"
+                                   readonly="state != 'draft'"/>
+                            <field name="vacancy_reference" invisible="1"/>
+                            <field name="ext_candidate_id"
+                                   string="Candidate Name"
+                                   domain="[('selection_type', 'in', ['selected', 'Selected']), '|', ('ext_rec_sel_cand.vacancy_reference', '=', vacancy_reference), ('ext_rec_sel_cand.vacancy_id', '=', vacancy_id)]"
+                                   options="{'no_create': True}"
+                                   readonly="state != 'draft'"/>
+                            <field name="applicant_id" readonly="1" options="{'no_create': True}"/>
+                            <field name="candidate_email" readonly="state != 'draft'"/>
                         </group>
-                        <group string="Offer Dates">
-                            <field name="offer_date"/>
-                            <field name="expiry_date"/>
-                            <field name="response_date" invisible="state not in ('accepted', 'declined')"/>
+                        <group string="Offer Timeline (3-Day Window)">
+                            <field name="offer_date" readonly="state != 'draft'"/>
+                            <field name="expiry_date" readonly="1"/>
+                            <field name="response_date" invisible="state not in ('accepted', 'declined', 'expired')"/>
                         </group>
                     </group>
-                    <group string="Reason" invisible="state != 'declined'">
-                        <field name="rejection_reason" nolabel="1"/>
+                    <group string="Decline / Rejection Reason" invisible="state not in ('sent', 'declined', 'expired')">
+                        <field name="rejection_reason" placeholder="State optional reason for candidate decline or offer expiry..." readonly="state in ('accepted', 'cascaded')"/>
                     </group>
-                    <group string="Notes">
-                        <field name="notes" nolabel="1"/>
+                    <group string="Internal Notes">
+                        <field name="notes" placeholder="Internal HR recruitment notes..."/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -68,8 +85,29 @@
         <field name="view_mode">list,form</field>
         <field name="help" type="xml">
             <p class="o_view_nocontent_smiling_face">
-                No offer letters yet. Create one for a selected candidate.
+                No offer letters created yet. Select an External Vacancy to generate offer letters for selected candidates!
             </p>
+    <!-- Decline Offer Wizard View -->
+    <record id="view_recruitment_offer_decline_wizard_form" model="ir.ui.view">
+        <field name="name">recruitment.offer.decline.wizard.form</field>
+        <field name="model">recruitment.offer.decline.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Decline Offer Letter">
+                <sheet>
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Decline &amp; Reserve Escalation:</strong>
+                        Please state the exact reason for declining the offer letter. Declining will reject this candidate and automatically promote the top reserve candidate.
+                    </div>
+                    <group>
+                        <field name="offer_letter_id" invisible="1"/>
+                        <field name="reason" placeholder="Type reason for declining the offer..." required="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_decline" string="Confirm &amp; Decline Offer" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
         </field>
     </record>
 </odoo>

@@ -12,11 +12,7 @@ class RecruitmentProcessInternal(models.Model):
     _rec_name = "job_position"
     active = fields.Boolean(default=True)
 
-    def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+
 
     def _compute_display_name(self):
         for rec in self:
@@ -47,8 +43,22 @@ class RecruitmentProcessInternal(models.Model):
                                    string="Internal Recruitment")
 
     def populate_criteria(self):
-        p_id = self.id
-        self.env.cr.execute('SELECT internal_candidates_criteria(%s)', (p_id,))
+        """
+        Populates eligible candidates for this internal recruitment.
+        Delegates to stored procedure public.internal_candidates_criteria.
+        """
+        for rec in self:
+            _logger.info("[populate_criteria] Populating criteria for Internal Recruitment ID=%s", rec.id)
+            target_id = rec.vacancy_id.id if rec.vacancy_id else False
+            if not target_id and rec.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', rec.vacancy_reference)], limit=1)
+                if vac:
+                    target_id = vac.id
+                    rec.write({'vacancy_id': vac.id})
+            if not target_id:
+                target_id = rec.id
+            self.env.cr.execute('SELECT public.internal_candidates_criteria(%s)', (target_id,))
+
 
     def populate_promotion(self):
         p_id = self.id
@@ -57,8 +67,41 @@ class RecruitmentProcessInternal(models.Model):
     def notify(self):
         p_id = self.id
         _logger.info("Starting notification process for Internal Recruitment ID: %s", self.id)
-        self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        
+        # Create hr.applicant records in python for all selected eligible employees
+        HrApplicant = self.env['hr.applicant']
         vac = self.env["job.vacancy"].search([("reference", "=", self.vacancy_reference)], limit=1)
+        
+        for val in self.eligible_emp:
+            if val.select_flag and val.emp_name:
+                existing = HrApplicant.search([
+                    ('internal_employee_id', '=', val.emp_name.id),
+                    ('job_id', '=', self.job_position.id),
+                ], limit=1)
+                
+                emp_grade = val.emp_name.job_grade.grade_name if val.emp_name.job_grade else ''
+                
+                if not existing:
+                    HrApplicant.create({
+                        'partner_name': val.emp_name.name,
+                        'email_from': val.emp_name.work_email or '',
+                        'partner_phone': val.emp_name.mobile_phone or val.emp_name.work_phone or '',
+                        'job_id': self.job_position.id,
+                        'application_type': 'Internal',
+                        'app_reference': vac.id if vac else False,
+                        'internal_employee_id': val.emp_name.id,
+                        'bunna_app_status': 'shortlisted',
+                        'employee_grade': emp_grade,
+                        'employee_position': val.emp_name.job_position.name if val.emp_name.job_position else '',
+                        'active': True,
+                    })
+
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT public.internal_applicant(%s)', (p_id,))
+        except Exception:
+            _logger.warning("Database stored procedure internal_applicant failed or does not exist. Bypassed since Python sync ran successfully.")
+
         work_units = []
         if vac:
             for rec in vac.hiring_details:
@@ -121,7 +164,7 @@ class RecruitmentProcessInternal(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = """Hi This is a Message from Cortex Workflow<br><br>
+        message = """Hi This is a Message from Bunna Bank HR <br><br>
                     You have been shortlisted for an Internal Recruitment position of <b><u>%s</u></b><br><br>
                     If you are interested, please apply before <b><u>%s</u></b> - The Vacancy is available in <b><u>%s</u></b><br><br>Thanks """ % (
             ref, arg1, arg2)
@@ -145,13 +188,13 @@ class EligibleEmployees(models.Model):
             rec.write({'active': False})
         return True
 
-    # Leave Status — cross-reference with Time Off module (hr.leave)
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
     # No new model created; reads directly from hr.leave for the linked employee.
     active_leave_status = fields.Char(
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
              "if the employee has an approved leave covering today's date.",
     )
 
@@ -310,7 +353,11 @@ class InternalSelectedCandidates(models.Model):
 
     def notify(self):
         p_id = self.job_position.id
-        self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        except Exception:
+            _logger.warning("Database procedure internal_applicant failed or missing.")
         self.status = 'notify'
         return self.status
 
@@ -328,12 +375,12 @@ class InternalEligibleEmployees(models.Model):
             rec.write({'active': False})
         return True
 
-    # Leave Status — cross-reference with Time Off module (hr.leave)
+    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
     active_leave_status = fields.Char(
         string="Leave Status",
         compute="_compute_leave_status",
         store=False,
-        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.)"
+        help="Cross-references the Time Off module. Shows leave type (Annual, Medical, Maternity, etc.) "
              "if the employee has an approved leave covering today's date.",
     )
 
@@ -377,3 +424,27 @@ class InternalEligibleEmployees(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     select_flag = fields.Boolean(string="Select")
     internal_selected_id = fields.Many2one("internal.selected", string="Internal Selected Candidates for Recruitment")
+
+
+class InternalCandidatesV(models.Model):
+    _name = 'internal.candidates.v'
+    _table = 'internal_candidates_v'
+    _auto = False
+    _description = 'Internal Candidates View'
+
+    employee_id = fields.Many2one('hr.employee', string='Employee')
+    supervisory_experience = fields.Float(string='Supervisory Experience')
+    current_position = fields.Char(string='Current Position')
+    service_in_company = fields.Float(string='Service in Company')
+    employment_experience = fields.Float(string='Employment Experience')
+    total_experience = fields.Float(string='Total Experience')
+    educational_qualification = fields.Char(string='Educational Qualification')
+    name = fields.Char(string='Current Department')
+    last_promotion = fields.Float(string='Months since last Promotion')
+    pms_score = fields.Float(string='PMS Score')
+
+    def init(self):
+        pass
+
+
+

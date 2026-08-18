@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Report Action for Selection Minute -->
+        <record id="action_report_selection_minute" model="ir.actions.report">
+            <field name="name">Selection Committee Minute PDF</field>
+            <field name="model">recruitment.selection.minute</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">custom_recruitment.report_selection_minute_document</field>
+            <field name="report_file">custom_recruitment.report_selection_minute_document</field>
+            <field name="binding_model_id" ref="model_recruitment_selection_minute"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- QWeb PDF Report Template -->
+        <template id="report_selection_minute_document">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333;">
+                            
+                            <!-- Document Header -->
+                            <div class="text-center mb-4">
+                                <h2 style="font-weight: bold; letter-spacing: 0.5px; color: #1a365d;">
+                                    <span t-if="doc.recruitment_type == 'internal'">INTERNAL RECRUITMENT COMMITTEE SELECTION MINUTE</span>
+                                    <span t-if="doc.recruitment_type == 'external'">EXTERNAL RECRUITMENT COMMITTEE SELECTION MINUTE</span>
+                                    <span t-if="not doc.recruitment_type">RECRUITMENT COMMITTEE SELECTION MINUTE</span>
+                                </h2>
+                                <p class="text-muted small">Official Executive Record of Candidate Scores, Ranking, &amp; Committee Signatures</p>
+                            </div>
+
+                            <table class="table table-sm table-borderless mb-4" style="font-size: 13px; background-color: #f8fafc; padding: 10px; border-radius: 4px;">
+                                <tr>
+                                    <td><strong>Minute Reference:</strong> <span t-field="doc.name"/></td>
+                                    <td><strong>Meeting Date:</strong> <span t-field="doc.meeting_date"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Target Vacancy:</strong> <span t-field="doc.vacancy_id.display_name"/></td>
+                                    <td><strong>Recruitment Track:</strong> <span t-field="doc.recruitment_type" style="text-transform: capitalize;"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Approved Status:</strong> <span t-field="doc.state" style="text-transform: capitalize;"/></td>
+                                    <td><strong>Vacancy Capacity:</strong> <span t-field="doc.vacancy_id.no_of_vacancies"/> Positions</td>
+                                </tr>
+                            </table>
+
+                            <!-- Candidate Ranking Matrix -->
+                            <h4 style="color: #2b6cb0; border-bottom: 2px solid #cbd5e0; padding-bottom: 5px;" class="mt-4">
+                                1. Ranked Candidate Performance &amp; Selection Results
+                            </h4>
+
+                            <table class="table table-bordered table-sm mt-3" style="font-size: 12px; width: 100%;">
+                                <thead style="background-color: #edf2f7; color: #2d3748;">
+                                    <tr>
+                                        <th class="text-center" style="width: 6%;">Rank</th>
+                                        <th style="width: 26%;">Candidate Name</th>
+                                        <t t-if="doc.recruitment_type == 'internal'">
+                                            <th style="width: 20%;">Current Department</th>
+                                            <th class="text-center" style="width: 12%;">PMS Score</th>
+                                        </t>
+                                        <t t-if="doc.recruitment_type == 'external'">
+                                            <th style="width: 20%;">Applicant Reference</th>
+                                        </t>
+                                        <th class="text-center" style="width: 12%;">Written Exam</th>
+                                        <th class="text-center" style="width: 12%;">Interview Exam</th>
+                                        <th class="text-center" style="width: 12%;">Final Total</th>
+                                        <th class="text-center" style="width: 14%;">Committee Decision</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="doc.ranking_line_ids" t-as="line">
+                                        <tr t-att-style="'background-color: #f0fff4;' if line.selection_status == 'selected' else ('background-color: #f7fafc;' if line.selection_status == 'reserve' else '')">
+                                            <td class="text-center"><strong><span t-field="line.rank"/></strong></td>
+                                            <td><span t-field="line.candidate_name"/></td>
+                                            
+                                            <t t-if="doc.recruitment_type == 'internal'">
+                                                <td><span t-field="line.employee_id.department_id.name"/></td>
+                                                <td class="text-center"><span t-field="line.pms_score"/></td>
+                                            </t>
+                                            <t t-if="doc.recruitment_type == 'external'">
+                                                <td><span t-field="line.applicant_id.partner_name"/></td>
+                                            </t>
+                                            
+                                            <td class="text-center"><span t-field="line.written_score"/></td>
+                                            <td class="text-center"><span t-field="line.interview_score"/></td>
+                                            <td class="text-center"><strong><span t-field="line.final_score"/></strong></td>
+                                            <td class="text-center">
+                                                <span t-if="line.selection_status == 'selected'" class="badge badge-success" style="padding: 4px 8px; font-weight: bold;">Selected</span>
+                                                <span t-if="line.selection_status == 'reserve'" class="badge badge-info" style="padding: 4px 8px;">Reserve</span>
+                                                <span t-if="line.selection_status == 'failed'" class="badge badge-danger" style="padding: 4px 8px;">Rejected</span>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Resolution Narrative -->
+                            <h4 style="color: #2b6cb0; border-bottom: 2px solid #cbd5e0; padding-bottom: 5px;" class="mt-4">
+                                2. Committee Decision Narrative &amp; Justification
+                            </h4>
+                            <div class="p-3 mt-2" style="background-color: #f8fafc; border-left: 4px solid #3182ce; font-size: 13px; min-height: 80px;">
+                                <p t-field="doc.decision_summary"/>
+                            </div>
+
+                            <!-- Committee Signatures Grid -->
+                            <h4 style="color: #2b6cb0; border-bottom: 2px solid #cbd5e0; padding-bottom: 5px;" class="mt-4">
+                                3. Committee Members Digital Signatures &amp; Audit Log
+                            </h4>
+
+                            <div class="row mt-3">
+                                <t t-foreach="doc.committee_signature_ids" t-as="sig">
+                                    <div class="col-4 text-center mb-3" style="padding: 10px;">
+                                        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; background-color: #fff;">
+                                            <p class="mb-1" style="font-weight: bold; color: #2d3748;">
+                                                <span t-field="sig.user_id.name"/>
+                                            </p>
+                                            <p class="text-muted small mb-2" style="font-style: italic;">
+                                                <span t-field="sig.role" t-if="sig.role"/>
+                                                <span t-else="">Committee Member</span>
+                                            </p>
+
+                                            <!-- Render Signature Image -->
+                                            <div style="height: 65px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px;">
+                                                <t t-if="sig.signature_img">
+                                                    <img t-att-src="image_data_uri(sig.signature_img)" style="max-height: 55px; max-width: 140px;"/>
+                                                </t>
+                                                <t t-else="">
+                                                    <p class="text-danger small mt-2"><em>[Pending Signature]</em></p>
+                                                </t>
+                                            </div>
+
+                                            <div style="border-top: 1px dashed #cbd5e0; pt-1;" class="mt-1">
+                                                <p class="text-muted small mb-0" style="font-size: 10px;">
+                                                    Signed: <span t-field="sig.signed_date" t-options='{"widget": "datetime"}'/>
+                                                </p>
+                                                <p class="text-muted small mb-0" style="font-size: 9px; color: #718096;">
+                                                    Status: <span t-field="sig.state" style="text-transform: capitalize;"/>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+    </data>
+</odoo>

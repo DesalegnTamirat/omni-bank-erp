@@ -1,76 +1,212 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
+    <!-- List View -->
     <record id="hr_employee_probation_list_view" model="ir.ui.view">
         <field name="name">hr.employee.probation.list</field>
         <field name="model">hr.employee.probation</field>
         <field name="arch" type="xml">
-            <list string="Employee Probations" decoration-warning="state=='notified'" decoration-success="outcome=='satisfactory'" decoration-danger="outcome=='unsatisfactory'">
+            <list string="Probationer Performance Evaluations" 
+                  decoration-info="state=='in_progress'" 
+                  decoration-warning="state=='notified' or state=='extended'" 
+                  decoration-success="state=='completed' or outcome=='satisfactory'" 
+                  decoration-danger="state=='terminated' or outcome=='unsatisfactory'">
                 <field name="name"/>
-                <field name="employee_id"/>
-                <field name="job_position_id"/>
-                <field name="employee_category"/>
-                <field name="probation_start_date"/>
+                <field name="employee_id" string="Name of Probationer"/>
+                <field name="job_position_id" string="Position Title"/>
+                <field name="operating_unit_id" string="Place of Assignment"/>
+                <field name="probation_start_date" string="Employment Date"/>
                 <field name="probation_end_date"/>
-                <field name="supervisor_id"/>
-                <field name="notification_sent"/>
+                <field name="supervisor_id" string="Evaluator"/>
+                <field name="percentage_score" string="Result (/100)" widget="progressbar"/>
+                <field name="recommend_permanent"/>
                 <field name="outcome"/>
-                <field name="state"/>
+                <field name="state" widget="badge"/>
             </list>
         </field>
     </record>
 
+    <!-- Form View (Matching Bunna Bank S.C. Official Evaluation Form) -->
     <record id="hr_employee_probation_form_view" model="ir.ui.view">
         <field name="name">hr.employee.probation.form</field>
         <field name="model">hr.employee.probation</field>
         <field name="arch" type="xml">
-            <form string="Employee Probation">
+            <form string="Probationer Performance Evaluation Form">
                 <header>
                     <button name="action_start" string="Start Probation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                    <button name="action_notify_supervisor" string="Notify Supervisor" type="object" class="oe_highlight" invisible="state not in ('in_progress',) or notification_sent"/>
-                    <button name="action_record_outcome" string="Record Outcome" type="object" class="oe_highlight" invisible="state == 'completed'"/>
-                    <field name="state" widget="statusbar"/>
+                    <button name="action_populate_criteria" string="Reload Evaluation Criteria" type="object" invisible="state in ('completed', 'terminated')"/>
+                    <button name="action_notify_supervisor" string="Notify Evaluator" type="object" class="oe_highlight" invisible="state not in ('in_progress',) or notification_sent"/>
+                    <button name="action_committee_evaluate" string="Committee Vote" type="object" class="oe_highlight" invisible="state not in ('notified', 'in_progress') or not delegation_team_ids"/>
+                    <button name="action_extend_probation" string="Extend Probation" type="object" invisible="state in ('completed', 'terminated')"/>
+                    <button name="action_record_outcome" string="Record Outcome &amp; Confirm/Terminate" type="object" class="oe_highlight" invisible="state in ('completed', 'terminated')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,notified,evaluated,completed"/>
                 </header>
                 <sheet>
-                    <div class="oe_title">
+                    <div class="oe_button_box" name="button_box">
+                    </div>
+
+                    <!-- Header Title matching official form -->
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold" style="letter-spacing: 1px;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase">Probationer Performance Evaluation Form</h3>
+                        <h5 class="text-muted">People Operations &amp; Talent Management Directorate</h5>
+                    </div>
+
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Evaluation Form Reference"/>
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
-                    <group>
-                        <group>
-                            <field name="employee_id"/>
-                            <field name="job_position_id" readonly="1"/>
-                            <field name="operating_unit_id" readonly="1"/>
-                            <field name="supervisor_id"/>
-                        </group>
-                        <group>
-                            <field name="source_recruitment"/>
-                            <field name="recruitment_reference"/>
-                            <field name="employee_category"/>
-                            <field name="probation_start_date"/>
-                            <field name="duration_days" readonly="1"/>
-                            <field name="probation_end_date" readonly="1"/>
-                        </group>
-                    </group>
-                    <group string="Supervisor Notification">
-                        <field name="notification_sent" readonly="1"/>
-                        <field name="notification_date" readonly="1"/>
-                    </group>
-                    <group string="Outcome">
-                        <field name="outcome"/>
-                        <field name="outcome_date" readonly="1"/>
-                        <field name="outcome_notes"/>
-                    </group>
-                </sheet>
 
+                    <!-- Header Metadata Section (Matches Word Document) -->
+                    <div class="card p-3 mb-4 bg-light">
+                        <group>
+                            <group>
+                                <field name="employee_id" string="NAME OF PROBATIONER" readonly="state != 'draft'"/>
+                                <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
+                                <field name="operating_unit_id" string="PLACE OF ASSIGNMENT" readonly="1"/>
+                                <field name="department_id" string="DEPARTMENT" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="probation_start_date" string="EMPLOYMENT DATE" readonly="state != 'draft'"/>
+                                <field name="duration_days" string="PROBATION DURATION (DAYS)" readonly="1"/>
+                                <field name="probation_end_date" string="PROBATION END DATE" readonly="1"/>
+                                <field name="employee_category" string="JOB CATEGORY" readonly="state != 'draft'"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <!-- Main Evaluation Criteria Table (Matches Word Table) -->
+                    <notebook>
+                        <page string="Evaluation Criteria &amp; Scoring">
+                            <field name="criteria_line_ids" readonly="state in ('completed', 'terminated')">
+                                <list editable="bottom">
+                                    <field name="criteria_name" string="EVALUATION CRITERIA"/>
+                                    <field name="description" string="GUIDELINE QUESTION / SCOPE"/>
+                                    <field name="rating" string="RATING (1-5)"/>
+                                    <field name="coefficient" string="COEFFICIENT"/>
+                                    <field name="score" string="SCORE" sum="Total Score"/>
+                                </list>
+                            </field>
+
+                            <!-- Result Out of 100 Summary Box -->
+                            <div class="card p-3 mt-3 border-primary bg-light">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <h4 class="fw-bold mb-0 text-primary">Evaluation Result Out of 100:</h4>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <h2 class="fw-bold mb-0 text-primary">
+                                            <field name="percentage_score" widget="progressbar" readonly="1"/>
+                                        </h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </page>
+
+                        <page string="Committee Delegation (Approvals)">
+                            <button name="action_committee_evaluate" string="Register Committee Vote" type="object" class="oe_link" invisible="state in ('completed', 'terminated')"/>
+                            <field name="delegation_team_ids" readonly="state in ('completed', 'terminated')">
+                                <list editable="bottom">
+                                    <field name="role"/>
+                                    <field name="employee_name"/>
+                                    <field name="operating_unit"/>
+                                    <field name="status"/>
+                                    <field name="alternate_committee_member"/>
+                                    <field name="alter_operating_unit"/>
+                                    <field name="approve" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Extension Details" invisible="not is_extended">
+                            <group>
+                                <group>
+                                    <field name="is_extended" readonly="1"/>
+                                    <field name="extension_days"/>
+                                </group>
+                                <group>
+                                    <field name="extension_reason"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Recruitment &amp; System Metadata">
+                            <group>
+                                <group>
+                                    <field name="source_recruitment"/>
+                                    <field name="recruitment_reference"/>
+                                </group>
+                                <group>
+                                    <field name="notification_sent" readonly="1"/>
+                                    <field name="notification_date" readonly="1"/>
+                                    <field name="in_charge_id"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+
+                    <!-- Footer Section matching Word document -->
+                    <div class="card p-3 mt-4">
+                        <h4 class="fw-bold mb-3">Recommendation &amp; Evaluator Sign-off</h4>
+                        <group>
+                            <field name="recommend_permanent" string="Do you recommend him/her for permanent employment?" widget="radio"/>
+                        </group>
+                        <group invisible="recommend_permanent != 'yes'">
+                            <field name="outcome_notes" string="Comments and State Observation" placeholder="Please comment and state your observation..."/>
+                        </group>
+                        <group>
+                            <group>
+                                <field name="supervisor_id" string="EVALUATOR"/>
+                                <field name="evaluator_name" string="Name of Evaluator" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="evaluator_position" string="Position" readonly="1"/>
+                                <field name="outcome" string="FINAL OUTCOME DECISION"/>
+                                <field name="outcome_date" string="Date" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+                </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
 
+    <!-- Search View -->
+    <record id="hr_employee_probation_search_view" model="ir.ui.view">
+        <field name="name">hr.employee.probation.search</field>
+        <field name="model">hr.employee.probation</field>
+        <field name="arch" type="xml">
+            <search string="Search Evaluation Forms">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="job_position_id"/>
+                <field name="supervisor_id"/>
+                <separator/>
+                <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_notified" string="Notified" domain="[('state', '=', 'notified')]"/>
+                <filter name="filter_completed" string="Completed (Confirmed)" domain="[('state', '=', 'completed')]"/>
+                <filter name="filter_extended" string="Extended" domain="[('state', '=', 'extended')]"/>
+                <filter name="filter_terminated" string="Terminated" domain="[('state', '=', 'terminated')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_category" string="Employee Category" context="{'group_by': 'employee_category'}"/>
+                    <filter name="group_unit" string="Place of Assignment" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter name="group_supervisor" string="Evaluator" context="{'group_by': 'supervisor_id'}"/>
+                    <filter name="group_recommend" string="Recommendation" context="{'group_by': 'recommend_permanent'}"/>
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_hr_employee_probation" model="ir.actions.act_window">
-        <field name="name">Employee Probation</field>
+        <field name="name">Probationer Performance Evaluations</field>
         <field name="res_model">hr.employee.probation</field>
         <field name="view_mode">list,form</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Create a Probation record!</p>
+            <p class="o_view_nocontent_smiling_face">Create a Probationer Performance Evaluation Form!</p>
+            <p>Conduct official Bunna Bank S.C. Probationer Performance Evaluations: rating out of 100 across Quality of Work, Dependability, Integrity, Punctuality, Efficiency, and Cooperation with statutory duration tracking (60/75 days) and automated HR contract actions.</p>
         </field>
     </record>
 </odoo>

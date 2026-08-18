@@ -1,63 +1,330 @@
-<?xml version='1.0' encoding='UTF-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- ============================================ -->
+    <!-- INTERVIEW SESSION VIEWS                      -->
+    <!-- ============================================ -->
+
+    <record id="view_interview_session_form" model="ir.ui.view">
+        <field name="name">interview.session.form</field>
+        <field name="model">interview.session</field>
+        <field name="arch" type="xml">
+            <form string="Interview Assessment Session">
+                <header>
+                    <button name="action_load_panel_and_candidates" string="Load Panel &amp; Candidates" type="object" class="btn-secondary" icon="fa-refresh" invisible="state != 'draft'"/>
+                    <button name="action_start_interview" string="Start Interview Process" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_calculate_final_results" string="Calculate Final Scores" type="object" class="oe_highlight" invisible="state != 'in_progress'"/>
+                    <button name="action_reset_to_draft" string="Reset to Draft" type="object" invisible="state not in ('cancelled', 'completed')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Session Reference"/>
+                        <h1>
+                            <field name="name" readonly="state != 'draft'"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="vacancy_id" readonly="state != 'draft'"/>
+                            <field name="recruiting_position_id" readonly="state != 'draft'"/>
+                            <field name="recruitment_type" widget="radio" readonly="state != 'draft'"/>
+                            <field name="assessment_date" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="rate_sheet_id" readonly="state != 'draft'"/>
+                            <field name="no_of_interviewers"/>
+                            <field name="no_of_candidates"/>
+                            <field name="submission_status" class="fw-bold text-info" invisible="state == 'draft'"/>
+                            <field name="interviewer_domain_ids" invisible="1"/>
+                            <field name="employee_candidate_domain_ids" invisible="1"/>
+                            <field name="applicant_candidate_domain_ids" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <!-- Configuration Page -->
+                        <page string="Panel &amp; Candidates" name="panel_candidates">
+                            <group>
+                                <group string="Interview Panel Members">
+                                    <field name="interviewer_ids" widget="many2many_tags" domain="[('id', 'in', interviewer_domain_ids)]" placeholder="Select panel members..." readonly="state != 'draft'"/>
+                                </group>
+                                <group string="Assigned Candidates">
+                                    <field name="applicant_ids" widget="many2many_tags" invisible="recruitment_type != 'External'" domain="[('id', 'in', applicant_candidate_domain_ids)]" placeholder="Select external applicants..." readonly="state != 'draft'"/>
+                                    <field name="employee_candidate_ids" widget="many2many_tags" invisible="recruitment_type != 'Internal'" domain="[('id', 'in', employee_candidate_domain_ids)]" placeholder="Select internal employee candidates..." readonly="state != 'draft'"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Individual Interviewer Assessments Page -->
+                        <page string="Interviewer Assessments" name="assessments" invisible="state == 'draft'">
+                            <field name="interviewer_assessment_ids" readonly="1">
+                                <list string="Interviewer Evaluation Sheets">
+                                    <field name="assessor_name"/>
+                                    <field name="assessment_date"/>
+                                    <field name="total_score" string="Average Score (%)"/>
+                                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'submitted'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Final Calculated Results Page -->
+                        <page string="Final Candidate Results" name="final_results" invisible="state == 'draft'">
+                            <div class="alert alert-info mb-3" role="alert" invisible="state != 'completed'">
+                                <strong>Evaluation Complete!</strong> Final scores have been automatically computed as the exact average of scores submitted by all assigned interviewers.
+                            </div>
+                            <field name="final_result_ids" readonly="1">
+                                <list string="Final Candidate Results" decoration-success="result_status == 'passed'" decoration-danger="result_status == 'failed'">
+                                    <field name="candidate_name"/>
+                                    <field name="attendance"/>
+                                    <field name="no_of_assessments" string="Interviewer Count"/>
+                                    <field name="individual_score_summary" string="Individual Panel Scores"/>
+                                    <field name="final_score" class="fw-bold" string="Final Average Score (%)"/>
+                                    <field name="result_status" widget="badge" decoration-success="result_status == 'passed'" decoration-danger="result_status == 'failed'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_interview_session_list" model="ir.ui.view">
+        <field name="name">interview.session.list</field>
+        <field name="model">interview.session</field>
+        <field name="arch" type="xml">
+            <list string="Interview Sessions">
+                <field name="name"/>
+                <field name="vacancy_id"/>
+                <field name="recruiting_position_id"/>
+                <field name="recruitment_type"/>
+                <field name="assessment_date"/>
+                <field name="no_of_interviewers"/>
+                <field name="no_of_candidates"/>
+                <field name="submission_status"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'in_progress'" decoration-success="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_interview_session" model="ir.actions.act_window">
+        <field name="name">Interview Sessions</field>
+        <field name="res_model">interview.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Interview Assessment Session!
+            </p>
+            <p>
+                Configure the interview panel, candidate list, and rate sheet to manage independent interviewer evaluations and automated score aggregation.
+            </p>
+        </field>
+    </record>
+
+
+    <!-- ============================================ -->
+    <!-- INDIVIDUAL INTERVIEW ASSESSMENT VIEWS        -->
+    <!-- ============================================ -->
+
     <record id="interview_assessment_form" model="ir.ui.view">
         <field name="name">interview.assessment.form</field>
         <field name="model">interview.assessment</field>
         <field name="arch" type="xml">
-            <form string="Interview Assessment">
-                <group colspan="2">
+            <form string="Individual Interview Assessment Sheet">
+                <header>
+                    <button name="action_submit" string="Submit Assessment" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'submitted'">
+                        <strong>Submission Locked:</strong> This assessment has been submitted and cannot be modified.
+                    </div>
                     <group>
-                        <field name="recruiting_position" readonly="1"/>
-                        <field name="assessor_name" readonly="1"/>
-                        <field name="assessment_date" readonly="1"/>
+                        <group>
+                            <field name="session_id" readonly="1"/>
+                            <field name="assessor_name" readonly="1"/>
+                            <field name="assessment_date" readonly="state == 'submitted'"/>
+                        </group>
+                        <group>
+                            <field name="recruiting_position" readonly="1"/>
+                            <field name="vacancy_reference" readonly="1"/>
+                            <field name="recruitment_type" readonly="1"/>
+                            <field name="total_score" string="Overall Average Score (%)" class="fw-bold"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="applicant_name" readonly="1"/>
-                        <field name="recruitment_type" readonly="1"/>
-                    </group>
-                    <group>
-                        <field name="assessment_criteria" readonly="1"/>
-                        <field name="weightage" readonly="1"/>
-                    </group>
-                    <group>
-                        <field name="marks_awarded"/>
-                    </group>
-                </group>
+
+                    <notebook>
+                        <!-- Tab 1: Rate Sheet Evaluation (Enter Marks per Criterion) -->
+                        <page string="Rate Sheet Evaluation (Enter Marks)" name="rate_sheet_marks">
+                            <div class="alert alert-info mb-2" role="alert">
+                                <strong>Rate Sheet Guidelines:</strong> Enter the marks awarded for each Area of Assessment per candidate. Total scores and percentages will compute automatically.
+                            </div>
+                            <field name="criteria_score_ids" readonly="state == 'submitted'">
+                                <list string="Rate Sheet Criteria Scores" editable="bottom" create="0" delete="0">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="candidate_name" readonly="1" string="Candidate Name"/>
+                                    <field name="criteria_name" readonly="1" string="Area of Assessment"/>
+                                    <field name="max_marks" readonly="1" string="Max Marks"/>
+                                    <field name="marks_awarded" string="Marks Awarded"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 2: Candidate Scores & Remarks Summary -->
+                        <page string="Candidate Summary &amp; Remarks" name="candidate_summary">
+                            <field name="candidate_assessment_ids" readonly="state == 'submitted'">
+                                <form string="Candidate Rating">
+                                    <group>
+                                        <group>
+                                            <field name="candidate_name" readonly="1"/>
+                                            <field name="attendance"/>
+                                        </group>
+                                        <group>
+                                            <field name="total_marks" string="Total Marks Awarded"/>
+                                            <field name="total_max_marks"/>
+                                            <field name="percentage_score" string="Percentage Score (%)" class="fw-bold"/>
+                                        </group>
+                                    </group>
+                                    <notebook>
+                                        <page string="Criteria Scores (Rate Sheet)">
+                                            <field name="criteria_score_ids">
+                                                <list editable="bottom" create="0" delete="0">
+                                                    <field name="sequence" widget="handle"/>
+                                                    <field name="criteria_name" readonly="1"/>
+                                                    <field name="max_marks" readonly="1"/>
+                                                    <field name="marks_awarded"/>
+                                                </list>
+                                            </field>
+                                        </page>
+                                        <page string="Interviewer Remarks">
+                                            <field name="notes" placeholder="Enter comments or remarks regarding candidate's performance..."/>
+                                        </page>
+                                    </notebook>
+                                </form>
+                                <list string="Candidate Ratings">
+                                    <field name="candidate_name" readonly="1"/>
+                                    <field name="attendance"/>
+                                    <field name="total_marks" readonly="1"/>
+                                    <field name="total_max_marks" readonly="1"/>
+                                    <field name="percentage_score" string="Score (%)" class="fw-bold" readonly="1"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
             </form>
         </field>
     </record>
+
     <record id="interview_assessment_tree" model="ir.ui.view">
         <field name="name">interview.assessment.tree</field>
         <field name="model">interview.assessment</field>
         <field name="arch" type="xml">
-            <list editable="bottom" create="1" delete="1" multi_edit="1" string="Interview Assessment">
-                <field name="vacancy_reference" readonly="1"/>
-                <field name="recruiting_position" readonly="1"/>
-                <field name="assessor_name" readonly="1"/>
-                <field name="assessment_date" readonly="1"/>
-                <field name="applicant_name" readonly="1"/>
-                <field name="recruitment_type" readonly="1"/>
-                <field name="assessment_criteria" readonly="1"/>
-				<field name="weightage" readonly="1"/>
-                <field name="candidate_attendance"/>
-                <field name="marks_awarded"/>
+            <list string="Interview Assessments">
+                <field name="session_id"/>
+                <field name="assessor_name"/>
+                <field name="recruiting_position"/>
+                <field name="recruitment_type"/>
+                <field name="assessment_date"/>
+                <field name="total_score" string="Average Score (%)"/>
+                <field name="state" decoration-info="state == 'draft'" decoration-success="state == 'submitted'"/>
             </list>
         </field>
-	</record>
-	<record id="interview_assessment_search" model="ir.ui.view">
+    </record>
+
+    <record id="interview_assessment_search" model="ir.ui.view">
         <field name="name">interview.assessment.view.search</field>
         <field name="model">interview.assessment</field>
         <field name="arch" type="xml">
-            <search string="Search Source">
+            <search string="Search Interview Assessments">
+                <field name="assessor_name"/>
                 <field name="vacancy_reference"/>
-                <field name="applicant_name"/>
-           </search>
+                <field name="session_id"/>
+                <filter string="My Assessments" name="my_assessments" domain="[('assessor_name.user_id', '=', uid)]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Submitted" name="submitted" domain="[('state', '=', 'submitted')]"/>
+            </search>
         </field>
-	</record>
+    </record>
+
     <record id="interview_assessment_tree_form" model="ir.actions.act_window">
-        <field name="name">Interview Assessment</field>
+        <field name="name">Interview Assessments</field>
         <field name="res_model">interview.assessment</field>
         <field name="context">{}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_my_interview_assessment" model="ir.actions.act_window">
+        <field name="name">My Interview Assessments</field>
+        <field name="res_model">interview.assessment</field>
+        <field name="domain">[('assessor_name.user_id', '=', uid)]</field>
+        <field name="context">{'search_default_my_assessments': 1}</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+
+    <!-- ============================================ -->
+    <!-- FINAL INTERVIEW RESULT VIEWS                 -->
+    <!-- ============================================ -->
+
+    <record id="view_interview_final_result_form" model="ir.ui.view">
+        <field name="name">interview.final.result.form</field>
+        <field name="model">interview.final.result</field>
+        <field name="arch" type="xml">
+            <form string="Final Candidate Interview Result" create="0" edit="0">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="candidate_name"/>
+                            <field name="session_id"/>
+                            <field name="attendance"/>
+                        </group>
+                        <group>
+                            <field name="no_of_assessments"/>
+                            <field name="final_score" class="fw-bold text-success"/>
+                            <field name="result_status" widget="badge"/>
+                        </group>
+                    </group>
+                    <group string="Individual Scores Summary">
+                        <field name="individual_score_summary" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Interviewer Score Breakdown">
+                            <field name="detail_line_ids">
+                                <list>
+                                    <field name="interviewer_name"/>
+                                    <field name="score" string="Score Awarded (%)"/>
+                                    <field name="submitted_date"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_interview_final_result_list" model="ir.ui.view">
+        <field name="name">interview.final.result.list</field>
+        <field name="model">interview.final.result</field>
+        <field name="arch" type="xml">
+            <list string="Final Interview Results" create="0">
+                <field name="session_id"/>
+                <field name="candidate_name"/>
+                <field name="attendance"/>
+                <field name="no_of_assessments"/>
+                <field name="individual_score_summary"/>
+                <field name="final_score" class="fw-bold"/>
+                <field name="result_status" decoration-success="result_status == 'passed'" decoration-danger="result_status == 'failed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_interview_final_result" model="ir.actions.act_window">
+        <field name="name">Final Interview Results</field>
+        <field name="res_model">interview.final.result</field>
         <field name="view_mode">list,form</field>
     </record>
 </odoo>

@@ -1,18 +1,5 @@
-﻿# *- coding: utf-8 -*
-"""
-Recruitment criteria and Probation Assessment models — fully owned by custom_recruitment.
+# -*- coding: utf-8 -*-
 
-Migrated from hr_employee_custom:
-  - recruitment.competency
-  - recruitment.experience
-  - recruitment.qualification
-  - vacancy.workunit  (SQL view)
-  - emp.probation.criteria
-  - probation.assessment.form + criteria + delegation team
-
-hr_employee_custom now depends on custom_recruitment so these models are
-available when hr_employee_hrMaster.py references them.
-"""
 from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError
 
@@ -25,8 +12,9 @@ class EmployeeProbationCriteria(models.Model):
     _name = "emp.probation.criteria"
     _rec_name = "emp_evaluation_criteria"
 
-    emp_evaluation_criteria = fields.Char(string="Evaluation Criteria")
-    coefficient = fields.Integer(string="Coefficient")
+    emp_evaluation_criteria = fields.Char(string="Evaluation Criteria", required=True)
+    description = fields.Text(string="Guideline Question / Description")
+    coefficient = fields.Integer(string="Coefficient", default=1)
 
 
 # ── Probation Assessment Form ─────────────────────────────────────────────────
@@ -105,6 +93,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Delegation team notified successfully.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -145,6 +134,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Evaluation recorded.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -198,6 +188,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('TDD In-charge Officer has been informed.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -215,6 +206,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Employee confirmed as permanent.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -228,6 +220,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Probation rejected.'),
                 'type': 'warning',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -245,6 +238,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Contract terminated.'),
                 'type': 'warning',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
