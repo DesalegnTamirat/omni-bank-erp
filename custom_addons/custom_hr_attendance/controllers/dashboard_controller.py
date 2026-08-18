@@ -115,64 +115,68 @@ class AttendanceDashboardController(http.Controller):
         total_on_time = range_p + range_lv
         punctuality_index = round((total_on_time / max(1, range_p + range_l + range_lv)) * 100, 1)
 
-        # Query Late Employees for Discipline Action Center in selected period
-        late_sql = """
-            SELECT 
-                emp.id AS employee_id,
-                emp.name AS employee_name,
-                COALESCE(job.name, 'Staff') AS job_title,
-                COALESCE(ou.name, 'Head Office') AS ou_name,
-                COALESCE(dept.name, 'N/A') AS dept_name,
-                COUNT(CASE WHEN att.check_in_status = 'Late' THEN 1 END) AS late_count,
-                SUM(CASE WHEN att.check_in_status = 'Late' THEN COALESCE(att.late_time_hour, 0.0) ELSE 0.0 END) AS late_hours
-            FROM hr_attendance att
-            JOIN hr_employee emp ON att.employee_id = emp.id
-            LEFT JOIN hr_job job ON emp.job_id = job.id
-            LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
-            LEFT JOIN hr_department dept ON emp.department_id = dept.id
-            WHERE att.check_in >= %s AND att.check_in <= %s AND att.check_in_status = 'Late'
-            GROUP BY emp.id, emp.name, job.name, ou.name, dept.name
-            ORDER BY late_count DESC, late_hours DESC
-            LIMIT 50
-        """
-        request.env.cr.execute(late_sql, (range_start, range_end))
-        late_rows = request.env.cr.dictfetchall()
+        # Query Late Employees for Discipline Action Center in selected period using ORM
+        late_attendances = request.env['hr.attendance'].sudo().search([
+            ('check_in', '>=', range_start),
+            ('check_in', '<=', range_end),
+            ('check_in_status', '=', 'Late')
+        ])
+
+        emp_late_map = {}
+        for att in late_attendances:
+            emp = att.employee_id
+            if not emp:
+                continue
+            if emp.id not in emp_late_map:
+                emp_late_map[emp.id] = {
+                    'employee_id': emp.id,
+                    'name': emp.name or 'Employee',
+                    'job': emp.job_id.name if emp.job_id else 'Staff',
+                    'ou': emp.default_operating_unit_id.name if emp.default_operating_unit_id else 'Head Office',
+                    'dept': emp.department_id.name if emp.department_id else 'N/A',
+                    'late_count': 0,
+                    'late_hours': 0.0,
+                }
+            emp_late_map[emp.id]['late_count'] += 1
+            emp_late_map[emp.id]['late_hours'] += (att.late_time_hour or 0.0)
+
+        sorted_late = sorted(emp_late_map.values(), key=lambda x: (x['late_count'], x['late_hours']), reverse=True)[:50]
 
         late_employees_list = [{
             'employee_id': r['employee_id'],
-            'name': r['employee_name'],
-            'job': r['job_title'],
-            'ou': r['ou_name'],
-            'dept': r['dept_name'],
+            'name': r['name'],
+            'job': r['job'],
+            'ou': r['ou'],
+            'dept': r['dept'],
             'late_count': r['late_count'],
             'late_hours_str': self._format_float_hours(r['late_hours']),
-        } for r in late_rows]
+        } for r in sorted_late]
 
-        ou_query = """
-            SELECT COALESCE(ou.name, 'Head Office') AS ou_name, COUNT(att.id) AS att_cnt
-            FROM hr_attendance att
-            JOIN hr_employee emp ON att.employee_id = emp.id
-            LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
-            WHERE att.check_in >= %s AND att.check_in <= %s
-            GROUP BY ou.name
-            ORDER BY att_cnt DESC
-            LIMIT 12
-        """
-        request.env.cr.execute(ou_query, (range_start, range_end))
-        ou_rows = request.env.cr.dictfetchall()
+        # Query Attendances per Operating Unit using ORM
+        range_atts = request.env['hr.attendance'].sudo().search([
+            ('check_in', '>=', range_start),
+            ('check_in', '<=', range_end)
+        ])
+        ou_count_map = {}
+        for att in range_atts:
+            ou_name = att.employee_id.default_operating_unit_id.name if (att.employee_id and att.employee_id.default_operating_unit_id) else 'Head Office'
+            ou_count_map[ou_name] = ou_count_map.get(ou_name, 0) + 1
 
-        ou_labels = [r['ou_name'] for r in ou_rows] or [
-            'Head Office', 'East Addis Ababa', 'South Addis Ababa', 'West Addis Ababa',
-            'Bahir Dar', 'Dessie', 'Debre Berhan', 'Adama', 'Hawassa', 'Mekelle', 'Debre Markos', 'Jimma'
-        ]
-        ou_values = [r['att_cnt'] for r in ou_rows] or [480, 260, 240, 220, 210, 140, 140, 90, 80, 70, 60, 40]
-
-        max_ou_val = max(1, max(ou_values))
-        ou_items = [{
-            'name': ou_labels[i],
-            'count': ou_values[i],
-            'pct': round((ou_values[i] / max_ou_val) * 100, 1)
-        } for i in range(len(ou_labels))]
+        if not ou_count_map:
+            ou_items = [
+                {'name': 'Head Office', 'count': 480, 'pct': 100.0},
+                {'name': 'East Addis Ababa', 'count': 260, 'pct': 54.2},
+                {'name': 'South Addis Ababa', 'count': 240, 'pct': 50.0},
+                {'name': 'West Addis Ababa', 'count': 220, 'pct': 45.8},
+            ]
+        else:
+            sorted_ous = sorted(ou_count_map.items(), key=lambda x: x[1], reverse=True)[:12]
+            max_ou_val = max(1, max(cnt for _, cnt in sorted_ous))
+            ou_items = [{
+                'name': name,
+                'count': cnt,
+                'pct': round((cnt / max_ou_val) * 100, 1)
+            } for name, cnt in sorted_ous]
 
         hourly_labels = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']
         hourly_values = [15, 240, 1850, 1920, 1980, 2010, 2025, 2030, 2031, 2031, 2031, 2031, 2031]
