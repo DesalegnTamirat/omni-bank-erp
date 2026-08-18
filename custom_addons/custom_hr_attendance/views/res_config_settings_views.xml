@@ -145,13 +145,35 @@
                         <!-- BLOCK 4: Discipline Integration Thresholds -->
                         <!-- ========================================= -->
                         <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
-                            <setting string="Lateness Violation Threshold (Occurrences)"
-                                     help="Number of late check-ins that triggers an automatic discipline case.">
-                                <field name="lateness_violation_threshold"/>
+                            <setting string="Cumulative Late Hours Threshold (Hours)"
+                                     help="Total cumulative late hours within the rolling evaluation window that triggers an automatic discipline case.">
+                                <field name="lateness_hours_violation_threshold"/>
+                            </setting>
+                            <setting string="Lateness Evaluation Window (Months)"
+                                     help="Rolling evaluation window in months over which cumulative late hours are aggregated (e.g., 3 months).">
+                                <field name="lateness_eval_window_months"/>
                             </setting>
                             <setting string="Force Checkout Violation Threshold (Occurrences)"
                                      help="Number of force checkouts that triggers an automatic discipline case.">
                                 <field name="force_checkout_violation_threshold"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
+                        <!-- BLOCK 5: Warning Validity Periods (Art. 10.3) -->
+                        <!-- ========================================= -->
+                        <block title="Bank Regulation Warning Validity (Art. 10.3)" name="custom_warning_validity">
+                            <setting string="1st Written Warning Validity (Months)"
+                                     help="First written warning will be valid for 3 months (Art. 10.3.1).">
+                                <field name="warning_1_validity_months"/>
+                            </setting>
+                            <setting string="2nd Written Warning Validity (Months)"
+                                     help="Second written warning will be valid for 6 months (Art. 10.3.2).">
+                                <field name="warning_2_validity_months"/>
+                            </setting>
+                            <setting string="Final Written Warning Validity (Months)"
+                                     help="Final written warning will be valid for 1 year (Art. 10.3.3).">
+                                <field name="warning_3_validity_months"/>
                             </setting>
                         </block>
                 </xpath>

@@ -193,25 +193,45 @@ class ResConfigSettings(models.TransientModel):
     # ----------------------------------------------------------
     # DISCIPLINE INTEGRATION THRESHOLDS
     # ----------------------------------------------------------
-    lateness_violation_threshold = fields.Integer(
-        string='Lateness Violation Threshold (Occurrences)',
+    lateness_hours_violation_threshold = fields.Float(
+        string='Cumulative Late Hours Threshold for Discipline (Hours)',
+        default=4.0,
+        config_parameter="hr_attendance.lateness_hours_violation_threshold",
+        help="Total cumulative late hours within the rolling evaluation window that triggers an automatic discipline case."
+    )
+    lateness_eval_window_months = fields.Integer(
+        string='Lateness Evaluation Window (Months)',
         default=3,
-        config_parameter="hr_attendance.lateness_violation_threshold",
-        help="Number of late check-ins that triggers an automatic discipline case (Repeated Lateness Violation). "
-             "Counter resets to zero after a case is created."
+        config_parameter="hr_attendance.lateness_eval_window_months",
+        help="Rolling evaluation window in months over which cumulative late hours are aggregated (e.g., 3 months)."
     )
     force_checkout_violation_threshold = fields.Integer(
         string='Force Checkout Violation Threshold (Occurrences)',
         default=2,
         config_parameter="hr_attendance.force_checkout_violation_threshold",
-        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout). "
-             "Counter resets to zero after a case is created."
+        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout)."
     )
-    missing_lunch_tap_threshold = fields.Integer(
-        string='Missing Lunch Taps Before Lateness (Occurrences)',
+
+    # ----------------------------------------------------------
+    # EMPLOYEE REGULATION WARNING VALIDITY PERIODS (ART. 10.3)
+    # ----------------------------------------------------------
+    warning_1_validity_months = fields.Integer(
+        string='First Written Warning Validity (Months)',
         default=3,
-        config_parameter="hr_attendance.missing_lunch_tap_threshold",
-        help="Number of missing lunch taps that automatically converts to 1 Lateness Violation (Discipline Parity Rule)."
+        config_parameter="hr_attendance.warning_1_validity_months",
+        help="Validity duration of 1st written warning per Bank Regulation 10.3.1 (Default: 3 months)."
+    )
+    warning_2_validity_months = fields.Integer(
+        string='Second Written Warning Validity (Months)',
+        default=6,
+        config_parameter="hr_attendance.warning_2_validity_months",
+        help="Validity duration of 2nd written warning per Bank Regulation 10.3.2 (Default: 6 months)."
+    )
+    warning_3_validity_months = fields.Integer(
+        string='Final Written Warning Validity (Months)',
+        default=12,
+        config_parameter="hr_attendance.warning_3_validity_months",
+        help="Validity duration of final written warning per Bank Regulation 10.3.3 (Default: 12 months)."
     )
 
     def get_values(self):

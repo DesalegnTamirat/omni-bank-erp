@@ -72,9 +72,9 @@ export class MyAttendance extends Component {
                 lunch_out_time: 12.0,
                 lunch_duration: 1.0,
                 lunch_grace_time: 0.25,
-                lateness_violation_threshold: 3,
+                lateness_hours_violation_threshold: 4.0,
+                lateness_eval_window_months: 3,
                 force_checkout_violation_threshold: 2,
-                missing_lunch_tap_threshold: 3,
             },
         });
 
@@ -286,14 +286,14 @@ export class MyAttendance extends Component {
     onInputLunchGraceTime(ev) {
         this.state.settings.lunch_grace_time = parseFloat(ev.target.value) || 0;
     }
-    onInputLatenessThreshold(ev) {
-        this.state.settings.lateness_violation_threshold = parseInt(ev.target.value, 10) || 0;
+    onInputLatenessHoursThreshold(ev) {
+        this.state.settings.lateness_hours_violation_threshold = parseFloat(ev.target.value) || 0;
+    }
+    onInputLatenessEvalWindowMonths(ev) {
+        this.state.settings.lateness_eval_window_months = parseInt(ev.target.value, 10) || 0;
     }
     onInputForceCheckoutThreshold(ev) {
         this.state.settings.force_checkout_violation_threshold = parseInt(ev.target.value, 10) || 0;
-    }
-    onInputMissingLunchTapThreshold(ev) {
-        this.state.settings.missing_lunch_tap_threshold = parseInt(ev.target.value, 10) || 0;
     }
     onToggleCheckinRestrict(ev) {
         this.state.settings.enable_checkin_restriction = ev.target.checked;

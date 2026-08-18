@@ -1,0 +1,65 @@
+<odoo>
+    <record id="view_my_shift_schedule_tree" model="ir.ui.view">
+        <field name="name">my.shift.schedule.list</field>
+        <field name="model">my.shift.schedule</field>
+        <field name="arch" type="xml">
+            <list string="My Current Shift Schedule" create="0" delete="0" edit="0">
+                <field name="schedule_name"/>
+                <field name="employee_id"/>
+                <field name="job_position"/>
+                <field name="operating_unit_id"/>
+                <field name="start_date"/>
+                <field name="end_date" placeholder="Indefinite"/>
+                <field name="start_time" widget="float_time"/>
+                <field name="end_time" widget="float_time"/>
+                <field name="time_range"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_my_shift_schedule_form" model="ir.ui.view">
+        <field name="name">my.shift.schedule.form</field>
+        <field name="model">my.shift.schedule</field>
+        <field name="arch" type="xml">
+            <form string="My Current Shift Schedule" edit="0" create="0" delete="0">
+                <sheet>
+                    <div class="oe_title mb-3">
+                        <label for="schedule_name" string="Active Shift Schedule"/>
+                        <h1><field name="schedule_name" readonly="1" class="text-primary"/></h1>
+                        <span class="badge rounded-pill bg-primary p-2 fs-6 mb-2">
+                            <field name="assignment_source" readonly="1"/>
+                        </span>
+                    </div>
+
+                    <group>
+                        <group string="Employee &amp; Location Info">
+                            <field name="employee_id" readonly="1"/>
+                            <field name="job_position" readonly="1"/>
+                            <field name="department_id" readonly="1"/>
+                            <field name="operating_unit_id" readonly="1"/>
+                        </group>
+                        <group string="Shift Validity &amp; Dates">
+                            <field name="start_date" readonly="1"/>
+                            <field name="end_date" placeholder="Indefinite / Permanent Shift" readonly="1"/>
+                        </group>
+                        <group string="Timing Overview">
+                            <field name="start_time" widget="float_time" readonly="1"/>
+                            <field name="end_time" widget="float_time" readonly="1"/>
+                            <field name="duration" readonly="1"/>
+                            <field name="time_range" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_my_shift_schedule_resolved" model="ir.actions.server">
+        <field name="name">My Shift Schedule</field>
+        <field name="model_id" ref="model_my_shift_schedule"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.action_open_my_shift()
+        </field>
+    </record>
+</odoo>

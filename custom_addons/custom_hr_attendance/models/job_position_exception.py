@@ -306,7 +306,7 @@ class JobPositionException(models.Model):
 
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            allowed = self.env.user._get_allowed_job_shift_ids()
+            allowed = self.env.user.sudo()._get_allowed_job_shift_ids()
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
     start_time = fields.Float(string="Start Time", compute="_compute_shift_details", store=True, readonly=True)

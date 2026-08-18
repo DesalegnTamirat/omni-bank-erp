@@ -232,9 +232,9 @@
          7. Job Shift Record Rules
          ==================================================== -->
     <record id="job_shift_rule_non_admin_scoped_readonly" model="ir.rule">
-        <field name="name">Job Shift: Scoped to Logged In User Operating Unit or Department</field>
+        <field name="name">Job Shift: Active Shifts Read-Only for All Internal Users</field>
         <field name="model_id" ref="model_job_shift"/>
-        <field name="domain_force">['&amp;', ('active', '=', True), '|', '&amp;', ('applies_to_branches', '=', False), '&amp;', ('operating_unit_ids', '=', False), ('department_ids', '=', False), '|', ('operating_unit_ids', 'in', user.employee_id.default_operating_unit_id.ids), ('department_ids', 'in', user.employee_id.department_id.ids)]</field>
+        <field name="domain_force">[('active', '=', True)]</field>
         <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="0"/>
