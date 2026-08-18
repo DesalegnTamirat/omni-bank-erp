@@ -127,6 +127,15 @@ class HrAttendance(models.Model):
         - Effective Check-Out = MIN(check_out, shift_end_time) (Late check-out or force checkout after shift end is excluded).
         - Worked Hours = MAX(0.0, Effective Check-Out - Effective Check-In - lunch_break_hours).
         """
+        params = self.env['ir.config_parameter'].sudo()
+        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
+        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
+        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
+        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
+        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
+        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
+        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+
         for rec in self:
             if not rec.check_in or not rec.check_out:
                 rec.worked_hours = 0.0
@@ -140,18 +149,15 @@ class HrAttendance(models.Model):
                 local_tz = pytz.utc
 
             # 1. Resolve Shift Start & Shift End for this employee and date
-            params = self.env['ir.config_parameter'].sudo()
-            shift_start = float(params.get_param('hr_attendance.morning_time', 8.0))
-            shift_end = float(params.get_param('hr_attendance.exit_time', 17.0))
+            shift_start = default_morning_time
+            shift_end = default_exit_time
 
             check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
-            enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-            enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
             if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                 ou = emp.default_operating_unit_id if emp else None
                 unit_type = ou.work_unit_type if ou else False
                 if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
-                    shift_end = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
+                    shift_end = saturday_exit_time
 
             active_shift = False
             if emp:
@@ -203,8 +209,7 @@ class HrAttendance(models.Model):
                 elif active_shift and active_shift.has_lunch_break:
                     lunch_hrs = active_shift.lunch_duration
                 else:
-                    enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-                    lunch_hrs = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+                    lunch_hrs = default_lunch_duration
 
                 rec.worked_hours = max(0.0, round(raw_hours - lunch_hrs, 2))
             else:

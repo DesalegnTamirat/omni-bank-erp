@@ -77,18 +77,10 @@
                                     </div>
                                     <div class="stat_title_label">Total Active Workforce</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Units</div>
-                                        <div class="period_value" t-esc="state.data.executive.total_units"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Index</div>
-                                        <div class="period_value" t-esc="state.data.executive.punctuality_index + '%'"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Status</div>
-                                        <div class="period_value text-success">Active</div>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                        <span class="text-muted fw-bold">Operating Units</span>
+                                        <span class="badge bg-light text-dark border" t-esc="state.data.executive.total_units + ' Units'"/>
                                     </div>
                                 </div>
                             </div>
@@ -100,22 +92,14 @@
                                 <div>
                                     <div class="stat_header_box">
                                         <div class="stat_icon icon_green"><i class="fa fa-check-circle"/></div>
-                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.present.range"/>
+                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.present.count"/>
                                     </div>
-                                    <div class="stat_title_label">Present Staff (<t t-esc="state.data.executive.kpi_cards.present.pct"/>%)</div>
+                                    <div class="stat_title_label">Present Staff</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Daily</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.present.daily"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Weekly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.present.weekly"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Monthly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.present.monthly"/>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                        <span class="text-muted fw-bold">Period Attendance</span>
+                                        <span class="badge bg-success" t-esc="state.data.executive.kpi_cards.present.pct + '%'"/>
                                     </div>
                                 </div>
                             </div>
@@ -127,22 +111,14 @@
                                 <div>
                                     <div class="stat_header_box">
                                         <div class="stat_icon icon_gold"><i class="fa fa-clock-o"/></div>
-                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.late.range"/>
+                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.late.count"/>
                                     </div>
-                                    <div class="stat_title_label">Late Check-Ins (<t t-esc="state.data.executive.kpi_cards.late.pct"/>%)</div>
+                                    <div class="stat_title_label">Late Check-Ins</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Daily</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.late.daily"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Weekly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.late.weekly"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Monthly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.late.monthly"/>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                        <span class="text-muted fw-bold">Total Late Time</span>
+                                        <span class="badge bg-warning text-dark" t-esc="state.data.executive.kpi_cards.late.total_hours_str"/>
                                     </div>
                                 </div>
                             </div>
@@ -154,22 +130,14 @@
                                 <div>
                                     <div class="stat_header_box">
                                         <div class="stat_icon icon_olive"><i class="fa fa-calendar-check-o"/></div>
-                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.leave.range"/>
+                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.leave.count"/>
                                     </div>
-                                    <div class="stat_title_label">On Rest / Leave (<t t-esc="state.data.executive.kpi_cards.leave.pct"/>%)</div>
+                                    <div class="stat_title_label">On Rest / Leave</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Daily</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.leave.daily"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Weekly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.leave.weekly"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Monthly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.leave.monthly"/>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                        <span class="text-muted fw-bold">Approved Absence</span>
+                                        <span class="badge bg-info text-dark" t-esc="state.data.executive.kpi_cards.leave.pct + '%'"/>
                                     </div>
                                 </div>
                             </div>
@@ -181,22 +149,14 @@
                                 <div>
                                     <div class="stat_header_box">
                                         <div class="stat_icon icon_crimson"><i class="fa fa-user-times"/></div>
-                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.absent.range"/>
+                                        <div class="stat_main_value" t-esc="state.data.executive.kpi_cards.absent.count"/>
                                     </div>
-                                    <div class="stat_title_label">Absent / Missing (<t t-esc="state.data.executive.kpi_cards.absent.pct"/>%)</div>
+                                    <div class="stat_title_label">Absent / Missing</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Daily</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.absent.daily"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Weekly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.absent.weekly"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Monthly</div>
-                                        <div class="period_value" t-esc="state.data.executive.kpi_cards.absent.monthly"/>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between align-items-center" style="font-size: 0.72rem;">
+                                        <span class="text-muted fw-bold">Unexcused Rate</span>
+                                        <span class="badge bg-danger" t-esc="state.data.executive.kpi_cards.absent.pct + '%'"/>
                                     </div>
                                 </div>
                             </div>
@@ -212,18 +172,9 @@
                                     </div>
                                     <div class="stat_title_label">Punctuality Compliance</div>
                                 </div>
-                                <div class="stat_period_grid">
-                                    <div class="period_pill">
-                                        <div class="period_label">Target</div>
-                                        <div class="period_value">95.0%</div>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Batch</div>
-                                        <div class="period_value" t-esc="state.data.executive.ops_summary.active_batch_requests"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Flags</div>
-                                        <div class="period_value text-danger" t-esc="state.data.executive.ops_summary.discipline_warnings"/>
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="progress" style="height: 6px; background-color: #f1f5f9; border-radius: 3px;">
+                                        <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{state.data.executive.punctuality_index}%; border-radius: 3px;"/>
                                     </div>
                                 </div>
                             </div>
@@ -373,6 +324,53 @@
 
                     </div>
 
+                    <!-- LATE & DISCIPLINE AUTOMATED MONITOR FOR SELECTED PERIOD -->
+                    <div t-if="state.data.executive.late_employees_list and state.data.executive.late_employees_list.length > 0" class="bunna_pro_card mb-3">
+                        <div class="card_pro_header d-flex justify-content-between align-items-center">
+                            <span><i class="fa fa-clock-o text-warning me-2"/> Late Check-Ins &amp; Automated Discipline Trigger Monitor (<t t-esc="state.data.user_info.start_date"/> to <t t-esc="state.data.user_info.end_date"/>)</span>
+                            <span class="badge bg-warning text-dark"><t t-esc="state.data.executive.late_employees_list.length"/> Late Employees</span>
+                        </div>
+                        <div class="card_pro_body p-0">
+                            <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Job Position</th>
+                                            <th>Operating Unit / Dept</th>
+                                            <th>Late Count</th>
+                                            <th>Total Late Time</th>
+                                            <th class="text-center">Automated Discipline Trigger</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="state.data.executive.late_employees_list" t-as="emp" t-key="emp.employee_id">
+                                            <td class="fw-bold text-dark" t-esc="emp.name"/>
+                                            <td t-esc="emp.job"/>
+                                            <td><t t-esc="emp.ou"/> <span class="text-muted small">(<t t-esc="emp.dept"/>)</span></td>
+                                            <td>
+                                                <span class="badge bg-warning text-dark" t-esc="emp.late_count + ' Check-Ins'"/>
+                                            </td>
+                                            <td class="fw-bold text-danger" t-esc="emp.late_hours_str"/>
+                                            <td class="text-center">
+                                                <t t-if="emp.late_count >= 3">
+                                                    <span class="badge bg-danger py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-gavel me-1"/> Auto Discipline Initiated
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-light text-dark border py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-shield me-1"/> Monitoring (<t t-esc="emp.late_count"/>/3)
+                                                    </span>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
 
@@ -381,8 +379,9 @@
                 <!-- ==================================================== -->
                 <div t-if="state.currentTab === 'coach' and state.data.team">
                     <div class="bunna_pro_card mb-4">
-                        <div class="card_pro_header">
-                            <span><i class="fa fa-table me-2"/> Subordinate Real-Time Presence Matrix</span>
+                        <div class="card_pro_header d-flex justify-content-between align-items-center">
+                            <span><i class="fa fa-table me-2"/> Subordinate Real-Time Presence &amp; Discipline Status Matrix</span>
+                            <span class="badge bg-danger"><t t-esc="state.data.user_info.start_date"/> to <t t-esc="state.data.user_info.end_date"/></span>
                         </div>
                         <div class="card_pro_body p-0">
                             <div class="table-responsive">
@@ -391,19 +390,43 @@
                                         <tr>
                                             <th>Employee</th>
                                             <th>Job Position</th>
-                                            <th>Operating Unit</th>
-                                            <th>Check-In Time</th>
+                                            <th>Operating Unit / Dept</th>
+                                            <th>Latest Check-In</th>
                                             <th>Status</th>
+                                            <th>Period Late Count</th>
+                                            <th>Total Late Time</th>
+                                            <th class="text-center">Automated Discipline Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr t-foreach="state.data.team.presence_rows" t-as="row" t-key="row.id">
                                             <td class="fw-bold text-dark" t-esc="row.name"/>
                                             <td t-esc="row.job"/>
-                                            <td t-esc="row.ou"/>
+                                            <td><t t-esc="row.ou"/> <span class="text-muted small">(<t t-esc="row.dept"/>)</span></td>
                                             <td t-esc="row.check_in"/>
                                             <td>
                                                 <span t-attf-class="badge #{row.badge_class}" t-esc="row.status_label"/>
+                                            </td>
+                                            <td>
+                                                <span t-attf-class="badge #{row.late_count > 0 ? 'bg-warning text-dark' : 'bg-light text-dark border'}" t-esc="row.late_count + ' Late'"/>
+                                            </td>
+                                            <td t-esc="row.late_hours_str"/>
+                                            <td class="text-center">
+                                                <t t-if="row.late_count >= 3">
+                                                    <span class="badge bg-danger py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-gavel me-1"/> Auto Case Triggered
+                                                    </span>
+                                                </t>
+                                                <t t-elif="row.late_count > 0">
+                                                    <span class="badge bg-warning text-dark py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-exclamation-triangle me-1"/> Warning (<t t-esc="row.late_count"/>/3)
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-success py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-check me-1"/> Good Standing
+                                                    </span>
+                                                </t>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -612,18 +635,18 @@
                                         <i class="fa fa-list me-1"/> View Period Logs
                                     </button>
                                 </div>
-                                <div class="card_pro_body d-flex flex-column justify-content-between">
-                                    <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0;">
-                                        <div t-foreach="state.data.personal_summary.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end;">
-                                            <div class="d-flex gap-1 align-items-end" style="height: 100%;">
+                                <div class="card_pro_body d-flex flex-column justify-content-between" style="overflow: hidden; width: 100%;">
+                                    <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; overflow-x: hidden; width: 100%;">
+                                        <div t-foreach="state.data.personal_summary.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end; min-width: 0;">
+                                            <div class="d-flex gap-2 align-items-end justify-content-center" style="height: 100%;">
                                                 <!-- Worked Bar (#425727) -->
-                                                <div t-attf-style="height: #{p.w_pct}%; width: 10px; background-color: #425727; border-radius: 3px 3px 0 0;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.w_pct}%; width: #{p.bar_width_px or 28}px; background-color: #425727; border-radius: 5px 5px 0 0; min-height: #{p.w_pct > 0 ? 4 : 0}px;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
                                                 <!-- Late Bar (#c17540) -->
-                                                <div t-attf-style="height: #{p.l_pct}%; width: 10px; background-color: #c17540; border-radius: 3px 3px 0 0;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.l_pct}%; width: #{p.bar_width_px or 28}px; background-color: #c17540; border-radius: 5px 5px 0 0; min-height: #{p.l_pct > 0 ? 4 : 0}px;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
                                                 <!-- Absent Bar (#541718) -->
-                                                <div t-attf-style="height: #{p.a_pct}%; width: 10px; background-color: #541718; border-radius: 3px 3px 0 0;" t-att-title="'Absent: ' + p.absent_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + p.absent_hours + 'h'"/>
                                             </div>
-                                            <div class="small text-muted mt-1" style="font-size: 0.65rem; font-weight: 700;" t-esc="p.date_label"/>
+                                            <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
                                         </div>
                                     </div>
 

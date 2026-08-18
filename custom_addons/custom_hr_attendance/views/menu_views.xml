@@ -44,7 +44,7 @@
     <menuitem id="menu_my_shift_schedule"
               name="My Shift Schedule"
               parent="menu_preapproval_root"
-              action="action_my_roster_exception"
+              action="action_my_shift_schedule_resolved"
               groups="base.group_user"
               sequence="5"/>
 

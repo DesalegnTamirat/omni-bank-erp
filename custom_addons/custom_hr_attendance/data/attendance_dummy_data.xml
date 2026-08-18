@@ -38,8 +38,8 @@
         <field name="work_unit_type">branch</field>
     </record>
 
-    <record id="op_airport_branch" model="operating.unit">
-        <field name="name">Airport Branch</field>
+    <record id="op_kazanchis_branch" model="operating.unit">
+        <field name="name">Kazanchis Branch</field>
         <field name="sol_id">103</field>
         <field name="work_unit_type">branch</field>
     </record>
@@ -58,39 +58,36 @@
         <field name="work_email">abebe.bikila@bunnabank.com</field>
     </record>
 
-    <!-- Level 2: Supervisor / Branch Manager (Reports to Abebe Bikila) -->
-    <record id="emp_bethlehem_tadesse" model="hr.employee">
-        <field name="name">Bethlehem Tadesse</field>
+    <!-- Level 2: Division Managers -->
+    <record id="emp_derese_wudu" model="hr.employee">
+        <field name="name">Derese Wudu Mekonnen</field>
         <field name="job_id" ref="job_branch_manager"/>
         <field name="job_position" ref="job_branch_manager"/>
-        <field name="job_title">Branch Manager</field>
+        <field name="job_title">Enterprise Application Development Division Manager</field>
         <field name="parent_id" ref="emp_abebe_bikila"/>
-        <field name="coach_id" ref="emp_abebe_bikila"/>
-        <field name="default_operating_unit_id" ref="op_bole_branch"/>
+        <field name="default_operating_unit_id" ref="hr_employee_custom.main_operating_unit"/>
         <field name="employee_identification">EMP-002</field>
-        <field name="work_email">bethlehem.tadesse@bunnabank.com</field>
+        <field name="work_email">derese.wudu@bunnabank.com</field>
     </record>
 
-    <!-- Level 3: Subordinates (Report to Bethlehem Tadesse) -->
-    <record id="emp_tina_williamson" model="hr.employee">
-        <field name="name">Tina Williamson</field>
-        <field name="job_id" ref="job_senior_teller"/>
-        <field name="job_position" ref="job_senior_teller"/>
-        <field name="job_title">Senior Customer Service Officer</field>
-        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
-        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
-        <field name="default_operating_unit_id" ref="op_bole_branch"/>
+    <record id="emp_eyob_shewangzaw" model="hr.employee">
+        <field name="name">Eyob Shewangzaw Bogale</field>
+        <field name="job_id" ref="job_branch_manager"/>
+        <field name="job_position" ref="job_branch_manager"/>
+        <field name="job_title">IT Infrastructure &amp; Operations Division Manager</field>
+        <field name="parent_id" ref="emp_abebe_bikila"/>
+        <field name="default_operating_unit_id" ref="hr_employee_custom.main_operating_unit"/>
         <field name="employee_identification">EMP-003</field>
-        <field name="work_email">tina.williamson@bunnabank.com</field>
+        <field name="work_email">eyob.shewangzaw@bunnabank.com</field>
     </record>
 
+    <!-- Level 3: Operational Employees -->
     <record id="emp_dawit_yilma" model="hr.employee">
         <field name="name">Dawit Yilma</field>
         <field name="job_id" ref="job_it_specialist"/>
         <field name="job_position" ref="job_it_specialist"/>
-        <field name="job_title">Senior IT Support Specialist</field>
-        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
-        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
+        <field name="job_title">Senior Software Engineer</field>
+        <field name="parent_id" ref="emp_derese_wudu"/>
         <field name="default_operating_unit_id" ref="hr_employee_custom.main_operating_unit"/>
         <field name="employee_identification">EMP-004</field>
         <field name="work_email">dawit.yilma@bunnabank.com</field>
@@ -100,18 +97,28 @@
         <field name="name">Chala Kebede</field>
         <field name="job_id" ref="job_executive_driver"/>
         <field name="job_position" ref="job_executive_driver"/>
-        <field name="job_title">Executive Transport Driver</field>
-        <field name="parent_id" ref="emp_bethlehem_tadesse"/>
-        <field name="coach_id" ref="emp_bethlehem_tadesse"/>
+        <field name="job_title">Senior Driver</field>
+        <field name="parent_id" ref="emp_eyob_shewangzaw"/>
         <field name="default_operating_unit_id" ref="op_bole_branch"/>
         <field name="employee_identification">EMP-005</field>
         <field name="work_email">chala.kebede@bunnabank.com</field>
     </record>
 
+    <record id="emp_tina_williamson" model="hr.employee">
+        <field name="name">Tina Williamson</field>
+        <field name="job_id" ref="job_senior_teller"/>
+        <field name="job_position" ref="job_senior_teller"/>
+        <field name="job_title">Branch Teller</field>
+        <field name="parent_id" ref="emp_eyob_shewangzaw"/>
+        <field name="default_operating_unit_id" ref="op_kazanchis_branch"/>
+        <field name="employee_identification">EMP-006</field>
+        <field name="work_email">tina.williamson@bunnabank.com</field>
+    </record>
+
     <!-- ============================================================ -->
     <!-- 4. JOB POSITION EXCEPTIONS (3 Scenarios) -->
     <!-- ============================================================ -->
-    <!-- Scenario 1: IT Night Shift Exception -->
+    <!-- Scenario 1: Contact Center Night Shift Exception (Job Position Exception) -->
     <record id="jpe_dawit_night" model="job.position.exception">
         <field name="employee_id" ref="emp_dawit_yilma"/>
         <field name="shift_id" ref="shift_night"/>
@@ -155,11 +162,11 @@
         <field name="active">True</field>
     </record>
 
-    <!-- Scenario 3: Airport Branch Night Shift (22:00 - 06:00) -->
-    <record id="lbe_airport_night" model="location.based.exception">
-        <field name="operating_unit" ref="op_airport_branch"/>
-        <field name="start_time">22.0</field>
-        <field name="end_time">6.0</field>
+    <!-- Scenario 3: Kazanchis Branch Evening Shift (14:00 - 22:00) -->
+    <record id="lbe_kazanchis_evening" model="location.based.exception">
+        <field name="operating_unit" ref="op_kazanchis_branch"/>
+        <field name="start_time">14.0</field>
+        <field name="end_time">22.0</field>
         <field name="active">True</field>
     </record>
 

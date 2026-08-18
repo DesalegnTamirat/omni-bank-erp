@@ -182,61 +182,85 @@ class JobShift(models.Model):
                 else:
                     pass
 
-    def is_applicable_for(self, operating_unit=None, department=None):
+    def is_applicable_for(self, operating_unit=None, department=None, assigner_operating_unit=None, assigner_department=None):
         """
-        Helper method to check if a shift applies to a given operating unit or department.
+        Determines if a shift applies to a target employee/location or the assigning coach/manager.
+        
         Rules:
-        1. If applies_to_branches=False, department_ids empty, operating_unit_ids empty -> applies to ALL departments & OUs in bank.
-        2. If department_ids is set and operating_unit_ids is empty -> applies to ALL operating units under those departments.
-        3. If department_ids and operating_unit_ids are set -> applies to those specific operating units.
+        1. Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere.
+        2. applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office.
+        3. operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids.
+        4. department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy)
+           or if target operating_unit is linked to department_ids.
         """
         self.ensure_one()
+
+        # Rule 1: Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere
         if not self.applies_to_branches and not self.operating_unit_ids and not self.department_ids:
             return True
 
-        if self.applies_to_branches and operating_unit and getattr(operating_unit, 'work_unit_type', '') == 'branch':
+        # Rule 2: applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office
+        if self.applies_to_branches:
+            target_ou = operating_unit or assigner_operating_unit
+            if target_ou:
+                code = (target_ou.code or '').upper()
+                name = (target_ou.name or '').upper()
+                is_head_office = ('HEAD' in code or 'HEAD' in name or 'MAIN' in code or 'MAIN' in name or code == 'HO')
+                if is_head_office:
+                    return False
             return True
 
-        if operating_unit and operating_unit in self.operating_unit_ids:
-            return True
+        # Collect OUs to check (both target location/employee OU and assigner/coach OU)
+        ous_to_check = [ou for ou in [operating_unit, assigner_operating_unit] if ou]
 
-        if department and department in self.department_ids and not self.operating_unit_ids:
-            return True
+        # Rule 3: operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids
+        if self.operating_unit_ids and ous_to_check:
+            if any(ou in self.operating_unit_ids for ou in ous_to_check):
+                return True
 
-        if department:
-            curr = department
-            while curr:
-                if curr in self.department_ids and not self.operating_unit_ids:
-                    return True
-                curr = curr.parent_id
+        # Collect Departments to check (both target department and assigner/coach department)
+        depts_to_check = [d for d in [department, assigner_department] if d]
 
-        if self.department_ids and not self.operating_unit_ids:
-            if operating_unit:
-                if hasattr(operating_unit, 'department') and operating_unit.department in self.department_ids:
-                    return True
-                depts_linked = self.env['hr.department'].sudo().search([
-                    '|',
-                    ('operating_unit_id', '=', operating_unit.id),
-                    ('operating_unit', '=', operating_unit.id)
-                ])
-                if any(d in self.department_ids or d.parent_id in self.department_ids for d in depts_linked):
-                    return True
-                if hasattr(operating_unit, 'name') and operating_unit.name:
-                    if any(d.name and d.name.lower() in operating_unit.name.lower() for d in self.department_ids):
+        # Rule 4: department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy) or if target operating_unit is linked to department_ids
+        if self.department_ids:
+            if depts_to_check:
+                for dept in depts_to_check:
+                    curr = dept
+                    while curr:
+                        if curr in self.department_ids:
+                            return True
+                        curr = curr.parent_id
+
+            # Check if operating_unit is linked to department_ids
+            if ous_to_check:
+                for ou in ous_to_check:
+                    depts_linked = self.env['hr.department'].sudo().search([
+                        '|',
+                        ('operating_unit_id', '=', ou.id),
+                        ('operating_unit', '=', ou.id)
+                    ])
+                    if any(d in self.department_ids or d.parent_id in self.department_ids for d in depts_linked):
                         return True
 
         return False
 
     @api.model
-    def get_allowed_shift_ids(self, operating_unit_id=None, department_id=None):
+    def get_allowed_shift_ids(self, operating_unit_id=None, department_id=None, assigner_operating_unit_id=None, assigner_department_id=None):
         """
-        Returns list of shift IDs allowed for the given operating unit and/or department.
+        Returns list of shift IDs allowed for the given target operating unit/department and assigner operating unit/department.
         """
         ou = self.env['operating.unit'].browse(operating_unit_id) if operating_unit_id else False
         dept = self.env['hr.department'].browse(department_id) if department_id else False
+        a_ou = self.env['operating.unit'].browse(assigner_operating_unit_id) if assigner_operating_unit_id else False
+        a_dept = self.env['hr.department'].browse(assigner_department_id) if assigner_department_id else False
 
-        domain = [('active', '=', True)]
-        shifts = self.search(domain)
-        allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=ou, department=dept))
+        shifts = self.search([('active', '=', True)])
+        allowed = shifts.filtered(lambda s: s.is_applicable_for(
+            operating_unit=ou,
+            department=dept,
+            assigner_operating_unit=a_ou,
+            assigner_department=a_dept
+        ))
+        return allowed.ids
         return allowed.ids
 

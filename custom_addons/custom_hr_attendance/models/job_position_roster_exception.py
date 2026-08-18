@@ -33,24 +33,29 @@ class JobPositionRosterException(models.Model):
 
     @api.model
     def _get_team_member_domain(self):
-        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
-            return []
+        if self.env.is_superuser() or self.env.user.has_group('base.group_system'):
+            return [('active', '=', True)]
+
         current_employee = self.env.user.employee_id
         if not current_employee:
-            current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
-        if current_employee:
-            return ['|', '|', '|',
-                ('user_id', '=', self.env.uid),
-                ('parent_id.user_id', '=', self.env.uid),
-                ('attendance_manager_id', '=', self.env.uid),
-                ('id', 'child_of', current_employee.id)
-            ]
-        return [('user_id', '=', self.env.uid)]
+            current_employee = self.env['hr.employee'].sudo().search([('user_id', '=', self.env.uid)], limit=1)
 
-    @api.depends('employee_id')
+        emp_id = current_employee.id if current_employee else 0
+
+        return [
+            ('active', '=', True),
+            '|', '|', '|', '|', '|',
+            ('user_id', '=', self.env.uid),
+            ('parent_id.user_id', '=', self.env.uid),
+            ('parent_id', '=', emp_id),
+            ('coach_id.user_id', '=', self.env.uid),
+            ('coach_id', '=', emp_id),
+            ('attendance_manager_id', '=', self.env.uid)
+        ]
+
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            allowed = self.env.user._get_allowed_job_shift_ids(target_employee=rec.employee_id)
+            allowed = self.env.user.sudo()._get_allowed_job_shift_ids()
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
     job_position = fields.Char(
@@ -218,16 +223,19 @@ class JobPositionRosterException(models.Model):
                 raise ValidationError(_("Shift End Date (%s) cannot be earlier than Shift Start Date (%s).") % (rec.end_date, rec.start_date))
 
             if rec.active and rec.status == 'active':
-                # 0. Check open attendance blocking
-                open_att = self.env['hr.attendance'].sudo().search([
-                    ('employee_id', '=', rec.employee_id.id),
-                    ('check_out', '=', False)
-                ], limit=1)
-                if open_att:
-                    raise ValidationError(_(
-                        "Cannot assign, modify, or change roster exception for '%s' while they have an active open attendance session.\n\n"
-                        "Employee checked in at %s. Please wait until the employee checks out before changing their roster schedule."
-                    ) % (rec.employee_id.name, open_att.check_in))
+                # 0. Check open attendance blocking ONLY if exception includes TODAY
+                if rec.start_date <= today and rec.end_date >= today:
+                    open_att = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('check_out', '=', False)
+                    ], limit=1)
+                    if open_att:
+                        att_date = fields.Date.context_today(self, open_att.check_in)
+                        if att_date == today:
+                            raise ValidationError(_(
+                                "Cannot assign, modify, or change today's roster exception for '%s' while they have an active open attendance session today.\n\n"
+                                "Employee checked in at %s. Please wait until the employee checks out before changing today's roster schedule."
+                            ) % (rec.employee_id.name, open_att.check_in))
 
                 # 1. Check overlap with other active Roster Exceptions
                 overlap_roster = self.search([
@@ -421,8 +429,10 @@ class JobPositionRosterExceptionLine(models.Model):
 
     @api.constrains('schedule_type', 'shift_id')
     def _check_open_attendance_line_blocking(self):
+        today = fields.Date.context_today(self)
         for rec in self:
-            if rec.roster_id and rec.roster_id.active and rec.roster_id.status == 'active':
+            # ONLY block if line date is today or in the past
+            if rec.date and rec.date <= today and rec.roster_id and rec.roster_id.active and rec.roster_id.status == 'active':
                 emp = rec.roster_id.employee_id
                 if emp:
                     open_att = self.env['hr.attendance'].sudo().search([
@@ -430,7 +440,9 @@ class JobPositionRosterExceptionLine(models.Model):
                         ('check_out', '=', False)
                     ], limit=1)
                     if open_att:
-                        raise ValidationError(_(
-                            "Cannot modify daily shift line for employee '%s' while they have an active open attendance session.\n\n"
-                            "Employee checked in at %s. Please wait until the employee checks out before modifying their roster schedule."
-                        ) % (emp.name, open_att.check_in))
+                        att_date = fields.Date.context_today(self, open_att.check_in)
+                        if att_date == rec.date:
+                            raise ValidationError(_(
+                                "Cannot modify daily shift line for employee '%s' on %s while they have an active open attendance session.\n\n"
+                                "Employee checked in at %s. Please wait until the employee checks out before modifying today's roster schedule."
+                            ) % (emp.name, rec.date, open_att.check_in))

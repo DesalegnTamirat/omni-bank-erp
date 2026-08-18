@@ -44,7 +44,7 @@ class AttendanceDashboardController(http.Controller):
                 'end_date': str(end_d),
             },
             'executive': self._get_enterprise_executive_analytics(start_d, end_d),
-            'team': self._get_team_presence_analytics(employee, user, is_coach or is_admin),
+            'team': self._get_team_presence_analytics(employee, user, is_coach or is_admin, start_d, end_d),
             'personal_summary': self._get_personal_kpi_summary(employee, start_d, end_d, date_range) if employee else {},
         }
         return data
@@ -78,22 +78,6 @@ class AttendanceDashboardController(http.Controller):
     def _get_enterprise_executive_analytics(self, start_d, end_d):
         local_tz = pytz.timezone('Africa/Addis_Ababa')
         today = fields.Date.context_today(request.env.user)
-        
-        day_start = local_tz.localize(datetime.datetime.combine(today, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
-        day_end = local_tz.localize(datetime.datetime.combine(today, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
-
-        week_s = today - datetime.timedelta(days=today.weekday())
-        week_e = week_s + datetime.timedelta(days=6)
-        week_start = local_tz.localize(datetime.datetime.combine(week_s, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
-        week_end = local_tz.localize(datetime.datetime.combine(week_e, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
-
-        month_s = datetime.date(today.year, today.month, 1)
-        if today.month == 12:
-            month_e = datetime.date(today.year, 12, 31)
-        else:
-            month_e = datetime.date(today.year, today.month + 1, 1) - datetime.timedelta(days=1)
-        month_start = local_tz.localize(datetime.datetime.combine(month_s, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
-        month_end = local_tz.localize(datetime.datetime.combine(month_e, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
 
         range_start = local_tz.localize(datetime.datetime.combine(start_d, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
         range_end = local_tz.localize(datetime.datetime.combine(end_d, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
@@ -104,9 +88,10 @@ class AttendanceDashboardController(http.Controller):
         def query_period_stats(dt_s, dt_e):
             sql = """
                 SELECT 
-                    COUNT(CASE WHEN check_in_status = 'Normal' THEN 1 END) AS present_cnt,
+                    COUNT(CASE WHEN check_in_status IN ('Normal', 'On-Time', 'On Time') OR check_in_status IS NULL THEN 1 END) AS present_cnt,
                     COUNT(CASE WHEN check_in_status = 'Late' THEN 1 END) AS late_cnt,
-                    COUNT(CASE WHEN check_in_status LIKE '%%Rest%%' THEN 1 END) AS leave_cnt
+                    COUNT(CASE WHEN check_in_status LIKE '%%Rest%%' THEN 1 END) AS leave_cnt,
+                    COALESCE(SUM(CASE WHEN check_in_status = 'Late' THEN late_time_hour ELSE 0 END), 0.0) AS late_hours
                 FROM hr_attendance
                 WHERE check_in >= %s AND check_in <= %s
             """
@@ -115,13 +100,14 @@ class AttendanceDashboardController(http.Controller):
             p = r.get('present_cnt', 0)
             l = r.get('late_cnt', 0)
             lv = r.get('leave_cnt', 0)
-            a = max(0, total_employees - (p + l + lv))
-            return p, l, lv, a
+            lh = r.get('late_hours', 0.0)
+            eval_e = min(end_d, today)
+            elapsed_days = max(1, (eval_e - start_d).days + 1)
+            expected_total = total_employees * elapsed_days
+            a = max(0, expected_total - (p + l + lv))
+            return p, l, lv, a, lh
 
-        daily_p, daily_l, daily_lv, daily_a = query_period_stats(day_start, day_end)
-        weekly_p, weekly_l, weekly_lv, weekly_a = query_period_stats(week_start, week_end)
-        monthly_p, monthly_l, monthly_lv, monthly_a = query_period_stats(month_start, month_end)
-        range_p, range_l, range_lv, range_a = query_period_stats(range_start, range_end)
+        range_p, range_l, range_lv, range_a, range_lh = query_period_stats(range_start, range_end)
 
         range_samples = max(1, range_p + range_l + range_lv + range_a)
         pct_present = round((range_p / range_samples) * 100, 1)
@@ -132,31 +118,68 @@ class AttendanceDashboardController(http.Controller):
         total_on_time = range_p + range_lv
         punctuality_index = round((total_on_time / max(1, range_p + range_l + range_lv)) * 100, 1)
 
-        ou_query = """
-            SELECT COALESCE(ou.name, 'Head Office') AS ou_name, COUNT(att.id) AS att_cnt
-            FROM hr_attendance att
-            JOIN hr_employee emp ON att.employee_id = emp.id
-            LEFT JOIN operating_unit ou ON emp.default_operating_unit_id = ou.id
-            WHERE att.check_in >= %s AND att.check_in <= %s
-            GROUP BY ou.name
-            ORDER BY att_cnt DESC
-            LIMIT 12
-        """
-        request.env.cr.execute(ou_query, (range_start, range_end))
-        ou_rows = request.env.cr.dictfetchall()
+        # Query Late Employees for Discipline Action Center in selected period using ORM
+        late_attendances = request.env['hr.attendance'].sudo().search([
+            ('check_in', '>=', range_start),
+            ('check_in', '<=', range_end),
+            ('check_in_status', '=', 'Late')
+        ])
 
-        ou_labels = [r['ou_name'] for r in ou_rows] or [
-            'Head Office', 'East Addis Ababa', 'South Addis Ababa', 'West Addis Ababa',
-            'Bahir Dar', 'Dessie', 'Debre Berhan', 'Adama', 'Hawassa', 'Mekelle', 'Debre Markos', 'Jimma'
-        ]
-        ou_values = [r['att_cnt'] for r in ou_rows] or [480, 260, 240, 220, 210, 140, 140, 90, 80, 70, 60, 40]
+        emp_late_map = {}
+        for att in late_attendances:
+            emp = att.employee_id
+            if not emp:
+                continue
+            if emp.id not in emp_late_map:
+                emp_late_map[emp.id] = {
+                    'employee_id': emp.id,
+                    'name': emp.name or 'Employee',
+                    'job': emp.job_id.name if emp.job_id else 'Staff',
+                    'ou': emp.default_operating_unit_id.name if emp.default_operating_unit_id else 'Head Office',
+                    'dept': emp.department_id.name if emp.department_id else 'N/A',
+                    'late_count': 0,
+                    'late_hours': 0.0,
+                }
+            emp_late_map[emp.id]['late_count'] += 1
+            emp_late_map[emp.id]['late_hours'] += (att.late_time_hour or 0.0)
 
-        max_ou_val = max(1, max(ou_values))
-        ou_items = [{
-            'name': ou_labels[i],
-            'count': ou_values[i],
-            'pct': round((ou_values[i] / max_ou_val) * 100, 1)
-        } for i in range(len(ou_labels))]
+        sorted_late = sorted(emp_late_map.values(), key=lambda x: (x['late_count'], x['late_hours']), reverse=True)[:50]
+
+        late_employees_list = [{
+            'employee_id': r['employee_id'],
+            'name': r['name'],
+            'job': r['job'],
+            'ou': r['ou'],
+            'dept': r['dept'],
+            'late_count': r['late_count'],
+            'late_hours_str': self._format_float_hours(r['late_hours']),
+        } for r in sorted_late]
+
+        # Query Attendances per Operating Unit using ORM
+        range_atts = request.env['hr.attendance'].sudo().search([
+            ('check_in', '>=', range_start),
+            ('check_in', '<=', range_end)
+        ])
+        ou_count_map = {}
+        for att in range_atts:
+            ou_name = att.employee_id.default_operating_unit_id.name if (att.employee_id and att.employee_id.default_operating_unit_id) else 'Head Office'
+            ou_count_map[ou_name] = ou_count_map.get(ou_name, 0) + 1
+
+        if not ou_count_map:
+            ou_items = [
+                {'name': 'Head Office', 'count': 480, 'pct': 100.0},
+                {'name': 'East Addis Ababa', 'count': 260, 'pct': 54.2},
+                {'name': 'South Addis Ababa', 'count': 240, 'pct': 50.0},
+                {'name': 'West Addis Ababa', 'count': 220, 'pct': 45.8},
+            ]
+        else:
+            sorted_ous = sorted(ou_count_map.items(), key=lambda x: x[1], reverse=True)[:12]
+            max_ou_val = max(1, max(cnt for _, cnt in sorted_ous))
+            ou_items = [{
+                'name': name,
+                'count': cnt,
+                'pct': round((cnt / max_ou_val) * 100, 1)
+            } for name, cnt in sorted_ous]
 
         hourly_labels = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00']
         hourly_values = [15, 240, 1850, 1920, 1980, 2010, 2025, 2030, 2031, 2031, 2031, 2031, 2031]
@@ -205,11 +228,12 @@ class AttendanceDashboardController(http.Controller):
             'total_units': total_units,
             'punctuality_index': punctuality_index,
             'kpi_cards': {
-                'present': {'daily': daily_p, 'weekly': weekly_p, 'monthly': monthly_p, 'range': range_p, 'pct': pct_present},
-                'late': {'daily': daily_l, 'weekly': weekly_l, 'monthly': monthly_l, 'range': range_l, 'pct': pct_late},
-                'leave': {'daily': daily_lv, 'weekly': weekly_lv, 'monthly': monthly_lv, 'range': range_lv, 'pct': pct_leave},
-                'absent': {'daily': daily_a, 'weekly': weekly_a, 'monthly': monthly_a, 'range': range_a, 'pct': pct_absent},
+                'present': {'count': range_p, 'pct': pct_present, 'label': f"{pct_present}% of active workforce"},
+                'late': {'count': range_l, 'pct': pct_late, 'total_hours_str': self._format_float_hours(range_lh), 'label': f"{pct_late}% late rate in period"},
+                'leave': {'count': range_lv, 'pct': pct_leave, 'label': f"{pct_leave}% on leave in period"},
+                'absent': {'count': range_a, 'pct': pct_absent, 'label': f"{pct_absent}% absent rate in period"},
             },
+            'late_employees_list': late_employees_list,
             'donut_svg': {
                 'circumference': c,
                 'p_dash': f"{p_dash} {c}", 'p_off': p_off,
@@ -233,14 +257,17 @@ class AttendanceDashboardController(http.Controller):
             }
         }
 
-    def _get_team_presence_analytics(self, employee, user, allowed):
+    def _get_team_presence_analytics(self, employee, user, allowed, start_d=None, end_d=None):
         if not allowed:
             return {}
 
         local_tz = pytz.timezone('Africa/Addis_Ababa')
         today = fields.Date.context_today(request.env.user)
-        day_start_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
-        day_end_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
+        s_d = start_d or today
+        e_d = end_d or today
+
+        range_s_utc = local_tz.localize(datetime.datetime.combine(s_d, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
+        range_e_utc = local_tz.localize(datetime.datetime.combine(e_d, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
 
         emp_domain = [('active', '=', True)]
         if not user.has_group('hr_attendance.group_hr_attendance_manager'):
@@ -255,24 +282,28 @@ class AttendanceDashboardController(http.Controller):
 
         presence_rows = []
         for sub in subordinates:
-            att = request.env['hr.attendance'].sudo().search([
+            atts = request.env['hr.attendance'].sudo().search([
                 ('employee_id', '=', sub.id),
-                ('check_in', '>=', day_start_utc),
-                ('check_in', '<=', day_end_utc)
-            ], limit=1, order='check_in desc')
+                ('check_in', '>=', range_s_utc),
+                ('check_in', '<=', range_e_utc)
+            ], order='check_in desc')
+
+            latest_att = atts[0] if atts else False
+            late_cnt = sum(1 for a in atts if a.check_in_status == 'Late')
+            late_hours = sum(a.late_time_hour or 0.0 for a in atts if a.check_in_status == 'Late')
 
             check_in_str = '-'
-            st_label = 'Absent'
+            st_label = 'Absent / Missing'
             badge_class = 'bg-danger'
 
-            if att:
-                dt_in = pytz.utc.localize(att.check_in).astimezone(local_tz)
-                check_in_str = dt_in.strftime('%I:%M %p')
-                if att.check_in_status == 'Late':
-                    st_label = f"Late ({self._format_float_hours(att.late_time_hour or 0.0)})"
+            if latest_att:
+                dt_in = pytz.utc.localize(latest_att.check_in).astimezone(local_tz)
+                check_in_str = dt_in.strftime('%b %d, %I:%M %p')
+                if latest_att.check_in_status == 'Late':
+                    st_label = f"Late ({self._format_float_hours(latest_att.late_time_hour or 0.0)})"
                     badge_class = 'bg-warning text-dark'
-                elif 'Rest' in (att.check_in_status or ''):
-                    st_label = att.check_in_status
+                elif 'Rest' in (latest_att.check_in_status or ''):
+                    st_label = latest_att.check_in_status
                     badge_class = 'bg-info text-dark'
                 else:
                     st_label = 'Present (Normal)'
@@ -283,9 +314,13 @@ class AttendanceDashboardController(http.Controller):
                 'name': sub.name,
                 'job': sub.job_id.name if sub.job_id else 'Staff',
                 'ou': sub.default_operating_unit_id.name if sub.default_operating_unit_id else 'Head Office',
+                'dept': sub.department_id.name if sub.department_id else 'N/A',
                 'status_label': st_label,
                 'badge_class': badge_class,
                 'check_in': check_in_str,
+                'late_count': late_cnt,
+                'late_hours_str': self._format_float_hours(late_hours),
+                'has_offense': late_cnt > 0 or not latest_att,
             })
 
         return {'presence_rows': presence_rows}
@@ -317,18 +352,22 @@ class AttendanceDashboardController(http.Controller):
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
         period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
         period_leave_count = sum(1 for att in range_atts if 'Rest' in (att.check_in_status or ''))
-        period_normal_count = sum(1 for att in range_atts if att.check_in_status == 'Normal')
+        period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
 
         total_sessions = len(range_atts)
         punctuality_score = round(((total_sessions - period_late_count) / max(1, total_sessions)) * 100, 1) if total_sessions > 0 else 100.0
 
         # Card 3 Offenses for selected period
-        force_checkout_count = sum(1 for att in range_atts if (att.check_out_status == 'Forced Check-Out' or getattr(att, 'is_forced_checkout', False)))
-        recorded_days = len(set(pytz.utc.localize(att.check_in).astimezone(local_tz).date() for att in range_atts))
-        absent_count = max(0, period_days - recorded_days)
+        force_checkout_count = sum(1 for att in range_atts if (att.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(att, 'is_force_checkout', False) or getattr(att, 'is_forced_checkout', False)))
+        
+        today = fields.Date.context_today(request.env.user)
+        eval_end_d = min(end_d, today)
+        elapsed_days = max(0, (eval_end_d - start_d).days + 1)
+        recorded_days = len(set(pytz.utc.localize(att.check_in).astimezone(local_tz).date() for att in range_atts if att.check_in))
+        absent_count = max(0, elapsed_days - recorded_days)
 
         # Card 4 Approvals for selected period
-        acknowledged_count = sum(1 for att in range_atts if getattr(att, 'is_acknowledged', False))
+        acknowledged_count = sum(1 for att in range_atts if (getattr(att, 'is_acknowledged', False) or (getattr(att, 'acknowledged_late', 0.0) or 0.0) > 0 or (getattr(att, 'acknowledged_exit', 0.0) or 0.0) > 0))
         predefined_count = 0
         if 'attendance.preapproval' in request.env:
             predefined_count = request.env['attendance.preapproval'].sudo().search_count([
@@ -405,17 +444,33 @@ class AttendanceDashboardController(http.Controller):
                 })
                 cur_m = next_m
         else:
-            # Aggregate by YEAR
-            cur_y = start_d.year
-            while cur_y <= end_d.year:
+            # Aggregate by YEAR / MULTI-YEAR RANGES (Group to max 10-12 bars)
+            start_y = start_d.year
+            end_y = end_d.year
+            total_years = max(1, end_y - start_y + 1)
+            
+            if total_years <= 10:
+                step_years = 1
+            else:
+                step_years = int(math.ceil(total_years / 10.0))
+
+            cur_y = start_y
+            while cur_y <= end_y:
+                block_end_y = min(end_y, cur_y + step_years - 1)
                 y_start = max(start_d, datetime.date(cur_y, 1, 1))
-                y_end = min(end_d, datetime.date(cur_y, 12, 31))
+                y_end = min(end_d, datetime.date(block_end_y, 12, 31))
+                
+                if cur_y == block_end_y:
+                    lbl = str(cur_y)
+                else:
+                    lbl = f"{cur_y}-{block_end_y}"
+                    
                 raw_blocks.append({
-                    'label': str(cur_y),
+                    'label': lbl,
                     'start_date': y_start,
                     'end_date': y_end,
                 })
-                cur_y += 1
+                cur_y = block_end_y + 1
 
         # Calculate Worked, Late, and Absent Hours per Block
         progression_points = []
@@ -455,6 +510,16 @@ class AttendanceDashboardController(http.Controller):
                 'absent_hours': a_h,
             })
 
+        num_blocks = max(1, len(progression_points))
+        if num_blocks <= 3:
+            bar_width_px = 38
+        elif num_blocks <= 5:
+            bar_width_px = 28
+        elif num_blocks <= 7:
+            bar_width_px = 20
+        else:
+            bar_width_px = 14
+
         prog_svg_points = []
         for pt in progression_points:
             w_pct = round((pt['worked_hours'] / max_bar_h) * 100, 1)
@@ -468,6 +533,7 @@ class AttendanceDashboardController(http.Controller):
                 'w_pct': w_pct,
                 'l_pct': l_pct,
                 'a_pct': a_pct,
+                'bar_width_px': bar_width_px,
             })
 
         logs = []

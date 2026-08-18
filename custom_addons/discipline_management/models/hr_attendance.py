@@ -68,7 +68,7 @@ class HrAttendance(models.Model):
             emp_atts = recent_attendances.filtered(lambda a: a.employee_id == emp)
             # Count force check-outs or repeated lateness
             forced_or_late_count = len(emp_atts.filtered(
-                lambda a: getattr(a, 'is_forced_checkout', False) or getattr(a, 'is_late', False) or (a.check_in and a.check_out and (a.check_out - a.check_in).total_seconds() < 14400)
+                lambda a: getattr(a, 'is_force_checkout', False) or getattr(a, 'is_forced_checkout', False) or a.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(a, 'is_late', False) or (a.check_in and a.check_out and (a.check_out - a.check_in).total_seconds() < 14400)
             ))
             if forced_or_late_count >= threshold_count or len(emp_atts) >= threshold_count:
                 Category = self.env['discipline.offense.category']

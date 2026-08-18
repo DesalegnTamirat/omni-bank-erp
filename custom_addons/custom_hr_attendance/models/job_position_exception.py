@@ -279,38 +279,99 @@ class JobPositionException(models.Model):
 
     @api.model
     def _get_team_member_domain(self):
-        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
-            return []
+        if self.env.is_superuser() or self.env.user.has_group('base.group_system'):
+            return [('active', '=', True)]
+
         current_employee = self.env.user.employee_id
         if not current_employee:
-            current_employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
-        if current_employee:
-            return ['|', '|', '|',
-                ('user_id', '=', self.env.uid),
-                ('parent_id.user_id', '=', self.env.uid),
-                ('attendance_manager_id', '=', self.env.uid),
-                ('id', 'child_of', current_employee.id)
-            ]
-        return [('user_id', '=', self.env.uid)]
+            current_employee = self.env['hr.employee'].sudo().search([('user_id', '=', self.env.uid)], limit=1)
+
+        emp_id = current_employee.id if current_employee else 0
+
+        return [
+            ('active', '=', True),
+            '|', '|', '|', '|', '|',
+            ('user_id', '=', self.env.uid),
+            ('parent_id.user_id', '=', self.env.uid),
+            ('parent_id', '=', emp_id),
+            ('coach_id.user_id', '=', self.env.uid),
+            ('coach_id', '=', emp_id),
+            ('attendance_manager_id', '=', self.env.uid)
+        ]
 
     @api.depends('employee_id')
     def _compute_job_position(self):
         for record in self:
             record.job_position = record.employee_id.job_position.name or ""
 
-    @api.depends('employee_id')
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            if rec.employee_id:
-                allowed = self.env.user._get_allowed_job_shift_ids(target_employee=rec.employee_id)
-            else:
-                allowed = self.env['job.shift'].sudo().search([('active', '=', True)]).ids
+            allowed = self.env.user.sudo()._get_allowed_job_shift_ids()
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
-    @api.depends('shift_id')
-    def _compute_time_range(self):
-        for record in self:
-            record.time_range = record.shift_id.time_range if record.shift_id else ""
+    start_time = fields.Float(string="Start Time", compute="_compute_shift_details", store=True, readonly=True)
+    end_time = fields.Float(string="End Time", compute="_compute_shift_details", store=True, readonly=True)
+    duration = fields.Float(string="Net Worked Duration (Hours)", compute="_compute_shift_details", store=True, readonly=True)
+    has_lunch_break = fields.Boolean(string="Includes Lunch Break", compute="_compute_shift_details", store=True, readonly=True)
+    morning_window = fields.Char(string="Morning Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    lunch_window = fields.Char(string="Lunch Break Window", compute="_compute_shift_details", store=True, readonly=True)
+    afternoon_window = fields.Char(string="Afternoon Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    time_range = fields.Char(string="Time Range", compute="_compute_shift_details", store=True, readonly=True)
+
+    @api.depends('shift_id', 'shift_id.start_time', 'shift_id.end_time', 'shift_id.has_lunch_break', 'shift_id.lunch_start_time', 'shift_id.lunch_duration', 'shift_id.is_night_shift')
+    def _compute_shift_details(self):
+        def _format_decimal_time(float_val):
+            if float_val is None or float_val is False:
+                return "00:00"
+            val = float(float_val) % 24.0
+            h = int(val)
+            m = int(round((val - h) * 60))
+            if m >= 60:
+                h = (h + 1) % 24
+                m = 0
+            return f"{h:02d}:{m:02d}"
+
+        for rec in self:
+            s = rec.shift_id
+            if not s:
+                rec.start_time = 0.0
+                rec.end_time = 0.0
+                rec.duration = 0.0
+                rec.has_lunch_break = False
+                rec.morning_window = "-"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "-"
+                rec.time_range = "-"
+                continue
+
+            rec.start_time = s.start_time
+            rec.end_time = s.end_time
+            rec.has_lunch_break = s.has_lunch_break
+
+            gross = s.end_time - s.start_time
+            if s.is_night_shift or gross < 0:
+                gross += 24.0
+
+            lunch_deduction = s.lunch_duration if s.has_lunch_break else 0.0
+            rec.duration = max(0.0, round(gross - lunch_deduction, 2))
+
+            start_str = _format_decimal_time(s.start_time)
+            end_str = _format_decimal_time(s.end_time)
+
+            if s.has_lunch_break and s.lunch_start_time:
+                l_start_str = _format_decimal_time(s.lunch_start_time)
+                l_end = s.lunch_start_time + (s.lunch_duration or 1.0)
+                l_end_str = _format_decimal_time(l_end)
+
+                rec.morning_window = f"{start_str} - {l_start_str}"
+                rec.lunch_window = f"{l_start_str} - {l_end_str} ({s.lunch_duration or 1.0:g}h break)"
+                rec.afternoon_window = f"{l_end_str} - {end_str}"
+                rec.time_range = f"{start_str} - {end_str} (Lunch: {l_start_str} - {l_end_str})"
+            else:
+                rec.morning_window = f"{start_str} - {end_str}"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "N/A"
+                rec.time_range = f"{start_str} - {end_str}"
 
     @api.constrains('employee_id', 'shift_id', 'status', 'active')
     def _check_duplicate_exception(self):
@@ -318,18 +379,26 @@ class JobPositionException(models.Model):
             if not record.employee_id or not record.shift_id:
                 continue
 
+            assigner_emp = self.env.user.employee_id or (self.env.user.employee_ids[0] if self.env.user.employee_ids else False)
+            assigner_ou = assigner_emp.default_operating_unit_id if assigner_emp else False
+            assigner_dept = assigner_emp.department_id if assigner_emp else False
+
             emp_ou = record.employee_id.default_operating_unit_id
             emp_dept = record.employee_id.department_id
-            if not record.shift_id.is_applicable_for(operating_unit=emp_ou, department=emp_dept):
+            if not record.shift_id.is_applicable_for(
+                operating_unit=emp_ou,
+                department=emp_dept,
+                assigner_operating_unit=assigner_ou,
+                assigner_department=assigner_dept
+            ):
                 raise ValidationError(
                     _(
                         "The selected shift '%s' is not configured to apply to employee %s's "
-                        "operating unit (%s) or department (%s)."
+                        "operating unit/department nor to assigner %s's operating unit/department."
                     ) % (
                         record.shift_id.name,
                         record.employee_id.name,
-                        emp_ou.name if emp_ou else "N/A",
-                        emp_dept.name if emp_dept else "N/A"
+                        self.env.user.name
                     )
                 )
 

@@ -38,6 +38,57 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_lunch_break",
         help="Enable the lunch break flow: Check-In → Lunch-Out → Back from Lunch → Check-Out."
     )
+
+    # ----------------------------------------------------------
+    # CONFIGURABLE REGULATION PARAMETERS (Requirement 3)
+    # ----------------------------------------------------------
+    attendance_unexcused_consecutive_threshold = fields.Integer(
+        string='Discipline Trigger: Consecutive Unexcused Absences (Days)',
+        default=3,
+        config_parameter='custom_hr_attendance.unexcused_consecutive_threshold',
+        help='Auto-generates draft discipline case when consecutive unexcused absences reach this number.'
+    )
+    attendance_unexcused_monthly_threshold = fields.Integer(
+        string='Discipline Trigger: Monthly Cumulative Unexcused Absences (Days)',
+        default=5,
+        config_parameter='custom_hr_attendance.unexcused_monthly_threshold',
+        help='Auto-generates draft discipline case when cumulative monthly unexcused absences reach this number.'
+    )
+    discipline_managerial_warning1_days = fields.Integer(
+        string='Managerial 1st Warning Penalty (Days)',
+        default=1,
+        config_parameter='discipline_management.managerial_warning1_days'
+    )
+    discipline_managerial_warning2_days = fields.Integer(
+        string='Managerial 2nd Warning Penalty (Days)',
+        default=2,
+        config_parameter='discipline_management.managerial_warning2_days'
+    )
+    discipline_managerial_warning3_days = fields.Integer(
+        string='Managerial 3rd Warning Penalty (Days)',
+        default=3,
+        config_parameter='discipline_management.managerial_warning3_days'
+    )
+    discipline_non_managerial_warning1_pct = fields.Float(
+        string='Non-Managerial 1st Warning Penalty (%)',
+        default=5.0,
+        config_parameter='discipline_management.non_managerial_warning1_pct'
+    )
+    discipline_non_managerial_warning2_pct = fields.Float(
+        string='Non-Managerial 2nd Warning Penalty (%)',
+        default=10.0,
+        config_parameter='discipline_management.non_managerial_warning2_pct'
+    )
+    discipline_non_managerial_warning3_pct = fields.Float(
+        string='Non-Managerial 3rd Warning Penalty (%)',
+        default=20.0,
+        config_parameter='discipline_management.non_managerial_warning3_pct'
+    )
+    discipline_appeal_window_days = fields.Integer(
+        string='Appeal Deadline Window (Working Days)',
+        default=10,
+        config_parameter='discipline_management.appeal_window_days'
+    )
     enable_auto_absence = fields.Boolean(
         string='Enable Automatic Absence Detection',
         default=True,
@@ -142,25 +193,45 @@ class ResConfigSettings(models.TransientModel):
     # ----------------------------------------------------------
     # DISCIPLINE INTEGRATION THRESHOLDS
     # ----------------------------------------------------------
-    lateness_violation_threshold = fields.Integer(
-        string='Lateness Violation Threshold (Occurrences)',
+    lateness_hours_violation_threshold = fields.Float(
+        string='Cumulative Late Hours Threshold for Discipline (Hours)',
+        default=4.0,
+        config_parameter="hr_attendance.lateness_hours_violation_threshold",
+        help="Total cumulative late hours within the rolling evaluation window that triggers an automatic discipline case."
+    )
+    lateness_eval_window_months = fields.Integer(
+        string='Lateness Evaluation Window (Months)',
         default=3,
-        config_parameter="hr_attendance.lateness_violation_threshold",
-        help="Number of late check-ins that triggers an automatic discipline case (Repeated Lateness Violation). "
-             "Counter resets to zero after a case is created."
+        config_parameter="hr_attendance.lateness_eval_window_months",
+        help="Rolling evaluation window in months over which cumulative late hours are aggregated (e.g., 3 months)."
     )
     force_checkout_violation_threshold = fields.Integer(
         string='Force Checkout Violation Threshold (Occurrences)',
         default=2,
         config_parameter="hr_attendance.force_checkout_violation_threshold",
-        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout). "
-             "Counter resets to zero after a case is created."
+        help="Number of force checkouts that triggers an automatic discipline case (Repeated Force Checkout)."
     )
-    missing_lunch_tap_threshold = fields.Integer(
-        string='Missing Lunch Taps Before Lateness (Occurrences)',
+
+    # ----------------------------------------------------------
+    # EMPLOYEE REGULATION WARNING VALIDITY PERIODS (ART. 10.3)
+    # ----------------------------------------------------------
+    warning_1_validity_months = fields.Integer(
+        string='First Written Warning Validity (Months)',
         default=3,
-        config_parameter="hr_attendance.missing_lunch_tap_threshold",
-        help="Number of missing lunch taps that automatically converts to 1 Lateness Violation (Discipline Parity Rule)."
+        config_parameter="hr_attendance.warning_1_validity_months",
+        help="Validity duration of 1st written warning per Bank Regulation 10.3.1 (Default: 3 months)."
+    )
+    warning_2_validity_months = fields.Integer(
+        string='Second Written Warning Validity (Months)',
+        default=6,
+        config_parameter="hr_attendance.warning_2_validity_months",
+        help="Validity duration of 2nd written warning per Bank Regulation 10.3.2 (Default: 6 months)."
+    )
+    warning_3_validity_months = fields.Integer(
+        string='Final Written Warning Validity (Months)',
+        default=12,
+        config_parameter="hr_attendance.warning_3_validity_months",
+        help="Validity duration of final written warning per Bank Regulation 10.3.3 (Default: 12 months)."
     )
 
     def get_values(self):

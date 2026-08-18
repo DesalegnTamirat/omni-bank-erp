@@ -113,30 +113,29 @@ class ResUsers(models.Model):
                 if group_manager in user.groups_id and not has_higher_role:
                     user.sudo().write({'groups_id': [(3, group_manager.id)]})
 
-    def _get_allowed_job_shift_ids(self, target_employee=None):
+    def _get_allowed_job_shift_ids(self, target_employee=None, target_operating_unit=None):
         """
-        Returns list of job.shift IDs allowed for the target employee and/or the logged-in manager trying to assign a shift.
-        Only System Superusers / System Admins (base.group_system) see all active shifts.
-        Line managers & Job Position Officers only see shifts applicable to their operating unit / department.
+        Returns list of job.shift IDs allowed for the target employee or target operating unit,
+        considering both target employee/OU and the assigning coach/manager's OU and department.
         """
         self.ensure_one()
         user_sudo = self.sudo()
         shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
 
-        # Only System Superusers and System Admins see all active shifts
-        if self.env.is_superuser() or user_sudo.has_group('base.group_system'):
-            return shifts.ids
+        assigner_emp = user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
+        assigner_ou = assigner_emp.default_operating_unit_id if assigner_emp else False
+        assigner_dept = assigner_emp.department_id if assigner_emp else False
 
-        manager_emp = user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
-        emp = target_employee or manager_emp
+        target_emp = target_employee or assigner_emp
+        target_ou = target_operating_unit or (target_emp.default_operating_unit_id if target_emp else False)
+        target_dept = target_emp.department_id if target_emp else False
 
-        if not emp and not manager_emp:
-            return shifts.ids
-
-        emp_ou = (emp.default_operating_unit_id if emp else False) or (manager_emp.default_operating_unit_id if manager_emp else False)
-        emp_dept = (emp.department_id if emp else False) or (manager_emp.department_id if manager_emp else False)
-
-        allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=emp_ou, department=emp_dept))
+        allowed = shifts.filtered(lambda s: s.is_applicable_for(
+            operating_unit=target_ou,
+            department=target_dept,
+            assigner_operating_unit=assigner_ou,
+            assigner_department=assigner_dept
+        ))
         return allowed.ids
 
 

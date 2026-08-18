@@ -111,18 +111,32 @@ class HrAttendanceViolationProcessor(models.Model):
 
         notif_log = self.env['hr.attendance.notification.log']
 
-        # --- LATE CHECK-IN COUNTER ---
+        # --- LATE CHECK-IN CUMULATIVE HOURS COUNTER ---
         if self.check_in_status == 'Late':
-            lateness_threshold = int(params.get_param(
-                'hr_attendance.lateness_violation_threshold', 3
+            hours_threshold = float(params.get_param(
+                'hr_attendance.lateness_hours_violation_threshold', 4.0
             ))
-            new_count = employee._increment_late_count()
-            _logger.debug(
-                "Employee %s late count: %d / %d threshold.",
-                employee.name, new_count, lateness_threshold
+            eval_months = int(params.get_param(
+                'hr_attendance.lateness_eval_window_months', 3
+            ))
+
+            today = fields.Date.context_today(self)
+            eval_start_date = today - timedelta(days=eval_months * 30)
+
+            # Compute total cumulative late hours in rolling window
+            recent_atts = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', employee.id),
+                ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
+                ('check_in_status', '=', 'Late')
+            ])
+            total_late_hours = sum(att.late_time or getattr(att, 'late_time_hour', 0.0) or 0.0 for att in recent_atts)
+
+            _logger.info(
+                "Employee %s cumulative late hours (%d-month window): %.2f / %.2f hrs threshold.",
+                employee.name, eval_months, total_late_hours, hours_threshold
             )
 
-            # otify Supervisor on late check-in violation
+            # Notify Supervisor on late check-in violation
             if employee.parent_id and employee.parent_id.user_id:
                 if notif_log.log_and_check(employee.id, 'violation_supervisor'):
                     self.env['mail.activity'].sudo().create({
@@ -134,8 +148,7 @@ class HrAttendanceViolationProcessor(models.Model):
                         'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
                     })
 
-            if lateness_threshold > 0 and new_count >= lateness_threshold:
-                employee._reset_late_count()
+            if hours_threshold > 0 and total_late_hours >= hours_threshold:
                 self.env['discipline.case'].sudo()._create_from_attendance(
                     employee.id, 'lateness', self.id
                 )
@@ -150,8 +163,8 @@ class HrAttendanceViolationProcessor(models.Model):
                             'res_model_id': self.env.ref('hr_attendance.model_hr_attendance').id,
                             'res_id': self.id,
                             'user_id': hr_user.id,
-                            'summary': _('ESCALATION: Lateness Threshold Exceeded for %s') % employee.name,
-                            'note': _('Employee %s has reached %d late check-ins. Discipline case initiated.') % (employee.name, lateness_threshold),
+                            'summary': _('ESCALATION: Cumulative Late Hours Threshold Exceeded for %s') % employee.name,
+                            'note': _('Employee %s has reached %.2f cumulative late hours over the last %d months (Threshold: %.2f hrs). Discipline case initiated.') % (employee.name, total_late_hours, eval_months, hours_threshold),
                             'activity_type_id': self.env.ref('mail.mail_activity_data_warning', raise_if_not_found=False) or self.env.ref('mail.mail_activity_data_todo').id,
                         })
 

@@ -141,19 +141,25 @@ class OverTime(models.Model):
     # show team members under manager hierarchy
     @api.model
     def _get_team_member_domain(self):
-        if self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
-            return []
-        employee = self.env.user.employee_id
-        if not employee:
-            employee = self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
-        if employee:
-            return ['|', '|', '|',
-                ('user_id', '=', self.env.uid),
-                ('parent_id.user_id', '=', self.env.uid),
-                ('attendance_manager_id', '=', self.env.uid),
-                ('id', 'child_of', employee.id)
-            ]
-        return [('user_id', '=', self.env.uid)]
+        if self.env.is_superuser() or self.env.user.has_group('base.group_system'):
+            return [('active', '=', True)]
+
+        current_employee = self.env.user.employee_id
+        if not current_employee:
+            current_employee = self.env['hr.employee'].sudo().search([('user_id', '=', self.env.uid)], limit=1)
+
+        emp_id = current_employee.id if current_employee else 0
+
+        return [
+            ('active', '=', True),
+            '|', '|', '|', '|', '|',
+            ('user_id', '=', self.env.uid),
+            ('parent_id.user_id', '=', self.env.uid),
+            ('parent_id', '=', emp_id),
+            ('coach_id.user_id', '=', self.env.uid),
+            ('coach_id', '=', emp_id),
+            ('attendance_manager_id', '=', self.env.uid)
+        ]
 
 
     # Compute: over_time display name

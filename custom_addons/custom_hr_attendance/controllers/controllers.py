@@ -421,9 +421,9 @@ class BunnaMyAttendance(http.Controller):
                 'lunch_out_time': _float('hr_attendance.lunch_out_time', 12.0),
                 'lunch_duration': _float('hr_attendance.lunch_duration', 1.0),
                 'lunch_grace_time': _float('hr_attendance.lunch_grace_time', 0.25),
-                'lateness_violation_threshold': _int('hr_attendance.lateness_violation_threshold', 3),
+                'lateness_hours_violation_threshold': _float('hr_attendance.lateness_hours_violation_threshold', 4.0),
+                'lateness_eval_window_months': _int('hr_attendance.lateness_eval_window_months', 3),
                 'force_checkout_violation_threshold': _int('hr_attendance.force_checkout_violation_threshold', 2),
-                'missing_lunch_tap_threshold': _int('hr_attendance.missing_lunch_tap_threshold', 3),
             }
         }
 
@@ -444,11 +444,11 @@ class BunnaMyAttendance(http.Controller):
         float_keys = [
             'morning_time', 'exit_time', 'dead_time', 'checkin_buffer',
             'post_shift_grace_hours', 'saturday_exit_time',
-            'lunch_out_time', 'lunch_duration', 'lunch_grace_time'
+            'lunch_out_time', 'lunch_duration', 'lunch_grace_time',
+            'lateness_hours_violation_threshold'
         ]
         int_keys = [
-            'lateness_violation_threshold', 'force_checkout_violation_threshold',
-            'missing_lunch_tap_threshold'
+            'lateness_eval_window_months', 'force_checkout_violation_threshold'
         ]
         for key in bool_keys:
             if key in settings:
@@ -459,4 +459,4 @@ class BunnaMyAttendance(http.Controller):
         for key in int_keys:
             if key in settings:
                 params.set_param(f'hr_attendance.{key}', str(int(settings[key])))
-        return {'success': True}
+        return {'status': 'success'}
