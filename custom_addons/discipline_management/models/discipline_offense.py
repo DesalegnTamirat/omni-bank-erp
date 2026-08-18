@@ -37,6 +37,7 @@ class DisciplineOffense(models.Model):
 
     punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
         ('final_warning_penalty', 'Final Written Warning + 20% Salary Deduction'),
         ('second_warning_penalty', 'Second Written Warning + 10% Salary Deduction'),
         ('first_warning_penalty', 'First Written Warning + 5% Salary Deduction'),
@@ -61,7 +62,7 @@ class DisciplineOffense(models.Model):
 
     @api.onchange('severity_level')
     def _onchange_severity_level(self):
-        """Auto-populate default standard penalties based on ."""
+        """Auto-populate default standard penalties based on."""
         if self.severity_level == 'level_1':
             self.punishment_type = 'dismissal'
             self.penalty_percentage = 0.0

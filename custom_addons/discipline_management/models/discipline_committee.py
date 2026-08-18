@@ -13,18 +13,19 @@ class DisciplineCommitteeMeeting(models.Model):
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Affected Employee', related='case_id.employee_id', store=True, readonly=True)
     meeting_date = fields.Datetime(string='Scheduled Meeting Time', required=True, tracking=True)
+    meeting_end_time = fields.Datetime(string='Scheduled Meeting End Time', tracking=True)
     location = fields.Char(string='Meeting Room / Location', default='Main HR Conference Room')
 
     committee_chair_id = fields.Many2one('res.users', string='Committee Chair', required=True, tracking=True)
     member_ids = fields.Many2many('res.users', 'discipline_committee_members_rel', 'meeting_id', 'user_id', string='Committee Members', required=True)
 
-    # Quorum Requirements 
+    # Quorum Requirements
     total_expected_members = fields.Integer(string='Total Expected Members', compute='_compute_quorum', store=True)
     present_members_count = fields.Integer(string='Members Present Count', required=True, default=0, tracking=True)
     required_quorum_percentage = fields.Float(string='Required Quorum (%)', default=50.0, required=True, help='Minimum percentage of members present required for valid decision')
     is_quorum_met = fields.Boolean(string='Quorum Validated', compute='_compute_quorum', store=True, tracking=True)
 
-    # Minutes & Decision Capture ( & )
+    # Minutes & Decision Capture
     agenda = fields.Text(string='Meeting Agenda')
     meeting_minutes = fields.Text(string='Official Meeting Minutes', tracking=True)
     final_recommendation = fields.Selection([
@@ -53,7 +54,7 @@ class DisciplineCommitteeMeeting(models.Model):
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    #  — Sequential sign-off tracking
+    # — Sequential sign-off tracking
     director_signed_off = fields.Boolean(
         string='Director Sign-off Completed',
         default=False,
@@ -88,7 +89,7 @@ class DisciplineCommitteeMeeting(models.Model):
         return super().create(vals_list)
 
     def action_schedule_and_notify(self):
-        """ & Schedule meeting and notify members & employee."""
+        """Schedule meeting and notify members & employee."""
         for rec in self:
             rec.write({'state': 'in_progress'})
             # Post message and send notification to committee members and employee
@@ -141,7 +142,7 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.write({'state': 'minutes_recorded'})
 
     def action_finalize_meeting(self):
-        """Quorum Validation +  sequential sign-off check before final decision."""
+        """Quorum Validation +sequential sign-off check before final decision."""
         for rec in self:
             # Director must have signed off before finalisation
             if not rec.director_signed_off:

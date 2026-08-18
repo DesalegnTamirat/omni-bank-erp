@@ -29,7 +29,7 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved"/>
                     </header>
                     <sheet>
-                        <!--  Part 1 & 2: Header Info -->
+                        <!-- Part 1 & 2: Header Info -->
                         <group>
                             <group string="Case Reference">
                                 <field name="name"/>
@@ -40,17 +40,17 @@
                                 <field name="investigator_id"/>
                                 <field name="investigation_date"/>
                                 <field name="examination_date"/>
-                                <!--  Part 1 -->
+                                <!-- Part 1 -->
                                 <field name="misconduct_type"/>
                                 <field name="misconduct_type_notes" invisible="misconduct_type != 'other'"/>
                             </group>
                         </group>
                         <notebook>
-                            <!--  Part 3: Findings -->
+                            <!-- Part 3: Findings -->
                             <page string="Findings &amp; Summary">
                                 <field name="summary_findings" placeholder="Detail all facts established during the investigation..."/>
                             </page>
-                            <!--  Part 4: Liable Employees -->
+                            <!-- Part 4: Liable Employees -->
                             <page string="Liable Employees">
                                 <field name="liable_employee_ids">
                                     <list editable="bottom">
@@ -61,7 +61,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <!--  Part 5 & 6: Policy &amp; Evidence -->
+                            <!-- Part 5 & 6: Policy &amp; Evidence -->
                             <page string="Policy &amp; Evidence">
                                 <group>
                                     <field name="applicable_policy" placeholder="e.g. HR Policy Section 4.2 – Attendance Violations"/>
@@ -70,11 +70,11 @@
                                     <field name="evidence_description" placeholder="Evidence collected, chain of custody, CCTV references..."/>
                                 </group>
                             </page>
-                            <!--  Part 7: Recommendation -->
+                            <!-- Part 7: Recommendation -->
                             <page string="Conclusion &amp; Recommendation">
                                 <field name="investigator_recommendation" placeholder="Investigator recommended action based on evidence..."/>
                             </page>
-                            <!--  Part 8: Management Review -->
+                            <!-- Part 8: Management Review -->
                             <page string="Management Review Sign-off">
                                 <group>
                                     <field name="reviewed_by_id"/>

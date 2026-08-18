@@ -39,5 +39,17 @@
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=30, second=0)"/>
             <field name="active" eval="True"/>
         </record>
+
+        <!-- Cron: Process Monthly Suspension Payroll Penalties -->
+        <record id="ir_cron_discipline_monthly_suspension_penalty" model="ir.cron">
+            <field name="name">Discipline Management: Monthly Suspension Payroll Penalty Processing</field>
+            <field name="model_id" ref="discipline_management.model_discipline_suspension"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_process_monthly_suspension_penalties()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">months</field>
+            <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=2, minute=45, second=0)"/>
+            <field name="active" eval="True"/>
+        </record>
     </data>
 </odoo>

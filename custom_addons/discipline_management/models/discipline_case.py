@@ -20,12 +20,33 @@ class DisciplineCase(models.Model):
     offense_id = fields.Many2one('discipline.offense', string='Offense Type', required=True, tracking=True)
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='offense_id.category_id', store=True, readonly=True)
     severity_level = fields.Selection(related='offense_id.severity_level', string='Severity Level', store=True, readonly=True)
-    punishment_type = fields.Selection(related='offense_id.punishment_type', string='Applicable Punishment', store=True, readonly=True)
+    punishment_type = fields.Selection([
+        ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
+        ('final_warning_penalty', 'Final Written Warning + 20% Salary Deduction'),
+        ('second_warning_penalty', 'Second Written Warning + 10% Salary Deduction'),
+        ('first_warning_penalty', 'First Written Warning + 5% Salary Deduction'),
+        ('verbal_warning', 'Recorded Verbal Warning'),
+        ('custom', 'Custom Administrative Action'),
+    ], string='Applicable Punishment', compute='_compute_punishment_type', store=True, readonly=False, tracking=True)
+
     penalty_percentage = fields.Float(string='Penalty Percentage (%)', compute='_compute_penalty_percentage', store=True, readonly=False, tracking=True)
+
+    # Demotion fields
+    new_job_id = fields.Many2one('hr.job', string='Demotion Target Job Position', tracking=True)
+    new_grade_id = fields.Char(string='Demotion Target Grade Scale', tracking=True)
+
+    # Automatic routing & authority
+    required_final_authority = fields.Selection([
+        ('cpco', 'Chief People Officer (CPCO)'),
+        ('ceo', 'Chief Executive Officer (CEO)'),
+    ], string='Required Final Approval Authority', compute='_compute_required_final_authority', store=True, tracking=True)
 
     incident_date = fields.Date(string='Incident Date', required=True, default=fields.Date.context_today, tracking=True)
     description = fields.Text(string='Detailed Description of Misconduct', required=True)
-    
+    is_system_generated = fields.Boolean(string='System Generated', default=False, readonly=True)
+    is_locked_for_committee = fields.Boolean(string='Locked for Committee Review', default=False, tracking=True)
+
     # Workflow Roles (Segregation of Duties)
     initiator_id = fields.Many2one('res.users', string='Initiator', default=lambda self: self.env.user, readonly=True, tracking=True)
     reviewer_id = fields.Many2one('res.users', string='Reviewer / Investigator', tracking=True)
@@ -51,7 +72,7 @@ class DisciplineCase(models.Model):
         ('closed', 'Closed'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # SLA Tracking 
+    # SLA Tracking
     sla_deadline = fields.Date(string='SLA Resolution Deadline', compute='_compute_sla_deadline', store=True)
     is_sla_exceeded = fields.Boolean(string='SLA Breached', compute='_compute_is_sla_exceeded', store=True, tracking=True)
     sla_target_days = fields.Integer(string='SLA Target (Days)', default=7, help='Target resolution days per policy')
@@ -69,7 +90,7 @@ class DisciplineCase(models.Model):
     appeal_deadline = fields.Date(string='Appeal Deadline', compute='_compute_appeal_deadline', store=True, tracking=True)
     is_appeal_window_open = fields.Boolean(string='Appeal Window Open', compute='_compute_is_appeal_window_open')
     
-    # Revocation Data ( to )
+    # Revocation Data
     is_revoked = fields.Boolean(string='Is Revoked', default=False, readonly=True, tracking=True)
     revocation_reason = fields.Text(string='Revocation Justification', readonly=True, tracking=True)
     revoked_by_id = fields.Many2one('res.users', string='Revoked By', readonly=True, tracking=True)
@@ -80,12 +101,18 @@ class DisciplineCase(models.Model):
         'res.users',
         string='Dismissal Authority (CEO/CPCO)',
         tracking=True,
-        help='For Level 1 Dismissals, records the CEO or CPCO who provided final authority.'
+        help='For Level 1 Dismissals and executive cases, records the CEO or CPCO who provided final authority.'
     )
 
     # Computed counts for smart buttons
     appeal_count = fields.Integer(string='Appeal Count', compute='_compute_appeal_count')
     suspension_count = fields.Integer(string='Suspension Count', compute='_compute_suspension_count')
+
+    @api.depends('offense_id', 'offense_id.punishment_type')
+    def _compute_punishment_type(self):
+        for rec in self:
+            if rec.offense_id and rec.offense_id.punishment_type:
+                rec.punishment_type = rec.offense_id.punishment_type
 
     @api.depends('offense_id')
     def _compute_penalty_percentage(self):
@@ -94,6 +121,16 @@ class DisciplineCase(models.Model):
                 rec.penalty_percentage = rec.offense_id.penalty_percentage
             else:
                 rec.penalty_percentage = 0.0
+
+    @api.depends('employee_id', 'employee_id.job_id', 'severity_level', 'punishment_type')
+    def _compute_required_final_authority(self):
+        for rec in self:
+            job_name = (rec.employee_id.job_id.name or '').lower() if rec.employee_id and rec.employee_id.job_id else ''
+            is_executive = any(kw in job_name for kw in ['manager', 'director', 'chief', 'vp', 'executive', 'head'])
+            if is_executive or rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
+                rec.required_final_authority = 'ceo'
+            else:
+                rec.required_final_authority = 'cpco'
 
     def _compute_appeal_count(self):
         for rec in self:
@@ -127,7 +164,6 @@ class DisciplineCase(models.Model):
     def _compute_appeal_deadline(self):
         for rec in self:
             if rec.final_decision_date:
-                # 10 Calendar Days appeal window
                 rec.appeal_deadline = rec.final_decision_date + timedelta(days=10)
             else:
                 rec.appeal_deadline = False
@@ -141,24 +177,17 @@ class DisciplineCase(models.Model):
             else:
                 rec.is_appeal_window_open = False
 
-    #  Auto-suggest Reviewer & Approver based on organizational hierarchy
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
-        """Auto-populate suggested Reviewer and Approver based on employee structure."""
         if self.employee_id:
-            # Reviewer defaults to direct manager's res.user
             if self.employee_id.parent_id and self.employee_id.parent_id.user_id:
                 self.reviewer_id = self.employee_id.parent_id.user_id
-            # Approver defaults to department manager's res.user
             if self.employee_id.department_id and self.employee_id.department_id.manager_id and self.employee_id.department_id.manager_id.user_id:
                 self.approver_id = self.employee_id.department_id.manager_id.user_id
 
-
-    # Duplicate Case Prevention (same offense AND same severity on same date)
     @api.constrains('employee_id', 'incident_date', 'offense_id')
     def _check_duplicate_case(self):
         for rec in self:
-            # Exact duplicate: same employee, same incident date, same offense
             duplicate = self.search([
                 ('id', '!=', rec.id),
                 ('employee_id', '=', rec.employee_id.id),
@@ -172,8 +201,6 @@ class DisciplineCase(models.Model):
                     'on incident date %s for offense "%s" (Case Reference: %s).'
                 ) % (rec.employee_id.name, rec.incident_date, rec.offense_id.name, duplicate[0].name))
 
-            # Also block a second case of the SAME severity level on the SAME incident date
-            # This prevents splitting one incident into multiple files to escalate severity
             if rec.offense_id and rec.severity_level:
                 same_severity = self.search([
                     ('id', '!=', rec.id),
@@ -183,17 +210,25 @@ class DisciplineCase(models.Model):
                     ('state', 'not in', ['revoked', 'closed']),
                 ])
                 if same_severity:
+                    severity_field = rec._fields['severity_level']
+                    if hasattr(severity_field, '_description_selection'):
+                        severity_sel = severity_field._description_selection(rec.env)
+                    elif isinstance(severity_field.selection, list):
+                        severity_sel = severity_field.selection
+                    elif callable(severity_field.selection):
+                        severity_sel = severity_field.selection(rec.env)
+                    else:
+                        severity_sel = []
+                    severity_label = dict(severity_sel).get(rec.severity_level, rec.severity_level)
                     raise ValidationError(_(
-                        'Duplicate Severity Prevention : Employee %s already has an open %s case '
+                        'Duplicate Severity Prevention: Employee %s already has an open %s case '
                         'on incident date %s (Case Ref: %s). Consolidate into the existing case instead.'
-                    ) % (rec.employee_id.name, dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level),
+                    ) % (rec.employee_id.name, severity_label,
                          rec.incident_date, same_severity[0].name))
 
-    #  & Segregation of Duties & Approval Restrictions
     def _validate_segregation_of_duties(self):
         for rec in self:
             current_user = self.env.user
-            # Check Initiator != Reviewer != Approver
             if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
                 raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Reviewer must be different individuals.'))
             if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id:
@@ -201,19 +236,23 @@ class DisciplineCase(models.Model):
             if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
                 raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
 
-            #  / Level 1 Dismissal requires CEO or CPCO authority
-            # HR Admin is the minimum — they must also assign the Dismissal Authority field
-            if rec.severity_level == 'level_1':
-                if not current_user.has_group('discipline_management.group_discipline_admin'):
+            if rec.severity_level == 'level_1' or rec.required_final_authority == 'ceo':
+                if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
                     raise ValidationError(_(
-                        'Approval Restriction: Dismissal decisions (Level 1 Critical Offense) are restricted exclusively '
-                        'to HR Administrators / Senior Authority.'
+                        'Approval Restriction: Decisions requiring CEO / Senior Executive Authority are restricted '
+                        'exclusively to authorized executive approvers.'
                     ))
                 if not rec.dismissal_authority_id:
                     raise ValidationError(_(
-                        'CEO/CPCO Authority Required: For Level 1 Dismissal cases, you must record the CEO or CPCO '
-                        'who provided final dismissal authority in the "Dismissal Authority" field.'
+                        'Authority Record Required: For executive or dismissal cases, you must record the designated '
+                        'CEO or CPCO approver in the "Dismissal Authority" field.'
                     ))
+                if rec.required_final_authority == 'ceo' and rec.dismissal_authority_id:
+                    if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_ceo') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
+                        raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CEO / Executive approval authority.'))
+            elif rec.required_final_authority == 'cpco' and rec.dismissal_authority_id:
+                if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_cpco') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
+                    raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CPCO approval authority.'))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -223,52 +262,89 @@ class DisciplineCase(models.Model):
         cases = super().create(vals_list)
         return cases
 
+    def write(self, vals):
+        force_write = self.env.context.get('force_write')
+        if not force_write:
+            whitelisted_fields = {'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked', 'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee', 'approver_id', 'final_decision_date'}
+            for rec in self:
+                if rec.state in ('enforced', 'closed', 'appealed'):
+                    if set(vals.keys()) - whitelisted_fields:
+                        raise UserError(_('Enforced, closed, or appealed disciplinary cases are immutable and cannot be edited. Use formal revocation if required.'))
+                if rec.is_locked_for_committee:
+                    if set(vals.keys()) - whitelisted_fields:
+                        raise UserError(_('Case %s is currently locked for committee review and cannot be edited.') % rec.name)
+        return super().write(vals)
+
     def unlink(self):
-        # Original Record Preservation - Enforced or Finalized cases cannot be deleted
         for rec in self:
             if rec.state in ['enforced', 'closed', 'appealed']:
                 raise UserError(_('Preservation Policy Violation: Enforced or finalized disciplinary records cannot be deleted. Use formal Revocation if required.'))
         return super().unlink()
 
-    # --- Workflow Actions ---
     def action_initiate(self):
         for rec in self:
             if not rec.description:
                 raise UserError(_('Detailed Description is mandatory before initiating a case.'))
-            rec.write({'state': 'initiated'})
+            rec.with_context(force_write=True).write({'state': 'initiated'})
             rec.message_post(body=_('Disciplinary case initiated for employee %s.') % rec.employee_id.name)
 
     def action_start_investigation(self):
         for rec in self:
             rec.reviewer_id = self.env.user
-            rec.write({'state': 'investigating'})
+            rec.with_context(force_write=True).write({'state': 'investigating'})
             rec.message_post(body=_('Investigation process started by %s.') % self.env.user.name)
 
     def action_send_to_committee(self):
         for rec in self:
-            rec.write({'state': 'committee_review'})
-            rec.message_post(body=_('Case submitted for Disciplinary Committee Review.'))
+            rec.with_context(force_write=True).write({'state': 'committee_review', 'is_locked_for_committee': True})
+            rec.message_post(body=_('Case submitted for Disciplinary Committee Review and locked for feedback.'))
+
+    def action_committee_feedback_received(self):
+        """Unlock case when committee feedback is received and notify HR officer."""
+        for rec in self:
+            rec.with_context(force_write=True).write({'is_locked_for_committee': False})
+            rec.message_post(body=_('Committee feedback received. Case unlocked for review.'))
+            target_user = rec.reviewer_id or rec.initiator_id or rec.create_uid
+            if target_user:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('Committee Feedback Received: Case %s') % rec.name,
+                    note=_('Disciplinary Committee feedback is ready for your review.'),
+                    user_id=target_user.id
+                )
 
     def action_submit_for_approval(self):
         for rec in self:
-            rec.write({'state': 'pending_approval'})
+            rec.with_context(force_write=True).write({'state': 'pending_approval'})
             rec.message_post(body=_('Case submitted for final approval.'))
 
-    #  to Decision Enforcement & System Integration
     def action_approve_and_enforce(self):
         for rec in self:
             rec.approver_id = self.env.user
             rec._validate_segregation_of_duties()
 
+            # Verify linked committee meetings are completed with quorum and signoff
+            if rec.committee_meeting_ids:
+                for meeting in rec.committee_meeting_ids:
+                    if meeting.state != 'completed' or not meeting.director_signed_off or not meeting.is_quorum_met:
+                        raise UserError(_('Cannot enforce case decision. Linked committee meeting (%s) must be in Completed state with director sign-off and valid quorum.') % meeting.name)
+
             rec.final_decision_date = fields.Date.context_today(self)
-            rec.write({'state': 'enforced'})
+            rec.with_context(force_write=True).write({'state': 'enforced'})
 
-            # 1. Update Employee Master Disciplinary Info 
-            rec.employee_id.active_disciplinary_action = True
-            rec.employee_id.disciplinary_warning_count += 1
-            rec.employee_id.last_disciplinary_date = rec.final_decision_date
+            # Update Employee Master Disciplinary Info & Internal Mobility Ineligibility
+            rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({
+                'active_disciplinary_action': True,
+                'is_ineligible_for_promotion_transfer': True,
+                'disciplinary_warning_count': rec.employee_id.disciplinary_warning_count + 1,
+                'last_disciplinary_date': rec.final_decision_date,
+            })
 
-            # 2. Trigger Payroll Penalty Deduction if applicable 
+            # Demotion handling (preserves basic salary while downgrading position scale/allowances)
+            if rec.punishment_type == 'demotion':
+                rec.action_apply_demotion()
+
+            # Trigger Payroll Penalty Deduction if applicable
             if rec.penalty_percentage > 0.0:
                 self.env['discipline.payroll.penalty'].create({
                     'case_id': rec.id,
@@ -280,7 +356,7 @@ class DisciplineCase(models.Model):
                     'notes': _('Automatic percentage penalty of %s%% from Case %s.') % (rec.penalty_percentage, rec.name)
                 })
 
-            # 2b. Suspension without-pay deduction for active suspensions
+            # Suspension without-pay deduction for active suspensions
             active_swp = rec.suspension_ids.filtered(
                 lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
             )
@@ -296,24 +372,19 @@ class DisciplineCase(models.Model):
                     'notes': _('Without-pay suspension deduction for %d days from Suspension %s.') % (susp.working_days_count, susp.name)
                 })
 
-            # 3. Dismissal Handling & Separation Workflow ( & )
+            # Dismissal Handling & Separation Workflow
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
-                rec._process_employee_dismissal()
+                rec.action_approve_dismissal()
 
-            # 4. Auto-attach the warning letter PDF
+            # Auto-attach the warning letter PDF
             rec._attach_warning_letter()
 
             rec.message_post(body=_('Disciplinary case decision approved and enforced. Warning letter auto-attached.'))
 
     def _attach_warning_letter(self):
-        """
-         Generate and auto-attach the warning letter PDF to this case's chatter.
-        Uses the discipline.case.warning.letter report if present.
-        Falls back to a plain text letter if the report template is not installed.
-        """
+        """Generate and auto-attach the warning letter PDF to chatter."""
         self.ensure_one()
-        # Try the registered Qweb report first
-        report_ref = 'discipline_management.action_report_warning_letter'
+        report_ref = 'discipline_management.action_report_disciplinary_warning_letter'
         try:
             report = self.env.ref(report_ref, raise_if_not_found=True)
             pdf_content, _ = self.env['ir.actions.report']._render_qweb_pdf(
@@ -333,7 +404,6 @@ class DisciplineCase(models.Model):
                 attachment_ids=[attachment.id]
             )
         except Exception:
-            #  Fallback: Attach a plain text stub so the case always has a record
             import base64
             body_text = (
                 'WARNING LETTER\n'
@@ -356,11 +426,22 @@ class DisciplineCase(models.Model):
                 'mimetype': 'text/plain',
             })
 
+    def action_apply_demotion(self):
+        """Gap 1: Demotion execution preserving basic salary while downgrading position scale/allowances."""
+        for rec in self:
+            if rec.new_job_id:
+                rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({'job_id': rec.new_job_id.id})
+                rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved.') % rec.new_job_id.name)
+
+    def action_approve_dismissal(self):
+        """Gap 3: Final approval of Level 1 Dismissal creating separation record and revoking system access."""
+        for rec in self:
+            rec._process_employee_dismissal()
+
     def _process_employee_dismissal(self):
-        """ & Handle separation and access revocation."""
+        """Handle separation and access revocation with extensible hook."""
         for rec in self:
             emp = rec.employee_id
-            # Build write dict safely - departure fields exist when hr module supports archiving
             write_vals = {'active': False}
             departure_reason = self.env.ref('hr.departure_fired', raise_if_not_found=False)
             if departure_reason and 'departure_reason_id' in emp._fields:
@@ -369,11 +450,23 @@ class DisciplineCase(models.Model):
                 write_vals['departure_date'] = rec.final_decision_date
             if 'departure_description' in emp._fields:
                 write_vals['departure_description'] = _('Dismissed under Disciplinary Case %s on %s.') % (rec.name, rec.final_decision_date)
-            emp.write(write_vals)
-            # Trigger request/action to disable user system access
+            emp.with_context(no_leave_resource_calendar_update=True).write(write_vals)
             if emp.user_id:
                 emp.user_id.sudo().write({'active': False})
                 rec.message_post(body=_('System user access for user %s disabled due to dismissal.') % emp.user_id.name)
+            
+            rec._on_employee_dismissed(emp)
+
+    def _on_employee_dismissed(self, employee):
+        """Extensible event hook for separation management module integration."""
+        Separation = self.env.get('hr.separation') or self.env.get('employee.separation')
+        if Separation:
+            Separation.sudo().create({
+                'employee_id': employee.id,
+                'separation_type': 'dismissal',
+                'case_id': self.id,
+                'reason': _('Disciplinary dismissal under Case %s.') % self.name,
+            })
 
     def action_open_revocation_wizard(self):
         self.ensure_one()
@@ -389,10 +482,6 @@ class DisciplineCase(models.Model):
         }
 
     def action_create_appeal(self):
-        """
-         Open appeal form pre-filled with case data.
-        Only available when appeal window is open (enforced state + within 10 days).
-        """
         self.ensure_one()
         if not self.is_appeal_window_open:
             raise UserError(_(
@@ -413,7 +502,6 @@ class DisciplineCase(models.Model):
         }
 
     def action_view_appeals(self):
-        """Smart button: open list of all appeals for this case."""
         self.ensure_one()
         return {
             'name': _('Appeals — %s') % self.name,
@@ -424,7 +512,44 @@ class DisciplineCase(models.Model):
             'context': {'default_case_id': self.id},
         }
 
-    # Cron Methods
+    @api.model
+    def get_discipline_analytics_payload(self, date_from=None, date_to=None):
+        """Public API method returning aggregated disciplinary statistics for external HR Analytics integration."""
+        domain = []
+        if date_from:
+            domain.append(('incident_date', '>=', date_from))
+        if date_to:
+            domain.append(('incident_date', '<=', date_to))
+            
+        cases = self.search(domain)
+        total_cases = len(cases)
+        
+        by_state = {}
+        by_severity = {}
+        by_department = {}
+        by_punishment = {}
+        
+        for c in cases:
+            st = c.state or 'unknown'
+            by_state[st] = by_state.get(st, 0) + 1
+            
+            sev = c.severity_level or 'unclassified'
+            by_severity[sev] = by_severity.get(sev, 0) + 1
+            
+            dept = c.department_id.name if c.department_id else 'Unassigned'
+            by_department[dept] = by_department.get(dept, 0) + 1
+            
+            pish = c.punishment_type or 'none'
+            by_punishment[pish] = by_punishment.get(pish, 0) + 1
+            
+        return {
+            'total_cases': total_cases,
+            'cases_by_state': by_state,
+            'cases_by_severity': by_severity,
+            'cases_by_department': by_department,
+            'cases_by_punishment': by_punishment,
+        }
+
     @api.model
     def _cron_check_sla_escalations(self):
         today = fields.Date.context_today(self)

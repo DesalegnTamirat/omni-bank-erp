@@ -5,19 +5,20 @@
     'category': 'Human Resources/Discipline',
     'summary': 'Manage employee misconduct, disciplinary cases, investigations, committee decisions, suspensions, appeals, and payroll deductions.',
     'description': """
-Module 8: Discipline Management System (Bunna Bank ERP HR Upgrade)
-===================================================================
+Discipline Management System (Bunna Bank ERP HR Upgrade)
+=========================================================
 Key Features:
 - Standard Offense Classification (Level 1 Dismissal to Level 5 Minor Warning).
 - Segregation of duties (Initiator != Reviewer != Approver).
-- Workflow routing & Dismissal approval restriction to higher authorities.
+- Workflow routing & Dismissal approval restriction to higher authorities (CEO vs CPCO).
 - SLA Escalation and tracking.
 - Investigation finding recording & evidence attachment management.
 - Disciplinary Committee scheduling, participant notification, voting, and quorum validation.
-- Automated Decision Enforcement (Warning letters PDF, payroll deductions, separation workflow).
-- Payroll Integration (Salary penalty deduction tracking & payload hook).
-- Suspension Management (Max 30 working days, with/without pay, automated tracking).
-- Appeal & Review Process (10 calendar days submission window enforcement).
+- Automated Decision Enforcement (Warning letters PDF, payroll deductions, demotion, separation workflow).
+- Payroll Integration (Salary penalty deduction tracking & get_payroll_transmission_payload integration contract).
+- Analytics Data API (get_discipline_analytics_payload integration contract).
+- Suspension Management (Max 30 working days, with/without pay, automated tracking, monthly penalty generation).
+- Appeal & Review Process (10 calendar days submission window enforcement, appeal committee routing).
 - Disciplinary History tracking per employee and Recruitment/Promotion eligibility checks.
 - Formal Case Revocation with mandatory justification and immutable original record audit log.
     """,
@@ -27,8 +28,8 @@ Key Features:
     'depends': [
         'base',
         'hr',
-        'hr_attendance',
         'hr_employee_custom',
+        'hr_attendance',
         'mail',
     ],
     'data': [

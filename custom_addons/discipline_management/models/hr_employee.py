@@ -35,6 +35,13 @@ class HrEmployee(models.Model):
         ('without_pay', 'Suspension Without Pay'),
     ], string='Active Suspension Type', readonly=True)
 
+    is_ineligible_for_promotion_transfer = fields.Boolean(
+        string='Ineligible for Promotion / Transfer',
+        default=False,
+        help='Automatically set to True when active disciplinary penalties (warnings, demotion) are enforced.',
+        tracking=True
+    )
+
     discipline_case_ids = fields.One2many(
         'discipline.case',
         'employee_id',
@@ -50,17 +57,14 @@ class HrEmployee(models.Model):
         for emp in self:
             emp.discipline_case_count = len(emp.discipline_case_ids)
 
-    # Recruitment & Promotion Eligibility Integration Method
     def check_discipline_eligibility(self):
-        """
-        Check if employee is eligible for promotion, transfer, or internal recruitment.
-        Returns tuple: (is_eligible: bool, reason: str)
-        """
+        """Check if employee is eligible for promotion, transfer, or internal recruitment."""
         self.ensure_one()
         if self.is_suspended:
             return (False, _('Employee is currently under active disciplinary suspension (%s).') % self.suspension_type)
+        if self.is_ineligible_for_promotion_transfer:
+            return (False, _('Employee is currently flagged as ineligible for promotion/transfer due to active disciplinary action.'))
         
-        # Check active cases in enforced state within last 12 months
         cutoff_date = fields.Date.context_today(self) - timedelta(days=365)
         active_cases = self.discipline_case_ids.filtered(
             lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
@@ -70,6 +74,25 @@ class HrEmployee(models.Model):
             return (False, _('Ineligible for promotion/recruitment due to active disciplinary record within 12 months (Cases: %s).') % case_names)
         
         return (True, _('Employee is eligible.'))
+
+    @api.model
+    def _cron_revert_ineligibility(self):
+        """Cron job: automatically revert ineligibility flag once legal active penalty period (365 days) expires."""
+        today = fields.Date.context_today(self)
+        cutoff_date = today - timedelta(days=365)
+        ineligible_employees = self.search([
+            ('is_ineligible_for_promotion_transfer', '=', True),
+            ('is_suspended', '=', False),
+        ])
+        for emp in ineligible_employees:
+            active_recent_cases = emp.discipline_case_ids.filtered(
+                lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
+            )
+            if not active_recent_cases:
+                emp.with_context(no_leave_resource_calendar_update=True).write({
+                    'is_ineligible_for_promotion_transfer': False,
+                    'active_disciplinary_action': False,
+                })
 
     def action_view_discipline_cases(self):
         self.ensure_one()

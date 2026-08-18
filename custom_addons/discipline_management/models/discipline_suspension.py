@@ -97,7 +97,7 @@ class DisciplineSuspension(models.Model):
 
     def action_convert_to_dismissal(self):
         """
-         / Convert an active suspension to a dismissal.
+/: Convert an active suspension to a dismissal.
         Triggers the full dismissal workflow on the parent case.
         Restricted to HR Administrators only.
         """
@@ -134,3 +134,29 @@ class DisciplineSuspension(models.Model):
                 body=_('SUSPENSION EXPIRY NOTICE: Suspension %s for %s will expire on %s (%s days remaining).') % (susp.name, susp.employee_id.name, susp.end_date, susp.days_remaining),
                 message_type='notification'
             )
+
+    @api.model
+    def _cron_process_monthly_suspension_penalties(self):
+        """Process periodic payroll penalty records for active without-pay suspensions."""
+        today = fields.Date.context_today(self)
+        active_suspensions = self.search([
+            ('state', 'in', ['active', 'extended']),
+            ('suspension_type', '=', 'without_pay')
+        ])
+        Penalty = self.env['discipline.payroll.penalty']
+        for susp in active_suspensions:
+            existing = Penalty.search([
+                ('suspension_id', '=', susp.id),
+                ('effective_date', '>=', today.replace(day=1))
+            ])
+            if not existing:
+                Penalty.create({
+                    'case_id': susp.case_id.id,
+                    'employee_id': susp.employee_id.id,
+                    'penalty_type': 'suspension_without_pay',
+                    'suspension_id': susp.id,
+                    'suspension_days': min(susp.working_days_count or 1, 30),
+                    'effective_date': today,
+                    'state': 'pending',
+                    'notes': _('Monthly periodic without-pay suspension penalty for %s.') % susp.name
+                })

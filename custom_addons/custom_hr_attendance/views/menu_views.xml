@@ -63,13 +63,18 @@
               sequence="15"/>
 
     <!-- ====================================================
-         4. Attendance Dashboard
+         4. Attendance Dashboard (Bunna Bank Executive Platform)
          ==================================================== -->
+    <record id="action_executive_attendance_dashboard" model="ir.actions.client">
+        <field name="name">Attendance Dashboard</field>
+        <field name="tag">custom_hr_attendance.attendance_dashboard</field>
+    </record>
+
     <menuitem
             id="menu_bunna_attendance_dashboard"
             name="Attendance Dashboard"
             parent="hr_attendance.menu_hr_attendance_root"
-            action="hr_attendance.hr_attendance_action"
+            action="action_executive_attendance_dashboard"
             sequence="4"
             groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"/>
 

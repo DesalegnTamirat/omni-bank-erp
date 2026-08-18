@@ -19,9 +19,7 @@ class DisciplinePayrollPenalty(models.Model):
         ('suspension_without_pay', 'Suspension Without Pay (Daily Rate)'),
         ('managerial', 'Managerial Day-Count Deduction'),
     ], string='Penalty Calculation Type', required=True, default='percentage', tracking=True,
-        help='Percentage deduction for warning penalties. '
-             'Daily deduction for suspension without pay. '
-             'Managerial: deducts based on working day count authorised by management.')
+        help='Percentage deduction for warning penalties. Daily deduction for suspension without pay. Managerial: deducts based on working day count.')
 
     penalty_percentage = fields.Float(string='Penalty Deduction (%)', tracking=True)
 
@@ -30,7 +28,7 @@ class DisciplinePayrollPenalty(models.Model):
                                     help='Link to the suspension record to auto-fill days.')
     suspension_days = fields.Integer(string='Suspension Days Without Pay', tracking=True)
     managerial_days = fields.Integer(string='Managerial Deduction Days', tracking=True,
-                                    help='Days authorised by management for penalty (e.g. annual leave offset).')
+                                    help='Days authorised by management for penalty.')
 
     # Calculated amounts
     calculated_amount = fields.Float(
@@ -74,11 +72,16 @@ class DisciplinePayrollPenalty(models.Model):
     def _get_employee_wage(self):
         """Helper: return current active contract basic wage, or 0."""
         self.ensure_one()
-        contract = self.env['hr.contract'].search([
-            ('employee_id', '=', self.employee_id.id),
-            ('state', '=', 'open'),
-        ], limit=1)
-        return contract.wage if contract else 0.0
+        ContractModel = self.env.get('hr.contract') or self.env.get('hr.version')
+        if ContractModel:
+            contract = ContractModel.search([
+                ('employee_id', '=', self.employee_id.id),
+            ], limit=1)
+            if contract:
+                wage = getattr(contract, 'wage', 0.0) or getattr(contract, 'basic_salary', 0.0) or getattr(contract, 'salary', 0.0)
+                if wage:
+                    return float(wage)
+        return getattr(self.employee_id, 'wage', 0.0) or getattr(self.employee_id, 'basic_salary', 0.0)
 
     @api.depends('employee_id', 'penalty_percentage', 'penalty_type', 'suspension_days', 'managerial_days')
     def _compute_daily_rate(self):
@@ -87,7 +90,6 @@ class DisciplinePayrollPenalty(models.Model):
                 rec.daily_rate = 0.0
                 continue
             wage = rec._get_employee_wage()
-            # Bank policy assumes 30 working days per calendar month
             rec.daily_rate = wage / 30.0 if wage else 0.0
 
     @api.depends('employee_id', 'penalty_percentage', 'penalty_type',
@@ -99,26 +101,44 @@ class DisciplinePayrollPenalty(models.Model):
                 continue
             wage = rec._get_employee_wage()
             if rec.penalty_type == 'percentage':
-                # Standard % of gross monthly basic wage
                 rec.calculated_amount = (wage * rec.penalty_percentage) / 100.0
             elif rec.penalty_type == 'suspension_without_pay':
-                #  days × daily_rate
                 rec.calculated_amount = (rec.suspension_days or 0) * rec.daily_rate
             elif rec.penalty_type == 'managerial':
-                # HR-authorised day count × daily_rate
                 rec.calculated_amount = (rec.managerial_days or 0) * rec.daily_rate
             else:
                 rec.calculated_amount = 0.0
 
     @api.onchange('suspension_id')
     def _onchange_suspension_id(self):
-        """Auto-populate suspension days from linked suspension record."""
         if self.suspension_id:
             self.suspension_days = self.suspension_id.working_days_count
             self.penalty_type = 'suspension_without_pay'
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            emp_id = vals.get('employee_id')
+            if emp_id:
+                emp = self.env['hr.employee'].browse(emp_id)
+                job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+                is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+                if is_managerial and vals.get('penalty_type') in (False, 'percentage'):
+                    case_id = vals.get('case_id')
+                    if case_id:
+                        case = self.env['discipline.case'].browse(case_id)
+                        if case.severity_level != 'level_5':
+                            vals['penalty_type'] = 'managerial'
+                            prior_cases_count = self.env['discipline.case'].search_count([
+                                ('employee_id', '=', emp.id),
+                                ('offense_category_id', '=', case.offense_category_id.id if case.offense_category_id else False),
+                                ('state', 'in', ['enforced', 'closed', 'appealed']),
+                                ('id', '!=', case.id)
+                            ])
+                            vals['managerial_days'] = min(prior_cases_count + 1, 3)
+        return super().create(vals_list)
+
     def action_transmit_to_payroll(self):
-        """Transmit penalty deduction data to Payroll."""
         for rec in self:
             if rec.calculated_amount <= 0:
                 raise UserError(_('Calculated deduction amount is zero. Verify contract wage and penalty settings.'))
@@ -143,3 +163,21 @@ class DisciplinePayrollPenalty(models.Model):
             rec.write({'state': 'cancelled'})
             rec.case_id.message_post(body=_('Penalty deduction %s cancelled/waived.') % rec.name)
 
+    def get_payroll_transmission_payload(self):
+        """Public API returning structured penalty transmission payload for HR Payroll rule processing."""
+        self.ensure_one()
+        return {
+            'penalty_id': self.id,
+            'penalty_reference': self.name,
+            'case_reference': self.case_id.name if self.case_id else '',
+            'employee_id': self.employee_id.id,
+            'employee_name': self.employee_id.name,
+            'violation_type': self.case_id.offense_id.name if self.case_id and self.case_id.offense_id else 'Disciplinary Deduction',
+            'calculation_method': self.penalty_type,
+            'effective_date': fields.Date.to_string(self.effective_date or fields.Date.today()),
+            'approval_status': self.state,
+            'amount': self.calculated_amount,
+            'penalty_percentage': self.penalty_percentage,
+            'suspension_days': self.suspension_days,
+            'managerial_days': self.managerial_days,
+        }

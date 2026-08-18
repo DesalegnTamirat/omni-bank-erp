@@ -2,19 +2,13 @@
 <odoo>
     <data>
 
-        <!-- Root Menu -->
+        <!-- Root Menu (Landing Page & Main Action) -->
         <menuitem id="menu_discipline_root"
-                  name="Discipline Management"
+                  name="Discipline &amp; Governance"
+                  action="action_discipline_dashboard"
                   web_icon="discipline_management,static/description/icon.png"
                   groups="discipline_management.group_discipline_user"
                   sequence="75"/>
-
-        <!-- Dashboard Menu (Landing Page) -->
-        <menuitem id="menu_discipline_dashboard"
-                  name="Dashboard"
-                  parent="menu_discipline_root"
-                  action="action_discipline_dashboard"
-                  sequence="1"/>
 
         <!-- Main Operations Submenus -->
         <menuitem id="menu_discipline_cases"

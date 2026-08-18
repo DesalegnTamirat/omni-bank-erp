@@ -10,6 +10,7 @@
                     <field name="case_id"/>
                     <field name="employee_id"/>
                     <field name="meeting_date"/>
+                    <field name="meeting_end_time"/>
                     <field name="committee_chair_id"/>
                     <field name="is_quorum_met" widget="boolean"/>
                     <field name="final_recommendation"/>
@@ -50,6 +51,7 @@
                                 <field name="case_id"/>
                                 <field name="employee_id"/>
                                 <field name="meeting_date"/>
+                                <field name="meeting_end_time"/>
                                 <field name="location"/>
                             </group>
                         <group>

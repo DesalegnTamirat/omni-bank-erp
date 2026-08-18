@@ -66,11 +66,7 @@
                     <sheet>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
                         <widget name="web_ribbon" title="Enforced" bg_color="text-bg-success" invisible="state != 'enforced'"/>
-                        <!-- Appeal window open banner -->
-                        <div class="alert alert-warning" role="alert" invisible="not is_appeal_window_open">
-                            <strong>Appeal Window Open:</strong> This case can be appealed until <field name="appeal_deadline" readonly="1" nolabel="1"/>.
-                            Click "Submit Appeal" to file an appeal.
-                        </div>
+                        <widget name="web_ribbon" title="Appeal Window Open" bg_color="text-bg-warning" invisible="not is_appeal_window_open"/>
                         <!-- Smart buttons -->
                         <div class="oe_button_box" name="button_box">
                             <button type="object" name="action_view_appeals" class="oe_stat_button" icon="fa-gavel"
@@ -78,9 +74,7 @@
                                 <field name="appeal_count" widget="statinfo" string="Appeals"/>
                             </button>
                             <button type="object" name="action_open_revocation_wizard" class="oe_stat_button" icon="fa-ban"
-                                    invisible="not is_revoked" groups="discipline_management.group_discipline_admin">
-                                <span class="o_stat_text">Revoked</span>
-                            </button>
+                                    string="Revoked" invisible="not is_revoked" groups="discipline_management.group_discipline_admin"/>
                         </div>
                         <div class="oe_title">
                             <h1>

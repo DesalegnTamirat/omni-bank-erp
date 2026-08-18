@@ -28,8 +28,21 @@
 
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--disc-bg);
-    min-height: 100vh;
+    height: 100%;
+    min-height: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden;
     padding: 0 0 40px 0;
+    box-sizing: border-box;
+}
+
+/* Force Odoo Client Action Viewport Containers to Allow Vertical Scrolling */
+.o_action_manager:has(.o_discipline_dashboard),
+.o_content:has(.o_discipline_dashboard),
+.o_action_manager > .o_discipline_dashboard,
+.o_content > .o_discipline_dashboard {
+    height: 100% !important;
+    overflow-y: auto !important;
 }
 
 /* ---- Loading Overlay ---- */
@@ -472,11 +485,14 @@
 
 /* ---- Table ---- */
 .disc-table-wrapper {
+    width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .disc-table {
     width: 100%;
+    min-width: 580px;
     border-collapse: collapse;
     font-size: 13px;
 }
@@ -793,20 +809,21 @@
 /* ---- Responsive ---- */
 @media (max-width: 1400px) {
     .disc-kpi-grid-5 {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     }
 }
 
 @media (max-width: 1200px) {
     .disc-kpi-grid-4 {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
     .disc-main-grid {
         grid-template-columns: 1fr;
     }
     .disc-right-panel {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
     }
 }
 
@@ -815,6 +832,12 @@
         padding: 20px 20px;
         flex-direction: column;
         align-items: flex-start;
+        gap: 16px;
+    }
+    .disc-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
     }
     .disc-kpi-grid {
         padding: 0 20px;
@@ -833,10 +856,12 @@
 @media (max-width: 640px) {
     .disc-kpi-grid-4,
     .disc-kpi-grid-5 {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
     }
-    .disc-header-actions {
-        width: 100%;
-        justify-content: flex-end;
+    .disc-header-text h1 {
+        font-size: 19px;
+    }
+    .disc-kpi-card {
+        padding: 16px 14px;
     }
 }

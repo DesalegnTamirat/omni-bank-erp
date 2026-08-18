@@ -15,7 +15,7 @@ class DisciplineRevocationWizard(models.TransientModel):
     approval_notes = fields.Text(string='Senior Management Approval Details', required=True)
 
     def action_confirm_revocation(self):
-        """ to Revoke case with mandatory justification preserving original record."""
+        """to: Revoke case with mandatory justification preserving original record."""
         self.ensure_one()
         # Revocation Authority Check
         if not self.env.user.has_group('discipline_management.group_discipline_admin'):
@@ -27,7 +27,7 @@ class DisciplineRevocationWizard(models.TransientModel):
 
         today = fields.Date.context_today(self)
 
-        # Mark case as revoked without deleting 
+        # Mark case as revoked without deleting
         case.write({
             'state': 'revoked',
             'is_revoked': True,
@@ -45,7 +45,7 @@ class DisciplineRevocationWizard(models.TransientModel):
         # Cancel any active/pending payroll penalties associated with this case
         case.payroll_penalty_ids.write({'state': 'cancelled'})
 
-        # Post immutable audit log in chatter ( & )
+        # Post immutable audit log in chatter
         case.message_post(
             body=_('CASE REVOKED by HR Administrator %s on %s.\nJustification: %s\nApproval Details: %s') % (
                 self.env.user.name, today, self.revocation_reason, self.approval_notes

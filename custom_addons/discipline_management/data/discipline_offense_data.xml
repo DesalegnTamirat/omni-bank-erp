@@ -20,7 +20,7 @@
             <field name="description">Fraud, embezzlement, unauthorized transactions, cash shortage, negligence causing bank financial loss.</field>
         </record>
 
-        <!-- Standard Offense Levels  -->
+        <!-- Standard Offense Levels -->
         <record id="offense_level_1_dismissal" model="discipline.offense">
             <field name="name">Level 1: Critical Misconduct (Dismissal)</field>
             <field name="category_id" ref="offense_cat_financial"/>
