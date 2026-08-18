@@ -16,25 +16,14 @@
     </record>
 
     <record id="hr_employee_rule_read_attendance_user" model="ir.rule">
-        <field name="name">HR Employee: Attendance User Read All Employee Names</field>
+        <field name="name">HR Employee: Coached and Managed Subordinates Only</field>
         <field name="model_id" ref="hr.model_hr_employee"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">['|', '|', '|', '|', '|', ('user_id', '=', user.id), ('parent_id.user_id', '=', user.id), ('parent_id', '=', user.employee_id.id), ('coach_id.user_id', '=', user.id), ('coach_id', '=', user.employee_id.id), ('attendance_manager_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_user'))]"/>
         <field name="perm_read" eval="1"/>
         <field name="perm_write" eval="0"/>
         <field name="perm_create" eval="0"/>
         <field name="perm_unlink" eval="0"/>
-    </record>
-
-    <record id="hr_employee_rule_administrator_all" model="ir.rule">
-        <field name="name">HR Employee: Attendance Admin Sees All</field>
-        <field name="model_id" ref="hr.model_hr_employee"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
-        <field name="groups" eval="[(4, ref('hr_attendance.group_hr_attendance_manager'))]"/>
-        <field name="perm_read" eval="1"/>
-        <field name="perm_write" eval="1"/>
-        <field name="perm_create" eval="1"/>
-        <field name="perm_unlink" eval="1"/>
     </record>
 
     <!-- ====================================================
