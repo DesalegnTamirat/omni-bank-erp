@@ -503,6 +503,9 @@ class AttendanceDashboardController(http.Controller):
                 'absent_hours': a_h,
             })
 
+        num_blocks = max(1, len(progression_points))
+        bar_width_px = max(8, min(28, int(100 / (num_blocks * 1.2))))
+
         prog_svg_points = []
         for pt in progression_points:
             w_pct = round((pt['worked_hours'] / max_bar_h) * 100, 1)
@@ -516,6 +519,7 @@ class AttendanceDashboardController(http.Controller):
                 'w_pct': w_pct,
                 'l_pct': l_pct,
                 'a_pct': a_pct,
+                'bar_width_px': bar_width_px,
             })
 
         logs = []
