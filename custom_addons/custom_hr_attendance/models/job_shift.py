@@ -187,47 +187,60 @@ class JobShift(models.Model):
         Determines if a shift applies to a target employee/location or the assigning coach/manager.
         
         Rules:
-        1. Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> NEVER APPLICABLE (Hidden).
-        2. applies_to_branches=True -> APPLICABLE EVERYWHERE.
+        1. Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere.
+        2. applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office.
         3. operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids.
         4. department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy)
            or if target operating_unit is linked to department_ids.
         """
         self.ensure_one()
 
-        # Rule 1: Shifts not assigned to any Operating Unit, Department, or Branch flag are NEVER APPLICABLE
+        # Rule 1: Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere
         if not self.applies_to_branches and not self.operating_unit_ids and not self.department_ids:
-            return False
+            return True
 
-        # Rule 2: Branch-wide shifts apply automatically everywhere
+        # Rule 2: applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office
         if self.applies_to_branches:
+            target_ou = operating_unit or assigner_operating_unit
+            if target_ou:
+                code = (target_ou.code or '').upper()
+                name = (target_ou.name or '').upper()
+                is_head_office = ('HEAD' in code or 'HEAD' in name or 'MAIN' in code or 'MAIN' in name or code == 'HO')
+                if is_head_office:
+                    return False
             return True
 
         # Collect OUs to check (both target location/employee OU and assigner/coach OU)
         ous_to_check = [ou for ou in [operating_unit, assigner_operating_unit] if ou]
+
+        # Rule 3: operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids
         if self.operating_unit_ids and ous_to_check:
             if any(ou in self.operating_unit_ids for ou in ous_to_check):
                 return True
 
         # Collect Departments to check (both target department and assigner/coach department)
         depts_to_check = [d for d in [department, assigner_department] if d]
-        if self.department_ids:
-            for dept in depts_to_check:
-                curr = dept
-                while curr:
-                    if curr in self.department_ids:
-                        return True
-                    curr = curr.parent_id
 
-            # Check if operating_unit has linked departments matching shift department_ids
-            for ou in ous_to_check:
-                depts_linked = self.env['hr.department'].sudo().search([
-                    '|',
-                    ('operating_unit_id', '=', ou.id),
-                    ('operating_unit', '=', ou.id)
-                ])
-                if any(d in self.department_ids or d.parent_id in self.department_ids for d in depts_linked):
-                    return True
+        # Rule 4: department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy) or if target operating_unit is linked to department_ids
+        if self.department_ids:
+            if depts_to_check:
+                for dept in depts_to_check:
+                    curr = dept
+                    while curr:
+                        if curr in self.department_ids:
+                            return True
+                        curr = curr.parent_id
+
+            # Check if operating_unit is linked to department_ids
+            if ous_to_check:
+                for ou in ous_to_check:
+                    depts_linked = self.env['hr.department'].sudo().search([
+                        '|',
+                        ('operating_unit_id', '=', ou.id),
+                        ('operating_unit', '=', ou.id)
+                    ])
+                    if any(d in self.department_ids or d.parent_id in self.department_ids for d in depts_linked):
+                        return True
 
         return False
 
