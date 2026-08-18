@@ -324,10 +324,10 @@
 
                     </div>
 
-                    <!-- LATE & DISCIPLINE ACTION CENTER FOR SELECTED PERIOD -->
+                    <!-- LATE & DISCIPLINE AUTOMATED MONITOR FOR SELECTED PERIOD -->
                     <div t-if="state.data.executive.late_employees_list and state.data.executive.late_employees_list.length > 0" class="bunna_pro_card mb-3">
                         <div class="card_pro_header d-flex justify-content-between align-items-center">
-                            <span><i class="fa fa-exclamation-triangle text-warning me-2"/> Late Check-Ins &amp; Oral Warning Action Center (<t t-esc="state.data.user_info.start_date"/> to <t t-esc="state.data.user_info.end_date"/>)</span>
+                            <span><i class="fa fa-clock-o text-warning me-2"/> Late Check-Ins &amp; Automated Discipline Trigger Monitor (<t t-esc="state.data.user_info.start_date"/> to <t t-esc="state.data.user_info.end_date"/>)</span>
                             <span class="badge bg-warning text-dark"><t t-esc="state.data.executive.late_employees_list.length"/> Late Employees</span>
                         </div>
                         <div class="card_pro_body p-0">
@@ -340,7 +340,7 @@
                                             <th>Operating Unit / Dept</th>
                                             <th>Late Count</th>
                                             <th>Total Late Time</th>
-                                            <th class="text-center">Action</th>
+                                            <th class="text-center">Automated Discipline Trigger</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -353,12 +353,16 @@
                                             </td>
                                             <td class="fw-bold text-danger" t-esc="emp.late_hours_str"/>
                                             <td class="text-center">
-                                                <button class="btn btn-sm btn-outline-warning me-1 py-1 px-2" style="font-size: 0.75rem;" t-on-click="() => this.openOralWarning(emp.employee_id, emp.name)">
-                                                    <i class="fa fa-exclamation-triangle me-1"/> Oral Warning
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 0.75rem;" t-on-click="() => this.openDisciplineCase(emp.employee_id, emp.name)">
-                                                    <i class="fa fa-gavel me-1"/> Discipline Case
-                                                </button>
+                                                <t t-if="emp.late_count >= 3">
+                                                    <span class="badge bg-danger py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-gavel me-1"/> Auto Discipline Initiated
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-light text-dark border py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-shield me-1"/> Monitoring (<t t-esc="emp.late_count"/>/3)
+                                                    </span>
+                                                </t>
                                             </td>
                                         </tr>
                                     </tbody>
@@ -376,7 +380,7 @@
                 <div t-if="state.currentTab === 'coach' and state.data.team">
                     <div class="bunna_pro_card mb-4">
                         <div class="card_pro_header d-flex justify-content-between align-items-center">
-                            <span><i class="fa fa-table me-2"/> Subordinate Attendance &amp; Discipline Action Matrix</span>
+                            <span><i class="fa fa-table me-2"/> Subordinate Real-Time Presence &amp; Discipline Status Matrix</span>
                             <span class="badge bg-danger"><t t-esc="state.data.user_info.start_date"/> to <t t-esc="state.data.user_info.end_date"/></span>
                         </div>
                         <div class="card_pro_body p-0">
@@ -391,7 +395,7 @@
                                             <th>Status</th>
                                             <th>Period Late Count</th>
                                             <th>Total Late Time</th>
-                                            <th class="text-center">Discipline Actions</th>
+                                            <th class="text-center">Automated Discipline Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -408,12 +412,21 @@
                                             </td>
                                             <td t-esc="row.late_hours_str"/>
                                             <td class="text-center">
-                                                <button class="btn btn-sm btn-outline-warning me-1 py-1 px-2" style="font-size: 0.75rem;" t-on-click="() => this.openOralWarning(row.id, row.name)" title="Issue Oral Warning">
-                                                    <i class="fa fa-exclamation-triangle me-1"/> Oral Warning
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 0.75rem;" t-on-click="() => this.openDisciplineCase(row.id, row.name)" title="Initiate Discipline Case">
-                                                    <i class="fa fa-gavel me-1"/> Discipline Case
-                                                </button>
+                                                <t t-if="row.late_count >= 3">
+                                                    <span class="badge bg-danger py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-gavel me-1"/> Auto Case Triggered
+                                                    </span>
+                                                </t>
+                                                <t t-elif="row.late_count > 0">
+                                                    <span class="badge bg-warning text-dark py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-exclamation-triangle me-1"/> Warning (<t t-esc="row.late_count"/>/3)
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-success py-1 px-2" style="font-size: 0.75rem;">
+                                                        <i class="fa fa-check me-1"/> Good Standing
+                                                    </span>
+                                                </t>
                                             </td>
                                         </tr>
                                     </tbody>
