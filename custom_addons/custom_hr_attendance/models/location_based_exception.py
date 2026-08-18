@@ -78,17 +78,10 @@ class LocationBasedException(models.Model):
 
     shift_id = fields.Many2one('job.shift', string="Shift Template", help="Link to an applicable shift definition")
 
-    @api.depends('operating_unit')
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
-            target_ou = rec.operating_unit or (self.env.user.employee_id.default_operating_unit_id if self.env.user.employee_id else False)
-            if target_ou:
-                allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=target_ou, department=None))
-                rec.allowed_shift_ids = [(6, 0, allowed.ids)]
-            else:
-                allowed = shifts.filtered(lambda s: s.applies_to_branches or bool(s.operating_unit_ids))
-                rec.allowed_shift_ids = [(6, 0, allowed.ids)]
+            allowed = self.env.user._get_allowed_job_shift_ids(target_operating_unit=rec.operating_unit)
+            rec.allowed_shift_ids = [(6, 0, allowed)]
 
     @api.onchange('shift_id')
     def _onchange_shift_id(self):

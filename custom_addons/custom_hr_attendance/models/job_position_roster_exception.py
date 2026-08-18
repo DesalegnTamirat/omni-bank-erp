@@ -53,10 +53,9 @@ class JobPositionRosterException(models.Model):
             ('attendance_manager_id', '=', self.env.uid)
         ]
 
-    @api.depends('employee_id')
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            allowed = self.env.user._get_allowed_job_shift_ids(target_employee=rec.employee_id)
+            allowed = self.env.user._get_allowed_job_shift_ids()
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
     job_position = fields.Char(
