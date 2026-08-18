@@ -185,23 +185,23 @@ class JobShift(models.Model):
     def is_applicable_for(self, operating_unit=None, department=None):
         """
         Helper method to check if a shift applies to a given operating unit or department.
-        Rules:
-        1. If applies_to_branches=False, department_ids empty, operating_unit_ids empty -> applies to ALL departments & OUs in bank.
-        2. If department_ids is set and operating_unit_ids is empty -> applies to ALL operating units under those departments.
-        3. If department_ids and operating_unit_ids are set -> applies to those specific operating units.
+        Requirement 2 Enforcement: A shift not set to a specific operating unit (or branch-wide)
+        will NOT appear in OU-specific dropdown lists.
         """
         self.ensure_one()
         if not self.applies_to_branches and not self.operating_unit_ids and not self.department_ids:
-            return True
+            return False
 
-        if self.applies_to_branches and operating_unit and getattr(operating_unit, 'work_unit_type', '') == 'branch':
+        if self.applies_to_branches and operating_unit:
             return True
 
         if operating_unit and operating_unit in self.operating_unit_ids:
             return True
 
-        if department and department in self.department_ids and not self.operating_unit_ids:
+        if department and department in self.department_ids:
             return True
+
+        return False
 
         if department:
             curr = department

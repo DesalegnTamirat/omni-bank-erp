@@ -45,6 +45,49 @@
                         </block>
 
                         <!-- ========================================= -->
+                        <!-- BLOCK 1.5: Configurable HR Regulations     -->
+                        <!-- ========================================= -->
+                        <block title="HR &amp; Discipline Regulations" name="custom_hr_regulations_settings">
+                            <setting string="Absence Escalation Triggers" help="Thresholds that auto-trigger draft discipline cases">
+                                <div>
+                                    <label for="attendance_unexcused_consecutive_threshold" string="Consecutive Days: "/>
+                                    <field name="attendance_unexcused_consecutive_threshold" class="oe_inline"/>
+                                    <span class="ms-2">days</span>
+                                    <br/>
+                                    <label for="attendance_unexcused_monthly_threshold" string="Monthly Cumulative: "/>
+                                    <field name="attendance_unexcused_monthly_threshold" class="oe_inline"/>
+                                    <span class="ms-2">days</span>
+                                </div>
+                            </setting>
+                            <setting string="Managerial Staff Penalties (Daily Wage Units)" help="Daily wage deduction per warning step">
+                                <div>
+                                    <label for="discipline_managerial_warning1_days" string="1st Warning: "/>
+                                    <field name="discipline_managerial_warning1_days" class="oe_inline"/> day(s)
+                                    <label for="discipline_managerial_warning2_days" string=" | 2nd Warning: "/>
+                                    <field name="discipline_managerial_warning2_days" class="oe_inline"/> day(s)
+                                    <label for="discipline_managerial_warning3_days" string=" | 3rd Warning: "/>
+                                    <field name="discipline_managerial_warning3_days" class="oe_inline"/> day(s)
+                                </div>
+                            </setting>
+                            <setting string="Non-Managerial Staff Penalties (% Basic Salary)" help="Monthly basic salary percentage per warning step">
+                                <div>
+                                    <label for="discipline_non_managerial_warning1_pct" string="1st Warning: "/>
+                                    <field name="discipline_non_managerial_warning1_pct" class="oe_inline"/>%
+                                    <label for="discipline_non_managerial_warning2_pct" string=" | 2nd Warning: "/>
+                                    <field name="discipline_non_managerial_warning2_pct" class="oe_inline"/>%
+                                    <label for="discipline_non_managerial_warning3_pct" string=" | 3rd Warning: "/>
+                                    <field name="discipline_non_managerial_warning3_pct" class="oe_inline"/>%
+                                </div>
+                            </setting>
+                            <setting string="Appeal Deadline Window" help="Working days allowed to lodge an appeal">
+                                <div>
+                                    <field name="discipline_appeal_window_days" class="oe_inline"/>
+                                    <span class="ms-2">working days</span>
+                                </div>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================= -->
                         <!-- BLOCK 2: Attendance Time Settings         -->
                         <!-- ========================================= -->
                         <block title="Attendance Time Settings" name="custom_attendance_time_settings">

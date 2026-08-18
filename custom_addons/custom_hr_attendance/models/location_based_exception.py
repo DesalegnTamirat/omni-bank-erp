@@ -9,6 +9,46 @@ class LocationBasedException(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     active = fields.Boolean(string="Active", default=True, index=True)
+    start_date = fields.Date(
+        string="Start Date",
+        required=True,
+        default=fields.Date.context_today,
+        index=True,
+        tracking=True,
+        help="Date when this location-based shift exception starts taking effect."
+    )
+    end_date = fields.Date(
+        string="End Date",
+        required=False,
+        index=True,
+        tracking=True,
+        help="Optional end date. If left blank, exception continues indefinitely until edited. If set, reverts to default after this date."
+    )
+    is_active_today = fields.Boolean(
+        string="Active Today",
+        compute="_compute_is_active_today",
+        store=True
+    )
+
+    @api.depends('start_date', 'end_date', 'active')
+    def _compute_is_active_today(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            if not rec.active:
+                rec.is_active_today = False
+            elif rec.start_date and rec.start_date > today:
+                rec.is_active_today = False
+            elif rec.end_date and rec.end_date < today:
+                rec.is_active_today = False
+            else:
+                rec.is_active_today = True
+
+    @api.constrains('start_date', 'end_date')
+    def _check_date_boundaries(self):
+        for rec in self:
+            if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
+                raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
+
     schedule_name = fields.Char(
         string="Schedule Name",
         compute="_compute_schedule_name",

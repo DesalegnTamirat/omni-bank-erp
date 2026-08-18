@@ -38,6 +38,57 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_lunch_break",
         help="Enable the lunch break flow: Check-In → Lunch-Out → Back from Lunch → Check-Out."
     )
+
+    # ----------------------------------------------------------
+    # CONFIGURABLE REGULATION PARAMETERS (Requirement 3)
+    # ----------------------------------------------------------
+    attendance_unexcused_consecutive_threshold = fields.Integer(
+        string='Discipline Trigger: Consecutive Unexcused Absences (Days)',
+        default=3,
+        config_parameter='custom_hr_attendance.unexcused_consecutive_threshold',
+        help='Auto-generates draft discipline case when consecutive unexcused absences reach this number.'
+    )
+    attendance_unexcused_monthly_threshold = fields.Integer(
+        string='Discipline Trigger: Monthly Cumulative Unexcused Absences (Days)',
+        default=5,
+        config_parameter='custom_hr_attendance.unexcused_monthly_threshold',
+        help='Auto-generates draft discipline case when cumulative monthly unexcused absences reach this number.'
+    )
+    discipline_managerial_warning1_days = fields.Integer(
+        string='Managerial 1st Warning Penalty (Days)',
+        default=1,
+        config_parameter='discipline_management.managerial_warning1_days'
+    )
+    discipline_managerial_warning2_days = fields.Integer(
+        string='Managerial 2nd Warning Penalty (Days)',
+        default=2,
+        config_parameter='discipline_management.managerial_warning2_days'
+    )
+    discipline_managerial_warning3_days = fields.Integer(
+        string='Managerial 3rd Warning Penalty (Days)',
+        default=3,
+        config_parameter='discipline_management.managerial_warning3_days'
+    )
+    discipline_non_managerial_warning1_pct = fields.Float(
+        string='Non-Managerial 1st Warning Penalty (%)',
+        default=5.0,
+        config_parameter='discipline_management.non_managerial_warning1_pct'
+    )
+    discipline_non_managerial_warning2_pct = fields.Float(
+        string='Non-Managerial 2nd Warning Penalty (%)',
+        default=10.0,
+        config_parameter='discipline_management.non_managerial_warning2_pct'
+    )
+    discipline_non_managerial_warning3_pct = fields.Float(
+        string='Non-Managerial 3rd Warning Penalty (%)',
+        default=20.0,
+        config_parameter='discipline_management.non_managerial_warning3_pct'
+    )
+    discipline_appeal_window_days = fields.Integer(
+        string='Appeal Deadline Window (Working Days)',
+        default=10,
+        config_parameter='discipline_management.appeal_window_days'
+    )
     enable_auto_absence = fields.Boolean(
         string='Enable Automatic Absence Detection',
         default=True,
