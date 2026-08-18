@@ -309,10 +309,69 @@ class JobPositionException(models.Model):
             allowed = self.env.user._get_allowed_job_shift_ids()
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
-    @api.depends('shift_id')
-    def _compute_time_range(self):
-        for record in self:
-            record.time_range = record.shift_id.time_range if record.shift_id else ""
+    start_time = fields.Float(string="Start Time", compute="_compute_shift_details", store=True, readonly=True)
+    end_time = fields.Float(string="End Time", compute="_compute_shift_details", store=True, readonly=True)
+    duration = fields.Float(string="Net Worked Duration (Hours)", compute="_compute_shift_details", store=True, readonly=True)
+    has_lunch_break = fields.Boolean(string="Includes Lunch Break", compute="_compute_shift_details", store=True, readonly=True)
+    morning_window = fields.Char(string="Morning Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    lunch_window = fields.Char(string="Lunch Break Window", compute="_compute_shift_details", store=True, readonly=True)
+    afternoon_window = fields.Char(string="Afternoon Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    time_range = fields.Char(string="Time Range", compute="_compute_shift_details", store=True, readonly=True)
+
+    @api.depends('shift_id', 'shift_id.start_time', 'shift_id.end_time', 'shift_id.has_lunch_break', 'shift_id.lunch_start_time', 'shift_id.lunch_duration', 'shift_id.is_night_shift')
+    def _compute_shift_details(self):
+        def _format_decimal_time(float_val):
+            if float_val is None or float_val is False:
+                return "00:00"
+            val = float(float_val) % 24.0
+            h = int(val)
+            m = int(round((val - h) * 60))
+            if m >= 60:
+                h = (h + 1) % 24
+                m = 0
+            return f"{h:02d}:{m:02d}"
+
+        for rec in self:
+            s = rec.shift_id
+            if not s:
+                rec.start_time = 0.0
+                rec.end_time = 0.0
+                rec.duration = 0.0
+                rec.has_lunch_break = False
+                rec.morning_window = "-"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "-"
+                rec.time_range = "-"
+                continue
+
+            rec.start_time = s.start_time
+            rec.end_time = s.end_time
+            rec.has_lunch_break = s.has_lunch_break
+
+            gross = s.end_time - s.start_time
+            if s.is_night_shift or gross < 0:
+                gross += 24.0
+
+            lunch_deduction = s.lunch_duration if s.has_lunch_break else 0.0
+            rec.duration = max(0.0, round(gross - lunch_deduction, 2))
+
+            start_str = _format_decimal_time(s.start_time)
+            end_str = _format_decimal_time(s.end_time)
+
+            if s.has_lunch_break and s.lunch_start_time:
+                l_start_str = _format_decimal_time(s.lunch_start_time)
+                l_end = s.lunch_start_time + (s.lunch_duration or 1.0)
+                l_end_str = _format_decimal_time(l_end)
+
+                rec.morning_window = f"{start_str} - {l_start_str}"
+                rec.lunch_window = f"{l_start_str} - {l_end_str} ({s.lunch_duration or 1.0:g}h break)"
+                rec.afternoon_window = f"{l_end_str} - {end_str}"
+                rec.time_range = f"{start_str} - {end_str} (Lunch: {l_start_str} - {l_end_str})"
+            else:
+                rec.morning_window = f"{start_str} - {end_str}"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "N/A"
+                rec.time_range = f"{start_str} - {end_str}"
 
     @api.constrains('employee_id', 'shift_id', 'status', 'active')
     def _check_duplicate_exception(self):

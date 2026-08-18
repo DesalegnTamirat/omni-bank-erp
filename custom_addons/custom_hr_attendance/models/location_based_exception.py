@@ -56,18 +56,6 @@ class LocationBasedException(models.Model):
         readonly=True
     )
 
-    start_time = fields.Float(
-        string="Start Time",
-        required=True,
-        help="Enter time as decimal hours (e.g., 8.5 = 8:30, 8.75 = 8:45)"
-    )
-
-    end_time = fields.Float(
-        string="End Time",
-        required=True,
-        help="Enter time as decimal hours (e.g., 17.25 = 5:15, 17.5 = 5:30)"
-    )
-
     operating_unit = fields.Many2one('operating.unit', string="Location", index=True)
 
     allowed_shift_ids = fields.Many2many(
@@ -83,14 +71,69 @@ class LocationBasedException(models.Model):
             allowed = self.env.user._get_allowed_job_shift_ids(target_operating_unit=rec.operating_unit)
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
-    @api.onchange('shift_id')
-    def _onchange_shift_id(self):
-        if self.shift_id:
-            self.start_time = self.shift_id.start_time
-            self.end_time = self.shift_id.end_time
+    start_time = fields.Float(string="Start Time", compute="_compute_shift_details", store=True, readonly=True)
+    end_time = fields.Float(string="End Time", compute="_compute_shift_details", store=True, readonly=True)
+    duration = fields.Float(string="Net Worked Duration (Hours)", compute="_compute_shift_details", store=True, readonly=True)
+    has_lunch_break = fields.Boolean(string="Includes Lunch Break", compute="_compute_shift_details", store=True, readonly=True)
+    morning_window = fields.Char(string="Morning Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    lunch_window = fields.Char(string="Lunch Break Window", compute="_compute_shift_details", store=True, readonly=True)
+    afternoon_window = fields.Char(string="Afternoon Shift Window", compute="_compute_shift_details", store=True, readonly=True)
+    time_range = fields.Char(string="Time Range", compute="_compute_shift_details", store=True, readonly=True)
 
-    duration = fields.Float(string="Duration (Hours)", compute='_compute_duration', store=True)
-    time_range = fields.Char(string="Time Range", compute='_compute_time_range', store=True)
+    @api.depends('shift_id', 'shift_id.start_time', 'shift_id.end_time', 'shift_id.has_lunch_break', 'shift_id.lunch_start_time', 'shift_id.lunch_duration', 'shift_id.is_night_shift')
+    def _compute_shift_details(self):
+        def _format_decimal_time(float_val):
+            if float_val is None or float_val is False:
+                return "00:00"
+            val = float(float_val) % 24.0
+            h = int(val)
+            m = int(round((val - h) * 60))
+            if m >= 60:
+                h = (h + 1) % 24
+                m = 0
+            return f"{h:02d}:{m:02d}"
+
+        for rec in self:
+            s = rec.shift_id
+            if not s:
+                rec.start_time = 0.0
+                rec.end_time = 0.0
+                rec.duration = 0.0
+                rec.has_lunch_break = False
+                rec.morning_window = "-"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "-"
+                rec.time_range = "-"
+                continue
+
+            rec.start_time = s.start_time
+            rec.end_time = s.end_time
+            rec.has_lunch_break = s.has_lunch_break
+
+            gross = s.end_time - s.start_time
+            if s.is_night_shift or gross < 0:
+                gross += 24.0
+
+            lunch_deduction = s.lunch_duration if s.has_lunch_break else 0.0
+            rec.duration = max(0.0, round(gross - lunch_deduction, 2))
+
+            start_str = _format_decimal_time(s.start_time)
+            end_str = _format_decimal_time(s.end_time)
+
+            if s.has_lunch_break and s.lunch_start_time:
+                l_start_str = _format_decimal_time(s.lunch_start_time)
+                l_end = s.lunch_start_time + (s.lunch_duration or 1.0)
+                l_end_str = _format_decimal_time(l_end)
+
+                rec.morning_window = f"{start_str} - {l_start_str}"
+                rec.lunch_window = f"{l_start_str} - {l_end_str} ({s.lunch_duration or 1.0:g}h break)"
+                rec.afternoon_window = f"{l_end_str} - {end_str}"
+                rec.time_range = f"{start_str} - {end_str} (Lunch: {l_start_str} - {l_end_str})"
+            else:
+                rec.morning_window = f"{start_str} - {end_str}"
+                rec.lunch_window = "No Lunch Break"
+                rec.afternoon_window = "N/A"
+                rec.time_range = f"{start_str} - {end_str}"
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -104,33 +147,7 @@ class LocationBasedException(models.Model):
             rec.schedule_name = f"{rec.operating_unit.name} / Location Based" \
                 if rec.operating_unit  else ""
 
-    @api.depends('start_time', 'end_time')
-    def _compute_duration(self):
-        for rec in self:
-            rec.duration = round(rec.end_time - rec.start_time, 2) \
-                if rec.start_time is not None and rec.end_time is not None else 0.0
 
-    @api.depends('start_time', 'end_time')
-    def _compute_time_range(self):
-        for rec in self:
-            if rec.start_time is not None and rec.end_time is not None:
-
-                start_h = int(rec.start_time)
-                start_m = round((rec.start_time - start_h) * 60)
-                end_h = int(rec.end_time)
-                end_m = round((rec.end_time - end_h) * 60)
-
-                # Handle minute overflow
-                if start_m >= 60:
-                    start_h += start_m // 60
-                    start_m %= 60
-                if end_m >= 60:
-                    end_h += end_m // 60
-                    end_m %= 60
-
-                rec.time_range = f"{start_h:02d}:{start_m:02d} - {end_h:02d}:{end_m:02d}"
-            else:
-                rec.time_range = ""
 
 
     @api.constrains('start_time', 'end_time')
