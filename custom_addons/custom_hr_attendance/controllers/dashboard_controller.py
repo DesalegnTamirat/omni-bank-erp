@@ -405,17 +405,33 @@ class AttendanceDashboardController(http.Controller):
                 })
                 cur_m = next_m
         else:
-            # Aggregate by YEAR
-            cur_y = start_d.year
-            while cur_y <= end_d.year:
+            # Aggregate by YEAR / MULTI-YEAR RANGES (Group to max 10-12 bars)
+            start_y = start_d.year
+            end_y = end_d.year
+            total_years = max(1, end_y - start_y + 1)
+            
+            if total_years <= 10:
+                step_years = 1
+            else:
+                step_years = int(math.ceil(total_years / 10.0))
+
+            cur_y = start_y
+            while cur_y <= end_y:
+                block_end_y = min(end_y, cur_y + step_years - 1)
                 y_start = max(start_d, datetime.date(cur_y, 1, 1))
-                y_end = min(end_d, datetime.date(cur_y, 12, 31))
+                y_end = min(end_d, datetime.date(block_end_y, 12, 31))
+                
+                if cur_y == block_end_y:
+                    lbl = str(cur_y)
+                else:
+                    lbl = f"{cur_y}-{block_end_y}"
+                    
                 raw_blocks.append({
-                    'label': str(cur_y),
+                    'label': lbl,
                     'start_date': y_start,
                     'end_date': y_end,
                 })
-                cur_y += 1
+                cur_y = block_end_y + 1
 
         # Calculate Worked, Late, and Absent Hours per Block
         progression_points = []

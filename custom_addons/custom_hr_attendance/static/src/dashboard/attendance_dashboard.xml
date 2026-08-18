@@ -612,18 +612,18 @@
                                         <i class="fa fa-list me-1"/> View Period Logs
                                     </button>
                                 </div>
-                                <div class="card_pro_body d-flex flex-column justify-content-between">
-                                    <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0;">
-                                        <div t-foreach="state.data.personal_summary.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end;">
+                                <div class="card_pro_body d-flex flex-column justify-content-between" style="overflow: hidden; width: 100%;">
+                                    <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; overflow-x: hidden; width: 100%;">
+                                        <div t-foreach="state.data.personal_summary.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end; min-width: 0;">
                                             <div class="d-flex gap-1 align-items-end" style="height: 100%;">
                                                 <!-- Worked Bar (#425727) -->
-                                                <div t-attf-style="height: #{p.w_pct}%; width: 10px; background-color: #425727; border-radius: 3px 3px 0 0;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.w_pct}%; width: 8px; background-color: #425727; border-radius: 3px 3px 0 0;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
                                                 <!-- Late Bar (#c17540) -->
-                                                <div t-attf-style="height: #{p.l_pct}%; width: 10px; background-color: #c17540; border-radius: 3px 3px 0 0;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.l_pct}%; width: 8px; background-color: #c17540; border-radius: 3px 3px 0 0;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
                                                 <!-- Absent Bar (#541718) -->
-                                                <div t-attf-style="height: #{p.a_pct}%; width: 10px; background-color: #541718; border-radius: 3px 3px 0 0;" t-att-title="'Absent: ' + p.absent_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.a_pct}%; width: 8px; background-color: #541718; border-radius: 3px 3px 0 0;" t-att-title="'Absent: ' + p.absent_hours + 'h'"/>
                                             </div>
-                                            <div class="small text-muted mt-1" style="font-size: 0.65rem; font-weight: 700;" t-esc="p.date_label"/>
+                                            <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
                                         </div>
                                     </div>
 
