@@ -94,6 +94,33 @@ export class AttendanceDashboard extends Component {
     closeLogsModal() {
         this.state.showLogsModal = false;
     }
+
+    openOralWarning(employeeId, employeeName) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `Log Oral Warning - ${employeeName}`,
+            res_model: "hr.employee.discipline.profile",
+            views: [[false, "form"]],
+            context: {
+                default_employee_id: employeeId,
+                default_action_type: "oral_warning",
+            },
+            target: "new",
+        });
+    }
+
+    openDisciplineCase(employeeId, employeeName) {
+        this.action.doAction({
+            type: "ir.actions.act_window",
+            name: `Initiate Discipline Case - ${employeeName}`,
+            res_model: "discipline.case",
+            views: [[false, "form"]],
+            context: {
+                default_employee_id: employeeId,
+            },
+            target: "new",
+        });
+    }
 }
 
 registry.category("actions").add("custom_hr_attendance.attendance_dashboard", AttendanceDashboard);
