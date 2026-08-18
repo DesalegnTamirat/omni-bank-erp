@@ -113,26 +113,29 @@ class ResUsers(models.Model):
                 if group_manager in user.groups_id and not has_higher_role:
                     user.sudo().write({'groups_id': [(3, group_manager.id)]})
 
-    def _get_allowed_job_shift_ids(self, target_employee=None):
+    def _get_allowed_job_shift_ids(self, target_employee=None, target_operating_unit=None):
         """
-        Returns list of job.shift IDs allowed for the target employee or operating unit.
-        Strictly filters out non-applicable shifts so unassignable shifts never appear in dropdown lists.
+        Returns list of job.shift IDs allowed for the target employee or target operating unit,
+        considering both target employee/OU and the assigning coach/manager's OU and department.
         """
         self.ensure_one()
         user_sudo = self.sudo()
         shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
 
-        emp = target_employee or user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
+        assigner_emp = user_sudo.employee_id or (user_sudo.employee_ids[0] if user_sudo.employee_ids else False)
+        assigner_ou = assigner_emp.default_operating_unit_id if assigner_emp else False
+        assigner_dept = assigner_emp.department_id if assigner_emp else False
 
-        if not emp:
-            # If no employee is selected yet, return shifts configured with operating units/branches
-            allowed = shifts.filtered(lambda s: s.applies_to_branches or bool(s.operating_unit_ids))
-            return allowed.ids
+        target_emp = target_employee or assigner_emp
+        target_ou = target_operating_unit or (target_emp.default_operating_unit_id if target_emp else False)
+        target_dept = target_emp.department_id if target_emp else False
 
-        emp_ou = emp.default_operating_unit_id
-        emp_dept = emp.department_id
-
-        allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=emp_ou, department=emp_dept))
+        allowed = shifts.filtered(lambda s: s.is_applicable_for(
+            operating_unit=target_ou,
+            department=target_dept,
+            assigner_operating_unit=assigner_ou,
+            assigner_department=assigner_dept
+        ))
         return allowed.ids
 
 

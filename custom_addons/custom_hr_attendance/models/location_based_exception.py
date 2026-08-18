@@ -168,21 +168,27 @@ class LocationBasedException(models.Model):
             # if duration > 4:
             #     raise ValidationError("Maximum allowed window is 4 hours.")
 
-    @api.constrains('shift_id')
+    @api.constrains('shift_id', 'operating_unit')
     def _check_shift_applicability(self):
         for rec in self:
-            if rec.shift_id and not self.env.user.has_group('hr_attendance.group_hr_attendance_manager') and not self.env.is_superuser():
+            if rec.shift_id:
                 manager_emp = self.env.user.employee_id or (self.env.user.employee_ids[0] if self.env.user.employee_ids else False)
                 manager_ou = manager_emp.default_operating_unit_id if manager_emp else False
                 manager_dept = manager_emp.department_id if manager_emp else False
-                if not rec.shift_id.is_applicable_for(operating_unit=manager_ou, department=manager_dept):
+                if not rec.shift_id.is_applicable_for(
+                    operating_unit=rec.operating_unit,
+                    department=None,
+                    assigner_operating_unit=manager_ou,
+                    assigner_department=manager_dept
+                ):
                     from odoo import _
                     raise ValidationError(
                         _(
-                            "The selected shift '%s' is not configured to apply to your "
-                            "operating unit (%s) or department (%s)."
+                            "The selected shift '%s' is not configured to apply to location '%s' "
+                            "nor to your operating unit (%s) or department (%s)."
                         ) % (
                             rec.shift_id.name,
+                            rec.operating_unit.name if rec.operating_unit else "N/A",
                             manager_ou.name if manager_ou else "N/A",
                             manager_dept.name if manager_dept else "N/A"
                         )

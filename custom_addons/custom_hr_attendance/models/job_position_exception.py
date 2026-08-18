@@ -319,18 +319,26 @@ class JobPositionException(models.Model):
             if not record.employee_id or not record.shift_id:
                 continue
 
+            assigner_emp = self.env.user.employee_id or (self.env.user.employee_ids[0] if self.env.user.employee_ids else False)
+            assigner_ou = assigner_emp.default_operating_unit_id if assigner_emp else False
+            assigner_dept = assigner_emp.department_id if assigner_emp else False
+
             emp_ou = record.employee_id.default_operating_unit_id
             emp_dept = record.employee_id.department_id
-            if not record.shift_id.is_applicable_for(operating_unit=emp_ou, department=emp_dept):
+            if not record.shift_id.is_applicable_for(
+                operating_unit=emp_ou,
+                department=emp_dept,
+                assigner_operating_unit=assigner_ou,
+                assigner_department=assigner_dept
+            ):
                 raise ValidationError(
                     _(
                         "The selected shift '%s' is not configured to apply to employee %s's "
-                        "operating unit (%s) or department (%s)."
+                        "operating unit/department nor to assigner %s's operating unit/department."
                     ) % (
                         record.shift_id.name,
                         record.employee_id.name,
-                        emp_ou.name if emp_ou else "N/A",
-                        emp_dept.name if emp_dept else "N/A"
+                        self.env.user.name
                     )
                 )
 
