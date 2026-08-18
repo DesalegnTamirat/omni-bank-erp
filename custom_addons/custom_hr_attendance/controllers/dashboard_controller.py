@@ -504,7 +504,14 @@ class AttendanceDashboardController(http.Controller):
             })
 
         num_blocks = max(1, len(progression_points))
-        bar_width_px = max(8, min(28, int(100 / (num_blocks * 1.2))))
+        if num_blocks <= 3:
+            bar_width_px = 38
+        elif num_blocks <= 5:
+            bar_width_px = 28
+        elif num_blocks <= 7:
+            bar_width_px = 20
+        else:
+            bar_width_px = 14
 
         prog_svg_points = []
         for pt in progression_points:
