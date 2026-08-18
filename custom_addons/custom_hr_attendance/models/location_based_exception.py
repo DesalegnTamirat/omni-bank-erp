@@ -82,15 +82,13 @@ class LocationBasedException(models.Model):
     def _compute_allowed_shift_ids(self):
         for rec in self:
             shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
-            manager_ou = self.env.user.employee_id.default_operating_unit_id if self.env.user.employee_id else False
-            target_ou = rec.operating_unit or manager_ou
+            target_ou = rec.operating_unit or (self.env.user.employee_id.default_operating_unit_id if self.env.user.employee_id else False)
             if target_ou:
                 allowed = shifts.filtered(lambda s: s.is_applicable_for(operating_unit=target_ou, department=None))
                 rec.allowed_shift_ids = [(6, 0, allowed.ids)]
-            elif not self.env.is_superuser() and not self.env.user.has_group('base.group_system'):
-                rec.allowed_shift_ids = [(6, 0, [])]
             else:
-                rec.allowed_shift_ids = [(6, 0, shifts.ids)]
+                allowed = shifts.filtered(lambda s: s.applies_to_branches or bool(s.operating_unit_ids))
+                rec.allowed_shift_ids = [(6, 0, allowed.ids)]
 
     @api.onchange('shift_id')
     def _onchange_shift_id(self):

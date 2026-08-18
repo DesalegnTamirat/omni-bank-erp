@@ -304,7 +304,8 @@ class JobPositionException(models.Model):
             if rec.employee_id:
                 allowed = self.env.user._get_allowed_job_shift_ids(target_employee=rec.employee_id)
             else:
-                allowed = self.env['job.shift'].sudo().search([('active', '=', True)]).ids
+                shifts = self.env['job.shift'].sudo().search([('active', '=', True)])
+                allowed = shifts.filtered(lambda s: s.applies_to_branches or bool(s.operating_unit_ids)).ids
             rec.allowed_shift_ids = [(6, 0, allowed)]
 
     @api.depends('shift_id')
