@@ -179,16 +179,6 @@
                                 </div>
                             </div>
                         </div>
-                                        <div class="period_label">Batch</div>
-                                        <div class="period_value" t-esc="state.data.executive.ops_summary.active_batch_requests"/>
-                                    </div>
-                                    <div class="period_pill">
-                                        <div class="period_label">Flags</div>
-                                        <div class="period_value text-danger" t-esc="state.data.executive.ops_summary.discipline_warnings"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                     </div>
 
