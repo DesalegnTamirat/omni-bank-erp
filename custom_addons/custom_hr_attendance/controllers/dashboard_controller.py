@@ -363,10 +363,18 @@ class AttendanceDashboardController(http.Controller):
         today = fields.Date.context_today(request.env.user)
         eval_end_d = min(end_d, today)
         elapsed_days = max(0, (eval_end_d - start_d).days + 1)
-        recorded_days = len(set(pytz.utc.localize(att.check_in).astimezone(local_tz).date() for att in range_atts if att.check_in))
+        def _get_att_work_date(a):
+            if getattr(a, 'work_date', False):
+                return a.work_date
+            if not a.check_in:
+                return None
+            dt_loc = pytz.utc.localize(a.check_in).astimezone(local_tz) if not a.check_in.tzinfo else a.check_in.astimezone(local_tz)
+            return (dt_loc - datetime.timedelta(days=1)).date() if dt_loc.hour < 4 else dt_loc.date()
+
+        recorded_days = len(set(_get_att_work_date(att) for att in range_atts if _get_att_work_date(att)))
         absent_count = max(0, elapsed_days - recorded_days)
 
-        # Card 4 Approvals for selected period
+        # Card 4 Approvals & Discipline Cases for selected period
         acknowledged_count = sum(1 for att in range_atts if (getattr(att, 'is_acknowledged', False) or (getattr(att, 'acknowledged_late', 0.0) or 0.0) > 0 or (getattr(att, 'acknowledged_exit', 0.0) or 0.0) > 0))
         predefined_count = 0
         if 'attendance.preapproval' in request.env:
@@ -375,6 +383,13 @@ class AttendanceDashboardController(http.Controller):
                 ('date', '>=', start_d),
                 ('date', '<=', end_d),
                 ('state', '=', 'approved')
+            ])
+        discipline_cases_count = 0
+        if 'discipline.case' in request.env:
+            discipline_cases_count = request.env['discipline.case'].sudo().search_count([
+                ('employee_id', '=', employee.id),
+                ('incident_date', '>=', start_d),
+                ('incident_date', '<=', end_d)
             ])
 
         # Personal Status Donut for selected period
@@ -569,6 +584,7 @@ class AttendanceDashboardController(http.Controller):
             'approvals': {
                 'acknowledged': acknowledged_count,
                 'predefined': predefined_count,
+                'discipline_cases': discipline_cases_count,
             },
             'personal_donut_svg': {
                 'circumference': c,

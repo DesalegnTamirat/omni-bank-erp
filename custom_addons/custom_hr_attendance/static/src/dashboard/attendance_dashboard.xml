@@ -541,8 +541,8 @@
                                         <span class="badge bg-primary rounded-pill px-3 py-1 fs-6" t-esc="state.data.personal_summary.approvals.predefined"/>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
-                                        <span class="small fw-bold text-dark"><i class="fa fa-check text-info me-2"/> Compliance</span>
-                                        <span class="badge bg-info text-dark rounded-pill px-3 py-1 fs-6">Verified</span>
+                                        <span class="small fw-bold text-dark"><i class="fa fa-gavel text-danger me-2"/> Discipline Cases</span>
+                                        <span t-attf-class="badge #{state.data.personal_summary.approvals.discipline_cases > 0 ? 'bg-danger' : 'bg-success'} rounded-pill px-3 py-1 fs-6" t-esc="(state.data.personal_summary.approvals.discipline_cases || 0) + ' Initiated'"/>
                                     </div>
                                 </div>
                             </div>

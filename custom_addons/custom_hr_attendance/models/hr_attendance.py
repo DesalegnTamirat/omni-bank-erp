@@ -1,5 +1,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+import datetime
 import pytz
 import logging
 
@@ -287,15 +288,30 @@ class HrAttendance(models.Model):
         return True
 
     # ----------------------------------------------------------
-    # ACTUAL (WALL-CLOCK) CHECK-IN TIME
+    # ACTUAL (WALL-CLOCK) CHECK-IN TIME & SHIFT WORK DATE
     # ----------------------------------------------------------
-    # `check_in` itself is intentionally snapped to the official shift
-    # start time by _attendance_action_change() (see restrict_checkin.py)
-    # since it drives worked_hours / weekly totals / payroll payloads.
-    # `actual_check_in` instead stores the real moment the employee
-    # tapped "Check In", so the live dashboard timer can start ticking
-    # from 00:00:00 at that exact moment instead of jumping to the
-    # elapsed time since the official shift start.
+    work_date = fields.Date(
+        string='Shift / Work Date',
+        compute='_compute_work_date',
+        store=True,
+        index=True,
+        help='The official shift date this attendance record belongs to (handles 11 PM - 7 AM night shift crossover past midnight).'
+    )
+
+    @api.depends('check_in', 'actual_check_in')
+    def _compute_work_date(self):
+        local_tz = pytz.timezone('Africa/Addis_Ababa')
+        for rec in self:
+            dt = rec.actual_check_in or rec.check_in
+            if not dt:
+                rec.work_date = False
+                continue
+            local_dt = pytz.utc.localize(dt).astimezone(local_tz) if not dt.tzinfo else dt.astimezone(local_tz)
+            if local_dt.hour < 4:
+                rec.work_date = (local_dt - datetime.timedelta(days=1)).date()
+            else:
+                rec.work_date = local_dt.date()
+
     actual_check_in = fields.Datetime(
         string='Actual Check-in Time',
         readonly=True,

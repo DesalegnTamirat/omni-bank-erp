@@ -129,7 +129,7 @@ class HrAttendanceViolationProcessor(models.Model):
                 ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
                 ('check_in_status', '=', 'Late')
             ])
-            total_late_hours = sum(att.late_time or getattr(att, 'late_time_hour', 0.0) or 0.0 for att in recent_atts)
+            total_late_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
 
             _logger.info(
                 "Employee %s cumulative late hours (%d-month window): %.2f / %.2f hrs threshold.",
