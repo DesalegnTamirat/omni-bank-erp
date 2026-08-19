@@ -112,29 +112,31 @@ class HrAttendanceViolationProcessor(models.Model):
         notif_log = self.env['hr.attendance.notification.log']
 
         # --- LATE CHECK-IN CUMULATIVE HOURS COUNTER ---
+        # --- DYNAMIC CONFIGURABLE LATENESS DISCIPLINE RULES ENGINE ---
         if self.check_in_status == 'Late':
-            hours_threshold = float(params.get_param(
-                'hr_attendance.lateness_hours_violation_threshold', 4.0
-            ))
-            eval_months = int(params.get_param(
-                'hr_attendance.lateness_eval_window_months', 3
-            ))
-
             today = fields.Date.context_today(self)
-            eval_start_date = today - timedelta(days=eval_months * 30)
+            lateness_rules = self.env['attendance.lateness.rule'].sudo().search([('active', '=', True)], order='threshold_hours desc')
+            
+            # Fallback values if no custom rules configured
+            hours_threshold = float(params.get_param('hr_attendance.lateness_hours_violation_threshold', 4.0))
+            eval_months = int(params.get_param('hr_attendance.lateness_eval_window_months', 3))
 
-            # Compute total cumulative late hours in rolling window
-            recent_atts = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
-                ('check_in_status', '=', 'Late')
-            ])
-            total_late_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
-
-            _logger.info(
-                "Employee %s cumulative late hours (%d-month window): %.2f / %.2f hrs threshold.",
-                employee.name, eval_months, total_late_hours, hours_threshold
-            )
+            triggered_rule = False
+            matched_late_hours = 0.0
+            
+            if lateness_rules:
+                for rule in lateness_rules:
+                    eval_start = today - timedelta(days=rule.reset_window_months * 30)
+                    recent_atts = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', employee.id),
+                        ('check_in', '>=', fields.Datetime.to_datetime(eval_start)),
+                        ('check_in_status', '=', 'Late')
+                    ])
+                    tot_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
+                    if tot_hours >= rule.threshold_hours:
+                        triggered_rule = rule
+                        matched_late_hours = tot_hours
+                        break
 
             # Notify Supervisor on late check-in violation
             if employee.parent_id and employee.parent_id.user_id:
@@ -144,14 +146,42 @@ class HrAttendanceViolationProcessor(models.Model):
                         'res_id': self.id,
                         'user_id': employee.parent_id.user_id.id,
                         'summary': _('Attendance Violation: %s Late Check-in') % employee.name,
-                        'note': _('Employee %s checked in late on %s.') % (employee.name, fields.Date.context_today(self)),
+                        'note': _('Employee %s checked in late on %s.') % (employee.name, today),
                         'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
                     })
 
-            if hours_threshold > 0 and total_late_hours >= hours_threshold:
-                self.env['discipline.case'].sudo()._create_from_attendance(
-                    employee.id, 'lateness', self.id
-                )
+            if triggered_rule and triggered_rule.offense_id:
+                existing_case = self.env['discipline.case'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('offense_id', '=', triggered_rule.offense_id.id),
+                    ('state', 'in', ['draft', 'initiated', 'investigating']),
+                    ('incident_date', '>=', today - timedelta(days=triggered_rule.reset_window_months * 30))
+                ], limit=1)
+                if not existing_case:
+                    case = self.env['discipline.case'].sudo().create({
+                        'employee_id': employee.id,
+                        'offense_id': triggered_rule.offense_id.id,
+                        'description': _(
+                            'Attendance Violation Rule Exceeded: %s\n'
+                            'Threshold: %.2f hours | Recorded Late Hours: %.2f hours (Window: %d months)\n'
+                            'Configured Salary Deduction: %.1f Days'
+                        ) % (triggered_rule.name, triggered_rule.threshold_hours, matched_late_hours, triggered_rule.reset_window_months, triggered_rule.deduction_days),
+                        'reference': 'ATT-LATE-%s' % self.id,
+                    })
+                    if hasattr(case, 'action_initiate'):
+                        case.action_initiate()
+            elif hours_threshold > 0:
+                eval_start_date = today - timedelta(days=eval_months * 30)
+                recent_atts = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
+                    ('check_in_status', '=', 'Late')
+                ])
+                total_late_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
+                if total_late_hours >= hours_threshold:
+                    self.env['discipline.case'].sudo()._create_from_attendance(
+                        employee.id, 'lateness', self.id
+                    )
 
                 # Escalation on threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):

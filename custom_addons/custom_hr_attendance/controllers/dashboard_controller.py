@@ -516,6 +516,9 @@ class AttendanceDashboardController(http.Controller):
             expected_hours = working_days * 8.0
             a_h = max(0.0, round(expected_hours - w_h, 2))
 
+            a_days = round(a_h / 8.0, 1)
+            a_days_formatted = int(a_days) if (a_days % 1 == 0) else a_days
+
             max_bar_h = max(max_bar_h, w_h, l_h, a_h)
 
             progression_points.append({
@@ -523,6 +526,7 @@ class AttendanceDashboardController(http.Controller):
                 'worked_hours': w_h,
                 'late_hours': l_h,
                 'absent_hours': a_h,
+                'absent_days': a_days_formatted,
             })
 
         num_blocks = max(1, len(progression_points))
@@ -545,6 +549,7 @@ class AttendanceDashboardController(http.Controller):
                 'worked_hours': pt['worked_hours'],
                 'late_hours': pt['late_hours'],
                 'absent_hours': pt['absent_hours'],
+                'absent_days': pt['absent_days'],
                 'w_pct': w_pct,
                 'l_pct': l_pct,
                 'a_pct': a_pct,

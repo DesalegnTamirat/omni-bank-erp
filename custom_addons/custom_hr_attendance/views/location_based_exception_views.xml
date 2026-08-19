@@ -6,7 +6,7 @@
         <field name="arch" type="xml">
             <list string="Location Based Exception" edit="0">
                 <field name="schedule_name"/>
-                <field name="operating_unit"/>
+                <field name="operating_unit_ids" widget="many2many_tags" string="Locations"/>
                 <field name="shift_id"/>
                 <field name="start_date"/>
                 <field name="end_date" placeholder="Indefinite"/>
@@ -27,7 +27,7 @@
                     <group>
                         <group string="Location &amp; Shift">
                             <field name="schedule_name"/>
-                            <field name="operating_unit"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" string="Locations / Operating Units" required="1"/>
                             <field name="allowed_shift_ids" invisible="1"/>
                             <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
                         </group>

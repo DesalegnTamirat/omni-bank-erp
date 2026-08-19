@@ -644,7 +644,7 @@
                                                 <!-- Late Bar (#c17540) -->
                                                 <div t-attf-style="height: #{p.l_pct}%; width: #{p.bar_width_px or 28}px; background-color: #c17540; border-radius: 5px 5px 0 0; min-height: #{p.l_pct > 0 ? 4 : 0}px;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
                                                 <!-- Absent Bar (#541718) -->
-                                                <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + p.absent_hours + 'h'"/>
+                                                <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + (p.absent_days !== undefined ? p.absent_days : p.absent_hours) + ' Days'"/>
                                             </div>
                                             <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
                                         </div>
@@ -654,7 +654,7 @@
                                     <div class="d-flex justify-content-center gap-4 mt-3 small font-weight-bold">
                                         <span class="text-success"><i class="fa fa-square me-1"/> Worked Hours</span>
                                         <span class="text-warning"><i class="fa fa-square me-1"/> Late Hours</span>
-                                        <span class="text-danger"><i class="fa fa-square me-1"/> Absent Hours</span>
+                                        <span class="text-danger"><i class="fa fa-square me-1"/> Absent Days</span>
                                     </div>
                                 </div>
                             </div>

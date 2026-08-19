@@ -56,7 +56,28 @@ class LocationBasedException(models.Model):
         readonly=True
     )
 
-    operating_unit = fields.Many2one('operating.unit', string="Location", index=True)
+    operating_unit_ids = fields.Many2many(
+        'operating.unit',
+        'rel_location_exception_operating_unit',
+        'location_exception_id',
+        'operating_unit_id',
+        string="Locations / Operating Units",
+        index=True,
+        help="Select one or multiple operating units / branch locations for this shift exception."
+    )
+
+    operating_unit = fields.Many2one(
+        'operating.unit',
+        string="Primary Location",
+        compute="_compute_operating_unit",
+        store=True,
+        index=True
+    )
+
+    @api.depends('operating_unit_ids')
+    def _compute_operating_unit(self):
+        for rec in self:
+            rec.operating_unit = rec.operating_unit_ids[0] if rec.operating_unit_ids else False
 
     allowed_shift_ids = fields.Many2many(
         'job.shift',
@@ -141,11 +162,16 @@ class LocationBasedException(models.Model):
             rec.write({'active': False})
         return True
 
-    @api.depends('operating_unit')
+    @api.depends('operating_unit', 'operating_unit_ids')
     def _compute_schedule_name(self):
         for rec in self:
-            rec.schedule_name = f"{rec.operating_unit.name} / Location Based" \
-                if rec.operating_unit  else ""
+            if rec.operating_unit_ids:
+                names = ", ".join(rec.operating_unit_ids.mapped('name'))
+                rec.schedule_name = f"{names} / Location Based"
+            elif rec.operating_unit:
+                rec.schedule_name = f"{rec.operating_unit.name} / Location Based"
+            else:
+                rec.schedule_name = "Location Based Exception"
 
 
 

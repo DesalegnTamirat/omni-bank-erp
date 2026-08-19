@@ -78,7 +78,8 @@ class MyShiftSchedule(models.TransientModel):
             # Priority 3: Location Based Exception (Branch / Operating Unit)
             if employee.default_operating_unit_id:
                 loc_ex = self.env['location.based.exception'].sudo().search([
-                    ('operating_unit', '=', employee.default_operating_unit_id.id),
+                    '|', ('operating_unit_ids', 'in', [employee.default_operating_unit_id.id]),
+                         ('operating_unit', '=', employee.default_operating_unit_id.id),
                     ('active', '=', True),
                     ('start_date', '<=', today),
                     '|', ('end_date', '=', False), ('end_date', '>=', today)

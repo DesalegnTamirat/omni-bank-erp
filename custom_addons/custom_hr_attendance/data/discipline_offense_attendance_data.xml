@@ -52,6 +52,24 @@
             </field>
         </record>
 
+        <!--
+            Repeated Absence / Unexcused Absence (Level 2):
+            Triggered when an employee accumulates unexcused absence days threshold.
+            Severity: Level 2 Final Written Warning + 20% penalty.
+            Approval authority: HR Manager.
+        -->
+        <record id="offense_repeated_absence" model="discipline.offense">
+            <field name="name">Unexcused Absence Violation</field>
+            <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
+            <field name="severity_level">level_2</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="penalty_percentage">20.0</field>
+            <field name="approval_authority">hr_manager</field>
+            <field name="description">
+                Automatically triggered by the Attendance module when an employee accumulates unexcused absence days. Results in Final Written Warning and salary deduction upon HR Manager approval.
+            </field>
+        </record>
+
     </data>
 </odoo>
 

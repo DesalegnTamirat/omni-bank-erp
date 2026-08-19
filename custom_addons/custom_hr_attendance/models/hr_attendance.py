@@ -164,7 +164,8 @@ class HrAttendance(models.Model):
             if emp:
                 if emp.default_operating_unit_id:
                     loc_ex = self.env['location.based.exception'].sudo().search(
-                        [('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
+                        ['|', ('operating_unit_ids', 'in', [emp.default_operating_unit_id.id]),
+                              ('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
                     )
                     if loc_ex:
                         if hasattr(loc_ex, 'start_time') and loc_ex.start_time:
@@ -456,8 +457,10 @@ class HrAttendance(models.Model):
         m_start = _get_param_float('hr_attendance.morning_time', 8.0)
         e_time = _get_param_float('hr_attendance.exit_time', 17.0)
 
-        loc_ex = self.env['location.based.exception'].search(
-            [('operating_unit', '=', emp.default_operating_unit_id.id)])
+        loc_ex = self.env['location.based.exception'].search([
+            '|', ('operating_unit_ids', 'in', [emp.default_operating_unit_id.id]),
+                 ('operating_unit', '=', emp.default_operating_unit_id.id)
+        ])
         job_ex = self.env['job.position.exception'].search([('employee_id', '=', emp.id), ('status', '=', 'active')])
 
         # Phase 2: Check for Technical Failure or Operational Disruption reasons

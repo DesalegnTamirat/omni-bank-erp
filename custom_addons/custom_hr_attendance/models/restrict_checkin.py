@@ -364,7 +364,8 @@ class HrEmployee(models.Model):
         # Location Exceptions
         # ----------------------------------------------------
         location_exceptions = self.env['location.based.exception'].search([
-            ('operating_unit', '=', self.default_operating_unit_id.id),
+            '|', ('operating_unit_ids', 'in', [self.default_operating_unit_id.id]),
+                 ('operating_unit', '=', self.default_operating_unit_id.id),
             ('active', '=', True)
         ])
         # ----------------------------------------------------
