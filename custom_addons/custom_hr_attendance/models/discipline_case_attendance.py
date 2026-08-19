@@ -241,5 +241,42 @@ class HrAttendanceViolationProcessor(models.Model):
                             'activity_type_id': self.env.ref('mail.mail_activity_data_warning', raise_if_not_found=False) or self.env.ref('mail.mail_activity_data_todo').id,
                         })
 
+        # --- DYNAMIC CONFIGURABLE ABSENCE DISCIPLINE RULES ENGINE ---
+        absence_rules = self.env['attendance.absence.rule'].sudo().search([('active', '=', True)], order='threshold_days desc')
+        if absence_rules:
+            today = fields.Date.context_today(self)
+            for a_rule in absence_rules:
+                eval_start = today - timedelta(days=a_rule.reset_window_months * 30)
+                # Calculate unexcused missing days + half-day absences in window
+                half_day_atts = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '>=', fields.Datetime.to_datetime(eval_start)),
+                    ('worked_hours', '>', 0.0),
+                    ('worked_hours', '<', 4.0)
+                ])
+                tot_absent_days = len(half_day_atts) * 0.5
+                
+                if tot_absent_days >= a_rule.threshold_days and a_rule.offense_id:
+                    existing_case = self.env['discipline.case'].sudo().search([
+                        ('employee_id', '=', employee.id),
+                        ('offense_id', '=', a_rule.offense_id.id),
+                        ('state', 'in', ['draft', 'initiated', 'investigating']),
+                        ('incident_date', '>=', eval_start)
+                    ], limit=1)
+                    if not existing_case:
+                        case = self.env['discipline.case'].sudo().create({
+                            'employee_id': employee.id,
+                            'offense_id': a_rule.offense_id.id,
+                            'description': _(
+                                'Absence Discipline Rule Exceeded: %s\n'
+                                'Threshold: %.1f Days | Recorded Absence: %.1f Days (Window: %d months)\n'
+                                'Configured Salary Deduction: %.1f Days'
+                            ) % (a_rule.name, a_rule.threshold_days, tot_absent_days, a_rule.reset_window_months, a_rule.deduction_days),
+                            'reference': 'ATT-ABS-%s' % self.id,
+                        })
+                        if hasattr(case, 'action_initiate'):
+                            case.action_initiate()
+                    break
+
 
 

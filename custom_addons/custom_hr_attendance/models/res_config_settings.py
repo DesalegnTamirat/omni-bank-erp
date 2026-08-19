@@ -38,6 +38,12 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_lunch_break",
         help="Enable the lunch break flow: Check-In → Lunch-Out → Back from Lunch → Check-Out."
     )
+    enable_overtime_payroll = fields.Boolean(
+        string='Enable Overtime Payout for Payroll',
+        default=False,
+        config_parameter="custom_hr_attendance.enable_overtime_payroll",
+        help="When OFF (Default), extra shift work is compensated via Duty OFF (Half-Day/Full-Day). When ON, managers can record and approve overtime for payroll payout."
+    )
 
     # ----------------------------------------------------------
     # CONFIGURABLE REGULATION PARAMETERS (Requirement 3)

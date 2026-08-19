@@ -17,6 +17,19 @@ class HrAttendance(models.Model):
     is_acknowledged = fields.Boolean(string="Manager Acknowledged", default=False, index=True)
     late_by = fields.Char(string="Late By", compute="_compute_late_by", store=True)
 
+    @api.model
+    def _register_hook(self):
+        res = super()._register_hook()
+        reporting_menu = self.env.ref('hr_attendance.menu_hr_attendance_reporting', raise_if_not_found=False)
+        if reporting_menu:
+            duplicate_menus = self.env['ir.ui.menu'].sudo().search([
+                ('parent_id', '=', reporting_menu.id),
+                ('name', '=', 'Attendances')
+            ])
+            if duplicate_menus:
+                duplicate_menus.write({'active': False})
+        return res
+
     @api.depends('late_time_hour')
     def _compute_late_by(self):
         for rec in self:
@@ -688,13 +701,11 @@ class HrAttendance(models.Model):
     @api.model
     def cron_automatic_force_checkout(self):
         """
-        Executes the high-performance PostgreSQL function auto_checkout_all_employees()
-        off-peak to automatically force check-out any employees who remained checked-in
-        past their shift end (+ 15 min grace period).
-        Runs natively inside PostgreSQL on the DB server with zero app server load.
+        Executes high-performance PostgreSQL routine process_automated_force_checkouts()
+        to perform lunch-time and shift-end auto checkouts while protecting night shifts.
         """
-        self.env.cr.execute("SELECT auto_checkout_all_employees();")
-        _logger.info("Executed shift-aware automatic force checkout PostgreSQL function.")
+        self.env.cr.execute("SELECT process_automated_force_checkouts();")
+        _logger.info("Executed process_automated_force_checkouts PostgreSQL function.")
 
     @api.model
     def cron_automatic_absence_detection(self):

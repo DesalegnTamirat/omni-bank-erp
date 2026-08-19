@@ -578,7 +578,7 @@
                                             </svg>
                                             <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
                                                 <div style="font-size: 1.35rem; font-weight: 800; color: #1d2b32;" t-esc="state.data.personal_summary.personal_donut_svg.pct_normal + '%'"/>
-                                                <div style="font-size: 0.62rem; color: #64748b; font-weight: 700;">ON-TIME RATE</div>
+                                                <div style="font-size: 0.58rem; color: #64748b; font-weight: 700; text-align: center; line-height: 1;">ATTENDANCE RATIO</div>
                                             </div>
                                         </div>
                                     </div>
@@ -611,10 +611,10 @@
                                         </div>
                                     </div>
 
-                                    <!-- PUNCTUALITY COMPLIANCE RATING METER -->
+                                    <!-- PUNCTUALITY SCORE RATING METER -->
                                     <div class="mt-2 pt-2 border-top">
                                         <div class="d-flex justify-content-between small fw-bold mb-1">
-                                            <span class="text-dark"><i class="fa fa-shield text-success me-1"/> Compliance Index</span>
+                                            <span class="text-dark"><i class="fa fa-shield text-success me-1"/> Punctuality Score Index</span>
                                             <span class="text-success" t-esc="state.data.personal_summary.punctuality_score + '%'"/>
                                         </div>
                                         <div class="progress" style="height: 6px; background-color: #f1f5f9; border-radius: 3px;">

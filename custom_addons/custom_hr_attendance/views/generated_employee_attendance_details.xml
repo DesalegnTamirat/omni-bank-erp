@@ -138,4 +138,11 @@
         <field name="view_id" ref="view_employee_attendance_summary_tree"/>
     </record>
 
+    <!-- Action 3: Attendance Analytics (Pivot & Charts) -->
+    <record id="action_reporting_attendances_pivot" model="ir.actions.act_window">
+        <field name="name">Attendance Analytics (Pivot &amp; Charts)</field>
+        <field name="res_model">hr.attendance</field>
+        <field name="view_mode">pivot,graph,list</field>
+    </record>
+
 </odoo>
