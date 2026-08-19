@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from . import discipline_severity_level
 from . import discipline_offense
 from . import discipline_policy_version
 from . import discipline_case

@@ -19,7 +19,8 @@ class DisciplineCase(models.Model):
 
     offense_id = fields.Many2one('discipline.offense', string='Offense Type', required=True, tracking=True)
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='offense_id.category_id', store=True, readonly=True)
-    severity_level = fields.Selection(related='offense_id.severity_level', string='Severity Level', store=True, readonly=True)
+    severity_level_id = fields.Many2one('discipline.severity.level', string='Severity Level', related='offense_id.severity_level_id', store=True, readonly=True)
+    severity_level = fields.Char(string='Severity Code', related='severity_level_id.code', store=True, readonly=True)
     punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
         ('demotion', 'Demotion to Lower Grade / Position'),
@@ -213,7 +214,7 @@ class DisciplineCase(models.Model):
                     raise ValidationError(_(
                         'Duplicate Severity Prevention: Employee %s already has an open %s case '
                         'on incident date %s (Case Ref: %s). Consolidate into the existing case instead.'
-                    ) % (rec.employee_id.name, dict(rec._fields['severity_level'].selection).get(rec.severity_level, rec.severity_level),
+                    ) % (rec.employee_id.name, rec.severity_level_id.name if rec.severity_level_id else (rec.severity_level or ''),
                          rec.incident_date, same_severity[0].name))
 
     def _validate_segregation_of_duties(self):

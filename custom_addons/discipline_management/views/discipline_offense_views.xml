@@ -39,7 +39,7 @@
                                 <field name="offense_ids" readonly="1">
                                     <list>
                                         <field name="name"/>
-                                        <field name="severity_level"/>
+                                        <field name="severity_level_id"/>
                                         <field name="punishment_type"/>
                                     </list>
                                 </field>
@@ -62,7 +62,7 @@
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
                 <list>
-                    <field name="severity_level"/>
+                    <field name="severity_level_id"/>
                     <field name="name"/>
                     <field name="category_id"/>
                     <field name="punishment_type"/>
@@ -84,13 +84,13 @@
                             <group string="Offense Attributes">
                                 <field name="name"/>
                                 <field name="category_id"/>
-                                <field name="severity_level"/>
+                                <field name="severity_level_id"/>
                                 <field name="policy_version_id"/>
                             </group>
-                            <group string="Standard Punishment &amp; Approval Rules">
-                                <field name="punishment_type"/>
-                                <field name="penalty_percentage"/>
-                                <field name="approval_authority"/>
+                            <group string="Standard Punishment &amp; Approval Rules (Driven by Severity Level)">
+                                <field name="punishment_type" readonly="1"/>
+                                <field name="penalty_percentage" readonly="1"/>
+                                <field name="approval_authority" readonly="1"/>
                                 <field name="active"/>
                             </group>
                         </group>

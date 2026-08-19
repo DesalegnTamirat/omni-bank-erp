@@ -24,7 +24,7 @@
         <record id="offense_level_1_dismissal" model="discipline.offense">
             <field name="name">Level 1: Critical Misconduct (Dismissal)</field>
             <field name="category_id" ref="offense_cat_financial"/>
-            <field name="severity_level">level_1</field>
+            <field name="severity_level_id" ref="severity_level_1"/>
             <field name="punishment_type">dismissal</field>
             <field name="penalty_percentage">0.0</field>
             <field name="approval_authority">executive</field>
@@ -34,7 +34,7 @@
         <record id="offense_level_2_final_warning" model="discipline.offense">
             <field name="name">Level 2: Very High Misconduct (Final Written Warning + 20% Penalty)</field>
             <field name="category_id" ref="offense_cat_conduct"/>
-            <field name="severity_level">level_2</field>
+            <field name="severity_level_id" ref="severity_level_2"/>
             <field name="punishment_type">final_warning_penalty</field>
             <field name="penalty_percentage">20.0</field>
             <field name="approval_authority">hr_manager</field>
@@ -44,7 +44,7 @@
         <record id="offense_level_3_second_warning" model="discipline.offense">
             <field name="name">Level 3: High Misconduct (Second Written Warning + 10% Penalty)</field>
             <field name="category_id" ref="offense_cat_conduct"/>
-            <field name="severity_level">level_3</field>
+            <field name="severity_level_id" ref="severity_level_3"/>
             <field name="punishment_type">second_warning_penalty</field>
             <field name="penalty_percentage">10.0</field>
             <field name="approval_authority">hr_manager</field>
@@ -54,7 +54,7 @@
         <record id="offense_level_4_first_warning" model="discipline.offense">
             <field name="name">Level 4: Moderate Misconduct (First Written Warning + 5% Penalty)</field>
             <field name="category_id" ref="offense_cat_attendance"/>
-            <field name="severity_level">level_4</field>
+            <field name="severity_level_id" ref="severity_level_4"/>
             <field name="punishment_type">first_warning_penalty</field>
             <field name="penalty_percentage">5.0</field>
             <field name="approval_authority">direct_manager</field>
@@ -64,7 +64,7 @@
         <record id="offense_level_5_verbal_warning" model="discipline.offense">
             <field name="name">Level 5: Minor Misconduct (Recorded Verbal Warning)</field>
             <field name="category_id" ref="offense_cat_attendance"/>
-            <field name="severity_level">level_5</field>
+            <field name="severity_level_id" ref="severity_level_5"/>
             <field name="punishment_type">verbal_warning</field>
             <field name="penalty_percentage">0.0</field>
             <field name="approval_authority">direct_manager</field>

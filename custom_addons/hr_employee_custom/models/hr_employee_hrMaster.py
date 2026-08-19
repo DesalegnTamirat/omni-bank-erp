@@ -456,8 +456,8 @@ class qualification_multi_record_job(models.Model):
     _description = "qualification Profile "
     _rec_name = "qualification"
     job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
 
-    # qualification = fields.Char(string="Qualification")
     qualification = fields.Many2one('recruitment.qualification', string="Recruitment Qualification")
     requirement = fields.Float(string="Requirement(CGPA)")
     response = fields.Float(string="Response")

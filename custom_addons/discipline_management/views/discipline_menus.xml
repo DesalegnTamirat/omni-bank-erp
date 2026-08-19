@@ -55,6 +55,13 @@
                   groups="discipline_management.group_discipline_officer"
                   sequence="100"/>
 
+        <menuitem id="menu_discipline_severity_levels"
+                  name="Severity Levels"
+                  parent="menu_discipline_config"
+                  action="action_discipline_severity_level"
+                  groups="discipline_management.group_discipline_officer"
+                  sequence="5"/>
+
         <menuitem id="menu_discipline_offenses"
                   name="Offense Rules &amp; Penalties"
                   parent="menu_discipline_config"
