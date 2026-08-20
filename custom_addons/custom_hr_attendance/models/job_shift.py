@@ -183,23 +183,13 @@ class JobShift(models.Model):
                     pass
 
     def is_applicable_for(self, operating_unit=None, department=None, assigner_operating_unit=None, assigner_department=None):
-        """
-        Determines if a shift applies to a target employee/location or the assigning coach/manager.
-        
-        Rules:
-        1. Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere.
-        2. applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office.
-        3. operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids.
-        4. department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy)
-           or if target operating_unit is linked to department_ids.
-        """
         self.ensure_one()
 
-        # Rule 1: Unassigned shift (applies_to_branches=False, operating_unit_ids empty, department_ids empty) -> applies everywhere
+        # Rule 1: Unassigned shift -> applies everywhere
         if not self.applies_to_branches and not self.operating_unit_ids and not self.department_ids:
             return True
 
-        # Rule 2: applies_to_branches=True -> APPLICABLE EVERY branch except the head office or main office
+        # Rule 2: applies_to_branches=True -> APPLICABLE to branches except head office
         if self.applies_to_branches:
             target_ou = operating_unit or assigner_operating_unit
             if target_ou:
@@ -210,29 +200,36 @@ class JobShift(models.Model):
                     return False
             return True
 
-        # Collect OUs to check (both target location/employee OU and assigner/coach OU)
-        ous_to_check = [ou for ou in [operating_unit, assigner_operating_unit] if ou]
+        # Collect OUs to check (both target location/employee OU, assigner/coach OU, and parent units)
+        ous_to_check = []
+        for ou in [operating_unit, assigner_operating_unit]:
+            if ou:
+                if ou not in ous_to_check:
+                    ous_to_check.append(ou)
+                if hasattr(ou, 'parent_unit') and ou.parent_unit and ou.parent_unit not in ous_to_check:
+                    ous_to_check.append(ou.parent_unit)
 
-        # Rule 3: operating_unit_ids set -> Applicable if target operating_unit OR assigner_operating_unit is in operating_unit_ids
-        if self.operating_unit_ids and ous_to_check:
-            if any(ou in self.operating_unit_ids for ou in ous_to_check):
-                return True
+        # Rule 3: If operating_unit_ids is specified, location MUST match
+        if self.operating_unit_ids:
+            if not ous_to_check or not any(ou in self.operating_unit_ids for ou in ous_to_check):
+                return False  # Target location does not match restricted operating units
 
-        # Collect Departments to check (both target department and assigner/coach department)
+        # Collect Departments to check
         depts_to_check = [d for d in [department, assigner_department] if d]
 
-        # Rule 4: department_ids set -> Applicable if target department OR assigner_department is in department_ids (or parent/child hierarchy) or if target operating_unit is linked to department_ids
+        # Rule 4: If department_ids is specified, department MUST match
         if self.department_ids:
+            dept_matched = False
             if depts_to_check:
                 for dept in depts_to_check:
                     curr = dept
                     while curr:
                         if curr in self.department_ids:
-                            return True
+                            dept_matched = True
+                            break
                         curr = curr.parent_id
 
-            # Check if operating_unit is linked to department_ids
-            if ous_to_check:
+            if not dept_matched and ous_to_check:
                 for ou in ous_to_check:
                     depts_linked = self.env['hr.department'].sudo().search([
                         '|',
@@ -240,9 +237,16 @@ class JobShift(models.Model):
                         ('operating_unit', '=', ou.id)
                     ])
                     if any(d in self.department_ids or d.parent_id in self.department_ids for d in depts_linked):
-                        return True
+                        dept_matched = True
+                        break
+                    if hasattr(ou, 'department') and ou.department and (ou.department in self.department_ids or ou.department.parent_id in self.department_ids):
+                        dept_matched = True
+                        break
 
-        return False
+            if not dept_matched:
+                return False  # Target department does not match restricted departments
+
+        return True
 
     @api.model
     def get_allowed_shift_ids(self, operating_unit_id=None, department_id=None, assigner_operating_unit_id=None, assigner_department_id=None):

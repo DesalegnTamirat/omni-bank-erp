@@ -11,7 +11,8 @@
                         <h4 class="mb-1">
                             Welcome Back, <span t-esc="state.employeeName"/> 👋
                         </h4>
-                        <!-- <div class="text-muted" style="font-weight: 500;">Smart Attendance Dashboard</div> -->
+                            <!-- <div class="text-muted" style="font-weight: 500;">Smart Attendance
+                            Dashboard</div> -->
                     </div>
                     <div class="d-flex align-items-center gap-3">
                         <div class="o_live_clock_pill d-inline-flex align-items-center">
@@ -124,7 +125,7 @@
                                         </div>
                                     </div>
 
-                                    <!-- SHIFT TIMINGS & LUNCH BREAK PILLS -->
+                                        <!-- SHIFT TIMINGS & LUNCH BREAK PILLS -->
                                     <div class="row g-3 mt-2">
                                         <div class="col-12 col-sm-4">
                                             <div class="shift-pill p-3 rounded-3 text-center" style="background: #f8fafc; border: 1px solid #e2e8f0;">
@@ -153,7 +154,7 @@
                                     </div>
                                     <div class="d-flex justify-content-end mt-3 pt-2 border-top" style="border-color: rgba(0,0,0,0.06) !important;">
                                         <button class="btn btn-sm btn-link text-primary text-decoration-none fw-bold p-0" t-on-click="onOpenMySchedule">
-                                            <i class="fa fa-calendar me-1"/> View Full Roster Schedule <i class="fa fa-arrow-right ms-1 small"/>
+                                            <i class="fa fa-calendar me-1"/> View Full Schedule <i class="fa fa-arrow-right ms-1 small"/>
                                         </button>
                                     </div>
                                 </t>
@@ -192,7 +193,7 @@
                     <div class="col-12 col-lg-7 col-xl-7">
 
 
-                        <!-- STAT CARDS ROW -->
+                            <!-- STAT CARDS ROW -->
                         <div class="row g-4 mb-4">
                             <div class="col-12 col-md-4">
                                 <div class="premium-card o_stat_card h-100">
@@ -385,39 +386,39 @@
                 <div class="settings-section mb-4">
                     <div class="settings-section-title">Shift Time Parameters</div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Morning Start (h)</label>
-                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
-                               t-att-value="state.settings.morning_time"
+                        <label class="settings-input-label">Morning Start</label>
+                        <input type="time" class="settings-input"
+                               t-att-value="state.settings.morning_time_str"
                                t-on-input="onInputMorningTime"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Exit Time (h)</label>
-                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
-                               t-att-value="state.settings.exit_time"
+                        <label class="settings-input-label">Exit Time</label>
+                        <input type="time" class="settings-input"
+                               t-att-value="state.settings.exit_time_str"
                                t-on-input="onInputExitTime"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Dead Time / Grace (h)</label>
-                        <input type="number" class="settings-input" min="0" max="2" step="0.05"
-                               t-att-value="state.settings.dead_time"
+                        <label class="settings-input-label">Dead Time / Grace</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.dead_time_str"
                                t-on-input="onInputDeadTime"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Check-In Buffer (h)</label>
-                        <input type="number" class="settings-input" min="0" max="2" step="0.25"
-                               t-att-value="state.settings.checkin_buffer"
+                        <label class="settings-input-label">Check-In Buffer</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.checkin_buffer_str"
                                t-on-input="onInputCheckinBuffer"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Post-Shift Grace (h)</label>
-                        <input type="number" class="settings-input" min="0.5" max="8" step="0.5"
-                               t-att-value="state.settings.post_shift_grace_hours"
+                        <label class="settings-input-label">Post-Shift Grace</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.post_shift_grace_hours_str"
                                t-on-input="onInputPostShiftGraceHours"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Saturday Exit (h)</label>
-                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
-                               t-att-value="state.settings.saturday_exit_time"
+                        <label class="settings-input-label">Saturday Exit</label>
+                        <input type="time" class="settings-input"
+                               t-att-value="state.settings.saturday_exit_time_str"
                                t-on-input="onInputSaturdayExitTime"/>
                     </div>
                 </div>
@@ -426,21 +427,21 @@
                 <div t-if="state.settings.enable_lunch_break" class="settings-section mb-4">
                     <div class="settings-section-title">Lunch Break Parameters</div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Lunch Start (h)</label>
-                        <input type="number" class="settings-input" min="0" max="23" step="0.25"
-                               t-att-value="state.settings.lunch_out_time"
+                        <label class="settings-input-label">Lunch Start</label>
+                        <input type="time" class="settings-input"
+                               t-att-value="state.settings.lunch_out_time_str"
                                t-on-input="onInputLunchOutTime"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Lunch Duration (h)</label>
-                        <input type="number" class="settings-input" min="0.25" max="4" step="0.25"
-                               t-att-value="state.settings.lunch_duration"
+                        <label class="settings-input-label">Lunch Duration</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.lunch_duration_str"
                                t-on-input="onInputLunchDuration"/>
                     </div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Lunch Grace (h)</label>
-                        <input type="number" class="settings-input" min="0" max="2" step="0.05"
-                               t-att-value="state.settings.lunch_grace_time"
+                        <label class="settings-input-label">Lunch Grace</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.lunch_grace_time_str"
                                t-on-input="onInputLunchGraceTime"/>
                     </div>
                 </div>
@@ -449,9 +450,9 @@
                 <div class="settings-section mb-4">
                     <div class="settings-section-title">Discipline Thresholds</div>
                     <div class="settings-input-row">
-                        <label class="settings-input-label">Cumulative Late Hours Threshold (h)</label>
-                        <input type="number" class="settings-input" min="0.5" max="100" step="0.5"
-                               t-att-value="state.settings.lateness_hours_violation_threshold"
+                        <label class="settings-input-label">Cumulative Late Hours Threshold</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.lateness_hours_violation_threshold_str"
                                t-on-input="onInputLatenessHoursThreshold"/>
                     </div>
                     <div class="settings-input-row">

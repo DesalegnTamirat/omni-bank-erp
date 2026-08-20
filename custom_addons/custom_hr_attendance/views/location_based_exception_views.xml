@@ -27,7 +27,8 @@
                     <group>
                         <group string="Location &amp; Shift">
                             <field name="schedule_name"/>
-                            <field name="operating_unit_ids" widget="many2many_tags" string="Locations / Operating Units" required="1"/>
+                            <field name="district_id" options="{'no_create': True}" placeholder="Filter locations by district (Optional)"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" string="Locations / Operating Units" required="1" options="{'no_create': True}" domain="[('parent_unit', '=', district_id)] if district_id else []"/>
                             <field name="allowed_shift_ids" invisible="1"/>
                             <field name="shift_id" domain="[('id', 'in', allowed_shift_ids)]"/>
                         </group>

@@ -157,9 +157,9 @@ class ResConfigSettings(models.TransientModel):
     )
     checkin_buffer = fields.Float(
         string='Check-in Buffer (Hours)',
-        default=0.50,
+        default=1.00,
         config_parameter="hr_attendance.checkin_buffer",
-        help="Allowed early check-in buffer before shift start (e.g., 0.5 = 30 minutes)"
+        help="Allowed early check-in buffer before shift start (e.g., 1.0 = 60 minutes)"
     )
     force_checkout_hours = fields.Float(
         string='Post-Shift Force Checkout Grace (Hours)',

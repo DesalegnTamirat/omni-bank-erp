@@ -163,20 +163,23 @@ class HrEmployee(models.Model):
         pre_defined_lateness_hours = 0.0
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
+        cutoff = shift_start + dead_time
+        _logger.warning(
+            "EVALUATING CHECKIN | Employee: %s | Current: %.4f | ShiftStart: %.4f | DeadTime: %.4f | Cutoff: %.4f | Pass: %s",
+            self.name, current_float, shift_start, dead_time, cutoff, current_float <= cutoff
+        )
+
         if predefined_late and current_float <= predefined_late.end_time:
             status = 'Pre-Defined Lateness'
             pre_defined_lateness_hours = round(current_float - shift_start, 4)
-        elif current_float <= shift_start + dead_time:
+        elif current_float <= cutoff:
             status = 'Late' if current_float > shift_start else 'Normal'
             late_time = max(0.0, round(current_float - shift_start, 4))
         elif allow_late:
-            # Applies ONLY when check-in restriction is turned OFF in system settings
             status = 'Late'
             late_time = max(0.0, round(current_float - shift_start, 4))
         else:
-            # COMMENTED OUT: Manager bypass for late check-in (elif is_manager or allow_late: ...)
-            # Managers and Employees are both strictly mandated to check in within the allowed grace period (shift_start + dead_time).
-            _logger.warning("Check-in rejected: Outside allowed grace period (%.2f)", current_float)
+            _logger.warning("Check-in rejected for %s: Current (%.4f) > Cutoff (%.4f)", self.name, current_float, cutoff)
             raise UserError(_("Check-in is not allowed. You are past the allowed late threshold."))
 
         return status, late_time, 0.0, pre_defined_lateness_hours
@@ -248,7 +251,14 @@ class HrEmployee(models.Model):
 
     # Load Parameters
     def _get_param_float(self, key, default):
-        return float(self.env['ir.config_parameter'].sudo().get_param(key, default))
+        val = self.env['ir.config_parameter'].sudo().get_param(key)
+        if val is None or val is False or str(val).strip() == '':
+            return float(default)
+        try:
+            res = float(val)
+            return res if res > 0.0 else float(default)
+        except (ValueError, TypeError):
+            return float(default)
 
     
     def _attendance_action_change(self, geo_information=None):
@@ -271,13 +281,7 @@ class HrEmployee(models.Model):
 
         morning_start = self._get_param_float('hr_attendance.morning_time', 8.0)
         exit_time = self._get_param_float('hr_attendance.exit_time', 17.0)
-        raw_dead_time = self._get_param_float('hr_attendance.dead_time', 0.25)
-        if raw_dead_time >= 1.0:
-            dead_time = raw_dead_time / 60.0
-        elif abs(raw_dead_time - 0.15) < 0.001:
-            dead_time = 0.25
-        else:
-            dead_time = raw_dead_time
+        dead_time = self._get_param_float('hr_attendance.dead_time', 0.25)
         min_work_hour = self._get_param_float('hr_attendance.min_working_hour', 7.0)
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
         saturday_exit = self._get_param_float('hr_attendance.saturday_exit_time', 12.00)
@@ -372,11 +376,16 @@ class HrEmployee(models.Model):
         # ----------------------------------------------------
         # Location Exceptions
         # ----------------------------------------------------
-        location_exceptions = self.env['location.based.exception'].search([
-            '|', ('operating_unit_ids', 'in', [self.default_operating_unit_id.id]),
-                 ('operating_unit', '=', self.default_operating_unit_id.id),
-            ('active', '=', True)
-        ])
+        location_exceptions = self.env['location.based.exception'].browse()
+        if self.default_operating_unit_id:
+            ou_ids = [self.default_operating_unit_id.id]
+            if hasattr(self.default_operating_unit_id, 'parent_unit') and self.default_operating_unit_id.parent_unit:
+                ou_ids.append(self.default_operating_unit_id.parent_unit.id)
+            location_exceptions = self.env['location.based.exception'].search([
+                '|', ('operating_unit_ids', 'in', ou_ids),
+                     ('operating_unit', 'in', ou_ids),
+                ('active', '=', True)
+            ])
         # ----------------------------------------------------
         # Job Position Exceptions
         # ----------------------------------------------------
@@ -436,7 +445,9 @@ class HrEmployee(models.Model):
                 'actual_check_in': utc_naive_dt,
                 'check_in_status': status,
                 'late_time_hour': late_time,
-                'pre_defined_lateness': pre_late
+                'pre_defined_lateness': pre_late,
+                'shift_start_float': shift_start,
+                'shift_end_float': shift_end,
             }
             if geo_information:
                 vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
@@ -495,6 +506,11 @@ class HrEmployee(models.Model):
         # ----------------------------------------------------
         if open_attendance and self.attendance_state != 'lunch_out':
             attendance = open_attendance
+
+            # Ensure checkout is strictly anchored to the check-in shift
+            if attendance.shift_end_float:
+                shift_end = attendance.shift_end_float
+                shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt)
 
             enable_checkout_restriction = self.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkout_restriction', 'True')
@@ -634,7 +650,44 @@ class HrEmployee(models.Model):
                 'lunch_duration': shift.lunch_duration,
             }
 
-        # 3. Default Global Shift (Sunday is Day Off)
+        # 3. Location Based Exception
+        if self.default_operating_unit_id:
+            ou_ids = [self.default_operating_unit_id.id]
+            if hasattr(self.default_operating_unit_id, 'parent_unit') and self.default_operating_unit_id.parent_unit:
+                ou_ids.append(self.default_operating_unit_id.parent_unit.id)
+
+            loc_ex = self.env['location.based.exception'].sudo().search([
+                '|', ('operating_unit_ids', 'in', ou_ids),
+                     ('operating_unit', 'in', ou_ids),
+                ('active', '=', True),
+                ('start_date', '<=', target_date),
+                '|', ('end_date', '=', False), ('end_date', '>=', target_date)
+            ], order='start_date desc, id desc', limit=1)
+
+            if loc_ex:
+                shift = loc_ex.shift_id
+                if shift:
+                    return {
+                        'name': loc_ex.schedule_name or shift.name,
+                        'is_day_off': False,
+                        'has_lunch_break': shift.has_lunch_break,
+                        'start_time': shift.start_time,
+                        'end_time': shift.end_time,
+                        'lunch_start_time': shift.lunch_start_time,
+                        'lunch_duration': shift.lunch_duration,
+                    }
+                elif loc_ex.start_time and loc_ex.end_time:
+                    return {
+                        'name': loc_ex.schedule_name or 'Location Based Exception',
+                        'is_day_off': False,
+                        'has_lunch_break': False,
+                        'start_time': loc_ex.start_time,
+                        'end_time': loc_ex.end_time,
+                        'lunch_start_time': 12.0,
+                        'lunch_duration': 1.0,
+                    }
+
+        # 4. Default Global Shift (Sunday is Day Off)
         if target_date.weekday() == 6:
             return {
                 'name': 'Default Global Shift (Day Off)',

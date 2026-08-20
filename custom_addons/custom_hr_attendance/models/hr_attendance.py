@@ -16,6 +16,8 @@ class HrAttendance(models.Model):
     attendance_reason_ids = fields.Many2many("hr.attendance.reason", string="Acknowledgement Reason")
     is_acknowledged = fields.Boolean(string="Manager Acknowledged", default=False, index=True)
     late_by = fields.Char(string="Late By", compute="_compute_late_by", store=True)
+    shift_start_float = fields.Float(string="Check-in Shift Start", help="Shift start time resolved at check-in")
+    shift_end_float = fields.Float(string="Check-in Shift End", help="Shift end time resolved at check-in")
 
     @api.model
     def _register_hook(self):
@@ -163,42 +165,46 @@ class HrAttendance(models.Model):
                 local_tz = pytz.utc
 
             # 1. Resolve Shift Start & Shift End for this employee and date
-            shift_start = default_morning_time
-            shift_end = default_exit_time
+            if rec.shift_start_float or rec.shift_end_float:
+                shift_start = rec.shift_start_float or default_morning_time
+                shift_end = rec.shift_end_float or default_exit_time
+            else:
+                shift_start = default_morning_time
+                shift_end = default_exit_time
 
-            check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
-            if enable_saturday and check_in_local and check_in_local.weekday() == 5:
-                ou = emp.default_operating_unit_id if emp else None
-                unit_type = ou.work_unit_type if ou else False
-                if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
-                    shift_end = saturday_exit_time
+                check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
+                if enable_saturday and check_in_local and check_in_local.weekday() == 5:
+                    ou = emp.default_operating_unit_id if emp else None
+                    unit_type = ou.work_unit_type if ou else False
+                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                        shift_end = saturday_exit_time
 
-            active_shift = False
-            if emp:
-                if emp.default_operating_unit_id:
-                    loc_ex = self.env['location.based.exception'].sudo().search(
-                        ['|', ('operating_unit_ids', 'in', [emp.default_operating_unit_id.id]),
-                              ('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
-                    )
-                    if loc_ex:
-                        if hasattr(loc_ex, 'start_time') and loc_ex.start_time:
-                            shift_start = loc_ex.start_time
-                        if hasattr(loc_ex, 'end_time') and loc_ex.end_time:
-                            shift_end = loc_ex.end_time
-                        if hasattr(loc_ex, 'shift_id') and loc_ex.shift_id:
-                            active_shift = loc_ex.shift_id
+                active_shift = False
+                if emp:
+                    if emp.default_operating_unit_id:
+                        loc_ex = self.env['location.based.exception'].sudo().search(
+                            ['|', ('operating_unit_ids', 'in', [emp.default_operating_unit_id.id]),
+                                  ('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
+                        )
+                        if loc_ex:
+                            if hasattr(loc_ex, 'start_time') and loc_ex.start_time:
+                                shift_start = loc_ex.start_time
+                            if hasattr(loc_ex, 'end_time') and loc_ex.end_time:
+                                shift_end = loc_ex.end_time
+                            if hasattr(loc_ex, 'shift_id') and loc_ex.shift_id:
+                                active_shift = loc_ex.shift_id
 
-                check_in_date = fields.Datetime.context_timestamp(emp, rec.check_in).date() if rec.check_in else fields.Date.context_today(self)
-                job_ex = self.env['job.position.exception'].sudo().search([
-                    ('employee_id', '=', emp.id), ('status', '=', 'active'),
-                    ('start_date', '<=', check_in_date),
-                    '|', ('end_date', '=', False), ('end_date', '>=', check_in_date)
-                ], order='start_date desc, id desc', limit=1)
-                if job_ex:
-                    if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
-                        shift_start = job_ex.shift_id.start_time or shift_start
-                        shift_end = job_ex.shift_id.end_time or shift_end
-                        active_shift = job_ex.shift_id
+                    check_in_date = fields.Datetime.context_timestamp(emp, rec.check_in).date() if rec.check_in else fields.Date.context_today(self)
+                    job_ex = self.env['job.position.exception'].sudo().search([
+                        ('employee_id', '=', emp.id), ('status', '=', 'active'),
+                        ('start_date', '<=', check_in_date),
+                        '|', ('end_date', '=', False), ('end_date', '>=', check_in_date)
+                    ], order='start_date desc, id desc', limit=1)
+                    if job_ex:
+                        if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
+                            shift_start = job_ex.shift_id.start_time or shift_start
+                            shift_end = job_ex.shift_id.end_time or shift_end
+                            active_shift = job_ex.shift_id
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
             start_hour = int(shift_start)
@@ -221,11 +227,15 @@ class HrAttendance(models.Model):
                     lunch_hrs = (rec.lunch_in - rec.lunch_out).total_seconds() / 3600.0
                 elif hasattr(rec, 'lunch_break_hours') and rec.lunch_break_hours > 0:
                     lunch_hrs = rec.lunch_break_hours
+                elif rec.shift_start_float == default_morning_time and rec.shift_end_float == default_exit_time:
+                    # Default shift check-in: use standard lunch break duration
+                    lunch_hrs = default_lunch_duration if enable_lunch else 0.0
                 elif active_shift and active_shift.has_lunch_break:
                     lunch_hrs = active_shift.lunch_duration
-                else:
+                elif enable_lunch:
                     lunch_hrs = default_lunch_duration
-
+                else:
+                    lunch_hrs = 0.0
                 rec.worked_hours = max(0.0, round(raw_hours - lunch_hrs, 2))
             else:
                 rec.worked_hours = 0.0

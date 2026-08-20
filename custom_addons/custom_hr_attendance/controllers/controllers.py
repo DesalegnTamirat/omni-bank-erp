@@ -31,6 +31,33 @@ class BunnaMyAttendance(http.Controller):
         if not target_date:
             target_date = fields.Date.context_today(request.env.user)
 
+        today_date = fields.Date.context_today(request.env.user)
+
+        # Tier 0: If employee has an active open check-in session today, anchor to check-in shift!
+        if target_date == today_date:
+            open_attendance = env['hr.attendance'].sudo().search([
+                ('employee_id', '=', employee.id),
+                ('check_out', '=', False)
+            ], limit=1)
+            if open_attendance:
+                s_start = open_attendance.shift_start_float or 8.0
+                s_end = open_attendance.shift_end_float or 17.0
+                start_str = self._float_to_time_str(s_start)
+                end_str = self._float_to_time_str(s_end)
+                return {
+                    'name': 'Default Global Shift',
+                    'code': 'ACTIVE_SHIFT',
+                    'time_range': f"{start_str} - {end_str}",
+                    'start_time_str': start_str,
+                    'end_time_str': end_str,
+                    'is_night_shift': False,
+                    'has_lunch_break': True,
+                    'lunch_time_str': "12:00 PM - 01:00 PM (1.0h)",
+                    'is_custom_exception': False,
+                    'is_day_off': False,
+                    'source_label': 'Default Global Shift (Check-in Shift)'
+                }
+
         # Tier 1: Check active Roster Exception (job.position.roster.exception)
         roster = env['job.position.roster.exception'].sudo().search([
             ('employee_id', '=', employee.id),
@@ -135,7 +162,63 @@ class BunnaMyAttendance(http.Controller):
                 'source_label': 'Assigned Shift Exception'
             }
 
-        # Tier 3: Fallback to Default Global Shift (Sunday is default Day Off)
+        # Tier 3: Search for active Location Based Exception (location.based.exception)
+        if employee.default_operating_unit_id:
+            ou_ids = [employee.default_operating_unit_id.id]
+            if hasattr(employee.default_operating_unit_id, 'parent_unit') and employee.default_operating_unit_id.parent_unit:
+                ou_ids.append(employee.default_operating_unit_id.parent_unit.id)
+
+            loc_ex = env['location.based.exception'].sudo().search([
+                '|', ('operating_unit_ids', 'in', ou_ids),
+                     ('operating_unit', 'in', ou_ids),
+                ('active', '=', True),
+                ('start_date', '<=', target_date),
+                '|', ('end_date', '=', False), ('end_date', '>=', target_date)
+            ], order='start_date desc, id desc', limit=1)
+
+            if loc_ex:
+                shift = loc_ex.shift_id
+                if shift:
+                    start_str = self._float_to_time_str(shift.start_time)
+                    end_str = self._float_to_time_str(shift.end_time)
+                    lunch_str = "No Lunch Break"
+                    if shift.has_lunch_break:
+                        l_start = self._float_to_time_str(shift.lunch_start_time)
+                        l_end_float = shift.lunch_start_time + shift.lunch_duration
+                        l_end = self._float_to_time_str(l_end_float)
+                        lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
+
+                    return {
+                        'name': loc_ex.schedule_name or shift.name,
+                        'code': shift.code or 'LOC_EX',
+                        'time_range': shift.time_range or f"{start_str} - {end_str}",
+                        'start_time_str': start_str,
+                        'end_time_str': end_str,
+                        'is_night_shift': shift.is_night_shift,
+                        'has_lunch_break': shift.has_lunch_break,
+                        'lunch_time_str': lunch_str,
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'source_label': 'Location Based Exception'
+                    }
+                elif loc_ex.start_time and loc_ex.end_time:
+                    start_str = self._float_to_time_str(loc_ex.start_time)
+                    end_str = self._float_to_time_str(loc_ex.end_time)
+                    return {
+                        'name': loc_ex.schedule_name or 'Location Based Exception',
+                        'code': 'LOC_EX',
+                        'time_range': f"{start_str} - {end_str}",
+                        'start_time_str': start_str,
+                        'end_time_str': end_str,
+                        'is_night_shift': False,
+                        'has_lunch_break': False,
+                        'lunch_time_str': 'No Lunch Break',
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'source_label': 'Location Based Exception'
+                    }
+
+        # Tier 4: Fallback to Default Global Shift (Sunday is default Day Off)
         if target_date.weekday() == 6:
             return {
                 'name': 'Default Global Shift (Day Off)',

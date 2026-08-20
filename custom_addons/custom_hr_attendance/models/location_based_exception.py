@@ -49,11 +49,24 @@ class LocationBasedException(models.Model):
             if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
                 raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
+    @api.constrains('operating_unit_ids', 'operating_unit', 'active')
+    def _check_operating_unit_required(self):
+        for rec in self:
+            if rec.active and not rec.operating_unit_ids and not rec.operating_unit:
+                raise ValidationError(_("A Location-Based Exception must specify at least one Location / Operating Unit."))
+
     schedule_name = fields.Char(
         string="Schedule Name",
         compute="_compute_schedule_name",
         store=True,
         readonly=True
+    )
+
+    district_id = fields.Many2one(
+        'operating.unit',
+        string="Filter by District",
+        domain="[('work_unit_type', 'in', ['district_office', 'regional_office'])]",
+        help="Optional administrative filter to narrow down branch selection by District Office."
     )
 
     operating_unit_ids = fields.Many2many(

@@ -25,6 +25,11 @@ class MyShiftSchedule(models.TransientModel):
     duration = fields.Float(string="Net Worked Duration (Hours)", readonly=True)
     time_range = fields.Char(string="Time Range", readonly=True)
     
+    has_lunch_break = fields.Boolean(string="Includes Lunch Break", readonly=True)
+    lunch_start_time = fields.Float(string="Lunch Start Time", readonly=True)
+    lunch_duration = fields.Float(string="Lunch Duration (Hours)", readonly=True)
+    lunch_time_range = fields.Char(string="Lunch Time Range", readonly=True)
+
     start_date = fields.Date(string="Start Date", readonly=True)
     end_date = fields.Date(string="End Date", readonly=True)
 
@@ -32,71 +37,11 @@ class MyShiftSchedule(models.TransientModel):
     def action_open_my_shift(self):
         """
         Resolves the logged-in user's active shift hierarchy
-        and opens a List View with 1 row (or Form view if clicked).
+        and opens a clean My Shift Schedule transient view.
         """
         user = self.env.user
         employee = user.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
         today = fields.Date.context_today(self)
-
-        # Priority 1: Job Position Roster Exception (Date-based)
-        if employee:
-            roster = self.env['job.position.roster.exception'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('active', '=', True),
-                ('start_date', '<=', today),
-                ('end_date', '>=', today)
-            ], order='start_date desc, id desc', limit=1)
-
-            if roster:
-                return {
-                    'type': 'ir.actions.act_window',
-                    'name': _('My Shift Schedule (Roster Exception)'),
-                    'res_model': 'job.position.roster.exception',
-                    'domain': [('id', '=', roster.id)],
-                    'view_mode': 'list,form',
-                    'target': 'current',
-                }
-
-            # Priority 2: Job Position Exception (Static)
-            job_ex = self.env['job.position.exception'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('active', '=', True),
-                ('start_date', '<=', today),
-                '|', ('end_date', '=', False), ('end_date', '>=', today)
-            ], order='start_date desc, id desc', limit=1)
-
-            if job_ex:
-                return {
-                    'type': 'ir.actions.act_window',
-                    'name': _('My Shift Schedule (Job Position Exception)'),
-                    'res_model': 'job.position.exception',
-                    'domain': [('id', '=', job_ex.id)],
-                    'view_mode': 'list,form',
-                    'target': 'current',
-                }
-
-            # Priority 3: Location Based Exception (Branch / Operating Unit)
-            if employee.default_operating_unit_id:
-                loc_ex = self.env['location.based.exception'].sudo().search([
-                    '|', ('operating_unit_ids', 'in', [employee.default_operating_unit_id.id]),
-                         ('operating_unit', '=', employee.default_operating_unit_id.id),
-                    ('active', '=', True),
-                    ('start_date', '<=', today),
-                    '|', ('end_date', '=', False), ('end_date', '>=', today)
-                ], order='start_date desc, id desc', limit=1)
-
-                if loc_ex:
-                    return {
-                        'type': 'ir.actions.act_window',
-                        'name': _('My Shift Schedule (Location Based Exception)'),
-                        'res_model': 'location.based.exception',
-                        'domain': [('id', '=', loc_ex.id)],
-                        'view_mode': 'list,form',
-                        'target': 'current',
-                    }
-
-        # Priority 4: Default System Shift from Settings (Transient Record)
-        self.sudo().search([('create_uid', '=', self.env.uid)]).unlink()
 
         def _fmt(f_val):
             val = float(f_val or 0.0) % 24.0
@@ -107,31 +52,131 @@ class MyShiftSchedule(models.TransientModel):
                 m = 0
             return f"{h:02d}:{m:02d}"
 
-        ICP = self.env['ir.config_parameter'].sudo()
-        m_time = float(ICP.get_param('hr_attendance.morning_time', '8.0'))
-        e_time = float(ICP.get_param('hr_attendance.exit_time', '17.0'))
-        enable_lunch = ICP.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        lunch_dur = float(ICP.get_param('hr_attendance.lunch_duration', '1.0')) if enable_lunch else 0.0
+        # Clean old transient records created by this user
+        self.sudo().search([('create_uid', '=', self.env.uid)]).unlink()
 
-        gross = e_time - m_time
-        if gross < 0:
-            gross += 24.0
-        dur = max(0.0, round(gross - lunch_dur, 2))
-        t_range = f"{_fmt(m_time)} - {_fmt(e_time)}"
+        assignment_source = 'default'
+        schedule_name = ""
+        shift_obj = False
+        start_time = 8.0
+        end_time = 17.0
+        duration = 8.0
+        time_range = "08:00 - 17:00"
+        start_date = today
+        end_date = False
 
-        rec = self.create({
+        if employee:
+            # Priority 1: Job Position Roster Exception (Date-based)
+            roster = self.env['job.position.roster.exception'].sudo().search([
+                ('employee_id', '=', employee.id),
+                ('active', '=', True),
+                ('start_date', '<=', today),
+                ('end_date', '>=', today)
+            ], order='start_date desc, id desc', limit=1)
+
+            if roster:
+                assignment_source = 'roster'
+                schedule_name = roster.name or _('Job Position Roster Exception')
+                shift_obj = roster.shift_id
+                start_date = roster.start_date
+                end_date = roster.end_date
+
+            else:
+                # Priority 2: Job Position Exception (Static)
+                job_ex = self.env['job.position.exception'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('active', '=', True),
+                    ('start_date', '<=', today),
+                    '|', ('end_date', '=', False), ('end_date', '>=', today)
+                ], order='start_date desc, id desc', limit=1)
+
+                if job_ex:
+                    assignment_source = 'job_position'
+                    schedule_name = job_ex.job_position_exception_name or _('Job Position Exception')
+                    shift_obj = job_ex.shift_id
+                    start_date = job_ex.start_date
+                    end_date = job_ex.end_date
+
+                else:
+                    # Priority 3: Location Based Exception (Branch / Operating Unit)
+                    if employee.default_operating_unit_id:
+                        ou_ids = [employee.default_operating_unit_id.id]
+                        if hasattr(employee.default_operating_unit_id, 'parent_unit') and employee.default_operating_unit_id.parent_unit:
+                            ou_ids.append(employee.default_operating_unit_id.parent_unit.id)
+
+                        loc_ex = self.env['location.based.exception'].sudo().search([
+                            '|', ('operating_unit_ids', 'in', ou_ids),
+                                 ('operating_unit', 'in', ou_ids),
+                            ('active', '=', True),
+                            ('start_date', '<=', today),
+                            '|', ('end_date', '=', False), ('end_date', '>=', today)
+                        ], order='start_date desc, id desc', limit=1)
+
+                        if loc_ex:
+                            assignment_source = 'location'
+                            schedule_name = loc_ex.schedule_name or _('Location Based Exception')
+                            shift_obj = loc_ex.shift_id
+                            start_date = loc_ex.start_date
+                            end_date = loc_ex.end_date
+
+        has_lunch_break = False
+        lunch_start_time = 12.0
+        lunch_duration = 1.0
+        lunch_time_range = _("No Lunch Break")
+
+        if shift_obj:
+            start_time = shift_obj.start_time
+            end_time = shift_obj.end_time
+            has_lunch_break = shift_obj.has_lunch_break
+            lunch_start_time = shift_obj.lunch_start_time if has_lunch_break else 0.0
+            lunch_duration = shift_obj.lunch_duration if has_lunch_break else 0.0
+            gross = end_time - start_time
+            if gross < 0:
+                gross += 24.0
+            duration = max(0.0, round(gross - (lunch_duration if has_lunch_break else 0.0), 2))
+            time_range = shift_obj.time_range or f"{_fmt(start_time)} - {_fmt(end_time)}"
+            if has_lunch_break:
+                l_end = lunch_start_time + lunch_duration
+                lunch_time_range = f"{_fmt(lunch_start_time)} - {_fmt(l_end)} ({lunch_duration:.1f}h)"
+            else:
+                lunch_time_range = _("No Lunch Break")
+        elif assignment_source == 'default':
+            ICP = self.env['ir.config_parameter'].sudo()
+            start_time = float(ICP.get_param('hr_attendance.morning_time', '8.0'))
+            end_time = float(ICP.get_param('hr_attendance.exit_time', '17.0'))
+            has_lunch_break = ICP.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
+            lunch_start_time = float(ICP.get_param('hr_attendance.lunch_out_time', '12.0'))
+            lunch_duration = float(ICP.get_param('hr_attendance.lunch_duration', '1.0')) if has_lunch_break else 0.0
+            gross = end_time - start_time
+            if gross < 0:
+                gross += 24.0
+            duration = max(0.0, round(gross - (lunch_duration if has_lunch_break else 0.0), 2))
+            time_range = f"{_fmt(start_time)} - {_fmt(end_time)}"
+            schedule_name = _("Default System Shift (%s - %s)") % (_fmt(start_time), _fmt(end_time))
+            if has_lunch_break:
+                l_end = lunch_start_time + lunch_duration
+                lunch_time_range = f"{_fmt(lunch_start_time)} - {_fmt(l_end)} ({lunch_duration:.1f}h)"
+            else:
+                lunch_time_range = _("No Lunch Break")
+
+        rec = self.sudo().create({
             'employee_id': employee.id if employee else False,
             'job_position': (employee.job_title or (employee.job_id.name if employee.job_id else '')) if employee else 'System Administrator',
             'department_id': (employee.department_id.id if employee.department_id else False) if employee else False,
             'operating_unit_id': (employee.default_operating_unit_id.id if employee.default_operating_unit_id else False) if employee else False,
-            'assignment_source': 'default',
-            'schedule_name': _("Default System Shift (%s - %s)") % (_fmt(m_time), _fmt(e_time)),
-            'start_time': m_time,
-            'end_time': e_time,
-            'duration': dur,
-            'time_range': t_range,
-            'start_date': today,
-            'end_date': False,
+            'assignment_source': assignment_source,
+            'schedule_name': schedule_name,
+            'shift_id': shift_obj.id if shift_obj else False,
+            'start_time': start_time,
+            'end_time': end_time,
+            'duration': duration,
+            'time_range': time_range,
+            'has_lunch_break': has_lunch_break,
+            'lunch_start_time': lunch_start_time,
+            'lunch_duration': lunch_duration,
+            'lunch_time_range': lunch_time_range,
+            'start_date': start_date,
+            'end_date': end_date,
         })
 
         return {

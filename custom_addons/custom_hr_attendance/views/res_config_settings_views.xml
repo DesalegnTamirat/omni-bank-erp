@@ -152,7 +152,7 @@
                         <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
                             <setting string="Cumulative Late Hours Threshold (Hours)"
                                      help="Total cumulative late hours within the rolling evaluation window that triggers an automatic discipline case.">
-                                <field name="lateness_hours_violation_threshold"/>
+                                <field name="lateness_hours_violation_threshold" widget="float_time"/>
                             </setting>
                             <setting string="Lateness Evaluation Window (Months)"
                                      help="Rolling evaluation window in months over which cumulative late hours are aggregated (e.g., 3 months).">
