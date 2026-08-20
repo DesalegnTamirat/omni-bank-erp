@@ -91,19 +91,25 @@
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group string="Misconduct &amp; Offense Classification">
+                                <field name="allowed_severity_level_ids" invisible="1"/>
+                                <field name="staff_category_display" readonly="1"/>
                                 <field name="offense_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="offense_category_id"/>
-                                <field name="severity_level"/>
+                                <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="punishment_type"/>
                                 <field name="penalty_percentage" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="fine_days" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="property_repair_cost" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
                             </group>
                         </group>
                         <group>
                             <group string="Workflow &amp; Governance (Segregation of Duties)">
-                                <field name="initiator_id"/>
+                                <field name="is_hr_admin" invisible="1"/>
+                                <field name="initiator_type" readonly="state in ('enforced', 'closed', 'revoked') or not is_hr_admin"/>
+                                <field name="initiator_id" readonly="1"/>
                                 <field name="reviewer_id"/>
-                                <field name="approver_id"/>
+                                <field name="approver_id" readonly="state in ('enforced', 'closed', 'revoked') or not is_hr_admin"/>
                                 <!-- CEO/CPCO authority field for Level 1 Dismissals -->
                                 <field name="dismissal_authority_id"
                                        invisible="severity_level != 'level_1'"

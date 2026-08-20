@@ -36,9 +36,18 @@
                         </group>
                         <group string="Default Penalties &amp; Routing">
                             <field name="default_punishment_type"/>
-                            <field name="default_penalty_percentage"/>
-                            <field name="default_fine_days"/>
                             <field name="default_approval_authority"/>
+                            <field name="default_reset_window_months"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Non-Managerial Default Fines">
+                            <field name="default_non_managerial_penalty_pct"/>
+                            <field name="default_non_managerial_fine_days"/>
+                        </group>
+                        <group string="Managerial Default Fines">
+                            <field name="default_managerial_penalty_pct"/>
+                            <field name="default_managerial_fine_days"/>
                         </group>
                     </group>
                     <group string="Description &amp; Guidelines">

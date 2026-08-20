@@ -7,6 +7,13 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
     # Disciplinary History Smart Fields
+    is_managerial = fields.Boolean(
+        string='Is Managerial Staff',
+        compute='_compute_is_managerial',
+        store=True,
+        readonly=False,
+        help='Indicates whether employee belongs to Managerial Staff (uses managerial penalty rates)'
+    )
     active_disciplinary_action = fields.Boolean(
         string='Has Active Disciplinary Action',
         default=False,
@@ -94,6 +101,17 @@ class HrEmployee(models.Model):
                     'active_disciplinary_action': False,
                 })
 
+    @api.depends('job_id', 'job_id.name')
+    def _compute_is_managerial(self):
+        for emp in self:
+            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+            if emp.job_id and getattr(emp.job_id, 'is_managerial', False):
+                emp.is_managerial = True
+            elif any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor', 'president', 'officer in charge']):
+                emp.is_managerial = True
+            else:
+                emp.is_managerial = False
+
     def action_view_discipline_cases(self):
         self.ensure_one()
         return {
@@ -104,3 +122,13 @@ class HrEmployee(models.Model):
             'domain': [('employee_id', '=', self.id)],
             'context': {'default_employee_id': self.id}
         }
+
+
+class HrJob(models.Model):
+    _inherit = 'hr.job'
+
+    is_managerial = fields.Boolean(
+        string='Is Managerial Position',
+        default=False,
+        help='Check if this job position belongs to Managerial Staff'
+    )

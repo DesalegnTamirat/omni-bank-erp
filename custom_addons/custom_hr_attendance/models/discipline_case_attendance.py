@@ -29,11 +29,11 @@ class DisciplineCaseAttendance(models.Model):
         Returns the created discipline.case record, or None if the offense is not found.
         """
         kind_map = {
-            'lateness': 'custom_hr_attendance.offense_repeated_lateness',
-            'force_checkout': 'custom_hr_attendance.offense_repeated_force_checkout',
-            'absence': 'custom_hr_attendance.offense_repeated_absence',
+            'lateness': 'discipline_management.offense_latecoming',
+            'force_checkout': 'discipline_management.offense_leaving_without_permission',
+            'absence': 'discipline_management.offense_absence_without_cause',
         }
-        offense_xmlid = kind_map.get(kind, 'custom_hr_attendance.offense_repeated_lateness')
+        offense_xmlid = kind_map.get(kind, 'discipline_management.offense_latecoming')
         offense = self.env.ref(offense_xmlid, raise_if_not_found=False)
         if not offense:
             _logger.warning(

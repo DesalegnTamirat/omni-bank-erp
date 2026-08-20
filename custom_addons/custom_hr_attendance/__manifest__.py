@@ -80,8 +80,6 @@
         'data/job_shift_data.xml',
         'data/hr_attendance_reason_data.xml',
         'data/sql_functions.xml',
-        # Discipline Offense Seeds (loaded after discipline_management data)
-        'data/discipline_offense_attendance_data.xml',
         # Scheduled Actions
         'data/ir_cron_data.xml',
     ],

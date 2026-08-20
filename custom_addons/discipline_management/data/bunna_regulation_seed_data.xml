@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ======================================================== -->
+        <!-- 1. OFFENSE CATEGORIES (Bunna Bank Regulation Art. 10.4) -->
+        <!-- ======================================================== -->
+
+        <record id="cat_attendance" model="discipline.offense.category">
+            <field name="name">Attendance &amp; Punctuality Misconduct</field>
+            <field name="code">ATT</field>
+            <field name="description">Latecoming, leaving office without permission, absence without cause.</field>
+        </record>
+
+        <record id="cat_conduct" model="discipline.offense.category">
+            <field name="name">General Conduct &amp; Professional Ethics</field>
+            <field name="code">CND</field>
+            <field name="description">Personal hygiene, attire, performance evaluation refusal, insubordination.</field>
+        </record>
+
+        <record id="cat_property" model="discipline.offense.category">
+            <field name="name">Bank Property &amp; Operational Negligence</field>
+            <field name="code">PRP</field>
+            <field name="description">Negligent property damage, failure to report accidents, duty negligence, unauthorized property utilization.</field>
+        </record>
+
+        <!-- ======================================================== -->
+        <!-- 2. OFFENSE TYPES & SEVERITY ESCALATION MATRIX (Art. 10.4.1) -->
+        <!-- ======================================================== -->
+
+        <!-- Offense 1: Latecoming -->
+        <record id="offense_latecoming" model="discipline.offense">
+            <field name="name">Latecoming</field>
+            <field name="category_id" ref="cat_attendance"/>
+            <field name="description">Cumulative late hours or repeated tardiness under Bank Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_latecoming_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_latecoming"/>
+            <field name="severity_level_id" ref="severity_level_5"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">verbal_warning</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">direct_manager</field>
+        </record>
+
+        <record id="line_latecoming_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_latecoming"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.5</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">1.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_latecoming_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_latecoming"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">2.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_latecoming_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_latecoming"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">2.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">3.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_latecoming_5" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_latecoming"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">5</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 2: Leaving Office During Working Hours Without Permission -->
+        <record id="offense_leaving_without_permission" model="discipline.offense">
+            <field name="name">Leaving office during working hours without permission</field>
+            <field name="category_id" ref="cat_attendance"/>
+            <field name="description">Unexcused departure from workplace during working hours under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_leaving_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_leaving_without_permission"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.5</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">1.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_leaving_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_leaving_without_permission"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">2.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_leaving_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_leaving_without_permission"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">2.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">3.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_leaving_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_leaving_without_permission"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 3: Absence From Work Without Good Cause -->
+        <record id="offense_absence_without_cause" model="discipline.offense">
+            <field name="name">Absence from work without good cause</field>
+            <field name="category_id" ref="cat_attendance"/>
+            <field name="description">Unexcused absence without valid justification under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_absence_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_absence_without_cause"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">1.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_absence_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_absence_without_cause"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">12.5</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">15.0</field>
+            <field name="managerial_fine_days">1.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_absence_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_absence_without_cause"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">25.0</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">30.0</field>
+            <field name="managerial_fine_days">1.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_absence_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_absence_without_cause"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 4: Personal Hygiene and Attire -->
+        <record id="offense_hygiene_attire" model="discipline.offense">
+            <field name="name">Repeated failure to maintain a reasonable degree of personal hygiene and appropriate attire</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="description">Dress code or personal hygiene non-compliance under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_hygiene_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_hygiene_attire"/>
+            <field name="severity_level_id" ref="severity_level_5"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">verbal_warning</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">direct_manager</field>
+        </record>
+
+        <record id="line_hygiene_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_hygiene_attire"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">1.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">1.5</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_hygiene_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_hygiene_attire"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">2.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">3.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_hygiene_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_hygiene_attire"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">5.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">7.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_hygiene_5" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_hygiene_attire"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">5</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 5: Damage to Bank Property -->
+        <record id="offense_property_damage" model="discipline.offense">
+            <field name="name">Causing damage to the Bank's property due to negligent mishandling</field>
+            <field name="category_id" ref="cat_property"/>
+            <field name="description">Property damage caused by negligence under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_prop_damage_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_property_damage"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_prop_damage_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_property_damage"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">10.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">15.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_prop_damage_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_property_damage"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 6: Failure to Report Accidents -->
+        <record id="offense_failure_report_accidents" model="discipline.offense">
+            <field name="name">Failure to report immediately accidents or damages to property to Management or concerned authority</field>
+            <field name="category_id" ref="cat_property"/>
+            <field name="description">Omission to report property damage or accidents under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_report_accidents_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_failure_report_accidents"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_report_accidents_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_failure_report_accidents"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">10.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">15.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_report_accidents_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_failure_report_accidents"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 7: Negligent Performance of Duties -->
+        <record id="offense_negligent_performance" model="discipline.offense">
+            <field name="name">Negligent performance of duties</field>
+            <field name="category_id" ref="cat_property"/>
+            <field name="description">Duty negligence under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_negligence_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_negligent_performance"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_negligence_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_negligent_performance"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">3.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">5.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_negligence_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_negligent_performance"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">7.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">10.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_negligence_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_negligent_performance"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 8: Unauthorized Utilization of Property -->
+        <record id="offense_unauthorized_property" model="discipline.offense">
+            <field name="name">Unauthorized utilization of the bank's property</field>
+            <field name="category_id" ref="cat_property"/>
+            <field name="description">Misuse or unauthorized utilization of Bank property under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_unauthorized_prop_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_unauthorized_property"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_unauthorized_prop_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_unauthorized_property"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">5.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">7.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_unauthorized_prop_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_unauthorized_property"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">10.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">15.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_unauthorized_prop_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_unauthorized_property"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+
+        <!-- Offense 9: Refusal to Sign Performance Evaluation -->
+        <record id="offense_refusal_sign_eval" model="discipline.offense">
+            <field name="name">Refusal to sign the performance evaluation</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="description">Refusal to sign performance evaluation under Regulation Art 10.4.1.</field>
+        </record>
+
+        <record id="line_refusal_eval_1" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_refusal_sign_eval"/>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="occurrence_number">1</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">3</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_refusal_eval_2" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_refusal_sign_eval"/>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="occurrence_number">2</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">3.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">5.0</field>
+            <field name="reset_window_months">6</field>
+            <field name="approval_authority">hr_manager</field>
+        </record>
+
+        <record id="line_refusal_eval_3" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_refusal_sign_eval"/>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="occurrence_number">3</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">5.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">7.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">cpco</field>
+        </record>
+
+        <record id="line_refusal_eval_4" model="discipline.offense.line">
+            <field name="offense_id" ref="offense_refusal_sign_eval"/>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="occurrence_number">4</field>
+            <field name="punishment_type">dismissal</field>
+            <field name="non_managerial_penalty_pct">0.0</field>
+            <field name="non_managerial_fine_days">0.0</field>
+            <field name="managerial_penalty_pct">0.0</field>
+            <field name="managerial_fine_days">0.0</field>
+            <field name="reset_window_months">12</field>
+            <field name="approval_authority">ceo</field>
+        </record>
+
+    </data>
+</odoo>

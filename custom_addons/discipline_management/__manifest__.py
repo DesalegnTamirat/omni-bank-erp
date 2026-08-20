@@ -37,7 +37,7 @@ Key Features:
         'security/ir.model.access.csv',
         'data/discipline_sequence.xml',
         'data/discipline_severity_level_data.xml',
-        'data/discipline_offense_data.xml',
+        'data/bunna_regulation_seed_data.xml',
         'data/discipline_cron.xml',
         'views/discipline_severity_level_views.xml',
         'views/discipline_offense_views.xml',

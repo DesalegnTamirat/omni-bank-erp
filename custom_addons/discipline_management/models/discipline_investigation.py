@@ -82,6 +82,53 @@ class DisciplineInvestigation(models.Model):
         ('approved', 'Reviewed & Accepted'),
     ], string='Status', default='draft', required=True, tracking=True)
 
+    # Suspension Request during Investigation (Requirement 3)
+    is_suspension_required = fields.Boolean(
+        string='Requires Suspension during Investigation',
+        default=False,
+        tracking=True,
+        help='Check if the employee under investigation should be suspended from work during investigation.'
+    )
+    suspension_type = fields.Selection([
+        ('with_pay', 'Suspension With Pay'),
+        ('without_pay', 'Suspension Without Pay'),
+    ], string='Requested Suspension Type', default='without_pay', tracking=True)
+    suspension_duration_days = fields.Integer(string='Requested Suspension Duration (Days)', default=30, tracking=True)
+    suspension_reason = fields.Text(string='Suspension Justification / Reason', tracking=True)
+    suspension_request_state = fields.Selection([
+        ('none', 'Not Requested'),
+        ('requested', 'Suspension Requested'),
+        ('approved', 'Suspension Approved by HR'),
+        ('rejected', 'Suspension Rejected'),
+    ], string='Suspension Status', default='none', tracking=True)
+    suspension_id = fields.Many2one('discipline.suspension', string='Linked Suspension Record', readonly=True)
+
+    def action_request_suspension(self):
+        for rec in self:
+            if not rec.is_suspension_required:
+                raise UserError(_('Please check "Requires Suspension during Investigation" before requesting suspension.'))
+            if not rec.suspension_reason:
+                raise UserError(_('Please provide a Suspension Justification / Reason.'))
+            if rec.suspension_duration_days <= 0 or rec.suspension_duration_days > 30:
+                raise UserError(_('Suspension duration must be between 1 and 30 days.'))
+            
+            # Create draft suspension record
+            susp_vals = {
+                'case_id': rec.case_id.id,
+                'employee_id': rec.case_id.employee_id.id,
+                'suspension_type': rec.suspension_type,
+                'start_date': fields.Date.context_today(self),
+                'reason': rec.suspension_reason,
+            }
+            susp = self.env['discipline.suspension'].create(susp_vals)
+            rec.write({
+                'suspension_id': susp.id,
+                'suspension_request_state': 'requested'
+            })
+            rec.case_id.message_post(body=_(
+                'Suspension Request created by Investigator %s for Employee %s (%s, %d days).'
+            ) % (self.env.user.name, rec.case_id.employee_id.name, rec.suspension_type, rec.suspension_duration_days))
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

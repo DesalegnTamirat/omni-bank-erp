@@ -27,6 +27,14 @@ class DisciplineSeverityLevel(models.Model):
     default_penalty_percentage = fields.Float(string='Default Penalty Percentage (%)', default=0.0)
     default_fine_days = fields.Float(string='Default Salary Fine (Days)', default=0.0)
 
+    default_non_managerial_penalty_pct = fields.Float(string='Default Non-Managerial Penalty (%)', default=0.0)
+    default_non_managerial_fine_days = fields.Float(string='Default Non-Managerial Fine (Days)', default=0.0)
+    
+    default_managerial_penalty_pct = fields.Float(string='Default Managerial Penalty (%)', default=0.0)
+    default_managerial_fine_days = fields.Float(string='Default Managerial Fine (Days)', default=0.0)
+
+    default_reset_window_months = fields.Integer(string='Default Reset Window (Months)', default=3, help="Validity period in months before warning count resets")
+
     default_approval_authority = fields.Selection([
         ('direct_manager', 'Direct Manager'),
         ('hr_manager', 'HR Manager'),
