@@ -142,10 +142,11 @@ class HrEmployee(models.Model):
             _logger.info("Using Default Full Day shift: %.2f - %.2f", morning_start, exit_time)
             return morning_start, exit_time
 
-        # MANAGER OVERRIDE
-        if is_manager:
-            _logger.info("Manager Override: Forcing default shift bounds.")
-            return morning_start, exit_time
+        # COMMENTED OUT: Manager Override bypass.
+        # ALL personnel (including Managers) must adhere to scheduled buffer windows.
+        # if is_manager:
+        #     _logger.info("Manager Override: Forcing default shift bounds.")
+        #     return morning_start, exit_time
 
         raise UserError(_(
             "Check-in is not allowed yet.\n\n"
@@ -165,15 +166,16 @@ class HrEmployee(models.Model):
         if predefined_late and current_float <= predefined_late.end_time:
             status = 'Pre-Defined Lateness'
             pre_defined_lateness_hours = round(current_float - shift_start, 4)
-        elif current_float <= shift_start:
-            status = 'Normal'
         elif current_float <= shift_start + dead_time:
-            status = 'Late'
+            status = 'Late' if current_float > shift_start else 'Normal'
             late_time = max(0.0, round(current_float - shift_start, 4))
-        elif is_manager or allow_late:
+        elif allow_late:
+            # Applies ONLY when check-in restriction is turned OFF in system settings
             status = 'Late'
             late_time = max(0.0, round(current_float - shift_start, 4))
         else:
+            # COMMENTED OUT: Manager bypass for late check-in (elif is_manager or allow_late: ...)
+            # Managers and Employees are both strictly mandated to check in within the allowed grace period (shift_start + dead_time).
             _logger.warning("Check-in rejected: Outside allowed grace period (%.2f)", current_float)
             raise UserError(_("Check-in is not allowed. You are past the allowed late threshold."))
 
@@ -185,13 +187,14 @@ class HrEmployee(models.Model):
     def _evaluate_checkout_status(self, current_float, shift_end, attendance, utc_naive_dt, min_work_hour,
                                   predefined_early_exit, is_manager=False):
 
-        # EXIT TIME VALIDATION
-        if current_float < shift_end and not is_manager:
+        # EXIT TIME VALIDATION: Strictly enforced for ALL users (including Managers)
+        # COMMENTED OUT: if current_float < shift_end and not is_manager:
+        if current_float < shift_end:
            # Check if they have a pre-approved early exit for this exact time
             if not (predefined_early_exit and current_float >= predefined_early_exit.start_time):
                 raise UserError(_(
-                    "You cannot check out yet. Your shift ends at %.2f.\n"
-                    "Current time is %.2f.") % (shift_end, current_float))
+                    "You cannot check out yet. Your shift ends at %s.\n"
+                    "Current time is %s.") % (_fmt(shift_end), _fmt(current_float)))
 
         status = 'Normal'
         early_exit = 0.0
@@ -268,7 +271,13 @@ class HrEmployee(models.Model):
 
         morning_start = self._get_param_float('hr_attendance.morning_time', 8.0)
         exit_time = self._get_param_float('hr_attendance.exit_time', 17.0)
-        dead_time = self._get_param_float('hr_attendance.dead_time', 0.25)
+        raw_dead_time = self._get_param_float('hr_attendance.dead_time', 0.25)
+        if raw_dead_time >= 1.0:
+            dead_time = raw_dead_time / 60.0
+        elif abs(raw_dead_time - 0.15) < 0.001:
+            dead_time = 0.25
+        else:
+            dead_time = raw_dead_time
         min_work_hour = self._get_param_float('hr_attendance.min_working_hour', 7.0)
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
         saturday_exit = self._get_param_float('hr_attendance.saturday_exit_time', 12.00)
@@ -399,15 +408,22 @@ class HrEmployee(models.Model):
                 'hr_attendance.enable_checkin_restriction', 'True')
             checkin_restriction_enabled = enable_checkin_restriction.lower() in ('true', '1')
 
+            is_manager = (
+                self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or 
+                self.env.user.has_group('hr_attendance.group_hr_attendance_user') or 
+                self.env.is_superuser() or
+                (self.user_id and self.user_id.id == self.env.uid and (self.user_id.has_group('hr_attendance.group_hr_attendance_manager') or self.user_id.has_group('hr_attendance.group_hr_attendance_user')))
+            )
+
             if checkin_restriction_enabled:
                 status, late_time, ot, pre_late = self._evaluate_checkin_status(
-                    current_float, shift_start, dead_time, predefined_late
+                    current_float, shift_start, dead_time, predefined_late, is_manager=is_manager
                 )
                 checkin_dt = utc_naive_dt if status == 'Late' else shift_start_utc
             else:
                 # Restriction disabled: do not block check-in, but still evaluate shift lateness
                 status, late_time, ot, pre_late = self._evaluate_checkin_status(
-                    current_float, shift_start, dead_time, predefined_late, allow_late=True
+                    current_float, shift_start, dead_time, predefined_late, is_manager=is_manager, allow_late=True
                 )
                 checkin_dt = utc_naive_dt
             vals = {
