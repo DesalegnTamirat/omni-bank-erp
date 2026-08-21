@@ -15,15 +15,26 @@ class RecruitmentRequest(models.Model):
     _rec_name = "reference"
     _order = "request_date desc"
 
+    def _default_requested_by(self):
+        user = self.env.user
+        if user.employee_id:
+            return user.employee_id.id
+        emp = self.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
+        return emp.id if emp else False
+
     def _default_operating_unit_id(self):
-        return self.env.user.default_operating_unit_id.id or False
+        user = self.env.user
+        if getattr(user, 'default_operating_unit_id', False):
+            return user.default_operating_unit_id.id
+        employee = user.employee_id or self.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
+        if employee and getattr(employee, 'default_operating_unit_id', False):
+            return employee.default_operating_unit_id.id
+        return False
 
     def _default_department_id(self):
-        employee = self.env["hr.employee"].search([
-            ("user_id", "=", self.env.user.id),
-            ("company_id", "=", self.env.company.id),
-        ], limit=1)
-        return employee.department_id.id if employee else False
+        user = self.env.user
+        employee = user.employee_id or self.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
+        return employee.department_id.id if employee and employee.department_id else False
 
     def _default_workforce_plan_id(self):
         unit_id = self._default_operating_unit_id()
@@ -33,8 +44,8 @@ class RecruitmentRequest(models.Model):
             ("work_unit_id", "=", unit_id),
             ("state", "=", "approved"),
             ("del_flg", "=", "N"),
-        ])
-        return plans.id if len(plans) == 1 else False
+        ], order="id desc")
+        return plans[0].id if plans else False
 
     # -- Reference --------------------------------------------------------
     reference = fields.Char(
@@ -55,11 +66,8 @@ class RecruitmentRequest(models.Model):
     )
     requested_by = fields.Many2one(
         "hr.employee", string="Requested By",
-        default=lambda self: self.env["hr.employee"].search([
-            ("user_id", "=", self.env.user.id),
-            ("company_id", "=", self.env.company.id),
-        ], limit=1),
-        required=True, tracking=True, readonly= True,
+        default=lambda self: self._default_requested_by(),
+        required=True, tracking=True, readonly=True,
     help="Defaults to the currently logged-in user's employee record "
              "and is read-only in Draft, so a request can't be filed on "
              "behalf of someone else."
@@ -74,12 +82,12 @@ class RecruitmentRequest(models.Model):
     workforce_plan_id = fields.Many2one(
         "planning.work.unit.manpower", string="Approved Workforce Plan",
         tracking=True,
-        default=lambda self: self._default_workforce_plan_id(),readonly= True,
+        default=lambda self: self._default_workforce_plan_id(),
         domain="[('work_unit_id', '=', operating_unit_id), "
                "('state', '=', 'approved'), ('del_flg', '=', 'N')]",
         help=": Required for Planned requests. Only approved plans "
              "belonging to the selected Work Unit are selectable. "
-             "Auto-filled when only one Approved plan exists for your Work Unit."
+             "Auto-filled when an Approved plan exists for your Work Unit."
     )
 
     justification = fields.Text(
@@ -148,12 +156,10 @@ class RecruitmentRequest(models.Model):
         help=": Tick if this request is to replace an existing employee or position."
     )
     replaced_employee_id = fields.Many2one(
-        "hr.employee", string="Employee Being Replaced",
-        invisible="not is_replacement"
+        "hr.employee", string="Employee Being Replaced"
     )
     replacement_reason = fields.Char(
-        string="Reason for Replacement",
-        invisible="not is_replacement"
+        string="Reason for Replacement"
     )
 
     is_hr = fields.Boolean(
@@ -195,7 +201,9 @@ class RecruitmentRequest(models.Model):
     def _compute_allowed_jobs(self):
         for rec in self:
             jobs = self.env["hr.job"]
-            if rec.workforce_plan_id:
+            if rec.request_type == "unplanned":
+                jobs = self.env["hr.job"].search([])
+            elif rec.workforce_plan_id:
                 jobs = rec.workforce_plan_id.manpower_line_ids.mapped("job_id")
             elif rec.operating_unit_id:
                 plans = self.env["planning.work.unit.manpower"].search([
@@ -206,7 +214,7 @@ class RecruitmentRequest(models.Model):
                 jobs = plans.mapped("manpower_line_ids.job_id")
             rec.allowed_job_ids = jobs
 
-    @api.depends("operating_unit_id", "workforce_plan_id", "job_position_id")
+    @api.depends("operating_unit_id", "workforce_plan_id", "job_position_id", "request_type")
     def _compute_allowed_grades(self):
         for rec in self:
             if not rec.job_position_id:
@@ -286,7 +294,29 @@ class RecruitmentRequest(models.Model):
                 vals["reference"] = (
                         self.env["ir.sequence"].next_by_code("recruitment.request") or _("New")
                 )
+            if vals.get("job_position_id"):
+                job = self.env["hr.job"].browse(vals["job_position_id"])
+                if job.exists():
+                    if not vals.get("job_description"):
+                        job_desc = getattr(job, 'job_description', False) or getattr(job, 'description', False)
+                        if job_desc:
+                            vals["job_description"] = job_desc
+                    if not vals.get("qualification_id"):
+                        qual = False
+                        if hasattr(job, 'qualification_id') and job.qualification_id:
+                            q_field = job.qualification_id
+                            if hasattr(q_field, '_name') and q_field._name == 'recruitment.qualification':
+                                qual = q_field
+                            elif hasattr(q_field, 'filtered'):
+                                lines_with_qual = q_field.filtered(lambda l: getattr(l, 'qualification', False))
+                                if lines_with_qual:
+                                    first_qual = lines_with_qual[0].qualification
+                                    if hasattr(first_qual, '_name') and first_qual._name == 'recruitment.qualification':
+                                        qual = first_qual
+                        if qual:
+                            vals["qualification_id"] = qual.id
         return super().create(vals_list)
+
 
     def _get_matching_plan_lines(self, plan, job, grade):
         """Return the manpower lines on `plan` that correspond to `job`
@@ -496,11 +526,11 @@ class RecruitmentRequest(models.Model):
 
     @api.constrains("employee_category", "sourcing_type", "job_level")
     def _check_job_level_required(self):
-        """Job Level is only required for Non-Managerial when Sourcing Type is External or Both, and must be empty for Managerial."""
+        """Job Level is only required for Non-Managerial when Sourcing Type is External."""
         for rec in self:
-            if rec.employee_category == "Non Managerial" and rec.sourcing_type in ("external", "both") and not rec.job_level:
+            if rec.employee_category == "Non Managerial" and rec.sourcing_type == "external" and not rec.job_level:
                 raise ValidationError(_(
-                    "Job Level (Junior / Senior) is required for Non-Managerial requests when Sourcing Type is External or Both."
+                    "Job Level (Junior / Senior) is required for Non-Managerial external requests."
                 ))
             if rec.employee_category == "Managerial" and rec.job_level:
                 rec.job_level = False
@@ -556,10 +586,25 @@ class RecruitmentRequest(models.Model):
                                                 "department") and self.operating_unit_id.department:
             self.department_id = self.operating_unit_id.department
 
-        # Auto-sync description and requirements if empty
-        if hasattr(self.job_position_id,
-                   'description') and self.job_position_id.description and not self.job_description:
-            self.job_description = self.job_position_id.description
+        # Auto-sync description and qualification from Job Position
+        job_desc = getattr(self.job_position_id, 'job_description', False) or getattr(self.job_position_id, 'description', False)
+        if job_desc:
+            self.job_description = job_desc
+
+        qual = False
+        if hasattr(self.job_position_id, 'qualification_id') and self.job_position_id.qualification_id:
+            q_field = self.job_position_id.qualification_id
+            if hasattr(q_field, '_name') and q_field._name == 'recruitment.qualification':
+                qual = q_field
+            elif hasattr(q_field, 'filtered'):
+                lines_with_qual = q_field.filtered(lambda l: getattr(l, 'qualification', False))
+                if lines_with_qual:
+                    first_qual = lines_with_qual[0].qualification
+                    if hasattr(first_qual, '_name') and first_qual._name == 'recruitment.qualification':
+                        qual = first_qual
+        if qual:
+            self.qualification_id = qual.id
+
         if hasattr(self.job_position_id,
                    'requirements') and self.job_position_id.requirements and not self.required_qualifications:
             self.required_qualifications = self.job_position_id.requirements

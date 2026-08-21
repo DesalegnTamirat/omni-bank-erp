@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
-	<record id="new_hr_leave_allocation_inherit" model="ir.ui.view">
+    <record id="new_hr_leave_allocation_inherit" model="ir.ui.view">
         <field name="name">hr.leave.allocation.inherit</field>
         <field name="model">hr.leave.allocation</field>
         <field name="inherit_id" ref="hr_holidays.hr_leave_allocation_view_form_manager"/>
@@ -21,5 +21,17 @@
         </field>
     </record>
 
-<!--<menuitem id="menu_new_recruitments" name="Recruitments" parent="hr_recruitment.menu_hr_recruitment_root"/>-->
+    <record id="view_hr_job_form_inherit_recruitment_req" model="ir.ui.view">
+        <field name="name">hr.job.form.inherit.recruitment.req</field>
+        <field name="model">hr.job</field>
+        <field name="inherit_id" ref="hr_employee_custom.hr_job_new_line_view_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='grade']" position="after">
+                <field name="job_description" placeholder="Enter Job Description and responsibilities..."/>
+            </xpath>
+        </field>
+    </record>
+
+    <!--<menuitem id="menu_new_recruitments" name="Recruitments" parent="hr_recruitment.menu_hr_recruitment_root"/>-->
 </odoo>

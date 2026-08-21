@@ -130,15 +130,19 @@ class HrEmployeeJobPositionSync(models.Model):
         _inherit = 'hr.employee'
 
         def write(self, vals):
+            if self.env.context.get('in_sync_job_position_counts'):
+                return super().write(vals)
             res = super().write(vals)
             if 'job_position' in vals or 'operating_unit_ids' in vals:
-                self._sync_job_position_counts()
+                self.with_context(in_sync_job_position_counts=True)._sync_job_position_counts()
             return res
 
         @api.model_create_multi
         def create(self, vals_list):
+            if self.env.context.get('in_sync_job_position_counts'):
+                return super().create(vals_list)
             records = super().create(vals_list)
-            records._sync_job_position_counts()
+            records.with_context(in_sync_job_position_counts=True)._sync_job_position_counts()
             return records
 
         def _sync_job_position_counts(self):

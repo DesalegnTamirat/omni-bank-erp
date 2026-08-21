@@ -606,8 +606,6 @@ class EmployeeTransferRequest(models.Model):
                 missing.append(_("Reason for Transfer"))
             if not rec.current_job_category:
                 missing.append(_("Job Category"))
-            if rec.current_job_category == "Non Managerial" and not rec.current_job_level:
-                missing.append(_("Job Level (Junior / Senior)"))
             if missing:
                 raise ValidationError(
                     _("Please complete the following before submitting:\n- %s")
@@ -724,10 +722,6 @@ class EmployeeTransferRequest(models.Model):
             raise UserError(_("This request has no current job position."))
 
         category = self.current_job_category or "Non Managerial"
-        if category == "Non Managerial" and not self.current_job_level:
-            raise UserError(
-                _("Job Level (Junior / Senior) is required for Non-Managerial vacancies.")
-            )
 
         responsible_employee = self.env.user.employee_id
         vacancy_vals = {

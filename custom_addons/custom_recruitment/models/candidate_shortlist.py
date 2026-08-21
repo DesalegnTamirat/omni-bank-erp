@@ -35,7 +35,7 @@ class CandidateShortlist(models.Model):
     applicant_email = fields.Char(string="Applicant email")
     notify_candidate = fields.Boolean(string='Notify Candidate', default=False)
 
-    # FR-REC-056: Leave Status — cross-reference with Time Off module (hr.leave)
+    # Leave Status — cross-reference with Time Off module (hr.leave)
     # No new model created; reads directly from hr.leave for the linked employee.
     active_leave_status = fields.Char(
         string="Leave Status",

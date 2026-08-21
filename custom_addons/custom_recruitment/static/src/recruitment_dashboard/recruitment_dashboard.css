@@ -1,17 +1,24 @@
 /* ── Recruitment Dashboard ── */
-/* Brand colors from palette:
-   Primary Dark Teal : #1d2632
-   Primary Maroon    : #b47198  (last two from color card)
+/* Official Corporate Brand Colors:
+   Forest Green: #425727
+   Olive Gold:   #726732
+   Warm Bronze:  #c17540
+   Dark Navy:    #1d2b32
+   Forest Teal:  #1e2917
+   Burgundy:     #541718
 */
 
 :root {
-    --rd-primary:   #1d2632;   /* dark teal/navy  */
-    --rd-secondary: #b47198;   /* maroon/wine     */
-    --rd-bg:        #f4f1ee;
+    --rd-primary:   #425727;   /* Forest Green */
+    --rd-secondary: #726732;   /* Olive Gold */
+    --rd-accent:    #c17540;   /* Warm Bronze */
+    --rd-navy:      #1d2b32;   /* Dark Navy */
+    --rd-burgundy:  #541718;   /* Deep Burgundy */
+    --rd-bg:        #f7f9f5;
     --rd-card-bg:   #ffffff;
-    --rd-border:    #e0d9d0;
-    --rd-text:      #2d1e0f;
-    --rd-muted:     #7a6f66;
+    --rd-border:    #dcdfd8;
+    --rd-text:      #1d2b32;
+    --rd-muted:     #6b7762;
 }
 
 .o_recruitment_dashboard {
@@ -133,3 +140,46 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+/* ── Prevent List Table Header Truncation (Ellipsis) ── */
+.o_list_table th,
+.o_list_table th .o_column_title,
+.o_list_renderer .o_list_table th {
+    white-space: normal !important;
+    text-overflow: clip !important;
+    word-break: normal !important;
+    overflow: visible !important;
+    vertical-align: bottom !important;
+    min-width: 120px !important;
+}
+
+.o_list_table th.o_list_number_th,
+.o_list_table th[data-name="number_of_openings"],
+.o_list_table th[data-name="planned_positions"] {
+    min-width: 140px !important;
+}
+
+/* ── Bunna Bank Coffee Brand Palette (#4A2E1A) ── */
+.btn-success,
+button.btn-success,
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active {
+    background-color: #4A2E1A !important;
+    border-color: #4A2E1A !important;
+    color: #FFFFFF !important;
+}
+
+.btn-success:hover {
+    background-color: #361E0B !important;
+    border-color: #361E0B !important;
+}
+
+.bg-success,
+.text-bg-success,
+.badge.text-bg-success,
+.badge.bg-success {
+    background-color: #4A2E1A !important;
+    color: #FFFFFF !important;
+}
+

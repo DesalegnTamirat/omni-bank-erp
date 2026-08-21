@@ -36,7 +36,7 @@ class HrPayrollAdjustments(models.Model):
     def create(self, vals):
         if vals.get('reference', _('New')) == _('New'):
             vals['reference'] = self.env['ir.sequence'].next_by_code('hr.payroll.adjustments') or _('New')
-            res = super(HrPayrollAdjustments, self).create(vals)
+            res = super().create(vals)
             return res
 
     def notify(self):

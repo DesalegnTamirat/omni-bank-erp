@@ -69,8 +69,11 @@
                   action="employee_supplementary_role_tree" sequence="14"/>
         <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
                   action="employee_re_instating_tree" sequence="15"/>
-        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="employee_transfer_form_tree" sequence="16"/>
+<!--        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"-->
+<!--                  action="employee_transfer_form_tree" sequence="16"/>-->
+       <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
+                  action="custom_recruitment.action_employee_transfer_request" sequence="16"/>
+
         <menuitem id="menu_hr_award_list" name="Awards Given Details" parent="hr.menu_hr_employee_payroll"
                   action="employee_hr_award_tree" sequence="17"/>
         <menuitem id="menu_hr_employee_document_all" name="Documents" parent="hr.menu_hr_employee_payroll"

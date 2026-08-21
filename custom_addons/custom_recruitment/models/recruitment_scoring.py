@@ -41,7 +41,14 @@ class RecruitmentCandidateScore(models.Model):
     _rec_name = "candidate_name"
     _order = "rank asc, final_score desc"
 
-    vacancy_id = fields.Many2one("job.vacancy", string="Vacancy", required=True, ondelete="cascade", tracking=True)
+    vacancy_id = fields.Many2one(
+        "job.vacancy",
+        string="Vacancy",
+        required=True,
+        ondelete="cascade",
+        tracking=True,
+        domain="['|', ('recruitment_type', '=', 'External'), ('sourcing_type', 'in', ['external', 'both'])]"
+    )
 
     recruitment_type = fields.Selection(
         [("internal", "Internal"), ("external", "External")],
@@ -414,9 +421,38 @@ class RecruitmentCandidateScore(models.Model):
                 )
 
 
+    def action_sync_interview_score(self):
+        FinalResult = self.env["interview.final.result"]
+        for rec in self:
+            if not rec.vacancy_id:
+                continue
+            final_res = False
+            if rec.applicant_id:
+                final_res = FinalResult.search([
+                    ('applicant_id', '=', rec.applicant_id.id),
+                    ('session_id.vacancy_id', '=', rec.vacancy_id.id)
+                ], order='id desc', limit=1)
+                if not final_res:
+                    final_res = FinalResult.search([
+                        ('applicant_id', '=', rec.applicant_id.id)
+                    ], order='id desc', limit=1)
+            elif rec.employee_id:
+                final_res = FinalResult.search([
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('session_id.vacancy_id', '=', rec.vacancy_id.id)
+                ], order='id desc', limit=1)
+                if not final_res:
+                    final_res = FinalResult.search([
+                        ('employee_id', '=', rec.employee_id.id)
+                    ], order='id desc', limit=1)
+
+            if final_res:
+                rec.interview_score = final_res.final_score
+
     def action_apply_disqualification_check(self):
 
         for rec in self:
+            rec.action_sync_interview_score()
             reasons = []
             if rec.written_score < DISQUALIFICATION_THRESHOLD and rec.written_weight > 0:
                 reasons.append(_("Written Exam score %.1f%% < 50%%") % rec.written_score)
@@ -480,6 +516,7 @@ class RecruitmentCandidateScore(models.Model):
                 "message": _("%d candidate(s) checked against the 50%% gate.") % len(candidates),
                 "type": "success",
                 "sticky": False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -521,6 +558,7 @@ class RecruitmentCandidateScore(models.Model):
                 "message": _("%d candidates ranked across %d vacancy(ies).") % (total_ranked, len(vacancies)),
                 "type": "success",
                 "sticky": False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -702,10 +740,11 @@ class JobVacancyOfferableCandidates(models.Model):
 
     def _search_has_offerable_candidates(self, operator, value):
         Score = self.env["recruitment.candidate.score"]
-        eligible_vacancy_ids = Score.search([
+        eligible_vacs = Score.search([
             ("selection_status", "=", "selected"),
             ("has_offer_letter", "=", False),
-        ]).mapped("vacancy_id").ids
+        ]).mapped("vacancy_id").filtered(lambda v: (v.sourcing_type in ('external', 'both') or 'EXT' in (v.reference or '')) and 'INT' not in (v.reference or ''))
+        eligible_vacancy_ids = eligible_vacs.ids
 
         if (operator == "=" and value) or (operator == "!=" and not value):
             return [("id", "in", eligible_vacancy_ids)]
@@ -727,21 +766,20 @@ class RecruitmentOfferLetter(models.Model):
 
     reference = fields.Char(string="Offer Reference", copy=False, readonly=True,
                             default=lambda self: _("New"))
-    # ── CHANGED: only vacancies that still have at least one Selected,
-    # not-yet-offered candidate are selectable.
+    # ── CHANGED: only External vacancies that still have at least one Selected candidate are selectable.
     vacancy_id = fields.Many2one(
         "job.vacancy", string="Vacancy", required=True, tracking=True,
-        domain="[('has_offerable_candidates', '=', True)]"
+        domain="[('reference', 'ilike', 'EXT')]"
     )
-    # ── CHANGED: only "Selected" candidates who don't already have an
-    # offer letter (in ANY state) may be picked when creating a new offer.
+    ext_candidate_id = fields.Many2one(
+        "external.recruitment.selected.candidates", string="Candidate", required=True, tracking=True,
+        domain="[('selection_type', 'in', ['selected', 'Selected'])]",
+        help="Selected external candidate for offer letter."
+    )
     candidate_score_id = fields.Many2one(
-        "recruitment.candidate.score", string="Candidate", required=True,
-        domain="[('vacancy_id','=',vacancy_id),"
-               "('selection_status','=','selected'),"
-               "('has_offer_letter','=',False)]"
+        "recruitment.candidate.score", string="Candidate Score Record", required=False
     )
-    candidate_name = fields.Char(related="candidate_score_id.candidate_name", store=True)
+    candidate_name = fields.Char(related="ext_candidate_id.display_name", store=True)
     active = fields.Boolean(default=True)
 
     offer_date = fields.Date(string="Offer Issue Date", default=fields.Date.context_today, required=True)
@@ -769,35 +807,25 @@ class RecruitmentOfferLetter(models.Model):
                         self.env["ir.sequence"].next_by_code("recruitment.offer.letter") or _("New")
                 )
         records = super().create(vals_list)
-        # ── NEW: flag each candidate as having an offer letter, so they're
-        # excluded from the candidate_score_id domain on any future offer.
-        records.mapped("candidate_score_id").write({"has_offer_letter": True})
         return records
 
     def unlink(self):
-        # ── NEW: keep has_offer_letter accurate if an offer letter is
-        # deleted (e.g. created in error) — recompute per remaining offers.
-        candidates = self.mapped("candidate_score_id")
         res = super().unlink()
-        for cand in candidates:
-            cand.has_offer_letter = bool(self.search_count([
-                ("candidate_score_id", "=", cand.id),
-            ]))
         return res
 
-
-    @api.constrains("candidate_score_id")
+    @api.constrains("ext_candidate_id")
     def _check_candidate_not_already_offered(self):
         for rec in self:
-            dupes = self.search([
-                ("candidate_score_id", "=", rec.candidate_score_id.id),
-                ("id", "!=", rec.id),
-            ])
-            if dupes:
-                raise ValidationError(_(
-                    "Candidate %s already has an offer letter (%s). A candidate "
-                    "can only ever receive one offer letter."
-                ) % (rec.candidate_name, dupes[0].reference))
+            if rec.ext_candidate_id:
+                dupes = self.search([
+                    ("ext_candidate_id", "=", rec.ext_candidate_id.id),
+                    ("id", "!=", rec.id),
+                    ("state", "not in", ["declined", "expired"])
+                ])
+                if dupes:
+                    raise ValidationError(_(
+                        "Candidate %s already has an active offer letter (%s)."
+                    ) % (rec.ext_candidate_id.display_name or rec.candidate_name, dupes[0].reference))
 
     @api.depends("offer_date")
     def _compute_deadline(self):

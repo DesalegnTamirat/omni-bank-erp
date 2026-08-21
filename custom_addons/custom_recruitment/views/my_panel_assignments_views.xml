@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View for My Panel Assignments -->
+    <record id="view_my_panel_assignments_tree" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.panel.my.tree</field>
+        <field name="model">new.internal.recruitment.panel</field>
+        <field name="arch" type="xml">
+            <list string="Panel Interview Invitations" create="0" delete="0">
+                <field name="emp_name" string="Panel Member"/>
+                <field name="vacancy_reference"/>
+                <field name="job_position_id"/>
+                <field name="selection_criteria"/>
+                <field name="interview_date"/>
+                <field name="interview_location"/>
+                <field name="response_status"
+                       decoration-info="response_status == 'pending'"
+                       decoration-success="response_status == 'accepted'"
+                       decoration-danger="response_status == 'unavailable'"
+                       decoration-warning="response_status in ['reschedule_requested', 'delegation_requested']"/>
+                <field name="delegate_employee_id" optional="show"/>
+                <field name="delegation_state" optional="show"
+                       decoration-warning="delegation_state == 'pending_hr'"
+                       decoration-success="delegation_state == 'approved'"
+                       decoration-danger="delegation_state == 'rejected'"/>
+                <field name="response_reason" optional="show"/>
+                <button name="action_accept_assignment" string="Accept" type="object" class="btn-success btn-sm" icon="fa-check" invisible="response_status != 'pending'"/>
+                <button name="action_reject_assignment" string="Reject" type="object" class="btn-danger btn-sm" icon="fa-times" invisible="response_status != 'pending'"/>
+                <button name="action_open_response_wizard" string="Respond" type="object" class="btn-secondary btn-sm" invisible="response_status != 'pending'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View for Panel Assignments -->
+    <record id="view_my_panel_assignments_search" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.panel.my.search</field>
+        <field name="model">new.internal.recruitment.panel</field>
+        <field name="arch" type="xml">
+            <search string="Search Panel Invitations">
+                <field name="emp_name" string="Panel Member"/>
+                <field name="vacancy_reference" string="Vacancy"/>
+                <field name="job_position_id" string="Job Position"/>
+                <field name="response_status"/>
+                <filter string="My Invitations" name="my_invitations" domain="['|', ('emp_name.user_id', '=', uid), ('delegate_employee_id.user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Pending Response" name="filter_pending" domain="[('response_status', '=', 'pending')]"/>
+                <filter string="Accepted" name="filter_accepted" domain="[('response_status', '=', 'accepted')]"/>
+                <filter string="Unavailable / Rejected" name="filter_unavailable" domain="[('response_status', '=', 'unavailable')]"/>
+                <filter string="Delegation Requested" name="filter_delegation" domain="[('response_status', '=', 'delegation_requested')]"/>
+                <separator/>
+                <filter string="Group by Vacancy" name="group_vacancy" context="{'group_by': 'vacancy_reference'}"/>
+                <filter string="Group by Job Position" name="group_job" context="{'group_by': 'job_position_id'}"/>
+                <filter string="Group by Response Status" name="group_status" context="{'group_by': 'response_status'}"/>
+                <filter string="Group by Panel Member" name="group_emp" context="{'group_by': 'emp_name'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Form View for My Panel Assignments -->
+    <record id="view_my_panel_assignments_form" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.panel.my.form</field>
+        <field name="model">new.internal.recruitment.panel</field>
+        <field name="arch" type="xml">
+            <form string="My Panel Assignment Details" create="0" delete="0">
+                <header>
+                    <button name="action_accept_assignment" string="Accept Assignment" type="object" class="btn-success" icon="fa-check" invisible="response_status != 'pending'"/>
+                    <button name="action_reject_assignment" string="Reject / Unavailable" type="object" class="btn-danger" icon="fa-times" invisible="response_status != 'pending'"/>
+                    <button name="action_open_response_wizard" string="Request Reschedule / Delegate" type="object" class="btn-secondary" icon="fa-reply" invisible="response_status != 'pending'"/>
+                    <field name="response_status" widget="statusbar" statusbar_visible="pending,accepted,unavailable,reschedule_requested,delegation_requested"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Vacancy &amp; Position Info">
+                            <field name="emp_name" readonly="1" string="Assigned Panel Member"/>
+                            <field name="vacancy_reference" readonly="1"/>
+                            <field name="job_position_id" readonly="1"/>
+                            <field name="selection_criteria" readonly="1"/>
+                        </group>
+                        <group string="Schedule &amp; Location">
+                            <field name="interview_date" readonly="1"/>
+                            <field name="interview_location" readonly="1"/>
+                            <field name="accepted" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Response &amp; Delegation Details">
+                        <group>
+                            <field name="response_status" readonly="1"/>
+                            <field name="response_reason" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="proposed_interview_date" readonly="1" invisible="not proposed_interview_date"/>
+                            <field name="delegate_employee_id" readonly="1" invisible="not delegate_employee_id"/>
+                            <field name="delegation_state" readonly="1" invisible="not delegate_employee_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for My Panel Assignments -->
+    <record id="action_my_panel_assignments" model="ir.actions.act_window">
+        <field name="name">Panel Interview Invitations</field>
+        <field name="res_model">new.internal.recruitment.panel</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_my_panel_assignments_search"/>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_my_panel_assignments_tree')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_my_panel_assignments_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No interview panel assignments found.
+            </p>
+            <p>
+                When HR assigns you to an interview or exam panel, your assignments will appear here for you to Accept, Declare Unavailability, Request Reschedule, or Delegate.
+            </p>
+        </field>
+    </record>
+</odoo>

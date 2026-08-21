@@ -47,7 +47,7 @@ dependency, so they were intentionally left in place.
     """,
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Bunna Bank',
+    'author': 'EAD Team',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -58,6 +58,7 @@ dependency, so they were intentionally left in place.
         'website',
         'hr_employee_custom',
         'discipline_management',
+        'competency_management',
     ],
     'data': [
         'security/recruitment_security_groups.xml',
@@ -71,15 +72,18 @@ dependency, so they were intentionally left in place.
         'data/hr_job_vacancy.xml',
         'data/employee_transfer_probation.xml',
         'data/recruitment_request_sequence.xml',
+        'data/recruitment_selection_minute_sequence.xml',
         'data/recruitment_scoring_data.xml',
         'data/recruitment_master_seed_data.xml',
 
         # -- Reports (must load before views referencing their actions) --
         'reports/minute_template.xml',
         'reports/transfer_minute_template.xml',
+        'reports/internal_recruitment_minute.xml',
+        'reports/recruitment_selection_minute_report.xml',
 
         # -- Menus Root (must load first so parent menus exist early) --
-        # 'views/menu_recruitment_root.xml',
+        'views/menu_recruitment_root.xml',
 
         # -- Dashboard --
         'views/recruitment_dashboard_action.xml',
@@ -87,26 +91,26 @@ dependency, so they were intentionally left in place.
         # -- Recruitment Criteria / Internal Job Position --
         'views/internal_job_position_views.xml',
 
-        # -- Portal --
+        # -- Portal & ATS --
         'views/acceptance_portal.xml',
+        'views/candidate_profile_views.xml',
+        'views/ats_portal_templates.xml',
 
         # -- Core Recruitment Views --
-        'views/applicant_assessment.xml',
         'views/applicant_shortlist.xml',
-        'views/assessment_criteria.xml',
         'views/candidate_shortlist.xml',
         'views/blacklist_pool.xml',
         'views/eligible_employees_external.xml',
         'views/eligible_employees_internal.xml',
         'views/internal_recruitment.xml',
 
-        'views/interview_assessment.xml',
         'views/job_vacancy.xml',
         'views/recruitment_process_external.xml',
         'views/external_default_criteria_views.xml',
         'views/recruitment_process_internal.xml',
         'views/selected_external.xml',
         'views/selected_internal.xml',
+        'views/recruitment_selection_minute_views.xml',
         'views/hr_applicant_views.xml',
         'views/employee_probation.xml',
         'views/hr_onboarding.xml',
@@ -117,17 +121,23 @@ dependency, so they were intentionally left in place.
         'views/employee_education_views.xml',
         # -- Recruitment Request Management  --
         'views/recruitment_request.xml',
+        'views/hr_job.xml',
 
         # -- Scoring Engine, Offer Management, Application Window, Blacklist (FRS 5,6,9,11) --
         'views/recruitment_scoring_views.xml',
         'views/talent_roster_views.xml',
         'data/talent_roster_cron.xml',
 
-        # -- Wizards (views + actions only; menu items are in menu_recruitment.xml) --
+        'views/ats_news_views.xml',
         'wizards/external_candidates.xml',
         'wizards/internal_candidates.xml',
         'wizards/notify_internal_candidates.xml',
         'wizards/talent_roster_wizard.xml',
+        'wizards/release_wizard.xml',
+        'wizards/ats_bulk_communication_views.xml',
+        'wizards/blacklist_import_wizard.xml',
+        'wizards/panel_member_response_wizard.xml',
+        'wizards/reschedule_interview_wizard.xml',
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',

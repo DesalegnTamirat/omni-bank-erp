@@ -34,6 +34,12 @@ class HrDocumentType(models.Model):
         ('name_uniq', 'unique(name)', 'A document type with this name already exists.'),
     ]
 
+    def unlink(self):
+        """Soft delete: Set active=False for all records instead of deleting from DB."""
+        for rec in self:
+            rec.write({'active': False})
+        return True
+
 
 # -----------------------------------------------------------------------
 # Main Document model
@@ -119,6 +125,13 @@ class HrEmployeeDocument(models.Model):
     # Notes
     # ---------------------------------------------------------------
     description = fields.Text(string='Description')
+    active = fields.Boolean(string='Active', default=True)
+
+    def unlink(self):
+        """Soft delete: Set active=False for all records instead of deleting from DB."""
+        for rec in self:
+            rec.write({'active': False})
+        return True
 
 
 # -----------------------------------------------------------------------

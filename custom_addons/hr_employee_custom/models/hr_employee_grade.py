@@ -115,14 +115,18 @@ class HrEmployeeGrade(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        if self.env.context.get('in_generate_increments'):
+            return super().create(vals_list)
         records = super().create(vals_list)
-        records._generate_increments()
+        records.with_context(in_generate_increments=True)._generate_increments()
         return records
 
     def write(self, vals):
+        if self.env.context.get('in_generate_increments'):
+            return super().write(vals)
         res = super().write(vals)
         if 'base_salary' in vals or 'salary_factor' in vals:
-            self._generate_increments()
+            self.with_context(in_generate_increments=True)._generate_increments()
         return res
 
     def _generate_increments(self):

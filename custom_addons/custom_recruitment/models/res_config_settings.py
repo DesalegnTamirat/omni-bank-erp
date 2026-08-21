@@ -71,7 +71,7 @@ class TransferRequestConfig(models.TransientModel):
 
     @api.model
     def default_get(self, fields_list):
-        res = super(TransferRequestConfig, self).default_get(fields_list)
+        res = super().default_get(fields_list)
         ICPSudo = self.env["ir.config_parameter"].sudo()
         res.update({
             'transfer_discipline_blocks_first_warning': ICPSudo.get_param('custom_recruitment.transfer_discipline_blocks_first_warning', 'False') == 'True',
@@ -126,5 +126,6 @@ class TransferRequestConfig(models.TransientModel):
                 'message': _('Transfer Request Settings have been updated successfully.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }

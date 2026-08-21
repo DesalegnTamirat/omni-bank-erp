@@ -39,7 +39,6 @@
                 <field name="award_cost"/>
                 <field name="date_awarded"/>
                 <field name="comments"/>
-<!--                <button name="approve" string="Approve" type="object" class="btn-primary"/>-->
             </list>
         </field>
     </record>

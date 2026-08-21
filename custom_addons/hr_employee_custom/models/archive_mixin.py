@@ -2,10 +2,7 @@
 """
 ArchiveMixin
 ============
-Drop this mixin on any model to:
-  - Block unlink() — raises ValidationError instead of deleting
-  - Provide action_archive / action_unarchive convenience methods
-  - Require an `active` field on the model (Boolean, default=True)
+Mixin for Soft Delete (Archiving instead of Hard Delete).
 
 Usage:
     class MyModel(models.Model):
@@ -14,20 +11,25 @@ Usage:
 
         active = fields.Boolean(default=True)
 """
-from odoo import models, _
-from odoo.exceptions import ValidationError
+from odoo import models, fields, _
 
 
 class ArchiveMixin(models.AbstractModel):
     _name = 'archive.mixin'
-    _description = 'Archive Instead of Delete Mixin'
+    _description = 'Archive Instead of Delete (Soft Delete Mixin)'
+
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        help="Set to false to soft delete / archive the record.",
+    )
 
     def unlink(self):
-        """Block all deletion — archive instead."""
-        raise ValidationError(_(
-            'Deleting records is not allowed. '
-            'Please use the Archive option to deactivate records.'
-        ))
+        """Soft delete: Set active=False for all records instead of removing from DB."""
+        records_to_archive = self.filtered(lambda r: 'active' in r._fields)
+        if records_to_archive:
+            records_to_archive.write({'active': False})
+        return True
 
     def action_archive(self):
         """Set active=False for all records in self."""

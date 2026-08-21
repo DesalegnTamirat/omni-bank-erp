@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_reschedule_interview_wizard_form" model="ir.ui.view">
+        <field name="name">reschedule.interview.wizard.form</field>
+        <field name="model">reschedule.interview.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reschedule Interview &amp; Reassign Panel">
+                <sheet>
+                    <group>
+                        <group string="Selection Process Details">
+                            <field name="internal_selected_id" readonly="1" invisible="not internal_selected_id"/>
+                            <field name="external_selected_id" readonly="1" invisible="not external_selected_id"/>
+                            <field name="new_interview_date" required="1"/>
+                            <field name="new_interview_location"/>
+                        </group>
+                        <group string="Notifications &amp; Options">
+                            <field name="re_notify_panel"/>
+                            <field name="re_notify_candidates"/>
+                        </group>
+                    </group>
+
+                    <group string="Reason for Rescheduling">
+                        <field name="reschedule_reason" placeholder="Explain why the interview is being rescheduled..." nolabel="1" required="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_reschedule" string="Confirm Reschedule" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

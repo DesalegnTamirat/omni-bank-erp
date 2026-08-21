@@ -3,11 +3,12 @@ from odoo import models, fields, api
 
 
 class Hr_Awards_received_Info(models.Model):
-    """Table for keep employee family information"""
+    """Table for keep employee award information"""
     _name = 'hr.awards'
     _description = 'HR Awards Received'
     _rec_name = 'award_name'
-    employee_id = fields.Many2one('hr.employee', string="Employee Name ", help='Select corresponding Employee')
+
+    employee_id = fields.Many2one('hr.employee', string="Employee Name", help='Select corresponding Employee')
     ref_num = fields.Char(string='Ref Num')
     employee_name = fields.Many2one('hr.employee', string="Employee Name", help='Select corresponding Employee')
     award_name = fields.Many2one('service.award', string="Award Name", help='Select corresponding Award')
@@ -17,6 +18,7 @@ class Hr_Awards_received_Info(models.Model):
     award_cost = fields.Integer(string="Award Amount")
     date_awarded = fields.Date(string="Date Awarded")
     comments = fields.Char(string="Comments")
+    active = fields.Boolean(string='Active', default=True)
 
     @api.onchange('award_name')
     @api.depends('award_name')
@@ -24,3 +26,8 @@ class Hr_Awards_received_Info(models.Model):
         award = self.env['service.award'].search([('id', '=', self.award_name.id)])
         self.award_type = award.award_type
 
+    def unlink(self):
+        """Soft delete: Archive records instead of removing from DB."""
+        for rec in self:
+            rec.write({'active': False})
+        return True

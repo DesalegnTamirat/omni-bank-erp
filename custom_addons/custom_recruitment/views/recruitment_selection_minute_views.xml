@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Digital Selection Minute List View -->
+    <record id="recruitment_selection_minute_view_tree" model="ir.ui.view">
+        <field name="name">recruitment.selection.minute.list</field>
+        <field name="model">recruitment.selection.minute</field>
+        <field name="arch" type="xml">
+            <list string="Digital  Minutes" decoration-info="state == 'draft'" decoration-warning="state == 'pending_approval'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'">
+                <field name="name"/>
+                <field name="vacancy_id"/>
+                <field name="recruitment_type"/>
+                <field name="meeting_date"/>
+                <field name="is_fully_signed" widget="boolean_toggle"/>
+                <field name="state" decoration-info="state == 'draft'" decoration-warning="state == 'pending_approval'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Digital Selection Minute Form View -->
+    <record id="recruitment_selection_minute_view_form" model="ir.ui.view">
+        <field name="name">recruitment.selection.minute.form</field>
+        <field name="model">recruitment.selection.minute</field>
+        <field name="arch" type="xml">
+            <form string="Digital Minute">
+                <header>
+                    <button name="action_submit_to_committee" string="Submit &amp; Notify Panel for Digital Sign-Off" type="object" class="btn-primary" icon="fa-paper-plane" invisible="state != 'draft'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_load_from_vacancy" string="Load Panel &amp; Candidates" type="object" class="btn-secondary" icon="fa-refresh" invisible="state == 'approved'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_notify_panel_members" string="Notify Panel for Digital Sign-Off" type="object" class="btn-secondary" icon="fa-envelope" invisible="state in ('draft', 'approved') or panel_notified == True" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,approved"/>
+                </header>
+                <sheet>
+                    <field name="panel_notified" invisible="1"/>
+                    <widget name="web_ribbon" title="APPROVED" bg_color="text-bg-success" invisible="state != 'approved'"/>
+                    <widget name="web_ribbon" title="PENDING APPROVAL" bg_color="text-bg-warning" invisible="state != 'pending_approval'"/>
+                    <div class="oe_title">
+                        <label for="name" string="Minute Reference"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Vacancy &amp; Meeting Setup">
+                            <field name="vacancy_id" readonly="state != 'draft'"/>
+                            <field name="recruitment_type"/>
+                            <field name="meeting_date" readonly="state != 'draft'"/>
+                            <field name="is_fully_signed" widget="boolean"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Ranked Candidates" name="ranked_candidates">
+                            <field name="ranking_line_ids" readonly="state == 'approved'">
+                                <list string="Ranked Candidates" editable="bottom">
+                                    <field name="rank"/>
+                                    <field name="candidate_name"/>
+                                    <field name="applicant_id" optional="show"/>
+                                    <field name="employee_id" optional="show"/>
+                                    <field name="pms_score" optional="show"/>
+                                    <field name="written_score"/>
+                                    <field name="interview_score"/>
+                                    <field name="final_score" bold="1"/>
+                                    <field name="selection_status"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Committee Signatures" name="committee_signatures">
+                            <field name="committee_signature_ids">
+                                <list string="Committee Signatures" editable="bottom">
+                                    <field name="user_id"/>
+                                    <field name="role"/>
+                                    <field name="signature_img" widget="signature"/>
+                                    <field name="state" readonly="1"/>
+                                    <field name="signed_date" readonly="1"/>
+                                    <field name="remarks"/>
+                                    <button name="action_sign_minute" string="Sign Minute" type="object" class="btn-sm btn-success" invisible="state == 'signed'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Decision Summary" name="decision_summary_page">
+                            <field name="decision_summary" placeholder="Provide minute narrative and selection justification..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Digital Selection Minute Action -->
+    <record id="action_recruitment_selection_minute" model="ir.actions.act_window">
+        <field name="name">Digital Selection Minutes</field>
+        <field name="res_model">recruitment.selection.minute</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a Digital Committee Selection Minute!
+            </p>
+        </field>
+    </record>
+</odoo>

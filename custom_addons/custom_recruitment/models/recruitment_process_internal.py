@@ -12,11 +12,7 @@ class RecruitmentProcessInternal(models.Model):
     _rec_name = "job_position"
     active = fields.Boolean(default=True)
 
-    def unlink(self):
-        """ Soft delete: Archive records instead of removing from DB """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+
 
     def _compute_display_name(self):
         for rec in self:
@@ -47,8 +43,22 @@ class RecruitmentProcessInternal(models.Model):
                                    string="Internal Recruitment")
 
     def populate_criteria(self):
-        p_id = self.id
-        self.env.cr.execute('SELECT internal_candidates_criteria(%s)', (p_id,))
+        """
+        Populates eligible candidates for this internal recruitment.
+        Delegates to stored procedure public.internal_candidates_criteria.
+        """
+        for rec in self:
+            _logger.info("[populate_criteria] Populating criteria for Internal Recruitment ID=%s", rec.id)
+            target_id = rec.vacancy_id.id if rec.vacancy_id else False
+            if not target_id and rec.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', rec.vacancy_reference)], limit=1)
+                if vac:
+                    target_id = vac.id
+                    rec.write({'vacancy_id': vac.id})
+            if not target_id:
+                target_id = rec.id
+            self.env.cr.execute('SELECT public.internal_candidates_criteria(%s)', (target_id,))
+
 
     def populate_promotion(self):
         p_id = self.id
@@ -87,7 +97,8 @@ class RecruitmentProcessInternal(models.Model):
                     })
 
         try:
-            self.env.cr.execute('SELECT public.internal_applicant(%s)', (p_id,))
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT public.internal_applicant(%s)', (p_id,))
         except Exception:
             _logger.warning("Database stored procedure internal_applicant failed or does not exist. Bypassed since Python sync ran successfully.")
 
@@ -107,42 +118,50 @@ class RecruitmentProcessInternal(models.Model):
                 emp_user = val.emp_name.user_id
                 _logger.info("Notifying Employee: %s (User ID: %s)", val.emp_name.name, emp_user.id if emp_user else None)
 
+                domain = [('vacancy_reference', '=', self.vacancy_reference)]
                 if emp_user:
-                    existing = Available.search([
+                    domain = [
                         ('vacancy_reference', '=', self.vacancy_reference),
-                        ('employee_user_id', '=', emp_user.id),
-                    ], limit=1)
-                    avail_vals = {
-                        'vacancy_id': vac.id if vac else False,
-                        'vacancy_reference': self.vacancy_reference,
-                        'job_position': self.job_position.name if self.job_position else False,
-                        'job_location': self.job_location,
-                        'employee_grade': self.job_grade,
-                        'employee_category': self.job_category,
-                        'type_of_employment': self.emp_type,
-                        'number_of_vacancies': self.no_of_vacancies,
-                        'vacancy_announced_on': self.vacancy_announced_on,
-                        'last_date_to_apply': self.last_date_to_apply,
-                        'job_description': vac.vacancy_description if vac else '',
-                        'employee_id': val.emp_name.id,
-                        'employee_user_id': emp_user.id,
-                        'employee_applicant': val.emp_name.name,
-                        'application_status': 'New',
-                    }
-                    if existing:
-                        existing.write(avail_vals)
-                        avail_rec = existing
-                    else:
-                        avail_rec = Available.create(avail_vals)
+                        '|', ('employee_id', '=', val.emp_name.id), ('employee_user_id', '=', emp_user.id)
+                    ]
+                else:
+                    domain = [
+                        ('vacancy_reference', '=', self.vacancy_reference),
+                        ('employee_id', '=', val.emp_name.id)
+                    ]
 
-                    if vac and vac.hiring_details:
-                        avail_rec.employee_vacancy_ids.unlink()
-                        vac_lines = [(0, 0, {
-                            'operating_unit': h.work_unit.name if h.work_unit else False,
-                            'number_of_vacancies': h.number_of_openings or 0,
-                            'location_preference': 0,
-                        }) for h in vac.hiring_details]
-                        avail_rec.write({'employee_vacancy_ids': vac_lines})
+                existing = Available.search(domain, limit=1)
+                avail_vals = {
+                    'vacancy_id': vac.id if vac else (self.vacancy_id.id if hasattr(self, 'vacancy_id') and self.vacancy_id else False),
+                    'vacancy_reference': self.vacancy_reference,
+                    'job_position': self.job_position.name if self.job_position else False,
+                    'job_location': self.job_location,
+                    'employee_grade': self.job_grade,
+                    'employee_category': self.job_category,
+                    'type_of_employment': self.emp_type,
+                    'number_of_vacancies': self.no_of_vacancies,
+                    'vacancy_announced_on': self.vacancy_announced_on,
+                    'last_date_to_apply': self.last_date_to_apply,
+                    'job_description': vac.vacancy_description if vac else '',
+                    'employee_id': val.emp_name.id,
+                    'employee_user_id': emp_user.id if emp_user else False,
+                    'employee_applicant': val.emp_name.name,
+                    'application_status': 'New',
+                }
+                if existing:
+                    existing.write(avail_vals)
+                    avail_rec = existing
+                else:
+                    avail_rec = Available.create(avail_vals)
+
+                if vac and vac.hiring_details:
+                    avail_rec.employee_vacancy_ids.unlink()
+                    vac_lines = [(0, 0, {
+                        'operating_unit': h.work_unit.name if h.work_unit else False,
+                        'number_of_vacancies': h.number_of_openings or 0,
+                        'location_preference': 0,
+                    }) for h in vac.hiring_details]
+                    avail_rec.write({'employee_vacancy_ids': vac_lines})
 
                 if emp_user and emp_user.partner_id:
                     self.mail_channel_msgs(emp_user.partner_id.id, self.job_position.name if self.job_position else '', self.last_date_to_apply, work_units_str)
@@ -153,7 +172,7 @@ class RecruitmentProcessInternal(models.Model):
     def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         channel_id = channel
-        message = """Hi This is a Message from Cortex Workflow<br><br>
+        message = """Hi This is a Message from Bunna Bank HR <br><br>
                     You have been shortlisted for an Internal Recruitment position of <b><u>%s</u></b><br><br>
                     If you are interested, please apply before <b><u>%s</u></b> - The Vacancy is available in <b><u>%s</u></b><br><br>Thanks """ % (
             ref, arg1, arg2)
@@ -170,6 +189,7 @@ class EligibleEmployees(models.Model):
 
     emp_name = fields.Many2one("hr.employee", string="Name")
     active = fields.Boolean(default=True)
+    vacancy_id = fields.Many2one("job.vacancy", string="Job Vacancy", index=True)
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -342,7 +362,11 @@ class InternalSelectedCandidates(models.Model):
 
     def notify(self):
         p_id = self.job_position.id
-        self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute('SELECT internal_applicant(%s)', (p_id,))
+        except Exception:
+            _logger.warning("Database procedure internal_applicant failed or missing.")
         self.status = 'notify'
         return self.status
 
@@ -409,3 +433,27 @@ class InternalEligibleEmployees(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     select_flag = fields.Boolean(string="Select")
     internal_selected_id = fields.Many2one("internal.selected", string="Internal Selected Candidates for Recruitment")
+
+
+class InternalCandidatesV(models.Model):
+    _name = 'internal.candidates.v'
+    _table = 'internal_candidates_v'
+    _auto = False
+    _description = 'Internal Candidates View'
+
+    employee_id = fields.Many2one('hr.employee', string='Employee')
+    supervisory_experience = fields.Float(string='Supervisory Experience')
+    current_position = fields.Char(string='Current Position')
+    service_in_company = fields.Float(string='Service in Company')
+    employment_experience = fields.Float(string='Employment Experience')
+    total_experience = fields.Float(string='Total Experience')
+    educational_qualification = fields.Char(string='Educational Qualification')
+    name = fields.Char(string='Current Department')
+    last_promotion = fields.Float(string='Months since last Promotion')
+    pms_score = fields.Float(string='PMS Score')
+
+    def init(self):
+        pass
+
+
+

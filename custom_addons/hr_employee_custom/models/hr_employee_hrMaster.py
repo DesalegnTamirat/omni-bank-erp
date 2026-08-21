@@ -310,7 +310,7 @@ class Hr_contact_Fields(models.Model):
     _inherit = "hr.version"
     # company_name = fields.Char(string='Company Name',required=True)
 
-    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=False)
+    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
     job_category = fields.Many2one('employee.job', 'Job Name')
     probation_period = fields.Integer(string="Probation Period (months)", help="Probation Period")
     job_description = fields.Text(string="Job Description", help="Job Description")
@@ -352,11 +352,14 @@ class Hr_contact_Fields(models.Model):
         pass
 
     def _compute_job_categoryy(self):
-        val = self.env["hr.employee"].search([("name", "=", self.employee_id.name)])
-        vals = self.env["hr.job"].search([("name", "=", val.job_position.name)])
-        self.job_categoryy = vals.employee_category
-        return self.job_category
-        # self.job_category=val.employee_category
+        for rec in self:
+            category = False
+            if rec.employee_id and rec.employee_id.name:
+                emp = self.env["hr.employee"].search([("name", "=", rec.employee_id.name)], limit=1)
+                if emp and emp.job_position:
+                    job = self.env["hr.job"].search([("name", "=", emp.job_position.name)], limit=1)
+                    category = job.employee_category if job else False
+            rec.job_categoryy = category
 
     # @api.onchange("date_end")
     # def date_difference(self):
@@ -473,7 +476,7 @@ class EligibleGrades(models.Model):
     employee_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
 
     job_grade = fields.Many2one("employee.grade", string="Job Grade")
-    status = fields.Boolean(string="Status")
+    status = fields.Boolean(string="Status", default=True)
 
 
 class EligiblePositions(models.Model):
@@ -483,7 +486,7 @@ class EligiblePositions(models.Model):
     employee_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
 
     position = fields.Many2one("hr.job", string="Position")
-    status = fields.Boolean(string="Status")
+    status = fields.Boolean(string="Status", default=True)
 
 
 class hr_recruitment_stage2(models.Model):
@@ -539,7 +542,6 @@ class competencies_multi_record_job(models.Model):
     job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
     employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
-    # competencies = fields.Char(string="Competencies")
     competencies = fields.Many2one('recruitment.competency', string="Competency")
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
@@ -618,7 +620,7 @@ class hr_department_job(models.Model):
 class AllTimeOff(models.Model):
     _inherit = "hr.leave"
 
-    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=False)
+    job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
     job_category = fields.Many2one('employee.job', 'Job Category')
     job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
     operating_unit = fields.Many2one('operating.unit', 'Operating Unit')

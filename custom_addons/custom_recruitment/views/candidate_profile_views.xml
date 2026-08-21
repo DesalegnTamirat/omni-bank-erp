@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             CANDIDATE PROFILE — Form View (Master Electronic CV)
+        ============================================================ -->
+        <record id="candidate_profile_view_form" model="ir.ui.view">
+            <field name="name">candidate.profile.form</field>
+            <field name="model">candidate.profile</field>
+            <field name="arch" type="xml">
+                <form string="Candidate Master Profile / Electronic CV">
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" icon="fa-briefcase" type="action"
+                                    name="%(hr_recruitment.action_hr_job_applications)d"
+                                    context="{'search_default_candidate_profile_id': id}">
+                                <div class="o_stat_info">
+                                    <span class="o_stat_value"><field name="application_count"/></span>
+                                    <span class="o_stat_text">Applications</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Full Candidate Name"/>
+                            </h1>
+                        </div>
+                        <group col="2">
+                            <group string="Contact Information">
+                                <field name="email" widget="email"/>
+                                <field name="phone"/>
+                                <field name="national_id"/>
+                                <field name="secondary_id_type"/>
+                                <field name="secondary_id_number"/>
+                                <field name="gender"/>
+                                <field name="birth_date"/>
+                            </group>
+                            <group string="Location &amp; Account">
+                                <field name="partner_id"/>
+                                <field name="user_id"/>
+                                <field name="city"/>
+                                <field name="address"/>
+                                <field name="country_id"/>
+                                <field name="state_id"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <group string="Profile Summaries">
+                            <group>
+                                <field name="highest_education"/>
+                                <field name="latest_cgpa"/>
+                            </group>
+                            <group>
+                                <field name="total_experience_years"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Education" name="education_page">
+                                <field name="education_ids">
+                                    <list editable="bottom">
+                                        <field name="qualification_name" string="Qualification / Degree"/>
+                                        <field name="field_of_study" string="Field of Study"/>
+                                        <field name="institution" string="University / School"/>
+                                        <field name="start_date"/>
+                                        <field name="end_date" string="Graduation Date"/>
+                                        <field name="cgpa" string="CGPA"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Experience" name="experience_page">
+                                <field name="experience_ids">
+                                    <list editable="bottom">
+                                        <field name="position" string="Job Title"/>
+                                        <field name="organization" string="Company"/>
+                                        <field name="experience_type"/>
+                                        <field name="start_date"/>
+                                        <field name="end_date"/>
+                                        <field name="is_current"/>
+                                        <field name="duration_years"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Certifications" name="certifications_page">
+                                <field name="certification_ids">
+                                    <list editable="bottom">
+                                        <field name="name"/>
+                                        <field name="issuing_organization"/>
+                                        <field name="issue_date"/>
+                                        <field name="expiry_date"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Skills &amp; Languages" name="skills_page">
+                                <group>
+                                    <group string="Skills">
+                                        <field name="skill_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="name"/>
+                                                <field name="level"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                    <group string="Languages">
+                                        <field name="language_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="name"/>
+                                                <field name="proficiency"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="References &amp; Documents" name="documents_page">
+                                <group>
+                                    <group string="References">
+                                        <field name="reference_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="name"/>
+                                                <field name="position"/>
+                                                <field name="organization"/>
+                                                <field name="phone"/>
+                                                <field name="email"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                    <group string="Supporting Documents">
+                                        <field name="document_ids" nolabel="1">
+                                            <list editable="bottom">
+                                                <field name="name"/>
+                                                <field name="attachment" filename="filename"/>
+                                                <field name="filename" column_invisible="True"/>
+                                            </list>
+                                        </field>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Applications History" name="applications_page">
+                                <field name="application_ids" readonly="1">
+                                    <list>
+                                        <field name="app_reference" string="Vacancy"/>
+                                        <field name="partner_name" string="Applicant Name"/>
+                                        <field name="create_date" string="Applied On"/>
+                                        <field name="stage_id" string="Workflow Stage"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             CANDIDATE PROFILE — List View
+        ============================================================ -->
+        <record id="candidate_profile_view_tree" model="ir.ui.view">
+            <field name="name">candidate.profile.list</field>
+            <field name="model">candidate.profile</field>
+            <field name="arch" type="xml">
+                <list string="Master Candidate Profiles">
+                    <field name="name"/>
+                    <field name="email"/>
+                    <field name="phone"/>
+                    <field name="highest_education"/>
+                    <field name="latest_cgpa"/>
+                    <field name="total_experience_years"/>
+                    <field name="application_count"/>
+                    <field name="create_date"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             CANDIDATE PROFILE — Search View
+        ============================================================ -->
+        <record id="candidate_profile_view_search" model="ir.ui.view">
+            <field name="name">candidate.profile.search</field>
+            <field name="model">candidate.profile</field>
+            <field name="arch" type="xml">
+                <search string="Search Candidate Profiles">
+                    <field name="name"/>
+                    <field name="email"/>
+                    <field name="phone"/>
+                    <field name="national_id"/>
+                    <field name="secondary_id_number"/>
+                    <field name="highest_education"/>
+                    <separator/>
+                    <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             WINDOW ACTION — Candidate Master Profiles
+        ============================================================ -->
+        <record id="action_candidate_profile" model="ir.actions.act_window">
+            <field name="name">Master Candidate Profiles (CVs)</field>
+            <field name="res_model">candidate.profile</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Candidate Master Profiles found.
+                </p>
+                <p>
+                    External candidates register and build their Electronic CV profiles through the candidate portal.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

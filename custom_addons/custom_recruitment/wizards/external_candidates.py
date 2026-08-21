@@ -30,7 +30,7 @@ class external_candidate_details(models.TransientModel):
         })
 
         # Sync recruitment records (this will remove internal records for external sourcing)
-        self.job_id._sync_published_vacancy_records
+        self.job_id._sync_published_vacancy_records()
         # Run the external shortlist stored procedure
         self.env.cr.execute('SELECT public.external_candidates(%s)', (p_id,))
 

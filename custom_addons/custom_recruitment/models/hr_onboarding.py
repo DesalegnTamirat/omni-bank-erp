@@ -273,6 +273,7 @@ class HrOnboardingPlan(models.Model):
                 'message': _('7-Day Pre-arrival IT & Workstation alert triggered.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -312,6 +313,7 @@ class HrOnboardingPlan(models.Model):
                 'message': _('Induction marked completed. Work unit onboarding unlocked.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -360,6 +362,7 @@ class HrOnboardingPlan(models.Model):
                 'message': _('4-Week Mid-Term Evaluation Form dispatched.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -387,6 +390,7 @@ class HrOnboardingPlan(models.Model):
                 'message': _('Onboarding program successfully completed and closed.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 

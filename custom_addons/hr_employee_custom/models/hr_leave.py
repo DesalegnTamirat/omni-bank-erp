@@ -15,7 +15,7 @@ class HrLeave(models.Model):
     def action_refuse(self):
 
         # Run standard Odoo behavior first
-        res = super(HrLeave, self).action_refuse()
+        res = super().action_refuse()
 
         for leave in self:
             if leave.holiday_status_id.id in(80,5):

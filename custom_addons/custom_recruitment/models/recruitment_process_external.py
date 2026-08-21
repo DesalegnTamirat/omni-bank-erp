@@ -189,10 +189,30 @@ class EligibleEmployeesexternal(models.Model):
                                    compute='_compute_highest_qualification', store=True)
     graduation_date = fields.Date(string="Graduation Date",
                                   compute='_compute_highest_qualification', store=True)
-    graduation_year = fields.Integer(string="Graduation Year",
+    graduation_year = fields.Date(string="Graduation Year",
                                      compute='_compute_highest_qualification', store=True)
     highest_cgpa = fields.Float(string="CGPA / GPA",
                                 compute='_compute_highest_qualification', store=True)
+
+    def _auto_init(self):
+        self.env.cr.execute("""
+            SELECT data_type FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'graduation_year'
+        """, (self._table,))
+        res = self.env.cr.fetchone()
+        if res and res[0] in ('integer', 'bigint', 'numeric', 'double precision'):
+            self.env.cr.execute(f"""
+                ALTER TABLE {self._table} 
+                ALTER COLUMN graduation_year TYPE date 
+                USING (
+                    CASE 
+                        WHEN graduation_year IS NULL OR graduation_year::text = '0' OR length(graduation_year::text) < 4 
+                        THEN NULL 
+                        ELSE (left(graduation_year::text, 4) || '-01-01')::date 
+                    END
+                );
+            """)
+        super()._auto_init()
 
     # ── Education list (multiple qualifications) ────────────────────────────
     education_ids = fields.One2many(
@@ -224,7 +244,7 @@ class EligibleEmployeesexternal(models.Model):
                 rec.field_of_study = False
                 rec.institution_name = False
                 rec.graduation_date = False
-                rec.graduation_year = 0
+                rec.graduation_year = False
                 rec.highest_cgpa = 0.0
 
     # ── Work Experience ─────────────────────────────────────────────────────────
@@ -271,6 +291,51 @@ class EligibleEmployeesexternal(models.Model):
     # ── Scoring / Selection ─────────────────────────────────────────────────────
     select_flag = fields.Boolean(string="Selected")
     recommendation = fields.Text(string="Notes / Recommendation")
+
+    # ── Blacklist Pool Verification ──────────────────────────────────────────────
+    is_blacklisted = fields.Boolean(
+        string="Blacklisted",
+        compute='_compute_is_blacklisted',
+        store=True,
+        help="Flagged if applicant matches any entry in the Blacklist Pool (by Name, NID, Email, or Phone)."
+    )
+    blacklist_reason = fields.Char(
+        string="Blacklist Reason",
+        compute='_compute_is_blacklisted',
+        store=True,
+    )
+
+    @api.depends('applicant_name', 'applicant_email', 'applicant_phone')
+    def _compute_is_blacklisted(self):
+        blacklist_pool = self.env['blacklist.pool'].sudo()
+        for rec in self:
+            is_black = False
+            reason = False
+
+            cand_name = rec.applicant_name.partner_name if rec.applicant_name and rec.applicant_name.partner_name else (rec.applicant_name.name if rec.applicant_name else False)
+            nid = getattr(rec, 'national_id', False) or (rec.applicant_name.national_id if rec.applicant_name and hasattr(rec.applicant_name, 'national_id') else False)
+            email = rec.applicant_email or (rec.applicant_name.email_from if rec.applicant_name else False)
+            phone = rec.applicant_phone or (rec.applicant_name.partner_phone if rec.applicant_name else False)
+
+            or_conditions = []
+            if nid:
+                or_conditions.append(('national_id', '=ilike', str(nid).strip()))
+            if cand_name:
+                or_conditions.append(('candidate', '=ilike', str(cand_name).strip()))
+            if email:
+                or_conditions.append(('email', '=ilike', str(email).strip()))
+            if phone:
+                or_conditions.append(('phone', '=ilike', str(phone).strip()))
+
+            if or_conditions:
+                domain = ['|'] * (len(or_conditions) - 1) + or_conditions if len(or_conditions) > 1 else or_conditions
+                match = blacklist_pool.search(domain, limit=1)
+                if match:
+                    is_black = True
+                    reason = match.reason or f"Matched in Blacklist Pool: {match.candidate} (NID: {match.national_id or 'N/A'})"
+
+            rec.is_blacklisted = is_black
+            rec.blacklist_reason = reason
 
     # ── Salary Information ──────────────────────────────────────────────────────
     current_salary = fields.Float(
@@ -420,13 +485,33 @@ class ExternalApplicantEducation(models.Model):
     field_of_study = fields.Char(string="Field of Study / Major")
     institution_name = fields.Char(string="University / Institution")
     graduation_date = fields.Date(string="Graduation Date")
-    graduation_year = fields.Integer(string="Graduation Year", compute='_compute_graduation_year', store=True)
+    graduation_year = fields.Date(string="Graduation Year", compute='_compute_graduation_year', store=True)
     cgpa = fields.Float(string="CGPA / GPA", digits=(4, 2))
+
+    def _auto_init(self):
+        self.env.cr.execute("""
+            SELECT data_type FROM information_schema.columns 
+            WHERE table_name = %s AND column_name = 'graduation_year'
+        """, (self._table,))
+        res = self.env.cr.fetchone()
+        if res and res[0] in ('integer', 'bigint', 'numeric', 'double precision'):
+            self.env.cr.execute(f"""
+                ALTER TABLE {self._table} 
+                ALTER COLUMN graduation_year TYPE date 
+                USING (
+                    CASE 
+                        WHEN graduation_year IS NULL OR graduation_year::text = '0' OR length(graduation_year::text) < 4 
+                        THEN NULL 
+                        ELSE (left(graduation_year::text, 4) || '-01-01')::date 
+                    END
+                );
+            """)
+        super()._auto_init()
 
     @api.depends('graduation_date')
     def _compute_graduation_year(self):
         for rec in self:
-            rec.graduation_year = rec.graduation_date.year if rec.graduation_date else 0
+            rec.graduation_year = rec.graduation_date.replace(month=1, day=1) if rec.graduation_date else False
 
     def _compute_display_name(self):
         level_labels = dict(self._fields['level'].selection)

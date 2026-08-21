@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_blacklist_pool_import_wizard_form" model="ir.ui.view">
+        <field name="name">blacklist.pool.import.wizard.form</field>
+        <field name="model">blacklist.pool.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Blacklist Pool Excel/CSV">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Import Blacklist Pool Records</h2>
+                        <span class="text-muted">Upload an Excel/CSV template containing blacklisted candidate records</span>
+                    </div>
+
+                    <group>
+                        <group string="Template Download">
+                            <button name="action_download_template" string="📥 Download Excel/CSV Template" type="object" class="btn-info"/>
+                        </group>
+                        <group string="Select File">
+                            <field name="file_data" filename="filename"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_import_file" string="📤 Confirm &amp; Import" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_blacklist_pool_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Blacklist Excel</field>
+        <field name="res_model">blacklist.pool.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

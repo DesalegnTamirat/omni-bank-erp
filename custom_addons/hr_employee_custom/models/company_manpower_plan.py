@@ -87,7 +87,7 @@ class CompanyManpowerPlan(models.Model):
     def unlink(self):
         for val in self.company_manpower_plan_id:
             val.unlink()
-        return super(CompanyManpowerPlan,self).unlink()
+        return super().unlink()
 
 class Requirements(models.Model):
     _name = "manpower.plan.jobs"
@@ -160,7 +160,7 @@ class Requirements(models.Model):
     #     print("vals=",vals)
     #     get_manpower=self.env["manpower.plan"].search([("id","=",vals["company_manpower_id"])])
     #     vals["plan_version"]=get_manpower.plan_version
-    #     return super(Requirements, self).create(vals)
+    #     return super().create(vals)
 
     # @api.onchange("position")
     # def _onchange_position(self):
@@ -174,7 +174,7 @@ class Requirements(models.Model):
     # def name_create(self, name):
     #     return self.create({'name': name}).name_get()[0]
     def unlink(self):
-        return super(Requirements, self).unlink()
+        return super().unlink()
 
     def details(self):
 

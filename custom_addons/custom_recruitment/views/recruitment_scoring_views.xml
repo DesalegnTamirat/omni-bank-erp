@@ -68,7 +68,7 @@
                 <field name="vacancy_no_of_vacancies" string="Vacancy Slots" readonly="selection_status != 'pending'"/>
 
 
-                <field name="selection_status" widget="badge"
+                <field name="selection_status"
                        decoration-success="selection_status == 'selected'"
                        decoration-danger="selection_status in ('rejected','disqualified')"
                        decoration-warning="selection_status == 'reserve'"/>
@@ -83,9 +83,21 @@
         <field name="arch" type="xml">
             <form string="Candidate Score">
                 <header>
-                    <!-- Auto-Select and Check Disqualification moved to the
-                         list view (header buttons + ⚙ Actions menu) — not
-                         duplicated here anymore. -->
+                    <button name="action_apply_disqualification_check"
+                            type="object"
+                            string="Check Disqualification (50% Gate)"
+                            class="btn-secondary"/>
+
+                    <button name="action_rank_candidates"
+                            type="object"
+                            string="Rank Candidates"
+                            class="btn-secondary"/>
+
+                    <button name="action_auto_select_candidates"
+                            type="object"
+                            string="Auto-Select Candidates"
+                            class="btn-primary"/>
+
                     <field name="selection_status" widget="statusbar"
                            statusbar_visible="pending,selected,reserve,rejected"/>
                 </header>
@@ -105,7 +117,7 @@
 
                     <group>
                         <group string="Candidate">
-                            <field name="vacancy_id" readonly="selection_status != 'pending'"/>
+                            <field name="vacancy_id" domain="['|', ('recruitment_type', '=', 'External'), ('sourcing_type', 'in', ['external', 'both'])]" readonly="selection_status != 'pending'"/>
                             <field name="recruitment_type" readonly="selection_status != 'pending'"/>
                             <field name="vacancy_employee_category" readonly="1"/>
                             <field name="job_level" readonly="selection_status != 'pending'"
@@ -181,24 +193,63 @@
         <field name="code">action = records.action_rank_and_auto_select</field>
     </record>
 
+    <!-- ── Candidate Score: Search View ───────────────────────────────── -->
+    <record id="recruitment_candidate_score_search" model="ir.ui.view">
+        <field name="name">recruitment.candidate.score.search</field>
+        <field name="model">recruitment.candidate.score</field>
+        <field name="arch" type="xml">
+            <search string="Search Candidate Scores">
+                <field name="candidate_name"/>
+                <field name="vacancy_id"/>
+                <field name="applicant_id"/>
+                <field name="employee_id"/>
+                <filter string="External Vacancies" name="external" domain="[('recruitment_type', '=', 'external')]"/>
+                <filter string="Internal Vacancies" name="internal" domain="[('recruitment_type', '=', 'internal')]"/>
+                <separator/>
+                <filter string="Selected" name="selected" domain="[('selection_status', '=', 'selected')]"/>
+                <filter string="Reserve Pool" name="reserve" domain="[('selection_status', '=', 'reserve')]"/>
+                <filter string="Pending" name="pending" domain="[('selection_status', '=', 'pending')]"/>
+                <filter string="Rejected" name="rejected" domain="[('selection_status', '=', 'rejected')]"/>
+                <filter string="Disqualified" name="disqualified" domain="[('disqualified', '=', True)]"/>
+                <group>
+                    <filter string="Vacancy" name="group_vacancy" context="{'group_by': 'vacancy_id'}"/>
+                    <filter string="Recruitment Type" name="group_recruitment_type" context="{'group_by': 'recruitment_type'}"/>
+                    <filter string="Selection Status" name="group_selection_status" context="{'group_by': 'selection_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_recruitment_candidate_score" model="ir.actions.act_window">
         <field name="name">Candidate Scores</field>
         <field name="res_model">recruitment.candidate.score</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="recruitment_candidate_score_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                <b>Workflow:</b>
-                <br/>
-                1. Add candidate scores
-                <br/>
-                2. Check disqualification (50% gate)
-                <br/>
-                3. Rank candidates
-                <br/>
-                4. Click "Auto-Select Candidates" to automatically fill vacancy slots
-                <br/>
-                <b>Note:</b>
-                Manual selection is disabled. Use Auto-Select for all selections.
+                <b>Workflow:</b><br/>
+                1. Add candidate scores<br/>
+                2. Check disqualification (50% gate)<br/>
+                3. Rank candidates<br/>
+                4. Click "Auto-Select Candidates" to fill vacancy slots
+            </p>
+        </field>
+    </record>
+
+    <!-- Action for External Candidate Scores -->
+    <record id="action_recruitment_candidate_score_external" model="ir.actions.act_window">
+        <field name="name">External Candidate Scores</field>
+        <field name="res_model">recruitment.candidate.score</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="recruitment_candidate_score_search"/>
+        <field name="domain">[('recruitment_type', '=', 'external')]</field>
+        <field name="context">{'default_recruitment_type': 'external', 'search_default_external': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                <b>External Candidate Scoring &amp; Selection:</b><br/>
+                1. Enter Exam &amp; Interview scores for external applicants<br/>
+                2. Run 50% Disqualification Check<br/>
+                3. Rank Candidates &amp; Auto-Select top candidates based on Vacancy Slots
             </p>
         </field>
     </record>
@@ -212,16 +263,15 @@
                   decoration-success="state == 'accepted'"
                   decoration-danger="state in ('declined','expired')"
                   decoration-warning="state == 'sent'">
-                <field name="reference" readonly="response != 'pending'"/>
-                <field name="vacancy_id" readonly="response != 'pending'"/>
-                <field name="candidate_name" readonly="response != 'pending'"/>
-                <field name="offer_date" readonly="response != 'pending'"/>
-                <field name="response_deadline" readonly="response != 'pending'"/>
-                <field name="response" readonly="response != 'pending'"/>
+                <field name="reference"/>
+                <field name="vacancy_id"/>
+                <field name="ext_candidate_id" string="Candidate"/>
+                <field name="offer_date"/>
+                <field name="expiry_date"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'accepted'"
+                       decoration-warning="state == 'sent'"
                        decoration-danger="state in ('declined','expired')"/>
-                <field name="employment_letter_generated"/>
             </list>
         </field>
     </record>
@@ -233,14 +283,14 @@
         <field name="arch" type="xml">
             <form string="Job Offer Letter">
                 <header>
-                    <button name="action_send_offer" string="Send Offer" type="object"
-                            class="btn-primary" invisible="state != 'draft'"/>
-                    <button name="action_accept" string="Mark Accepted" type="object"
-                            class="btn-primary" invisible="state != 'sent'"/>
-                    <button name="action_decline" string="Mark Declined" type="object"
-                            invisible="state != 'sent'"/>
+                    <button name="action_send" string="Send Offer" type="object"
+                            class="btn-primary" icon="fa-paper-plane" invisible="state != 'draft'"/>
+                    <button name="action_accept" string="Accept Offer" type="object"
+                            class="btn-success" icon="fa-check" invisible="state != 'sent'"/>
+                    <button name="action_decline" string="Decline Offer" type="object"
+                            class="btn-danger" icon="fa-times" invisible="state != 'sent'"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,sent,accepted"/>
+                           statusbar_visible="draft,sent,accepted,declined,expired"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -250,20 +300,21 @@
                     </div>
                     <group>
                         <group string="Offer Details">
-                            <field name="vacancy_id" readonly="response != 'pending'"/>
-                            <field name="candidate_score_id" readonly="response != 'pending'"/>
-                            <field name="candidate_name" readonly="1"/>
-                            <field name="offer_date" readonly="response != 'pending'"/>
-                            <field name="response_deadline" readonly="1"/>
+                            <field name="vacancy_id" domain="[('reference', 'ilike', 'EXT')]" options="{'no_create': True}" readonly="state != 'draft'"/>
+                            <field name="vacancy_reference" invisible="1"/>
+                            <field name="ext_candidate_id" string="Candidate Name" domain="[('selection_type', 'in', ['selected', 'Selected']), '|', ('ext_rec_sel_cand.vacancy_reference', '=', vacancy_reference), ('ext_rec_sel_cand.vacancy_id', '=', vacancy_id)]" options="{'no_create': True}" readonly="state != 'draft'"/>
+                            <field name="candidate_email" readonly="state != 'draft'"/>
+                            <field name="offer_date" readonly="state != 'draft'"/>
+                            <field name="expiry_date" readonly="1"/>
                         </group>
-                        <group string="Response">
-                            <field name="response" readonly="response != 'pending'"/>
-                            <field name="response_date" readonly="1"/>
-                            <field name="employment_letter_generated" readonly="1"/>
+                        <group string="Response &amp; Notes">
+                            <field name="response_date" readonly="1" invisible="state not in ('accepted', 'declined', 'expired')"/>
+                            <field name="rejection_reason" placeholder="State reason for decline or expiry..." invisible="state not in ('sent', 'declined', 'expired')"/>
+                            <field name="notes" placeholder="Internal HR notes..."/>
                         </group>
                     </group>
                 </sheet>
-                <!-- Chatter (Log/Messages/Followers) hidden per request -->
+                <chatter/>
             </form>
         </field>
     </record>

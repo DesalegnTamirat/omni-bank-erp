@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-# Migrated from the standalone hr_contract module (models/hr_contract_type.py)
-# so that hr_employee_custom no longer depends on the hr_contract module.
-# Fields and logic are unchanged.
+
 
 from odoo import fields, models
 

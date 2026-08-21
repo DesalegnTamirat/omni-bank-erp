@@ -2,7 +2,7 @@
 <odoo>
     <data>
 
-        <!-- Root Recruitment menus - Using ONLY custom groups -->
+        <!-- Root Recruitment parent category menus (loaded early so parent refs in views resolve) -->
         <menuitem id="new_recruitment_menu"
                   name="Recruitments"
                   parent="hr_recruitment.menu_hr_recruitment_root"
@@ -20,28 +20,6 @@
                   parent="new_recruitment_menu"
                   sequence="4"
                   groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
-
-        <!-- Manager & Administrator only -->
-        <menuitem id="menu_candidate_scores"
-                  name="Candidate Scores"
-                  parent="new_recruitment_menu"
-                  action="action_recruitment_candidate_score"
-                  groups="group_recruitment_manager,group_recruitment_administrator"
-                  sequence="15"/>
-
-        <menuitem id="menu_offer_letters"
-                  name="Offer Letters"
-                  parent="new_recruitment_menu"
-                  action="action_recruitment_offer_letter"
-                  groups="group_recruitment_manager,group_recruitment_administrator"
-                  sequence="16"/>
-
-        <menuitem id="menu_application_windows"
-                  name="Application Windows"
-                  parent="menu_internal_recruitment"
-                  action="action_recruitment_application_window"
-                  groups="group_recruitment_manager,group_recruitment_administrator"
-                  sequence="9"/>
 
     </data>
 </odoo>

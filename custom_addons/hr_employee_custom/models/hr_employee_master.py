@@ -279,14 +279,18 @@ class HrEmployee(models.Model):
     # ------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
+        if self.env.context.get('in_sync_criteria_from_job'):
+            return super().create(vals_list)
         employees = super().create(vals_list)
-        employees._sync_criteria_from_job()
+        employees.with_context(in_sync_criteria_from_job=True)._sync_criteria_from_job()
         return employees
 
     def write(self, vals):
+        if self.env.context.get('in_sync_criteria_from_job'):
+            return super().write(vals)
         res = super().write(vals)
         if 'job_id' in vals or 'job_position' in vals:
-            self._sync_criteria_from_job()
+            self.with_context(in_sync_criteria_from_job=True)._sync_criteria_from_job()
         return res
 
     @api.onchange('job_id', 'job_position', 'edu_ids', 'education_detail_ids')
@@ -331,7 +335,8 @@ class HrEmployee(models.Model):
                 qual_cmds = []
                 for q in job.qualification_id:
                     if q.qualification:
-                        q_name = q.qualification.name.strip().lower() if q.qualification.name else ''
+                        q_name_str = getattr(q.qualification, 'display_name', False) or getattr(q.qualification, 'qualification', False) or ''
+                        q_name = q_name_str.strip().lower() if q_name_str else ''
                         resp = edu_responses.get(q_name, (None, q.response))[1]
                         if force or q.qualification.id not in existing_qual_ids:
                             if q.qualification.id in existing_qual_ids and force:
@@ -347,9 +352,9 @@ class HrEmployee(models.Model):
 
             # 1b. Qualifications directly from Employee Education tables
             for qual_key, (display_name, cgpa_val) in edu_responses.items():
-                rec_qual = self.env['recruitment.qualification'].search([('name', '=ilike', display_name)], limit=1)
+                rec_qual = self.env['recruitment.qualification'].search(['|', ('display_name', '=ilike', display_name), ('qualification', '=ilike', display_name)], limit=1)
                 if not rec_qual:
-                    rec_qual = self.env['recruitment.qualification'].create({'name': display_name})
+                    rec_qual = self.env['recruitment.qualification'].create({'qualification': display_name})
 
                 existing_eq = employee.qualification_id.filtered(lambda r: r.qualification and r.qualification.id == rec_qual.id)
                 if existing_eq:

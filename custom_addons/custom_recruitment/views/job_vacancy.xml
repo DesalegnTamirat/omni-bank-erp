@@ -6,11 +6,109 @@
         <field name="arch" type="xml">
             <form string="Job Vacancy Form">
                 <header>
-                    <button name="notify"
-                            invisible="status in ('notify', 'evaluate')"
-                            string="Notify"
+                    <!-- Sequential progressive buttons (One-by-one in exact order) -->
+                    <!-- 1. Shortlist Candidate -->
+                    <button name="action_shortlist_candidates"
+                            string="Shortlist Candidate"
                             type="object"
-                            class="btn-primary"/>
+                            class="btn-primary"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'shortlist'"/>
+
+                    <!-- 2. Notify Candidate -->
+                    <button name="action_notify_candidates"
+                            string="Notify Candidate"
+                            type="object"
+                            class="btn-primary"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_cand'"/>
+
+                    <!-- 3. Notify Written Exam -->
+                    <button name="action_notify_written_exam"
+                            string="Notify Written Exam"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-paper-plane"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_exam'"/>
+
+                    <!-- 4. Fetch Written Exam -->
+                    <button name="action_fetch_exam_score"
+                            string="Fetch Written Exam"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-download"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_exam'"/>
+
+                    <!-- 5. Notify Panel Member -->
+                    <button name="action_notify_interview_panel"
+                            string="Notify Panel Member"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-users"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_panel'"/>
+
+                    <!-- 6. Notify Interview for Candidates -->
+                    <button name="action_notify_interview"
+                            string="Notify Interview for Candidates"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-calendar"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_interview'"/>
+
+                    <!-- 7. Fetch Interview Exam -->
+                    <button name="action_fetch_interview_score"
+                            string="Fetch Interview Exam"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-download"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_interview'"/>
+
+                    <!-- 8. Compute and Rank -->
+                    <button name="action_compute_and_rank"
+                            string="Compute and Rank"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-calculator"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'compute_rank'"
+                            confirm="This will compute weighted scores for all candidates using the vacancy weight matrix, then rank and set final status (Selected / Reserved / Disqualified). Continue?"/>
+
+                    <!-- 9. Notify Approval Committee -->
+                    <button name="action_notify_approval_committee"
+                            string="Notify Approval Committee"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-bell"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_committee'"/>
+
+                    <!-- 10. Digital Signature -->
+                    <button name="action_open_digital_minute"
+                            string="Digital Signature"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-pencil-square-o"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'digital_minute'"
+                            help="Open digital selection minute for digital signatures."/>
+
+                    <!-- 11. Notify Selected Candidate -->
+                    <button name="action_notify_selection"
+                            string="Notify Selected Candidate"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-trophy"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_selection'"/>
+
+                    <!-- 12. Promote Selected Candidate -->
+                    <button name="action_promote_selected_employees"
+                            string="Promote Selected Candidate"
+                            type="object"
+                            class="btn-success"
+                            style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
+                            icon="fa-rocket"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'promote'"/>
+
+                    <button name="notify"
+                            invisible="status in ('notify', 'evaluate') or vacancy_status != 'draft'"
+                            string="Notify Approvers"
+                            type="object"
+                            class="btn-secondary"/>
                     <button name="vacancy_evaluate"
                             invisible="vacancy_status != 'draft'"
                             string="Evaluate"
@@ -21,12 +119,37 @@
                             type="object"
                             class="btn-secondary"
                             invisible="vacancy_status != 'draft'"/>
+                    <button name="publish_vacancy"
+                            invisible="vacancy_status != 'evaluate'"
+                            string="Publish Vacancy"
+                            type="object"
+                            class="btn-primary"/>
+                    <button name="close_vacancy"
+                            invisible="vacancy_status in ['draft', 'closed']"
+                            string="Close Vacancy"
+                            type="object"
+                            class="btn-secondary"/>
                     <field name="vacancy_status" widget="statusbar"
                            statusbar_visible="draft,evaluate,published,closed"
                            readonly="1"/>
                 </header>
 
                 <sheet>
+                    <div class="oe_button_box" name="button_box" invisible="vacancy_status == 'draft'">
+                        <button class="oe_stat_button" icon="fa-users">
+                            <field name="total_candidates_count" string="Applicants" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-check-circle" style="color: #4A2E1A;">
+                            <field name="selected_candidates_count" string="Selected" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-clock-o" style="color: #e0a800;">
+                            <field name="reserve_candidates_count" string="Reserve Pool" widget="statinfo"/>
+                        </button>
+                        <button class="oe_stat_button" icon="fa-times-circle" style="color: #dc3545;">
+                            <field name="disqualified_candidates_count" string="Disqualified" widget="statinfo"/>
+                        </button>
+                    </div>
+
                     <!-- Title -->
                     <div class="oe_title">
                         <h1>
@@ -36,6 +159,7 @@
 
                     <field name="status" invisible="1"/>
                     <field name="vacancy_status" invisible="1"/>
+                    <field name="recruitment_step" invisible="1"/>
 
                     <!-- Main two-column group — mirrors Odoo 14 layout -->
                     <group>
@@ -74,6 +198,23 @@
                         </group>
                     </group>
 
+                    <!-- Evaluation Weights & Exam/Interview Schedules — visible after draft -->
+                    <group invisible="vacancy_status == 'draft'">
+                        <group string="Evaluation Weights">
+                            <field name="pms_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="written_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="interview_weight" widget="float" readonly="scores_computed == True"/>
+                        </group>
+                        <group string="Exam &amp; Interview Schedules">
+                            <field name="written_exam_date" widget="datetime" readonly="scores_computed == True"/>
+                            <field name="exam_location" readonly="scores_computed == True"/>
+                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'"/>
+                            <field name="interview_date" widget="datetime" readonly="scores_computed == True"/>
+                            <field name="interview_location" readonly="scores_computed == True"/>
+                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'"/>
+                        </group>
+                    </group>
+
                     <!-- EXTERNAL REQUIREMENTS — only visible for external/both -->
                     <group string="External Applicant Requirements"
                            invisible="sourcing_type not in ['external', 'both']">
@@ -95,34 +236,21 @@
                         </group>
                     </group>
 
-
-                    <div>
-                        <button name="publish_vacancy"
-                                invisible="vacancy_status in ['published', 'closed']"
-                                string="Publish Vacancy"
-                                type="object"
-                                class="btn-primary"/>
-                        <button name="close_vacancy"
-                                invisible="vacancy_status in ['draft', 'closed']"
-                                string="Close Vacancy"
-                                type="object"
-                                class="btn-secondary ms-2"/>
-                    </div>
-
-                    <!-- Tabs: Hiring Details + Vacancy Approval Members + Competencies -->
+                    <!-- Tabs -->
                     <notebook>
-                        <page string="Hiring Details">
+                        <!-- 1. Tabs visible at creation / draft (DO NOT WAIT APPROVAL) -->
+                        <page string="Hiring Details" name="hiring_details">
                             <field name="hiring_details" readonly="vacancy_status != 'draft'">
                                 <list editable="bottom">
-                                    <field name="work_unit" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="responsible_employee" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="number_of_openings" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="planned_positions" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="work_unit" string="Work Unit" style="min-width: 250px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="responsible_employee" string="Responsible Officer" style="min-width: 180px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="number_of_openings" string="Number of Openings" style="min-width: 160px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="planned_positions" string="Planned Openings" style="min-width: 160px;" readonly="parent.vacancy_status != 'draft'"/>
+                                    <field name="status" string="Status" style="min-width: 100px;" readonly="parent.vacancy_status != 'draft'"/>
                                 </list>
                             </field>
                         </page>
-                        <page string="Vacancy Approval Members">
+                        <page string="Vacancy Approval Members" name="approval_members">
                             <field name="vac_del_team_id" readonly="vacancy_status != 'draft'">
                                 <list editable="bottom">
                                     <field name="role" readonly="parent.vacancy_status != 'draft'"/>
@@ -136,7 +264,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Competencies">
+                        <page string="Competencies" name="competencies">
                             <field name="competency_line_ids" readonly="vacancy_status != 'draft'">
                                 <list editable="bottom">
                                     <field name="competency_id" readonly="parent.vacancy_status != 'draft'"/>
@@ -144,66 +272,105 @@
                                 </list>
                             </field>
                         </page>
-                    </notebook>
 
-                    <!-- Interview Schedule + Agenda side-by-side -->
-                    <group>
-                        <group string="Interview Schedule">
-                            <field name="place_of_interview" readonly="vacancy_status != 'draft'"/>
-                            <field name="date_of_interview" readonly="vacancy_status != 'draft'"/>
-                            <field name="time_begin" readonly="vacancy_status != 'draft'"/>
-                            <field name="morning" readonly="vacancy_status != 'draft'"/>
-                            <field name="afternoon" readonly="vacancy_status != 'draft'"/>
-                            <field name="time_end" readonly="vacancy_status != 'draft'"/>
-                        </group>
-                        <group string="Agenda">
-                            <field name="total_number_of_applicant" readonly="vacancy_status != 'draft'"/>
-                            <field name="short_listed_applicant" readonly="vacancy_status != 'draft'"/>
-                            <field name="purpose_of_employment" readonly="vacancy_status != 'draft'"/>
-                            <field name="vacancy_announcement_no" string="Required Number"
-                                   readonly="vacancy_status != 'draft'"/>
-                            <field name="total_participant_on_the_assessment" string="Shortlisted for Interview"
-                                   readonly="vacancy_status != 'draft'"/>
-                            <field name="not_selected_applicants" readonly="vacancy_status != 'draft'"/>
-                        </group>
-                    </group>
-
-                    <!-- Recruitment Approval Members -->
-                    <notebook>
-                        <page string="Recruitment Approval Members">
-                            <field name="memb_panel_vac" readonly="vacancy_status != 'draft'">
-                                <list editable="bottom">
-                                    <field name="role" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="panel_member_name" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="status" readonly="parent.vacancy_status != 'draft'"/>
+                        <!-- 2. Tabs visible ONLY after evaluation / approval (vacancy_status != 'draft') -->
+                        <page string="Eligible Candidates" name="eligible_candidates" invisible="vacancy_status == 'draft'">
+                            <field name="eligible_employee_ids">
+                                <list string="Eligible Employees" editable="bottom">
+                                    <field name="emp_name"/>
+                                    <field name="select_flag"/>
+                                    <field name="app_date"/>
+                                    <field name="emp_grade"/>
+                                    <field name="emp_position"/>
+                                    <field name="emp_category"/>
+                                    <field name="emp_type"/>
+                                    <field name="emp_gender"/>
+                                    <field name="current_work_unit"/>
+                                    <field name="current_department"/>
+                                    <field name="educational_qualification"/>
+                                    <field name="service_in_company"/>
+                                    <field name="relevant_experience"/>
+                                    <field name="employment_experience"/>
+                                    <field name="total_experience"/>
+                                    <field name="current_location_exp"/>
+                                    <field name="current_position_exp"/>
+                                    <field name="supervisory_experience"/>
+                                    <field name="last_promotion"/>
+                                    <field name="pms_score"/>
+                                    <field name="recommendation"/>
+                                    <field name="written_warning"/>
+                                    <field name="demoted"/>
+                                    <!-- FR-REC-056: Leave Status from Time Off module -->
+                                    <field name="active_leave_status" string="Leave Status" readonly="1"
+                                           optional="show"
+                                           decoration-danger="active_leave_status not in ('Active', 'N/A')"
+                                           decoration-success="active_leave_status == 'Active'"/>
                                 </list>
                             </field>
                         </page>
-                        <page string="Result Summary">
-                            <field name="hiring_rank_details" readonly="vacancy_status != 'draft'">
-                                <list editable="bottom">
-                                    <field name="no" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="applicant_name" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="result" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="rank" readonly="parent.vacancy_status != 'draft'"/>
-                                    <field name="statues" readonly="parent.vacancy_status != 'draft'"/>
+
+                        <page string="Selected Employees" name="selected_employees" invisible="vacancy_status == 'draft'">
+                            <field name="new_int_rec_sel" readonly="scores_computed == True">
+                                <list string="Selected Employees" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']">
+                                    <field name="emp_name" readonly="parent.scores_computed == True"/>
+                                    <field name="select_flag" readonly="parent.scores_computed == True"/>
+                                    <field name="emp_position" readonly="parent.scores_computed == True"/>
+                                    <field name="current_work_unit" readonly="parent.scores_computed == True"/>
+                                    <field name="current_department" readonly="parent.scores_computed == True"/>
+                                    <field name="preferred_location" readonly="parent.scores_computed == True"/>
+                                    <field name="pms_score" readonly="parent.scores_computed == True"/>
+                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="weighted_score" readonly="1" class="fw-bold"/>
+                                    <field name="rank" readonly="1"/>
+                                    <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
+                                    <field name="promotion_type" readonly="1" optional="show"/>
+                                    <field name="promotion_status" readonly="1" optional="show"/>
+                                    <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or promotion_status in ('promoted', 'released')"/>
+                                    <field name="remarks"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Panel Members" name="panel_members" invisible="vacancy_status == 'draft'">
+                            <field name="new_int_rec_panel">
+                                <list string="Panel Members" editable="bottom" delete="0">
+                                    <field name="emp_name"/>
+                                    <field name="selection_criteria"/>
+                                    <field name="accepted"/>
+                                    <field name="response_status"
+                                           decoration-info="response_status == 'pending'"
+                                           decoration-success="response_status == 'accepted'"
+                                           decoration-danger="response_status == 'unavailable'"
+                                           decoration-warning="response_status in ['reschedule_requested', 'delegation_requested']"/>
+                                    <field name="delegate_employee_id" column_invisible="not parent.has_delegation_requests" optional="show"/>
+                                    <field name="delegation_state" column_invisible="not parent.has_delegation_requests" optional="show"
+                                           decoration-warning="delegation_state == 'pending_hr'"
+                                           decoration-success="delegation_state == 'approved'"
+                                           decoration-danger="delegation_state == 'rejected'"/>
+                                    <field name="response_reason" optional="show"/>
+                                    <button name="action_open_response_wizard" string="Respond" type="object" class="btn-sm btn-secondary" invisible="response_status != 'pending'"/>
+                                    <button name="action_approve_delegation" string="Approve Delegation" type="object" class="btn-sm btn-success" invisible="delegation_state != 'pending_hr'"/>
+                                    <button name="action_reject_delegation" string="Reject Delegation" type="object" class="btn-sm btn-danger" invisible="delegation_state != 'pending_hr'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Recruitment Approval Committee" name="recruitment_approval_committee" invisible="vacancy_status == 'draft'">
+                            <field name="recr_selected_team_id">
+                                <list editable="bottom" delete="0">
+                                    <field name="role" width="20%"/>
+                                    <field name="employee_name" width="20%"/>
+                                    <field name="operating_unit" width="20%"/>
+                                    <field name="status" width="20%"/>
+                                    <field name="alternate_committee_member" width="20%"/>
+                                    <field name="alter_operating_unit" width="20%"/>
+                                    <field name="approve" width="20%"/>
                                 </list>
                             </field>
                         </page>
                     </notebook>
 
-                    <group string="Comment">
-                        <field name="comment" nolabel="1" readonly="vacancy_status != 'draft'"/>
-                    </group>
-
-                    <!-- Internal Placement Release Tracking — only relevant for internal/both vacancies -->
-                    <group string="Internal Placement &amp; Release"
-                           invisible="sourcing_type not in ['internal', 'both']">
-                        <group>
-                            <field name="release_date"/>
-                            <field name="release_notes" nolabel="1" placeholder="Optional release / handover notes..."/>
-                        </group>
-                    </group>
                 </sheet>
 
             </form>

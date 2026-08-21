@@ -115,7 +115,7 @@ class ManpowerPlan(models.Model):
     def unlink(self):
         for val in self.manpower_plan_id:
             val.unlink()
-        return super(ManpowerPlan, self).unlink()
+        return super().unlink()
     def confirm(self):
         if self.approve_status == 'approved':
             rec = self.env["planning.approval"].sudo().search([("operating_unit", "=", self.sudo().work_unit.name)])
@@ -212,7 +212,7 @@ class ManpowerPlan(models.Model):
     #                     get_position=self.env["manpower.plan.jobs"].search([("id","=",i)])
     #                     raise ValidationError(get_position.position.name+"already exists")
     #
-    #     return super(ManpowerPlan, self).create(vals)
+    #     return super().create(vals)
     # def write(self,vals):
     #     for val in self.manpower_plan_id:
     #         if "manpower_plan_id" in vals:
@@ -226,7 +226,7 @@ class ManpowerPlan(models.Model):
     #                         get_position = self.env["manpower.plan.jobs"].search([("id", "=", val2[1])])
     #                         if val.position.id == get_position.id:
     #                             raise ValidationError(val.position.position.name + " Position Already Exists")
-    #     return super(ManpowerPlan, self).write(vals)
+    #     return super().write(vals)
 
 
 
@@ -337,7 +337,7 @@ class Requirements2(models.Model):
         # vals["work_unit2"] = get_manpower.work_unit.id
         # vals["department2"] = get_manpower.department.id
         # vals["plan_version"] = get_manpower.plan_version.plan_version
-        return super(Requirements2, self).write(vals)
+        return super().write(vals)
 
 
     def save(self):

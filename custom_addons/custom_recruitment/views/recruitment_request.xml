@@ -104,7 +104,7 @@
                             <field name="workforce_plan_id"
                                    invisible="request_type != 'planned'"
                                    required="request_type == 'planned'"
-                                   />
+                                   readonly="state != 'draft'"/>
 
                             <field name="plan_total_headcount"
                                    invisible="request_type != 'planned' or not workforce_plan_id"/>

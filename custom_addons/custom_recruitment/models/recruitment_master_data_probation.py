@@ -93,6 +93,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Delegation team notified successfully.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -133,6 +134,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Evaluation recorded.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -186,6 +188,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('TDD In-charge Officer has been informed.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -203,6 +206,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Employee confirmed as permanent.'),
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -216,6 +220,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Probation rejected.'),
                 'type': 'warning',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 
@@ -233,6 +238,7 @@ class ProbationAssessmentForm(models.Model):
                 'message': _('Contract terminated.'),
                 'type': 'warning',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
         }
 

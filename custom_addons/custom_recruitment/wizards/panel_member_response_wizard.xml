@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_panel_member_response_wizard_form" model="ir.ui.view">
+        <field name="name">panel.member.response.wizard.form</field>
+        <field name="model">panel.member.response.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Panel Member Interview Response">
+                <sheet>
+                    <group>
+                        <field name="panel_member_id" readonly="1" invisible="not panel_member_id"/>
+                        <field name="ext_panel_member_id" readonly="1" invisible="not ext_panel_member_id"/>
+                        <field name="internal_selected_id" readonly="1" invisible="not internal_selected_id"/>
+                        <field name="external_selected_id" readonly="1" invisible="not external_selected_id"/>
+                        <field name="response_type" widget="radio"/>
+                    </group>
+                    
+                    <group invisible="response_type != 'reschedule'">
+                        <field name="proposed_datetime" required="response_type == 'reschedule'"/>
+                    </group>
+
+                    <group invisible="response_type != 'delegate'">
+                        <field name="delegate_employee_id" required="response_type == 'delegate'" options="{'no_create': True}"/>
+                    </group>
+
+                    <group string="Reason / Notes">
+                        <field name="reason" placeholder="Provide reason for your response choice..." nolabel="1" required="response_type in ['unavailable', 'reschedule', 'delegate']"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_submit_response" string="Submit Response" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

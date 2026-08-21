@@ -70,7 +70,7 @@
                     <page string="Education Qualification">
                         <field name="qualification_id">
                             <list editable="bottom">
-                                <field name="qualification"/>
+                                <field name="qualification" options="{'no_open': True}"/>
                                 <field name="requirement"/>
                                 <field name="response"/>
                             </list>
@@ -79,7 +79,7 @@
                     <page string="Experience">
                         <field name="experiance_id">
                             <list editable="bottom">
-                                <field name="experience"/>
+                                <field name="experience" options="{'no_open': True}"/>
                                 <field name="requirement"/>
                                 <field name="response"/>
                             </list>
@@ -88,7 +88,7 @@
                     <page string="Competencies ">
                         <field name="competencies_id">
                             <list editable="bottom">
-                                <field name="competencies"/>
+                                <field name="competencies" options="{'no_open': True}"/>
                                 <field name="requirement"/>
                                 <field name="response"/>
                             </list>

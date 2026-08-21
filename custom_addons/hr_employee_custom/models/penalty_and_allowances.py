@@ -46,7 +46,7 @@ class EmpAllowance(models.Model):
 #     _inherit = 'hr.payslip'
 
 #     def get_inputs(self, contract_ids, date_from, date_to):
-#         res = super(MarriageRuleInput, self).get_inputs(contract_ids, date_from, date_to)
+#         res = super().get_inputs(contract_ids, date_from, date_to)
 #         contract_obj = self.env['hr.version']
 #         for i in contract_ids:
 #             if contract_ids[0]:
@@ -62,7 +62,7 @@ class EmpAllowance(models.Model):
 #     _inherit = 'hr.payslip'
 
 #     def get_inputs(self, contract_ids, date_from, date_to):
-#         res = super(FuneralAllowanceInput, self).get_inputs(contract_ids, date_from, date_to)
+#         res = super().get_inputs(contract_ids, date_from, date_to)
 #         contract_obj = self.env['hr.version']
 #         for i in contract_ids:
 #             if contract_ids[0]:
@@ -77,7 +77,7 @@ class EmpAllowance(models.Model):
 #     _inherit = 'hr.payslip'
 
 #     def get_inputs(self, contract_ids, date_from, date_to):
-#         res = super(FitnessAllowanceInput, self).get_inputs(contract_ids, date_from, date_to)
+#         res = super().get_inputs(contract_ids, date_from, date_to)
 #         contract_obj = self.env['hr.version']
 #         for i in contract_ids:
 #             if contract_ids[0]:
@@ -92,7 +92,7 @@ class EmpAllowance(models.Model):
 #     _inherit = 'hr.payslip'
 
 #     def get_inputs(self, contract_ids, date_from, date_to):
-#         res = super(FitnessAllowanceInput, self).get_inputs(contract_ids, date_from, date_to)
+#         res = super().get_inputs(contract_ids, date_from, date_to)
 #         contract_obj = self.env['hr.version']
 #         for i in contract_ids:
 #             if contract_ids[0]:
@@ -108,7 +108,7 @@ class EmpAllowance(models.Model):
 #     _inherit = 'hr.payslip'
     
 #     def get_inputs(self, contract_ids, date_from, date_to):
-#         res = super(DisciplinePenalityRuleInput, self).get_inputs(contract_ids, date_from, date_to)
+#         res = super().get_inputs(contract_ids, date_from, date_to)
 #         contract_obj = self.env['hr.version']
 #         for contract_id in contract_ids:
 #             if contract_id:
@@ -126,7 +126,7 @@ class EmpAllowance(models.Model):
                         
 #         return res
 #     # def get_inputs(self, contract_ids, date_from, date_to):
-#         # res = super(DisciplinePenalityRuleInput, self).get_inputs(contract_ids, date_from, date_to)
+#         # res = super().get_inputs(contract_ids, date_from, date_to)
 #         # contract_obj = self.env['hr.version']
 #         # for i in contract_ids:
 #             # if contract_ids[0]:
