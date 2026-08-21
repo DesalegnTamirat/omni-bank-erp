@@ -121,11 +121,12 @@
         # -- Misc utility wizards --
         'wizards/print_employee_report_views.xml',
         'views/employee_history.xml',
+        'views/hr_employee_master_views.xml',
         'views/hr_employee_document_views.xml',
         'views/hr_employee_relative_views.xml',
         'views/hr_employee_education_detail_views.xml',
         'views/hr_employee_previous_occupation_views.xml',
-        'views/hr_employee_master_views.xml',
+        # 'views/hr_employee_master_views.xml',
         'views/menu.xml',
     ],
     'assets': {

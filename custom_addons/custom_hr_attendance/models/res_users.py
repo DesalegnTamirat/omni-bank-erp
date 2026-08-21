@@ -104,14 +104,15 @@ class ResUsers(models.Model):
                 continue
 
             has_subordinates = bool(emp.child_ids)
-            has_higher_role = any(g in user.groups_id for g in higher_groups)
+            # has_higher_role = any(g in user.groups_id for g in higher_groups)
+            has_higher_role = any(g in user.group_ids for g in higher_groups)
 
             if has_subordinates:
-                if group_manager not in user.groups_id and not has_higher_role:
-                    user.sudo().write({'groups_id': [(4, group_manager.id)]})
+                if group_manager not in user.group_ids and not has_higher_role:
+                    user.sudo().write({'group_ids': [(4, group_manager.id)]})
             else:
-                if group_manager in user.groups_id and not has_higher_role:
-                    user.sudo().write({'groups_id': [(3, group_manager.id)]})
+                if group_manager in user.group_ids and not has_higher_role:
+                    user.sudo().write({'group_ids': [(3, group_manager.id)]})
 
     def _get_allowed_job_shift_ids(self, target_employee=None, target_operating_unit=None):
         """
