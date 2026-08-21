@@ -52,16 +52,19 @@
                 <form string="Disciplinary Case">
                     <header>
                         <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <button name="action_start_investigation" string="Start Investigation" type="object" class="btn-info" invisible="state != 'initiated'"/>
-                        <button name="action_send_to_committee" string="Submit to Committee" type="object" class="btn-warning" invisible="state not in ('initiated', 'investigating')"/>
-                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="btn-primary" invisible="state not in ('investigating', 'committee_review')"/>
+                        <button name="action_submit_for_approval" string="Submit for Director Approval" type="object" class="btn-primary" invisible="state not in ('draft', 'initiated') or initiator_type != 'manager'"/>
+                        <button name="action_start_investigation" string="Start Investigation" type="object" class="btn-info" invisible="state != 'initiated' or initiator_type == 'manager'"/>
+                        <button name="action_send_to_committee" string="Submit to Committee" type="object" class="btn-warning" invisible="state not in ('initiated', 'investigating') or initiator_type == 'manager'"/>
+                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="btn-primary" invisible="state not in ('investigating', 'committee_review') or initiator_type == 'manager'"/>
                         <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success" invisible="state != 'pending_approval'"/>
+                        <button name="action_return_revision" string="Return for Revision" type="object" class="btn-warning" invisible="state != 'pending_approval'"/>
+                        <button name="action_reject" string="Reject Case" type="object" class="btn-secondary" invisible="state != 'pending_approval'"/>
                         <!-- Submit Appeal button — only when window is open -->
                         <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
                                 invisible="not is_appeal_window_open"
                                 help="Submit an appeal within the 10-calendar-day window."/>
                         <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,initiated,investigating,committee_review,pending_approval,enforced"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,initiated,pending_approval,enforced"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
@@ -140,7 +143,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Committee Meetings">
+                            <page string="Committee Meetings" invisible="initiator_type == 'manager'">
                                 <field name="committee_meeting_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Committee Meetings">
                                         <field name="name"/>

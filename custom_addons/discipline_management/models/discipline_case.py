@@ -382,15 +382,31 @@ class DisciplineCase(models.Model):
     def action_submit_for_approval(self):
         for rec in self:
             rec.with_context(force_write=True).write({'state': 'pending_approval'})
-            rec.message_post(body=_('Case submitted for final approval.'))
+            rec.message_post(body=_('Case submitted for final approval to Director.'))
+
+    def action_return_revision(self):
+        """Return case to Initiator / Line Manager for revision."""
+        for rec in self:
+            if rec.state != 'pending_approval':
+                raise UserError(_('Only cases pending approval can be returned for revision.'))
+            rec.with_context(force_write=True).write({'state': 'draft'})
+            rec.message_post(body=_('Case returned to Initiator for revision by %s.') % self.env.user.name)
+
+    def action_reject(self):
+        """Reject disciplinary case."""
+        for rec in self:
+            if rec.state not in ['pending_approval', 'initiated', 'investigating']:
+                raise UserError(_('Case cannot be rejected in its current state.'))
+            rec.with_context(force_write=True).write({'state': 'closed'})
+            rec.message_post(body=_('Disciplinary case rejected and closed by %s.') % self.env.user.name)
 
     def action_approve_and_enforce(self):
         for rec in self:
             rec.approver_id = self.env.user
             rec._validate_segregation_of_duties()
 
-            # Verify linked committee meetings are completed with quorum and signoff
-            if rec.committee_meeting_ids:
+            # Verify linked committee meetings are completed with quorum and signoff (only if committee route)
+            if rec.initiator_type != 'manager' and rec.committee_meeting_ids:
                 for meeting in rec.committee_meeting_ids:
                     if meeting.state != 'completed' or not meeting.director_signed_off or not meeting.is_quorum_met:
                         raise UserError(_('Cannot enforce case decision. Linked committee meeting (%s) must be in Completed state with director sign-off and valid quorum.') % meeting.name)
