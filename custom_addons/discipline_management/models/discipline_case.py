@@ -24,30 +24,135 @@ class DisciplineCase(models.Model):
     punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
         ('demotion', 'Demotion to Lower Grade / Position'),
-        ('final_warning_penalty', 'Final Written Warning + Penalty'),
-        ('second_warning_penalty', 'Second Written Warning + Penalty'),
-        ('first_warning_penalty', 'First Written Warning + Penalty'),
+        ('final_warning_penalty', 'Final Warning + Penalty'),
+        ('second_warning_penalty', 'Second Warning + Penalty'),
+        ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
-    ], string='Applicable Punishment', store=True, readonly=False, tracking=True)
+    ], string='Applicable Punishment', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
 
-    penalty_percentage = fields.Float(string='Penalty Percentage (%)', store=True, readonly=False, tracking=True)
-    fine_days = fields.Float(string='Salary Fine (Days)', store=True, readonly=False, tracking=True)
+    original_punishment_type = fields.Selection([
+        ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
+        ('final_warning_penalty', 'Final Warning + Penalty'),
+        ('second_warning_penalty', 'Second Warning + Penalty'),
+        ('first_warning_penalty', 'First Warning + Penalty'),
+        ('verbal_warning', 'Recorded Verbal Warning'),
+        ('custom', 'Custom Administrative Action'),
+    ], string='Original Standard Punishment', compute='_compute_punishment_details', store=True, readonly=True)
+
+    original_penalty_percentage = fields.Float(string='Original Penalty Percentage (%)', compute='_compute_punishment_details', store=True, readonly=True)
+    original_fine_days = fields.Float(string='Original Salary Fine (Days)', compute='_compute_punishment_details', store=True, readonly=True)
+
+    decided_punishment_type = fields.Selection([
+        ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
+        ('final_warning_penalty', 'Final Warning + Penalty'),
+        ('second_warning_penalty', 'Second Warning + Penalty'),
+        ('first_warning_penalty', 'First Warning + Penalty'),
+        ('verbal_warning', 'Recorded Verbal Warning'),
+        ('custom', 'Custom Administrative Action'),
+    ], string='Final Committee Decided Punishment', tracking=True)
+
+    decided_penalty_percentage = fields.Float(string='Final Decided Penalty (%)', tracking=True)
+    decided_fine_days = fields.Float(string='Final Decided Salary Fine (Days)', tracking=True)
+    is_punishment_modified_by_committee = fields.Boolean(string='Punishment Modified by Committee', compute='_compute_is_punishment_modified', store=True)
+
+    @api.depends('original_punishment_type', 'punishment_type', 'original_penalty_percentage', 'penalty_percentage', 'original_fine_days', 'fine_days')
+    def _compute_is_punishment_modified(self):
+        for rec in self:
+            rec.is_punishment_modified_by_committee = (
+                (rec.punishment_type and rec.original_punishment_type and rec.punishment_type != rec.original_punishment_type) or
+                (rec.penalty_percentage != rec.original_penalty_percentage) or
+                (rec.fine_days != rec.original_fine_days)
+            )
+
+    @api.depends('severity_level_id', 'offense_id', 'employee_id')
+    def _compute_punishment_details(self):
+        for rec in self:
+            if rec.severity_level_id:
+                emp = rec.employee_id
+                job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+                is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+
+                matching_line = False
+                if rec.offense_id and rec.offense_id.line_ids:
+                    matching_line = rec.offense_id.line_ids.filtered(lambda l: l.severity_level_id == rec.severity_level_id)
+
+                if matching_line:
+                    line = matching_line[0]
+                    punish = line.punishment_type
+                    if line.approval_authority and line.approval_authority in ['cpco', 'ceo']:
+                        rec.required_final_authority = line.approval_authority
+                    pct = line.managerial_penalty_pct if is_managerial else line.non_managerial_penalty_pct
+                    days = line.managerial_fine_days if is_managerial else line.non_managerial_fine_days
+                else:
+                    lvl = rec.severity_level_id
+                    punish = lvl.default_punishment_type
+                    if lvl.default_approval_authority and lvl.default_approval_authority in ['cpco', 'ceo']:
+                        rec.required_final_authority = lvl.default_approval_authority
+                    pct = (getattr(lvl, 'default_managerial_penalty_pct', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_penalty_pct', 0.0)) or getattr(lvl, 'default_penalty_percentage', 0.0)
+                    days = (getattr(lvl, 'default_managerial_fine_days', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_fine_days', 0.0)) or getattr(lvl, 'default_fine_days', 0.0)
+
+                rec.original_punishment_type = punish
+                rec.original_penalty_percentage = pct
+                rec.original_fine_days = days
+
+                rec.punishment_type = rec.decided_punishment_type or punish
+                rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
+                rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
+            else:
+                rec.original_punishment_type = False
+                rec.original_penalty_percentage = 0.0
+                rec.original_fine_days = 0.0
+                rec.punishment_type = False
+                rec.penalty_percentage = 0.0
+                rec.fine_days = 0.0
+
+    @api.onchange('severity_level_id', 'offense_id', 'employee_id')
+    def _onchange_offense_severity_resolve_rules(self):
+        """Re-trigger rule resolution immediately when severity level, offense, or employee changes."""
+        self._compute_punishment_details()
+
+    penalty_percentage = fields.Float(string='Penalty Percentage (%)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
+    fine_days = fields.Float(string='Salary Fine (Days)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
     property_repair_cost = fields.Float(string='Property Repair / Replacement Cost (ETB)', tracking=True)
     is_managerial = fields.Boolean(string='Is Managerial Employee', related='employee_id.is_managerial', store=True, readonly=True)
     staff_category_display = fields.Char(string='Staff Category', compute='_compute_staff_category_display', store=True)
+
+    def _default_initiator_type(self):
+        user = self.env.user
+        audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
+        user_dept_name = (user.employee_id.department_id.name or '').lower() if user.employee_id and user.employee_id.department_id else ''
+        is_audit = (audit_group and audit_group in user.groups_id) or ('audit' in user_dept_name or 'compliance' in user_dept_name)
+        return 'audit' if is_audit else 'manager'
+
     initiator_type = fields.Selection([
         ('manager', 'Line Manager / Supervisor'),
-        ('hr', 'HR Directorate'),
         ('audit', 'Internal Audit / Compliance'),
-        ('committee', 'Disciplinary Committee'),
-    ], string='Case Initiator Source', default='hr', tracking=True)
+    ], string='Case Initiator Source', default=_default_initiator_type, store=True, readonly=False, tracking=True)
 
     allowed_severity_level_ids = fields.Many2many(
         'discipline.severity.level',
         compute='_compute_allowed_severity_level_ids',
         string='Allowed Severity Levels'
     )
+
+    subordinate_employee_ids = fields.Many2many(
+        'hr.employee',
+        compute='_compute_subordinate_employee_ids',
+        string='Subordinate Employees'
+    )
+
+    @api.depends('reported_by_id', 'create_uid')
+    def _compute_subordinate_employee_ids(self):
+        for rec in self:
+            reporter = rec.reported_by_id or self.env.user.employee_id
+            if reporter:
+                subs = self.env['hr.employee'].search([('id', 'child_of', reporter.id)])
+                rec.subordinate_employee_ids = subs
+            else:
+                rec.subordinate_employee_ids = self.env['hr.employee'].search([])
 
     @api.depends('offense_id', 'offense_id.line_ids')
     def _compute_allowed_severity_level_ids(self):
@@ -86,10 +191,14 @@ class DisciplineCase(models.Model):
     reviewer_id = fields.Many2one('res.users', string='Reviewer / Investigator', tracking=True)
     approver_id = fields.Many2one('res.users', string='Final Approver', tracking=True)
 
+    def _default_reported_by_id(self):
+        return self.env.user.employee_id or self.env['hr.employee'].search([('user_id', '=', self.env.uid)], limit=1)
+
     reported_by_id = fields.Many2one(
         'hr.employee', 
         string='Reported By', 
-        default=lambda self: self.env.user.employee_id
+        default=_default_reported_by_id,
+        readonly=True
     )
     
     reference = fields.Char(string='Reference')
@@ -204,62 +313,29 @@ class DisciplineCase(models.Model):
         for rec in self:
             rec.is_hr_admin = is_admin
 
-    @api.onchange('employee_id')
+    @api.onchange('reported_by_id', 'employee_id', 'initiator_type')
     def _onchange_employee_id(self):
-        if self.employee_id:
-            # Set reviewer to employee's direct manager
-            if self.employee_id.parent_id and self.employee_id.parent_id.user_id:
-                self.reviewer_id = self.employee_id.parent_id.user_id
-            
-            # Set approver to employee's Department Director (enforcing no self-approval)
-            dept_mgr = self.employee_id.department_id.manager_id.user_id if self.employee_id.department_id and self.employee_id.department_id.manager_id else False
-            if dept_mgr and dept_mgr != self.env.user:
-                self.approver_id = dept_mgr
-            elif self.employee_id.parent_id and self.employee_id.parent_id.user_id and self.employee_id.parent_id.user_id != self.env.user:
-                self.approver_id = self.employee_id.parent_id.user_id
+        self.reviewer_id = False
+        if self.initiator_type == 'manager':
+            # Approver is inferred from the REPORTER (the Line Manager initiating the case), NOT the employee under case!
+            reporter_emp = self.reported_by_id or self.env.user.employee_id
+            if reporter_emp:
+                dept_mgr = reporter_emp.department_id.manager_id.user_id if reporter_emp.department_id and reporter_emp.department_id.manager_id else False
+                if dept_mgr and dept_mgr != self.env.user:
+                    self.approver_id = dept_mgr
+                elif reporter_emp.parent_id and reporter_emp.parent_id.user_id and reporter_emp.parent_id.user_id != self.env.user:
+                    self.approver_id = reporter_emp.parent_id.user_id
+                else:
+                    # Fallback to HR Manager / CPCO if the reporter is already the Department Director
+                    hr_mgr = self.env['res.users'].search([('name', 'ilike', 'Marta Bekele')], limit=1)
+                    self.approver_id = hr_mgr or self.env.user
             else:
-                # Fallback to HR Manager / CPCO if line manager is creating case for direct subordinate
-                hr_mgr = self.env['res.users'].search([('name', 'ilike', 'Marta Bekele')], limit=1)
-                self.approver_id = hr_mgr or self.env.user
+                self.approver_id = False
+        else:
+            self.approver_id = False
 
-        # Auto-set initiator_type for non-admin managers
-        if not self.env.user.has_group('discipline_management.group_discipline_manager') and not self.env.user.has_group('base.group_system'):
-            self.initiator_type = 'manager'
-
-        if self.offense_id and self.severity_level_id:
+        if self.severity_level_id:
             self._onchange_offense_severity_resolve_rules()
-
-    @api.onchange('offense_id', 'severity_level_id')
-    def _onchange_offense_severity_resolve_rules(self):
-        """Resolve exact punishment rules from offense severity line matrix when offense or severity level is selected."""
-        if self.offense_id and self.severity_level_id:
-            emp = self.employee_id
-            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
-            is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
-
-            matching_line = self.offense_id.line_ids.filtered(lambda l: l.severity_level_id == self.severity_level_id)
-            if matching_line:
-                line = matching_line[0]
-                self.punishment_type = line.punishment_type
-                if line.approval_authority and line.approval_authority in ['cpco', 'ceo']:
-                    self.required_final_authority = line.approval_authority
-                if is_managerial:
-                    self.penalty_percentage = line.managerial_penalty_pct
-                    self.fine_days = line.managerial_fine_days
-                else:
-                    self.penalty_percentage = line.non_managerial_penalty_pct
-                    self.fine_days = line.non_managerial_fine_days
-            else:
-                lvl = self.severity_level_id
-                self.punishment_type = lvl.default_punishment_type
-                if lvl.default_approval_authority and lvl.default_approval_authority in ['cpco', 'ceo']:
-                    self.required_final_authority = lvl.default_approval_authority
-                if is_managerial:
-                    self.penalty_percentage = lvl.default_managerial_penalty_pct or lvl.default_penalty_percentage
-                    self.fine_days = lvl.default_managerial_fine_days or lvl.default_fine_days
-                else:
-                    self.penalty_percentage = lvl.default_non_managerial_penalty_pct or lvl.default_penalty_percentage
-                    self.fine_days = lvl.default_non_managerial_fine_days or lvl.default_fine_days
 
     @api.constrains('employee_id', 'incident_date', 'offense_id')
     def _check_duplicate_case(self):
@@ -580,6 +656,22 @@ class DisciplineCase(models.Model):
                 'default_case_id': self.id,
                 'default_employee_id': self.employee_id.id,
                 'default_submission_date': fields.Date.context_today(self),
+            }
+        }
+
+    def action_create_appeal_on_behalf(self):
+        self.ensure_one()
+        if not self.env.user.has_group('discipline_management.group_discipline_admin') and not self.env.user.has_group('discipline_management.group_discipline_manager'):
+            raise UserError(_('Only HR Administrators or Managers can lodge an appeal on behalf of an employee.'))
+        return {
+            'name': _('Lodge Appeal on Behalf of %s') % self.employee_id.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'discipline.appeal',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_case_id': self.id,
+                'default_appellant_id': self.employee_id.id,
             }
         }
 

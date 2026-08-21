@@ -17,9 +17,9 @@ class DisciplineSeverityLevel(models.Model):
     default_punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
         ('demotion', 'Demotion to Lower Grade / Position'),
-        ('final_warning_penalty', 'Final Written Warning + 20% Salary Deduction'),
-        ('second_warning_penalty', 'Second Written Warning + 10% Salary Deduction'),
-        ('first_warning_penalty', 'First Written Warning + 5% Salary Deduction'),
+        ('final_warning_penalty', 'Final Warning + Penalty'),
+        ('second_warning_penalty', 'Second Warning + Penalty'),
+        ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
     ], string='Default Punishment Type', default='first_warning_penalty', tracking=True)

@@ -79,11 +79,11 @@ class HrAttendance(models.Model):
                 Offense = self.env['discipline.offense']
                 offense = Offense.search([('category_id', '=', cat.id)], limit=1)
                 if not offense:
+                    sev_level = self.env['discipline.severity.level'].search([('code', '=', 'level_4')], limit=1) or self.env['discipline.severity.level'].search([], limit=1)
                     offense = Offense.create({
                         'name': 'Repeated Lateness / Attendance Violation',
                         'category_id': cat.id,
-                        'severity_level': 'level_4',
-                        'punishment_type': 'first_warning_penalty',
+                        'severity_level_id': sev_level.id if sev_level else False,
                     })
                 
                 existing = self.env['discipline.case'].search([
