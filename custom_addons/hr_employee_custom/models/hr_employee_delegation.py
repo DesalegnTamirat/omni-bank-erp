@@ -326,12 +326,14 @@ class HrEmployeeDelegation(models.Model):
 
 
 
-    @api.depends('employee_id', 'include_sub_level_staff')
+    @api.depends('employee_id', 'include_sub_level_staff', 'start_date', 'end_date')
     def _compute_allowed_delegate_ids(self):
+
         for rec in self:
             if not rec.employee_id:
-                rec.allowed_delegate_ids = [(6, 0, [])]
+                rec.allowed_delegate_ids = False
                 continue
+
 
             # Fetch direct coachees/subordinates (sudo to avoid read access errors)
             direct_staff = self.env['hr.employee'].sudo().search([
@@ -360,7 +362,26 @@ class HrEmployeeDelegation(models.Model):
                     visited.update(new_sub_staff.ids)
                     current_level = new_sub_staff
 
-            rec.allowed_delegate_ids = [(6, 0, list(allowed_ids))]
+            # Exclude self
+            allowed_ids.discard(rec.employee_id.id)
+
+            # If dates are specified, exclude employees who are already serving as delegates or have delegated authority
+            if rec.start_date and rec.end_date:
+                rec_id = rec.id if isinstance(rec.id, int) else False
+                busy_delegates = self.env['hr.employee.delegation'].sudo().search([
+                    ('id', '!=', rec_id),
+                    ('state', '!=', 'cancelled'),
+                    ('start_date', '<=', rec.end_date),
+                    ('end_date', '>=', rec.start_date),
+                ])
+                # Exclude employees currently acting as delegates
+                allowed_ids.difference_update(busy_delegates.mapped('delegate_id.id'))
+                # Exclude employees who have delegated their own authority
+                allowed_ids.difference_update(busy_delegates.mapped('employee_id.id'))
+
+            rec.allowed_delegate_ids = self.env['hr.employee'].sudo().browse(list(allowed_ids))
+
+
 
     @api.depends('start_date', 'end_date', 'state')
     def _compute_is_active_delegation(self):
@@ -382,6 +403,19 @@ class HrEmployeeDelegation(models.Model):
     def _onchange_employee_id(self):
         if self.employee_id:
             self._set_default_notification_recipients()
+
+    @api.onchange('include_sub_level_staff', 'employee_id', 'start_date', 'end_date')
+    def _onchange_delegate_options(self):
+        self._compute_allowed_delegate_ids()
+        if self.delegate_id and self.delegate_id not in self.allowed_delegate_ids:
+            self.delegate_id = False
+        return {
+            'domain': {
+                'delegate_id': [('id', 'in', self.allowed_delegate_ids.ids)]
+            }
+        }
+
+
 
     def _get_default_notification_recipients(self):
         self.ensure_one()
@@ -466,38 +500,105 @@ class HrEmployeeDelegation(models.Model):
                     "Only managerial employees with direct staff under them can create delegation requests."
                 ) % rec.employee_id.name)
 
-    @api.constrains('employee_id', 'start_date', 'end_date', 'state', 'active')
+    @api.constrains('employee_id', 'delegate_id')
+    def _check_self_delegation(self):
+        for rec in self:
+            if rec.employee_id and rec.delegate_id and rec.employee_id.id == rec.delegate_id.id:
+                raise ValidationError(_("An employee cannot delegate their authority to themselves."))
+
+    @api.constrains('employee_id', 'delegate_id', 'start_date', 'end_date', 'state', 'active')
     def _check_no_overlapping_delegation(self):
-        """A coach/manager may only have ONE delegate active at a time.
-        Reject creating/activating a delegation whose period overlaps an
-        existing draft or submitted (non-cancelled, non-archived)
-        delegation for the same manager - regardless of which delegate is
-        chosen - to prevent duplicate/conflicting delegations within the
-        same time interval.
+        """Validates:
+        1. A delegating manager (employee_id) cannot have multiple active/overlapping delegations.
+        2. A delegate (delegate_id) cannot have multiple delegations assigned to them in the same period (duplicate delegation).
+        3. Chained/Sub-delegation prevention: An employee who is currently an active delegate cannot delegate someone else.
+        4. Selected delegate cannot already be delegating their own authority during this period.
         """
         for rec in self:
-            if not (rec.employee_id and rec.start_date and rec.end_date):
+            if not (rec.employee_id and rec.delegate_id and rec.start_date and rec.end_date):
                 continue
             if rec.state == 'cancelled' or not rec.active:
                 continue
-            overlapping = self.search([
+
+            # 1. Prevent duplicate/overlapping delegation by the same manager
+            overlapping_manager = self.search([
                 ('id', '!=', rec.id),
                 ('employee_id', '=', rec.employee_id.id),
                 ('state', '!=', 'cancelled'),
                 ('start_date', '<=', rec.end_date),
                 ('end_date', '>=', rec.start_date),
             ], limit=1)
-            if overlapping:
+            if overlapping_manager:
                 raise ValidationError(_(
-                    "Manager '%(manager)s' already has a delegation (%(ref)s, %(start)s to %(end)s) "
-                    "that overlaps this period. Only one delegate is allowed per manager for any "
-                    "given time interval - please cancel the existing delegation first or adjust the dates."
+                    "Manager '%(manager)s' already has an active delegation (%(ref)s, %(start)s to %(end)s) "
+                    "that overlaps this period. Duplicate active delegations are not allowed."
                 ) % {
                     'manager': rec.employee_id.name,
-                    'ref': overlapping.name,
-                    'start': overlapping.start_date,
-                    'end': overlapping.end_date,
+                    'ref': overlapping_manager.name,
+                    'start': overlapping_manager.start_date,
+                    'end': overlapping_manager.end_date,
                 })
+
+            # 2. Prevent duplicate delegation where the delegate is already assigned in this period
+            overlapping_delegate = self.search([
+                ('id', '!=', rec.id),
+                ('delegate_id', '=', rec.delegate_id.id),
+                ('state', '!=', 'cancelled'),
+                ('start_date', '<=', rec.end_date),
+                ('end_date', '>=', rec.start_date),
+            ], limit=1)
+            if overlapping_delegate:
+                raise ValidationError(_(
+                    "Delegate '%(delegate)s' is already serving as a delegate in delegation (%(ref)s, %(start)s to %(end)s) "
+                    "for '%(manager)s'. An employee cannot hold multiple overlapping active delegations."
+                ) % {
+                    'delegate': rec.delegate_id.name,
+                    'ref': overlapping_delegate.name,
+                    'start': overlapping_delegate.start_date,
+                    'end': overlapping_delegate.end_date,
+                    'manager': overlapping_delegate.employee_id.name,
+                })
+
+            # 3. Chained/Sub-delegation prevention: A delegated employee cannot delegate another person during their active delegation period
+            serving_as_delegate = self.search([
+                ('id', '!=', rec.id),
+                ('delegate_id', '=', rec.employee_id.id),
+                ('state', '!=', 'cancelled'),
+                ('start_date', '<=', rec.end_date),
+                ('end_date', '>=', rec.start_date),
+            ], limit=1)
+            if serving_as_delegate:
+                raise ValidationError(_(
+                    "Employee '%(employee)s' cannot delegate authority because they are currently serving as a delegate "
+                    "in delegation (%(ref)s, %(start)s to %(end)s) delegated by '%(manager)s'. "
+                    "Delegated employees cannot sub-delegate authority during an active delegation period."
+                ) % {
+                    'employee': rec.employee_id.name,
+                    'ref': serving_as_delegate.name,
+                    'start': serving_as_delegate.start_date,
+                    'end': serving_as_delegate.end_date,
+                    'manager': serving_as_delegate.employee_id.name,
+                })
+
+            # 4. A chosen delegate cannot have already delegated their own authority during this period
+            delegate_is_delegator = self.search([
+                ('id', '!=', rec.id),
+                ('employee_id', '=', rec.delegate_id.id),
+                ('state', '!=', 'cancelled'),
+                ('start_date', '<=', rec.end_date),
+                ('end_date', '>=', rec.start_date),
+            ], limit=1)
+            if delegate_is_delegator:
+                raise ValidationError(_(
+                    "Selected delegate '%(delegate)s' has delegated their own authority in delegation (%(ref)s, %(start)s to %(end)s). "
+                    "An employee who has delegated their authority cannot be selected as a delegate during that period."
+                ) % {
+                    'delegate': rec.delegate_id.name,
+                    'ref': delegate_is_delegator.name,
+                    'start': delegate_is_delegator.start_date,
+                    'end': delegate_is_delegator.end_date,
+                })
+
 
 
     # -------------------------------------------------------------------------

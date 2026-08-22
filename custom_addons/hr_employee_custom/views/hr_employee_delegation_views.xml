@@ -75,8 +75,9 @@
                         <group string="Delegate Selection">
                             <group>
                                 <field name="include_sub_level_staff" widget="boolean_toggle" invisible="not is_requestor or state != 'draft'"/>
-                                <field name="allowed_delegate_ids" invisible="1"/>
+                                <field name="allowed_delegate_ids" invisible="1" widget="many2many_tags"/>
                                 <!-- Editable Many2one: shown only to requestor in draft state -->
+
                                 <field name="delegate_id"
                                        options="{'no_create': True}"
                                        invisible="not is_requestor or state != 'draft'"/>
