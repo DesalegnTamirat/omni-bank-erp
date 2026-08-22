@@ -164,3 +164,9 @@ access_employee_education_user,employee.education.user,model_employee_education,
 access_employee_education_manager,employee.education.manager,model_employee_education,hr.group_hr_manager,1,1,1,1
 access_employee_previous_occupation_user,employee.previous.occupation.user,model_employee_previous_occupation,hr.group_hr_user,1,1,1,0
 access_employee_previous_occupation_manager,employee.previous.occupation.manager,model_employee_previous_occupation,hr.group_hr_manager,1,1,1,1
+access_hr_employee_delegation_user,hr.employee.delegation.user,model_hr_employee_delegation,base.group_user,1,1,1,1
+access_hr_employee_delegation_manager,hr.employee.delegation.manager,model_hr_employee_delegation,hr.group_hr_manager,1,1,1,1
+access_hr_employee_base_user,access.hr.employee.base.user,hr.model_hr_employee,base.group_user,1,0,0,0
+
+
+

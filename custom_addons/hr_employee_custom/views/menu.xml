@@ -63,27 +63,29 @@
         ══════════════════════════════════════════════════════════ -->
         <menuitem id="menu_employee_service_request" name="Employee Service Request"
                   parent="hr.menu_hr_employee_payroll" action="action_employee_service_request" sequence="12"/>
+        <menuitem id="menu_employee_delegation" name="Delegation Request"
+                  parent="hr.menu_hr_employee_payroll" action="action_hr_employee_delegation" sequence="13"/>
         <menuitem id="menu_guarentees_details_list" name="Guarantees Details" parent="hr.menu_hr_employee_payroll"
-                  action="employee_guarentees_details_tree_action" sequence="13"/>
+                  action="employee_guarentees_details_tree_action" sequence="14"/>
         <menuitem id="menu_supplementary_role_list" name="Supplementary Role" parent="hr.menu_hr_employee_payroll"
-                  action="employee_supplementary_role_tree" sequence="14"/>
+                  action="employee_supplementary_role_tree" sequence="15"/>
         <menuitem id="menu_hr_employee_custom_re_instating" name="Re-Instating" parent="hr.menu_hr_employee_payroll"
-                  action="employee_re_instating_tree" sequence="15"/>
+                  action="employee_re_instating_tree" sequence="16"/>
 <!--        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"-->
 <!--                  action="employee_transfer_form_tree" sequence="16"/>-->
        <menuitem id="menu_hr_employee_custom_transfer_form" name="Transfer Form" parent="hr.menu_hr_employee_payroll"
-                  action="custom_recruitment.action_employee_transfer_request" sequence="16"/>
+                  action="custom_recruitment.action_employee_transfer_request" sequence="17"/>
 
         <menuitem id="menu_hr_award_list" name="Awards Given Details" parent="hr.menu_hr_employee_payroll"
-                  action="employee_hr_award_tree" sequence="17"/>
+                  action="employee_hr_award_tree" sequence="18"/>
         <menuitem id="menu_hr_employee_document_all" name="Documents" parent="hr.menu_hr_employee_payroll"
-                  action="action_hr_employee_document_all" sequence="18"/>
+                  action="action_hr_employee_document_all" sequence="19"/>
         <menuitem id="menu_hr_employee_custom_demotion" name="Employee Demotion" parent="hr.menu_hr_employee_payroll"
-                  action="employee_demotion_action" sequence="19"/>
+                  action="employee_demotion_action" sequence="20"/>
         <menuitem id="menu_hr_employee_custom_part_time_employment" name="Part Time Employment"
-                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="20"/>
+                  parent="hr.menu_hr_employee_payroll" action="part_time_employment_action" sequence="21"/>
         <menuitem id="menu_job_form_list" name="Job History" parent="hr.menu_hr_employee_payroll"
-                  action="employee_job_form_tree" sequence="21"/>
+                  action="employee_job_form_tree" sequence="22"/>
 
         <!-- ── Reporting ── -->
         <record id="action_employee_presence_reporting" model="ir.actions.act_window">
@@ -99,8 +101,11 @@
                   parent="hr.hr_menu_hr_reports" action="action_print_employee_experience_report" sequence="3"/>
         <menuitem id="menu_employee_presence_custom" name="Employee Presence" parent="hr.hr_menu_hr_reports"
                   action="action_employee_presence_reporting" sequence="4"/>
+        <menuitem id="menu_overall_delegations_report" name="Overall Delegations" parent="hr.hr_menu_hr_reports"
+                  action="action_hr_employee_delegation_all" sequence="5"/>
         <menuitem id="menu_employee_category" name="Employee category" parent="hr.menu_human_resources_configuration"
                   action="employee_category" sequence="17"/>
+
 
         <!-- Document Types configuration -->
         <menuitem id="menu_hr_document_type"

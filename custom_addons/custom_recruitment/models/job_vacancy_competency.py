@@ -21,12 +21,11 @@ class JobVacancyCompetency(models.Model):
         self.env.cr.execute("""
             DO $$ 
             BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'job_vacancy_competency')
-                   AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'competency_competency')
-                   AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'job_vacancy_competency' AND column_name = 'competency_id') THEN
-                    DELETE FROM job_vacancy_competency 
-                    WHERE competency_id IS NOT NULL 
-                      AND competency_id NOT IN (SELECT id FROM competency_competency);
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'job_vacancy_competency' AND column_name = 'competency_id')
+                   AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'competency_competency') THEN
+                    EXECUTE 'DELETE FROM job_vacancy_competency 
+                             WHERE competency_id IS NOT NULL 
+                               AND competency_id NOT IN (SELECT id FROM competency_competency)';
                 END IF;
             END $$;
         """)

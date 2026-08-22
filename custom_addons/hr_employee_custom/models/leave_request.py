@@ -87,7 +87,20 @@ class LeaveRequest(models.Model):
         for vals in vals_list:
             if not vals.get('reference') or vals.get('reference') == _('New'):
                 vals['reference'] = self.env['ir.sequence'].next_by_code('leave.request') or _('New')
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        for rec in records:
+            if rec.delegated_name:
+                self.env['hr.employee.delegation'].sync_delegation_from_leave(rec)
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if any(k in vals for k in ['delegated_name', 'start_date', 'end_date', 'requester_name', 'leave_reason']):
+            for rec in self:
+                if rec.delegated_name:
+                    self.env['hr.employee.delegation'].sync_delegation_from_leave(rec)
+        return res
+
     # def _compute_no_of_days(self):
         # for val in self:
             # d1 = datetime.strptime(str(val.start_date), '%Y-%m-%d')

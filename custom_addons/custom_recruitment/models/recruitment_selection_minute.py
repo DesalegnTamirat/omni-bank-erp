@@ -115,29 +115,29 @@ class RecruitmentSelectionMinute(models.Model):
             DO $$ 
             BEGIN 
                 IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_selection_minute' AND column_name = 'recruitment_type') THEN
-                    UPDATE recruitment_selection_minute 
-                    SET recruitment_type = CASE 
-                        WHEN LOWER(recruitment_type) LIKE '%ext%' THEN 'external'
-                        ELSE 'internal'
-                    END
-                    WHERE recruitment_type IS NULL OR recruitment_type = '' OR LOWER(recruitment_type) NOT IN ('internal', 'external');
+                    EXECUTE 'UPDATE recruitment_selection_minute 
+                             SET recruitment_type = CASE 
+                                 WHEN LOWER(recruitment_type) LIKE ''%ext%'' THEN ''external''
+                                 ELSE ''internal''
+                             END
+                             WHERE recruitment_type IS NULL OR recruitment_type = '''' OR LOWER(recruitment_type) NOT IN (''internal'', ''external'')';
                 END IF;
 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'recruitment_selection_minute_line') THEN
-                    UPDATE recruitment_selection_minute_line 
-                    SET selection_status = CASE
-                        WHEN LOWER(selection_status) LIKE '%select%' THEN 'selected'
-                        WHEN LOWER(selection_status) LIKE '%reser%' THEN 'reserve'
-                        WHEN LOWER(selection_status) LIKE '%fail%' OR LOWER(selection_status) LIKE '%reject%' OR LOWER(selection_status) LIKE '%disqualif%' THEN 'failed'
-                        ELSE 'reserve'
-                    END
-                    WHERE selection_status IS NULL OR selection_status = '';
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_selection_minute_line' AND column_name = 'selection_status') THEN
+                    EXECUTE 'UPDATE recruitment_selection_minute_line 
+                             SET selection_status = CASE
+                                 WHEN LOWER(selection_status) LIKE ''%select%'' THEN ''selected''
+                                 WHEN LOWER(selection_status) LIKE ''%reser%'' THEN ''reserve''
+                                 WHEN LOWER(selection_status) LIKE ''%fail%'' OR LOWER(selection_status) LIKE ''%reject%'' OR LOWER(selection_status) LIKE ''%disqualif%'' THEN ''failed''
+                                 ELSE ''reserve''
+                             END
+                             WHERE selection_status IS NULL OR selection_status = ''''';
                 END IF;
 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'recruitment_committee_signature') THEN
-                    UPDATE recruitment_committee_signature 
-                    SET state = LOWER(state)
-                    WHERE state IS NOT NULL AND LOWER(state) IN ('pending', 'signed', 'rejected');
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'recruitment_committee_signature' AND column_name = 'state') THEN
+                    EXECUTE 'UPDATE recruitment_committee_signature 
+                             SET state = LOWER(state)
+                             WHERE state IS NOT NULL AND LOWER(state) IN (''pending'', ''signed'', ''rejected'')';
                 END IF;
             END $$;
         """)

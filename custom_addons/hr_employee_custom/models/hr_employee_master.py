@@ -556,3 +556,94 @@ class HrEmployee(models.Model):
             return datetime.combine(service_start_date, time(0, 0, 0))
         else:
             return super()._get_date_start_work()
+
+    # -------------------------------------------------------------------------
+    # DELEGATION APPROVAL HELPERS
+    # -------------------------------------------------------------------------
+    @api.model
+    def get_active_delegated_managers(self, user_id=None, check_date=None):
+        """Returns recordset of hr.employee (managers) for whom user_id is currently holding an active delegation."""
+        if not user_id:
+            user_id = self.env.uid
+        if not check_date:
+            check_date = fields.Date.today()
+
+        delegate_emp = self.env['hr.employee'].sudo().search([('user_id', '=', user_id)], limit=1)
+        if not delegate_emp:
+            return self.env['hr.employee']
+
+        delegations = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', '=', delegate_emp.id),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', check_date),
+            ('end_date', '>=', check_date),
+        ])
+        return delegations.mapped('employee_id')
+
+
+    def is_approver_or_delegate(self, target_employee, user_id=None, check_date=None):
+        """Returns True if user_id is either direct coach/manager of target_employee OR active delegate for target_employee's manager."""
+        if not target_employee:
+            return False
+        if not user_id:
+            user_id = self.env.uid
+        if not check_date:
+            check_date = fields.Date.today()
+
+        user_emp = self.env['hr.employee'].search([('user_id', '=', user_id)], limit=1)
+        if not user_emp:
+            return False
+
+        # Direct manager/coach check
+        manager = target_employee.coach_id or target_employee.parent_id
+        if manager and manager.id == user_emp.id:
+            return True
+
+        # Active delegation check
+        if manager:
+            delegated_managers = self.get_active_delegated_managers(user_id=user_id, check_date=check_date)
+            if manager in delegated_managers:
+                return True
+
+        return False
+
+    def _get_delegated_subordinate_ids(self):
+        """Returns list of employee IDs that the current employee is allowed to view/approve for via active delegations."""
+        if not self:
+            return []
+        emp_ids = self.ids
+        active_managers = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', 'in', emp_ids),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', fields.Date.today()),
+            ('end_date', '>=', fields.Date.today()),
+        ]).mapped('employee_id')
+        if not active_managers:
+            return []
+        subordinates = self.env['hr.employee'].sudo().search([
+            '|',
+            ('coach_id', 'in', active_managers.ids),
+            ('parent_id', 'in', active_managers.ids)
+        ])
+        return subordinates.ids
+
+    def _get_related_delegation_employee_ids(self):
+        """Returns list of hr.employee IDs referenced in delegations where self is delegator, delegate, or recipient."""
+        if not self:
+            return []
+        emp_ids = self.ids
+        delegations = self.env['hr.employee.delegation'].sudo().search([
+            '|', '|',
+            ('employee_id', 'in', emp_ids),
+            ('delegate_id', 'in', emp_ids),
+            ('notification_recipient_ids', 'in', emp_ids)
+        ])
+        related_ids = set()
+        for d in delegations:
+            if d.employee_id:
+                related_ids.add(d.employee_id.id)
+            if d.delegate_id:
+                related_ids.add(d.delegate_id.id)
+            if d.notification_recipient_ids:
+                related_ids.update(d.notification_recipient_ids.ids)
+        return list(related_ids)

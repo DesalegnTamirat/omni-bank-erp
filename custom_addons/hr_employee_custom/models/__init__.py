@@ -64,3 +64,4 @@ from . import hr_employee_document
 from . import hr_employee_relative
 from . import hr_employee_education_detail
 from . import hr_employee_previous_occupation
+from . import hr_employee_delegation

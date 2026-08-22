@@ -49,17 +49,21 @@
         'views/recruitment_experience.xml',
         'data/hr_job_data.xml',
 
-        # -- Service Request --
+        # -- Service Request & Delegation --
         'security/security_service_request.xml',
+        'security/security_delegation.xml',
         'data/employee_service_request_sequence.xml',
         'data/emp_service_req.xml',
         'data/employee_self_service_sequence.xml',
+        'data/delegation_sequence.xml',
         'views/service_request_type_views.xml',
         'views/service_request_views.xml',
         'views/service_request.xml',
         'views/employee_ser_request.xml',
+        'views/hr_employee_delegation_views.xml',
         'wizards/completion_wizard_views.xml',
         'wizards/rejection_wizard_views.xml',
+
 
         # -- Guarantees / Supplementary Role --
         'views/guarentees_details_views.xml',

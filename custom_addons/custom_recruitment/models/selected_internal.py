@@ -107,20 +107,20 @@ class NewInternalRecruitmentSelected(models.Model):
         self.env.cr.execute("""
             DO $$ 
             BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'new_internal_recruitment_selected') THEN
-                    UPDATE new_internal_recruitment_selected 
-                    SET state = 'notify',
-                        status = 'notify'
-                    WHERE state IS NULL OR state IN ('', 'draft')
-                       OR status IS NULL OR status IN ('', 'draft');
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'new_internal_recruitment_selected' AND column_name = 'state') THEN
+                    EXECUTE 'UPDATE new_internal_recruitment_selected 
+                             SET state = ''notify'',
+                                 status = ''notify''
+                             WHERE state IS NULL OR state IN ('''', ''draft'')
+                                OR status IS NULL OR status IN ('''', ''draft'')';
                 END IF;
 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'new_internal_recruitment_selected_candidates') THEN
-                    UPDATE new_internal_recruitment_selected_candidates 
-                    SET promotion_status = COALESCE(NULLIF(promotion_status, ''), 'draft'),
-                        selection_type = COALESCE(NULLIF(selection_type, ''), 'selected')
-                    WHERE promotion_status IS NULL OR promotion_status = ''
-                       OR selection_type IS NULL OR selection_type = '';
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'new_internal_recruitment_selected_candidates' AND column_name = 'promotion_status') THEN
+                    EXECUTE 'UPDATE new_internal_recruitment_selected_candidates 
+                             SET promotion_status = COALESCE(NULLIF(promotion_status, ''''), ''draft''),
+                                 selection_type = COALESCE(NULLIF(selection_type, ''''), ''selected'')
+                             WHERE promotion_status IS NULL OR promotion_status = ''''
+                                OR selection_type IS NULL OR selection_type = ''''';
                 END IF;
             END $$;
         """)

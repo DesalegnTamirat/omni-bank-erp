@@ -99,18 +99,18 @@ class ExternalRecruitmentSelected(models.Model):
         self.env.cr.execute("""
             DO $$ 
             BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'external_recruitment_selected') THEN
-                    UPDATE external_recruitment_selected 
-                    SET state = 'notify_approver',
-                        status = 'notify'
-                    WHERE state IS NULL OR state IN ('', 'draft')
-                       OR status IS NULL OR status IN ('', 'draft');
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'external_recruitment_selected' AND column_name = 'state') THEN
+                    EXECUTE 'UPDATE external_recruitment_selected 
+                             SET state = ''notify_approver'',
+                                 status = ''notify''
+                             WHERE state IS NULL OR state IN ('''', ''draft'')
+                                OR status IS NULL OR status IN ('''', ''draft'')';
                 END IF;
 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'external_recruitment_selected_candidates') THEN
-                    UPDATE external_recruitment_selected_candidates 
-                    SET selection_type = COALESCE(NULLIF(selection_type, ''), 'selected')
-                    WHERE selection_type IS NULL OR selection_type = '';
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'external_recruitment_selected_candidates' AND column_name = 'selection_type') THEN
+                    EXECUTE 'UPDATE external_recruitment_selected_candidates 
+                             SET selection_type = COALESCE(NULLIF(selection_type, ''''), ''selected'')
+                             WHERE selection_type IS NULL OR selection_type = ''''';
                 END IF;
             END $$;
         """)
