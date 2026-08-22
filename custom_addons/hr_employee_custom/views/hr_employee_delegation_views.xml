@@ -7,20 +7,28 @@
             <field name="name">hr.employee.delegation.form</field>
             <field name="model">hr.employee.delegation</field>
             <field name="arch" type="xml">
-                <form string="Employee Delegation" duplicate="0" delete="0" archive="0">
+                <form string="Employee Delegation" duplicate="0" archive="0">
                     <header>
                         <button name="action_submit"
                                 string="Submit Delegation"
                                 type="object"
                                 class="btn-primary"
                                 invisible="not is_requestor or state != 'draft' or not active"/>
+                        <button name="action_delete_draft"
+                                string="Delete Draft"
+                                type="object"
+                                class="btn-danger"
+                                invisible="not is_requestor or state != 'draft' or not active"
+                                confirm="Are you sure you want to delete this draft delegation request?"/>
                         <button name="action_cancel_delegation"
                                 string="Cancel Delegation"
                                 type="object"
-                                class="btn-danger"
-                                invisible="not is_requestor or state != 'submitted' or not active"/>
+                                class="btn-secondary"
+                                invisible="not is_requestor or state != 'submitted' or not active"
+                                confirm="Are you sure you want to cancel this active delegation?"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,cancelled"/>
                     </header>
+
 
                     <sheet>
                         <field name="active" invisible="1"/>
@@ -75,12 +83,18 @@
                         <group string="Delegate Selection">
                             <group>
                                 <field name="include_sub_level_staff" widget="boolean_toggle" invisible="not is_requestor or state != 'draft'"/>
+                                <field name="direct_coach_ids" invisible="1"/>
+                                <field name="filter_coach_id"
+                                       options="{'no_create': True}"
+                                       invisible="not include_sub_level_staff or not is_requestor or state != 'draft'"/>
                                 <field name="allowed_delegate_ids" invisible="1" widget="many2many_tags"/>
                                 <!-- Editable Many2one: shown only to requestor in draft state -->
-
                                 <field name="delegate_id"
                                        options="{'no_create': True}"
                                        invisible="not is_requestor or state != 'draft'"/>
+                                <field name="delegate_coach_name"
+                                       readonly="1"
+                                       invisible="not delegate_id"/>
                                 <field name="delegate_job_id"
                                        readonly="1"
                                        invisible="not is_requestor or state != 'draft'"/>
@@ -97,14 +111,36 @@
                             </group>
                         </group>
 
+
                         <notebook>
-                            <page string="Notification Recipients">
-                                <p class="text-muted" invisible="state != 'draft'">
-                                    The following staff members and leadership officers will be automatically notified upon submission:
+                            <page string="The following employees will receive delegation notifications" name="notification_recipients_tab">
+                                <p class="text-muted mb-2" invisible="not is_requestor or state != 'draft'">
+                                    The following stakeholders and leadership members will receive an automatic delegation notice upon submission. You can add or remove stakeholders as needed before submitting:
                                 </p>
-                                <field name="notification_recipients_display" readonly="1" nolabel="1"/>
+                                <p class="text-muted mb-2" invisible="is_requestor and state == 'draft'">
+                                    The following stakeholders and leadership members are assigned to receive notification for this delegation:
+                                </p>
+                                <field name="notification_recipient_ids"
+                                       widget="many2many"
+                                       readonly="not is_requestor or state != 'draft'"
+                                       options="{'no_create': True}">
+                                    <list>
+                                        <field name="name" string="Employee Name"/>
+                                        <field name="work_email" string="Work Email"/>
+                                        <field name="department_id" string="Department"/>
+                                        <field name="job_id" string="Job Position"/>
+                                    </list>
+                                </field>
+                                <div class="mt-2" invisible="not is_requestor or state != 'draft'">
+                                    <button name="action_reset_default_recipients"
+                                            string="Reset to Default Stakeholders"
+                                            type="object"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            help="Reset the stakeholders list to the automatically suggested reporting hierarchy."/>
+                                </div>
                             </page>
                         </notebook>
+
 
                     </sheet>
 

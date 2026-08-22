@@ -31,19 +31,40 @@ class HrEmployee(models.Model):
             ])
             visible_ids.update(subordinates.ids)
 
-            # Managers who delegated to me in submitted delegations
-            my_delegations = Delegation.search([
-                ('state', '=', 'submitted'),
-                '|',
+            # Immediate coach and coach of coach
+            if emp.coach_id:
+                visible_ids.add(emp.coach_id.id)
+                if emp.coach_id.coach_id:
+                    visible_ids.add(emp.coach_id.coach_id.id)
+            if emp.parent_id:
+                visible_ids.add(emp.parent_id.id)
+                if emp.parent_id.parent_id:
+                    visible_ids.add(emp.parent_id.parent_id.id)
+
+            # Corporate Leadership & People Operations (standard notification recipients)
+            standard_leadership = self.env['hr.employee'].sudo().search([
+                '|', '|',
+                ('job_id.name', 'ilike', 'People Operation'),
+                ('department_id.name', 'ilike', 'People Operation'),
+                ('job_id.name', 'ilike', 'Chief People and Culture')
+            ])
+            visible_ids.update(standard_leadership.ids)
+
+            # All delegations concerning this employee (as manager, delegate, or recipient)
+            all_my_delegations = Delegation.search([
+                '|', '|',
+                ('employee_id', '=', emp.id),
                 ('delegate_id', '=', emp.id),
                 ('notification_recipient_ids', 'in', [emp.id])
             ])
-            visible_ids.update(my_delegations.mapped('employee_id.id'))
+            visible_ids.update(all_my_delegations.mapped('employee_id.id'))
+            visible_ids.update(all_my_delegations.mapped('delegate_id.id'))
+            visible_ids.update(all_my_delegations.mapped('notification_recipient_ids.id'))
 
             # Subordinates of active delegating managers
             today = fields.Date.today()
-            active_delegated_managers = my_delegations.filtered(
-                lambda d: d.delegate_id.id == emp.id and d.start_date <= today and d.end_date >= today
+            active_delegated_managers = all_my_delegations.filtered(
+                lambda d: d.delegate_id.id == emp.id and d.state == 'submitted' and d.start_date <= today and d.end_date >= today
             ).mapped('employee_id')
             if active_delegated_managers:
                 delegated_subs = self.env['hr.employee'].sudo().search([
@@ -55,6 +76,7 @@ class HrEmployee(models.Model):
 
         visible_ids.discard(False)
         return list(visible_ids)
+
 
 
 
@@ -74,9 +96,10 @@ class HrEmployeeDelegation(models.Model):
         required=True,
         copy=False,
         readonly=True,
-        default=lambda self: _('New'),
+        default=lambda self: _('Draft'),
         tracking=True
     )
+
     employee_id = fields.Many2one(
         'hr.employee',
         string="Manager / Delegator",
@@ -120,6 +143,18 @@ class HrEmployeeDelegation(models.Model):
         string="Include Sub-level Staff",
         help="If enabled, indirect subordinates (subordinates of direct staff) will also be included in delegate options."
     )
+    direct_coach_ids = fields.Many2many(
+        'hr.employee',
+        string="Direct Coaches",
+        compute="_compute_direct_coach_ids",
+        compute_sudo=True
+    )
+    filter_coach_id = fields.Many2one(
+        'hr.employee',
+        string="Filter by Direct Coach",
+        domain="[('id', 'in', direct_coach_ids)]",
+        help="Optional: Select a direct coach to narrow down sub-level staff to that specific team."
+    )
     allowed_delegate_ids = fields.Many2many(
         'hr.employee',
         string="Allowed Delegates",
@@ -134,6 +169,13 @@ class HrEmployeeDelegation(models.Model):
         domain="[('id', 'in', allowed_delegate_ids)]",
         tracking=True
     )
+    delegate_coach_name = fields.Char(
+        string="Delegate's Direct Coach",
+        compute="_compute_delegate_coach_name",
+        store=True,
+        compute_sudo=True,
+        help="The direct manager/coach of the selected delegate."
+    )
     delegate_job_id = fields.Many2one(
         'hr.job',
         string="Delegate Job Position",
@@ -142,14 +184,16 @@ class HrEmployeeDelegation(models.Model):
         readonly=True
     )
 
+
     notification_recipient_ids = fields.Many2many(
         'hr.employee',
         'hr_delegation_notification_rel',
         'delegation_id',
         'employee_id',
-        string="Notification Recipients",
-        help="Adjustable list of employees to receive delegation notification"
+        string="The following employees will receive delegation notifications",
+        help="Adjustable list of stakeholders and leaders to receive delegation notice upon submission"
     )
+
     is_active_delegation = fields.Boolean(
         string="Is Active Today",
         compute="_compute_is_active_delegation",
@@ -227,18 +271,35 @@ class HrEmployeeDelegation(models.Model):
                 raise ValidationError(_("Please select a delegated staff member before submitting."))
             if not rec.is_manager_coach and not rec.leave_request_id:
                 raise ValidationError(_("Only managerial employees with direct staff under them can submit delegation requests."))
-            rec.write({'state': 'submitted'})
+            
+            vals = {'state': 'submitted'}
+            if not rec.name or rec.name in (_('New'), _('Draft'), 'New', 'Draft', '/'):
+                vals['name'] = self.env['ir.sequence'].next_by_code('hr.employee.delegation') or _('Draft')
+            rec.write(vals)
             rec._send_delegation_notifications()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _("Delegation Submitted"),
-                'message': _("Delegation request submitted and notifications sent to selected recipients."),
+                'message': _("Delegation request submitted with reference %s and notifications sent to selected recipients.") % rec.name,
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
             }
+        }
+
+    def action_delete_draft(self):
+        for rec in self:
+            if rec.state != 'draft':
+                raise UserError(_("Only draft delegations can be deleted."))
+        self.unlink()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Delegation Requests'),
+            'res_model': 'hr.employee.delegation',
+            'view_mode': 'list,form',
+            'target': 'main',
         }
 
     def action_cancel_delegation(self):
@@ -251,7 +312,7 @@ class HrEmployeeDelegation(models.Model):
                     ('res_id', '=', rec.id)
                 ])
                 activities.unlink()
-            rec.message_post(body=_("Delegation request has been cancelled and archived by manager. Delegation permissions are revoked."))
+            rec.message_post(body=_("Delegation request has been cancelled by manager. Delegation permissions are revoked."))
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -263,6 +324,7 @@ class HrEmployeeDelegation(models.Model):
                 'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
             }
         }
+
 
 
 
@@ -326,55 +388,85 @@ class HrEmployeeDelegation(models.Model):
 
 
 
-    @api.depends('employee_id', 'include_sub_level_staff', 'start_date', 'end_date')
-    def _compute_allowed_delegate_ids(self):
+    @api.depends('employee_id')
+    def _compute_direct_coach_ids(self):
+        for rec in self:
+            if not rec.employee_id:
+                rec.direct_coach_ids = False
+                continue
+            direct_coaches = self.env['hr.employee'].sudo().search([
+                '|',
+                ('coach_id', '=', rec.employee_id.id),
+                ('parent_id', '=', rec.employee_id.id)
+            ])
+            rec.direct_coach_ids = direct_coaches
 
+    @api.depends('delegate_id', 'delegate_id.coach_id', 'delegate_id.parent_id')
+    def _compute_delegate_coach_name(self):
+        for rec in self:
+            if rec.delegate_id:
+                coach = rec.delegate_id.sudo().coach_id or rec.delegate_id.sudo().parent_id
+                rec.delegate_coach_name = coach.name if coach else False
+            else:
+                rec.delegate_coach_name = False
+
+    @api.depends('employee_id', 'include_sub_level_staff', 'filter_coach_id', 'start_date', 'end_date')
+    def _compute_allowed_delegate_ids(self):
         for rec in self:
             if not rec.employee_id:
                 rec.allowed_delegate_ids = False
                 continue
 
+            # If user selected a specific direct coach to filter by
+            if rec.include_sub_level_staff and rec.filter_coach_id:
+                team_staff = self.env['hr.employee'].sudo().search([
+                    '|',
+                    ('coach_id', '=', rec.filter_coach_id.id),
+                    ('parent_id', '=', rec.filter_coach_id.id)
+                ])
+                allowed_ids = set(team_staff.ids)
+                allowed_ids.add(rec.filter_coach_id.id)
+            else:
+                # Fetch all direct coachees/subordinates
+                direct_staff = self.env['hr.employee'].sudo().search([
+                    '|',
+                    ('coach_id', '=', rec.employee_id.id),
+                    ('parent_id', '=', rec.employee_id.id)
+                ])
+                allowed_ids = set(direct_staff.ids)
 
-            # Fetch direct coachees/subordinates (sudo to avoid read access errors)
-            direct_staff = self.env['hr.employee'].sudo().search([
-                '|',
-                ('coach_id', '=', rec.employee_id.id),
-                ('parent_id', '=', rec.employee_id.id)
-            ])
-            allowed_ids = set(direct_staff.ids)
+                if rec.include_sub_level_staff and direct_staff:
+                    # Recursively fetch indirect subordinates
+                    current_level = direct_staff
+                    visited = set(direct_staff.ids)
+                    visited.add(rec.employee_id.id)
 
-            if rec.include_sub_level_staff and direct_staff:
-                # Recursively fetch indirect subordinates
-                current_level = direct_staff
-                visited = set(direct_staff.ids)
-                visited.add(rec.employee_id.id)
-
-                while current_level:
-                    sub_staff = self.env['hr.employee'].sudo().search([
-                        '|',
-                        ('coach_id', 'in', current_level.ids),
-                        ('parent_id', 'in', current_level.ids)
-                    ])
-                    new_sub_staff = sub_staff.filtered(lambda e: e.id not in visited)
-                    if not new_sub_staff:
-                        break
-                    allowed_ids.update(new_sub_staff.ids)
-                    visited.update(new_sub_staff.ids)
-                    current_level = new_sub_staff
+                    while current_level:
+                        sub_staff = self.env['hr.employee'].sudo().search([
+                            '|',
+                            ('coach_id', 'in', current_level.ids),
+                            ('parent_id', 'in', current_level.ids)
+                        ])
+                        new_sub_staff = sub_staff.filtered(lambda e: e.id not in visited)
+                        if not new_sub_staff:
+                            break
+                        allowed_ids.update(new_sub_staff.ids)
+                        visited.update(new_sub_staff.ids)
+                        current_level = new_sub_staff
 
             # Exclude self
             allowed_ids.discard(rec.employee_id.id)
 
-            # If dates are specified, exclude employees who are already serving as delegates or have delegated authority
+            # If dates are specified, exclude busy employees from active submitted delegations
             if rec.start_date and rec.end_date:
                 rec_id = rec.id if isinstance(rec.id, int) else False
                 busy_delegates = self.env['hr.employee.delegation'].sudo().search([
                     ('id', '!=', rec_id),
-                    ('state', '!=', 'cancelled'),
+                    ('state', '=', 'submitted'),
                     ('start_date', '<=', rec.end_date),
                     ('end_date', '>=', rec.start_date),
                 ])
-                # Exclude employees currently acting as delegates
+                # Exclude employees currently acting as delegates in active submitted delegations
                 allowed_ids.difference_update(busy_delegates.mapped('delegate_id.id'))
                 # Exclude employees who have delegated their own authority
                 allowed_ids.difference_update(busy_delegates.mapped('employee_id.id'))
@@ -404,8 +496,10 @@ class HrEmployeeDelegation(models.Model):
         if self.employee_id:
             self._set_default_notification_recipients()
 
-    @api.onchange('include_sub_level_staff', 'employee_id', 'start_date', 'end_date')
+    @api.onchange('include_sub_level_staff', 'filter_coach_id', 'employee_id', 'start_date', 'end_date')
     def _onchange_delegate_options(self):
+        if not self.include_sub_level_staff and self.filter_coach_id:
+            self.filter_coach_id = False
         self._compute_allowed_delegate_ids()
         if self.delegate_id and self.delegate_id not in self.allowed_delegate_ids:
             self.delegate_id = False
@@ -469,11 +563,12 @@ class HrEmployeeDelegation(models.Model):
     def _set_default_notification_recipients(self):
         for rec in self:
             recipients = rec._get_default_notification_recipients()
-            rec.sudo().write({'notification_recipient_ids': [(6, 0, recipients)]})
+            rec.notification_recipient_ids = self.env['hr.employee'].sudo().browse(recipients)
 
     def action_reset_default_recipients(self):
         for rec in self:
             rec._set_default_notification_recipients()
+
 
 
     # -------------------------------------------------------------------------
@@ -607,8 +702,8 @@ class HrEmployeeDelegation(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            if not vals.get('name') or vals.get('name') == _('New'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('hr.employee.delegation') or _('New')
+            if not vals.get('name') or vals.get('name') in (_('New'), 'New'):
+                vals['name'] = _('Draft')
 
         records = super().create(vals_list)
         for rec in records:
@@ -618,6 +713,13 @@ class HrEmployeeDelegation(models.Model):
 
     def write(self, vals):
         return super().write(vals)
+
+    def unlink(self):
+        for rec in self:
+            if rec.state == 'submitted':
+                raise UserError(_("You cannot delete a submitted active delegation. Please cancel it first."))
+        return super().unlink()
+
 
     def _send_delegation_notifications(self):
         for rec in self:
@@ -710,8 +812,8 @@ class HrEmployeeDelegation(models.Model):
                             <li><b>Status:</b> Active / Submitted</li>
                         </ul>
                         <p>During this period, you are authorized to act on behalf of {rec.employee_id.name} for approvals and managerial operations under their jurisdiction.</p>
-                        <p>Kindly review the delegation request in Omni Bank ERP and process pending tasks accordingly.</p>
-                        <p>Best regards,<br/>Omni Bank ERP</p>
+                        <p>Kindly review the delegation request in Bunna Bank ERP and process pending tasks accordingly.</p>
+                        <p>Best regards,<br/>Bunna Bank</p>
                     """
                 else:
                     # Specific Template for Notified Persons (Coaches, Directorate, Staff)
@@ -727,7 +829,7 @@ class HrEmployeeDelegation(models.Model):
                             <li><b>Status:</b> Submitted</li>
                         </ul>
                         <p>This is an automated notification for your records and operational awareness.</p>
-                        <p>Best regards,<br/>Omni Bank ERP</p>
+                        <p>Best regards,<br/>Bunna Bank</p>
                     """
 
                 try:
