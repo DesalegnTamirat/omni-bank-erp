@@ -7,6 +7,22 @@ from datetime import datetime, time
 _logger = logging.getLogger(__name__)
 
 
+def _fmt(val):
+    """Helper to format float hours to clean AM/PM string (e.g. 8.5 -> '08:30 AM')"""
+    if val is None or val is False:
+        return ""
+    hrs = int(val) % 24
+    mins = int(round((val - int(val)) * 60))
+    if mins >= 60:
+        hrs = (hrs + 1) % 24
+        mins = 0
+    ampm = "AM" if hrs < 12 else "PM"
+    dh = hrs if hrs in (1, 12) else (hrs % 12)
+    if dh == 0:
+        dh = 12
+    return f"{dh:02d}:{mins:02d} {ampm}"
+
+
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
@@ -33,15 +49,6 @@ class HrEmployee(models.Model):
 
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
-        # Helper to format float hours to clean AM/PM string
-        def _fmt(val):
-            hrs = int(val) % 24
-            mins = int(round((val - int(val)) * 60))
-            ampm = "AM" if hrs < 12 else "PM"
-            dh = hrs if hrs in (1, 12) else (hrs % 12)
-            if dh == 0:
-                dh = 12
-            return f"{dh:02d}:{mins:02d} {ampm}"
 
         # ----------------------------
         # 1. Roster Exceptions (Date-Based)
