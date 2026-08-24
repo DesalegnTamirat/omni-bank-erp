@@ -31,51 +31,33 @@ class HrEmployee(models.Model):
             ])
             visible_ids.update(subordinates.ids)
 
-            # Immediate coach and coach of coach
+            # Immediate coach and parent
             if emp.coach_id:
                 visible_ids.add(emp.coach_id.id)
-                if emp.coach_id.coach_id:
-                    visible_ids.add(emp.coach_id.coach_id.id)
             if emp.parent_id:
                 visible_ids.add(emp.parent_id.id)
-                if emp.parent_id.parent_id:
-                    visible_ids.add(emp.parent_id.parent_id.id)
 
-            # Corporate Leadership & People Operations (standard notification recipients)
-            standard_leadership = self.env['hr.employee'].sudo().search([
-                '|', '|',
-                ('job_id.name', 'ilike', 'People Operation'),
-                ('department_id.name', 'ilike', 'People Operation'),
-                ('job_id.name', 'ilike', 'Chief People and Culture')
-            ])
-            visible_ids.update(standard_leadership.ids)
-
-            # All delegations concerning this employee (as manager, delegate, or recipient)
-            all_my_delegations = Delegation.search([
-                '|', '|',
-                ('employee_id', '=', emp.id),
-                ('delegate_id', '=', emp.id),
-                ('notification_recipient_ids', 'in', [emp.id])
-            ])
-            visible_ids.update(all_my_delegations.mapped('employee_id.id'))
-            visible_ids.update(all_my_delegations.mapped('delegate_id.id'))
-            visible_ids.update(all_my_delegations.mapped('notification_recipient_ids.id'))
-
-            # Subordinates of active delegating managers
+            # Active delegations where this employee is the delegate
             today = fields.Date.today()
-            active_delegated_managers = all_my_delegations.filtered(
-                lambda d: d.delegate_id.id == emp.id and d.state == 'submitted' and d.start_date <= today and d.end_date >= today
-            ).mapped('employee_id')
-            if active_delegated_managers:
+            active_as_delegate = Delegation.search([
+                ('delegate_id', '=', emp.id),
+                ('state', '=', 'submitted'),
+                ('start_date', '<=', today),
+                ('end_date', '>=', today),
+            ])
+            if active_as_delegate:
+                delegating_managers = active_as_delegate.mapped('employee_id')
+                visible_ids.update(delegating_managers.ids)
+                # Delegated subordinates of active manager
                 delegated_subs = self.env['hr.employee'].sudo().search([
                     '|',
-                    ('coach_id', 'in', active_delegated_managers.ids),
-                    ('parent_id', 'in', active_delegated_managers.ids)
+                    ('coach_id', 'in', delegating_managers.ids),
+                    ('parent_id', 'in', delegating_managers.ids)
                 ])
                 visible_ids.update(delegated_subs.ids)
-
         visible_ids.discard(False)
         return list(visible_ids)
+
 
 
 
@@ -193,6 +175,13 @@ class HrEmployeeDelegation(models.Model):
         string="The following employees will receive delegation notifications",
         help="Adjustable list of stakeholders and leaders to receive delegation notice upon submission"
     )
+    stakeholder_ids = fields.One2many(
+        'hr.employee.delegation.stakeholder',
+        'delegation_id',
+        string="Stakeholders to Notify",
+        copy=True
+    )
+
 
     is_active_delegation = fields.Boolean(
         string="Is Active Today",
@@ -243,6 +232,26 @@ class HrEmployeeDelegation(models.Model):
 
 
 
+    cancellation_reason = fields.Text(
+        string="Cancellation Reason",
+        readonly=True,
+        copy=False,
+        tracking=True
+    )
+    cancellation_date = fields.Date(
+        string="Cancellation Date",
+        readonly=True,
+        copy=False,
+        tracking=True
+    )
+    cancelled_by_id = fields.Many2one(
+        'res.users',
+        string="Cancelled By",
+        readonly=True,
+        copy=False,
+        tracking=True
+    )
+
     leave_request_id = fields.Many2one(
         'leave.request',
         string="Related Leave Request",
@@ -259,11 +268,54 @@ class HrEmployeeDelegation(models.Model):
         string="Is Requestor",
         compute="_compute_is_requestor"
     )
+    delegated_approval_count = fields.Integer(
+        string="Pending Approvals",
+        compute="_compute_delegated_approval_count"
+    )
+
+    def _compute_delegated_approval_count(self):
+        current_uid = self.env.uid
+        today = fields.Date.today()
+        for rec in self:
+            count = 0
+            if rec.state == 'submitted' and rec.start_date and rec.end_date and rec.start_date <= today <= rec.end_date:
+                if rec.delegate_id and rec.delegate_id.user_id.id == current_uid:
+                    mgr_user = rec.employee_id.user_id
+                    if mgr_user:
+                        count += self.env['mail.activity'].sudo().search_count([
+                            ('user_id', '=', mgr_user.id),
+                            ('res_model', 'not in', ['hr.employee', 'hr.employee.delegation', 'hr.attendance', 'mail.channel', 'mail.activity', 'discuss.channel'])
+                        ])
+
+                    # Also count attendance preapprovals
+                    if 'attendance.preapproval' in self.env:
+                        subs = self.env['hr.employee'].sudo().search([
+                            '|', ('parent_id', '=', rec.employee_id.id), ('coach_id', '=', rec.employee_id.id)
+                        ])
+                        if subs:
+                            count += self.env['attendance.preapproval'].sudo().search_count([
+                                ('employee_id', 'in', subs.ids),
+                                ('state', '=', 'requested')
+                            ])
+            rec.delegated_approval_count = count
+
+    def action_view_delegated_approvals(self):
+        self.ensure_one()
+        self.env['hr.delegated.approval']._refresh_delegated_approvals(delegation_id=self.id)
+        return {
+            'name': _("Delegated Approvals: %s") % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.delegated.approval',
+            'view_mode': 'list,form',
+            'domain': [('delegation_id', '=', self.id)],
+            'context': {'create': False, 'delete': False},
+        }
 
     def _compute_is_requestor(self):
         current_uid = self.env.uid
         for rec in self:
             rec.is_requestor = bool(rec.employee_id and rec.employee_id.user_id.id == current_uid)
+
 
     def action_submit(self):
         for rec in self:
@@ -289,6 +341,7 @@ class HrEmployeeDelegation(models.Model):
             }
         }
 
+
     def action_delete_draft(self):
         for rec in self:
             if rec.state != 'draft':
@@ -303,8 +356,50 @@ class HrEmployeeDelegation(models.Model):
         }
 
     def action_cancel_delegation(self):
+        self.ensure_one()
+        if self.state == 'draft':
+            self._cancel_and_notify(
+                reason=_("Draft request cancelled by delegator."),
+                cancellation_date=fields.Date.today(),
+                cancelled_by=self.env.user
+            )
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _("Delegation Cancelled"),
+                    'message': _("Draft delegation request has been cancelled."),
+                    'type': 'warning',
+                    'sticky': False,
+                    'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+                }
+            }
+
+        # For submitted/active delegations: open cancellation wizard
+        return {
+            'name': _("Cancel Delegation"),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.employee.delegation.cancel.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_delegation_id': self.id,
+                'active_id': self.id,
+            }
+        }
+
+    def _cancel_and_notify(self, reason, cancellation_date, cancelled_by):
         for rec in self:
-            rec.write({'state': 'cancelled', 'active': False})
+            was_submitted = (rec.state == 'submitted')
+            rec.write({
+                'state': 'cancelled',
+                'active': False,
+                'cancellation_reason': reason,
+                'cancellation_date': cancellation_date,
+                'cancelled_by_id': cancelled_by.id,
+            })
+
+            # Unlink prior active delegation activities
             model = self.env.ref('hr_employee_custom.model_hr_employee_delegation', raise_if_not_found=False)
             if model:
                 activities = self.env['mail.activity'].sudo().search([
@@ -312,18 +407,81 @@ class HrEmployeeDelegation(models.Model):
                     ('res_id', '=', rec.id)
                 ])
                 activities.unlink()
-            rec.message_post(body=_("Delegation request has been cancelled by manager. Delegation permissions are revoked."))
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _("Delegation Cancelled"),
-                'message': _("Delegation request has been cancelled and archived."),
-                'type': 'warning',
-                'sticky': False,
-                'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},
+
+            if was_submitted:
+                rec._send_cancellation_notifications(reason, cancellation_date, cancelled_by)
+            else:
+                rec.message_post(body=_("Draft delegation request has been cancelled by %s.") % cancelled_by.name)
+
+
+
+    def _send_cancellation_notifications(self, reason, cancellation_date, cancelled_by):
+        for rec in self:
+            recip_employees = rec.notification_recipient_ids
+            if rec.delegate_id and rec.delegate_id not in recip_employees:
+                recip_employees |= rec.delegate_id
+
+            if not recip_employees:
+                continue
+
+            partners = recip_employees.sudo().mapped('user_id.partner_id').filtered(lambda p: p)
+
+            body = _(
+                "<strong>Managerial Delegation Cancelled</strong><br/>"
+                "<strong>Manager:</strong> %(manager)s<br/>"
+                "<strong>Former Delegate:</strong> %(delegate)s<br/>"
+                "<strong>Scheduled Period:</strong> %(start)s to %(end)s<br/>"
+                "<strong>Effective Cancellation Date:</strong> %(cancel_date)s<br/>"
+                "<strong>Cancelled By:</strong> %(cancelled_by)s<br/>"
+                "<strong>Reason:</strong> %(reason)s<br/>"
+                "<em>Delegated authority has been revoked and regular reporting hierarchy restored.</em>"
+            ) % {
+                'manager': rec.employee_id.name,
+                'delegate': rec.delegate_id.name,
+                'start': rec.start_date,
+                'end': rec.end_date,
+                'cancel_date': cancellation_date,
+                'cancelled_by': cancelled_by.name,
+                'reason': reason,
             }
-        }
+
+            if partners:
+                rec.sudo().message_post(
+                    body=Markup(body),
+                    partner_ids=partners.ids,
+                    message_type='comment',
+                    subtype_xmlid='mail.mt_comment'
+                )
+
+
+            # Create In-App activity / Clock notification for Delegate and Stakeholders
+            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+            model = self.env.ref('hr_employee_custom.model_hr_employee_delegation', raise_if_not_found=False)
+            if activity_type and model:
+                for emp in recip_employees:
+                    if emp.user_id:
+                        is_delegate = (emp.id == rec.delegate_id.id)
+                        if is_delegate:
+                            summary = _("Delegation Revoked: %s") % rec.name
+                            note = _(
+                                "Your delegated authority from %s has ended as of %s. Reason: %s"
+                            ) % (rec.employee_id.name, cancellation_date, reason)
+                        else:
+                            summary = _("Delegation Cancelled: %s") % rec.name
+                            note = _(
+                                "Delegation from %s to %s has been cancelled effective %s. Reason: %s"
+                            ) % (rec.employee_id.name, rec.delegate_id.name, cancellation_date, reason)
+
+                        self.env['mail.activity'].sudo().create({
+                            'activity_type_id': activity_type.id,
+                            'summary': summary,
+                            'note': note,
+                            'res_model_id': model.id,
+                            'res_id': rec.id,
+                            'user_id': emp.user_id.id,
+                            'date_deadline': cancellation_date,
+                        })
+
 
 
 
@@ -361,37 +519,39 @@ class HrEmployeeDelegation(models.Model):
             rec.manager_department_name = emp.department_id.name if (emp and emp.department_id) else ''
             rec.delegate_job_name = delegate.job_id.name if (delegate and delegate.job_id) else ''
 
-    @api.depends('notification_recipient_ids')
+    @api.depends('stakeholder_ids', 'stakeholder_ids.name', 'stakeholder_ids.work_email', 'stakeholder_ids.department_name', 'stakeholder_ids.job_name', 'stakeholder_ids.category')
     def _compute_notification_recipients_display(self):
         for rec in self:
-            recips = rec.notification_recipient_ids.sudo()
-            if recips:
+            stakeholders = rec.stakeholder_ids
+            if stakeholders:
                 rows = "".join([
-                    f"<tr><td><b>{r.name}</b></td><td>{r.work_email or '-'}</td><td>{r.department_id.name or '-'}</td><td>{r.job_id.name or '-'}</td></tr>"
-                    for r in recips
+                    f"<tr><td><b>{s.name}</b></td><td>{s.work_email or '-'}</td><td>{s.department_name or '-'}</td><td>{s.job_name or '-'}</td><td><span class='badge bg-light text-dark'>{s.category or '-'}</span></td></tr>"
+                    for s in stakeholders
                 ])
                 rec.notification_recipients_display = Markup(f"""
                     <table class="table table-sm table-striped">
                         <thead>
                             <tr>
-                                <th>Employee Name</th>
+                                <th>Stakeholder Name</th>
                                 <th>Work Email</th>
                                 <th>Department</th>
                                 <th>Job Position</th>
+                                <th>Role / Category</th>
                             </tr>
                         </thead>
                         <tbody>{rows}</tbody>
                     </table>
                 """)
             else:
-                rec.notification_recipients_display = Markup("<p class='text-muted'>No notification recipients assigned.</p>")
+                rec.notification_recipients_display = Markup("<p class='text-muted'>No notification stakeholders assigned.</p>")
 
 
 
-    @api.depends('employee_id')
+
+    @api.depends('employee_id', 'state')
     def _compute_direct_coach_ids(self):
         for rec in self:
-            if not rec.employee_id:
+            if not rec.employee_id or rec.state != 'draft':
                 rec.direct_coach_ids = False
                 continue
             direct_coaches = self.env['hr.employee'].sudo().search([
@@ -410,12 +570,13 @@ class HrEmployeeDelegation(models.Model):
             else:
                 rec.delegate_coach_name = False
 
-    @api.depends('employee_id', 'include_sub_level_staff', 'filter_coach_id', 'start_date', 'end_date')
+    @api.depends('employee_id', 'include_sub_level_staff', 'filter_coach_id', 'start_date', 'end_date', 'state')
     def _compute_allowed_delegate_ids(self):
         for rec in self:
-            if not rec.employee_id:
+            if not rec.employee_id or rec.state != 'draft':
                 rec.allowed_delegate_ids = False
                 continue
+
 
             # If user selected a specific direct coach to filter by
             if rec.include_sub_level_staff and rec.filter_coach_id:
@@ -562,12 +723,109 @@ class HrEmployeeDelegation(models.Model):
 
     def _set_default_notification_recipients(self):
         for rec in self:
-            recipients = rec._get_default_notification_recipients()
-            rec.notification_recipient_ids = self.env['hr.employee'].sudo().browse(recipients)
+            rec.stakeholder_ids.sudo().unlink()
+            manager = rec.employee_id.sudo()
+            if not manager:
+                continue
+
+            lines = []
+            recip_ids = set()
+
+            # 1. Immediate Coach / Manager
+            imm_coach = manager.coach_id or manager.parent_id
+            if imm_coach and imm_coach.id != manager.id:
+                lines.append({
+                    'employee_id': imm_coach.id,
+                    'name': imm_coach.name,
+                    'work_email': imm_coach.work_email or '',
+                    'department_name': imm_coach.department_id.name if imm_coach.department_id else '',
+                    'job_name': imm_coach.job_id.name if imm_coach.job_id else '',
+                    'category': 'Direct Manager / Coach',
+                })
+                recip_ids.add(imm_coach.id)
+
+                # 2. Coach of Coach
+                coach_of_coach = imm_coach.coach_id or imm_coach.parent_id
+                if coach_of_coach and coach_of_coach.id not in [manager.id, imm_coach.id]:
+                    lines.append({
+                        'employee_id': coach_of_coach.id,
+                        'name': coach_of_coach.name,
+                        'work_email': coach_of_coach.work_email or '',
+                        'department_name': coach_of_coach.department_id.name if coach_of_coach.department_id else '',
+                        'job_name': coach_of_coach.job_id.name if coach_of_coach.job_id else '',
+                        'category': 'Higher Leadership',
+                    })
+                    recip_ids.add(coach_of_coach.id)
+
+            # 3. Direct Staff under manager
+            direct_staff = self.env['hr.employee'].sudo().search([
+                '|', ('coach_id', '=', manager.id), ('parent_id', '=', manager.id),
+                ('id', '!=', manager.id)
+            ])
+            for st in direct_staff:
+                lines.append({
+                    'employee_id': st.id,
+                    'name': st.name,
+                    'work_email': st.work_email or '',
+                    'department_name': st.department_id.name if st.department_id else '',
+                    'job_name': st.job_id.name if st.job_id else '',
+                    'category': 'Direct Staff',
+                })
+                recip_ids.add(st.id)
+
+            # 4. People Operations
+            people_ops = self.env['hr.employee'].sudo().search([
+                '|',
+                ('job_id.name', 'ilike', 'People Operation'),
+                ('department_id.name', 'ilike', 'People Operation')
+            ])
+            for po in people_ops:
+                lines.append({
+                    'employee_id': po.id,
+                    'name': po.name,
+                    'work_email': po.work_email or '',
+                    'department_name': po.department_id.name if po.department_id else '',
+                    'job_name': po.job_id.name if po.job_id else '',
+                    'category': 'People Operations',
+                })
+                recip_ids.add(po.id)
+
+            # 5. Chief People and Culture
+            cpc = self.env['hr.employee'].sudo().search([
+                ('job_id.name', 'ilike', 'Chief People and Culture')
+            ])
+            for c in cpc:
+                lines.append({
+                    'employee_id': c.id,
+                    'name': c.name,
+                    'work_email': c.work_email or '',
+                    'department_name': c.department_id.name if c.department_id else '',
+                    'job_name': c.job_id.name if c.job_id else '',
+                    'category': 'Corporate HR Leadership',
+                })
+                recip_ids.add(c.id)
+
+            # Deduplicate lines by employee_id
+            seen_emp_ids = set()
+            unique_lines = []
+            for l in lines:
+                emp_id = l.get('employee_id')
+                if emp_id:
+                    if emp_id not in seen_emp_ids:
+                        seen_emp_ids.add(emp_id)
+                        unique_lines.append((0, 0, l))
+                else:
+                    unique_lines.append((0, 0, l))
+
+            rec.sudo().write({
+                'stakeholder_ids': unique_lines,
+                'notification_recipient_ids': [(6, 0, list(recip_ids))]
+            })
 
     def action_reset_default_recipients(self):
         for rec in self:
             rec._set_default_notification_recipients()
+
 
 
 
@@ -707,9 +965,10 @@ class HrEmployeeDelegation(models.Model):
 
         records = super().create(vals_list)
         for rec in records:
-            if not rec.notification_recipient_ids:
+            if not rec.stakeholder_ids:
                 rec._set_default_notification_recipients()
         return records
+
 
     def write(self, vals):
         return super().write(vals)
@@ -719,6 +978,8 @@ class HrEmployeeDelegation(models.Model):
             if rec.state == 'submitted':
                 raise UserError(_("You cannot delete a submitted active delegation. Please cancel it first."))
         return super().unlink()
+
+
 
 
     def _send_delegation_notifications(self):
@@ -756,11 +1017,12 @@ class HrEmployeeDelegation(models.Model):
 
             if partners:
                 rec.sudo().message_post(
-                    body=body,
+                    body=Markup(body),
                     partner_ids=partners.ids,
                     message_type='comment',
                     subtype_xmlid='mail.mt_comment'
                 )
+
 
             # Create Odoo activity for each recipient user so they receive top navbar clock/activity alert
             activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
@@ -914,3 +1176,28 @@ class HrEmployeeDelegation(models.Model):
             return existing
         else:
             return self.sudo().with_context(check_past_date=False).create(vals)
+
+
+class HrEmployeeDelegationStakeholder(models.Model):
+    _name = "hr.employee.delegation.stakeholder"
+    _description = "Delegation Notification Stakeholder"
+    _order = "id asc"
+
+    delegation_id = fields.Many2one('hr.employee.delegation', string="Delegation", ondelete='cascade', required=True)
+    employee_id = fields.Many2one('hr.employee', string="Employee Reference", ondelete='set null')
+    name = fields.Char(string="Stakeholder Name", required=True)
+    work_email = fields.Char(string="Work Email")
+    department_name = fields.Char(string="Department")
+    job_name = fields.Char(string="Job Position")
+    category = fields.Char(string="Category / Role", default="Custom Stakeholder")
+
+    @api.onchange('employee_id')
+    def _onchange_employee_id(self):
+        if self.employee_id:
+            emp = self.employee_id.sudo()
+            self.name = emp.name or ''
+            self.work_email = emp.work_email or ''
+            self.department_name = emp.department_id.name if emp.department_id else ''
+            self.job_name = emp.job_id.name if emp.job_id else ''
+            self.category = "Selected Stakeholder"
+

@@ -24,16 +24,26 @@
                                 string="Cancel Delegation"
                                 type="object"
                                 class="btn-secondary"
-                                invisible="not is_requestor or state != 'submitted' or not active"
-                                confirm="Are you sure you want to cancel this active delegation?"/>
+                                invisible="not is_requestor or state != 'submitted'"/>
+
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,cancelled"/>
                     </header>
 
 
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_delegated_approvals"
+                                    type="object"
+                                    class="oe_stat_button"
+                                    icon="fa-tasks"
+                                    invisible="state != 'submitted' or not is_active_delegation">
+                                <field name="delegated_approval_count" widget="statinfo" string="Pending Approvals"/>
+                            </button>
+                        </div>
                         <field name="active" invisible="1"/>
                         <field name="is_manager_coach" invisible="1"/>
                         <field name="is_requestor" invisible="1"/>
+
 
                         <div class="alert alert-warning" role="alert" invisible="is_manager_coach or not is_requestor">
                             <strong>Non-Managerial Employee Notice:</strong> The selected employee is not currently listed as a direct coach or manager of any staff members. Only managerial employees with direct staff under them can assign delegates.
@@ -111,26 +121,38 @@
                             </group>
                         </group>
 
+                        <group string="Cancellation Details" invisible="state != 'cancelled'">
+                            <group>
+                                <field name="cancellation_date" readonly="1"/>
+                                <field name="cancelled_by_id" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="cancellation_reason" readonly="1"/>
+                            </group>
+                        </group>
 
                         <notebook>
-                            <page string="The following employees will receive delegation notifications" name="notification_recipients_tab">
+                            <page string="Stakeholders to Notify" name="stakeholders_to_notify_tab">
                                 <p class="text-muted mb-2" invisible="not is_requestor or state != 'draft'">
-                                    The following stakeholders and leadership members will receive an automatic delegation notice upon submission. You can add or remove stakeholders as needed before submitting:
+                                    The following stakeholders and leadership members will receive an automatic delegation notice upon submission. You can add, edit, or remove stakeholders before submitting:
                                 </p>
                                 <p class="text-muted mb-2" invisible="is_requestor and state == 'draft'">
                                     The following stakeholders and leadership members are assigned to receive notification for this delegation:
                                 </p>
-                                <field name="notification_recipient_ids"
-                                       widget="many2many"
-                                       readonly="not is_requestor or state != 'draft'"
-                                       options="{'no_create': True}">
-                                    <list>
-                                        <field name="name" string="Employee Name"/>
+                                <field name="stakeholder_ids"
+                                       invisible="not is_requestor or state != 'draft'">
+                                    <list editable="bottom">
+                                        <field name="name" string="Stakeholder Name"/>
                                         <field name="work_email" string="Work Email"/>
-                                        <field name="department_id" string="Department"/>
-                                        <field name="job_id" string="Job Position"/>
+                                        <field name="department_name" string="Department"/>
+                                        <field name="job_name" string="Job Position"/>
+                                        <field name="category" string="Role / Category"/>
                                     </list>
                                 </field>
+                                <field name="notification_recipients_display"
+                                       widget="html"
+                                       invisible="is_requestor and state == 'draft'"
+                                       readonly="1"/>
                                 <div class="mt-2" invisible="not is_requestor or state != 'draft'">
                                     <button name="action_reset_default_recipients"
                                             string="Reset to Default Stakeholders"
@@ -139,7 +161,9 @@
                                             help="Reset the stakeholders list to the automatically suggested reporting hierarchy."/>
                                 </div>
                             </page>
+
                         </notebook>
+
 
 
                     </sheet>

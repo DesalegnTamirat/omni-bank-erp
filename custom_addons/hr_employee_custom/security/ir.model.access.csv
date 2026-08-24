@@ -167,6 +167,14 @@ access_employee_previous_occupation_manager,employee.previous.occupation.manager
 access_hr_employee_delegation_user,hr.employee.delegation.user,model_hr_employee_delegation,base.group_user,1,1,1,1
 access_hr_employee_delegation_manager,hr.employee.delegation.manager,model_hr_employee_delegation,hr.group_hr_manager,1,1,1,1
 access_hr_employee_base_user,access.hr.employee.base.user,hr.model_hr_employee,base.group_user,1,0,0,0
+access_hr_employee_delegation_cancel_wizard_user,hr.employee.delegation.cancel.wizard.user,model_hr_employee_delegation_cancel_wizard,base.group_user,1,1,1,1
+access_hr_employee_delegation_cancel_wizard_manager,hr.employee.delegation.cancel.wizard.manager,model_hr_employee_delegation_cancel_wizard,hr.group_hr_manager,1,1,1,1
+access_hr_delegated_approval_user,hr.delegated.approval.user,model_hr_delegated_approval,base.group_user,1,1,1,1
+access_hr_delegated_approval_manager,hr.delegated.approval.manager,model_hr_delegated_approval,hr.group_hr_manager,1,1,1,1
+access_hr_employee_delegation_stakeholder_user,hr.employee.delegation.stakeholder.user,model_hr_employee_delegation_stakeholder,base.group_user,1,1,1,1
+access_hr_employee_delegation_stakeholder_manager,hr.employee.delegation.stakeholder.manager,model_hr_employee_delegation_stakeholder,hr.group_hr_manager,1,1,1,1
+
+
 
 
 

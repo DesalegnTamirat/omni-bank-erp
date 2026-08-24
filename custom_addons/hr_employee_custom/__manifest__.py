@@ -57,12 +57,17 @@
         'data/employee_self_service_sequence.xml',
         'data/delegation_sequence.xml',
         'views/service_request_type_views.xml',
+
+
         'views/service_request_views.xml',
         'views/service_request.xml',
-        'views/employee_ser_request.xml',
         'views/hr_employee_delegation_views.xml',
+        'views/hr_delegated_approval_views.xml',
+        'wizards/hr_employee_delegation_cancel_wizard_views.xml',
+
         'wizards/completion_wizard_views.xml',
         'wizards/rejection_wizard_views.xml',
+
 
 
         # -- Guarantees / Supplementary Role --

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- LIST VIEW -->
+        <record id="view_hr_delegated_approval_list" model="ir.ui.view">
+            <field name="name">hr.delegated.approval.list</field>
+            <field name="model">hr.delegated.approval</field>
+            <field name="arch" type="xml">
+                <list string="Delegated Approvals" create="false" edit="false" delete="false">
+                    <field name="request_date"/>
+                    <field name="name" string="Reference / Subject"/>
+                    <field name="request_type" string="Category / Type"/>
+                    <field name="requester_id" string="Requester"/>
+                    <field name="delegating_manager_id" string="On Behalf Of (Manager)"/>
+                    <field name="summary" string="Summary"/>
+                    <field name="state" widget="badge" decoration-warning="state == 'requested'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'"/>
+                    <button name="action_approve_delegated" string="Approve" type="object" icon="fa-check" class="btn-success" invisible="state != 'requested'"/>
+                    <button name="action_reject_delegated" string="Reject" type="object" icon="fa-times" class="btn-danger" invisible="state != 'requested'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- FORM VIEW -->
+        <record id="view_hr_delegated_approval_form" model="ir.ui.view">
+            <field name="name">hr.delegated.approval.form</field>
+            <field name="model">hr.delegated.approval</field>
+            <field name="arch" type="xml">
+                <form string="Delegated Approval Request" create="false" edit="false" delete="false">
+                    <header>
+                        <button name="action_approve_delegated" string="Approve Request" type="object" class="btn-success" invisible="state != 'requested'"/>
+                        <button name="action_reject_delegated" string="Reject Request" type="object" class="btn-danger" invisible="state != 'requested'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="requested,approved,rejected"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Request Reference"/>
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group string="Delegation Information">
+                                <field name="delegating_manager_id" readonly="1"/>
+                                <field name="delegate_id" readonly="1"/>
+                                <field name="delegation_id" readonly="1"/>
+                            </group>
+                            <group string="Transaction Details">
+                                <field name="requester_id" readonly="1"/>
+                                <field name="request_date" readonly="1"/>
+                                <field name="request_type" readonly="1"/>
+                                <field name="action_date" readonly="1" invisible="not action_date"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Details &amp; Notes">
+                                <group>
+                                    <field name="summary" readonly="1"/>
+                                    <field name="notes" readonly="1"/>
+                                </group>
+                            </page>
+                            <page string="System Identifiers" invisible="1">
+                                <group>
+                                    <field name="res_model" readonly="1"/>
+                                    <field name="res_id" readonly="1"/>
+                                    <field name="activity_id" readonly="1"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- SEARCH VIEW -->
+        <record id="view_hr_delegated_approval_search" model="ir.ui.view">
+            <field name="name">hr.delegated.approval.search</field>
+            <field name="model">hr.delegated.approval</field>
+            <field name="arch" type="xml">
+                <search string="Search Delegated Approvals">
+                    <field name="name"/>
+                    <field name="requester_id"/>
+                    <field name="delegating_manager_id"/>
+                    <field name="request_type"/>
+                    <separator/>
+                    <filter string="Pending Review" name="pending_review" domain="[('state', '=', 'requested')]"/>
+                    <filter string="Approved" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                    <filter string="Rejected" name="filter_rejected" domain="[('state', '=', 'rejected')]"/>
+                    <separator/>
+                    <filter string="Delegating Manager" name="group_mgr" context="{'group_by': 'delegating_manager_id'}"/>
+                    <filter string="Requester" name="group_requester" context="{'group_by': 'requester_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Request Type" name="group_type" context="{'group_by': 'request_type'}"/>
+                    <filter string="Request Date" name="group_date" context="{'group_by': 'request_date'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- SERVER ACTION: Refresh and Open Delegated Approvals Hub -->
+        <record id="action_hr_delegated_approvals_server" model="ir.actions.server">
+            <field name="name">Delegated Approvals</field>
+            <field name="model_id" ref="model_hr_delegated_approval"/>
+            <field name="state">code</field>
+            <field name="code">
+action = model.action_open_delegated_approvals_hub()
+            </field>
+        </record>
+
+    </data>
+</odoo>

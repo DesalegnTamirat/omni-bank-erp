@@ -128,32 +128,25 @@ class AttendancePreApproval(models.Model):
         for rec in self:
             _logger.info(f"Validating attendance for {rec.employee_id.name} on {rec.date}")
 
-            if rec.start_time < 0 or rec.end_time < 0:
-                raise ValidationError("Start and end times must be positive.")
-
-            if rec.end_time <= rec.start_time:
-                raise ValidationError("End time must be greater than start time.")
-
-            if (rec.end_time - rec.start_time) > 4:
-                raise ValidationError("Maximum allowed window is 4 hours.")
+            if rec.start_time >= rec.end_time:
+                raise ValidationError("Start time must be strictly earlier than End time.")
 
             if rec.date < today:
-                raise ValidationError("Past date not allowed.")
+                raise ValidationError("Cannot create pre-approval for past dates.")
 
-            if rec.date == today:
-                if rec.start_time < current_time_float:
-                    raise ValidationError("Start time cannot be in the past.")
-                if rec.end_time < current_time_float:
-                    raise ValidationError("End time cannot be in the past.")
-             # Overlap protection
+            if rec.date == today and rec.start_time <= current_time_float:
+                raise ValidationError("Pre-approval must be requested before the event start time.")
+
+            # Overlap check for same employee on same date (ignore soft-deleted)
             conflict = self.search([
-                        ('id', '!=', rec.id),
-                        ('employee_id', '=', rec.employee_id.id),
-                        ('date', '=', rec.date),
-                        ('state', '!=', 'rejected'),
-                        ('start_time', '<', rec.end_time),
-                        ('end_time', '>', rec.start_time)
-                    ], limit=1)
+                ('id', '!=', rec.id),
+                ('active', '=', True),
+                ('employee_id', '=', rec.employee_id.id),
+                ('date', '=', rec.date),
+                ('state', 'in', ['draft', 'requested', 'approved']),
+                ('start_time', '<', rec.end_time),
+                ('end_time', '>', rec.start_time)
+            ], limit=1)
 
             if conflict:
                 raise ValidationError("This time window overlaps with another pre-approval.")
@@ -285,6 +278,7 @@ class AttendancePreApproval(models.Model):
                 raise ValidationError("Only the employee's manager or an administrator can reject this request.")
 
             rec.write({'state': 'rejected'})
+
 
             # Complete activity
             try:

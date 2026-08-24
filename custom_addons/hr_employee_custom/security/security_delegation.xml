@@ -77,7 +77,31 @@
             <field name="perm_unlink" eval="0"/>
         </record>
 
+        <!-- ==========================================================
+             hr.delegated.approval record rules
+        =========================================================== -->
+        <record id="rule_hr_delegated_approval_user" model="ir.rule">
+            <field name="name">Delegated Approvals: Delegate / Manager Access</field>
+            <field name="model_id" ref="model_hr_delegated_approval"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', ('delegate_id.user_id', '=', user.id), ('delegating_manager_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
 
+        <record id="rule_hr_delegated_approval_manager" model="ir.rule">
+            <field name="name">Delegated Approvals: HR Manager Full Access</field>
+            <field name="model_id" ref="model_hr_delegated_approval"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
 
     </data>
+
 </odoo>
