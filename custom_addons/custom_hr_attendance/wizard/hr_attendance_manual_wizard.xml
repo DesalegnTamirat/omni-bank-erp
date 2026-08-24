@@ -15,16 +15,28 @@
                     </group>
 
                     <!-- INDIVIDUAL MODE -->
+                    <div class="alert alert-info py-2 px-3 mb-2" invisible="entry_type != 'individual' or not detected_shift_info">
+                        <i class="fa fa-clock-o me-1"/> <strong>Applicable Shift: </strong><field name="detected_shift_info" readonly="1" class="fw-bold text-primary"/>
+                    </div>
                     <group invisible="entry_type != 'individual'">
                         <group string="Employee &amp; Date">
                             <field name="employee_id" required="entry_type == 'individual'"/>
                             <field name="work_date" required="entry_type == 'individual'"/>
+                            <field name="attendance_mode" placeholder="Select Action..." required="entry_type == 'individual'"/>
                         </group>
                         <group string="Timestamps (Time Only)">
-                            <field name="check_in_time" widget="float_time" required="entry_type == 'individual'"/>
-                            <field name="check_out_time" widget="float_time" placeholder="Leave blank for Check-In only..."/>
+                            <field name="check_in_time" widget="float_time"
+                                   readonly="attendance_mode == 'check_out'"
+                                   invisible="not attendance_mode"
+                                   required="entry_type == 'individual' and attendance_mode in ('both', 'check_in')"/>
+                            <field name="check_out_time" widget="float_time"
+                                   invisible="not attendance_mode or attendance_mode == 'check_in'"
+                                   required="entry_type == 'individual' and attendance_mode in ('both', 'check_out')"
+                                   placeholder="e.g. 17:00 or 18:00"/>
                         </group>
                     </group>
+
+
 
                     <!-- BATCH OPERATING UNIT MODE -->
                     <group invisible="entry_type != 'batch'">

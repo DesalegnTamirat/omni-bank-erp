@@ -184,16 +184,20 @@ class HrAttendance(models.Model):
             except Exception:
                 local_tz = pytz.utc
 
+            check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
+            active_shift = False
+
             # 1. Resolve Shift Start & Shift End for this employee and date
             if rec.shift_start_float or rec.shift_end_float:
                 shift_start = rec.shift_start_float or default_morning_time
                 shift_end = rec.shift_end_float or default_exit_time
+
             else:
                 shift_start = default_morning_time
                 shift_end = default_exit_time
 
-                check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
+
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
                     if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):

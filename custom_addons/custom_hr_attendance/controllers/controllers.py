@@ -33,32 +33,8 @@ class BunnaMyAttendance(http.Controller):
 
         today_date = fields.Date.context_today(request.env.user)
 
-        # Tier 0: If employee has an active open check-in session today, anchor to check-in shift!
-        if target_date == today_date:
-            open_attendance = env['hr.attendance'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('check_out', '=', False)
-            ], limit=1)
-            if open_attendance:
-                s_start = open_attendance.shift_start_float or 8.0
-                s_end = open_attendance.shift_end_float or 17.0
-                start_str = self._float_to_time_str(s_start)
-                end_str = self._float_to_time_str(s_end)
-                return {
-                    'name': 'Default Global Shift',
-                    'code': 'ACTIVE_SHIFT',
-                    'time_range': f"{start_str} - {end_str}",
-                    'start_time_str': start_str,
-                    'end_time_str': end_str,
-                    'is_night_shift': False,
-                    'has_lunch_break': True,
-                    'lunch_time_str': "12:00 PM - 01:00 PM (1.0h)",
-                    'is_custom_exception': False,
-                    'is_day_off': False,
-                    'source_label': 'Default Global Shift (Check-in Shift)'
-                }
-
         # Tier 1: Check active Roster Exception (job.position.roster.exception)
+
         roster = env['job.position.roster.exception'].sudo().search([
             ('employee_id', '=', employee.id),
             ('status', '=', 'active'),

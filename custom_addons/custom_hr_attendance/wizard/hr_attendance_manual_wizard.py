@@ -9,7 +9,7 @@ class HrAttendanceManualWizard(models.TransientModel):
     """
     Enhanced Manual Attendance Creation Wizard.
     Supports 3 modes:
-    1. Individual Entry (Single employee, single date, check-in/out or check-in only)
+    1. Individual Entry (Single employee, single date, check-in, check-out, or both)
     2. Batch Entry (Operating Unit employees, date range, lunch break splitting, Coach approval for >3 days)
     3. Finacle EOD Rest Entry (Morning OFF, Afternoon OFF, Full Day OFF for bank ops staff & drivers)
     """
@@ -23,6 +23,12 @@ class HrAttendanceManualWizard(models.TransientModel):
     ], string='Entry Mode', default='individual', required=True)
 
     # --- Individual Mode Fields ---
+    attendance_mode = fields.Selection([
+        ('check_in', 'Check-In Only'),
+        ('check_out', 'Check-Out Only'),
+        ('both', 'Both (Check-In & Check-Out)'),
+    ], string='Attendance Action')
+
     @api.model
     def _get_default_employee(self):
         emp = self.env.user.employee_id
@@ -45,6 +51,20 @@ class HrAttendanceManualWizard(models.TransientModel):
             ]
         return [('active', '=', True)]
 
+    def _float_to_time_str(self, float_time):
+        if float_time is None or float_time is False:
+            return ""
+        hours = int(float_time)
+        minutes = int(round((float_time - hours) * 60))
+        if minutes >= 60:
+            hours += 1
+            minutes = 0
+        hours_12 = hours % 12
+        if hours_12 == 0:
+            hours_12 = 12
+        period = "AM" if hours < 12 else "PM"
+        return f"{hours_12:02d}:{minutes:02d} {period}"
+
     employee_id = fields.Many2one(
         'hr.employee',
         string='Employee',
@@ -55,14 +75,20 @@ class HrAttendanceManualWizard(models.TransientModel):
         string='Attendance Date',
         default=fields.Date.context_today,
     )
+    detected_shift_name = fields.Char(
+        string='Detected Shift Name',
+        readonly=True
+    )
+    detected_shift_info = fields.Char(
+        string='Detected Shift',
+        readonly=True
+    )
     check_in_time = fields.Float(
         string='Check-In Time',
-        default=8.0,
         help='Check-in time (e.g. 8.0 = 08:00 AM)',
     )
     check_out_time = fields.Float(
         string='Check-Out Time',
-        default=17.0,
         help='Check-out time (e.g. 17.0 = 05:00 PM)',
     )
 
@@ -132,6 +158,26 @@ class HrAttendanceManualWizard(models.TransientModel):
         string='Attendance Reasons',
     )
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        emp_id = res.get('employee_id') or self._get_default_employee()
+        target_date = res.get('work_date') or fields.Date.context_today(self)
+        if emp_id:
+            emp = self.env['hr.employee'].browse(emp_id)
+            if emp.exists():
+                shift_info = emp._get_employee_shift_info(target_date=target_date)
+                if shift_info and not shift_info.get('is_day_off'):
+                    s_start = shift_info.get('start_time', 8.0)
+                    s_end = shift_info.get('end_time', 17.0)
+                    s_name = shift_info.get('name', 'Standard Shift')
+                    res['detected_shift_name'] = s_name
+                    res['detected_shift_info'] = f"{s_name} ({self._float_to_time_str(s_start)} - {self._float_to_time_str(s_end)})"
+                else:
+                    res['detected_shift_name'] = 'Default Global Shift'
+                    res['detected_shift_info'] = 'Default Global Shift (08:00 AM - 05:00 PM)'
+        return res
+
     @api.depends('start_date', 'end_date')
     def _compute_duration_days(self):
         for rec in self:
@@ -149,13 +195,95 @@ class HrAttendanceManualWizard(models.TransientModel):
             ])
             self.employee_ids = [(6, 0, emps.ids)]
 
-    @api.onchange('work_date')
-    def _onchange_work_date(self):
-        if self.work_date:
-            if not self.check_in_time:
-                self.check_in_time = 8.0
-            if not self.check_out_time:
-                self.check_out_time = 17.0
+    @api.onchange('employee_id', 'work_date', 'entry_type', 'attendance_mode')
+    def _onchange_employee_work_date(self):
+        if self.entry_type == 'individual' and self.employee_id:
+            target_date = self.work_date or fields.Date.context_today(self)
+            shift_info = self.employee_id._get_employee_shift_info(target_date=target_date)
+            if shift_info and not shift_info.get('is_day_off'):
+                s_start = shift_info.get('start_time', 8.0)
+                s_end = shift_info.get('end_time', 17.0)
+                s_name = shift_info.get('name', 'Standard Shift')
+                self.detected_shift_name = s_name
+                self.detected_shift_info = f"{s_name} ({self._float_to_time_str(s_start)} - {self._float_to_time_str(s_end)})"
+            else:
+                s_start = 8.0
+                s_end = 17.0
+                self.detected_shift_name = 'Default Global Shift'
+                self.detected_shift_info = 'Default Global Shift (08:00 AM - 05:00 PM)'
+
+            # Find active open check-in on that date or open check-in in general
+            open_att = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('work_date', '=', target_date),
+                ('check_out', '=', False),
+            ], order='check_in desc', limit=1)
+            if not open_att:
+                open_att = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('check_out', '=', False),
+                ], order='check_in desc', limit=1)
+
+            if not self.attendance_mode:
+                self.check_in_time = False
+                self.check_out_time = False
+                return
+
+            if self.attendance_mode == 'both':
+                if open_att:
+                    self.attendance_mode = False
+                    self.check_in_time = False
+                    self.check_out_time = False
+                    return {
+                        'warning': {
+                            'title': _('Active Check-In Exists'),
+                            'message': _(
+                                "Employee '%s' already has an active open check-in session for %s. "
+                                "You cannot create a 'Both (Check-In & Check-Out)' record while a session is open. "
+                                "Please select 'Check-Out Only' to complete the active session."
+                            ) % (self.employee_id.name, target_date)
+                        }
+                    }
+                self.check_in_time = s_start
+                self.check_out_time = s_end
+
+            elif self.attendance_mode == 'check_in':
+                if open_att:
+                    self.attendance_mode = False
+                    self.check_in_time = False
+                    self.check_out_time = False
+                    return {
+                        'warning': {
+                            'title': _('Active Check-In Exists'),
+                            'message': _(
+                                "Employee '%s' already has an active open check-in session for %s. "
+                                "Please select 'Check-Out Only' to complete the active session."
+                            ) % (self.employee_id.name, target_date)
+                        }
+                    }
+                self.check_in_time = s_start
+                self.check_out_time = False
+
+            elif self.attendance_mode == 'check_out':
+                if not open_att:
+                    self.attendance_mode = False
+                    self.check_in_time = False
+                    self.check_out_time = False
+                    return {
+                        'warning': {
+                            'title': _('No Active Check-In Found'),
+                            'message': _(
+                                "Employee '%s' does not have an active check-in record for %s to check out from. "
+                                "Please select 'Check-In Only' or 'Both'."
+                            ) % (self.employee_id.name, target_date)
+                        }
+                    }
+                if open_att.check_in:
+                    local_dt = fields.Datetime.context_timestamp(self.employee_id, open_att.check_in)
+                    self.check_in_time = local_dt.hour + (local_dt.minute / 60.0)
+                else:
+                    self.check_in_time = s_start
+                self.check_out_time = s_end
 
     @api.constrains('work_date', 'start_date', 'end_date', 'entry_type')
     def _check_back_date(self):
@@ -196,38 +324,243 @@ class HrAttendanceManualWizard(models.TransientModel):
         # SCENARIO 1: INDIVIDUAL ENTRY
         # ----------------------------------------------------
         if self.entry_type == 'individual':
-            if not self.employee_id or not self.work_date or self.check_in_time is False:
-                raise ValidationError(_('Employee, Attendance Date, and Check-In Time are required for individual entry.'))
+            if not self.employee_id or not self.work_date:
+                raise ValidationError(_('Employee and Attendance Date are required for individual entry.'))
 
-            dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
-            dt_check_out = self._float_time_to_utc_dt(self.work_date, self.check_out_time) if self.check_out_time else False
+            if not self.attendance_mode:
+                raise ValidationError(_('Please select an Attendance Action (Check-In Only, Check-Out Only, or Both).'))
 
-            if dt_check_out and dt_check_out <= dt_check_in:
-                raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))
+            shift_info = self.employee_id._get_employee_shift_info(target_date=self.work_date)
+            shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
+            shift_end = shift_info.get('end_time', 17.0) if shift_info else 17.0
 
-            vals = {
-                'employee_id': self.employee_id.id,
-                'work_date': self.work_date,
-                'check_in': dt_check_in,
-                'check_out': dt_check_out,
-                'is_acknowledged': True,
-                'acknowledged_by': self.env.user.id,
-                'acknowledged_date': fields.Datetime.now(),
-                'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-            }
+            # ------------------------------------------------
+            # 1.1 CHECK-OUT ONLY (Complete Active Session)
+            # ------------------------------------------------
+            if self.attendance_mode == 'check_out':
+                if self.check_out_time is False or self.check_out_time is None:
+                    raise ValidationError(_('Check-Out Time is required for Check-Out Only mode.'))
 
-            att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
-            if hasattr(att, 'message_post'):
-                att.message_post(body=_('Manual attendance created by %s. Justification: %s') % (self.env.user.name, self.justification))
+                open_att = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('work_date', '=', self.work_date),
+                    ('check_out', '=', False),
+                ], order='check_in desc', limit=1)
 
-            return {
-                'name': _('Manual Attendance Created'),
-                'type': 'ir.actions.act_window',
-                'res_model': 'hr.attendance',
-                'res_id': att.id,
-                'view_mode': 'form',
-                'target': 'current',
-            }
+                if not open_att:
+                    open_att = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', self.employee_id.id),
+                        ('check_out', '=', False),
+                    ], order='check_in desc', limit=1)
+
+                if not open_att:
+                    raise ValidationError(_(
+                        "Cannot complete Check-Out: Employee '%s' does not have an active open check-in record for %s."
+                    ) % (self.employee_id.name, self.work_date))
+
+                dt_check_out = self._float_time_to_utc_dt(self.work_date, self.check_out_time)
+                if dt_check_out <= open_att.check_in:
+                    raise ValidationError(_('Check-Out time must be strictly after the recorded Check-In time (%s).') % fields.Datetime.to_string(open_att.check_in))
+
+                s_end = open_att.shift_end_float or shift_end
+                check_out_status = 'Normal'
+                early_exit_hour = 0.0
+                acknowledged_exit = 0.0
+                if self.check_out_time < s_end:
+                    early_exit_hour = s_end - self.check_out_time
+                    acknowledged_exit = early_exit_hour
+                    check_out_status = 'Acknowledged Early Exit'
+
+                open_att.sudo().write({
+                    'check_out': dt_check_out,
+                    'check_out_status': check_out_status,
+                    'early_exit_hour': early_exit_hour,
+                    'acknowledged_exit': acknowledged_exit,
+                    'is_acknowledged': True,
+                    'acknowledged_by': self.env.user.id,
+                    'acknowledged_date': fields.Datetime.now(),
+                })
+                if self.attendance_reason_ids:
+                    open_att.sudo().write({'attendance_reason_ids': [(4, rid) for rid in self.attendance_reason_ids.ids]})
+
+                if self.work_date == today:
+                    self.employee_id.sudo().write({
+                        'attendance_state': 'checked_out',
+                        'last_attendance_id': open_att.id
+                    })
+
+                if hasattr(open_att, 'message_post'):
+                    open_att.message_post(body=_('Manual check-out recorded by %s. Justification: %s') % (self.env.user.name, self.justification))
+
+                return {
+                    'name': _('Manual Attendance Updated'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'hr.attendance',
+                    'res_id': open_att.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                }
+
+            # ------------------------------------------------
+            # 1.2 CHECK-IN ONLY (Start Open Session)
+            # ------------------------------------------------
+            elif self.attendance_mode == 'check_in':
+                if self.check_in_time is False or self.check_in_time is None:
+                    raise ValidationError(_('Check-In Time is required for Check-In Only mode.'))
+
+                existing_open = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('work_date', '=', self.work_date),
+                    ('check_out', '=', False),
+                ], limit=1)
+                if not existing_open:
+                    existing_open = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', self.employee_id.id),
+                        ('check_out', '=', False),
+                    ], limit=1)
+                if existing_open:
+                    raise ValidationError(_(
+                        "Employee '%s' already has an active open check-in session for %s. "
+                        "Please select 'Check-Out Only' to complete the active session."
+                    ) % (self.employee_id.name, self.work_date))
+
+                dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
+
+                if self.check_in_time > shift_start:
+                    late_hours = self.check_in_time - shift_start
+                    status = 'Acknowledged Lateness'
+                    late_time_hour = late_hours
+                    acknowledged_late = late_hours
+                else:
+                    status = 'Normal'
+                    late_time_hour = 0.0
+                    acknowledged_late = 0.0
+
+                vals = {
+                    'employee_id': self.employee_id.id,
+                    'work_date': self.work_date,
+                    'check_in': dt_check_in,
+                    'check_out': False,
+                    'actual_check_in': dt_check_in,
+                    'shift_start_float': shift_start,
+                    'shift_end_float': shift_end,
+                    'check_in_status': status,
+                    'late_time_hour': late_time_hour,
+                    'acknowledged_late': acknowledged_late,
+                    'is_acknowledged': True,
+                    'acknowledged_by': self.env.user.id,
+                    'acknowledged_date': fields.Datetime.now(),
+                    'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                }
+
+                att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+
+                if self.work_date == today:
+                    self.employee_id.sudo().write({
+                        'attendance_state': 'checked_in',
+                        'last_attendance_id': att.id
+                    })
+
+                if hasattr(att, 'message_post'):
+                    att.message_post(body=_('Manual check-in created by %s. Justification: %s') % (self.env.user.name, self.justification))
+
+                return {
+                    'name': _('Manual Attendance Created'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'hr.attendance',
+                    'res_id': att.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                }
+
+            # ------------------------------------------------
+            # 1.3 BOTH (Check-In & Check-Out)
+            # ------------------------------------------------
+            elif self.attendance_mode == 'both':
+                # Block creating 'both' if an active check-in exists
+                existing_open = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('work_date', '=', self.work_date),
+                    ('check_out', '=', False),
+                ], limit=1)
+                if not existing_open:
+                    existing_open = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', self.employee_id.id),
+                        ('check_out', '=', False),
+                    ], limit=1)
+                if existing_open:
+                    raise ValidationError(_(
+                        "Employee '%s' already has an active open check-in session for %s. "
+                        "You cannot create a 'Both (Check-In & Check-Out)' record while a session is active. "
+                        "Please select 'Check-Out Only' to complete the active session."
+                    ) % (self.employee_id.name, self.work_date))
+
+                if self.check_in_time is False or not self.check_out_time:
+                    raise ValidationError(_('Both Check-In Time and Check-Out Time are required when mode is Both.'))
+
+                dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
+                dt_check_out = self._float_time_to_utc_dt(self.work_date, self.check_out_time)
+
+                if dt_check_out <= dt_check_in:
+                    raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))
+
+                if self.check_in_time > shift_start:
+                    late_hours = self.check_in_time - shift_start
+                    status = 'Acknowledged Lateness'
+                    late_time_hour = late_hours
+                    acknowledged_late = late_hours
+                else:
+                    status = 'Normal'
+                    late_time_hour = 0.0
+                    acknowledged_late = 0.0
+
+                check_out_status = 'Normal'
+                early_exit_hour = 0.0
+                acknowledged_exit = 0.0
+                if self.check_out_time < shift_end:
+                    early_exit_hour = shift_end - self.check_out_time
+                    acknowledged_exit = early_exit_hour
+                    check_out_status = 'Acknowledged Early Exit'
+
+                vals = {
+                    'employee_id': self.employee_id.id,
+                    'work_date': self.work_date,
+                    'check_in': dt_check_in,
+                    'check_out': dt_check_out,
+                    'actual_check_in': dt_check_in,
+                    'shift_start_float': shift_start,
+                    'shift_end_float': shift_end,
+                    'check_in_status': status,
+                    'late_time_hour': late_time_hour,
+                    'acknowledged_late': acknowledged_late,
+                    'check_out_status': check_out_status,
+                    'early_exit_hour': early_exit_hour,
+                    'acknowledged_exit': acknowledged_exit,
+                    'is_acknowledged': True,
+                    'acknowledged_by': self.env.user.id,
+                    'acknowledged_date': fields.Datetime.now(),
+                    'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                }
+
+                att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+
+                if self.work_date == today:
+                    self.employee_id.sudo().write({
+                        'attendance_state': 'checked_out',
+                        'last_attendance_id': att.id
+                    })
+
+                if hasattr(att, 'message_post'):
+                    att.message_post(body=_('Manual attendance created by %s. Justification: %s') % (self.env.user.name, self.justification))
+
+                return {
+                    'name': _('Manual Attendance Created'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'hr.attendance',
+                    'res_id': att.id,
+                    'view_mode': 'form',
+                    'target': 'current',
+                }
 
         # ----------------------------------------------------
         # SCENARIO 2: BATCH OPERATING UNIT ENTRY
@@ -242,91 +575,226 @@ class HrAttendanceManualWizard(models.TransientModel):
             if duration > 3:
                 coach = self.env.user.employee_id.coach_id if self.env.user.employee_id else None
                 if not coach:
-                    # Fallback to parent manager or system admin
                     coach = self.env.user.employee_id.parent_id if self.env.user.employee_id else None
                 
                 req_vals = {
                     'name': _('Batch Request (%s to %s)') % (self.start_date, self.end_date),
                     'manager_id': self.env.user.id,
-                    'coach_id': coach.id if coach else self.env.user.employee_id.id,
-                    'operating_unit_id': self.operating_unit_id.id if self.operating_unit_id else self.env.user.employee_id.default_operating_unit_id.id,
+                    'coach_id': coach.id if coach else False,
                     'start_date': self.start_date,
                     'end_date': self.end_date,
+                    'reason': self.justification,
+                    'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
                     'employee_ids': [(6, 0, self.employee_ids.ids)],
                     'use_employee_shifts': self.use_employee_shifts,
                     'overwrite_existing': self.overwrite_existing,
                     'check_in_time_only': self.check_in_time_only,
                     'check_out_time_only': self.check_out_time_only,
-                    'justification': self.justification,
-                    'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-                    'state': 'to_approve',
+                    'state': 'submitted',
                 }
-                req = self.env['hr.attendance.batch.request'].sudo().create(req_vals)
+                batch_req = self.env['hr.attendance.batch.request'].sudo().create(req_vals)
                 
                 return {
-                    'type': 'ir.actions.client',
-                    'tag': 'display_notification',
-                    'params': {
-                        'title': _('Batch Request Submitted to Coach'),
-                        'message': _('Batch attendance duration (%d days) exceeds 3 days. Request %s has been submitted to your Coach for approval.') % (duration, req.name),
-                        'type': 'warning',
-                        'sticky': True,
-                    }
+                    'name': _('Batch Request Submitted for Coach Approval'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'hr.attendance.batch.request',
+                    'res_id': batch_req.id,
+                    'view_mode': 'form',
+                    'target': 'current',
                 }
 
-            # <= 3 DAYS: Direct Batch Execution
-            req_obj = self.env['hr.attendance.batch.request'].sudo().new({
-                'manager_id': self.env.user.id,
-                'coach_id': self.env.user.employee_id.id if self.env.user.employee_id else False,
-                'operating_unit_id': self.operating_unit_id.id if self.operating_unit_id else False,
-                'start_date': self.start_date,
-                'end_date': self.end_date,
-                'employee_ids': [(6, 0, self.employee_ids.ids)],
-                'rest_type': 'none',
-                'use_employee_shifts': self.use_employee_shifts,
-                'overwrite_existing': self.overwrite_existing,
-                'check_in_time_only': self.check_in_time_only,
-                'check_out_time_only': self.check_out_time_only,
-                'justification': self.justification,
-                'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-            })
-            created = req_obj._generate_batch_attendances()
-
-            return {
-                'name': _('Batch Attendance Created'),
-                'type': 'ir.actions.act_window',
-                'res_model': 'hr.attendance',
-                'domain': [('id', 'in', created.ids)],
-                'view_mode': 'list,form',
-                'target': 'current',
-            }
+            # <= 3 DAYS: Generate directly
+            return self._generate_batch_attendances()
 
         # ----------------------------------------------------
-        # SCENARIO 3: FINACLE EOD COMPENSATORY REST
+        # SCENARIO 3: FINACLE EOD REST ENTRY
         # ----------------------------------------------------
         elif self.entry_type == 'finacle_rest':
             if not self.employee_ids or not self.work_date:
-                raise ValidationError(_('Employees and Target Date are required for Finacle EOD Rest grant.'))
+                raise ValidationError(_('Employees and Target Rest Date are required for Duty OFF entry.'))
 
-            req_obj = self.env['hr.attendance.batch.request'].sudo().new({
-                'manager_id': self.env.user.id,
-                'coach_id': self.env.user.employee_id.id if self.env.user.employee_id else False,
-                'operating_unit_id': self.operating_unit_id.id if self.operating_unit_id else False,
-                'start_date': self.work_date,
-                'end_date': self.work_date,
-                'employee_ids': [(6, 0, self.employee_ids.ids)],
-                'rest_type': self.rest_type,
-                'use_employee_shifts': True,
-                'justification': self.justification,
-                'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-            })
-            created = req_obj._generate_batch_attendances()
+            created_attendances = []
+            for emp in self.employee_ids:
+                shift_info = emp._get_employee_shift_info(target_date=self.work_date)
+                s_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
+                s_end = shift_info.get('end_time', 17.0) if shift_info else 17.0
+                has_lunch = shift_info.get('has_lunch_break', False) if shift_info else False
+                lunch_start = shift_info.get('lunch_start_time', 12.0) if shift_info else 12.0
+                lunch_dur = shift_info.get('lunch_duration', 1.0) if shift_info else 1.0
+                lunch_end = lunch_start + lunch_dur
+
+                if self.rest_type == 'morning_off':
+                    actual_start = lunch_end if has_lunch else (s_start + (s_end - s_start) / 2.0)
+                    dt_in = self._float_time_to_utc_dt(self.work_date, actual_start)
+                    dt_out = self._float_time_to_utc_dt(self.work_date, s_end)
+                    vals = {
+                        'employee_id': emp.id,
+                        'work_date': self.work_date,
+                        'check_in': dt_in,
+                        'check_out': dt_out,
+                        'actual_check_in': dt_in,
+                        'shift_start_float': actual_start,
+                        'shift_end_float': s_end,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+                    created_attendances.append(att.id)
+
+                elif self.rest_type == 'afternoon_off':
+                    actual_end = lunch_start if has_lunch else (s_start + (s_end - s_start) / 2.0)
+                    dt_in = self._float_time_to_utc_dt(self.work_date, s_start)
+                    dt_out = self._float_time_to_utc_dt(self.work_date, actual_end)
+                    vals = {
+                        'employee_id': emp.id,
+                        'work_date': self.work_date,
+                        'check_in': dt_in,
+                        'check_out': dt_out,
+                        'actual_check_in': dt_in,
+                        'shift_start_float': s_start,
+                        'shift_end_float': actual_end,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+                    created_attendances.append(att.id)
+
+                elif self.rest_type == 'full_day_off':
+                    dt_in = self._float_time_to_utc_dt(self.work_date, s_start)
+                    dt_out = self._float_time_to_utc_dt(self.work_date, s_end)
+                    vals = {
+                        'employee_id': emp.id,
+                        'work_date': self.work_date,
+                        'check_in': dt_in,
+                        'check_out': dt_out,
+                        'actual_check_in': dt_in,
+                        'shift_start_float': s_start,
+                        'shift_end_float': s_end,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+                    created_attendances.append(att.id)
 
             return {
-                'name': _('Finacle EOD Rest Attendance Created'),
+                'name': _('Duty OFF Attendances Created'),
                 'type': 'ir.actions.act_window',
                 'res_model': 'hr.attendance',
-                'domain': [('id', 'in', created.ids)],
                 'view_mode': 'list,form',
+                'domain': [('id', 'in', created_attendances)],
                 'target': 'current',
             }
+
+    def _generate_batch_attendances(self):
+        """Helper to create attendance records across date range."""
+        current_date = self.start_date
+        created_attendances = []
+
+        while current_date <= self.end_date:
+            is_sunday = (current_date.weekday() == 6)
+
+            for emp in self.employee_ids:
+                if is_sunday:
+                    continue
+
+                if self.overwrite_existing:
+                    existing = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', emp.id),
+                        ('work_date', '=', current_date)
+                    ])
+                    existing.unlink()
+
+                if self.use_employee_shifts:
+                    shift_info = emp._get_employee_shift_info(target_date=current_date)
+                    if shift_info and shift_info.get('is_day_off'):
+                        continue
+                    s_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
+                    s_end = shift_info.get('end_time', 17.0) if shift_info else 17.0
+                    has_lunch = shift_info.get('has_lunch_break', False) if shift_info else False
+                    lunch_start = shift_info.get('lunch_start_time', 12.0) if shift_info else 12.0
+                    lunch_dur = shift_info.get('lunch_duration', 1.0) if shift_info else 1.0
+                else:
+                    s_start = self.check_in_time_only or 8.0
+                    s_end = self.check_out_time_only or 17.0
+                    has_lunch = False
+                    lunch_start = 12.0
+                    lunch_dur = 1.0
+
+                if has_lunch and lunch_dur > 0:
+                    lunch_end = lunch_start + lunch_dur
+                    dt_in1 = self._float_time_to_utc_dt(current_date, s_start)
+                    dt_out1 = self._float_time_to_utc_dt(current_date, lunch_start)
+                    vals1 = {
+                        'employee_id': emp.id,
+                        'work_date': current_date,
+                        'check_in': dt_in1,
+                        'check_out': dt_out1,
+                        'actual_check_in': dt_in1,
+                        'shift_start_float': s_start,
+                        'shift_end_float': lunch_start,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att1 = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals1)
+                    created_attendances.append(att1.id)
+
+                    dt_in2 = self._float_time_to_utc_dt(current_date, lunch_end)
+                    dt_out2 = self._float_time_to_utc_dt(current_date, s_end)
+                    vals2 = {
+                        'employee_id': emp.id,
+                        'work_date': current_date,
+                        'check_in': dt_in2,
+                        'check_out': dt_out2,
+                        'actual_check_in': dt_in2,
+                        'shift_start_float': lunch_end,
+                        'shift_end_float': s_end,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att2 = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals2)
+                    created_attendances.append(att2.id)
+                else:
+                    dt_in = self._float_time_to_utc_dt(current_date, s_start)
+                    dt_out = self._float_time_to_utc_dt(current_date, s_end)
+                    vals = {
+                        'employee_id': emp.id,
+                        'work_date': current_date,
+                        'check_in': dt_in,
+                        'check_out': dt_out,
+                        'actual_check_in': dt_in,
+                        'shift_start_float': s_start,
+                        'shift_end_float': s_end,
+                        'check_in_status': 'Normal',
+                        'is_acknowledged': True,
+                        'acknowledged_by': self.env.user.id,
+                        'acknowledged_date': fields.Datetime.now(),
+                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
+                    }
+                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+                    created_attendances.append(att.id)
+
+            current_date += datetime.timedelta(days=1)
+
+        return {
+            'name': _('Batch Attendances Created'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.attendance',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', created_attendances)],
+            'target': 'current',
+        }
