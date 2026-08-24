@@ -77,8 +77,28 @@ class HrAttendance(models.Model):
     regularization = fields.Boolean(string="Regularization")
     reason_type = fields.Selection(
         [('check_in', 'Acknowledged Check In'),
-         ('check_out', 'Acknowledged Check Out')], compute="_compute_reason_type", store=True, index=True)
+         ('check_out', 'Acknowledged Check Out'),
+         ('both', 'Acknowledged Check In & Out')], compute="_compute_reason_type", store=True, index=True)
+    in_mode = fields.Selection(
+        selection_add=[
+            ('predefined', 'Predefined Request'),
+            ('acknowledged', 'Manager Acknowledged'),
+            ('batch', 'Batch / Duty OFF'),
+        ],
+        ondelete={'predefined': 'set default', 'acknowledged': 'set default', 'batch': 'set default'}
+    )
+    out_mode = fields.Selection(
+        selection_add=[
+            ('predefined', 'Predefined Request'),
+            ('acknowledged', 'Manager Acknowledged'),
+            ('batch', 'Batch / Duty OFF'),
+        ],
+        default=False,
+        ondelete={'predefined': 'set default', 'acknowledged': 'set default', 'batch': 'set default'}
+    )
     acknowledged_by = fields.Many2one('res.users', string="Acknowledged By", readonly=True)
+
+
     acknowledged_date = fields.Datetime(string="Acknowledged Date", readonly=True)
     acknowledged_late = fields.Float(string="Acknowledged Late", readonly=True)
     acknowledged_exit = fields.Float(string="Acknowledged Exit", readonly=True)
@@ -185,50 +205,27 @@ class HrAttendance(models.Model):
                 local_tz = pytz.utc
 
             check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if emp else rec.check_in
-            active_shift = False
+            check_in_date = check_in_local.date() if check_in_local else (rec.work_date or fields.Date.context_today(self))
+
+            # Retrieve employee's assigned shift info for this work date
+            shift_info = emp._get_employee_shift_info(target_date=check_in_date) if emp else None
 
             # 1. Resolve Shift Start & Shift End for this employee and date
             if rec.shift_start_float or rec.shift_end_float:
-                shift_start = rec.shift_start_float or default_morning_time
-                shift_end = rec.shift_end_float or default_exit_time
-
+                shift_start = rec.shift_start_float or (shift_info.get('start_time') if shift_info else default_morning_time)
+                shift_end = rec.shift_end_float or (shift_info.get('end_time') if shift_info else default_exit_time)
+            elif shift_info and not shift_info.get('is_day_off'):
+                shift_start = shift_info.get('start_time', default_morning_time)
+                shift_end = shift_info.get('end_time', default_exit_time)
             else:
                 shift_start = default_morning_time
                 shift_end = default_exit_time
 
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
-
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
                     if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
                         shift_end = saturday_exit_time
-
-                active_shift = False
-                if emp:
-                    if emp.default_operating_unit_id:
-                        loc_ex = self.env['location.based.exception'].sudo().search(
-                            ['|', ('operating_unit_ids', 'in', [emp.default_operating_unit_id.id]),
-                                  ('operating_unit', '=', emp.default_operating_unit_id.id)], limit=1
-                        )
-                        if loc_ex:
-                            if hasattr(loc_ex, 'start_time') and loc_ex.start_time:
-                                shift_start = loc_ex.start_time
-                            if hasattr(loc_ex, 'end_time') and loc_ex.end_time:
-                                shift_end = loc_ex.end_time
-                            if hasattr(loc_ex, 'shift_id') and loc_ex.shift_id:
-                                active_shift = loc_ex.shift_id
-
-                    check_in_date = fields.Datetime.context_timestamp(emp, rec.check_in).date() if rec.check_in else fields.Date.context_today(self)
-                    job_ex = self.env['job.position.exception'].sudo().search([
-                        ('employee_id', '=', emp.id), ('status', '=', 'active'),
-                        ('start_date', '<=', check_in_date),
-                        '|', ('end_date', '=', False), ('end_date', '>=', check_in_date)
-                    ], order='start_date desc, id desc', limit=1)
-                    if job_ex:
-                        if hasattr(job_ex, 'shift_id') and job_ex.shift_id:
-                            shift_start = job_ex.shift_id.start_time or shift_start
-                            shift_end = job_ex.shift_id.end_time or shift_end
-                            active_shift = job_ex.shift_id
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
             start_hour = int(shift_start)
@@ -247,22 +244,76 @@ class HrAttendance(models.Model):
 
             if eff_check_out > eff_check_in:
                 raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
+                
+                # Check real punches first
                 if hasattr(rec, 'lunch_out') and hasattr(rec, 'lunch_in') and rec.lunch_out and rec.lunch_in:
                     lunch_hrs = (rec.lunch_in - rec.lunch_out).total_seconds() / 3600.0
                 elif hasattr(rec, 'lunch_break_hours') and rec.lunch_break_hours > 0:
                     lunch_hrs = rec.lunch_break_hours
-                elif rec.shift_start_float == default_morning_time and rec.shift_end_float == default_exit_time:
-                    # Default shift check-in: use standard lunch break duration
-                    lunch_hrs = default_lunch_duration if enable_lunch else 0.0
-                elif active_shift and active_shift.has_lunch_break:
-                    lunch_hrs = active_shift.lunch_duration
+                elif shift_info and shift_info.get('has_lunch_break'):
+                    lunch_hrs = shift_info.get('lunch_duration', default_lunch_duration if enable_lunch else 0.0)
                 elif enable_lunch:
                     lunch_hrs = default_lunch_duration
                 else:
                     lunch_hrs = 0.0
+
                 rec.worked_hours = max(0.0, round(raw_hours - lunch_hrs, 2))
             else:
                 rec.worked_hours = 0.0
+
+    @api.depends('shift_start_float', 'shift_end_float', 'work_date', 'check_in', 'employee_id')
+    def _compute_expected_hours(self):
+        """
+        Expected Hours = Total Scheduled Shift Duration (Shift End - Shift Start - Lunch Duration)
+        """
+        params = self.env['ir.config_parameter'].sudo()
+        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
+        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
+        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
+        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
+        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
+        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
+        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+
+        for rec in self:
+            emp = rec.employee_id
+            if not emp:
+                rec.expected_hours = round(default_exit_time - default_morning_time - (default_lunch_duration if enable_lunch else 0.0), 2)
+                continue
+
+            check_in_local = fields.Datetime.context_timestamp(emp, rec.check_in) if rec.check_in else False
+            check_in_date = check_in_local.date() if check_in_local else (rec.work_date or fields.Date.context_today(self))
+
+            shift_info = emp._get_employee_shift_info(target_date=check_in_date) if emp else None
+
+            if rec.shift_start_float or rec.shift_end_float:
+                shift_start = rec.shift_start_float or (shift_info.get('start_time') if shift_info else default_morning_time)
+                shift_end = rec.shift_end_float or (shift_info.get('end_time') if shift_info else default_exit_time)
+            elif shift_info and not shift_info.get('is_day_off'):
+                shift_start = shift_info.get('start_time', default_morning_time)
+                shift_end = shift_info.get('end_time', default_exit_time)
+            else:
+                shift_start = default_morning_time
+                shift_end = default_exit_time
+
+                if enable_saturday and check_in_local and check_in_local.weekday() == 5:
+                    ou = emp.default_operating_unit_id if emp else None
+                    unit_type = ou.work_unit_type if ou else False
+                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                        shift_end = saturday_exit_time
+
+            # Calculate shift lunch duration
+            if shift_info and shift_info.get('has_lunch_break'):
+                lunch_dur = shift_info.get('lunch_duration', default_lunch_duration if enable_lunch else 0.0)
+            elif enable_lunch:
+                lunch_dur = default_lunch_duration
+            else:
+                lunch_dur = 0.0
+
+            total_shift_dur = max(0.0, (shift_end - shift_start) - lunch_dur)
+            rec.expected_hours = round(total_shift_dur, 2)
+
+
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing them from database """
@@ -484,16 +535,42 @@ class HrAttendance(models.Model):
             user.has_group('hr_attendance.group_hr_attendance_user'),
         ])
 
-    @api.depends('is_acknowledged', 'check_in', 'check_out', 'attendance_reason_ids')
+    @api.depends('is_acknowledged', 'check_in', 'check_out', 'attendance_reason_ids', 'attendance_reason_ids.action_type', 'check_in_status', 'check_out_status')
     def _compute_reason_type(self):
         for rec in self:
             if not rec.is_acknowledged and not rec.attendance_reason_ids:
                 rec.reason_type = False
                 continue
-            elif rec.check_in and not rec.check_out:
+            
+            # If attendance is an open session (only check_in exists, check_out is False)
+            if rec.check_in and not rec.check_out:
                 rec.reason_type = 'check_in'
-            else:
+                continue
+            
+            # If both check_in and check_out exist
+            if rec.check_in and rec.check_out:
+                has_in_exc = bool(rec.check_in_status and rec.check_in_status not in ('Normal', False))
+                has_out_exc = bool(rec.check_out_status and rec.check_out_status not in ('Normal', False))
+                action_types = set(rec.attendance_reason_ids.mapped('action_type')) if rec.attendance_reason_ids else set()
+
+                if has_in_exc and has_out_exc:
+                    rec.reason_type = 'both'
+                elif has_in_exc:
+                    rec.reason_type = 'check_in'
+                elif has_out_exc:
+                    rec.reason_type = 'check_out'
+                elif 'both' in action_types or ('check_in' in action_types and 'check_out' in action_types):
+                    rec.reason_type = 'both'
+                elif 'check_out' in action_types:
+                    rec.reason_type = 'check_out'
+                elif 'check_in' in action_types:
+                    rec.reason_type = 'check_in'
+                else:
+                    rec.reason_type = 'both'
+            elif rec.check_out and not rec.check_in:
                 rec.reason_type = 'check_out'
+            else:
+                rec.reason_type = False
 
     def _apply_manager_logic(self):
         self.ensure_one()
@@ -516,27 +593,35 @@ class HrAttendance(models.Model):
 
         # Phase 2: Check for Technical Failure or Operational Disruption reasons
         reason_codes = self.attendance_reason_ids.mapped('code')
-        if 'TECHNICAL_FAILURE' in reason_codes or 'Technical' in reason_codes:
-            if self.reason_type == 'check_in':
-                self.check_in_status = 'Technical Failure'
+        is_tech = ('TECHNICAL_FAILURE' in reason_codes or 'Technical' in reason_codes)
+        is_ops = ('OPERATIONAL_DISRUPTION' in reason_codes)
+
+        if is_tech or is_ops:
+            status_label = 'Technical Failure' if is_tech else 'Operational Disruption'
+            if self.check_in and not self.check_out:
+                self.check_in_status = status_label
+            elif self.check_out and not self.check_in:
+                self.check_out_status = status_label
             else:
-                self.check_out_status = 'Technical Failure'
-            return
-        elif 'OPERATIONAL_DISRUPTION' in reason_codes:
-            if self.reason_type == 'check_in':
-                self.check_in_status = 'Operational Disruption'
-            else:
-                self.check_out_status = 'Operational Disruption'
+                if self.reason_type == 'check_in':
+                    self.check_in_status = status_label
+                elif self.reason_type == 'check_out':
+                    self.check_out_status = status_label
+                else:
+                    self.check_in_status = status_label
+                    self.check_out_status = status_label
             return
 
         # ----------------------------------------------------------
         # MANUAL CHECK-IN CALCULATION
         # ----------------------------------------------------------
-        if self.reason_type == 'check_in' and self.check_in:
+        if self.check_in and self.reason_type in ('check_in', 'both'):
             dt_local = pytz.utc.localize(self.check_in).astimezone(local_tz)
             f_time = dt_local.hour + dt_local.minute / 60 + dt_local.second / 3600
 
             s_start, s_end = emp._select_applicable_shift(f_time, m_start,  e_time, loc_ex, job_ex, is_manager=True)
+            if self.shift_start_float:
+                s_start = self.shift_start_float
 
             _logger.info("Manual Check-in | Selected Time: %.2f | Shift Start: %.2f", f_time, s_start)
 
@@ -544,26 +629,30 @@ class HrAttendance(models.Model):
                 self.check_in_status = 'Acknowledged Lateness'
                 self.acknowledged_late = round((f_time - s_start) * 60, 2)
             else:
-                self.check_in_status = 'Normal'
+                self.check_in_status = 'Acknowledged Check-In' if self.attendance_reason_ids else 'Manager Manual Check-In'
                 self.acknowledged_late = 0.0
 
         # ----------------------------------------------------------
-        # MANUAL CHECK-OUT CALCULATION
+        # MANUAL CHECK-OUT CALCULATION (Only when check_out is recorded)
         # ----------------------------------------------------------
-        elif self.reason_type == 'check_out' and self.is_acknowledged and self.check_out:
+        if self.check_out and self.reason_type in ('check_out', 'both') and self.is_acknowledged:
             dt_local = pytz.utc.localize(self.check_out).astimezone(local_tz)
             f_time = dt_local.hour + dt_local.minute / 60 + dt_local.second / 3600
 
             s_start, s_end = emp._select_applicable_shift(f_time, m_start, e_time, loc_ex, job_ex, is_manager=True)
+            if self.shift_end_float:
+                s_end = self.shift_end_float
 
             _logger.info("Manual Check-out | Selected Time: %.2f | Shift End: %.2f", f_time, s_end)
 
             if f_time < s_end:
-                self.check_out_status = 'Acknowledged Early check out'
+                self.check_out_status = 'Acknowledged Early Exit'
                 self.acknowledged_exit = round((s_end - f_time) * 60, 2)
             else:
-                self.check_out_status = 'Normal'
+                self.check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
                 self.acknowledged_exit = 0.0
+
+
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -589,6 +678,9 @@ class HrAttendance(models.Model):
                     'acknowledged_by': user.id,
                     'acknowledged_date': fields.Datetime.now()
                 })
+
+            if not vals.get('check_out'):
+                vals['out_mode'] = False
 
             # ---- track ip & device: stamp check-in IP & device info on creation ----
             if not vals.get('check_in_ip'):
@@ -620,6 +712,10 @@ class HrAttendance(models.Model):
 
         # ---- track ip & device: stamp check-out IP & device info when check_out is set ----
         if vals.get('check_out'):
+            if 'out_mode' not in vals:
+                for rec in self:
+                    if not rec.out_mode:
+                        vals['out_mode'] = 'manual'
             if not vals.get('check_out_ip'):
                 ip = self._resolve_check_out_ip(vals)
                 if ip:
@@ -631,6 +727,7 @@ class HrAttendance(models.Model):
                 device_info = self._resolve_request_device_info()
                 if device_info:
                     vals['check_out_device_info'] = device_info
+
 
         # Phase 8: Audit log immutability hardening guard
         # Block core attendance edits if linked to a payroll payload already transferred or processed.

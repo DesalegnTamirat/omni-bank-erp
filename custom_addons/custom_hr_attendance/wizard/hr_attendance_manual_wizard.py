@@ -363,16 +363,19 @@ class HrAttendanceManualWizard(models.TransientModel):
                     raise ValidationError(_('Check-Out time must be strictly after the recorded Check-In time (%s).') % fields.Datetime.to_string(open_att.check_in))
 
                 s_end = open_att.shift_end_float or shift_end
-                check_out_status = 'Normal'
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
                 if self.check_out_time < s_end:
                     early_exit_hour = s_end - self.check_out_time
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
+                else:
+                    check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
 
+                out_mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
                 open_att.sudo().write({
                     'check_out': dt_check_out,
+                    'out_mode': out_mode_val,
                     'check_out_status': check_out_status,
                     'early_exit_hour': early_exit_hour,
                     'acknowledged_exit': acknowledged_exit,
@@ -432,16 +435,19 @@ class HrAttendanceManualWizard(models.TransientModel):
                     late_time_hour = late_hours
                     acknowledged_late = late_hours
                 else:
-                    status = 'Normal'
+                    status = 'Acknowledged Check-In' if self.attendance_reason_ids else 'Manager Manual Check-In'
                     late_time_hour = 0.0
                     acknowledged_late = 0.0
 
+                in_mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
                 vals = {
                     'employee_id': self.employee_id.id,
                     'work_date': self.work_date,
                     'check_in': dt_check_in,
                     'check_out': False,
                     'actual_check_in': dt_check_in,
+                    'in_mode': in_mode_val,
+                    'out_mode': False,
                     'shift_start_float': shift_start,
                     'shift_end_float': shift_end,
                     'check_in_status': status,
@@ -452,6 +458,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'acknowledged_date': fields.Datetime.now(),
                     'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
                 }
+
 
                 att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
 
@@ -510,24 +517,29 @@ class HrAttendanceManualWizard(models.TransientModel):
                     late_time_hour = late_hours
                     acknowledged_late = late_hours
                 else:
-                    status = 'Normal'
+                    status = 'Acknowledged Check-In' if self.attendance_reason_ids else 'Manager Manual Check-In'
                     late_time_hour = 0.0
                     acknowledged_late = 0.0
 
-                check_out_status = 'Normal'
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
                 if self.check_out_time < shift_end:
                     early_exit_hour = shift_end - self.check_out_time
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
+                else:
+                    check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
 
+
+                mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
                 vals = {
                     'employee_id': self.employee_id.id,
                     'work_date': self.work_date,
                     'check_in': dt_check_in,
                     'check_out': dt_check_out,
                     'actual_check_in': dt_check_in,
+                    'in_mode': mode_val,
+                    'out_mode': mode_val,
                     'shift_start_float': shift_start,
                     'shift_end_float': shift_end,
                     'check_in_status': status,
@@ -541,6 +553,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'acknowledged_date': fields.Datetime.now(),
                     'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
                 }
+
 
                 att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
 
@@ -633,6 +646,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in,
                         'check_out': dt_out,
                         'actual_check_in': dt_in,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': actual_start,
                         'shift_end_float': s_end,
                         'check_in_status': 'Normal',
@@ -654,6 +669,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in,
                         'check_out': dt_out,
                         'actual_check_in': dt_in,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': s_start,
                         'shift_end_float': actual_end,
                         'check_in_status': 'Normal',
@@ -674,6 +691,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in,
                         'check_out': dt_out,
                         'actual_check_in': dt_in,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': s_start,
                         'shift_end_float': s_end,
                         'check_in_status': 'Normal',
@@ -739,6 +758,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in1,
                         'check_out': dt_out1,
                         'actual_check_in': dt_in1,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': s_start,
                         'shift_end_float': lunch_start,
                         'check_in_status': 'Normal',
@@ -758,6 +779,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in2,
                         'check_out': dt_out2,
                         'actual_check_in': dt_in2,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': lunch_end,
                         'shift_end_float': s_end,
                         'check_in_status': 'Normal',
@@ -777,6 +800,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'check_in': dt_in,
                         'check_out': dt_out,
                         'actual_check_in': dt_in,
+                        'in_mode': 'batch',
+                        'out_mode': 'batch',
                         'shift_start_float': s_start,
                         'shift_end_float': s_end,
                         'check_in_status': 'Normal',
@@ -787,6 +812,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                     }
                     att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
                     created_attendances.append(att.id)
+
 
             current_date += datetime.timedelta(days=1)
 

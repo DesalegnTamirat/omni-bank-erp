@@ -6,7 +6,7 @@
         <field name="name">acknowledged.attendance.report.tree</field>
         <field name="model">acknowledged.attendance.report</field>
         <field name="arch" type="xml">
-            <list string="Acknowledged Attendance" decoration-warning="reason_type == 'check_in'" decoration-info="reason_type == 'check_out'">
+            <list string="Acknowledged Attendance" decoration-warning="reason_type == 'check_in'" decoration-info="reason_type == 'check_out'" decoration-success="reason_type == 'both'">
                 <field name="employee_identification" string="ID"/>
                 <field name="employee_name" string="Employee"/>
                 <field name="place_of_assignment" string="Branch / Unit"/>
@@ -14,7 +14,8 @@
                 <field name="check_out" string="Check-Out"/>
                 <field name="reason_type" string="Type" widget="badge"
                        decoration-warning="reason_type == 'check_in'"
-                       decoration-info="reason_type == 'check_out'"/>
+                       decoration-info="reason_type == 'check_out'"
+                       decoration-success="reason_type == 'both'"/>
                 <field name="reason_name" string="Reason"/>
                 <field name="acknowledged_by" string="Acknowledged By"/>
                 <field name="acknowledged_date" string="Acknowledged On"/>
@@ -42,7 +43,12 @@
                         name="filter_check_out"
                         domain="[('reason_type','=','check_out')]"/>
 
+                <filter string="Both Check-In &amp; Out Acknowledged"
+                        name="filter_both"
+                        domain="[('reason_type','=','both')]"/>
+
                 <filter string="Acknowledged Today"
+
                         name="filter_today"
                         domain="[('acknowledged_date','&gt;=',context_today())]"/>
 
