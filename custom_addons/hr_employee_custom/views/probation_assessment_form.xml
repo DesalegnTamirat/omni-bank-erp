@@ -40,9 +40,9 @@
 					 <button name="inform_in_charge" invisible="state in ('draft', 'notify', 'inform_in_charge')" string="Inform TDD" type="object" class="oe_highlight"/>
                      <!-- <button name="inform_manager" string="Notify Manager" type="object" class="oe_highlight"/> -->
 
-<!-- <button name="inform_in_charge"  invisible="state in &apos;inform_in_charge&apos;" string="Inform TDD" type="object" class="oe_highlight"/> -->
-<!-- <button name="inform_manager"  invisible="state in (&apos;reject&apos;, &apos;approve&apos;, &apos;inform_manager&apos;, &apos;inform_in_charge&apos;)" string="Notify" type="object" class="oe_highlight"/> -->
-<!-- <button name="approve"  invisible="state in (&apos;draft&apos;, &apos;reject&apos;, &apos;approve&apos;, &apos;inform_in_charge&apos;)" string="Approve" type="object" class="oe_highlight"/> -->
+<!--                     <button name="inform_in_charge"  invisible="state in &apos;inform_in_charge&apos;" string="Inform TDD" type="object" class="oe_highlight"/>-->
+<!--                     <button name="inform_manager"  invisible="state in (&apos;reject&apos;, &apos;approve&apos;, &apos;inform_manager&apos;, &apos;inform_in_charge&apos;)" string="Notify" type="object" class="oe_highlight"/>-->
+<!--                     <button name="approve"  invisible="state in (&apos;draft&apos;, &apos;reject&apos;, &apos;approve&apos;, &apos;inform_in_charge&apos;)" string="Approve" type="object" class="oe_highlight"/>-->
 <!--  invisible="status in (&apos;notify_deligation&apos;, &apos;assess_evaluate&apos;)"                    
 <button name="reject"  invisible="state in (&apos;draft&apos;, &apos;reject&apos;, &apos;approve&apos;, &apos;inform_in_charge&apos;)" string="Reject" type="object" class="oe_highlight"/>-->
                 </header>

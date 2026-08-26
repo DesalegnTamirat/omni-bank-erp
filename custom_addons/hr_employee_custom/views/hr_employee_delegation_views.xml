@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- FORM VIEW -->
+        <record id="view_hr_employee_delegation_form" model="ir.ui.view">
+            <field name="name">hr.employee.delegation.form</field>
+            <field name="model">hr.employee.delegation</field>
+            <field name="arch" type="xml">
+                <form string="Employee Delegation" duplicate="0" delete="0" archive="0">
+                    <header>
+                        <button name="action_submit"
+                                string="Submit Delegation"
+                                type="object"
+                                class="btn-primary"
+                                invisible="not is_requestor or state != 'draft' or not active"/>
+                        <button name="action_cancel_delegation"
+                                string="Cancel Delegation"
+                                type="object"
+                                class="btn-danger"
+                                invisible="not is_requestor or state != 'submitted' or not active"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,cancelled"/>
+                    </header>
+
+                    <sheet>
+                        <field name="active" invisible="1"/>
+                        <field name="is_manager_coach" invisible="1"/>
+                        <field name="is_requestor" invisible="1"/>
+
+                        <div class="alert alert-warning" role="alert" invisible="is_manager_coach or not is_requestor">
+                            <strong>Non-Managerial Employee Notice:</strong> The selected employee is not currently listed as a direct coach or manager of any staff members. Only managerial employees with direct staff under them can assign delegates.
+                        </div>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+
+                        <group>
+                            <group string="Manager Information">
+                                <!-- Editable Many2one: shown only to requestor in draft state -->
+                                <field name="employee_id"
+                                       options="{'no_create': True}"
+                                       invisible="not is_requestor or state != 'draft'"/>
+                                <field name="manager_department_id"
+                                       readonly="1"
+                                       invisible="not is_requestor or state != 'draft'"/>
+                                <field name="manager_job_id"
+                                       readonly="1"
+                                       invisible="not is_requestor or state != 'draft'"/>
+
+                                <!-- Read-only safe display fields: shown to everyone else to avoid any hr.employee access checks -->
+                                <field name="employee_display_name"
+                                       string="Manager / Delegator"
+                                       readonly="1"
+                                       invisible="is_requestor and state == 'draft'"/>
+                                <field name="manager_department_name"
+                                       string="Department"
+                                       readonly="1"
+                                       invisible="is_requestor and state == 'draft'"/>
+                                <field name="manager_job_name"
+                                       string="Job Position"
+                                       readonly="1"
+                                       invisible="is_requestor and state == 'draft'"/>
+                            </group>
+                            <group string="Delegation Period &amp; Details">
+                                <field name="start_date" readonly="state != 'draft' or not is_requestor"/>
+                                <field name="end_date" readonly="state != 'draft' or not is_requestor"/>
+                                <field name="absence_reason" placeholder="e.g. Official Mission, Training, Leave" readonly="state != 'draft' or not is_requestor"/>
+                                <field name="is_active_delegation" widget="boolean_toggle" readonly="1"/>
+                                <field name="leave_request_id" invisible="not leave_request_id" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <group string="Delegate Selection">
+                            <group>
+                                <field name="include_sub_level_staff" widget="boolean_toggle" invisible="not is_requestor or state != 'draft'"/>
+                                <field name="allowed_delegate_ids" invisible="1"/>
+                                <!-- Editable Many2one: shown only to requestor in draft state -->
+                                <field name="delegate_id"
+                                       options="{'no_create': True}"
+                                       invisible="not is_requestor or state != 'draft'"/>
+                                <field name="delegate_job_id"
+                                       readonly="1"
+                                       invisible="not is_requestor or state != 'draft'"/>
+
+                                <!-- Read-only safe display fields: shown to everyone else -->
+                                <field name="delegate_display_name"
+                                       string="Delegated Staff / Delegate"
+                                       readonly="1"
+                                       invisible="is_requestor and state == 'draft'"/>
+                                <field name="delegate_job_name"
+                                       string="Delegate Job Position"
+                                       readonly="1"
+                                       invisible="is_requestor and state == 'draft'"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Notification Recipients">
+                                <p class="text-muted" invisible="state != 'draft'">
+                                    The following staff members and leadership officers will be automatically notified upon submission:
+                                </p>
+                                <field name="notification_recipients_display" readonly="1" nolabel="1"/>
+                            </page>
+                        </notebook>
+
+                    </sheet>
+
+
+                    <!-- <chatter/> -->
+                </form>
+            </field>
+        </record>
+
+
+        <!-- TREE VIEW -->
+        <record id="view_hr_employee_delegation_tree" model="ir.ui.view">
+            <field name="name">hr.employee.delegation.list</field>
+            <field name="model">hr.employee.delegation</field>
+            <field name="arch" type="xml">
+                <list string="Employee Delegations" multi_edit="0" duplicate="0" delete="0">
+                    <field name="name"/>
+                    <field name="employee_display_name" string="Manager / Delegator"/>
+                    <field name="delegate_display_name" string="Delegated Staff / Delegate"/>
+                    <field name="start_date"/>
+                    <field name="end_date"/>
+                    <field name="absence_reason"/>
+                    <field name="is_active_delegation" widget="boolean_toggle"/>
+                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'submitted'"/>
+                </list>
+
+
+
+            </field>
+        </record>
+
+        <!-- SEARCH VIEW -->
+        <record id="view_hr_employee_delegation_search" model="ir.ui.view">
+            <field name="name">hr.employee.delegation.search</field>
+            <field name="model">hr.employee.delegation</field>
+            <field name="arch" type="xml">
+                <search string="Search Delegations">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="delegate_id"/>
+                    <field name="absence_reason"/>
+                    <separator/>
+                    <filter string="Active Today" name="active_today" domain="[('start_date', '&lt;=', context_today()), ('end_date', '&gt;=', context_today())]"/>
+                    <filter string="My Related Delegations" name="all_my_related" domain="['|', '|', ('employee_id.user_id', '=', uid), ('delegate_id.user_id', '=', uid), ('notification_recipient_ids.user_id', '=', uid)]"/>
+                    <filter string="My Requests (Manager)" name="my_requests" domain="[('employee_id.user_id', '=', uid)]"/>
+                    <filter string="Delegated to Me" name="delegated_to_me" domain="[('delegate_id.user_id', '=', uid)]"/>
+                    <filter string="Notified to Me" name="notified_to_me" domain="[('notification_recipient_ids.user_id', '=', uid)]"/>
+                    <separator/>
+                    <filter string="Archived" name="archived" domain="[('active', '=', False)]"/>
+                    <separator/>
+                    <filter string="Manager / Delegator" name="group_employee" context="{'group_by': 'employee_id'}"/>
+                    <filter string="Delegate" name="group_delegate" context="{'group_by': 'delegate_id'}"/>
+                    <filter string="Start Date" name="group_start_date" context="{'group_by': 'start_date'}"/>
+
+                </search>
+            </field>
+        </record>
+
+
+
+        <!-- USER ACTION: Delegation Request -->
+        <record id="action_hr_employee_delegation" model="ir.actions.act_window">
+            <field name="name">Delegation Request</field>
+            <field name="res_model">hr.employee.delegation</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_hr_employee_delegation_search"/>
+            <field name="context">{'search_default_all_my_related': 1}</field>
+
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Create a new Manager Delegation Request!
+                </p>
+                <p>
+                    Assign a delegate from your staff when absent from the office.
+                </p>
+            </field>
+        </record>
+
+        <!-- HR BANK-WIDE ACTION: Overall Delegations -->
+        <record id="action_hr_employee_delegation_all" model="ir.actions.act_window">
+            <field name="name">Overall Delegations</field>
+            <field name="res_model">hr.employee.delegation</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_hr_employee_delegation_search"/>
+            <field name="context">{'search_default_active_today': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No managerial delegations recorded yet.
+                </p>
+                <p>
+                    View and audit all employee delegations across the bank.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

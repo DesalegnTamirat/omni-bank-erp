@@ -56,7 +56,7 @@
                                 </t>
                                   <br/>
 
-<!-- <span t-field="o.resignation_type" /> -->
+<!--                                <span t-field="o.resignation_type" />-->
                                   <br/>
                              </div>
 

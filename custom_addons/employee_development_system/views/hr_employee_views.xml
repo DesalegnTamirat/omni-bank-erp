@@ -13,6 +13,8 @@
                         <field name="eds_tna_entry_count" widget="statinfo"
                                string="Training Needs (TNA)"/>
                     </button>
+                    <!-- COMMENTED OUT PER USER JOURNEY: IDP and Self-Development omitted from 14 Use Cases -->
+                    <!--
                     <button name="action_view_eds_idps" type="object"
                             class="oe_stat_button" icon="fa-line-chart">
                         <field name="eds_idp_count" widget="statinfo"
@@ -23,6 +25,7 @@
                         <field name="eds_self_dev_count" widget="statinfo"
                                string="Self Development"/>
                     </button>
+                    -->
                 </xpath>
             </field>
         </record>

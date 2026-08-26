@@ -88,7 +88,7 @@ class AttendanceDashboardController(http.Controller):
         def query_period_stats(dt_s, dt_e):
             sql = """
                 SELECT 
-                    COUNT(CASE WHEN check_in_status = 'Normal' THEN 1 END) AS present_cnt,
+                    COUNT(CASE WHEN check_in_status IN ('Normal', 'On-Time', 'On Time') OR check_in_status IS NULL THEN 1 END) AS present_cnt,
                     COUNT(CASE WHEN check_in_status = 'Late' THEN 1 END) AS late_cnt,
                     COUNT(CASE WHEN check_in_status LIKE '%%Rest%%' THEN 1 END) AS leave_cnt,
                     COALESCE(SUM(CASE WHEN check_in_status = 'Late' THEN late_time_hour ELSE 0 END), 0.0) AS late_hours
@@ -101,7 +101,10 @@ class AttendanceDashboardController(http.Controller):
             l = r.get('late_cnt', 0)
             lv = r.get('leave_cnt', 0)
             lh = r.get('late_hours', 0.0)
-            a = max(0, total_employees - (p + l + lv))
+            eval_e = min(end_d, today)
+            elapsed_days = max(1, (eval_e - start_d).days + 1)
+            expected_total = total_employees * elapsed_days
+            a = max(0, expected_total - (p + l + lv))
             return p, l, lv, a, lh
 
         range_p, range_l, range_lv, range_a, range_lh = query_period_stats(range_start, range_end)
@@ -349,18 +352,30 @@ class AttendanceDashboardController(http.Controller):
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
         period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
         period_leave_count = sum(1 for att in range_atts if 'Rest' in (att.check_in_status or ''))
-        period_normal_count = sum(1 for att in range_atts if att.check_in_status == 'Normal')
+        period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
 
         total_sessions = len(range_atts)
         punctuality_score = round(((total_sessions - period_late_count) / max(1, total_sessions)) * 100, 1) if total_sessions > 0 else 100.0
 
         # Card 3 Offenses for selected period
-        force_checkout_count = sum(1 for att in range_atts if (att.check_out_status == 'Forced Check-Out' or getattr(att, 'is_forced_checkout', False)))
-        recorded_days = len(set(pytz.utc.localize(att.check_in).astimezone(local_tz).date() for att in range_atts))
-        absent_count = max(0, period_days - recorded_days)
+        force_checkout_count = sum(1 for att in range_atts if (att.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(att, 'is_force_checkout', False) or getattr(att, 'is_forced_checkout', False)))
+        
+        today = fields.Date.context_today(request.env.user)
+        eval_end_d = min(end_d, today)
+        elapsed_days = max(0, (eval_end_d - start_d).days + 1)
+        def _get_att_work_date(a):
+            if getattr(a, 'work_date', False):
+                return a.work_date
+            if not a.check_in:
+                return None
+            dt_loc = pytz.utc.localize(a.check_in).astimezone(local_tz) if not a.check_in.tzinfo else a.check_in.astimezone(local_tz)
+            return (dt_loc - datetime.timedelta(days=1)).date() if dt_loc.hour < 4 else dt_loc.date()
 
-        # Card 4 Approvals for selected period
-        acknowledged_count = sum(1 for att in range_atts if getattr(att, 'is_acknowledged', False))
+        recorded_days = len(set(_get_att_work_date(att) for att in range_atts if _get_att_work_date(att)))
+        absent_count = max(0, elapsed_days - recorded_days)
+
+        # Card 4 Approvals & Discipline Cases for selected period
+        acknowledged_count = sum(1 for att in range_atts if (getattr(att, 'is_acknowledged', False) or (getattr(att, 'acknowledged_late', 0.0) or 0.0) > 0 or (getattr(att, 'acknowledged_exit', 0.0) or 0.0) > 0))
         predefined_count = 0
         if 'attendance.preapproval' in request.env:
             predefined_count = request.env['attendance.preapproval'].sudo().search_count([
@@ -368,6 +383,13 @@ class AttendanceDashboardController(http.Controller):
                 ('date', '>=', start_d),
                 ('date', '<=', end_d),
                 ('state', '=', 'approved')
+            ])
+        discipline_cases_count = 0
+        if 'discipline.case' in request.env:
+            discipline_cases_count = request.env['discipline.case'].sudo().search_count([
+                ('employee_id', '=', employee.id),
+                ('incident_date', '>=', start_d),
+                ('incident_date', '<=', end_d)
             ])
 
         # Personal Status Donut for selected period
@@ -494,6 +516,9 @@ class AttendanceDashboardController(http.Controller):
             expected_hours = working_days * 8.0
             a_h = max(0.0, round(expected_hours - w_h, 2))
 
+            a_days = round(a_h / 8.0, 1)
+            a_days_formatted = int(a_days) if (a_days % 1 == 0) else a_days
+
             max_bar_h = max(max_bar_h, w_h, l_h, a_h)
 
             progression_points.append({
@@ -501,6 +526,7 @@ class AttendanceDashboardController(http.Controller):
                 'worked_hours': w_h,
                 'late_hours': l_h,
                 'absent_hours': a_h,
+                'absent_days': a_days_formatted,
             })
 
         num_blocks = max(1, len(progression_points))
@@ -523,6 +549,7 @@ class AttendanceDashboardController(http.Controller):
                 'worked_hours': pt['worked_hours'],
                 'late_hours': pt['late_hours'],
                 'absent_hours': pt['absent_hours'],
+                'absent_days': pt['absent_days'],
                 'w_pct': w_pct,
                 'l_pct': l_pct,
                 'a_pct': a_pct,
@@ -562,6 +589,7 @@ class AttendanceDashboardController(http.Controller):
             'approvals': {
                 'acknowledged': acknowledged_count,
                 'predefined': predefined_count,
+                'discipline_cases': discipline_cases_count,
             },
             'personal_donut_svg': {
                 'circumference': c,

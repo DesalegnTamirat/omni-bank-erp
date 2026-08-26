@@ -7,7 +7,7 @@ class CompetencyCoverageReport(models.Model):
     _name = 'competency.coverage.report'
     _description = 'Competency Mapping Coverage Report'
     _auto = False
-    _order = 'job_name'
+    _order = 'job_id'
 
     job_id = fields.Many2one('hr.job', string='Job Position', readonly=True)
     job_name = fields.Char(string='Job Position Name', readonly=True)
@@ -27,7 +27,7 @@ class CompetencyCoverageReport(models.Model):
                 SELECT
                     j.id AS id,
                     j.id AS job_id,
-                    j.name AS job_name,
+                    COALESCE(j.name->>'en_US', j.name::text) AS job_name,
                     j.department_id AS department_id,
                     CASE
                         WHEN (SELECT m.state FROM competency_role_mapping m WHERE m.job_position_id = j.id AND m.state = 'approved' ORDER BY m.id DESC LIMIT 1) = 'approved' THEN 'mapped'

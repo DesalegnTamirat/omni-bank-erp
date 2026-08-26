@@ -191,7 +191,19 @@ class Competency(models.Model):
     rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model')
     proficiency_level_ids = fields.One2many(
         'competency.proficiency.level', 'competency_id', string='Proficiency Levels')
-    applicable_job_ids = fields.Many2many('hr.job', string='Applicable Job Positions')
+    applicable_job_ids = fields.Many2many(
+        'hr.job', string='Applicable Job Positions',
+        compute='_compute_applicable_job_ids', store=True)
+
+    @api.depends('status')
+    def _compute_applicable_job_ids(self):
+        RoleMappingLine = self.env['competency.role.mapping.line']
+        for rec in self:
+            lines = RoleMappingLine.search([
+                ('competency_id', '=', rec.id),
+                ('mapping_id.state', '=', 'approved')
+            ])
+            rec.applicable_job_ids = lines.mapped('mapping_id.job_position_id')
     change_log_ids = fields.One2many(
         'competency.level.change.log', 'competency_id', string='Definition Change Logs', readonly=True)
     status = fields.Selection([
@@ -199,7 +211,6 @@ class Competency(models.Model):
         ('retired', 'Retired'),
     ], string='Status', default='active', tracking=True)
     active = fields.Boolean(default=True, tracking=True)
-    is_seed = fields.Boolean(string='Seeded Record')
     framework_line_ids = fields.One2many(
         'competency.framework.line', 'competency_id', string='Framework Lines')
     approved_framework_ids = fields.Many2many(
@@ -321,8 +332,6 @@ class Competency(models.Model):
         return super().write(vals)
 
     def unlink(self):
-        if any(rec.is_seed for rec in self):
-            raise ValidationError(_('Seeded competencies cannot be deleted. Archive them instead.'))
         for rec in self:
             if rec.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
                 raise ValidationError(_('Retired competencies cannot be deleted.'))

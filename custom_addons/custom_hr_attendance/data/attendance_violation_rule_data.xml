@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Default Configurable Lateness Regulation Rules (Matching Employee Regulation Matrix) -->
+        <record id="lateness_rule_oral_warning" model="attendance.lateness.rule">
+            <field name="sequence">10</field>
+            <field name="name">Any Lateness (Oral Warning)</field>
+            <field name="threshold_hours">0.01</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_lateness"/>
+            <field name="deduction_days">0.0</field>
+            <field name="reset_window_months">1</field>
+        </record>
+
+        <record id="lateness_rule_4h_first_written" model="attendance.lateness.rule">
+            <field name="sequence">20</field>
+            <field name="name">4 Hours Cumulative Lateness (1st Written Warning)</field>
+            <field name="threshold_hours">4.0</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_lateness"/>
+            <field name="deduction_days">0.5</field>
+            <field name="reset_window_months">3</field>
+        </record>
+
+        <record id="lateness_rule_8h_second_written" model="attendance.lateness.rule">
+            <field name="sequence">30</field>
+            <field name="name">8 Hours Cumulative Lateness (2nd Written Warning)</field>
+            <field name="threshold_hours">8.0</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_lateness"/>
+            <field name="deduction_days">1.0</field>
+            <field name="reset_window_months">6</field>
+        </record>
+
+        <record id="lateness_rule_16h_third_written" model="attendance.lateness.rule">
+            <field name="sequence">40</field>
+            <field name="name">16 Hours Cumulative Lateness (3rd Written Warning)</field>
+            <field name="threshold_hours">16.0</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_lateness"/>
+            <field name="deduction_days">2.0</field>
+            <field name="reset_window_months">12</field>
+        </record>
+
+        <!-- Default Configurable Absence Regulation Rules -->
+        <record id="absence_rule_1d_first_written" model="attendance.absence.rule">
+            <field name="sequence">10</field>
+            <field name="name">1 Day Unexcused Absence (1st Written Warning)</field>
+            <field name="threshold_days">1.0</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_absence"/>
+            <field name="deduction_days">1.0</field>
+            <field name="reset_window_months">3</field>
+        </record>
+
+        <record id="absence_rule_3d_final_written" model="attendance.absence.rule">
+            <field name="sequence">20</field>
+            <field name="name">3 Days Unexcused Absence (Final Written Warning)</field>
+            <field name="threshold_days">3.0</field>
+            <field name="offense_id" ref="custom_hr_attendance.offense_repeated_absence"/>
+            <field name="deduction_days">3.0</field>
+            <field name="reset_window_months">6</field>
+        </record>
+
+    </data>
+</odoo>

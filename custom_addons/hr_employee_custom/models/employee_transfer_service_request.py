@@ -88,7 +88,7 @@ class EmployeeTransferServiceRequest(models.Model):
         p_id = self.id
         # self.env.cr.execute('SELECT notify_external_applicant(%s)', (p_id,))
         self.env.cr.execute('SELECT populate_transfer_request(%s)', (p_id,))
-        # self.status = 'notify'
+        #self.status = 'notify'
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])

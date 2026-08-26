@@ -8,7 +8,7 @@
         <field name="arch" type="xml">
             <search string="Search information">
                 <field name="employee_name"/>
-<!-- <field name="contract_name"/> -->
+<!--                <field name="contract_name"/>-->
                 <field name="department_name"/>
                 <field name="joined_date"/>
                 <field name="discipline_reason"/>
@@ -47,22 +47,22 @@
         <field name="arch" type="xml">
             <form string="Disciplinary Action">
                 <header>
-<!-- <button name="assign_function" type="object" string="Proceed" -->
-<!-- class="btn-primary" -->
-<!-- invisible="state != 'draft'"/> -->
-<!-- <button name="explanation_function" type="object" string="Submit" -->
-<!-- class="btn-primary" -->
-<!-- invisible="state != 'explain'"/> -->
-<!-- <button name="action_function" type="object" string="Validate Action" -->
-<!-- class="btn-primary" -->
-<!-- invisible="state != 'submitted'" -->
-<!-- groups="hr.group_hr_manager"/> -->
-<!-- <button name="cancel_function" type="object" string="Cancel" -->
-<!-- invisible="state not in ('draft', 'submitted')" -->
-<!-- groups="hr.group_hr_manager"/> -->
-<!-- <button name="set_to_function" type="object" string="Set to Draft" -->
-<!-- invisible="state != 'cancel'" -->
-<!-- groups="hr.group_hr_manager"/> -->
+<!--                    <button name="assign_function" type="object" string="Proceed"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'draft'"/>-->
+<!--                    <button name="explanation_function" type="object" string="Submit"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'explain'"/>-->
+<!--                    <button name="action_function" type="object" string="Validate Action"-->
+<!--                            class="btn-primary"-->
+<!--                            invisible="state != 'submitted'"-->
+<!--                            groups="hr.group_hr_manager"/>-->
+<!--                    <button name="cancel_function" type="object" string="Cancel"-->
+<!--                            invisible="state not in ('draft', 'submitted')"-->
+<!--                            groups="hr.group_hr_manager"/>-->
+<!--                    <button name="set_to_function" type="object" string="Set to Draft"-->
+<!--                            invisible="state != 'cancel'"-->
+<!--                            groups="hr.group_hr_manager"/>-->
                     <field name="state" widget="statusbar" statusbar_visible="draft,explain,action"/>
                 </header>
                 <sheet>

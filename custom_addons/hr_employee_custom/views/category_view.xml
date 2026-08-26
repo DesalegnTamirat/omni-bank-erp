@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <data>
-             <!-- Discipline Category Creation -->
+             <!--Discipline Category Creation-->
 
         <record id="discipline_category_care" model="discipline.category">
             <field name="code">RULES</field>
@@ -24,7 +24,7 @@
             <field name="name">Work Performance Issues</field>
         </record>
 
-                <!-- Action Category Creation -->
+                <!--Action Category Creation-->
 
         <record id="action_category_noact" model="discipline.category">
             <field name="code">NOACTION</field>
@@ -73,7 +73,7 @@
                 </search>
             </field>
         </record>
-		    <!-- Discipline Category View -->
+		    <!--Discipline Category View-->
 
 	<record id="disciplinary_category_view_tree" model="ir.ui.view">
             <field name="name">discipline.category.tree</field>

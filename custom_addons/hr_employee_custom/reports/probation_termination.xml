@@ -19,7 +19,7 @@
                         <div class="row mt32">
                               <div class="col-12">
                                   <strong>Ref. No:</strong>
-<!-- <span t-field="o.reference"/> -->
+<!--                                <span t-field="o.reference"/>-->
                                 <br/>
                                   <br/>
                                   <strong>Dear <span t-field="o.employee_id"/>,</strong>
@@ -28,7 +28,7 @@
 
                         <br/>
                         <p> It is to be recalled that, the Bank has employed you on <strong><span t-field="o.date_start"/></strong> as <strong><span t-field="o.job_id"/></strong>for a probation period of <strong><span t-field="o.probation_period"/></strong> working days. </p>
-<!-- <t t-if="o.depreciation_line_ids"> -->
+<!--                        <t t-if="o.depreciation_line_ids">-->
 
 
                         <br/>

@@ -49,6 +49,12 @@ class LocationBasedException(models.Model):
             if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
                 raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
+    @api.constrains('operating_unit_ids', 'operating_unit', 'active')
+    def _check_operating_unit_required(self):
+        for rec in self:
+            if rec.active and not rec.operating_unit_ids and not rec.operating_unit:
+                raise ValidationError(_("A Location-Based Exception must specify at least one Location / Operating Unit."))
+
     schedule_name = fields.Char(
         string="Schedule Name",
         compute="_compute_schedule_name",
@@ -56,7 +62,35 @@ class LocationBasedException(models.Model):
         readonly=True
     )
 
-    operating_unit = fields.Many2one('operating.unit', string="Location", index=True)
+    district_id = fields.Many2one(
+        'operating.unit',
+        string="Filter by District",
+        domain="[('work_unit_type', 'in', ['district_office', 'regional_office'])]",
+        help="Optional administrative filter to narrow down branch selection by District Office."
+    )
+
+    operating_unit_ids = fields.Many2many(
+        'operating.unit',
+        'rel_location_exception_operating_unit',
+        'location_exception_id',
+        'operating_unit_id',
+        string="Locations / Operating Units",
+        index=True,
+        help="Select one or multiple operating units / branch locations for this shift exception."
+    )
+
+    operating_unit = fields.Many2one(
+        'operating.unit',
+        string="Primary Location",
+        compute="_compute_operating_unit",
+        store=True,
+        index=True
+    )
+
+    @api.depends('operating_unit_ids')
+    def _compute_operating_unit(self):
+        for rec in self:
+            rec.operating_unit = rec.operating_unit_ids[0] if rec.operating_unit_ids else False
 
     allowed_shift_ids = fields.Many2many(
         'job.shift',
@@ -141,18 +175,26 @@ class LocationBasedException(models.Model):
             rec.write({'active': False})
         return True
 
-    @api.depends('operating_unit')
+    @api.depends('operating_unit', 'operating_unit_ids')
     def _compute_schedule_name(self):
         for rec in self:
-            rec.schedule_name = f"{rec.operating_unit.name} / Location Based" \
-                if rec.operating_unit  else ""
+            if rec.operating_unit_ids:
+                names = ", ".join(rec.operating_unit_ids.mapped('name'))
+                rec.schedule_name = f"{names} / Location Based"
+            elif rec.operating_unit:
+                rec.schedule_name = f"{rec.operating_unit.name} / Location Based"
+            else:
+                rec.schedule_name = "Location Based Exception"
 
 
 
 
-    @api.constrains('start_time', 'end_time')
+    @api.constrains('start_time', 'end_time', 'shift_id')
     def _check_time_validity(self):
         for rec in self:
+            # Skip if no shift template is assigned or if start/end times are uninitialized (00:00)
+            if not rec.shift_id or (rec.start_time == 0.0 and rec.end_time == 0.0):
+                continue
 
             for time_field, label in [(rec.start_time, "Start"), (rec.end_time, "End")]:
                 if time_field is not None:

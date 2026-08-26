@@ -18,9 +18,12 @@
                 </header>
             </xpath>
 
-            <!-- 2. Ribbon for Archived status -->
-            <xpath expr="//sheet" position="inside">
-                <widget name="web_ribbon" title="Archived" bg_color="bg-danger" invisible="active"/>
+            <!-- 2. BADGE after h1 -->
+            <xpath expr="//div[hasclass('oe_title')]/h1" position="after">
+                <div class="mt-1 mb-2">
+                    <span class="badge text-bg-success" invisible="not active">● Active</span>
+                    <span class="badge text-bg-danger" invisible="active">● Archived</span>
+                </div>
             </xpath>
 
             <!-- 3. REPLACE the broken col=12 group entirely with a clean layout -->

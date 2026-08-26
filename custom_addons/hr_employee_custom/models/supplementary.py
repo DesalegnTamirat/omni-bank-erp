@@ -10,7 +10,7 @@ class Supplementary_details(models.Model):
     requesting_operating_unit = fields.Many2one("operating.unit", string="Requesting operating Unit" , readonly=True)
     acting_employee = fields.Many2one("hr.employee","Acting Employee" , readonly=True )
     employee_name = fields.Many2one("hr.employee","Employee Name" )
-    # employee_id = fields.Char(string="Employee Id")#="_compute_employee_id" )
+    #employee_id = fields.Char(string="Employee Id")#="_compute_employee_id" )
     employee_id = fields.Char(string="Employee Id")
     acting_basic_per_month = fields.Float("Acting Basic per Month" )
     acting_basic=fields.Float("New Basic Salary" )
@@ -36,7 +36,7 @@ class Supplementary_details(models.Model):
     more_than_four = fields.Float('More Than Four',default=0.50 )
     job_grade = fields.Many2one('employee.grade', string='Job Grade', help="Job Grade" , readonly=True)
     job_category = fields.Many2one('employee.job', string='Job Category', readonly=True)
-    # job_category = fields.Many2one(string='Job Category', readonly=1)
+    #job_category = fields.Many2one(string='Job Category', readonly=1)
     job_grade1 = fields.Many2one('employee.grade', string='Job Grade', help="Job Grade" , readonly=True)
     job_category1 = fields.Many2one('employee.job', string='Job Category', help="Job Category" , readonly=True) 
     cc_workunits = fields.Many2many("operating.unit", string="CC To:", help="Enter the Workunits to be copied")
@@ -84,7 +84,7 @@ class Supplementary_details(models.Model):
 
     def evaluate(self):
         n=0
-        usr = self.env.user.name # name of login user details
+        usr = self.env.user.name #  name of login user details
         for val in self.sup_delg_team:
             if val.status=="unavailable":
                 if usr==val.employee_name:
@@ -109,24 +109,24 @@ class Supplementary_details(models.Model):
         if cnt==mem_cnt:
             self.status="evaluate"
 			
-    # def _compute_employee_id(self)
-      # for vals in self
-        # if  vals.employee_name
+    # def _compute_employee_id(self):
+      # for vals in self:
+        # if  vals.employee_name:
             # val = self.env["hr.employee"].search([("name", "=", vals.employee_name.name)])
             # vals.employee_id=val.employee_identification
             # return vals.employee_id
-        # else
+        # else:
            # return 0
     
     @api.onchange('employee_name')
     def _onchange_employee_name_info(self):
         # print("employee_name=====================", self.employee_name)
         # print("employee_name=====================", self.employee_name)
-        # self.current_job_position = self.employee_name.job_position.name
+        #self.current_job_position = self.employee_name.job_position.name
         self.current_job_position = self.employee_name.job_position
        # self.current_work_unit = self.employee_name.default_operating_unit_id.name
         self.current_work_unit = self.employee_name.default_operating_unit_id
-
+    #
     @api.onchange('acting_employee')
     def _onchange_acting_employee_info(self):
         self.acting_job_position = self.acting_employee.job_position.name
@@ -152,33 +152,33 @@ class Supplementary_details(models.Model):
     def populate_benefits(self):
         p_id = self.id
         self.env.cr.execute('SELECT populate_supplementary_role(%s)', (p_id,))
-        # if self.acting_position
-        # acting_position_info = self.env["acting.position.rule"].search([('position_id', '=',self.acting_position.id)])
-        # print("acting_position_info=======================", acting_position_info)
-        # for val in acting_position_info
-        # supplementary_details = self.env['hr.supplementary.salary'].search([])
-        # for val3 in supplementary_details
-        # val3.unlink
+        # if self.acting_position:
+        #     acting_position_info = self.env["acting.position.rule"].search([('position_id', '=',self.acting_position.id)])
+        #     print("acting_position_info=======================", acting_position_info)
+        #     for val in acting_position_info:
+        #         supplementary_details = self.env['hr.supplementary.salary'].search([])
+        #         for val3 in supplementary_details:
+        #             val3.unlink()
 
-        # for val in acting_position_info
-        # self.supplementary_details=[(0,0,{"salary_rule":val.salary_rule_id.id
-        # "internal_name": val.internal_name,"value":val.contract_rule_value})]
+        #     for val in acting_position_info:
+        #         self.supplementary_details=[(0,0,{"salary_rule":val.salary_rule_id.id,
+        #             "internal_name": val.internal_name,"value":val.contract_rule_value})]
 
-        # if self.acting_employee
-        # contract_salary = self.env['hr.contract'].search([('employee_id', '=', self.acting_employee.id)])
-        # print("contract_salary================================", contract_salary)
+        # if self.acting_employee:
+        #     contract_salary = self.env['hr.contract'].search([('employee_id', '=', self.acting_employee.id)])
+        #     print("contract_salary================================", contract_salary)
 
-        # salary_rule = self.env['hr.salary.rule'].search([("internal_name","=","wage")])
-        # print("salary_rule================================", contract_salary.wage)
-        # # print("internal_name================================", salary_rule.internal_name)
-        # # print("value================================", salary_rule.value)
-        # for val in contract_salary.contract_multi_id
-        # supplementary_details = self.env['hr.supplementary.salary'].search([])
-        # for val3 in supplementary_details
-        # val3.unlink
-        # self.supplementary_details = [(0, 0,{"salary_rule": salary_rule.id, "internal_name": salary_rule.internal_name,"value":contract_salary.wage})]
-        # for val in contract_salary.contract_multi_id
-        # self.supplementary_details = [(0, 0, {"salary_rule": val.contract_salary_rule.id,"internal_name": val.contract_internal_name,"value":val.contract_value})]
+        #     salary_rule = self.env['hr.salary.rule'].search([("internal_name","=","wage")])
+        #     print("salary_rule================================", contract_salary.wage)
+        #     # print("internal_name================================", salary_rule.internal_name)
+        #     # print("value================================", salary_rule.value)
+        #     for val in contract_salary.contract_multi_id:
+        #         supplementary_details = self.env['hr.supplementary.salary'].search([])
+        #         for val3 in supplementary_details:
+        #             val3.unlink()
+        #     self.supplementary_details = [(0, 0,{"salary_rule": salary_rule.id, "internal_name": salary_rule.internal_name,"value":contract_salary.wage})]
+        #     for val in contract_salary.contract_multi_id:
+        #         self.supplementary_details = [(0, 0, {"salary_rule": val.contract_salary_rule.id,"internal_name": val.contract_internal_name,"value":val.contract_value})]
         self.state = "populate_benefits"
 		
     def populate_acting_Allowance(self):
@@ -188,22 +188,22 @@ class Supplementary_details(models.Model):
         # self.step_increment_value = 0
         # self.existing_allowance_total = 0
         # self.allowance_difference=0.0
-        # for val in self.supplementary_details
-        # self.acting_allowance_total += val.value
+        # for val in self.supplementary_details:
+        #     self.acting_allowance_total += val.value
         # print("total_value=========================", self.acting_allowance_total)
         # employee_salary = self.env['hr.contract'].search([('employee_id', '=', self.employee_name.id)])
-        # for val in employee_salary.contract_multi_id
-        # print(val.contract_value)
-        # self.existing_allowance_total+=val.contract_value
-        # # self.existing_allowance_total+=employee_salary.wage
+        # for val in employee_salary.contract_multi_id:
+        #     print(val.contract_value)
+        #     self.existing_allowance_total+=val.contract_value
+        #     # self.existing_allowance_total+=employee_salary.wage
         # self.existing_allowance_total += employee_salary.wage
         # self.step_increment_value=employee_salary.wage*employee_salary.factor
         # print("existing_allowance_total++++++++++++++++++++++++++", self.existing_allowance_total)
         # self.allowance_difference=self.acting_allowance_total - self.existing_allowance_total
-        # if self.allowance_difference>self.step_increment_value
-        # self.acting_allowance_per_month=self.allowance_difference
-        # else
-        # self.acting_allowance_per_month =self.step_increment_value
+        # if self.allowance_difference>self.step_increment_value:
+        #     self.acting_allowance_per_month=self.allowance_difference
+        # else:
+        #     self.acting_allowance_per_month =self.step_increment_value
         # print("acting_allowance_per_month==========================================================",self.allowance_difference)
         self.state="populate_acting_Allowance"
 

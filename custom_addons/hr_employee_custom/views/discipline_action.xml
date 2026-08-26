@@ -45,17 +45,17 @@
         <field name="arch" type="xml">
             <list string="Disciplinary Actions">
                 <field name="employee_name" width="20%"/>
-<!-- <field name="operating_unit"/> -->
-<!-- <field name="position"/> -->
+<!--                <field name="operating_unit"/>-->
+<!--                <field name="position"/>-->
                 <field name="breach" width="20%"/>
-<!-- <field name="breach_reference"/> -->
-<!-- <field name="description"/> -->
+<!--                <field name="breach_reference"/>-->
+<!--                <field name="description"/>-->
                 <field name="breach_date" width="20%"/>
                 <field name="breach_count" width="20%"/>
-<!-- <field name="disciplinary_measure"/> -->
-<!-- <field name="start_date"/> -->
-<!-- <field name="end_date"/> -->
-<!-- <field name="appeal_with_in"/> -->
+<!--                <field name="disciplinary_measure"/>-->
+<!--                <field name="start_date"/>-->
+<!--                <field name="end_date"/>-->
+<!--                <field name="appeal_with_in"/>-->
                 <field name="status" width="20%"/>
             </list>
         </field>

@@ -33,17 +33,15 @@
                         <!-- Part 1 & 2: Header Info -->
                         <group>
                             <group string="Case Reference">
-                                <field name="name"/>
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
+                                <field name="name" readonly="1"/>
+                                <field name="case_id" readonly="1"/>
+                                <field name="employee_id" readonly="1"/>
                             </group>
                             <group string="Investigator &amp; Dates">
-                                <field name="investigator_id"/>
+                                <field name="investigator_id" readonly="1"/>
                                 <field name="investigation_date"/>
                                 <field name="examination_date"/>
-                                <!-- Part 1 -->
-                                <field name="misconduct_type"/>
-                                <field name="misconduct_type_notes" invisible="misconduct_type != 'other'"/>
+                                <field name="offense_id" readonly="1"/>
                             </group>
                         </group>
                         <group string="Suspension Request during Investigation">

@@ -224,12 +224,23 @@ export class MyAttendance extends Component {
     async loadSettings() {
         try {
             const res = await rpc("/custom_hr_attendance/get_settings");
-            if (res) {
+            if (res && res.settings) {
                 this.state.isAdmin = res.is_admin || false;
-                Object.assign(this.state.settings, res.settings || {});
+                const s = res.settings;
+                Object.assign(this.state.settings, s);
+                this.state.settings.morning_time_str = this.floatToTimeStr(s.morning_time);
+                this.state.settings.exit_time_str = this.floatToTimeStr(s.exit_time);
+                this.state.settings.saturday_exit_time_str = this.floatToTimeStr(s.saturday_exit_time);
+                this.state.settings.lunch_out_time_str = this.floatToTimeStr(s.lunch_out_time);
+                this.state.settings.dead_time_str = this.floatToTimeStr(s.dead_time);
+                this.state.settings.checkin_buffer_str = this.floatToTimeStr(s.checkin_buffer);
+                this.state.settings.post_shift_grace_hours_str = this.floatToTimeStr(s.post_shift_grace_hours);
+                this.state.settings.lunch_duration_str = this.floatToTimeStr(s.lunch_duration);
+                this.state.settings.lunch_grace_time_str = this.floatToTimeStr(s.lunch_grace_time);
+                this.state.settings.lateness_hours_violation_threshold_str = this.floatToTimeStr(s.lateness_hours_violation_threshold);
             }
         } catch (e) {
-            // Not an admin or endpoint unavailable, silently ignore
+            // Silently ignore
         }
     }
 
@@ -241,14 +252,34 @@ export class MyAttendance extends Component {
         if (this.state.settingsSaving) return;
         this.state.settingsSaving = true;
         try {
-            await rpc("/custom_hr_attendance/save_settings", {
-                settings: this.state.settings,
+            const s = this.state.settings;
+            const payload = {
+                ...s,
+                morning_time: this.timeStrToFloat(s.morning_time_str !== undefined ? s.morning_time_str : s.morning_time),
+                exit_time: this.timeStrToFloat(s.exit_time_str !== undefined ? s.exit_time_str : s.exit_time),
+                saturday_exit_time: this.timeStrToFloat(s.saturday_exit_time_str !== undefined ? s.saturday_exit_time_str : s.saturday_exit_time),
+                lunch_out_time: this.timeStrToFloat(s.lunch_out_time_str !== undefined ? s.lunch_out_time_str : s.lunch_out_time),
+                dead_time: this.timeStrToFloat(s.dead_time_str !== undefined ? s.dead_time_str : s.dead_time),
+                checkin_buffer: this.timeStrToFloat(s.checkin_buffer_str !== undefined ? s.checkin_buffer_str : s.checkin_buffer),
+                post_shift_grace_hours: this.timeStrToFloat(s.post_shift_grace_hours_str !== undefined ? s.post_shift_grace_hours_str : s.post_shift_grace_hours),
+                lunch_duration: this.timeStrToFloat(s.lunch_duration_str !== undefined ? s.lunch_duration_str : s.lunch_duration),
+                lunch_grace_time: this.timeStrToFloat(s.lunch_grace_time_str !== undefined ? s.lunch_grace_time_str : s.lunch_grace_time),
+                lateness_hours_violation_threshold: this.timeStrToFloat(s.lateness_hours_violation_threshold_str !== undefined ? s.lateness_hours_violation_threshold_str : s.lateness_hours_violation_threshold),
+            };
+
+            const res = await rpc("/custom_hr_attendance/save_settings", {
+                settings: payload,
             });
-            this.notification.add(
-                _t("Attendance settings saved successfully."),
-                { title: _t("Settings Saved"), type: "success" }
-            );
-            this.state.showSettings = false;
+            if (res && res.status === 'success') {
+                this.notification.add(
+                    _t("Attendance settings saved successfully."),
+                    { title: _t("Settings Saved"), type: "success" }
+                );
+                Object.assign(this.state.settings, payload);
+                this.state.showSettings = false;
+            } else {
+                throw new Error(res ? res.error : "Failed to save settings");
+            }
         } catch (e) {
             this.notification.add(
                 _t("Failed to save settings. Check your permissions."),
@@ -259,35 +290,63 @@ export class MyAttendance extends Component {
         }
     }
 
+    floatToTimeStr(val) {
+        if (val === undefined || val === null || isNaN(val)) return "00:00";
+        const h = Math.floor(val);
+        const m = Math.round((val - h) * 60);
+        const hStr = String(h % 24).padStart(2, '0');
+        const mStr = String(m % 60).padStart(2, '0');
+        return `${hStr}:${mStr}`;
+    }
+
+    timeStrToFloat(timeStr) {
+        if (timeStr === undefined || timeStr === null) return 0.0;
+        const str = String(timeStr).trim();
+        if (!str) return 0.0;
+        if (str.includes(':')) {
+            const parts = str.split(':');
+            const hours = parseInt(parts[0], 10) || 0;
+            const minutes = parseInt(parts[1], 10) || 0;
+            return parseFloat((hours + minutes / 60.0).toFixed(4));
+        }
+        const val = parseFloat(str);
+        if (isNaN(val)) return 0.0;
+        if (val > 12 && Number.isInteger(val)) {
+            return parseFloat((val / 60.0).toFixed(4));
+        }
+        return val;
+    }
+
     onInputMorningTime(ev) {
-        this.state.settings.morning_time = parseFloat(ev.target.value) || 0;
+        this.state.settings.morning_time_str = ev.target.value;
     }
     onInputExitTime(ev) {
-        this.state.settings.exit_time = parseFloat(ev.target.value) || 0;
-    }
-    onInputDeadTime(ev) {
-        this.state.settings.dead_time = parseFloat(ev.target.value) || 0;
-    }
-    onInputCheckinBuffer(ev) {
-        this.state.settings.checkin_buffer = parseFloat(ev.target.value) || 0;
-    }
-    onInputPostShiftGraceHours(ev) {
-        this.state.settings.post_shift_grace_hours = parseFloat(ev.target.value) || 0;
+        this.state.settings.exit_time_str = ev.target.value;
     }
     onInputSaturdayExitTime(ev) {
-        this.state.settings.saturday_exit_time = parseFloat(ev.target.value) || 0;
+        this.state.settings.saturday_exit_time_str = ev.target.value;
     }
     onInputLunchOutTime(ev) {
-        this.state.settings.lunch_out_time = parseFloat(ev.target.value) || 0;
+        this.state.settings.lunch_out_time_str = ev.target.value;
+    }
+
+    onInputDeadTime(ev) {
+        this.state.settings.dead_time_str = ev.target.value;
+    }
+    onInputCheckinBuffer(ev) {
+        this.state.settings.checkin_buffer_str = ev.target.value;
+    }
+    onInputPostShiftGraceHours(ev) {
+        this.state.settings.post_shift_grace_hours_str = ev.target.value;
     }
     onInputLunchDuration(ev) {
-        this.state.settings.lunch_duration = parseFloat(ev.target.value) || 0;
+        this.state.settings.lunch_duration_str = ev.target.value;
     }
     onInputLunchGraceTime(ev) {
-        this.state.settings.lunch_grace_time = parseFloat(ev.target.value) || 0;
+        this.state.settings.lunch_grace_time_str = ev.target.value;
     }
     onInputLatenessHoursThreshold(ev) {
-        this.state.settings.lateness_hours_violation_threshold = parseFloat(ev.target.value) || 0;
+        this.state.settings.lateness_hours_violation_threshold_str = ev.target.value;
     }
     onInputLatenessEvalWindowMonths(ev) {
         this.state.settings.lateness_eval_window_months = parseInt(ev.target.value, 10) || 0;
@@ -326,7 +385,7 @@ export class MyAttendance extends Component {
     }
 
     onOpenMySchedule() {
-        this.action.doAction("custom_hr_attendance.action_my_roster_exception");
+        this.action.doAction("custom_hr_attendance.action_my_shift_schedule_resolved");
     }
 }
 

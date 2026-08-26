@@ -114,7 +114,10 @@
                         </group>
                     </group>
                     
-                    <widget name="web_ribbon" title="Rejected" bg_color="bg-danger" invisible="status != 'rejected'"/>
+                    <!-- Rejection banner + reason -->
+                    <div class="alert alert-danger text-center font-weight-bold" invisible="status != 'rejected'">
+                        This Request has been Rejected.
+                    </div>
                     <group invisible="status != 'rejected'">
                         <field name="rejection_reason" required="status == 'rejected'"/>
                     </group>

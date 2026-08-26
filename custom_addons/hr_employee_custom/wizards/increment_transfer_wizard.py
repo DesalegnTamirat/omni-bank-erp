@@ -116,7 +116,7 @@ class increment_transfer_wizard(models.TransientModel):
         self.env["call.api.b1"].process_api()
         # cr = self.env.cr
         # cr.execute("SELECT pre_process_payroll(%s,)", (p_id))
-        # cr.commit
+        # cr.commit()
         # print("Increment Transfer Executed")
 
     def cancel(self):

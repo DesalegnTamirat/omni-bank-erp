@@ -28,7 +28,9 @@ class DisciplineInvestigation(models.Model):
     name = fields.Char(string='Investigation Ref', required=True, default=lambda self: _('New'), copy=False)
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', related='case_id.employee_id', store=True, readonly=True)
-    investigator_id = fields.Many2one('res.users', string='Lead Investigator / Auditor', required=True, default=lambda self: self.env.user, tracking=True)
+    offense_id = fields.Many2one('discipline.offense', string='Offense Type / Misconduct', related='case_id.offense_id', store=True, readonly=True)
+    offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='case_id.offense_category_id', store=True, readonly=True)
+    investigator_id = fields.Many2one('res.users', string='Lead Investigator / Auditor', required=True, default=lambda self: self.env.user, readonly=True, tracking=True)
     investigation_date = fields.Date(string='Investigation Date', required=True, default=fields.Date.context_today, tracking=True)
 
     # Part 1: Type of Misconduct
@@ -39,8 +41,16 @@ class DisciplineInvestigation(models.Model):
         ('policy_breach', 'Policy / Procedure Breach'),
         ('conduct', 'Conduct Unbecoming'),
         ('other', 'Other'),
-    ], string='Type of Misconduct', required=True, tracking=True)
+    ], string='Legacy Misconduct Type', tracking=True)
     misconduct_type_notes = fields.Char(string='Misconduct Type Details')
+
+    @api.onchange('case_id')
+    def _onchange_case_id(self):
+        if self.case_id:
+            if not self.applicable_policy and self.case_id.offense_id:
+                self.applicable_policy = self.case_id.offense_id.name
+            if not self.summary_findings and self.case_id.description:
+                self.summary_findings = self.case_id.description
 
     # Part 2: Date of Examination
     examination_date = fields.Date(string='Date of Examination', required=True, default=fields.Date.context_today, tracking=True)

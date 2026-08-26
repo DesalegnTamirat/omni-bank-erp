@@ -50,7 +50,8 @@
             <field name="active" eval="True"/>
         </record>
 
-        <!-- Daily IDP Review Reminder -->
+        <!-- COMMENTED OUT PER USER JOURNEY: IDP standalone module omitted from 14 Use Cases -->
+        <!--
         <record id="cron_eds_idp_review_reminder" model="ir.cron">
             <field name="name">EDS: IDP Periodic Review Reminder</field>
             <field name="model_id" ref="employee_development_system.model_eds_individual_development_plan"/>
@@ -61,6 +62,7 @@
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=4, minute=0, second=0)"/>
             <field name="active" eval="True"/>
         </record>
+        -->
 
         <!-- Automated Certificate Auto-Issuance -->
         <record id="cron_eds_auto_issue_certificates" model="ir.cron">

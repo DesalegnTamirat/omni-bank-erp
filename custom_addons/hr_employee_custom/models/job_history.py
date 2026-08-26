@@ -11,7 +11,7 @@ class job_form_details(models.Model):
     new_job_title = fields.Many2one('hr.job', string='Position', help="Position")
     job_history_start_date = fields.Date(string='Job History Start Date', help="Job History Start Date")
     job_history_end_date = fields.Date(string='Job History End Date', help="Job History End Date")
-    reason = fields.Char(string='Reason for Change ', help="Reason for Change")
+    reason = fields.Char(string='Reason for Change ', help="Reason for Change ")
     status= fields.Char(string='Status', help="Status")
     salary_details = fields.One2many("salary.detail.changes", 'details_id', string="Salary Details Changes")
     def approve(self):
@@ -19,7 +19,7 @@ class job_form_details(models.Model):
 
         vals = {
             "employee_id": self.employee_name.id,
-            # "job_name": self.department1.id
+            # "job_name": self.department1.id,
             "job_id": self.new_job_title.id,
             "job_grade": self.job_grade.id,
             "job_category": self.job_name.id,

@@ -12,7 +12,7 @@
 
                 <footer>
                     <button name="net_salary_payment" string="Net Salary Payment" type="object" class="btn btn-primary"/>
-<!-- <button name="process_api" string="Process Net Pay API" type="object" class="btn btn-primary" model="call.api"/> -->
+<!--                    <button name="process_api" string="Process Net Pay API" type="object" class="btn btn-primary" model="call.api"/>-->
                     <button string="Cancel" class="btn btn-secondary" special="cancel"/>
                 </footer>
             </form>

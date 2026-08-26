@@ -62,9 +62,10 @@ class EdsAnnualPlan(models.Model):
         'eds.approval.history', 'annual_plan_id', string='Approval History',
         domain=[('model', '=', 'eds.annual.plan')])
 
-    amendment_ids = fields.One2many(
-        'eds.unscheduled.request', 'annual_plan_id', string='Amendments',
-        help='Approved unscheduled training requests appended as addenda /075/076).')
+    # COMMENTED OUT PER USER JOURNEY: Unscheduled training requests omitted from 14 Use Cases
+    # amendment_ids = fields.One2many(
+    #     'eds.unscheduled.request', 'annual_plan_id', string='Amendments',
+    #     help='Approved unscheduled training requests appended as addenda /075/076).')
     amendment_count = fields.Integer(string='Amendments', compute='_compute_counts')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
@@ -74,7 +75,7 @@ class EdsAnnualPlan(models.Model):
         for rec in self:
             rec.line_count = len(rec.line_ids)
             rec.delivered_count = len(rec.line_ids.filtered(lambda l: l.status == 'delivered'))
-            rec.amendment_count = len(rec.amendment_ids)
+            rec.amendment_count = 0
 
     @api.depends('line_ids.budget_allocated')
     def _compute_budget(self):

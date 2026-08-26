@@ -9,8 +9,8 @@ class employee_job(models.Model):
     start_date = fields.Date("Start date")
     end_date = fields.Date("End Date")
     # status = fields.Selection(selection=[
-    # ('active', 'Active')
-    # ('inactive', 'Inactive')
+    #     ('active', 'Active'),
+    #     ('inactive', 'Inactive'),
     # ], string='Status', required=True, readonly=True, copy=False, tracking=True)
     status = fields.Boolean('Status')
     grade_multi_record=fields.One2many("job_multi_record",'employee_id','grade_multi_record Details')

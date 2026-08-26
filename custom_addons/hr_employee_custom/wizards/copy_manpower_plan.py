@@ -37,4 +37,4 @@ class copy_manpower_plan_details(models.TransientModel):
         cr.execute("SELECT pre_process_payroll(%s, %s)", (p_id, f_rate))
         cr.commit()
         print("Pre Process Payroll Executed")
-        # cr.close
+        # cr.close()

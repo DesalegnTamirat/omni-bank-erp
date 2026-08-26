@@ -11,11 +11,11 @@
                                 <span t-esc="datetime.date.today()"/>
                                 <br/>
                                   <strong>Ref. No.</strong>
-<!-- <span t-field="o.reference"/> -->
+<!--                                <span t-field="o.reference"/>-->
                                   <br/>
                                   <br/>
                                    <strong>ID.No.:</strong>
-<!-- <span t-field="o.employee_id"/> -->
+<!--                                 <span t-field="o.employee_id"/>-->
                                 <br />
                                 <br/>
                                  <strong>Ato  Amaniel Kidane Fitwi</strong>
@@ -24,11 +24,11 @@
                                   <br/>
                                   <strong>Addis Ababa</strong>
                                   <br/>
-<!-- <strong><span t-field="o.current_work_unit"/></strong> -->
+<!--                                <strong><span t-field="o.current_work_unit"/></strong>-->
                                   <br/>
                                     <br/>
                                   <strong>Dear Ato Amanuel,</strong>
-<!-- <strong>Dear <span t-field="o.employee_name"/>,</strong> -->
+<!--                                <strong>Dear <span t-field="o.employee_name"/>,</strong>-->
                                   <br/>
                             </div>
 
@@ -59,7 +59,7 @@
                                  <li>Bunna Bank S.C </li>
                                  </ul>
 
-<!-- <span t-field="o.resignation_type" /> -->
+<!--                                <span t-field="o.resignation_type" />-->
                                   <br />
                              </div>
 

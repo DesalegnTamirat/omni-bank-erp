@@ -42,7 +42,12 @@
                                      help="When enabled, employees must be checked in to access ERP modules.">
                                 <field name="enable_checkin_gate"/>
                             </setting>
+                            <setting string="Overtime Payroll Payout Policy"
+                                     help="When OFF (Default), extra shift work is compensated via Duty OFF. When ON, overtime hours are exported for payroll payout.">
+                                <field name="enable_overtime_payroll"/>
+                            </setting>
                         </block>
+
 
                         <!-- ========================================= -->
                         <!-- BLOCK 1.5: Configurable HR Regulations     -->
@@ -147,7 +152,7 @@
                         <block title="Discipline Integration Thresholds" name="custom_discipline_thresholds">
                             <setting string="Cumulative Late Hours Threshold (Hours)"
                                      help="Total cumulative late hours within the rolling evaluation window that triggers an automatic discipline case.">
-                                <field name="lateness_hours_violation_threshold"/>
+                                <field name="lateness_hours_violation_threshold" widget="float_time"/>
                             </setting>
                             <setting string="Lateness Evaluation Window (Months)"
                                      help="Rolling evaluation window in months over which cumulative late hours are aggregated (e.g., 3 months).">

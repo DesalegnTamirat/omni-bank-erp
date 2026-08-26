@@ -77,9 +77,12 @@
                             <button class="oe_stat_button" icon="fa-money">
                                 <field name="budget_total" widget="statinfo" string="Total Budget"/>
                             </button>
+                            <!-- COMMENTED OUT PER USER JOURNEY: Unscheduled training requests omitted from 14 Use Cases -->
+                            <!--
                             <button class="oe_stat_button" icon="fa-pencil-square-o">
                                 <field name="amendment_count" widget="statinfo" string="Amendments"/>
                             </button>
+                            -->
                         </div>
                         <group>
                             <group string="Plan">
@@ -114,6 +117,8 @@
                                     </list>
                                 </field>
                             </page>
+                            <!-- COMMENTED OUT PER USER JOURNEY: Unscheduled training requests omitted from 14 Use Cases -->
+                            <!--
                             <page string="Amendments (Unscheduled Requests)" name="amendments">
                                 <field name="amendment_ids" readonly="1">
                                     <list>
@@ -126,6 +131,7 @@
                                     </list>
                                 </field>
                             </page>
+                            -->
                             <page string="Approval History" name="history">
                                 <field name="approval_history_ids" readonly="1">
                                     <list>

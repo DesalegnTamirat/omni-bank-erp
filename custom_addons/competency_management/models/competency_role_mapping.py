@@ -24,11 +24,6 @@ class CompetencyRoleMapping(models.Model):
         ('approved', 'Approved'),
         ('archived', 'Archived / Superseded'),
     ], string='Status', default='draft', tracking=True)
-    record_type = fields.Selection([
-        ('production', 'Production'),
-        ('demo', 'Demo / Training'),
-        ('test', 'Test'),
-    ], string='Record Type', default='production', required=True, tracking=True)
     effective_date = fields.Date(string='Effective Date', default=fields.Date.context_today, required=True)
     change_description = fields.Text(string='Change Description')
     last_review_date = fields.Date(string='Last Review Date')
@@ -61,28 +56,48 @@ class CompetencyRoleMapping(models.Model):
                 if duplicates:
                     raise ValidationError(_("A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead."))
 
-    @api.onchange('job_position_id')
-    def _onchange_job_position_id(self):
-        if self.job_position_id and self.job_position_id.name:
-            jname = self.job_position_id.name.upper()
-            if 'DEMO' in jname or 'TEST' in jname:
-                self.record_type = 'demo' if 'DEMO' in jname else 'test'
+    @api.onchange('cluster_ids')
+    def _onchange_cluster_ids(self):
+        if not self.cluster_ids:
+            return
+
+        existing_comp_ids = set()
+        for line in self.line_ids:
+            if line.competency_id:
+                existing_comp_ids.add(line.competency_id.id)
+
+        new_virtual_lines = self.env['competency.role.mapping.line']
+        for cluster in self.cluster_ids:
+            for comp in cluster.competency_ids:
+                if comp.id and comp.id not in existing_comp_ids:
+                    existing_comp_ids.add(comp.id)
+                    new_virtual_lines += self.env['competency.role.mapping.line'].new({
+                        'competency_id': comp.id,
+                        'required_proficiency': cluster.min_proficiency or '2',
+                        'weight': 1.0,
+                    })
+
+        if new_virtual_lines:
+            self.line_ids = self.line_ids + new_virtual_lines
+
+    @api.constrains('line_ids')
+    def _check_unique_competency_lines(self):
+        for rec in self:
+            comp_ids = rec.line_ids.mapped('competency_id.id')
+            if len(comp_ids) != len(set(comp_ids)):
+                raise ValidationError(_("Duplicate competencies detected in the mapping lines for '%s'. Each competency can only be added once per role mapping.") % rec.mapping_name)
 
     def action_submit_for_approval(self):
         """Draft -> Under Approval workflow."""
         for rec in self:
             if not rec.line_ids:
                 raise ValidationError(_('Add at least one competency line before submitting for approval.'))
-            if rec.record_type != 'production' or (rec.job_position_id and rec.job_position_id.name and any(kw in rec.job_position_id.name.upper() for kw in ('DEMO', 'TEST'))):
-                raise ValidationError(_("Demo or Test mapping records cannot be submitted or approved for live production use."))
             rec.with_context(force_write=True).write({'state': 'under_approval'})
             rec.message_post(body=_('Role-competency mapping %s submitted for approval.') % rec.mapping_name)
 
     def action_approve(self):
         """Under Approval -> Approved with version supersession."""
         for rec in self:
-            if rec.record_type != 'production' or (rec.job_position_id and rec.job_position_id.name and any(kw in rec.job_position_id.name.upper() for kw in ('DEMO', 'TEST'))):
-                raise ValidationError(_("Demo or Test mapping records cannot be submitted or approved for live production use."))
             
             # Automatically supersede/archive prior approved versions of the same job position
             prior_approved = self.search([

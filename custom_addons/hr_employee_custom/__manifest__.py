@@ -4,7 +4,7 @@
     'summary': "Adds Employee Grades and Levels configurations and mandatory fields.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Desalegn & Abeza',
+    'author': 'Bunna Bank',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -15,12 +15,12 @@
         'hr_homeworking',
         'hr_org_chart',
         'hr_recruitment',
+        'hr_skills',
         'hr_holidays',
         'mail',
         'portal',
         'website',
         'website_hr_recruitment',
-
     ],
     'data': [
         'security/security.xml',
@@ -49,24 +49,28 @@
         'views/recruitment_experience.xml',
         'data/hr_job_data.xml',
 
-        # Service Request
+        # -- Service Request & Delegation --
         'security/security_service_request.xml',
+        'security/security_delegation.xml',
         'data/employee_service_request_sequence.xml',
         'data/emp_service_req.xml',
         'data/employee_self_service_sequence.xml',
+        'data/delegation_sequence.xml',
         'views/service_request_type_views.xml',
         'views/service_request_views.xml',
         'views/service_request.xml',
         'views/employee_ser_request.xml',
+        'views/hr_employee_delegation_views.xml',
         'wizards/completion_wizard_views.xml',
         'wizards/rejection_wizard_views.xml',
 
-        # Guarantees / Supplementary Role
+
+        # -- Guarantees / Supplementary Role --
         'views/guarentees_details_views.xml',
         'views/guarentee_details.xml',
         'views/supplementary.xml',
 
-        # Transfer / Re-instating / Demotion / Part-time
+        # -- Transfer / Re-instating / Demotion / Part-time --
         'data/emp_transfer_form.xml',
         'views/transfer_form_views.xml',
         'views/transform_form.xml',
@@ -79,29 +83,29 @@
         'views/part_time_employment_views.xml',
         'views/part_time_employement.xml',
 
-        # Probation
+        # -- Probation --
         'data/prob_sequence.xml',
         'views/emp_probation.xml',
         'views/probation_assessment_form.xml',
 
-        # Increment
+        # -- Increment --
         'views/increment.xml',
         'views/employee_increment_setup.xml',
         'wizards/increment_transfer_wizard.xml',
 
-        # Insurance / Training / Report Codes / Service Award
+        # -- Insurance / Training / Report Codes / Service Award --
         'views/hr_employee_insurance_views.xml',
         'views/hr_training_history_views.xml',
         'views/report_code_views.xml',
         'views/service_award.xml',
         'views/award_received.xml',
 
-        # Leave / Misc data
+        # -- Leave / Misc data --
         'data/leave_request.xml',
         'data/supp_role.xml',
         'views/hr_payroll_structure_views.xml',
 
-        # Reports (HR letters)
+        # -- Reports (HR letters) --
         'reports/acting_assignment.xml',
         'reports/acting_assignment_managerial.xml',
         'reports/acting_termination.xml',
@@ -118,10 +122,14 @@
         'reports/transfer_letter.xml',
         'reports/employee_experience_letter.xml',
         'views/employee_category_views.xml',
-        # Misc utility wizards
+        # -- Misc utility wizards --
         'wizards/print_employee_report_views.xml',
-        'views/employee_history.xml',
         'views/hr_employee_master_views.xml',
+        'views/employee_history.xml',
+        'views/hr_employee_document_views.xml',
+        'views/hr_employee_relative_views.xml',
+        'views/hr_employee_education_detail_views.xml',
+        'views/hr_employee_previous_occupation_views.xml',
         'views/menu.xml',
     ],
     'assets': {

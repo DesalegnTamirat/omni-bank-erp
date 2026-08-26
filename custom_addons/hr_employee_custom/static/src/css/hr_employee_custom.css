@@ -96,10 +96,9 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────
-   ── 3. Notebook tab bar ──
-   • justify-content: flex-start → tabs COMPACT, NOT stretched
-   • flex: 0 0 auto per item    → tabs only as wide as their text
-   • margin-left: auto on ☰▾   → pins it to the far-right corner
+   ── 3. Notebook tab bar & Responsive Tabs ──
+   • flex: 1 1 auto per tab item → tabs distribute & align equally to fill remaining space
+   • margin-left: auto & order: 9999 on ☰ ▾ / ... → pins dropdown to the far-right corner
    ───────────────────────────────────────────────────────────────────── */
 .o_notebook {
     max-width: 100% !important;
@@ -116,13 +115,8 @@
     flex-wrap: nowrap !important;
     justify-content: flex-start !important;
     align-items: center !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
     max-width: 100% !important;
     width: 100% !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: thin !important;
-    scroll-behavior: smooth !important;
     border-bottom: 1px solid var(--border-color, #dee2e6) !important;
     padding-bottom: 2px !important;
     gap: 0 !important;
@@ -139,57 +133,74 @@
 .o_notebook_headers::-webkit-scrollbar-track,
 .o_notebook .nav-tabs::-webkit-scrollbar-track { background: transparent; }
 
-/* Each tab — compact, never grow, never stretch */
-.o_form_view .o_notebook .o_notebook_headers .nav-item,
-.o_form_view .o_notebook .nav-tabs .nav-item,
-.o_notebook_headers .nav-item,
-.o_notebook .nav-tabs .nav-item {
-    flex: 0 0 auto !important;
-    flex-grow: 0 !important;
-    flex-shrink: 0 !important;
+/* Tabs align & fill remaining space equally in a fully responsive layout */
+.o_form_view .o_notebook .o_notebook_headers .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_form_view .o_notebook .nav-tabs .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_notebook_headers .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown),
+.o_notebook .nav-tabs .nav-item:not(.dropdown):not(.o_notebook_more):not(.o_nav_entry_dropdown) {
+    flex: 1 1 auto !important;
+    flex-grow: 1 !important;
+    flex-shrink: 1 !important;
     white-space: nowrap !important;
-    width: auto !important;
     min-width: 0 !important;
-    max-width: none !important;
+    text-align: center !important;
 }
 
-/* Tab link text */
+/* Tab link text formatting */
 .o_form_view .o_notebook .o_notebook_headers .nav-link,
 .o_form_view .o_notebook .nav-tabs .nav-link,
 .o_notebook_headers .nav-link,
 .o_notebook .nav-tabs .nav-link {
-    flex: 0 0 auto !important;
-    flex-grow: 0 !important;
-    flex-shrink: 0 !important;
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
     white-space: nowrap !important;
     font-size: clamp(0.72rem, 0.75vw + 0.3rem, 0.88rem) !important;
     padding: 0.45rem 0.8rem !important;
     transition: all 0.15s ease-in-out !important;
-    width: auto !important;
-    min-width: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
 }
 
-/* ── 4. ☰ ▾ tab — pinned to the FAR RIGHT END CORNER ── */
+/* ── 4. ☰ ▾ / ... Overflow Dropdown button — pinned to the FAR RIGHT END CORNER ── */
+.o_form_view .o_notebook .o_notebook_headers .dropdown,
+.o_form_view .o_notebook .o_notebook_headers .o_notebook_dropdown,
+.o_form_view .o_notebook .o_notebook_headers .o_nav_entry_dropdown,
+.o_form_view .o_notebook .o_notebook_headers .o_notebook_more,
+.o_form_view .o_notebook .o_notebook_headers .nav-item.dropdown,
+.o_form_view .o_notebook .o_notebook_headers .nav-item:has(.dropdown-toggle),
+.o_form_view .o_notebook .o_notebook_headers .nav-item:has(a[data-bs-toggle="dropdown"]),
+.o_form_view .o_notebook .o_notebook_headers .nav-item:has(button[data-bs-toggle="dropdown"]),
 .o_form_view .o_notebook .o_notebook_headers .nav-item:has(.nav-link[data-name="more_nested_lists"]),
-.o_form_view .o_notebook .nav-tabs .nav-item:has(.nav-link[data-name="more_nested_lists"]),
-.o_notebook_headers .nav-item:has(.nav-link[data-name="more_nested_lists"]),
-.o_notebook .nav-tabs .nav-item:has(.nav-link[data-name="more_nested_lists"]) {
-    margin-left: auto !important;
-    flex: 0 0 auto !important;
-    position: sticky !important;
-    right: 0 !important;
-    background-color: var(--o-view-background-color, #faf6f0) !important;
-    z-index: 2 !important;
-}
-
-/* Fallback: standard Odoo .o_notebook_more overflow */
+.o_form_view .o_notebook .o_notebook_headers li.dropdown,
+.o_notebook_headers .dropdown,
+.o_notebook_headers .o_notebook_dropdown,
+.o_notebook_headers .o_nav_entry_dropdown,
 .o_notebook_headers .o_notebook_more,
-.o_notebook .nav-tabs .o_notebook_more {
+.o_notebook_headers .nav-item.dropdown,
+.o_notebook_headers .nav-item:has(.dropdown-toggle),
+.o_notebook_headers .nav-item:has(a[data-bs-toggle="dropdown"]),
+.o_notebook_headers .nav-item:has(button[data-bs-toggle="dropdown"]),
+.o_notebook_headers .nav-item:has(.nav-link[data-name="more_nested_lists"]),
+.o_notebook_headers li.dropdown,
+.nav-tabs .dropdown,
+.nav-tabs .o_notebook_dropdown,
+.nav-tabs .o_nav_entry_dropdown,
+.nav-tabs .o_notebook_more,
+.nav-tabs .nav-item.dropdown,
+.nav-tabs .nav-item:has(.dropdown-toggle),
+.nav-tabs .nav-item:has(a[data-bs-toggle="dropdown"]),
+.nav-tabs .nav-item:has(button[data-bs-toggle="dropdown"]),
+.nav-tabs .nav-item:has(.nav-link[data-name="more_nested_lists"]),
+.nav-tabs li.dropdown,
+.nav-tabs li:last-child:has(i),
+.nav-tabs li:last-child:has(a) {
     margin-left: auto !important;
     flex: 0 0 auto !important;
+    flex-grow: 0 !important;
     flex-shrink: 0 !important;
+    order: 9999 !important;
+    position: relative !important;
+    right: 0 !important;
+    z-index: 10 !important;
 }
 
 /* ── 5. Form groups — stretch to fill the full-width sheet ── */

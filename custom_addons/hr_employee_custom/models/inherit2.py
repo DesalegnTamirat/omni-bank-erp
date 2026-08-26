@@ -36,8 +36,8 @@ class HrContract(models.Model):
     # over_hour = fields.Float("Hour_Wage", store=True)
     # over_hour = fields.Monetary('Hour Wage')
 
-    # def hour_wage(self)
-    # self.over_hour = self.wage/176;
+    # def hour_wage(self):
+    #      self.over_hour = self.wage/176;
     
 class Job(models.Model):
     _inherit = 'hr.job'
@@ -50,25 +50,25 @@ class Job(models.Model):
 
 
 
-# class MyStockReturnReques(models.Model)
-# _inherit = 'stock.return.request.line'
+# class MyStockReturnReques(models.Model):
+#     _inherit = 'stock.return.request.line'
+#
+#     asset_name = fields.Many2one('account.asset', string="Asset Name", domain="[('location','=',parent.return_from)]")
+#
+#     @api.depends('parent.return_from')
+#     def _compute_asset_name_domain(self):
+#         for line in self:
+#             line.asset_name_domain = [('location','=',line.parent.return_from)]
 
-# asset_name = fields.Many2one('account.asset', string="Asset Name", domain="[('location','=',parent.return_from)]")
-
-# @api.depends('parent.return_from')
-# def _compute_asset_name_domain(self)
-# for line in self
-# line.asset_name_domain = [('location','=',line.parent.return_from)]
-
-# class Hr(models.Model)
-# _inherit = 'hr.employee'
-
-# job_category = fields.Char(string="Job Category")
-    # compute="_compute_job_category")
+# class Hr(models.Model):
+#     _inherit = 'hr.employee'
+#
+#     job_category = fields.Char(string="Job Category")
+    # , compute="_compute_job_category")
 
     # @api.depends('job_position')
-    # def _compute_job_category(self)
-    # val = self.env["hr.job"].search([("name", "=", self.job_position)])
-    # print("**********val", val)
-    # self.job_category = val.employee_category
-    # return self.job_category
+    # def _compute_job_category(self):
+    #     val = self.env["hr.job"].search([("name", "=", self.job_position)])
+    #     print("**********val", val)
+    #     self.job_category = val.employee_category
+    #     return self.job_category

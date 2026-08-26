@@ -10,17 +10,17 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
     _description = "Employee information"
 
-
+    # ------------------------------------------------------------------
     # Identification
-
+    # ------------------------------------------------------------------
     identification_id = fields.Char(string="Employee Identification")
     # Kept distinct from identification_id above - different field, used by
     # the legacy hr_employee_view.xml (see module docstring above).
     employee_identification = fields.Char(string="Employee Identification", help="Employee Id")
 
-
+    # ------------------------------------------------------------------
     # Contact info
-
+    # ------------------------------------------------------------------
     mobile_phone = fields.Char(string="Work Mobile")
     work_phone = fields.Char(string="Work Phone")
     work_email = fields.Char(string="Work Email")
@@ -39,9 +39,9 @@ class HrEmployee(models.Model):
         string='Gender',
         store=True,
     )
-
+    # ------------------------------------------------------------------
     # Address / locality
-
+    # ------------------------------------------------------------------
     house_number = fields.Char(string="House Number", help="House Number")
     city = fields.Char(string="City", help="City")
     sub_city = fields.Char(string="Sub City", help="Sub City")
@@ -49,9 +49,9 @@ class HrEmployee(models.Model):
     woreda = fields.Char(string="Woreda", help="Woreda")
     kebele = fields.Char(string="Kebele", help="Kebele")
 
-
+    # ------------------------------------------------------------------
     # Family / personal
-
+    # ------------------------------------------------------------------
     short_name = fields.Char(string="Short  Name", related='resource_id.name', required=False, store=True,
                              readonly=False)
     father_name = fields.Char(string='Father Name')
@@ -75,9 +75,9 @@ class HrEmployee(models.Model):
     crime_no = fields.Char("Crime No")
     age = fields.Char(string="Age")
 
-
+    # ------------------------------------------------------------------
     # Languages
-
+    # ------------------------------------------------------------------
     languages = fields.Char(string="Languages")
     language_ids = fields.Many2many('res.lang', string="Languages")
     languages_ids = fields.One2many('hr.languages', 'employee_id', string='HR Languages', help='Languages Information')
@@ -103,9 +103,9 @@ class HrEmployee(models.Model):
     remarks = fields.Char("Remarks if any")
     releived_on = fields.Char("Releived on")
 
-
+    # ------------------------------------------------------------------
     # Probation
-
+    # ------------------------------------------------------------------
     probation_start_date = fields.Date(
         string="Probation Start date",
         help="Probation Start date",
@@ -191,9 +191,9 @@ class HrEmployee(models.Model):
             else:
                 employee.probationary_details = False
 
-
+    # ------------------------------------------------------------------
     # Pension
-
+    # ------------------------------------------------------------------
     pension_number = fields.Char(string="Pension Number", help="Pension Number")
     pension_no = fields.Char("Pension No")
 
@@ -211,9 +211,9 @@ class HrEmployee(models.Model):
     entry_progress = fields.Integer(string="Entry Progress", default=0)
     exit_progress = fields.Integer(string="Exit Progress", default=0)
 
-
+    # ------------------------------------------------------------------
     # Hierarchy / management
-
+    # ------------------------------------------------------------------
     hr_officer_id = fields.Many2one('res.users', string="HR Officer Assigned")
     alternate_parent = fields.Integer(string="Incharge Manager Partner ID")
     alternate_manager = fields.Integer(string="Incharge Manager")
@@ -243,9 +243,9 @@ class HrEmployee(models.Model):
             elif not employee.planning_parent_id:
                 employee.planning_parent_id = False
 
-
+    # ------------------------------------------------------------------
     # Related record lines (One2many)
-
+    # ------------------------------------------------------------------
     Supplementary_ids = fields.One2many('supplementary.multi.role', 'employee_id', string='supplementary Role',
                                         help='supplementary Role Information')
     fam_ids = fields.One2many('hr.employee.family', 'employee_id', string='Family', help='Family Information')
@@ -263,27 +263,155 @@ class HrEmployee(models.Model):
     pension_info = fields.One2many("pension.multi.record", 'employee_id', string="Pension Information",
                                    help='Pension Information')
     sponsorship_info = fields.One2many("education.fee.sponsorship", 'sponsorship_id',
-                                       string=" Education Fee Sponsorship", help='Education Fee Sponsorship')
+                                       string=" Education Fee Sponsorship", help=' Education Fee Sponsorship')
     commitment_info = fields.One2many("training.commitment", 'commitment_id', string="Training Commitment",
-                                      help='Training Commitment')
+                                      help=' Training Commitment')
 
-    qualification_id = fields.One2many('hr.qualification.info.employee', 'employee_id', 'Education Qualification')
-    experiance_id = fields.One2many('hr.experience.info.employee', 'employee_id', 'Experiance')
-    competencies_id = fields.One2many('hr.competencies.info.employee', 'employee_id', 'Competencies')
+    qualification_id = fields.One2many('hr_qualification_info_job', 'employee_id', 'Education Qualification')
+    experiance_id = fields.One2many('hr_experience_info_job', 'employee_id', 'Experiance')
+    competencies_id = fields.One2many('hr_competencies_info_job', 'employee_id', 'Competencies')
 
     # From employee_fields_application (hr_employee_hrMaster.py)
     responsible_user_id = fields.Many2one('res.users', "Responsible", default=lambda self: self.env.uid)
 
+    # ------------------------------------------------------------------
+    # Recruitment Criteria Synchronization
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        if self.env.context.get('in_sync_criteria_from_job'):
+            return super().create(vals_list)
+        employees = super().create(vals_list)
+        employees.with_context(in_sync_criteria_from_job=True)._sync_criteria_from_job()
+        return employees
 
+    def write(self, vals):
+        if self.env.context.get('in_sync_criteria_from_job'):
+            return super().write(vals)
+        res = super().write(vals)
+        if 'job_id' in vals or 'job_position' in vals:
+            self.with_context(in_sync_criteria_from_job=True)._sync_criteria_from_job()
+        return res
+
+    @api.onchange('job_id', 'job_position', 'edu_ids', 'education_detail_ids')
+    def _onchange_job_position_sync_criteria(self):
+        """Automatically populate recruitment criteria when job position or education records change."""
+        self._sync_criteria_from_job()
+
+    def action_sync_recruitment_criteria(self):
+        """Method retained for view compatibility."""
+        self._sync_criteria_from_job(force=True)
+        return True
+
+    def _sync_criteria_from_job(self, force=False):
+        """Helper to copy qualification, experience, and competency criteria from Job to Employee,
+        and sync education qualifications directly from Employee Education tables."""
+        for employee in self:
+            job = employee.job_id or employee.job_position
+
+            # Collect education responses from hr.employee.education (edu_ids) & employee.education (education_detail_ids)
+            edu_responses = {}
+            for edu in employee.edu_ids:
+                q_name = False
+                if edu.qualification and edu.specialization:
+                    q_name = f"{edu.qualification.strip()} - {edu.specialization.strip()}"
+                elif edu.qualification:
+                    q_name = edu.qualification.strip()
+                elif edu.specialization:
+                    q_name = edu.specialization.strip()
+
+                if q_name:
+                    edu_responses[q_name.lower()] = (q_name, edu.cgpa_percentage or 0.0)
+
+            for edu in employee.education_detail_ids:
+                q_name = (edu.qualification or edu.field or (dict(edu._fields['edu_type'].selection).get(edu.edu_type) if edu.edu_type else False))
+                if q_name:
+                    q_name_str = str(q_name).strip()
+                    edu_responses[q_name_str.lower()] = (q_name_str, edu.CGPA or 0.0)
+
+            # 1. Qualifications from Job Position
+            if job:
+                existing_qual_ids = set(employee.qualification_id.mapped('qualification.id'))
+                qual_cmds = []
+                for q in job.qualification_id:
+                    if q.qualification:
+                        q_name_str = getattr(q.qualification, 'display_name', False) or getattr(q.qualification, 'qualification', False) or ''
+                        q_name = q_name_str.strip().lower() if q_name_str else ''
+                        resp = edu_responses.get(q_name, (None, q.response))[1]
+                        if force or q.qualification.id not in existing_qual_ids:
+                            if q.qualification.id in existing_qual_ids and force:
+                                continue
+                            qual_cmds.append((0, 0, {
+                                'qualification': q.qualification.id,
+                                'requirement': q.requirement,
+                                'response': resp,
+                                'smart_search': q.smart_search or 'yes',
+                            }))
+                if qual_cmds:
+                    employee.qualification_id = qual_cmds
+
+            # 1b. Qualifications directly from Employee Education tables
+            for qual_key, (display_name, cgpa_val) in edu_responses.items():
+                rec_qual = self.env['recruitment.qualification'].search(['|', ('display_name', '=ilike', display_name), ('qualification', '=ilike', display_name)], limit=1)
+                if not rec_qual:
+                    rec_qual = self.env['recruitment.qualification'].create({'qualification': display_name})
+
+                existing_eq = employee.qualification_id.filtered(lambda r: r.qualification and r.qualification.id == rec_qual.id)
+                if existing_eq:
+                    for eq in existing_eq:
+                        eq.response = cgpa_val
+                else:
+                    employee.qualification_id = [(0, 0, {
+                        'qualification': rec_qual.id,
+                        'requirement': 0.0,
+                        'response': cgpa_val,
+                        'smart_search': 'yes',
+                    })]
+
+            # 2. Experience from Job Position
+            if job:
+                existing_exp_ids = set(employee.experiance_id.mapped('experience.id'))
+                exp_cmds = []
+                for e in job.experiance_id:
+                    if e.experience and (force or e.experience.id not in existing_exp_ids):
+                        if e.experience.id in existing_exp_ids and force:
+                            continue
+                        exp_cmds.append((0, 0, {
+                            'experience': e.experience.id,
+                            'requirement': e.requirement,
+                            'response': e.response,
+                            'smart_search': e.smart_search or 'yes',
+                        }))
+                if exp_cmds:
+                    employee.experiance_id = exp_cmds
+
+            # 3. Competencies from Job Position
+            if job:
+                existing_comp_ids = set(employee.competencies_id.mapped('competencies.id'))
+                comp_cmds = []
+                for c in job.competencies_id:
+                    if c.competencies and (force or c.competencies.id not in existing_comp_ids):
+                        if c.competencies.id in existing_comp_ids and force:
+                            continue
+                        comp_cmds.append((0, 0, {
+                            'competencies': c.competencies.id,
+                            'requirement': c.requirement,
+                            'response': c.response,
+                            'smart_search': c.smart_search or 'yes',
+                        }))
+                if comp_cmds:
+                    employee.competencies_id = comp_cmds
+
+    # ------------------------------------------------------------------
     # Compute methods
-
+    # ------------------------------------------------------------------
     def _compute_award_count(self):
         for employee in self:
             employee.award_count = len(employee.award_ids)
 
-
+    # ------------------------------------------------------------------
     # Actions
-
+    # ------------------------------------------------------------------
     def action_save_employee(self):
         self.ensure_one()
         return {
@@ -428,3 +556,94 @@ class HrEmployee(models.Model):
             return datetime.combine(service_start_date, time(0, 0, 0))
         else:
             return super()._get_date_start_work()
+
+    # -------------------------------------------------------------------------
+    # DELEGATION APPROVAL HELPERS
+    # -------------------------------------------------------------------------
+    @api.model
+    def get_active_delegated_managers(self, user_id=None, check_date=None):
+        """Returns recordset of hr.employee (managers) for whom user_id is currently holding an active delegation."""
+        if not user_id:
+            user_id = self.env.uid
+        if not check_date:
+            check_date = fields.Date.today()
+
+        delegate_emp = self.env['hr.employee'].sudo().search([('user_id', '=', user_id)], limit=1)
+        if not delegate_emp:
+            return self.env['hr.employee']
+
+        delegations = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', '=', delegate_emp.id),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', check_date),
+            ('end_date', '>=', check_date),
+        ])
+        return delegations.mapped('employee_id')
+
+
+    def is_approver_or_delegate(self, target_employee, user_id=None, check_date=None):
+        """Returns True if user_id is either direct coach/manager of target_employee OR active delegate for target_employee's manager."""
+        if not target_employee:
+            return False
+        if not user_id:
+            user_id = self.env.uid
+        if not check_date:
+            check_date = fields.Date.today()
+
+        user_emp = self.env['hr.employee'].search([('user_id', '=', user_id)], limit=1)
+        if not user_emp:
+            return False
+
+        # Direct manager/coach check
+        manager = target_employee.coach_id or target_employee.parent_id
+        if manager and manager.id == user_emp.id:
+            return True
+
+        # Active delegation check
+        if manager:
+            delegated_managers = self.get_active_delegated_managers(user_id=user_id, check_date=check_date)
+            if manager in delegated_managers:
+                return True
+
+        return False
+
+    def _get_delegated_subordinate_ids(self):
+        """Returns list of employee IDs that the current employee is allowed to view/approve for via active delegations."""
+        if not self:
+            return []
+        emp_ids = self.ids
+        active_managers = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', 'in', emp_ids),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', fields.Date.today()),
+            ('end_date', '>=', fields.Date.today()),
+        ]).mapped('employee_id')
+        if not active_managers:
+            return []
+        subordinates = self.env['hr.employee'].sudo().search([
+            '|',
+            ('coach_id', 'in', active_managers.ids),
+            ('parent_id', 'in', active_managers.ids)
+        ])
+        return subordinates.ids
+
+    def _get_related_delegation_employee_ids(self):
+        """Returns list of hr.employee IDs referenced in delegations where self is delegator, delegate, or recipient."""
+        if not self:
+            return []
+        emp_ids = self.ids
+        delegations = self.env['hr.employee.delegation'].sudo().search([
+            '|', '|',
+            ('employee_id', 'in', emp_ids),
+            ('delegate_id', 'in', emp_ids),
+            ('notification_recipient_ids', 'in', emp_ids)
+        ])
+        related_ids = set()
+        for d in delegations:
+            if d.employee_id:
+                related_ids.add(d.employee_id.id)
+            if d.delegate_id:
+                related_ids.add(d.delegate_id.id)
+            if d.notification_recipient_ids:
+                related_ids.update(d.notification_recipient_ids.ids)
+        return list(related_ids)

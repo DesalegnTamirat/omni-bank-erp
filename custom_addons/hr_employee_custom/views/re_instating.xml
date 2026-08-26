@@ -33,7 +33,7 @@
                          <field name="status"/>
                     </group>
                         <group>
-<!-- <field name="wage" invisible="1"/> -->
+<!--                            <field name="wage" invisible="1"/>-->
                         <button name="Approve" invisible="status in ['approved']" string="Approve" type="object" class="btn-primary"/>
                         </group>
                     <group>
@@ -60,8 +60,8 @@
                 <field name="responsible"/>
                 <field name="reason"/>
 
-<!-- <field name="active"  invisible="inactive == True"/> -->
-<!-- <field name="inactive"  invisible="active == True"/> -->
+<!--                <field name="active"  invisible="inactive == True"/>-->
+<!--                <field name="inactive"  invisible="active == True"/>-->
             </list>
         </field>
     </record>

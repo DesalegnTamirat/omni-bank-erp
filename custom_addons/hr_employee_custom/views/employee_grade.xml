@@ -22,7 +22,7 @@
                         <field name="end_date"/>
                     </group>
                     <group>
-                        <!-- <field name="status" type="checkbox"/> -->
+                        <!--                     <field name="status" type="checkbox"/>-->
                         <!-- PAYROLL MODULE NOT INSTALLED — this button called a "salary_rule"
                              object method that no longer exists (it depended on hr.salary.rule).
                              Restore once the payroll module is installed and the method is added back.
@@ -31,23 +31,23 @@
                     </group>
                 </group>
 
-                <!-- <group> -->
-                <!-- <notebook > -->
-                <!-- <page string="Salary Details"> -->
+                <!--                 <group>-->
+                <!--                    <notebook >-->
+                <!--                        <page string="Salary Details">-->
 
-                <!-- <field name="job_multi_id"> -->
-                <!-- <list editable="bottom"> -->
-                <!-- <field name="salary_rule"/> -->
-                <!-- <field name="value"/> -->
-                <!-- <field name="start_date"/> -->
-                <!-- <field name="end_date"/> -->
+                <!--                <field name="job_multi_id">-->
+                <!--                       <list editable="bottom">-->
+                <!--                            <field name="salary_rule"/>-->
+                <!--                            <field name="value"/>-->
+                <!--                            <field name="start_date"/>-->
+                <!--                            <field name="end_date"/>-->
 
-                <!-- </list> -->
+                <!--                        </list>-->
 
-                <!-- </field> -->
-                <!-- </page> -->
-                <!-- </notebook> -->
-                <!-- </group> -->
+                <!--                    </field>-->
+                <!--			</page>-->
+                <!--                    </notebook>-->
+                <!--                </group>-->
 
             </form>
         </field>
@@ -63,9 +63,9 @@
                 <field name="category"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
-                <!-- <field name="status" type="checkbox"/> -->
-                <!-- <field name="active"  invisible="inactive == True"/> -->
-                <!-- <field name="inactive"  invisible="active == True"/> -->
+                <!--                 <field name="status" type="checkbox"/>-->
+                <!--                <field name="active"  invisible="inactive == True"/>-->
+                <!--                <field name="inactive"  invisible="active == True"/>-->
             </list>
         </field>
     </record>

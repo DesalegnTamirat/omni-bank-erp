@@ -27,7 +27,7 @@
                         -->
                     </group>
                      <group>
-<!-- <button name="populate_procurement_plan"  string="Populate Procurement Plan" type="object" class="oe_highlight"/> -->
+<!--                             <button name="populate_procurement_plan"  string="Populate Procurement Plan" type="object" class="oe_highlight"/>-->
                         <!-- <button name="populate_recruitment"  string="Populate Recruitment" type="object" class="oe_highlight"/> -->
                      </group>
 
@@ -40,8 +40,8 @@
 
                 <field name="company_manpower_plan_id">
                        <list editable="bottom">
-<!-- <field name="work_unit"/> -->
-<!-- <field name="department"/> -->
+<!--                            <field name="work_unit"/>-->
+<!--                            <field name="department"/>-->
 
                             <field name="position"/>
 							<field name="category"/>

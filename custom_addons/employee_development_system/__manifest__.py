@@ -48,10 +48,10 @@ Classroom training and talent development management system covering:
         'views/eds_curriculum_views.xml',
         'views/eds_course_views.xml',
         'views/eds_trainer_views.xml',
-        'views/eds_procurement_views.xml',
+        # 'views/eds_procurement_views.xml',  # COMMENTED OUT PER USER JOURNEY
         'views/eds_annual_plan_views.xml',
         'views/eds_session_views.xml',
-        'views/eds_unscheduled_views.xml',
+        # 'views/eds_unscheduled_views.xml',  # COMMENTED OUT PER USER JOURNEY
         'views/eds_nomination_views.xml',
         'wizards/eds_nomination_wizard_views.xml',
         'views/eds_delivery_views.xml',
@@ -65,7 +65,7 @@ Classroom training and talent development management system covering:
         'views/eds_report_views.xml',
         'views/hr_employee_views.xml',
         'wizards/eds_tna_unlock_wizard_views.xml',
-        'views/eds_apply_stage_views.xml',
+        # 'views/eds_apply_stage_views.xml',  # COMMENTED OUT PER USER JOURNEY
         'views/eds_menus.xml',
         'report/eds_tna_register.xml',
         'report/eds_certificate_template.xml',

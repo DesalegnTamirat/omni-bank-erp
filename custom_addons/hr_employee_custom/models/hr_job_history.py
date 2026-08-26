@@ -80,6 +80,8 @@ class HrEmployeeJobHistory(models.Model):
     )
 
     def write(self, vals):
+        if self.env.context.get('in_job_history_logging'):
+            return super().write(vals)
         tracked_fields = [f for f in self._JOB_HISTORY_TRACKED_FIELDS if f in vals]
 
         before = {}
@@ -90,7 +92,7 @@ class HrEmployeeJobHistory(models.Model):
         res = super().write(vals)
 
         if tracked_fields:
-            self._log_job_history_changes(before)
+            self.with_context(in_job_history_logging=True)._log_job_history_changes(before)
 
         return res
 

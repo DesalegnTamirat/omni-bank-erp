@@ -46,7 +46,7 @@
                         <br/>
 
                         <p> It is to be recalled that you have been assigned as<strong> <span t-field="o.current_job_position"/> </strong>at <strong><span t-field="o.current_work_unit"/></strong> effective<strong><span t-field="o.start_date"/></strong> by letter Ref. No.<strong><span t-field="o.reference"/></strong> dated <strong><span t-field="o.start_date"/></strong> </p>
-<!-- <t t-if="o.depreciation_line_ids"> -->
+<!--                        <t t-if="o.depreciation_line_ids">-->
                         <br/>
 
                         <p>However, this is to inform you that your acting assignment is terminated effective <strong><span t-field="o.end_date"/></strong>. Thus, you are advised to handover all documents, properties  and pending tasks to <strong><span t-field="o.acting_employee"/></strong> </p>
@@ -76,7 +76,7 @@
                                     <!-- Add more fields as needed -->
                                 </t>
 
-<!-- <span t-field="o.resignation_type" /> -->
+<!--                                <span t-field="o.resignation_type" />-->
                                   <br/>
                              </div>
 

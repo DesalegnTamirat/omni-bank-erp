@@ -209,11 +209,32 @@ class JobPositionException(models.Model):
                         "Please change the Start Date to TOMORROW (%s) or a future date (e.g. next Sunday)."
                     ) % (rec.employee_id.name, today.strftime('%Y-%m-%d'), tomorrow.strftime('%Y-%m-%d')))
 
+    can_end_shift = fields.Boolean(
+        string="Can End Shift",
+        compute="_compute_can_end_shift"
+    )
+
+    @api.depends_context('uid')
+    def _compute_can_end_shift(self):
+        current_uid = self.env.uid
+        is_admin = (
+            self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
+            self.env.user.has_group('base.group_system') or
+            self.env.is_superuser()
+        )
+        for rec in self:
+            is_creator = bool(rec.create_uid and rec.create_uid.id == current_uid)
+            is_direct_mgr = bool(rec.employee_id and rec.employee_id.parent_id and rec.employee_id.parent_id.user_id and rec.employee_id.parent_id.user_id.id == current_uid)
+            is_attendance_mgr = bool(rec.employee_id and rec.employee_id.attendance_manager_id and rec.employee_id.attendance_manager_id.id == current_uid)
+            rec.can_end_shift = is_admin or is_creator or is_direct_mgr or is_attendance_mgr
+
     @api.constrains('start_date', 'end_date')
     def _check_dates_validity(self):
+        if self.env.context.get('skip_date_check'):
+            return
         today = fields.Date.context_today(self)
         for rec in self:
-            if rec.start_date and rec.start_date < today:
+            if rec.start_date and rec.start_date < today and not rec.create_date:
                 raise ValidationError(_("Start Date (%s) cannot be in the past. Please select today (%s) or a future date.") % (rec.start_date, today))
             if rec.start_date and rec.end_date and rec.end_date < rec.start_date:
                 raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
@@ -221,18 +242,15 @@ class JobPositionException(models.Model):
     def unlink(self):
         if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
                 self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
+                self.env.user.has_group('base.group_system') or
                 self.env.is_superuser()):
-            raise UserError(_("Only Job Position Officers or Attendance Administrators can delete Job Position Exceptions."))
-        for rec in self:
-            if rec.active and rec.status == 'active' and rec.employee_id:
-                open_att = rec._get_open_attendance()
-                if open_att:
-                    raise ValidationError(_(
-                        "Cannot delete or archive shift exception for '%s' while they have an active open attendance session.\n\n"
-                        "Employee checked in at %s. Please wait until the employee checks out before deleting their shift schedule."
-                    ) % (rec.employee_id.name, open_att.check_in))
-            rec.write({'active': False})
-        return True
+            for rec in self:
+                is_creator = bool(rec.create_uid and rec.create_uid.id == self.env.uid)
+                is_direct_mgr = bool(rec.employee_id and rec.employee_id.parent_id and rec.employee_id.parent_id.user_id and rec.employee_id.parent_id.user_id.id == self.env.uid)
+                is_attendance_mgr = bool(rec.employee_id and rec.employee_id.attendance_manager_id and rec.employee_id.attendance_manager_id.id == self.env.uid)
+                if not (is_creator or is_direct_mgr or is_attendance_mgr):
+                    raise UserError(_("Only Job Position Officers, Attendance Administrators, or the creating manager can delete Job Position Exceptions."))
+        return super(JobPositionException, self.with_context(skip_date_check=True)).unlink()
 
     def _send_notification_to_employee(self, record, body_html):
         """ Sends direct chat notification in Discuss and posts to record chatter """
@@ -483,5 +501,32 @@ class JobPositionException(models.Model):
 
             record._send_notification_to_employee(record, body)
             record.write({'notify_status': 'notified'})
+
+    def action_end_shift(self):
+        """Ends shift exception, sets status inactive, and archives the exception record."""
+        self.ensure_one()
+        if not self.can_end_shift:
+            raise UserError(_("Only System/Attendance Administrators or the manager who created this exception can end it."))
+
+        today_date = fields.Date.context_today(self)
+        _logger.info("Archiving shift exception for employee %s (Shift: %s)", self.employee_id.name, self.shift_id.name if self.shift_id else 'N/A')
+        
+        self.with_context(skip_date_check=True).sudo().write({
+            'end_date': today_date,
+            'status': 'inactive',
+            'active': False,
+        })
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Shift Exception Ended & Archived'),
+                'message': _('The shift exception has been archived successfully. Employee schedule has reverted to default.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            }
+        }
 
 

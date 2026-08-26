@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+
+        <!-- ==========================================================
+             hr.employee.delegation record rules
+        =========================================================== -->
+
+        <!-- Requestor (Manager/Delegator): full control, but ONLY over
+             delegation requests where they themselves are the delegator.
+             This also scopes create/write so a coach can only delegate
+             their own staff, never impersonate another manager. -->
+        <record id="rule_hr_employee_delegation_requestor" model="ir.rule">
+            <field name="name">Employee Delegation: Requestor Full Access (Own Requests Only)</field>
+            <field name="model_id" ref="model_hr_employee_delegation"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- Delegate / Notification Recipients: read-only visibility of
+             requests that concern them. They can never edit or cancel a
+             delegation they did not create. -->
+        <record id="rule_hr_employee_delegation_related_readonly" model="ir.rule">
+            <field name="name">Employee Delegation: Delegate/Notified Read-Only Access</field>
+            <field name="model_id" ref="model_hr_employee_delegation"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', ('delegate_id.user_id', '=', user.id), ('notification_recipient_ids.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <!-- Record Rule for HR Managers / Directorate (Bank-wide Visibility) -->
+        <record id="rule_hr_employee_delegation_manager" model="ir.rule">
+            <field name="name">Employee Delegation: HR Manager Bank-wide Access</field>
+            <field name="model_id" ref="model_hr_employee_delegation"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ==========================================================
+             hr.employee visibility rule
+             A regular employee's own hr.employee record-rule set may be
+             stricter than this module needs (e.g. limited to self/direct
+             reports only). This rule ADDITIONALLY grants read access to
+             any hr.employee record that shows up as the manager/delegator
+             or the delegate in a delegation the current user is party to
+             (as delegator, delegate, or notification recipient), so the
+             delegation record's manager/delegate details never trigger an
+             Access Error for them. Read-only; no write/create/unlink.
+
+             NOTE: this rule ORs with other rules attached to the SAME
+             group (base.group_user). If the stricter hr.employee rule in
+             this database is defined as a *global* rule (no group), a
+             global rule always ANDs and cannot be widened from here -
+             in that case the global rule itself must be updated to
+             include this same condition.
+        =========================================================== -->
+        <record id="rule_hr_employee_visible_via_delegation" model="ir.rule">
+            <field name="name">HR Employee: Strict Hierarchy Access</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('coach_id', '=', user.employee_id.id), ('parent_id', '=', user.employee_id.id), ('id', 'in', user.employee_id._get_delegated_subordinate_ids())]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+
+
+    </data>
+</odoo>

@@ -15,7 +15,7 @@ class EmployeeDemotion(models.Model):
     change_date = fields.Date(string='Demotion Start Date', help="Demotion Start Date",required=True)
     job_history_start_date = fields.Date(string='Job History Start Date', help="Job History Start Date")
     job_history_end_date = fields.Date(string='Job History End Date', help="Job History End Date")
-    reason = fields.Char(string='Reason for Change ', help="Reason for Change")
+    reason = fields.Char(string='Reason for Change ', help="Reason for Change ")
     status= fields.Char(string='Status', help="Status")
     state = fields.Selection(
         [('draft', 'Draft'), ('populate_benefits', 'Populated Benifits'),

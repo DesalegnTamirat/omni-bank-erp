@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Bank-wide TNA Summary Report View -->
+    <!-- Bank-wide TNA Summary Report Views -->
     <record id="view_eds_report_tna_tree" model="ir.ui.view">
         <field name="name">eds.report.tna.tree</field>
         <field name="model">eds.report.tna</field>
@@ -9,20 +9,63 @@
                 <field name="cycle_id"/>
                 <field name="work_unit_id"/>
                 <field name="competency_id"/>
-                <field name="gap_severity" widget="badge"/>
-                <field name="delivery_mode"/>
+                <field name="gap_severity" widget="badge" decoration-danger="gap_severity == 'critical'" decoration-warning="gap_severity == 'high'" decoration-info="gap_severity == 'medium'"/>
+                <field name="delivery_mode" widget="badge"/>
                 <field name="total_entries" sum="Total Needs"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_eds_report_tna_graph" model="ir.ui.view">
+        <field name="name">eds.report.tna.graph</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <graph string="TNA Training Needs by Delivery Mode &amp; Severity" type="bar">
+                <field name="gap_severity"/>
+                <field name="total_entries" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_eds_report_tna_pivot" model="ir.ui.view">
+        <field name="name">eds.report.tna.pivot</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <pivot string="Bank-wide TNA Summary Matrix">
+                <field name="work_unit_id" type="row"/>
+                <field name="gap_severity" type="col"/>
+                <field name="total_entries" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_eds_report_tna_search" model="ir.ui.view">
+        <field name="name">eds.report.tna.search</field>
+        <field name="model">eds.report.tna</field>
+        <field name="arch" type="xml">
+            <search string="TNA Search">
+                <field name="cycle_id"/>
+                <field name="work_unit_id"/>
+                <field name="competency_id"/>
+                <filter string="Critical Severity" name="critical" domain="[('gap_severity', '=', 'critical')]"/>
+                <filter string="High Severity" name="high" domain="[('gap_severity', '=', 'high')]"/>
+                <group>
+                    <filter string="TNA Cycle" name="group_by_cycle" context="{'group_by': 'cycle_id'}"/>
+                    <filter string="Severity" name="group_by_severity" context="{'group_by': 'gap_severity'}"/>
+                    <filter string="Delivery Mode" name="group_by_delivery" context="{'group_by': 'delivery_mode'}"/>
+                </group>
+            </search>
         </field>
     </record>
 
     <record id="action_eds_report_tna" model="ir.actions.act_window">
         <field name="name">Bank-wide TNA Summary Report</field>
         <field name="res_model">eds.report.tna</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="search_view_id" ref="view_eds_report_tna_search"/>
     </record>
 
-    <!-- Annual Plan Variance Report View -->
+    <!-- Annual Plan Variance Report Views -->
     <record id="view_eds_report_annual_plan_tree" model="ir.ui.view">
         <field name="name">eds.report.annual.plan.tree</field>
         <field name="model">eds.report.annual.plan</field>
@@ -32,18 +75,41 @@
                 <field name="course_id"/>
                 <field name="scheduled_month"/>
                 <field name="budget_allocated"/>
-                <field name="status" widget="badge"/>
+                <field name="status" widget="badge" decoration-success="status == 'delivered'" decoration-info="status == 'scheduled'" decoration-warning="status == 'delayed'" decoration-danger="status == 'cancelled'"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_eds_report_annual_plan_graph" model="ir.ui.view">
+        <field name="name">eds.report.annual.plan.graph</field>
+        <field name="model">eds.report.annual.plan</field>
+        <field name="arch" type="xml">
+            <graph string="Annual L&amp;D Plan Budget Allocation by Status" type="bar">
+                <field name="status"/>
+                <field name="budget_allocated" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_eds_report_annual_plan_pivot" model="ir.ui.view">
+        <field name="name">eds.report.annual.plan.pivot</field>
+        <field name="model">eds.report.annual.plan</field>
+        <field name="arch" type="xml">
+            <pivot string="Annual L&amp;D Plan Variance Matrix">
+                <field name="course_id" type="row"/>
+                <field name="status" type="col"/>
+                <field name="budget_allocated" type="measure"/>
+            </pivot>
         </field>
     </record>
 
     <record id="action_eds_report_annual_plan" model="ir.actions.act_window">
         <field name="name">Annual L&amp;D Plan Variance Report</field>
         <field name="res_model">eds.report.annual.plan</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">graph,pivot,list</field>
     </record>
 
-    <!-- Training Delivery & Attendance Report View -->
+    <!-- Training Delivery & Attendance Report Views -->
     <record id="view_eds_report_delivery_tree" model="ir.ui.view">
         <field name="name">eds.report.delivery.tree</field>
         <field name="model">eds.report.delivery</field>
@@ -58,13 +124,36 @@
         </field>
     </record>
 
+    <record id="view_eds_report_delivery_graph" model="ir.ui.view">
+        <field name="name">eds.report.delivery.graph</field>
+        <field name="model">eds.report.delivery</field>
+        <field name="arch" type="xml">
+            <graph string="Training Attendance Rate by Course" type="bar">
+                <field name="course_id"/>
+                <field name="attendance_percentage" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_eds_report_delivery_pivot" model="ir.ui.view">
+        <field name="name">eds.report.delivery.pivot</field>
+        <field name="model">eds.report.delivery</field>
+        <field name="arch" type="xml">
+            <pivot string="Attendance Matrix">
+                <field name="course_id" type="row"/>
+                <field name="attended" type="col"/>
+                <field name="attendance_percentage" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
     <record id="action_eds_report_delivery" model="ir.actions.act_window">
         <field name="name">Training Delivery &amp; Attendance Report</field>
         <field name="res_model">eds.report.delivery</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">graph,pivot,list</field>
     </record>
 
-    <!-- Consolidated L1-L4 Evaluation Report View -->
+    <!-- Consolidated L1-L4 Evaluation Report Views -->
     <record id="view_eds_report_evaluation_tree" model="ir.ui.view">
         <field name="name">eds.report.evaluation.tree</field>
         <field name="model">eds.report.evaluation</field>
@@ -80,13 +169,38 @@
         </field>
     </record>
 
+    <record id="view_eds_report_evaluation_graph" model="ir.ui.view">
+        <field name="name">eds.report.evaluation.graph</field>
+        <field name="model">eds.report.evaluation</field>
+        <field name="arch" type="xml">
+            <graph string="L1 Reaction &amp; L2 Learning Scores by Course" type="bar">
+                <field name="course_id"/>
+                <field name="l1_score" type="measure"/>
+                <field name="l2_post_score" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_eds_report_evaluation_pivot" model="ir.ui.view">
+        <field name="name">eds.report.evaluation.pivot</field>
+        <field name="model">eds.report.evaluation</field>
+        <field name="arch" type="xml">
+            <pivot string="L1-L4 Evaluation Matrix">
+                <field name="course_id" type="row"/>
+                <field name="l2_passed" type="col"/>
+                <field name="l1_score" type="measure"/>
+                <field name="l2_post_score" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
     <record id="action_eds_report_evaluation" model="ir.actions.act_window">
         <field name="name">Consolidated L1-L4 Evaluation Report</field>
         <field name="res_model">eds.report.evaluation</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">graph,pivot,list</field>
     </record>
 
-    <!-- Employee Learning & Certification Transcript View -->
+    <!-- Employee Learning & Certification Transcript Views -->
     <record id="view_eds_report_transcript_tree" model="ir.ui.view">
         <field name="name">eds.report.transcript.tree</field>
         <field name="model">eds.report.transcript</field>
@@ -101,9 +215,30 @@
         </field>
     </record>
 
+    <record id="view_eds_report_transcript_graph" model="ir.ui.view">
+        <field name="name">eds.report.transcript.graph</field>
+        <field name="model">eds.report.transcript</field>
+        <field name="arch" type="xml">
+            <graph string="Issued Certificates by Course" type="bar">
+                <field name="course_id"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_eds_report_transcript_pivot" model="ir.ui.view">
+        <field name="name">eds.report.transcript.pivot</field>
+        <field name="model">eds.report.transcript</field>
+        <field name="arch" type="xml">
+            <pivot string="Certificates Matrix">
+                <field name="course_id" type="row"/>
+                <field name="employee_id" type="col"/>
+            </pivot>
+        </field>
+    </record>
+
     <record id="action_eds_report_transcript" model="ir.actions.act_window">
         <field name="name">Employee Learning Transcripts</field>
         <field name="res_model">eds.report.transcript</field>
-        <field name="view_mode">list</field>
+        <field name="view_mode">graph,pivot,list</field>
     </record>
 </odoo>

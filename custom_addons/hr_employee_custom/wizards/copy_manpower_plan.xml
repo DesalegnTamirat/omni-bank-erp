@@ -7,8 +7,8 @@
             <form string="Salary Rules">
 
                     <group>
-<!-- <field name="plan_version"/> -->
-<!-- <field name="fuel_rate"/> -->
+<!--                        <field name="plan_version"/>-->
+<!--                        <field name="fuel_rate"/>-->
                     </group>
 
 

@@ -6,7 +6,7 @@
             <field name="name">hr.attendance.batch.request.form</field>
             <field name="model">hr.attendance.batch.request</field>
             <field name="arch" type="xml">
-                <form string="Batch Attendance Entry Request" duplicate="0" delete="0">
+                <form string="Batch Attendance Entry Request" create="0" duplicate="0" delete="0">
                     <field name="is_responsible_approver" invisible="1"/>
                     <field name="is_creator" invisible="1"/>
                     <header>
@@ -52,7 +52,7 @@
             <field name="name">hr.attendance.batch.request.list</field>
             <field name="model">hr.attendance.batch.request</field>
             <field name="arch" type="xml">
-                <list string="Batch Attendance Entry Requests" duplicate="0" delete="0">
+                <list string="Batch Attendance Entry Requests" create="0" duplicate="0" delete="0">
                     <field name="name"/>
                     <field name="manager_id"/>
                     <field name="coach_id"/>

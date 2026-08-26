@@ -59,7 +59,7 @@
                                  <!-- <span t-field="o.operating_unit_tag" /> -->
                                   <br/>
 
-<!-- <span t-field="o.resignation_type" /> -->
+<!--                                <span t-field="o.resignation_type" />-->
                                   <br/>
                              </div>
 

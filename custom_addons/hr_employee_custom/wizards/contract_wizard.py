@@ -20,8 +20,8 @@ class salary_rules(models.TransientModel):
     def cancel(self):
         print("self",self)
 
-    # def run_contract_rules(self)
-    # self.env.cr.execute("SELECT contract_rules")
-    # self.env.cr.commit
-    # print('contract rules executed')
-    # return {'type': 'ir.actions.act_window_close'}
+    # def run_contract_rules(self):
+    #     self.env.cr.execute("SELECT contract_rules()")
+    #     self.env.cr.commit()
+    #     print('contract rules executed')
+    #     return {'type': 'ir.actions.act_window_close'}

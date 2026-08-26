@@ -37,8 +37,8 @@
                     </group>
                      <!-- <group> -->
                          
-<!-- <button name="populate_item"  string="Populate Positions" type="object" class="oe_highlight"/> -->
-<!-- <button name="populate_item"  invisible="populated_status in [&apos;populated&apos;]" string="Populate Positions" type="object" class="oe_highlight"/> -->
+<!--                         <button name="populate_item"  string="Populate Positions" type="object" class="oe_highlight"/>-->
+<!--                         <button name="populate_item"  invisible="populated_status in [&apos;populated&apos;]" string="Populate Positions" type="object" class="oe_highlight"/>-->
                      <!-- </group> -->
 
                 </group>

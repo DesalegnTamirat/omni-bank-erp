@@ -117,7 +117,7 @@ class net_salary_payment(models.TransientModel):
         self.env["call.api.n"].process_api(p_id)
         # cr = self.env.cr
         # cr.execute("SELECT pre_process_payroll(%s,)", (p_id))
-        # cr.commit
+        # cr.commit()
         print("Net Pay Transfer Executed")
 
     def cancel(self):

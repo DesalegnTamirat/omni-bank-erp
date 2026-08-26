@@ -175,7 +175,8 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
-        <!-- multi-company rules for procurement documents -->
+        <!-- COMMENTED OUT PER USER JOURNEY: RFP Procurement & Contracts omitted from 14 Use Cases -->
+        <!--
         <record id="rule_eds_venue_requirement_multi_company" model="ir.rule">
             <field name="name">Venue Requirement Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_venue_requirement"/>
@@ -201,6 +202,7 @@
             <field name="model_id" ref="employee_development_system.model_eds_training_contract"/>
             <field name="domain_force">[('provider_id', '!=', False)]</field>
         </record>
+        -->
 
         <!-- annual plan + sessions + venues are L&amp;D-team operational documents -->
         <record id="rule_eds_annual_plan_staff" model="ir.rule">
@@ -239,12 +241,15 @@
             <field name="domain_force">[('venue_id', '!=', False)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
+        <!-- COMMENTED OUT PER USER JOURNEY: Unscheduled training requests omitted from 14 Use Cases -->
+        <!--
         <record id="rule_eds_unscheduled_request_staff" model="ir.rule">
             <field name="name">Unscheduled Requests L&amp;D Only</field>
             <field name="model_id" ref="employee_development_system.model_eds_unscheduled_request"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
+        -->
 
         <!-- multi-company rules (module convention) -->
         <record id="rule_eds_annual_plan_multi_company" model="ir.rule">
@@ -277,11 +282,13 @@
             <field name="model_id" ref="employee_development_system.model_eds_venue_booking"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
+        <!--
         <record id="rule_eds_unscheduled_request_multi_company" model="ir.rule">
             <field name="name">Unscheduled Request Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_unscheduled_request"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
+        -->
 
         <!-- nominations - employees see their own, line managers their team -->
         <record id="rule_eds_nomination_employee_own" model="ir.rule">
@@ -432,7 +439,8 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
-        <!-- Confidential Assessment Center Record Rules -->
+        <!-- COMMENTED OUT PER USER JOURNEY: Assessment Centers omitted from 14 Use Cases -->
+        <!--
         <record id="rule_eds_ac_result_assessor_and_staff" model="ir.rule">
             <field name="name">Assessment Center Results: Assessors and L&amp;D Officers</field>
             <field name="model_id" ref="employee_development_system.model_eds_assessment_center_result"/>
@@ -445,6 +453,7 @@
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
+        -->
 
     </data>
 </odoo>

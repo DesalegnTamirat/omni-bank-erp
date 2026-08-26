@@ -7,8 +7,8 @@
             <field name="arch" type="xml">
                 <form string="Manual Attendance Entry">
                     <div class="alert alert-info" role="alert">
-                        <strong>Manual Attendance &amp; Finacle Rest Manager Entry</strong><br/>
-                        Select mode: Individual employee correction, Batch Operating Unit entry (multi-date / outage), or Finacle EOD Compensatory Rest. Note: Manual entry is strictly allowed for past dates or today.
+                        <strong>Manual Attendance &amp; Duty OFF Manager Entry</strong><br/>
+                        Select mode: Individual employee correction, Batch Operating Unit entry (multi-date / outage), or Duty OFF (Half-Day / Full-Day). Note: Manual entry is strictly allowed for past dates or today.
                     </div>
                     <group>
                         <field name="entry_type" widget="radio" class="oe_inline"/>
@@ -20,9 +20,9 @@
                             <field name="employee_id" required="entry_type == 'individual'"/>
                             <field name="work_date" required="entry_type == 'individual'"/>
                         </group>
-                        <group string="Timestamps (Time &amp; Date)">
-                            <field name="check_in" required="entry_type == 'individual'"/>
-                            <field name="check_out" placeholder="Leave blank for Check-In only..."/>
+                        <group string="Timestamps (Time Only)">
+                            <field name="check_in_time" widget="float_time" required="entry_type == 'individual'"/>
+                            <field name="check_out_time" widget="float_time" placeholder="Leave blank for Check-In only..."/>
                         </group>
                     </group>
 

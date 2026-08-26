@@ -99,12 +99,15 @@
                   action="action_eds_external_provider"
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: RFP evaluation criteria omitted from 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_evaluation_criteria"
                   name="Evaluation Criteria Templates"
                   parent="menu_eds_trainers"
                   action="action_eds_evaluation_criteria"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
         <menuitem id="menu_eds_venues"
                   name="Venues"
                   parent="menu_eds_trainers"
@@ -118,7 +121,8 @@
                   sequence="50"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Procurement & Contracts -->
+        <!-- COMMENTED OUT PER USER JOURNEY: Omitted from 14 EDS User Journey Use Cases -->
+        <!--
         <menuitem id="menu_eds_procurement"
                   name="Procurement &amp; Contracts"
                   parent="menu_eds_root"
@@ -149,6 +153,7 @@
                   action="action_eds_training_contract"
                   sequence="40"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
 
         <!-- Delivery -->
         <menuitem id="menu_eds_delivery"
@@ -169,12 +174,15 @@
                   action="action_eds_batch"
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: Ad-hoc nominations handled in Session Nomination (Use Case 5) -->
+        <!--
         <menuitem id="menu_eds_unscheduled_requests"
                   name="Unscheduled Training Requests"
                   parent="menu_eds_delivery"
                   action="action_eds_unscheduled_request"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
         <menuitem id="menu_eds_nominations"
                   name="Nominations"
                   parent="menu_eds_delivery"
@@ -423,7 +431,8 @@
                   sequence="90"
                   groups="employee_development_system.group_eds_officer"/>
 
-        <!-- Apply-Stage Development Interventions -->
+        <!-- COMMENTED OUT PER USER JOURNEY: The standalone Development Interventions submenus below are present in BRD Requirement only, but omitted from the 14 EDS User Journey Use Cases -->
+        <!--
         <menuitem id="menu_eds_apply_stage"
                   name="Development Interventions"
                   parent="menu_eds_root"
@@ -476,6 +485,7 @@
                   parent="menu_eds_apply_stage"
                   action="action_eds_assessment_center"
                   sequence="80"/>
+        -->
 
     </data>
 </odoo>

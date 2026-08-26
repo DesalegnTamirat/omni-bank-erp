@@ -49,8 +49,8 @@ class TransformDetails(models.Model):
     job_category1 = fields.Many2one('employee.job', 'Job Category', readonly=True)
     transfer_requested_date = fields.Date(string='Transfer Requested Date', help="Transfer Requested Date" )
     reason_for_transfer = fields.Text(string='Reason for Transfer', help="Reason for transfer" , readonly=True)
-    responsible = fields.Many2one('hr.employee', string='Responsible ', help="Responsible")
-    authorized_by = fields.Many2one('hr.employee', string='Authorized By ', help="Authorized by")
+    responsible = fields.Many2one('hr.employee', string='Responsible ', help="Responsible ")
+    authorized_by = fields.Many2one('hr.employee', string='Authorized By ', help="Authorized by ")
     authorized_date = fields.Date(string='Authorized Date', help="Authorized Date")
     approved_by = fields.Many2one('hr.employee', string='Approved By', help="Approved by")
     approved_date = fields.Date(string='Approved Date', help="Approved Date")
@@ -86,7 +86,7 @@ class TransformDetails(models.Model):
 					# self.mail_channel_msgs(usr.id, self.ref_num, self.job_position.name, self.type_of_employment)
         self.status_del = "notify"
 
-# def mail_channel_msgs(self, rec_id, ref, arg1, arg2)
+# def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
     def mail_channel_msgs(self, rec_id, ref, arg1):
             # print("*************")
             channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
@@ -108,7 +108,7 @@ class TransformDetails(models.Model):
     def evaluate(self):
         # print("**************vacancy evaluate")
         n=0
-        usr = self.env.user.name # name of login user details
+        usr = self.env.user.name #  name of login user details
         # print("******************usr", usr)
         for val in self.transform_del_id:
             if val.status=="unavailable":
@@ -235,46 +235,46 @@ class transform_multi_record(models.Model):
     end_date = fields.Date("End Date")
 
 
-# class HrEmployee(models.Model)
-# _inherit = 'hr.employee'
-# #
+# class HrEmployee(models.Model):
+#     _inherit = 'hr.employee'
+#     #
 
 
-# class HrEmployeeDocument(models.Model)
-# _inherit = 'hr.employee.document'
-# _description = 'HR Employee Documents'
-
-# class HrEmployee(models.Model)
-# _inherit = 'hr.employee'
-
-# def _document_count(self)
-# for each in self
-# document_ids = self.env['transfer_form'].sudo.search([('employee_ref', '=', each.id)])
-# each.document_count = len(document_ids)
-# # def _document_count(self)
-# #     for each in self
-# #         document_ids = self.env['transfer_form'].sudo.search([('employee_ref', '=', each.id)])
-# #         each.document_count = len(document_ids)
-
-# def document_view(self)
-# self.ensure_one
-# domain = [
-# ('employee_ref', '=', self.id)]
-# return {
-# 'name': _('Documents')
-# 'domain': domain
-# 'res_model': 'transfer_form'
-# 'type': 'ir.actions.act_window'
-# 'view_id': False
-# 'view_mode': 'tree,form'
-# 'help': _('''<p class="oe_view_nocontent_create">
-# Click to Create for New Documents
-# </p>''')
-# 'limit': 80
-# 'context': "{'default_employee_ref': %s}" % self.id
-# }
-
-# document_count = fields.Integer(compute='_document_count', string='# Documents')
+# class HrEmployeeDocument(models.Model):
+#     _inherit = 'hr.employee.document'
+#     _description = 'HR Employee Documents'
+#
+# class HrEmployee(models.Model):
+#     _inherit = 'hr.employee'
+#
+#     def _document_count(self):
+#         for each in self:
+#             document_ids = self.env['transfer_form'].sudo().search([('employee_ref', '=', each.id)])
+#             each.document_count = len(document_ids)
+#     # def _document_count(self):
+#     #     for each in self:
+#     #         document_ids = self.env['transfer_form'].sudo().search([('employee_ref', '=', each.id)])
+#     #         each.document_count = len(document_ids)
+#
+#     def document_view(self):
+#         self.ensure_one()
+#         domain = [
+#             ('employee_ref', '=', self.id)]
+#         return {
+#             'name': _('Documents'),
+#             'domain': domain,
+#             'res_model': 'transfer_form',
+#             'type': 'ir.actions.act_window',
+#             'view_id': False,
+#             'view_mode': 'tree,form',
+#             'help': _('''<p class="oe_view_nocontent_create">
+#                            Click to Create for New Documents
+#                         </p>'''),
+#             'limit': 80,
+#             'context': "{'default_employee_ref': %s}" % self.id
+#         }
+#
+#     document_count = fields.Integer(compute='_document_count', string='# Documents')
 # #
 class HrEmployeeAttachment_data(models.Model):
     _inherit = 'ir.attachment'
@@ -283,8 +283,8 @@ class HrEmployeeAttachment_data(models.Model):
                                        string="Attachment")
     # DOCUMENT MANAGEMENT MODULE NOT INSTALLED — 'hr.document' model does not
     # exist in this database. Uncomment once that module is installed.
-    # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id'
-    # string="Attachment")
+    # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id',
+    #                               string="Attachment")
 
 class SupplementaryDelegation(models.Model):
     _name = "transfer.delegation.team"

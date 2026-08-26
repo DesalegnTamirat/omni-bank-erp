@@ -4,7 +4,7 @@
         <record model="ir.ui.view" id="employee_department_history">
             <field name="name">departmenthistory.tree</field>
             <field name="model">department.history</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list editable="bottom">
                     <field name="employee_id"/>
@@ -23,7 +23,7 @@
         <record model="ir.ui.view" id="employee_timesheet_history">
             <field name="name">timesheetcost.tree</field>
             <field name="model">timesheet.cost</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list string="timesheet_cost">
                     <field name="employee_id" invisible="True"/>
@@ -37,7 +37,7 @@
         <record model="ir.ui.view" id="employee_salary_history">
             <field name="name">salaryhistory.tree</field>
             <field name="model">salary.history</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list string="salary_history">
                     <field name="employee_id" invisible="True"/>
@@ -54,7 +54,7 @@
         <record model="ir.ui.view" id="employee_contract_history">
             <field name="name">contracthistory.tree</field>
             <field name="model">contract.history</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list string="contract">
                     <field name="employee_id" invisible="True"/>
@@ -69,7 +69,7 @@
         <record model="ir.ui.view" id="employee_transfer_history_history">
             <field name="name">transfer.history.tree</field>
             <field name="model">transfer.history</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list string="contract">
                     <field name="employee_id" invisible="True"/>
@@ -92,7 +92,7 @@
         <record model="ir.ui.view" id="employee_re_instated_history">
             <field name="name">Reinstated History Tree</field>
             <field name="model">re.instated.history</field>
-<!-- <field name="view_mode">tree</field> -->
+<!--            <field name="view_mode">tree</field>-->
             <field name="arch" type="xml">
                 <list string="Reinstated">
                     <field name="employee_id" invisible="True"/>

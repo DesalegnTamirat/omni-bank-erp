@@ -29,11 +29,11 @@ class DisciplineCaseAttendance(models.Model):
         Returns the created discipline.case record, or None if the offense is not found.
         """
         kind_map = {
-            'lateness': 'discipline_management.offense_latecoming',
-            'force_checkout': 'discipline_management.offense_leaving_without_permission',
-            'absence': 'discipline_management.offense_absence_without_cause',
+            'lateness': 'custom_hr_attendance.offense_repeated_lateness',
+            'force_checkout': 'custom_hr_attendance.offense_repeated_force_checkout',
+            'absence': 'custom_hr_attendance.offense_repeated_absence',
         }
-        offense_xmlid = kind_map.get(kind, 'discipline_management.offense_latecoming')
+        offense_xmlid = kind_map.get(kind, 'custom_hr_attendance.offense_repeated_lateness')
         offense = self.env.ref(offense_xmlid, raise_if_not_found=False)
         if not offense:
             _logger.warning(
@@ -112,29 +112,31 @@ class HrAttendanceViolationProcessor(models.Model):
         notif_log = self.env['hr.attendance.notification.log']
 
         # --- LATE CHECK-IN CUMULATIVE HOURS COUNTER ---
+        # --- DYNAMIC CONFIGURABLE LATENESS DISCIPLINE RULES ENGINE ---
         if self.check_in_status == 'Late':
-            hours_threshold = float(params.get_param(
-                'hr_attendance.lateness_hours_violation_threshold', 4.0
-            ))
-            eval_months = int(params.get_param(
-                'hr_attendance.lateness_eval_window_months', 3
-            ))
-
             today = fields.Date.context_today(self)
-            eval_start_date = today - timedelta(days=eval_months * 30)
+            lateness_rules = self.env['attendance.lateness.rule'].sudo().search([('active', '=', True)], order='threshold_hours desc')
+            
+            # Fallback values if no custom rules configured
+            hours_threshold = float(params.get_param('hr_attendance.lateness_hours_violation_threshold', 4.0))
+            eval_months = int(params.get_param('hr_attendance.lateness_eval_window_months', 3))
 
-            # Compute total cumulative late hours in rolling window
-            recent_atts = self.env['hr.attendance'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
-                ('check_in_status', '=', 'Late')
-            ])
-            total_late_hours = sum(att.late_time or getattr(att, 'late_time_hour', 0.0) or 0.0 for att in recent_atts)
-
-            _logger.info(
-                "Employee %s cumulative late hours (%d-month window): %.2f / %.2f hrs threshold.",
-                employee.name, eval_months, total_late_hours, hours_threshold
-            )
+            triggered_rule = False
+            matched_late_hours = 0.0
+            
+            if lateness_rules:
+                for rule in lateness_rules:
+                    eval_start = today - timedelta(days=rule.reset_window_months * 30)
+                    recent_atts = self.env['hr.attendance'].sudo().search([
+                        ('employee_id', '=', employee.id),
+                        ('check_in', '>=', fields.Datetime.to_datetime(eval_start)),
+                        ('check_in_status', '=', 'Late')
+                    ])
+                    tot_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
+                    if tot_hours >= rule.threshold_hours:
+                        triggered_rule = rule
+                        matched_late_hours = tot_hours
+                        break
 
             # Notify Supervisor on late check-in violation
             if employee.parent_id and employee.parent_id.user_id:
@@ -144,14 +146,42 @@ class HrAttendanceViolationProcessor(models.Model):
                         'res_id': self.id,
                         'user_id': employee.parent_id.user_id.id,
                         'summary': _('Attendance Violation: %s Late Check-in') % employee.name,
-                        'note': _('Employee %s checked in late on %s.') % (employee.name, fields.Date.context_today(self)),
+                        'note': _('Employee %s checked in late on %s.') % (employee.name, today),
                         'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
                     })
 
-            if hours_threshold > 0 and total_late_hours >= hours_threshold:
-                self.env['discipline.case'].sudo()._create_from_attendance(
-                    employee.id, 'lateness', self.id
-                )
+            if triggered_rule and triggered_rule.offense_id:
+                existing_case = self.env['discipline.case'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('offense_id', '=', triggered_rule.offense_id.id),
+                    ('state', 'in', ['draft', 'initiated', 'investigating']),
+                    ('incident_date', '>=', today - timedelta(days=triggered_rule.reset_window_months * 30))
+                ], limit=1)
+                if not existing_case:
+                    case = self.env['discipline.case'].sudo().create({
+                        'employee_id': employee.id,
+                        'offense_id': triggered_rule.offense_id.id,
+                        'description': _(
+                            'Attendance Violation Rule Exceeded: %s\n'
+                            'Threshold: %.2f hours | Recorded Late Hours: %.2f hours (Window: %d months)\n'
+                            'Configured Salary Deduction: %.1f Days'
+                        ) % (triggered_rule.name, triggered_rule.threshold_hours, matched_late_hours, triggered_rule.reset_window_months, triggered_rule.deduction_days),
+                        'reference': 'ATT-LATE-%s' % self.id,
+                    })
+                    if hasattr(case, 'action_initiate'):
+                        case.action_initiate()
+            elif hours_threshold > 0:
+                eval_start_date = today - timedelta(days=eval_months * 30)
+                recent_atts = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '>=', fields.Datetime.to_datetime(eval_start_date)),
+                    ('check_in_status', '=', 'Late')
+                ])
+                total_late_hours = sum(getattr(att, 'late_time_hour', 0.0) or getattr(att, 'late_time', 0.0) or 0.0 for att in recent_atts)
+                if total_late_hours >= hours_threshold:
+                    self.env['discipline.case'].sudo()._create_from_attendance(
+                        employee.id, 'lateness', self.id
+                    )
 
                 # Escalation on threshold breach
                 if notif_log.log_and_check(employee.id, 'violation_hr_escalation'):
@@ -210,6 +240,43 @@ class HrAttendanceViolationProcessor(models.Model):
                             'note': _('Employee %s has reached %d force checkouts. Discipline case initiated.') % (employee.name, force_checkout_threshold),
                             'activity_type_id': self.env.ref('mail.mail_activity_data_warning', raise_if_not_found=False) or self.env.ref('mail.mail_activity_data_todo').id,
                         })
+
+        # --- DYNAMIC CONFIGURABLE ABSENCE DISCIPLINE RULES ENGINE ---
+        absence_rules = self.env['attendance.absence.rule'].sudo().search([('active', '=', True)], order='threshold_days desc')
+        if absence_rules:
+            today = fields.Date.context_today(self)
+            for a_rule in absence_rules:
+                eval_start = today - timedelta(days=a_rule.reset_window_months * 30)
+                # Calculate unexcused missing days + half-day absences in window
+                half_day_atts = self.env['hr.attendance'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('check_in', '>=', fields.Datetime.to_datetime(eval_start)),
+                    ('worked_hours', '>', 0.0),
+                    ('worked_hours', '<', 4.0)
+                ])
+                tot_absent_days = len(half_day_atts) * 0.5
+                
+                if tot_absent_days >= a_rule.threshold_days and a_rule.offense_id:
+                    existing_case = self.env['discipline.case'].sudo().search([
+                        ('employee_id', '=', employee.id),
+                        ('offense_id', '=', a_rule.offense_id.id),
+                        ('state', 'in', ['draft', 'initiated', 'investigating']),
+                        ('incident_date', '>=', eval_start)
+                    ], limit=1)
+                    if not existing_case:
+                        case = self.env['discipline.case'].sudo().create({
+                            'employee_id': employee.id,
+                            'offense_id': a_rule.offense_id.id,
+                            'description': _(
+                                'Absence Discipline Rule Exceeded: %s\n'
+                                'Threshold: %.1f Days | Recorded Absence: %.1f Days (Window: %d months)\n'
+                                'Configured Salary Deduction: %.1f Days'
+                            ) % (a_rule.name, a_rule.threshold_days, tot_absent_days, a_rule.reset_window_months, a_rule.deduction_days),
+                            'reference': 'ATT-ABS-%s' % self.id,
+                        })
+                        if hasattr(case, 'action_initiate'):
+                            case.action_initiate()
+                    break
 
 
 

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- =================================================== -->
+    # LATENESS DISCIPLINE REGULATION RULES
+    <!-- =================================================== -->
+    <record id="attendance_lateness_rule_view_tree" model="ir.ui.view">
+        <field name="name">attendance.lateness.rule.tree</field>
+        <field name="model">attendance.lateness.rule</field>
+        <field name="arch" type="xml">
+            <list string="Lateness Regulation Matrix" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name" placeholder="Rule Name (e.g. Any Late, 4 Hours Late)"/>
+                <field name="threshold_hours" string="Time / Hours Threshold" widget="float"/>
+                <field name="offense_id" string="Warning Level / Case Offense" options="{'no_create': True}"/>
+                <field name="deduction_days" string="Deduction / Fine (Days)" widget="float"/>
+                <field name="reset_window_months" string="Reset Window (Months)" widget="integer"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="attendance_lateness_rule_view_form" model="ir.ui.view">
+        <field name="name">attendance.lateness.rule.form</field>
+        <field name="model">attendance.lateness.rule</field>
+        <field name="arch" type="xml">
+            <form string="Lateness Discipline Regulation Rule">
+                <sheet>
+                    <group>
+                        <group string="Rule Definition">
+                            <field name="sequence"/>
+                            <field name="name"/>
+                            <field name="threshold_hours"/>
+                            <field name="offense_id"/>
+                        </group>
+                        <group string="Penalty &amp; Reset Window">
+                            <field name="deduction_days" help="Deduction in number of days (e.g., 0 = No deduction, 0.5 = Half day, 1.0 = 1 day, 2.0 = 2 days)"/>
+                            <field name="reset_window_months" help="Reset window in number of months (e.g., 1 = 1 month, 3 = 3 months, 6 = 6 months, 12 = 1 year)"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_attendance_lateness_rule" model="ir.actions.act_window">
+        <field name="name">Lateness Discipline Rules</field>
+        <field name="res_model">attendance.lateness.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define lateness discipline rules, thresholds, warning levels, fine deductions, and reset windows.
+            </p>
+        </field>
+    </record>
+
+    <!-- =================================================== -->
+    # ABSENCE DISCIPLINE REGULATION RULES
+    <!-- =================================================== -->
+    <record id="attendance_absence_rule_view_tree" model="ir.ui.view">
+        <field name="name">attendance.absence.rule.tree</field>
+        <field name="model">attendance.absence.rule</field>
+        <field name="arch" type="xml">
+            <list string="Absence Regulation Matrix" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name" placeholder="Rule Name (e.g. 1 Day Absence, 3 Days Absence)"/>
+                <field name="threshold_days" string="Days Threshold" widget="float"/>
+                <field name="offense_id" string="Warning Level / Case Offense" options="{'no_create': True}"/>
+                <field name="deduction_days" string="Deduction / Fine (Days)" widget="float"/>
+                <field name="reset_window_months" string="Reset Window (Months)" widget="integer"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="attendance_absence_rule_view_form" model="ir.ui.view">
+        <field name="name">attendance.absence.rule.form</field>
+        <field name="model">attendance.absence.rule</field>
+        <field name="arch" type="xml">
+            <form string="Absence Discipline Regulation Rule">
+                <sheet>
+                    <group>
+                        <group string="Rule Definition">
+                            <field name="sequence"/>
+                            <field name="name"/>
+                            <field name="threshold_days"/>
+                            <field name="offense_id"/>
+                        </group>
+                        <group string="Penalty &amp; Reset Window">
+                            <field name="deduction_days" help="Deduction in number of days (e.g., 0 = No deduction, 1.0 = 1 day, 3.0 = 3 days)"/>
+                            <field name="reset_window_months" help="Reset window in number of months (e.g., 1 = 1 month, 3 = 3 months, 6 = 6 months, 12 = 1 year)"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_attendance_absence_rule" model="ir.actions.act_window">
+        <field name="name">Absence Discipline Rules</field>
+        <field name="res_model">attendance.absence.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Define absence discipline rules, thresholds, warning levels, fine deductions, and reset windows.
+            </p>
+        </field>
+    </record>
+
+</odoo>

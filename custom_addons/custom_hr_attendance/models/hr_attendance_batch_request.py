@@ -50,9 +50,9 @@ class HrAttendanceBatchRequest(models.Model):
     
     rest_type = fields.Selection([
         ('none', 'Standard Shift Attendance'),
-        ('morning_off', 'Finacle EOD Rest - Morning OFF (08:00 AM - 01:00 PM)'),
-        ('afternoon_off', 'Finacle EOD Rest - Afternoon OFF (12:00 PM - 05:00 PM)'),
-        ('full_day_off', 'Finacle EOD Rest - Full Day OFF')
+        ('morning_off', 'Morning OFF'),
+        ('afternoon_off', 'Afternoon OFF'),
+        ('full_day_off', 'Full Day OFF')
     ], string='Rest / Exception Type', default='none', required=True)
 
     use_employee_shifts = fields.Boolean(string='Use Individual Assigned Shifts', default=True)

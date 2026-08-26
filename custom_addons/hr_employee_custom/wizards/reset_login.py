@@ -30,6 +30,6 @@ class reset_login_details(models.TransientModel):
 
         # cr = self.env.cr
         # cr.execute("SELECT pre_process_payroll(%s,%s)", (p_id,n_id ))
-        # cr.commit
+        # cr.commit()
         # print("Username Reset")
-        # cr.close
+        # cr.close()

@@ -28,7 +28,7 @@
 
                         <br/>
                         <p> It is to be recalled that, the Bank has employed you on <strong><span t-field="o.date_start"/></strong> as <strong><span t-field="o.job_id"/></strong> for a probation period of <strong><span t-field="o.probation_period"/></strong> working days. We are pleased to inform you that, you have successfully completed your probation period on <strong><span t-field="o.probation_end_date"/></strong> and have become a permanent staff member of Bunna Bank S.C.</p>
-<!-- <t t-if="o.depreciation_line_ids"> -->
+<!--                        <t t-if="o.depreciation_line_ids">-->
                         <br/>
 
                             <p>Please note that your future progress in the Bank depends on your commitment to meet the Bank’s set objectives and your readiness to meet the demands of our customers.</p>

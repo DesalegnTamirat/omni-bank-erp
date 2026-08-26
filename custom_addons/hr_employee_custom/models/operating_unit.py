@@ -32,7 +32,7 @@ class OperatingUnit(models.Model):
         "Users Allowed",
     )
 
-    # # added for operating unit
+    ## added for operating unit
     job_position_ids = fields.One2many(
         comodel_name='operating.unit.job.position',
         inverse_name='operating_unit_id',

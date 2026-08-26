@@ -19,7 +19,7 @@ class HrAttendanceManualWizard(models.TransientModel):
     entry_type = fields.Selection([
         ('individual', 'Individual Employee (Single Day)'),
         ('batch', 'Batch Operating Unit (Multi-Day / Outage)'),
-        ('finacle_rest', 'Finacle EOD/EOM Rest (Half-Day / Full-Day)')
+        ('finacle_rest', 'Duty OFF(Half-Day / Full-Day)')
     ], string='Entry Mode', default='individual', required=True)
 
     # --- Individual Mode Fields ---
@@ -55,11 +55,15 @@ class HrAttendanceManualWizard(models.TransientModel):
         string='Attendance Date',
         default=fields.Date.context_today,
     )
-    check_in = fields.Datetime(
+    check_in_time = fields.Float(
         string='Check-In Time',
+        default=8.0,
+        help='Check-in time (e.g. 8.0 = 08:00 AM)',
     )
-    check_out = fields.Datetime(
+    check_out_time = fields.Float(
         string='Check-Out Time',
+        default=17.0,
+        help='Check-out time (e.g. 17.0 = 05:00 PM)',
     )
 
     # --- Batch & Finacle Rest Fields ---
@@ -81,7 +85,7 @@ class HrAttendanceManualWizard(models.TransientModel):
         'manual_wiz_emp_rel',
         'wiz_id',
         'emp_id',
-        string='Employees (Under Manager)',
+        string='Employees',
         domain=lambda self: self._get_employee_domain(),
     )
 
@@ -100,9 +104,9 @@ class HrAttendanceManualWizard(models.TransientModel):
     )
 
     rest_type = fields.Selection([
-        ('morning_off', 'Finacle EOD Rest - Morning OFF (08:00 AM - 01:00 PM)'),
-        ('afternoon_off', 'Finacle EOD Rest - Afternoon OFF (12:00 PM - 05:00 PM)'),
-        ('full_day_off', 'Finacle EOD Rest - Full Day OFF')
+        ('morning_off', 'Morning OFF'),
+        ('afternoon_off', 'Afternoon OFF'),
+        ('full_day_off', 'Full Day OFF')
     ], string='Rest / Exception Type', default='morning_off')
 
     use_employee_shifts = fields.Boolean(
@@ -148,11 +152,10 @@ class HrAttendanceManualWizard(models.TransientModel):
     @api.onchange('work_date')
     def _onchange_work_date(self):
         if self.work_date:
-            local_tz = pytz.timezone('Africa/Addis_Ababa')
-            local_dt_in = local_tz.localize(datetime.datetime.combine(self.work_date, datetime.time(8, 0)))
-            local_dt_out = local_tz.localize(datetime.datetime.combine(self.work_date, datetime.time(17, 0)))
-            self.check_in = local_dt_in.astimezone(pytz.utc).replace(tzinfo=None)
-            self.check_out = local_dt_out.astimezone(pytz.utc).replace(tzinfo=None)
+            if not self.check_in_time:
+                self.check_in_time = 8.0
+            if not self.check_out_time:
+                self.check_out_time = 17.0
 
     @api.constrains('work_date', 'start_date', 'end_date', 'entry_type')
     def _check_back_date(self):
@@ -167,6 +170,23 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if rec.start_date and rec.end_date < rec.start_date:
                     raise ValidationError(_('End Date cannot be before Start Date.'))
 
+    def _float_time_to_utc_dt(self, target_date, float_time):
+        """Converts local EAT date and float time into a UTC Datetime object."""
+        if float_time is None or float_time is False:
+            return False
+        import datetime
+        import pytz
+        eat_tz = pytz.timezone('Africa/Addis_Ababa')
+        
+        hours = int(float_time)
+        minutes = int(round((float_time - hours) * 60))
+        if minutes >= 60:
+            hours = (hours + 1) % 24
+            minutes = 0
+            
+        local_dt = eat_tz.localize(datetime.datetime.combine(target_date, datetime.time(hours, minutes)))
+        return local_dt.astimezone(pytz.UTC).replace(tzinfo=None)
+
     def action_create_manual_attendance(self):
         """Main execution action for Individual, Batch, or Finacle Rest entries."""
         self.ensure_one()
@@ -176,15 +196,20 @@ class HrAttendanceManualWizard(models.TransientModel):
         # SCENARIO 1: INDIVIDUAL ENTRY
         # ----------------------------------------------------
         if self.entry_type == 'individual':
-            if not self.employee_id or not self.work_date or not self.check_in:
+            if not self.employee_id or not self.work_date or self.check_in_time is False:
                 raise ValidationError(_('Employee, Attendance Date, and Check-In Time are required for individual entry.'))
-            if self.check_out and self.check_out <= self.check_in:
+
+            dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
+            dt_check_out = self._float_time_to_utc_dt(self.work_date, self.check_out_time) if self.check_out_time else False
+
+            if dt_check_out and dt_check_out <= dt_check_in:
                 raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))
 
             vals = {
                 'employee_id': self.employee_id.id,
-                'check_in': self.check_in,
-                'check_out': self.check_out if self.check_out else False,
+                'work_date': self.work_date,
+                'check_in': dt_check_in,
+                'check_out': dt_check_out,
                 'is_acknowledged': True,
                 'acknowledged_by': self.env.user.id,
                 'acknowledged_date': fields.Datetime.now(),

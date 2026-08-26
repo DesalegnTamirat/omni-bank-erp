@@ -65,8 +65,28 @@
 
             <!-- 2. Contracts smart button in button_box -->
             <xpath expr="//div[@name='button_box']" position="inside">
+                <field name="contract_warning" invisible="1"/>
+                <field name="first_contract_date" invisible="1"/>
+                <field name="contracts_count" invisible="1"/>
                 <button name="%(hr_employee_custom.act_hr_employee_2_hr_contract)d" class="oe_stat_button" icon="fa-book" type="action" groups="hr_employee_custom.group_hr_contract_manager">
-                    <field name="contracts_count" widget="statinfo" string="Contracts"/>
+                    <!-- Has at least one contract -->
+                    <div invisible="not first_contract_date" class="o_stat_info">
+                        <span class="o_stat_text text-success" invisible="contract_warning">In Contract Since</span>
+                        <span class="o_stat_value text-success" invisible="contract_warning">
+                            <field name="first_contract_date" readonly="1"/>
+                        </span>
+                        <span class="o_stat_text text-danger" invisible="not contract_warning">In Contract Since</span>
+                        <span class="o_stat_value text-danger" invisible="not contract_warning">
+                            <field name="first_contract_date" readonly="1"/>
+                        </span>
+                    </div>
+                    <!-- No contracts yet -->
+                    <div invisible="first_contract_date" class="o_stat_info">
+                        <span class="o_stat_value text-danger">
+                            <field name="contracts_count"/>
+                        </span>
+                        <span class="o_stat_text text-danger">Contracts</span>
+                    </div>
                 </button>
             </xpath>
 
@@ -89,9 +109,18 @@
             <!-- 7. Hide Note section -->
             <xpath expr="//group[@name='note']" position="replace"/>
 
-            <!-- 8. Resource calendar required -->
-            <xpath expr="//field[@name='resource_calendar_id']" position="attributes">
-                <attribute name="required">1</attribute>
+            <!-- 8. Calendar mismatch warning near resource_calendar_id -->
+            <xpath expr="//field[@name='resource_calendar_id']" position="replace">
+                <field name="calendar_mismatch" invisible="1"/>
+                <label for="resource_calendar_id"/>
+                <div>
+                    <field name="resource_calendar_id" required="1" nolabel="1"/>
+                    <span invisible="not calendar_mismatch" class="fa fa-exclamation-triangle text-danger o_calendar_warning ps-3"/>
+                    <span class="o_calendar_warning_tooltip text-danger">
+                        Calendar Mismatch: The employee's working schedule does not match
+                        the current contract's schedule. This may cause unexpected payroll behaviour.
+                    </span>
+                </div>
             </xpath>
 
             <!-- 9. Style the employee form tabs -->
@@ -156,6 +185,10 @@
         </field>
     </record>
 
+
+    <!-- ═══════════════════════════════════════════
+         EMPLOYEE SEARCH — Contract Warning filter
+    ════════════════════════════════════════════ -->
     <record id="hr_employee_view_search_contract" model="ir.ui.view">
         <field name="name">hr.employee.view.search.contract</field>
         <field name="model">hr.employee</field>
@@ -163,6 +196,7 @@
         <field name="arch" type="xml">
             <xpath expr="//filter[@name='message_needaction']" position="after">
                 <separator/>
+                <filter string="Contract Warning" name="with_contract_warning" domain="[('contract_warning','=',True)]" groups="hr_employee_custom.group_hr_contract_manager"/>
             </xpath>
         </field>
     </record>

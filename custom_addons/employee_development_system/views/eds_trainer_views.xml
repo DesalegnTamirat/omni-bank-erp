@@ -162,7 +162,6 @@
                     <field name="accreditation"/>
                     <field name="pre_qualified" widget="boolean_toggle"/>
                     <field name="rating" widget="progressbar"/>
-                    <field name="contract_count"/>
                 </list>
             </field>
         </record>
@@ -210,9 +209,12 @@
                                     </list>
                                 </field>
                             </page>
+                            <!-- COMMENTED OUT PER USER JOURNEY: RFP Contracts omitted from 14 Use Cases -->
+                            <!--
                             <page string="Contracts" name="contracts">
                                 <field name="contract_ids" readonly="1"/>
                             </page>
+                            -->
                             <page string="External Trainers" name="trainers">
                                 <field name="trainer_ids" readonly="1"/>
                             </page>

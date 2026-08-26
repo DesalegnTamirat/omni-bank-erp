@@ -45,10 +45,7 @@ BEGIN
             COALESCE(emp.employee_identification, '') AS employee_identification,
             COALESCE(emp.name, '') AS employee_name,
             COALESCE(ou.name, '') AS place_of_assignment,
-            CASE 
-                WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
-                ELSE COALESCE(ou.name, '')
-            END AS work_unit,
+            COALESCE(ou.name, '') AS work_unit,
             CASE 
                 WHEN pg_typeof(job.name)::text = 'jsonb' THEN COALESCE(job.name->>'en_US', job.name::text, '')
                 ELSE COALESCE(job.name::text, '')
@@ -126,10 +123,7 @@ BEGIN
             COALESCE(job.name, '') AS job_title,
             COALESCE(CAST(emp.job_position AS VARCHAR), 'XIV') AS job_grade,
             COALESCE(ou.name, '') AS place_of_assignment,
-            CASE 
-                WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
-                ELSE COALESCE(ou.name, '')
-            END AS work_unit,
+            COALESCE(ou.name, '') AS work_unit,
             COALESCE(mgr.name, '') AS manager_name,
             TO_CHAR(att.check_in, 'Mon-YYYY') AS attendance_month,
             att.check_in::date AS checkin_date,
@@ -456,6 +450,54 @@ BEGIN
           );
     END IF;
 
+END;
+$$ LANGUAGE plpgsql;
+
+-- Automated Lunch and Shift-End Force Checkout PostgreSQL Engine
+CREATE OR REPLACE FUNCTION process_automated_force_checkouts() RETURNS VOID AS $$
+DECLARE
+    p_now_eat TIMESTAMP := NOW() AT TIME ZONE 'Africa/Addis_Ababa';
+    p_today_eat DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date;
+BEGIN
+    -- 1. LUNCH AUTO CHECKOUT ENGINE:
+    -- Runs 15 mins before Session 2 check-in time for open morning sessions.
+    UPDATE hr_attendance att
+    SET lunch_out = p_now_eat AT TIME ZONE 'UTC',
+        check_out_status = 'Auto Lunch Checkout',
+        write_date = NOW()
+    FROM hr_employee emp
+    LEFT JOIN job_shift s ON emp.job_shift_id = s.id
+    WHERE att.employee_id = emp.id
+      AND att.check_in IS NOT NULL
+      AND att.lunch_out IS NULL
+      AND att.check_out IS NULL
+      AND (att.active = TRUE OR att.active IS NULL)
+      AND s.has_lunch_break = TRUE
+      AND (
+          (EXTRACT(HOUR FROM p_now_eat) + EXTRACT(MINUTE FROM p_now_eat)/60.0) >= 
+          (s.lunch_start_time + s.lunch_duration - 0.25)
+      );
+
+    -- 2. SHIFT-END FORCE CHECKOUT ENGINE:
+    -- Auto checks out unclosed sessions past shift end. Explicitly protects Night Shifts.
+    UPDATE hr_attendance att
+    SET check_out = (att.check_in + INTERVAL '8 hours'),
+        check_out_status = 'Force Checkout',
+        is_force_checkout = TRUE,
+        write_date = NOW()
+    FROM hr_employee emp
+    LEFT JOIN job_shift s ON emp.job_shift_id = s.id
+    WHERE att.employee_id = emp.id
+      AND att.check_in IS NOT NULL
+      AND att.check_out IS NULL
+      AND (att.active = TRUE OR att.active IS NULL)
+      AND (
+          -- Day Shifts: Auto checkout if open 2 hours past shift end
+          (COALESCE(s.is_night_shift, FALSE) = FALSE AND (p_now_eat - (att.check_in AT TIME ZONE 'Africa/Addis_Ababa')) > INTERVAL '12 hours')
+          OR
+          -- Night Shifts (23:00 - 07:00): Only evaluate AFTER 08:00 AM next day
+          (COALESCE(s.is_night_shift, FALSE) = TRUE AND EXTRACT(HOUR FROM p_now_eat) >= 8 AND (p_now_eat - (att.check_in AT TIME ZONE 'Africa/Addis_Ababa')) > INTERVAL '10 hours')
+      );
 END;
 $$ LANGUAGE plpgsql;
 """

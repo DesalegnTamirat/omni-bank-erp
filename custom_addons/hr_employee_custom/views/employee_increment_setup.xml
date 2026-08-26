@@ -20,7 +20,7 @@
                 <field name="work_unit"/>
 				<field name="pms_score_from"/>
 				<field name="pms_score_to"/>
-                <!-- <field name="pms_ranking"/> -->
+                <!--<field name="pms_ranking"/>-->
                 <field name="increment_factor"/>
 				<field name="state"/>
             </list>

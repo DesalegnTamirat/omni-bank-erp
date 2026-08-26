@@ -38,6 +38,12 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.enable_lunch_break",
         help="Enable the lunch break flow: Check-In → Lunch-Out → Back from Lunch → Check-Out."
     )
+    enable_overtime_payroll = fields.Boolean(
+        string='Enable Overtime Payout for Payroll',
+        default=False,
+        config_parameter="custom_hr_attendance.enable_overtime_payroll",
+        help="When OFF (Default), extra shift work is compensated via Duty OFF (Half-Day/Full-Day). When ON, managers can record and approve overtime for payroll payout."
+    )
 
     # ----------------------------------------------------------
     # CONFIGURABLE REGULATION PARAMETERS (Requirement 3)
@@ -151,9 +157,9 @@ class ResConfigSettings(models.TransientModel):
     )
     checkin_buffer = fields.Float(
         string='Check-in Buffer (Hours)',
-        default=0.50,
+        default=1.00,
         config_parameter="hr_attendance.checkin_buffer",
-        help="Allowed early check-in buffer before shift start (e.g., 0.5 = 30 minutes)"
+        help="Allowed early check-in buffer before shift start (e.g., 1.0 = 60 minutes)"
     )
     force_checkout_hours = fields.Float(
         string='Post-Shift Force Checkout Grace (Hours)',

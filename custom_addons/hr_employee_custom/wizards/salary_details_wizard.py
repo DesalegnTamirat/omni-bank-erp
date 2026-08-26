@@ -14,7 +14,7 @@ class salary_rules(models.TransientModel):
     job_grade = fields.Many2one("employee.grade", string='Job Grade', help="Job Grade")
 
     def populate(self):
-        # Call the hr_contract function
+        # Call the hr_contract() function
         print("executing the PL/PGSQL Function hr_contract")
         self.env.cr.execute('SELECT hr_contract()')
 

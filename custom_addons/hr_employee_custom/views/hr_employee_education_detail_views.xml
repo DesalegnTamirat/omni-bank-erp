@@ -1,0 +1,150 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             FORM VIEW — matches Image 1 layout exactly
+             Left  : From Date, Education Field/Major,
+                     School/College Name, CGPA, Illiterate
+             Right : To Date, Qualification, Education Type
+             Below : Location (Country, State, Province) + Education Rank, Grade
+        ============================================================ -->
+        <record id="employee_education_detail_form_view" model="ir.ui.view">
+            <field name="name">employee.education.form</field>
+            <field name="model">employee.education</field>
+            <field name="arch" type="xml">
+                <form string="Education Details">
+                    <sheet>
+                        <group col="2">
+                            <!-- Left column -->
+                            <group>
+                                <field name="from_date"   string="From Date"/>
+                                <field name="field"       string="Education Field/Major"/>
+                                <field name="school_name" string="School / College Name"/>
+                                <field name="CGPA"        string="CGPA"/>
+                                <field name="illiterate"  string="Illiterate"/>
+                            </group>
+                            <!-- Right column -->
+                            <group>
+                                <field name="to_date"      string="To Date"/>
+                                <field name="qualification" string="Qualification"/>
+                                <field name="edu_type"     string="Education Type"/>
+                                <field name="employee_id"  string="Employee"/>
+                                <field name="active"       string="Active"/>
+                            </group>
+                        </group>
+
+                        <!-- Additional details -->
+                        <group string="Academic Details">
+                            <group>
+                                <field name="education_rank" string="Education Rank"/>
+                                <field name="grade"          string="Grade"/>
+                            </group>
+                            <group>
+                            </group>
+                        </group>
+
+                        <!-- Location -->
+                        <group string="Location">
+                            <group>
+                                <field name="country_id" string="Country"/>
+                                <field name="state_id"   string="State / Region"/>
+                            </group>
+                            <group>
+                                <field name="province" string="Province"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             LIST VIEW — matches Image 2 columns exactly
+             From Date | To Date | Education Field/Major |
+             School / College Name | Illiterate
+        ============================================================ -->
+        <record id="employee_education_detail_list_view" model="ir.ui.view">
+            <field name="name">employee.education.list</field>
+            <field name="model">employee.education</field>
+            <field name="arch" type="xml">
+                <list string="Education Details">
+                    <field name="from_date"   string="From Date"/>
+                    <field name="to_date"     string="To Date"/>
+                    <field name="field"       string="Education Field/Major"/>
+                    <field name="school_name" string="School / College Name"/>
+                    <field name="illiterate"  string="Illiterate"/>
+                    <field name="edu_type"    string="Education Type" optional="show"/>
+                    <field name="qualification" string="Qualification" optional="show"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             SEARCH VIEW — Odoo 19 compatible
+        ============================================================ -->
+        <record id="employee_education_detail_search_view" model="ir.ui.view">
+            <field name="name">employee.education.search</field>
+            <field name="model">employee.education</field>
+            <field name="arch" type="xml">
+                <search string="Search Education Details">
+                    <field name="employee_id"  string="Employee"/>
+                    <field name="school_name"  string="School / College Name"/>
+                    <field name="field"        string="Education Field/Major"/>
+                    <field name="qualification" string="Qualification"/>
+                    <separator/>
+                    <filter name="group_employee"
+                            string="Employee"
+                            context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_edu_type"
+                            string="Education Type"
+                            context="{'group_by': 'edu_type'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             WINDOW ACTION — smart button (filtered to active employee)
+        ============================================================ -->
+        <record id="act_hr_employee_2_education_detail" model="ir.actions.act_window">
+            <field name="name">Education Details</field>
+            <field name="res_model">employee.education</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id', '=', active_id)]</field>
+            <field name="context">{
+                'search_default_employee_id': active_id,
+                'default_employee_id': active_id
+            }</field>
+        </record>
+
+        <!-- ============================================================
+             INJECT SMART BUTTON — placed AFTER the Relatives button
+             Button order: In Contract Since | Documents | Relatives | Education
+        ============================================================ -->
+        <record id="hr_employee_education_detail_smart_button" model="ir.ui.view">
+            <field name="name">hr.employee.education.detail.smart.button</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_employee_custom.hr_employee_relative_smart_button"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='%(hr_employee_custom.act_hr_employee_2_relatives)d']"
+                       position="after">
+                    <field name="education_detail_count" invisible="1"/>
+                    <button name="%(hr_employee_custom.act_hr_employee_2_education_detail)d"
+                            class="oe_stat_button"
+                            icon="fa-graduation-cap"
+                            type="action"
+                            context="{'search_default_employee_id': id,
+                                      'default_employee_id': id}">
+                        <div class="o_stat_info">
+                            <span class="o_stat_value">
+                                <field name="education_detail_count"/>
+                            </span>
+                            <span class="o_stat_text">Education</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

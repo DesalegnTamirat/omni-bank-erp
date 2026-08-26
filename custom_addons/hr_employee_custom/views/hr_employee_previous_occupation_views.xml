@@ -1,0 +1,155 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<odoo>
+    <data>
+
+        <!-- ============================================================
+             FORM VIEW — matches Image 2 layout exactly
+             Left  : From Date, Position, Organization, Salary Earned,
+                     Reference Name, Reference Phone, Pension Contributed
+             Right : To Date, Experience Type, Reason for Leaving,
+                     Tax Paid, Reference Position, Email, Banking Experience
+        ============================================================ -->
+        <record id="employee_previous_occupation_form_view" model="ir.ui.view">
+            <field name="name">employee.previous.occupation.form</field>
+            <field name="model">employee.previous.occupation</field>
+            <field name="arch" type="xml">
+                <form string="Previous Occupation">
+                    <sheet>
+                        <group col="2">
+                            <!-- Left column -->
+                            <group>
+                                <field name="from_date"           string="From Date"/>
+                                <field name="position"            string="Position"
+                                       placeholder="Enter Position"/>
+                                <field name="organization"        string="Organization"
+                                       placeholder="Enter Organization"/>
+                                <field name="salary_earned"       string="Salary Earned"/>
+                                <field name="ref_name"            string="Reference Name"
+                                       placeholder="Enter Reference Name"/>
+                                <field name="ref_phone"           string="Reference Phone"
+                                       placeholder="Enter Reference Phone"/>
+                                <field name="pension_contributed" string="Pension Contributed"/>
+                            </group>
+                            <!-- Right column -->
+                            <group>
+                                <field name="to_date"            string="To Date"/>
+                                <field name="experience_type"    string="Experience Type"/>
+                                <field name="reason_for_leaving" string="Reason for Leaving Organization"
+                                       placeholder="Enter Reason For Leaving"/>
+                                <field name="tax_paid"           string="Tax Paid"/>
+                                <field name="ref_position"       string="Reference Position"
+                                       placeholder="Enter Reference Position"/>
+                                <field name="email"              string="Email"
+                                       placeholder="Enter Email"/>
+                                <field name="banking_experience" string="Banking Experience"/>
+                            </group>
+                        </group>
+
+                        <!-- Hidden employee link (auto-set via context) -->
+                        <group>
+                            <field name="employee_id" string="Employee" invisible="1"/>
+                            <field name="active"      string="Active"   invisible="1"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             LIST VIEW — matches Image 1 columns exactly
+             From Date | To Date | Position | Experience Type |
+             Organization | Reason for Leaving | Salary Earned |
+             Tax Paid | Reference Name | Reference Position | Reference Phone
+        ============================================================ -->
+        <record id="employee_previous_occupation_list_view" model="ir.ui.view">
+            <field name="name">employee.previous.occupation.list</field>
+            <field name="model">employee.previous.occupation</field>
+            <field name="arch" type="xml">
+                <list string="Previous Occupations">
+                    <field name="from_date"           string="From Date"/>
+                    <field name="to_date"             string="To Date"/>
+                    <field name="position"            string="Position"/>
+                    <field name="experience_type"     string="Experience Type"/>
+                    <field name="organization"        string="Organization"/>
+                    <field name="reason_for_leaving"  string="Reason for Leaving"/>
+                    <field name="salary_earned"       string="Salary Earned"/>
+                    <field name="tax_paid"            string="Tax Paid"/>
+                    <field name="ref_name"            string="Reference Name"/>
+                    <field name="ref_position"        string="Reference Position"/>
+                    <field name="ref_phone"           string="Reference Phone"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             SEARCH VIEW — Odoo 19 compatible
+        ============================================================ -->
+        <record id="employee_previous_occupation_search_view" model="ir.ui.view">
+            <field name="name">employee.previous.occupation.search</field>
+            <field name="model">employee.previous.occupation</field>
+            <field name="arch" type="xml">
+                <search string="Search Previous Occupations">
+                    <field name="employee_id"    string="Employee"/>
+                    <field name="position"       string="Position"/>
+                    <field name="organization"   string="Organization"/>
+                    <field name="experience_type" string="Experience Type"/>
+                    <separator/>
+                    <filter name="banking"
+                            string="Banking Experience"
+                            domain="[('banking_experience', '=', True)]"/>
+                    <filter name="group_employee"
+                            string="Employee"
+                            context="{'group_by': 'employee_id'}"/>
+                    <filter name="group_experience_type"
+                            string="Experience Type"
+                            context="{'group_by': 'experience_type'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- ============================================================
+             WINDOW ACTION — smart button (filtered to active employee)
+        ============================================================ -->
+        <record id="act_hr_employee_2_previous_occupation" model="ir.actions.act_window">
+            <field name="name">Previous Occupation</field>
+            <field name="res_model">employee.previous.occupation</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id', '=', active_id)]</field>
+            <field name="context">{
+                'search_default_employee_id': active_id,
+                'default_employee_id': active_id
+            }</field>
+        </record>
+
+        <!-- ============================================================
+             INJECT SMART BUTTON — placed AFTER the Education button
+             Order: In Contract Since | Documents | Relatives |
+                    Education | Previous Occupation | …
+        ============================================================ -->
+        <record id="hr_employee_previous_occupation_smart_button" model="ir.ui.view">
+            <field name="name">hr.employee.previous.occupation.smart.button</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_employee_custom.hr_employee_education_detail_smart_button"/>
+            <field name="arch" type="xml">
+                <xpath expr="//button[@name='%(hr_employee_custom.act_hr_employee_2_education_detail)d']"
+                       position="after">
+                    <field name="previous_occupation_count" invisible="1"/>
+                    <button name="%(hr_employee_custom.act_hr_employee_2_previous_occupation)d"
+                            class="oe_stat_button"
+                            icon="fa-briefcase"
+                            type="action"
+                            context="{'search_default_employee_id': id,
+                                      'default_employee_id': id}">
+                        <div class="o_stat_info">
+                            <span class="o_stat_value">
+                                <field name="previous_occupation_count"/>
+                            </span>
+                            <span class="o_stat_text">Prev. Occupation</span>
+                        </div>
+                    </button>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

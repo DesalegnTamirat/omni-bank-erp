@@ -60,7 +60,7 @@
                             </strong>
                             .
                         </p>
-                        <!-- <t t-if="o.depreciation_line_ids"> -->
+                        <!--                        <t t-if="o.depreciation_line_ids">-->
                         <br/>
                         <p>I am confident that you will exert utmost effort to discharge your responsibilities attached
                             to this acting assignment.
@@ -86,7 +86,7 @@
                                     <li>Bunna Bank S.C</li>
                                 </ul>
 
-                                <!-- <span t-field="o.resignation_type" /> -->
+                                <!--                                <span t-field="o.resignation_type" />-->
                                 <br/>
                             </div>
 

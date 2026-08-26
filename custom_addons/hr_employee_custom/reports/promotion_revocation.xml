@@ -23,7 +23,7 @@
                                   <br/>
 
                                   <strong>Dear <span t-field="o.partner_name"/>,</strong>
-<!-- <strong>Dear <span t-field="o.employee_name"/>,</strong> -->
+<!--                                <strong>Dear <span t-field="o.employee_name"/>,</strong>-->
                                   <br/>
                             </div>
 
@@ -51,15 +51,15 @@
                                     <!-- Add more fields as needed -->
                                 </t>
 
-<!-- <t t-foreach="docs.operating_unit_tag" t-as="line"> -->
-<!-- <ul> -->
-<!-- <li> -->
-<!-- <span t-field="line"/> -->
-<!-- </li> -->
-<!-- </ul> -->
+<!--                                 <t t-foreach="docs.operating_unit_tag" t-as="line">-->
+<!--                                    <ul>-->
+<!--                                        <li>-->
+<!--                                          <span t-field="line"/>-->
+<!--                                        </li>-->
+<!--                                    </ul>-->
 
-<!-- \ -->
-<!-- </t> -->
+<!--\-->
+<!--                                </t>-->
                                 <!-- <span t-field="o.operating_unit_tag" /> -->
                                   <br/>
                              </div>

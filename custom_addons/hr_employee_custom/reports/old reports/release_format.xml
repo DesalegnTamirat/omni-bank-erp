@@ -12,11 +12,11 @@
                                 <span t-esc="datetime.date.today()"/>
                                 <br/>
                                   <strong>To:-Olympia Branch</strong>
-<!-- <span t-field="o.reference"/> -->
+<!--                                <span t-field="o.reference"/>-->
                                   <br/>
                                   <br/>
                                    <strong>From: -Lemi Branch</strong>
-<!-- <span t-field="o.employee_id"/> -->
+<!--                                 <span t-field="o.employee_id"/>-->
                                 <br />
 
                             </div>
@@ -60,7 +60,7 @@
                                      <li><strong>Bunna Bank S.C </strong></li>
                                  </ul>
 
-<!-- <span t-field="o.resignation_type" /> -->
+<!--                                <span t-field="o.resignation_type" />-->
                                   <br />
                              </div>
 

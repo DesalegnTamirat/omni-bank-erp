@@ -50,15 +50,15 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-<!-- <t t-foreach="o.hiring_details" t-as="link"> -->
-<!-- <tr> -->
-<!-- <td><t t-esc="link.work_unit"/></td> -->
-<!-- &lt;!&ndash;                                        <td>Chairperson</td>&ndash;&gt; -->
-<!-- <td><t t-esc="link.number_of_openings"/></td> -->
-<!-- </tr> -->
-<!-- </t> -->
+<!--                                    <t t-foreach="o.hiring_details" t-as="link">-->
+<!--                                    <tr>-->
+<!--                                        <td><t t-esc="link.work_unit"/></td>-->
+<!--&lt;!&ndash;                                        <td>Chairperson</td>&ndash;&gt;-->
+<!--                                        <td><t t-esc="link.number_of_openings"/></td>-->
+<!--                                    </tr>-->
+<!--                                    </t>-->
                                     <t t-foreach="o.hiring_details" t-as="line">
-<!-- <t t-if='line.line_date &gt;= compare_date'> -->
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
 
                                     <tr>
                                         <td>
@@ -69,7 +69,7 @@
                                         </td>
 
                                     </tr>
-<!-- </t> -->
+<!--                                    </t>-->
                                 </t>
                                 </tbody>
                             </table>
@@ -91,7 +91,7 @@
                                 </thead>
                                 <tbody>
                                     <t t-foreach="o.memb_panel_vac" t-as="line">
-<!-- <t t-if='line.line_date &gt;= compare_date'> -->
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
 
                                     <tr>
                                         <td>
@@ -100,7 +100,7 @@
                                       <td></td>
 
                                     </tr>
-<!-- </t> -->
+<!--                                    </t>-->
                                 </t>
                                 </tbody>
 
@@ -167,7 +167,7 @@
                                 </thead>
                                 <tbody>
                                     <t t-foreach="o.hiring_rank_details" t-as="line">
-<!-- <t t-if='line.line_date &gt;= compare_date'> -->
+<!--                                 <t t-if='line.line_date &gt;= compare_date'>-->
 
                                     <tr>
                                         <td>
@@ -187,7 +187,7 @@
                                         </td>
 
                                     </tr>
-<!-- </t> -->
+<!--                                    </t>-->
                                 </t>
                                 </tbody>
 

@@ -70,11 +70,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
             if employee.default_operating_unit_id:
                 ou = employee.default_operating_unit_id
                 rec.place_of_assignment = ou.name
-                rec.work_unit = (
-                    "Head office"
-                    if ou.work_unit_type == 'head_office'
-                    else ou.name
-                )
+                rec.work_unit = ou.name
             else:
                 rec.place_of_assignment = False
                 rec.work_unit = False
@@ -123,10 +119,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     COALESCE(emp.employee_identification, '') AS employee_identification,
                     COALESCE(emp.name, '') AS employee_name,
                     COALESCE(ou.name, '') AS place_of_assignment,
-                    CASE 
-                        WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
-                        ELSE COALESCE(ou.name, '')
-                    END AS work_unit,
+                    COALESCE(ou.name, '') AS work_unit,
                     CASE 
                         WHEN pg_typeof(job.name)::text = 'jsonb' THEN COALESCE(job.name->>'en_US', job.name::text, '')
                         ELSE COALESCE(job.name::text, '')
@@ -208,10 +201,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     END AS job_title,
                     COALESCE(CAST(emp.job_position AS VARCHAR), 'XIV') AS job_grade,
                     COALESCE(ou.name, '') AS place_of_assignment,
-                    CASE 
-                        WHEN ou.work_unit_type = 'head_office' THEN 'Head office'
-                        ELSE COALESCE(ou.name, '')
-                    END AS work_unit,
+                    COALESCE(ou.name, '') AS work_unit,
                     COALESCE(mgr.name, '') AS manager_name,
                     TO_CHAR(att.check_in, 'Mon-YYYY') AS attendance_month,
                     att.check_in::date AS checkin_date,

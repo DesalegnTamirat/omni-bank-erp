@@ -6,6 +6,7 @@ from . import job_shift
 from . import job_position_exception
 from . import job_position_roster_exception
 from . import location_based_exception
+from . import attendance_violation_rule
 from . import my_shift_schedule
 from . import hr_attendance_reason
 from . import over_time

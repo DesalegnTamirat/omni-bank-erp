@@ -37,8 +37,9 @@ class EdsExternalProvider(models.Model):
         'eds.provider.performance.history', 'provider_id',
         string='Performance History',
         help='Post-training vendor/venue evaluations .')
-    contract_ids = fields.One2many('eds.training.contract', 'provider_id', string='Contracts')
-    contract_count = fields.Integer(string='Contracts', compute='_compute_contract_count')
+    # COMMENTED OUT PER USER JOURNEY: RFP Procurement & Contracts omitted from 14 Use Cases
+    # contract_ids = fields.One2many('eds.training.contract', 'provider_id', string='Contracts')
+    # contract_count = fields.Integer(string='Contracts', compute='_compute_contract_count')
     trainer_ids = fields.One2many('eds.trainer', 'external_provider_id', string='External Trainers')
     active = fields.Boolean(string='Active', default=True)
 
@@ -49,10 +50,9 @@ class EdsExternalProvider(models.Model):
             rec.rating = round(sum(ratings) / len(ratings), 2) if ratings else 0.0
             rec.rating_count = len(ratings)
 
-    @api.depends('contract_ids')
     def _compute_contract_count(self):
         for rec in self:
-            rec.contract_count = len(rec.contract_ids)
+            rec.contract_count = 0
 
     @api.model_create_multi
     def create(self, vals_list):

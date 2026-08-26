@@ -108,21 +108,25 @@ class HrEmployeeGrade(models.Model):
                 raise ValidationError("Grade Name must contain letters. Pure numbers are not allowed.")
 
     # @api.constrains('grade_code')
-    # def _check_grade_code_length(self)
-    # for record in self
-    # if record.grade_code and len(record.grade_code) < 2
-    # raise ValidationError("Grade Code must be at least 2 characters long.")
+    # def _check_grade_code_length(self):
+    #     for record in self:
+    #         if record.grade_code and len(record.grade_code) < 2:
+    #             raise ValidationError("Grade Code must be at least 2 characters long.")
 
     @api.model_create_multi
     def create(self, vals_list):
+        if self.env.context.get('in_generate_increments'):
+            return super().create(vals_list)
         records = super().create(vals_list)
-        records._generate_increments()
+        records.with_context(in_generate_increments=True)._generate_increments()
         return records
 
     def write(self, vals):
+        if self.env.context.get('in_generate_increments'):
+            return super().write(vals)
         res = super().write(vals)
         if 'base_salary' in vals or 'salary_factor' in vals:
-            self._generate_increments()
+            self.with_context(in_generate_increments=True)._generate_increments()
         return res
 
     def _generate_increments(self):

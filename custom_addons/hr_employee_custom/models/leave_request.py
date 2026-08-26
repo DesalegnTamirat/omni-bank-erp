@@ -56,11 +56,11 @@ class LeaveRequest(models.Model):
     end_date = fields.Date(string="End Date", help="End Date", store=True )
     start_half_day = fields.Boolean(string="Starting Half Day", help="Starting Half Day", readonly=True  )
     end_half_day = fields.Boolean(string="Ending Half Day", help="Ending Half Day", readonly=True  )
-    # start_half_day = fields.Boolean(string="Starting Half Day", help="Starting Half Day" )
-    # end_half_day = fields.Boolean(string="Ending Half Day", help="Ending Half Day" )
+    #start_half_day = fields.Boolean(string="Starting Half Day", help="Starting Half Day" )
+    #end_half_day = fields.Boolean(string="Ending Half Day", help="Ending Half Day" )
     job_grade = fields.Char(string='Job Grade')
-    # job_category = fields.Char(string='Job Category')
-    # job_grade = fields.Many2one("employee.grade",string='Job Grade')
+    #job_category = fields.Char(string='Job Category')
+    #job_grade = fields.Many2one("employee.grade",string='Job Grade')
     job_category = fields.Selection([('Managerial', 'Managerial'), ('Non Managerial', 'Non_Managerial')], string='Job Category')
     job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
     operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
@@ -69,7 +69,7 @@ class LeaveRequest(models.Model):
     accrued = fields.Float(string="Accrued Leave Balance", readonly=True)
     # state = fields.Selection([('notify', 'Notify'), ('confirm_leave', 'Confirm Leave')], string="State")
     status = fields.Selection([('fetch', 'Fetch'), ('notification', 'Notify')], string="Status")
-    # LeaveTypes_details =fields.Integer(string='LeaveTypes_details')
+    #LeaveTypes_details =fields.Integer(string='LeaveTypes_details')
     # no_of_days = fields.Integer(string="No of days", compute="_compute_no_of_days")
     requester_user_id =fields.Integer(string='Requester User Id')
     manager_user_id =fields.Integer(string='Manager User Id')
@@ -77,7 +77,7 @@ class LeaveRequest(models.Model):
     leave_attachment_ids = fields.Many2many('ir.attachment', 'ir_leave_attachment_rel', 'lv_attach_ids', string="Attachment")
     no_of_days = fields.Integer(string="No of Leave Requested Days", compute='_compute_leave_days', store=True)
     half_day = fields.Boolean(string="Half day", readonly=True )
-    # half_day = fields.Boolean(string="Half day")
+    #half_day = fields.Boolean(string="Half day")
     details = fields.Selection([("morning", "Morning"), ("afternoon", "Afternoon")], string="Details")
     computed_leave = fields.Float(string="Computed Leave", readonly=True)
 
@@ -87,35 +87,48 @@ class LeaveRequest(models.Model):
         for vals in vals_list:
             if not vals.get('reference') or vals.get('reference') == _('New'):
                 vals['reference'] = self.env['ir.sequence'].next_by_code('leave.request') or _('New')
-        return super().create(vals_list)
-    # def _compute_no_of_days(self)
-        # for val in self
+        records = super().create(vals_list)
+        for rec in records:
+            if rec.delegated_name:
+                self.env['hr.employee.delegation'].sync_delegation_from_leave(rec)
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if any(k in vals for k in ['delegated_name', 'start_date', 'end_date', 'requester_name', 'leave_reason']):
+            for rec in self:
+                if rec.delegated_name:
+                    self.env['hr.employee.delegation'].sync_delegation_from_leave(rec)
+        return res
+
+    # def _compute_no_of_days(self):
+        # for val in self:
             # d1 = datetime.strptime(str(val.start_date), '%Y-%m-%d')
             # d2 = datetime.strptime(str(val.end_date), '%Y-%m-%d')
             # d3 = d2 - d1
             # val.no_of_days= str(d3.days)
             # return val.no_of_days
 
-    # @api.onchange('start_date', 'leave_reason')
-    # def _onchange_start_date(self)
-        # if self.leave_reason in ['wedding_leave', 'maternity_leave', 'paternity_leave', 'mourning_leave']
-        # if self.start_date
-        # self.end_date = self.start_date + timedelta(days=5)
-        # else
-        # self.end_date = False
-        # else
-            # self.end_date = False
+    #@api.onchange('start_date', 'leave_reason')
+    #def _onchange_start_date(self):
+        #if self.leave_reason in ['wedding_leave', 'maternity_leave', 'paternity_leave', 'mourning_leave']:
+        #    if self.start_date:
+        #        self.end_date = self.start_date + timedelta(days=5)
+        #    else:
+        #        self.end_date = False  
+        #else:
+            #self.end_date = False  
 
    # @api.depends('start_date', 'leave_reason')
-    # def _compute_end_date(self)
-        # for rec in self
-            # if rec.leave_reason in ['wedding_leave','maternity_leave','paternity_leave','mourning_leave']
-                # if rec.start_date
-                    # rec.end_date = rec.start_date + timedelta(days=5)
-                # else
-                    # rec.end_date = False
-            # else
-                # rec.end_date = False
+    #def _compute_end_date(self):
+        #for rec in self:
+            #if rec.leave_reason in ['wedding_leave','maternity_leave','paternity_leave','mourning_leave']:
+                #if rec.start_date:
+                    #rec.end_date = rec.start_date + timedelta(days=5)
+                #else:
+                    #rec.end_date = False
+            #else:
+                #rec.end_date = False
 
 
 
@@ -162,7 +175,7 @@ class LeaveRequest(models.Model):
 
 
        
-    # def calling_accure_function(self)
+    # def calling_accure_function(self):
         # print("*******************requester_name", self.requester_name, self.reference)
         # val = self.env["hr.employee"].search([("name", "=", self.requester_name.name)])
         # print("*****************employee details", val.name, val.id)
@@ -363,14 +376,14 @@ class LeaveRequest(models.Model):
             })
 
 
-    # def notify1(self)
+    # def notify1(self):
         # print("notify")
-        # n_id = self.id
-		# p_id = self.env.user.id
-        # print("Fetching Requester Details")
+        #n_id = self.id
+		#p_id = self.env.user.id
+        #print("Fetching Requester Details")
         # print("User  ID is ************************ ",p_id)
         # print("Request  ID is ************************ ",n_id)
-        # self.env.cr.execute('SELECT leave_requester_inform_manager(%s)', (n_id,))
+        #self.env.cr.execute('SELECT leave_requester_inform_manager(%s)', (n_id,))
         
     def mail_channel_msgs1(self, rec_id, arg1, arg2, arg3, arg4):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
@@ -387,9 +400,9 @@ class LeaveRequest(models.Model):
         )
 
 	
-	# def confirm_leave(self)
-        # self.call_func_approval2
-        # # for val in self.LeaveTypes_details
+	# def confirm_leave(self):
+        # self.call_func_approval2()
+        # # for val in self.LeaveTypes_details:
             # # number_of_days = 0
             # print(val.leave_type.id)
             # print(val.start_date)
@@ -404,42 +417,42 @@ class LeaveRequest(models.Model):
             # print("details", self.requester_name.name, get_employee.name)
             # print("number_of_days", number_of_days)
             # val2 = {
-                # 'date_from': val.start_date
-                # 'date_to': val.end_date
-                # 'holiday_status_id': val.leave_type.id
-                # 'job_position': self.job_position.name
-                # 'job_category': self.job_category.job_name
-                # # 'job_grade': self.job_grade.grade_code
-                # 'request_date_from': val.start_date
-                # 'number_of_days': float(number_of_days)
-                # 'request_date_to': val.end_date
-                # 'name': self.reference
-                # 'employee_id': self.requester_name.id
-                # # 'employee_id': get_employee.id
+                # 'date_from': val.start_date,
+                # 'date_to': val.end_date,
+                # 'holiday_status_id': val.leave_type.id,
+                # 'job_position': self.job_position.name,
+                # 'job_category': self.job_category.job_name,
+                # # 'job_grade': self.job_grade.grade_code,
+                # 'request_date_from': val.start_date,
+                # 'number_of_days': float(number_of_days),
+                # 'request_date_to': val.end_date,
+                # 'name': self.reference,
+                # 'employee_id': self.requester_name.id,
+                # # 'employee_id': get_employee.id,
                 # 'leave_request_description': val.approver_comments
             # }
             # print("val2==============", val2)
             # history = self.env["hr.leave"].create(val2)
-            # history.action_approve
+            # history.action_approve()
             # print("histryzzzzzzzzzzzzzzzzz", history)
         # self.state = "confirm_leave"
 
 
-# class LeaveTypes(models.Model)
-# _name = "leave.request.types"
-# # request_id = fields.Many2one("leave.request", string="Leave", help="Leave Request", invisible="1")
-# leave_type = fields.Many2one("hr.leave.type", "Leave Type")
-# number_of_days = fields.Float('Duration in days'
-# help='Number of days of the time off request according to your working schedule. Used for interface.')
-# start_date = fields.Date(string="Start Date", help="Start Date")
-# end_date = fields.Date(string="End Date", help="End Date")
-# approver_comments = fields.Char(string="Approver Comments", help="Approver Comments")
+# class LeaveTypes(models.Model):
+#     _name = "leave.request.types"
+#     # request_id = fields.Many2one("leave.request", string="Leave", help="Leave Request", invisible="1")
+#     leave_type = fields.Many2one("hr.leave.type", "Leave Type")
+#     number_of_days = fields.Float('Duration in days',
+#                                   help='Number of days of the time off request according to your working schedule. Used for interface.')
+#     start_date = fields.Date(string="Start Date", help="Start Date")
+#     end_date = fields.Date(string="End Date", help="End Date")
+#     approver_comments = fields.Char(string="Approver Comments", help="Approver Comments")
 
 
-# class HrLeaveDetails(models.Model)
-# _inherit = "hr.leave"
-# leave_request_description = fields.Text(string="Leave Request Description", help="Leave Request Description")
-# job_position = fields.Char(string="Job Position")
-# job_category = fields.Char(string="Job Category")
+# class HrLeaveDetails(models.Model):
+#     _inherit = "hr.leave"
+#     leave_request_description = fields.Text(string="Leave Request Description", help="Leave Request Description")
+#     job_position = fields.Char(string="Job Position")
+#     job_category = fields.Char(string="Job Category")
 
 

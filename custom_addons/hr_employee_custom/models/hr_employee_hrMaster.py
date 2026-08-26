@@ -160,16 +160,16 @@ class Hr_department_Fields(models.Model):
     operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
 
 
-
-
-# class late_by(models.Model)
-# _inherit = "hr.attendance"
-# late_by = fields.Char(string="Late By")
-
-# class alternate_mobile_fields_new(models.Model)
-# _inherit = "res.partner"
-
-
+#
+#
+# class late_by(models.Model):
+#     _inherit = "hr.attendance"
+#     late_by = fields.Char(string="Late By")
+#
+# class alternate_mobile_fields_new(models.Model):
+#     _inherit = "res.partner"
+#
+#
 
 class hr_job_updated(models.Model):
     _inherit = "hr.job"
@@ -288,8 +288,8 @@ class HrEmployeeAttachment_data(models.Model):
                                        string="Attachment")
     # DOCUMENT MANAGEMENT MODULE NOT INSTALLED — 'hr.document' model does not
     # exist in this database. Uncomment once that module is installed.
-    # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id'
-    # string="Attachment")
+    # attach_rel = fields.Many2many('hr.document', 'attach_id', 'attachment_id3', 'document_id',
+    #                               string="Attachment")
 
 
 class Bank_info(models.Model):
@@ -352,17 +352,20 @@ class Hr_contact_Fields(models.Model):
         pass
 
     def _compute_job_categoryy(self):
-        val = self.env["hr.employee"].search([("name", "=", self.employee_id.name)])
-        vals = self.env["hr.job"].search([("name", "=", val.job_position.name)])
-        self.job_categoryy = vals.employee_category
-        return self.job_category
-        # self.job_category=val.employee_category
+        for rec in self:
+            category = False
+            if rec.employee_id and rec.employee_id.name:
+                emp = self.env["hr.employee"].search([("name", "=", rec.employee_id.name)], limit=1)
+                if emp and emp.job_position:
+                    job = self.env["hr.job"].search([("name", "=", emp.job_position.name)], limit=1)
+                    category = job.employee_category if job else False
+            rec.job_categoryy = category
 
     # @api.onchange("date_end")
-    # def date_difference(self)
-    # start_date =datetime.strptime(self.date_start, "%m/%d/%Y")
-    # end_date =datetime.strptime(self.date_end, "%m/%d/%Y")
-    # self.trial_date_end=(end_date-start_date).days
+    # def date_difference(self):
+    #     start_date =datetime.strptime(self.date_start, "%m/%d/%Y")
+    #     end_date =datetime.strptime(self.date_end, "%m/%d/%Y")
+    #     self.trial_date_end=(end_date-start_date).days
 
 
 class job_multi_record(models.Model):
@@ -379,8 +382,8 @@ class job_multi_record(models.Model):
     # PAYROLL MODULE NOT INSTALLED — uncomment once a payroll module providing
     # hr.salary.rule (e.g. hr_payroll_community) is installed.
     # contract_salary_rule = fields.Many2one("hr.salary.rule", string="Salary Rule", help='Salary Rule')
-    # contract_internal_name = fields.Char(string='Internal Name', help='Internal Name'
-    # related="contract_salary_rule.internal_name")
+    # contract_internal_name = fields.Char(string='Internal Name', help='Internal Name',
+    #                                      related="contract_salary_rule.internal_name")
     contract_value = fields.Float("Value")
     contract_start_date = fields.Date("Start Date", required=True)
     contract_end_date = fields.Date("End Date", required=True)
@@ -390,8 +393,8 @@ class hr_salary_breakup(models.Model):
     _name = "hr_salary_breakup"
     _description = "Salary Breakup"
     _rec_name = "pay_elements"
-    # employee_contract_new_id = fields.Many2one('hr.contract', string="Employee Contract", help='Select corresponding Employee'
-    # invisible=1)
+    # employee_contract_new_id = fields.Many2one('hr.contract', string="Employee Contract", help='Select corresponding Employee',
+    #                               invisible=1)
     salary_id = fields.Many2one('hr.version', string="Employee Contract", help='Select corresponding Employee')
     pay_elements = fields.Char(string='Pay Elements', required=True)
     category = fields.Char(string='Category', required=True)
@@ -400,7 +403,7 @@ class hr_salary_breakup(models.Model):
     end_date = fields.Date(string="End Date")
 
 
-
+#
 class non_monetary_benefits(models.Model):
     _name = "non_monetary_benefits"
     _description = "Non-Monetary Benefits"
@@ -455,12 +458,15 @@ class qualification_multi_record_job(models.Model):
     _name = "hr_qualification_info_job"
     _description = "qualification Profile "
     _rec_name = "qualification"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
 
+    # qualification = fields.Char(string="Qualification")
     qualification = fields.Many2one('recruitment.qualification', string="Recruitment Qualification")
     requirement = fields.Float(string="Requirement(CGPA)")
     response = fields.Float(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class EligibleGrades(models.Model):
@@ -470,7 +476,7 @@ class EligibleGrades(models.Model):
     employee_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
 
     job_grade = fields.Many2one("employee.grade", string="Job Grade")
-    status = fields.Boolean(string="Status")
+    status = fields.Boolean(string="Status", default=True)
 
 
 class EligiblePositions(models.Model):
@@ -480,14 +486,14 @@ class EligiblePositions(models.Model):
     employee_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
 
     position = fields.Many2one("hr.job", string="Position")
-    status = fields.Boolean(string="Status")
+    status = fields.Boolean(string="Status", default=True)
 
 
 class hr_recruitment_stage2(models.Model):
     _inherit = "hr.recruitment.stage"
 
 
-
+#
 class mail_thread2(models.AbstractModel):
     _inherit = "mail.thread"
 
@@ -506,37 +512,40 @@ class res_partner3(models.Model):
 
 # PAYROLL MODULE NOT INSTALLED — uncomment once a payroll module providing
 # hr.salary.rule (e.g. hr_payroll_community) is installed.
-# class inherit_internal_name(models.Model)
-# _inherit = 'hr.salary.rule'
-# _description = "Edit Internal Name In Salary Rules"
-# internal_name = fields.Char(string='Internal Name'
-# help="The code of salary rules can be used as reference in computation of other rules. "
-# "In that case, it is case sensitive.")
-# value = fields.Float(required=True, help='Use to enter numerical value for calculations')
+# class inherit_internal_name(models.Model):
+#     _inherit = 'hr.salary.rule'
+#     _description = "Edit Internal Name In Salary Rules"
+#     internal_name = fields.Char(string='Internal Name',
+#                                 help="The code of salary rules can be used as reference in computation of other rules. "
+#                                      "In that case, it is case sensitive.")
+#     value = fields.Float(required=True, help='Use to enter numerical value for calculations')
 
 
 class experience_multi_record_job(models.Model):
     _name = "hr_experience_info_job"
     _description = "experience Profile"
     _rec_name = "experience"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     # experience = fields.Char(string="Experience")
-    experience = fields.Many2one('recruitment.experience', string="Recruitment Experience")
+    experience = fields.Many2one('recruitment.experience', string="Experience")
     requirement = fields.Float(string="Requirement(Years)")
     response = fields.Float(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class competencies_multi_record_job(models.Model):
     _name = "hr_competencies_info_job"
     _description = "Competencies Profile"
     _rec_name = "competencies"
-    job_id = fields.Many2one('hr.job', string="Employee", help='Select corresponding Employee')
-    applicant_id = fields.Many2one('hr.applicant', string="Employee", help='Select corresponding Employee')
-    # competencies = fields.Char(string="Competencies")
-    competencies = fields.Many2one('recruitment.competency', string="Recruitment Competancy")
+    job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
+    applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
+    employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
+    competencies = fields.Many2one('recruitment.competency', string="Competency")
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
+    smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
 
 
 class hr_department_job(models.Model):
@@ -567,44 +576,44 @@ class hr_department_job(models.Model):
     def interview_form(self):
         pass
         # survey_id = fields.Char("Interview Form")
-    # class time_off(models.Model)
+    # class time_off(models.Model):
 
 
 # NOT INSTALLED — this class needs BOTH a loan module (for hr.loan) and a
 # payroll module (for hr.salary.rule). Neither is installed. Uncomment once
 # both are available.
-# class HrLoanField(models.Model)
-# _inherit = 'hr.loan'
+# class HrLoanField(models.Model):
+#     _inherit = 'hr.loan'
+#
+#     loan_type = fields.Selection(
+#         [('vehicle_loan', 'Vehicle Loan'), ('housing_loan', 'Housing Loan'), ('personal_loan', 'Personal Loan'),
+#          ('other_loan', 'Other  Loan')], string='Loan Type', default='vehicle_loan')
+#     installment_amount = fields.Integer("Installment Amount", required=True)
+#     salary_rule_name = fields.Many2one("hr.salary.rule", "Salary Rule Name")
+#     salary_rule_code = fields.Char("Salary Rule Code")
+#
+#     @api.onchange('salary_rule_name')
+#     def _onchange_salary_rule_name(self):
+#         print("id================================================", self.salary_rule_name.id)
+#         salary_rule = self.env['hr.salary.rule'].search([("id", "=", self.salary_rule_name.id)])
+#         print("salary_rule", salary_rule)
+#         self.salary_rule_code = salary_rule.code
 
-# loan_type = fields.Selection(
-# [('vehicle_loan', 'Vehicle Loan'), ('housing_loan', 'Housing Loan'), ('personal_loan', 'Personal Loan')
-# ('other_loan', 'Other  Loan')], string='Loan Type', default='vehicle_loan')
-# installment_amount = fields.Integer("Installment Amount", required=True)
-# salary_rule_name = fields.Many2one("hr.salary.rule", "Salary Rule Name")
-# salary_rule_code = fields.Char("Salary Rule Code")
 
-# @api.onchange('salary_rule_name')
-# def _onchange_salary_rule_name(self)
-# print("id================================================", self.salary_rule_name.id)
-# salary_rule = self.env['hr.salary.rule'].search([("id", "=", self.salary_rule_name.id)])
-# print("salary_rule", salary_rule)
-# self.salary_rule_code = salary_rule.code
-
-
-# class AttendanceValidationSheet(models.Model)
-# _inherit = "hr.attendance.validation.sheet"
-# job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
+# class AttendanceValidationSheet(models.Model):
+#   _inherit = "hr.attendance.validation.sheet"
+#  job_grade = fields.Many2one('employee.grade', 'Job Grade', required=True)
 # job_category = fields.Many2one('employee.job', 'Job Category')
 # job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
 # operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
-# gender = fields.Selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')]
-# string='Gender', default='male')
+# gender = fields.Selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+#                         string='Gender', default='male')
 
 # @api.onchange('employee_id')
-# def _onchange_acting_employee_info(self)
-# self.job_grade = self.employee_id.job_grade.id
-# self.job_category = self.employee_id.contract_id.job_category.id
-# self.job_position = self.employee_id.job_position.id
+# def _onchange_acting_employee_info(self):
+#    self.job_grade = self.employee_id.job_grade.id
+#  self.job_category = self.employee_id.contract_id.job_category.id
+#  self.job_position = self.employee_id.job_position.id
 # self.operating_unit = self.employee_id.default_operating_unit_id.id
 
 
@@ -625,16 +634,16 @@ class AllTimeOff(models.Model):
         self.job_position = self.employee_id.job_position.id
         self.operating_unit = self.employee_id.default_operating_unit_id.id
 
-# class EmployeeResignation(models.Model)
-# _inherit = 'hr.resignation'
-# job_category = fields.Many2one('employee.job', 'Job Category')
-# job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
-# operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
-# gender = fields.Selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')]
-# string='Gender', default='male')
+# class EmployeeResignation(models.Model):
+#     _inherit = 'hr.resignation'
+#     job_category = fields.Many2one('employee.job', 'Job Category')
+#     job_position = fields.Many2one("hr.job", string="Job Position", help="Job Position")
+#     operating_unit = fields.Many2one('operating.unit', 'Operating Unit')
+#     gender = fields.Selection([('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+#                               string='Gender', default='male')
 # # #
-# @api.onchange('employee_id')
-# def _onchange_acting_employee_info(self)
-# self.job_category = self.employee_id.contract_id.job_category.id
-# self.job_position = self.employee_id.job_position.id
-# self.operating_unit = self.employee_id.default_operating_unit_id.id
+#     @api.onchange('employee_id')
+#     def _onchange_acting_employee_info(self):
+#         self.job_category = self.employee_id.contract_id.job_category.id
+#         self.job_position = self.employee_id.job_position.id
+#         self.operating_unit = self.employee_id.default_operating_unit_id.id

@@ -56,7 +56,6 @@
                             <group string="Status">
                                 <field name="status"/>
                                 <field name="active"/>
-                                <field name="is_seed"/>
                             </group>
                         </group>
                         <group string="Definition">
@@ -103,6 +102,8 @@
                 <search>
                     <field name="name"/>
                     <field name="code"/>
+                    <field name="pillar"/>
+                    <field name="functional_domain"/>
                     <filter string="Active Competencies" name="active_status" domain="[('status','=','active')]"/>
                     <filter string="Core" name="pillar_core" domain="[('pillar','=','core')]"/>
                     <filter string="Leadership" name="pillar_leadership" domain="[('pillar','=','leadership')]"/>
