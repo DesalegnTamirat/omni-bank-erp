@@ -365,14 +365,6 @@
                         </div>
                     </div>
                     <div class="settings-toggle-row">
-                        <div class="settings-toggle-label">Auto Absence Detection</div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="s_absence"
-                                   t-att-checked="state.settings.enable_auto_absence"
-                                   t-on-change="onToggleAutoAbsence"/>
-                        </div>
-                    </div>
-                    <div class="settings-toggle-row">
                         <div class="settings-toggle-label">ERP Access Gate</div>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="s_gate"
@@ -382,21 +374,9 @@
                     </div>
                 </div>
 
-                    <!-- TIME PARAMETERS -->
+                <!-- OPERATIONAL POLICY & GRACE PARAMETERS -->
                 <div class="settings-section mb-4">
-                    <div class="settings-section-title">Shift Time Parameters</div>
-                    <div class="settings-input-row">
-                        <label class="settings-input-label">Morning Start</label>
-                        <input type="time" class="settings-input"
-                               t-att-value="state.settings.morning_time_str"
-                               t-on-input="onInputMorningTime"/>
-                    </div>
-                    <div class="settings-input-row">
-                        <label class="settings-input-label">Exit Time</label>
-                        <input type="time" class="settings-input"
-                               t-att-value="state.settings.exit_time_str"
-                               t-on-input="onInputExitTime"/>
-                    </div>
+                    <div class="settings-section-title">Policy &amp; Grace Tolerances</div>
                     <div class="settings-input-row">
                         <label class="settings-input-label">Dead Time / Grace</label>
                         <input type="text" class="settings-input" placeholder="HH:MM"
@@ -415,23 +395,11 @@
                                t-att-value="state.settings.post_shift_grace_hours_str"
                                t-on-input="onInputPostShiftGraceHours"/>
                     </div>
-                    <div class="settings-input-row">
-                        <label class="settings-input-label">Saturday Exit</label>
-                        <input type="time" class="settings-input"
-                               t-att-value="state.settings.saturday_exit_time_str"
-                               t-on-input="onInputSaturdayExitTime"/>
-                    </div>
                 </div>
 
-                    <!-- LUNCH BREAK PARAMETERS (CONDITIONAL) -->
+                <!-- LUNCH BREAK PARAMETERS (CONDITIONAL) -->
                 <div t-if="state.settings.enable_lunch_break" class="settings-section mb-4">
-                    <div class="settings-section-title">Lunch Break Parameters</div>
-                    <div class="settings-input-row">
-                        <label class="settings-input-label">Lunch Start</label>
-                        <input type="time" class="settings-input"
-                               t-att-value="state.settings.lunch_out_time_str"
-                               t-on-input="onInputLunchOutTime"/>
-                    </div>
+                    <div class="settings-section-title">Lunch Break Policy</div>
                     <div class="settings-input-row">
                         <label class="settings-input-label">Lunch Duration</label>
                         <input type="text" class="settings-input" placeholder="HH:MM"

@@ -803,3 +803,132 @@ class HrAttendanceDashboardService(models.Model):
             'progression_points': prog_svg_points,
             'recent_logs': logs,
         }
+
+    # ------------------------------------------------------------------
+    # On-Demand Absence & Attendance Query Helpers (For Reports, Discipline & Payroll)
+    # ------------------------------------------------------------------
+    @api.model
+    def get_employee_absent_dates(self, employee_id, start_date, end_date):
+        """Compute the list of unexcused absent dates for a specific employee over a date range.
+        Excludes approved leaves and Sundays/rest days. Zero cron required.
+        """
+        s_d = fields.Date.to_date(start_date)
+        e_d = fields.Date.to_date(end_date)
+        if not (employee_id and s_d and e_d and s_d <= e_d):
+            return []
+
+        # 1. Get all check-in dates for employee in range
+        s_dt = datetime.datetime.combine(s_d, datetime.time.min)
+        e_dt = datetime.datetime.combine(e_d, datetime.time.max)
+        atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('check_in', '>=', s_dt),
+            ('check_in', '<=', e_dt),
+        ])
+        checked_dates = set()
+        for a in atts:
+            if a.check_in:
+                checked_dates.add(a.check_in.date())
+
+        # 2. Get approved leave dates
+        leaves = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', e_dt),
+            ('date_to', '>=', s_dt),
+        ])
+        leave_dates = set()
+        for l in leaves:
+            cur_l = max(s_d, l.date_from.date())
+            end_l = min(e_d, l.date_to.date())
+            while cur_l <= end_l:
+                leave_dates.add(cur_l)
+                cur_l += datetime.timedelta(days=1)
+
+        # 3. Evaluate calendar working days
+        absent_dates = []
+        cur = s_d
+        while cur <= e_d:
+            # Skip Sunday (weekday 6)
+            if cur.weekday() != 6:
+                if cur not in checked_dates and cur not in leave_dates:
+                    absent_dates.append(str(cur))
+            cur += datetime.timedelta(days=1)
+
+        return absent_dates
+
+    @api.model
+    def get_operating_unit_absent_employees(self, ou_id, target_date=None):
+        """Retrieve the list of absent employees for an Operating Unit on a given date.
+        Zero cron required.
+        """
+        t_d = fields.Date.to_date(target_date) if target_date else fields.Date.context_today(self)
+        emp_model = self.env['hr.employee'].sudo()
+        employees = emp_model.search([
+            ('active', '=', True),
+            ('default_operating_unit_id', '=', int(ou_id))
+        ])
+        if not employees:
+            return []
+
+        emp_ids = employees.ids
+        t_s = datetime.datetime.combine(t_d, datetime.time.min)
+        t_e = datetime.datetime.combine(t_d, datetime.time.max)
+
+        # Check-in employee IDs today
+        att_emp_ids = set(self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('check_in', '>=', t_s),
+            ('check_in', '<=', t_e),
+        ]).mapped('employee_id.id'))
+
+        # Approved leave employee IDs today
+        leave_emp_ids = set(self.env['hr.leave'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', t_e),
+            ('date_to', '>=', t_s),
+        ]).mapped('employee_id.id'))
+
+        absent_list = []
+        for emp in employees:
+            if emp.id not in att_emp_ids and emp.id not in leave_emp_ids:
+                absent_list.append({
+                    'id': emp.id,
+                    'name': emp.name,
+                    'job_title': emp.job_id.name if emp.job_id else '',
+                    'work_email': emp.work_email or '',
+                    'work_phone': emp.work_phone or '',
+                })
+
+        return absent_list
+
+    @api.model
+    def get_payroll_attendance_summary(self, employee_id, start_date, end_date):
+        """Clean data endpoint for Payroll to pull attendance metrics without pushing penalties."""
+        s_d = fields.Date.to_date(start_date)
+        e_d = fields.Date.to_date(end_date)
+        s_dt = datetime.datetime.combine(s_d, datetime.time.min)
+        e_dt = datetime.datetime.combine(e_d, datetime.time.max)
+
+        atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('check_in', '>=', s_dt),
+            ('check_in', '<=', e_dt),
+        ])
+
+        worked_hours = round(sum(a.worked_hours or 0.0 for a in atts), 2)
+        late_hours = round(sum(a.late_time_hour or 0.0 for a in atts), 2)
+        force_checkout_count = sum(1 for a in atts if a.is_force_checkout)
+        absent_dates = self.get_employee_absent_dates(employee_id, start_date, end_date)
+
+        return {
+            'employee_id': employee_id,
+            'start_date': str(s_d),
+            'end_date': str(e_d),
+            'worked_hours': worked_hours,
+            'late_hours': late_hours,
+            'force_checkout_count': force_checkout_count,
+            'absent_days_count': len(absent_dates),
+            'absent_dates': absent_dates,
+        }

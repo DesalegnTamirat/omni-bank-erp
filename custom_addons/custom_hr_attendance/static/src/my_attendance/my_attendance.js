@@ -61,15 +61,10 @@ export class MyAttendance extends Component {
                 enable_checkout_restriction: true,
                 enable_saturday_halfday: true,
                 enable_lunch_break: false,
-                enable_auto_absence: true,
                 enable_checkin_gate: false,
-                morning_time: 8.0,
-                exit_time: 17.0,
                 dead_time: 0.25,
                 checkin_buffer: 0.5,
                 post_shift_grace_hours: 3.0,
-                saturday_exit_time: 12.0,
-                lunch_out_time: 12.0,
                 lunch_duration: 1.0,
                 lunch_grace_time: 0.25,
                 lateness_hours_violation_threshold: 4.0,
@@ -368,9 +363,6 @@ export class MyAttendance extends Component {
     }
     onToggleLunchBreak(ev) {
         this.state.settings.enable_lunch_break = ev.target.checked;
-    }
-    onToggleAutoAbsence(ev) {
-        this.state.settings.enable_auto_absence = ev.target.checked;
     }
     onToggleCheckinGate(ev) {
         this.state.settings.enable_checkin_gate = ev.target.checked;

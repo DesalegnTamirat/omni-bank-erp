@@ -26,13 +26,14 @@
                                      help="Apply reduced exit time on Saturdays for Head Office employees.">
                                 <field name="enable_saturday_halfday"/>
                             </setting>
+                            <setting string="Apply Saturday Half-Day to District Offices"
+                                     help="Apply Saturday half-day exit time to District Office staff in addition to Head Office."
+                                     invisible="not enable_saturday_halfday">
+                                <field name="saturday_halfday_district"/>
+                            </setting>
                             <setting string="Lunch Break"
                                      help="Enable Lunch-Out / Back-from-Lunch flow. Worked hours will exclude actual lunch break duration.">
                                 <field name="enable_lunch_break"/>
-                            </setting>
-                            <setting string="Automatic Absence Detection"
-                                     help="Enable automatic detection of unexcused absences">
-                                <field name="enable_auto_absence"/>
                             </setting>
                             <setting string="IP Address Tracking"
                                      help="Track IP address of device used when employee checks in and checks out.">
@@ -48,16 +49,10 @@
                             </setting>
                         </block>
 
-
                         <!-- ========================================= -->
-                        <!-- BLOCK 2: Attendance Time Settings         -->
+                        <!-- BLOCK 2: Policies, Buffers & Grace Periods-->
                         <!-- ========================================= -->
-                        <block title="Attendance Time Settings" name="custom_attendance_time_settings">
-                            <setting string="Morning Check-in Time"
-                                     help="The standard morning check-in time (24h format)"
-                                     invisible="not enable_checkin_restriction">
-                                <field name="morning_time" widget="float_time"/>
-                            </setting>
+                        <block title="Attendance Policies &amp; Grace Periods" name="custom_attendance_policy_settings">
                             <setting string="Check-in Buffer (Hours)"
                                      help="How early (in hours) employees are allowed to check in before shift start"
                                      invisible="not enable_checkin_restriction">
@@ -67,6 +62,31 @@
                                      help="Grace period in hours around check-in/out times before marking as late"
                                      invisible="not enable_checkin_restriction">
                                 <field name="dead_time" widget="float_time"/>
+                            </setting>
+                            <setting string="Lunch Break Duration (Hours)"
+                                     help="Duration of the lunch break (e.g., 1.0 = 1 hour, 0.5 = 30 minutes)"
+                                     invisible="not enable_lunch_break">
+                                <field name="lunch_duration" widget="float_time"/>
+                            </setting>
+                            <setting string="Lunch Grace Time (Hours)"
+                                     help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)"
+                                     invisible="not enable_lunch_break">
+                                <field name="lunch_grace_time" widget="float_time"/>
+                            </setting>
+                            <setting string="Force Checkout Threshold (Hours)"
+                                     help="Hours after check-in before automatic force checkout is performed">
+                                <field name="force_checkout_hours" widget="float_time"/>
+                            </setting>
+                        </block>
+
+                        <!-- ========================================================= -->
+                        <!-- BLOCK 3: Standard Shift Time Defaults [RARELY MODIFIED]   -->
+                        <!-- ========================================================= -->
+                        <block title="Standard Shift Time Defaults (Rarely Modified)" name="custom_shift_time_defaults">
+                            <setting string="Morning Check-in Time"
+                                     help="The standard morning check-in time (24h format)"
+                                     invisible="not enable_checkin_restriction">
+                                <field name="morning_time" widget="float_time"/>
                             </setting>
                             <setting string="Exit Time"
                                      help="The standard exit/check-out time (24h format)"
@@ -78,30 +98,13 @@
                                      invisible="not enable_saturday_halfday">
                                 <field name="saturday_exit_time" widget="float_time"/>
                             </setting>
-                            <setting string="Force Checkout Threshold (Hours)"
-                                     help="Hours after check-in before automatic force checkout is performed">
-                                <field name="force_checkout_hours" widget="float_time"/>
+                            <setting string="Lunch Break Start Time"
+                                     help="Time when lunch break starts (24h format, e.g., 12.00 for noon)"
+                                     invisible="not enable_lunch_break">
+                                <field name="lunch_out_time" widget="float_time"/>
                             </setting>
                         </block>
 
-                        <!-- ========================================= -->
-                        <!-- BLOCK 3: Lunch Break Settings             -->
-                        <!-- ========================================= -->
-                        <block title="Lunch Break Settings" name="custom_lunch_break_settings"
-                               invisible="not enable_lunch_break">
-                            <setting string="Lunch Break Start Time"
-                                     help="Time when lunch break starts (24h format, e.g., 12.00 for noon)">
-                                <field name="lunch_out_time" widget="float_time"/>
-                            </setting>
-                            <setting string="Lunch Break Duration (Hours)"
-                                     help="Duration of the lunch break (e.g., 1.0 = 1 hour, 0.5 = 30 minutes)">
-                                <field name="lunch_duration" widget="float_time"/>
-                            </setting>
-                            <setting string="Lunch Grace Time (Hours)"
-                                     help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)">
-                                <field name="lunch_grace_time" widget="float_time"/>
-                            </setting>
-                        </block>
                 </xpath>
 
                 <!-- Hide Standard Odoo Kiosk Settings and Overtime blocks, keep Modes visible at bottom -->
