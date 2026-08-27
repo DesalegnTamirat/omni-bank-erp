@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from . import res_config_settings
 from . import hr_attendance
+from . import attendance_dashboard_service
 from . import attendance_preapproval
 from . import job_shift
 from . import job_position_exception
