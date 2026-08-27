@@ -1,68 +1,419 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
-<t t-name="attendance_dashboard.AttendanceDashboard">
+<t t-name="custom_hr_attendance.AttendanceDashboard">
     <div class="o_attendance_dashboard">
 
-        <div class="o_ad_header">
-            <h1>Attendance Dashboard</h1>
-            <h4 class="o_ad_date" t-esc="state.today"/>
-        </div>
-
-        <div class="o_ad_filter">
-            <select class="o_ad_filter_select" t-on-change="onFilterChange">
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="this_week">This Week</option>
-                <option value="this_month">This Month</option>
-                <option value="this_year">This Year</option>
-            </select>
-        </div>
-
-        <!-- KPI -->
-        <div class="o_ad_kpi">
-            <div class="o_ad_kpi_card">
-                Total Employees
-                <span class="o_ad_kpi_value o_ad_kpi_total" t-esc="state.kpi.total"/>
-            </div>
-            <div class="o_ad_kpi_card">
-                Present
-                <span class="o_ad_kpi_value o_ad_kpi_present" t-esc="state.kpi.present"/>
-            </div>
-            <div class="o_ad_kpi_card">
-                Late
-                <span class="o_ad_kpi_value o_ad_kpi_late" t-esc="state.kpi.late"/>
-            </div>
-            <div class="o_ad_kpi_card">
-                On Leave
-                <span class="o_ad_kpi_value o_ad_kpi_leave" t-esc="state.kpi.leave"/>
-            </div>
-            <div class="o_ad_kpi_card">
-                Absent
-                <span class="o_ad_kpi_value o_ad_kpi_absent" t-esc="state.kpi.absent"/>
-            </div>
-        </div>
-
-        <!-- Charts -->
-        <div class="o_ad_charts">
-            <div class="o_ad_chart_box">
-                <h3>Status Distribution</h3>
-                <div class="o_ad_canvas_wrap">
-                    <canvas t-ref="pieChart"/>
+        <!-- Top Header & Navigation Tabs -->
+        <div class="bunna_hero_header d-flex flex-wrap align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center">
+                <i class="fa fa-university fa-2x me-3 text-warning"/>
+                <div>
+                    <div class="bunna_hero_title">
+                        <t t-if="state.currentTab === 'corporate'">Attendance Dashboard</t>
+                        <t t-else="">My Personal Attendance Dashboard</t>
+                    </div>
+                    <div class="text-white-50 small">
+                        <t t-if="state.currentTab === 'corporate'">Bank-Wide Workforce Analytics &amp; Operations Command Center</t>
+                        <t t-elif="state.personal and state.personal.employee_name">
+                            <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> &amp;bull; <span t-esc="state.personal.job_title"/>
+                        </t>
+                        <t t-else="">Personal Attendance History &amp; Metric Radar</t>
+                    </div>
                 </div>
             </div>
 
-            <div class="o_ad_chart_box">
-                <h3>Attendance Progress</h3>
-                <div class="o_ad_canvas_wrap">
-                    <canvas t-ref="lineChart"/>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <!-- CORPORATE SINGLE DATE FILTER -->
+                <div t-if="state.currentTab === 'corporate'" class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm bunna_date_select" t-att-value="state.filter" t-on-change="onFilterChange">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="specific">Select Date...</option>
+                    </select>
+                    <input t-if="state.filter === 'specific'" type="date" class="form-control form-control-sm bunna_date_picker" t-att-value="state.specificDate" t-on-change="onSpecificDateChange"/>
+                </div>
+
+                <!-- PERSONAL MULTI-PERIOD FILTER -->
+                <div t-if="state.currentTab === 'personal'" class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm bunna_date_select" t-att-value="state.personalPeriod" t-on-change="onPersonalPeriodChange">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="this_week">This Week</option>
+                        <option value="this_month">This Month</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    <div t-if="state.personalPeriod === 'custom'" class="d-flex align-items-center gap-1">
+                        <input type="date" class="form-control form-control-sm bunna_date_picker" t-att-value="state.personalStartDate" t-on-change="onPersonalStartChange"/>
+                        <span class="text-white-50 small">to</span>
+                        <input type="date" class="form-control form-control-sm bunna_date_picker" t-att-value="state.personalEndDate" t-on-change="onPersonalEndChange"/>
+                    </div>
+                </div>
+
+                <!-- ROLE NAVIGATION TABS -->
+                <ul class="nav bunna_nav_tabs">
+                    <li class="nav-item">
+                        <button t-attf-class="nav-link #{state.currentTab === 'corporate' ? 'active' : ''}" t-on-click="() => this.switchTab('corporate')">
+                            <i class="fa fa-building me-1"/> Corporate Attendance Dashboard
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button t-attf-class="nav-link #{state.currentTab === 'personal' ? 'active' : ''}" t-on-click="() => this.switchTab('personal')">
+                            <i class="fa fa-user me-1"/> My Personal Dashboard
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- LOADING INDICATOR -->
+        <div t-if="state.loading" class="text-center py-5">
+            <div class="spinner-border text-danger" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
+            <div class="mt-3 text-muted fw-bold fs-5">Loading Attendance Dashboard...</div>
+        </div>
+
+        <div t-else="">
+
+            <!-- ============================================== -->
+            <!-- 1. CORPORATE ATTENDANCE DASHBOARD (SINGLE DATE) -->
+            <!-- ============================================== -->
+            <div t-if="state.currentTab === 'corporate'">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0">Daily Workforce Presence Overview</h5>
+                    <span class="badge bg-light text-dark border fs-6 fw-bold" t-esc="state.today"/>
+                </div>
+
+                <!-- 5 KPI CARDS GRID -->
+                <div class="o_ad_kpi mb-3">
+                    <div class="o_ad_kpi_card">
+                        <div class="o_ad_kpi_label">Total Employees</div>
+                        <span class="o_ad_kpi_value o_ad_kpi_total" t-esc="state.kpi.total"/>
+                    </div>
+                    <div class="o_ad_kpi_card">
+                        <div class="o_ad_kpi_label">Present</div>
+                        <span class="o_ad_kpi_value o_ad_kpi_present" t-esc="state.kpi.present"/>
+                    </div>
+                    <div class="o_ad_kpi_card">
+                        <div class="o_ad_kpi_label">Late</div>
+                        <span class="o_ad_kpi_value o_ad_kpi_late" t-esc="state.kpi.late"/>
+                    </div>
+                    <div class="o_ad_kpi_card">
+                        <div class="o_ad_kpi_label">On Leave</div>
+                        <span class="o_ad_kpi_value o_ad_kpi_leave" t-esc="state.kpi.leave"/>
+                    </div>
+                    <div class="o_ad_kpi_card">
+                        <div class="o_ad_kpi_label">Absent</div>
+                        <span class="o_ad_kpi_value o_ad_kpi_absent" t-esc="state.kpi.absent"/>
+                    </div>
+                </div>
+
+                <!-- 3 CHARTS GRID -->
+                <div class="o_ad_charts mb-4">
+                    <div class="o_ad_chart_box">
+                        <h3>Status Distribution</h3>
+                        <div class="o_ad_canvas_wrap">
+                            <canvas t-ref="pieChart"/>
+                        </div>
+                    </div>
+
+                    <div class="o_ad_chart_box">
+                        <h3>Attendance Progress</h3>
+                        <div class="o_ad_canvas_wrap">
+                            <canvas t-ref="lineChart"/>
+                        </div>
+                    </div>
+
+                    <div class="o_ad_chart_box o_ad_full_width">
+                        <h3>Attendance by Operating Unit</h3>
+                        <div class="o_ad_canvas_wrap">
+                            <canvas t-ref="barChart"/>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="o_ad_chart_box o_ad_full_width">
-                <h3>Attendance by Operating Unit</h3>
-                <div class="o_ad_canvas_wrap">
-                    <canvas t-ref="barChart"/>
+
+            <!-- ============================================== -->
+            <!-- 2. MY PERSONAL DASHBOARD (RICH BUNNA METRICS) -->
+            <!-- ============================================== -->
+            <div t-if="state.currentTab === 'personal' and state.personal">
+                
+                <!-- 4 EXACT PERSONAL METRIC CARDS -->
+                <div class="row g-3 mb-3">
+                    <!-- CARD 1: TOTAL WORKED HOURS -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_pro_stat_card">
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="stat_icon icon_green"><i class="fa fa-clock-o fa-lg"/></div>
+                                    <div class="stat_main_value" style="font-size: 2rem; font-weight: 800; color: #425727;" t-esc="state.personal.period_worked_hours + 'h'"/>
+                                </div>
+                                <div class="stat_title_label">Total Worked Hours</div>
+                            </div>
+                            <div class="mt-2">
+                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                    <span>Target: <t t-esc="state.personal.target_hours"/>h</span>
+                                    <span class="fw-bold text-dark" t-esc="state.personal.worked_hours_pct + '%'"/>
+                                </div>
+                                <div class="progress" style="height: 8px; background-color: #f1f5f9; border-radius: 4px;">
+                                    <div class="progress-bar" role="progressbar" t-attf-style="width: #{state.personal.worked_hours_pct}%; background-color: #425727; border-radius: 4px;"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top" style="font-size: 0.72rem;">
+                                    <span class="text-muted fw-bold">Daily Average</span>
+                                    <span class="badge bg-light text-dark border" t-esc="state.personal.avg_daily_hours + ' h/day'"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: CUMULATIVE LATE HOURS -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_pro_stat_card">
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="stat_icon icon_gold"><i class="fa fa-hourglass-half fa-lg"/></div>
+                                    <div class="stat_main_value" style="font-size: 2rem; font-weight: 800; color: #c17540;" t-esc="state.personal.late_hours_formatted"/>
+                                </div>
+                                <div class="stat_title_label">Cumulative Late Hours</div>
+                            </div>
+                            <div class="mt-2">
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light mb-2">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-trophy text-warning me-1"/> Punctuality Rating</span>
+                                    <span class="badge bg-success" t-esc="state.personal.punctuality_score + '%'"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-1 border-top" style="font-size: 0.72rem;">
+                                    <span class="text-muted fw-bold">Late Occurrences</span>
+                                    <span class="badge bg-warning text-dark" t-esc="state.personal.late_count + ' Check-Ins'"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 3: ATTENDANCE EXCEPTIONS -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_pro_stat_card">
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="stat_icon icon_crimson"><i class="fa fa-shield fa-lg"/></div>
+                                    <div class="badge bg-danger">Offenses</div>
+                                </div>
+                                <div class="stat_title_label">Attendance Exceptions</div>
+                            </div>
+                            <div class="d-flex flex-column gap-2 mt-2" t-if="state.personal.offenses">
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-sign-out text-danger me-2"/> Force Checkout</span>
+                                    <span class="badge bg-danger rounded-pill px-3 py-1 fs-6" t-esc="state.personal.offenses.force_checkout"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-user-times text-warning me-2"/> Absent</span>
+                                    <span class="badge bg-warning text-dark rounded-pill px-3 py-1 fs-6" t-esc="state.personal.offenses.absent"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-clock-o text-secondary me-2"/> Late Check-Ins</span>
+                                    <span class="badge bg-secondary rounded-pill px-3 py-1 fs-6" t-esc="state.personal.offenses.late"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 4: APPROVALS & ACKNOWLEDGEMENTS -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="bunna_pro_stat_card">
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="stat_icon icon_green"><i class="fa fa-check-square-o fa-lg"/></div>
+                                    <div class="badge bg-success">Approvals</div>
+                                </div>
+                                <div class="stat_title_label">Approvals &amp; Acknowledged</div>
+                            </div>
+                            <div class="d-flex flex-column gap-2 mt-2" t-if="state.personal.approvals">
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-user-secret text-success me-2"/> Acknowledged</span>
+                                    <span class="badge bg-success rounded-pill px-3 py-1 fs-6" t-esc="state.personal.approvals.acknowledged"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-file-text-o text-primary me-2"/> Predefined</span>
+                                    <span class="badge bg-primary rounded-pill px-3 py-1 fs-6" t-esc="state.personal.approvals.predefined"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                                    <span class="small fw-bold text-dark"><i class="fa fa-check-circle text-info me-2"/> Status Compliance</span>
+                                    <span class="badge bg-info text-dark rounded-pill px-3 py-1 fs-6">Good</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PERSONAL DATA VIZ ROW (DONUT + PROGRESSION BARS) -->
+                <div class="row g-3 mb-4">
+                    <!-- PERSONAL ATTENDANCE STATUS BREAKDOWN DONUT -->
+                    <div class="col-lg-5">
+                        <div class="bunna_pro_card h-100" t-if="state.personal.personal_donut_svg">
+                            <div class="card_pro_header">
+                                <span><i class="fa fa-pie-chart me-2"/> Personal Attendance Status Breakdown</span>
+                                <span class="badge bg-light text-dark border">Evaluation Period</span>
+                            </div>
+                            <div class="card_pro_body d-flex flex-column justify-content-between">
+                                <div class="d-flex align-items-center justify-content-center py-2" style="position: relative; height: 160px;">
+                                    <svg viewBox="0 0 100 100" style="width: 150px; height: 150px; transform: rotate(-90deg);">
+                                        <!-- Background Circle -->
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" stroke-width="12"/>
+                                        <!-- Normal/On-Time Segment (#425727) -->
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#425727" stroke-width="12"
+                                            t-att-stroke-dasharray="state.personal.personal_donut_svg.p_dash"
+                                            t-att-stroke-dashoffset="state.personal.personal_donut_svg.p_off"/>
+                                        <!-- Late Segment (#c17540) -->
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#c17540" stroke-width="12"
+                                            t-att-stroke-dasharray="state.personal.personal_donut_svg.l_dash"
+                                            t-att-stroke-dashoffset="state.personal.personal_donut_svg.l_off"/>
+                                        <!-- Leave Segment (#726732) -->
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#726732" stroke-width="12"
+                                            t-att-stroke-dasharray="state.personal.personal_donut_svg.lv_dash"
+                                            t-att-stroke-dashoffset="state.personal.personal_donut_svg.lv_off"/>
+                                        <!-- Absent Segment (#541718) -->
+                                        <circle cx="50" cy="50" r="40" fill="transparent" stroke="#541718" stroke-width="12"
+                                            t-att-stroke-dasharray="state.personal.personal_donut_svg.a_dash"
+                                            t-att-stroke-dashoffset="state.personal.personal_donut_svg.a_off"/>
+                                    </svg>
+                                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                                        <div class="fw-bold fs-4 text-dark" t-esc="state.personal.punctuality_score + '%'"/>
+                                        <div class="text-muted small" style="font-size: 0.65rem;">Punctuality</div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mt-2 pt-2 border-top">
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center gap-2 p-2 rounded bg-light">
+                                            <span class="rounded-circle" style="width: 10px; height: 10px; background-color: #425727; display: inline-block;"/>
+                                            <div>
+                                                <div class="text-muted" style="font-size: 0.68rem; font-weight: 700;">ON TIME</div>
+                                                <div class="fw-bold text-dark fs-6" t-esc="state.personal.normal_count + ' (' + state.personal.personal_donut_svg.pct_normal + '%)'"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center gap-2 p-2 rounded bg-light">
+                                            <span class="rounded-circle" style="width: 10px; height: 10px; background-color: #c17540; display: inline-block;"/>
+                                            <div>
+                                                <div class="text-muted" style="font-size: 0.68rem; font-weight: 700;">LATE</div>
+                                                <div class="fw-bold text-dark fs-6" t-esc="state.personal.late_count + ' (' + state.personal.personal_donut_svg.pct_late + '%)'"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center gap-2 p-2 rounded bg-light">
+                                            <span class="rounded-circle" style="width: 10px; height: 10px; background-color: #726732; display: inline-block;"/>
+                                            <div>
+                                                <div class="text-muted" style="font-size: 0.68rem; font-weight: 700;">ON LEAVE</div>
+                                                <div class="fw-bold text-dark fs-6" t-esc="state.personal.leave_count + ' (' + state.personal.personal_donut_svg.pct_leave + '%)'"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="d-flex align-items-center gap-2 p-2 rounded bg-light">
+                                            <span class="rounded-circle" style="width: 10px; height: 10px; background-color: #541718; display: inline-block;"/>
+                                            <div>
+                                                <div class="text-muted" style="font-size: 0.68rem; font-weight: 700;">ABSENT</div>
+                                                <div class="fw-bold text-dark fs-6" t-esc="state.personal.absent_count + ' (' + state.personal.personal_donut_svg.pct_absent + '%)'"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PUNCTUALITY SCORE RATING METER -->
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="d-flex justify-content-between small fw-bold mb-1">
+                                        <span class="text-dark"><i class="fa fa-shield text-success me-1"/> Punctuality Score Index</span>
+                                        <span class="text-success" t-esc="state.personal.punctuality_score + '%'"/>
+                                    </div>
+                                    <div class="progress" style="height: 6px; background-color: #f1f5f9; border-radius: 3px;">
+                                        <div class="progress-bar" role="progressbar" t-attf-style="width: #{state.personal.punctuality_score}%; background-color: #425727; border-radius: 3px;"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3 STATUS BARS PROGRESSION CHART (WORKED, LATE, ABSENT) -->
+                    <div class="col-lg-7">
+                        <div class="bunna_pro_card h-100">
+                            <div class="card_pro_header">
+                                <span><i class="fa fa-bar-chart me-2"/> Worked vs Late vs Absent Hours Progression</span>
+                                <button class="btn btn-sm btn-outline-secondary" t-on-click="openLogsModal">
+                                    <i class="fa fa-list me-1"/> View Period Logs
+                                </button>
+                            </div>
+                            <div class="card_pro_body d-flex flex-column justify-content-between" style="overflow: hidden; width: 100%;">
+                                <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; overflow-x: hidden; width: 100%;">
+                                    <div t-foreach="state.personal.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end; min-width: 0;">
+                                        <div class="d-flex gap-2 align-items-end justify-content-center" style="height: 100%;">
+                                            <!-- Worked Bar (#425727) -->
+                                            <div t-attf-style="height: #{p.w_pct}%; width: #{p.bar_width_px or 28}px; background-color: #425727; border-radius: 5px 5px 0 0; min-height: #{p.w_pct > 0 ? 4 : 0}px;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
+                                            <!-- Late Bar (#c17540) -->
+                                            <div t-attf-style="height: #{p.l_pct}%; width: #{p.bar_width_px or 28}px; background-color: #c17540; border-radius: 5px 5px 0 0; min-height: #{p.l_pct > 0 ? 4 : 0}px;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
+                                            <!-- Absent Bar (#541718) -->
+                                            <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + (p.absent_days !== undefined ? p.absent_days : p.absent_hours) + ' Days'"/>
+                                        </div>
+                                        <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
+                                    </div>
+                                </div>
+
+                                <!-- 3 STATUS BARS LEGEND -->
+                                <div class="d-flex justify-content-center gap-4 mt-3 small font-weight-bold">
+                                    <span class="text-success"><i class="fa fa-square me-1" style="color: #425727;"/> Worked Hours</span>
+                                    <span class="text-warning"><i class="fa fa-square me-1" style="color: #c17540;"/> Late Hours</span>
+                                    <span class="text-danger"><i class="fa fa-square me-1" style="color: #541718;"/> Absent Days</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ============================================== -->
+        <!-- PERIOD LOGS MODAL DIALOG                      -->
+        <!-- ============================================== -->
+        <div t-if="state.showLogsModal" class="modal fade show d-block bunna_modal_backdrop" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="modal-header text-white" style="background: linear-gradient(135deg, #541718 0%, #1e2917 100%);">
+                        <h5 class="modal-title fw-bold">
+                            <i class="fa fa-history me-2"/> Attendance Period Logs (<t t-esc="state.personalPeriod.replace('_', ' ').toUpperCase()"/>)
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" t-on-click="closeLogsModal"/>
+                    </div>
+                    <div class="modal-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Check-In</th>
+                                        <th>Check-Out</th>
+                                        <th>Worked Hours</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="state.personal.recent_logs" t-as="log" t-key="log.id">
+                                        <td class="fw-bold text-dark" t-esc="log.date"/>
+                                        <td t-esc="log.check_in"/>
+                                        <td t-esc="log.check_out"/>
+                                        <td t-esc="log.worked_hours"/>
+                                        <td>
+                                            <span t-attf-class="badge #{log.check_in_status === 'Late' ? 'bg-warning text-dark' : 'bg-success'}" t-esc="log.check_in_status"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary fw-bold" t-on-click="closeLogsModal">Close</button>
+                    </div>
                 </div>
             </div>
         </div>

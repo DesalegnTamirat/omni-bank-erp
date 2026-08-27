@@ -1,6 +1,5 @@
-/* Bunna Bank Enterprise Executive Attendance Dashboard SCSS (Redesign) */
 :root {
-  --bunna-crimson-hero: #541718;  /* MAIN OFFICIAL BUNNA BANK BRAND COLOR */
+  --bunna-crimson-hero: #541718;
   --bunna-primary-green: #425727;
   --bunna-olive-gold: #726732;
   --bunna-terracotta-gold: #c17540;
@@ -10,214 +9,297 @@
   --bunna-card-border: #e2e8f0;
 }
 
-.bunna_dashboard_container {
-  background-color: var(--bunna-bg-light);
-  min-height: 100vh;
-  height: 100%;
-  width: 100%;
-  overflow-y: auto;
-  padding: 1rem 1.25rem 2.5rem 1.25rem;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  display: flex;
-  flex-direction: column;
+.o_attendance_dashboard {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    width: 100%;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    padding: 1.25rem 1.5rem 3.5rem 1.5rem;
+    background-color: #f8fafc;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  /* Executive Hero Header */
-  .bunna_hero_header {
-    background: linear-gradient(135deg, var(--bunna-crimson-hero) 0%, var(--bunna-dark-forest) 100%);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    color: #ffffff;
-    box-shadow: 0 4px 15px rgba(84, 24, 24, 0.18);
+    /* Hero Header */
+    .bunna_hero_header {
+        background: linear-gradient(135deg, var(--bunna-crimson-hero) 0%, var(--bunna-dark-forest) 100%);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        color: #ffffff;
+        box-shadow: 0 4px 15px rgba(84, 24, 24, 0.18);
+        margin-bottom: 1.25rem;
 
-    .bunna_hero_title {
-      font-weight: 800;
-      font-size: 1.45rem;
-      letter-spacing: -0.02em;
+        .bunna_hero_title {
+            font-weight: 800;
+            font-size: 1.4rem;
+            letter-spacing: -0.02em;
+        }
+
+        .bunna_date_select {
+            background-color: #ffffff !important;
+            color: var(--bunna-deep-navy) !important;
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            font-weight: 700;
+            border-radius: 6px;
+            padding: 0.35rem 0.85rem;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            width: auto;
+            min-width: 150px;
+
+            option {
+                background-color: #ffffff !important;
+                color: var(--bunna-deep-navy) !important;
+            }
+        }
+
+        .bunna_date_picker {
+            background-color: #ffffff !important;
+            color: var(--bunna-deep-navy) !important;
+            border: 1px solid rgba(255, 255, 255, 0.5) !important;
+            font-weight: 700;
+            border-radius: 6px;
+            padding: 0.35rem 0.65rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            width: auto;
+        }
+
+        .bunna_nav_tabs {
+            gap: 6px;
+
+            .nav-link {
+                color: rgba(255, 255, 255, 0.85);
+                font-weight: 700;
+                font-size: 0.88rem;
+                border: 1px solid transparent;
+                padding: 0.4rem 1rem;
+                border-radius: 6px;
+                background: transparent;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    color: #ffffff;
+                    background: rgba(255, 255, 255, 0.15);
+                }
+
+                &.active {
+                    color: #ffffff;
+                    background-color: rgba(255, 255, 255, 0.22);
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                    border: 1px solid rgba(255, 255, 255, 0.35);
+                }
+            }
+        }
     }
 
-    .bunna_date_select {
-      background-color: #ffffff !important;
-      color: var(--bunna-deep-navy) !important;
-      border: 1px solid rgba(255, 255, 255, 0.5) !important;
-      font-weight: 700;
-      border-radius: 6px;
-      padding: 0.35rem 0.85rem;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    /* Corporate 5-KPI Cards Grid */
+    .o_ad_kpi {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
 
-      option {
-        background-color: #ffffff !important;
-        color: var(--bunna-deep-navy) !important;
-      }
+        .o_ad_kpi_card {
+            background: #ffffff;
+            padding: 18px 14px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid #f1f5f9;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.15s ease;
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            }
+        }
+
+        .o_ad_kpi_label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+
+        .o_ad_kpi_value {
+            display: block;
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .o_ad_kpi_total { color: #3b82f6; }
+        .o_ad_kpi_present { color: #10b981; }
+        .o_ad_kpi_late { color: #1e293b; }
+        .o_ad_kpi_leave { color: #f59e0b; }
+        .o_ad_kpi_absent { color: #ef4444; }
     }
 
-    .bunna_date_picker {
-      background-color: #ffffff !important;
-      color: var(--bunna-deep-navy) !important;
-      border: 1px solid rgba(255, 255, 255, 0.5) !important;
-      font-weight: 700;
-      border-radius: 6px;
-      padding: 0.35rem 0.65rem;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    /* Corporate Charts Grid */
+    .o_ad_charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 25px;
+
+        .o_ad_chart_box {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid #f1f5f9;
+            min-height: 330px;
+
+            h3 {
+                font-size: 15px;
+                font-weight: 700;
+                margin-bottom: 16px;
+                color: #1e293b;
+                text-align: center;
+            }
+        }
+
+        .o_ad_full_width {
+            grid-column: span 2;
+        }
+
+        .o_ad_canvas_wrap {
+            height: 270px;
+            position: relative;
+            width: 100%;
+        }
     }
 
-    .bunna_nav_tabs {
-      .nav-link {
-        color: rgba(255, 255, 255, 0.8);
-        font-weight: 700;
-        border: none;
-        padding: 0.4rem 1rem;
-        border-radius: 6px;
-        transition: all 0.2s ease;
+    /* Multi-Period Executive Stat Cards */
+    .bunna_pro_stat_card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--bunna-card-border);
+        padding: 1.1rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
 
         &:hover {
-          color: #ffffff;
-          background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
         }
 
-        &.active {
-          color: #ffffff;
-          background-color: rgba(255, 255, 255, 0.22);
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.3);
+        .stat_header_box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
         }
-      }
+
+        .stat_icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+
+            &.icon_crimson {
+                background-color: rgba(84, 24, 24, 0.12);
+                color: var(--bunna-crimson-hero);
+            }
+            &.icon_green {
+                background-color: rgba(66, 87, 39, 0.12);
+                color: var(--bunna-primary-green);
+            }
+            &.icon_gold {
+                background-color: rgba(193, 117, 64, 0.12);
+                color: var(--bunna-terracotta-gold);
+            }
+        }
+
+        .stat_main_value {
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: var(--bunna-deep-navy);
+            line-height: 1;
+        }
+
+        .stat_title_label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
     }
-  }
 
-  /* Multi-Period Executive Stat Cards with Soft Shadows */
-  .bunna_pro_stat_card {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid var(--bunna-card-border);
-    padding: 1rem;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
-    }
-
-    .stat_header_box {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.5rem;
-
-      .stat_icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
+    /* Executive Pro Cards */
+    .bunna_pro_card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--bunna-card-border);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        height: 100%;
+        min-height: 300px;
         display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.15rem;
+        flex-direction: column;
 
-        &.icon_crimson {
-          background-color: rgba(84, 24, 24, 0.12);
-          color: var(--bunna-crimson-hero);
+        .card_pro_header {
+            padding: 0.85rem 1.1rem;
+            border-bottom: 1px solid var(--bunna-card-border);
+            background-color: #ffffff;
+            font-weight: 800;
+            font-size: 0.92rem;
+            color: var(--bunna-crimson-hero);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        &.icon_green {
-          background-color: rgba(66, 87, 39, 0.12);
-          color: var(--bunna-primary-green);
-        }
-        &.icon_gold {
-          background-color: rgba(193, 117, 64, 0.12);
-          color: var(--bunna-terracotta-gold);
-        }
-        &.icon_olive {
-          background-color: rgba(114, 103, 50, 0.12);
-          color: var(--bunna-olive-gold);
-        }
-        &.icon_navy {
-          background-color: rgba(29, 43, 50, 0.12);
-          color: var(--bunna-deep-navy);
-        }
-      }
 
-      .stat_main_value {
-        font-size: 1.85rem;
-        font-weight: 800;
-        color: var(--bunna-deep-navy);
-        line-height: 1;
-      }
+        .card_pro_body {
+            padding: 1.1rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
     }
 
-    .stat_title_label {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      margin-bottom: 0.6rem;
+    /* Responsive Breakpoints */
+    @media (max-width: 992px) {
+        padding: 1rem;
+
+        .o_ad_charts {
+            grid-template-columns: 1fr;
+
+            .o_ad_full_width {
+                grid-column: span 1;
+            }
+        }
     }
 
-    .stat_period_grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.3rem;
-
-      .period_pill {
-        background-color: var(--bunna-bg-light);
-        border-radius: 6px;
-        padding: 0.3rem 0.15rem;
-        text-align: center;
-
-        .period_label {
-          font-size: 0.65rem;
-          font-weight: 700;
-          color: #94a3b8;
-          text-transform: uppercase;
+    @media (max-width: 576px) {
+        .bunna_hero_header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
         }
 
-        .period_value {
-          font-size: 0.88rem;
-          font-weight: 700;
-          color: var(--bunna-deep-navy);
+        .o_ad_kpi {
+            grid-template-columns: 1fr 1fr;
         }
-      }
     }
-  }
-
-  /* Executive Card Containers with Soft Shadows & Min-Height Fit */
-  .bunna_pro_card {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid var(--bunna-card-border);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-    height: 100%;
-    min-height: 280px;
-    display: flex;
-    flex-direction: column;
-
-    .card_pro_header {
-      padding: 0.85rem 1.1rem;
-      border-bottom: 1px solid var(--bunna-card-border);
-      background-color: #ffffff;
-      font-weight: 800;
-      font-size: 0.95rem;
-      color: var(--bunna-crimson-hero);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .card_pro_body {
-      padding: 1.1rem;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-  }
-
-  /* Modal Backdrop Styling */
-  .bunna_modal_backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1050;
-  }
 }
+
+
+
