@@ -52,16 +52,20 @@
                 <form string="Disciplinary Case">
                     <header>
                         <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <button name="action_start_investigation" string="Start Investigation" type="object" class="btn-info" invisible="state != 'initiated'"/>
-                        <button name="action_send_to_committee" string="Submit to Committee" type="object" class="btn-warning" invisible="state not in ('initiated', 'investigating')"/>
-                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="btn-primary" invisible="state not in ('investigating', 'committee_review')"/>
+                        <button name="action_submit_for_approval" string="Submit for Director Approval" type="object" class="btn-primary" invisible="state not in ('draft', 'initiated') or initiator_type != 'manager'"/>
+                        <button name="action_send_to_committee" string="Submit to Disciplinary Committee" type="object" class="btn-warning" invisible="state not in ('draft', 'initiated') or initiator_type != 'audit'"/>
                         <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success" invisible="state != 'pending_approval'"/>
+                        <button name="action_return_revision" string="Return for Revision" type="object" class="btn-warning" invisible="state != 'pending_approval'"/>
+                        <button name="action_reject" string="Reject Case" type="object" class="btn-secondary" invisible="state != 'pending_approval'"/>
                         <!-- Submit Appeal button — only when window is open -->
                         <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
                                 invisible="not is_appeal_window_open"
                                 help="Submit an appeal within the 10-calendar-day window."/>
+                        <button name="action_create_appeal_on_behalf" string="Lodge Appeal (On Behalf)" type="object" class="btn-info"
+                                invisible="state not in ('enforced', 'closed') or not is_hr_admin"
+                                help="HR Admin can lodge an appeal on behalf of a suspended or dismissed employee."/>
                         <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,initiated,investigating,committee_review,pending_approval,enforced"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,initiated,committee_review,pending_approval,enforced"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
@@ -81,29 +85,40 @@
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
+                        <div class="alert alert-info" role="alert" invisible="initiator_type != 'audit'">
+                            <strong>Internal Audit Case:</strong> This case will follow the Disciplinary Committee workflow for investigation, voting, and final decision.
+                        </div>
                         <group>
                             <group string="Employee Information">
-                                <field name="employee_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="reported_by_id"/>
+                                <field name="subordinate_employee_ids" invisible="1"/>
+                                <field name="employee_id" domain="[('id', 'in', subordinate_employee_ids)] if (initiator_type == 'manager' and not is_hr_admin) else []" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="reported_by_id" readonly="1"/>
                                 <field name="department_id"/>
                                 <field name="job_id"/>
                                 <field name="work_location_id"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group string="Misconduct &amp; Offense Classification">
+                                <field name="allowed_severity_level_ids" invisible="1"/>
+                                <field name="staff_category_display" readonly="1"/>
                                 <field name="offense_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="offense_category_id"/>
-                                <field name="severity_level"/>
-                                <field name="punishment_type"/>
-                                <field name="penalty_percentage" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="punishment_type" readonly="1"/>
+                                <field name="penalty_percentage" readonly="1"/>
+                                <field name="fine_days" readonly="1"/>
+                                <field name="property_repair_cost" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
                             </group>
                         </group>
                         <group>
                             <group string="Workflow &amp; Governance (Segregation of Duties)">
-                                <field name="initiator_id"/>
-                                <field name="reviewer_id"/>
-                                <field name="approver_id"/>
+                                <field name="is_hr_admin" invisible="1"/>
+                                <field name="initiator_type" readonly="state in ('enforced', 'closed', 'revoked') or not is_hr_admin"/>
+                                <field name="initiator_id" readonly="1"/>
+                                <!-- Reviewer field commented out per policy requirement -->
+                                <!-- <field name="reviewer_id"/> -->
+                                <field name="approver_id" invisible="initiator_type == 'audit'" readonly="1"/>
                                 <!-- CEO/CPCO authority field for Level 1 Dismissals -->
                                 <field name="dismissal_authority_id"
                                        invisible="severity_level != 'level_1'"
@@ -117,6 +132,19 @@
                                 <field name="final_decision_date"/>
                                 <field name="appeal_deadline"/>
                                 <field name="is_appeal_window_open" widget="boolean"/>
+                            </group>
+                        </group>
+                        <group string="Standard vs. Committee Decided Punishment" invisible="initiator_type != 'audit' and not is_punishment_modified_by_committee">
+                            <group string="Standard Standard Rules">
+                                <field name="original_punishment_type" readonly="1"/>
+                                <field name="original_penalty_percentage" readonly="1"/>
+                                <field name="original_fine_days" readonly="1"/>
+                            </group>
+                            <group string="Committee Decided Outcome">
+                                <field name="decided_punishment_type"/>
+                                <field name="decided_penalty_percentage"/>
+                                <field name="decided_fine_days"/>
+                                <field name="is_punishment_modified_by_committee" widget="boolean" readonly="1"/>
                             </group>
                         </group>
                         <notebook>
@@ -134,7 +162,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Committee Meetings">
+                            <page string="Committee Meetings" invisible="initiator_type == 'manager'">
                                 <field name="committee_meeting_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Committee Meetings">
                                         <field name="name"/>
@@ -146,7 +174,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Suspensions">
+                            <page string="Suspensions" invisible="initiator_type == 'manager'">
                                 <field name="suspension_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Suspensions">
                                         <field name="name"/>
@@ -158,7 +186,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Appeals">
+                            <page string="Appeals" invisible="appeal_count == 0">
                                 <field name="appeal_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Appeals">
                                         <field name="name"/>

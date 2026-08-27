@@ -24,6 +24,7 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
+                        <button name="action_request_suspension" string="Request Suspension" type="object" class="btn-warning" invisible="suspension_request_state != 'none'"/>
                         <button name="action_submit_findings" string="Submit Findings" type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_accept_findings" string="Accept &amp; Sign-off Findings" type="object" class="btn-success" invisible="state != 'submitted'"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved"/>
@@ -32,17 +33,27 @@
                         <!-- Part 1 & 2: Header Info -->
                         <group>
                             <group string="Case Reference">
-                                <field name="name"/>
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
+                                <field name="name" readonly="1"/>
+                                <field name="case_id" readonly="1"/>
+                                <field name="employee_id" readonly="1"/>
                             </group>
                             <group string="Investigator &amp; Dates">
-                                <field name="investigator_id"/>
+                                <field name="investigator_id" readonly="1"/>
                                 <field name="investigation_date"/>
                                 <field name="examination_date"/>
-                                <!-- Part 1 -->
-                                <field name="misconduct_type"/>
-                                <field name="misconduct_type_notes" invisible="misconduct_type != 'other'"/>
+                                <field name="offense_id" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Suspension Request during Investigation">
+                            <group>
+                                <field name="is_suspension_required"/>
+                                <field name="suspension_type" invisible="not is_suspension_required"/>
+                                <field name="suspension_duration_days" invisible="not is_suspension_required"/>
+                            </group>
+                            <group>
+                                <field name="suspension_request_state" readonly="1"/>
+                                <field name="suspension_reason" invisible="not is_suspension_required"/>
+                                <field name="suspension_id" invisible="suspension_request_state == 'none'"/>
                             </group>
                         </group>
                         <notebook>

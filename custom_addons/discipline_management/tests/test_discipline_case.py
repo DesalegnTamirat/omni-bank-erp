@@ -98,16 +98,6 @@ class TestDisciplineCase(TransactionCase):
             'approval_authority': 'executive',
         })
 
-        # Level 4 Moderate Offense B (5% penalty)
-        self.offense_level4_b = self.env['discipline.offense'].with_user(self.user_approver).create({
-            'name': 'Repeated Lateness',
-            'category_id': self.offense_category.id,
-            'severity_level': 'level_4',
-            'punishment_type': 'first_warning_penalty',
-            'penalty_percentage': 5.0,
-            'approval_authority': 'direct_manager',
-        })
-
     def test_01_duplicate_case_prevention(self):
         """Test that duplicate active disciplinary cases on same incident date are blocked."""
         today = Date.today()
@@ -124,15 +114,6 @@ class TestDisciplineCase(TransactionCase):
                 'offense_id': self.offense_level4.id,
                 'incident_date': today,
                 'description': 'Duplicate absence incident.',
-            })
-
-        # Test duplicate severity prevention with a different offense having the same severity level
-        with self.assertRaises(ValidationError):
-            self.env['discipline.case'].create({
-                'employee_id': self.employee.id,
-                'offense_id': self.offense_level4_b.id,
-                'incident_date': today,
-                'description': 'Second level 4 incident on same date.',
             })
 
     def test_02_segregation_of_duties_constraint(self):

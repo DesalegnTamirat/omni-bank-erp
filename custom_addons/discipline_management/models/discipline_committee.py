@@ -81,6 +81,48 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.against_count = len(rec.vote_ids.filtered(lambda v: v.vote == 'against'))
             rec.abstain_count = len(rec.vote_ids.filtered(lambda v: v.vote == 'abstain'))
 
+    @api.onchange('case_id')
+    def _onchange_case_id_populate_committee(self):
+        """Auto-populate Chairman, Required Members, and Optional Members based on Managerial status & Labor Union membership (Requirement 6 & 9)."""
+        if self.case_id and self.case_id.employee_id:
+            emp = self.case_id.employee_id
+            is_mgr = emp.is_managerial
+            
+            # Find Chairman: CEO if Managerial, CPCO / HR Director if Non-Managerial
+            if is_mgr:
+                ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+                ceo_user = ceo_group.users[0] if ceo_group and ceo_group.users else False
+                if not ceo_user:
+                    ceo_user = self.env['res.users'].search([('name', 'ilike', 'CEO')], limit=1)
+                self.committee_chair_id = ceo_user or self.env.user
+            else:
+                cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+                cpco_user = cpco_group.users[0] if cpco_group and cpco_group.users else False
+                if not cpco_user:
+                    cpco_user = self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
+                self.committee_chair_id = cpco_user or self.env.user
+
+            # Build member list: Chairman, Secretary, Immediate Dept Director, Union President (if union member)
+            members = set()
+            if self.committee_chair_id:
+                members.add(self.committee_chair_id.id)
+            
+            # Immediate Director / Department Manager
+            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
+                members.add(emp.department_id.manager_id.user_id.id)
+            
+            # Labor Union President if employee is union member
+            is_union = getattr(emp, 'member_of_labour_union', False) or getattr(emp, 'union_member', False)
+            if is_union:
+                union_pres = self.env['res.users'].search([('name', 'ilike', 'Union')], limit=1)
+                if union_pres:
+                    members.add(union_pres.id)
+            
+            # Current user / HR Officer
+            members.add(self.env.user.id)
+            self.member_ids = [(6, 0, list(members))]
+            self.present_members_count = len(members)
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

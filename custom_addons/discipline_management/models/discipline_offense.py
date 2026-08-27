@@ -27,62 +27,52 @@ class DisciplineOffense(models.Model):
 
     name = fields.Char(string='Offense Title', required=True, tracking=True)
     category_id = fields.Many2one('discipline.offense.category', string='Offense Category', required=True, tracking=True)
-    severity_level = fields.Selection([
-        ('level_1', 'Level 1 (Critical - Dismissal)'),
-        ('level_2', 'Level 2 (Very High - Final Written Warning + 20% Penalty)'),
-        ('level_3', 'Level 3 (High - Second Written Warning + 10% Penalty)'),
-        ('level_4', 'Level 4 (Moderate - First Written Warning + 5% Penalty)'),
-        ('level_5', 'Level 5 (Minor - Recorded Verbal Warning)'),
-    ], string='Severity Level', required=True, tracking=True)
-
-    punishment_type = fields.Selection([
-        ('dismissal', 'Dismissal / Separation'),
-        ('demotion', 'Demotion to Lower Grade / Position'),
-        ('final_warning_penalty', 'Final Written Warning + 20% Salary Deduction'),
-        ('second_warning_penalty', 'Second Written Warning + 10% Salary Deduction'),
-        ('first_warning_penalty', 'First Written Warning + 5% Salary Deduction'),
-        ('verbal_warning', 'Recorded Verbal Warning'),
-        ('custom', 'Custom Administrative Action'),
-    ], string='Applicable Punishment', required=True, default='first_warning_penalty', tracking=True)
-
-    penalty_percentage = fields.Float(
-        string='Penalty Percentage (%)',
-        help='Monthly salary deduction percentage enforced by this offense level',
-        tracking=True
-    )
-    approval_authority = fields.Selection([
-        ('direct_manager', 'Direct Manager'),
-        ('hr_manager', 'HR Manager'),
-        ('executive', 'Executive HR / Disciplinary Committee'),
-    ], string='Required Approval Authority', required=True, default='hr_manager', tracking=True)
+    severity_level_id = fields.Many2one('discipline.severity.level', string='Default Severity Level', tracking=True)
+    severity_level = fields.Char(related='severity_level_id.code', string='Severity Level Code', store=True, readonly=True)
 
     description = fields.Text(string='Offense Description & Guidelines')
     active = fields.Boolean(default=True, tracking=True)
     policy_version_id = fields.Many2one('discipline.policy.version', string='Policy Version', tracking=True)
 
-    @api.onchange('severity_level')
-    def _onchange_severity_level(self):
-        """Auto-populate default standard penalties based on."""
-        if self.severity_level == 'level_1':
-            self.punishment_type = 'dismissal'
-            self.penalty_percentage = 0.0
-            self.approval_authority = 'executive'
-        elif self.severity_level == 'level_2':
-            self.punishment_type = 'final_warning_penalty'
-            self.penalty_percentage = 20.0
-            self.approval_authority = 'hr_manager'
-        elif self.severity_level == 'level_3':
-            self.punishment_type = 'second_warning_penalty'
-            self.penalty_percentage = 10.0
-            self.approval_authority = 'hr_manager'
-        elif self.severity_level == 'level_4':
-            self.punishment_type = 'first_warning_penalty'
-            self.penalty_percentage = 5.0
-            self.approval_authority = 'direct_manager'
-        elif self.severity_level == 'level_5':
-            self.punishment_type = 'verbal_warning'
-            self.penalty_percentage = 0.0
-            self.approval_authority = 'direct_manager'
+    line_ids = fields.One2many('discipline.offense.line', 'offense_id', string='Severity Escalation Lines', copy=True)
+
+    @api.onchange('category_id')
+    def _onchange_category_populate_lines(self):
+        """Auto-populate all active Severity Levels as default escalation lines if grid is empty."""
+        if not self.line_ids:
+            self.action_populate_default_severity_lines()
+
+    def action_populate_default_severity_lines(self):
+        """Pre-fill offense escalation lines from all active Severity Levels."""
+        levels = self.env['discipline.severity.level'].search([('active', '=', True)], order='sequence, id')
+        lines = []
+        for idx, lvl in enumerate(levels, start=1):
+            lines.append((0, 0, {
+                'severity_level_id': lvl.id,
+                'occurrence_number': idx,
+                'punishment_type': lvl.default_punishment_type,
+                'non_managerial_penalty_pct': lvl.default_non_managerial_penalty_pct or lvl.default_penalty_percentage,
+                'non_managerial_fine_days': lvl.default_non_managerial_fine_days or lvl.default_fine_days,
+                'managerial_penalty_pct': lvl.default_managerial_penalty_pct or lvl.default_penalty_percentage,
+                'managerial_fine_days': lvl.default_managerial_fine_days or lvl.default_fine_days,
+                'reset_window_months': lvl.default_reset_window_months or 3,
+                'approval_authority': lvl.default_approval_authority,
+            }))
+        if lines:
+            self.line_ids = [(5, 0, 0)] + lines
+
+    @api.depends('severity_level_id', 'severity_level_id.default_punishment_type', 'severity_level_id.default_penalty_percentage', 'severity_level_id.default_approval_authority')
+    def _compute_severity_defaults(self):
+        """Driven directly from the selected Severity Level master configuration."""
+        for rec in self:
+            if rec.severity_level_id:
+                rec.punishment_type = rec.severity_level_id.default_punishment_type
+                rec.penalty_percentage = rec.severity_level_id.default_penalty_percentage
+                rec.approval_authority = rec.severity_level_id.default_approval_authority
+            else:
+                rec.punishment_type = False
+                rec.penalty_percentage = 0.0
+                rec.approval_authority = 'hr_manager'
 
     @api.constrains('penalty_percentage')
     def _check_penalty_percentage(self):

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_discipline_severity_level_tree" model="ir.ui.view">
+        <field name="name">discipline.severity.level.list</field>
+        <field name="model">discipline.severity.level</field>
+        <field name="arch" type="xml">
+            <list string="Disciplinary Severity Levels" default_order="sequence, id">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="default_punishment_type"/>
+                <field name="default_penalty_percentage"/>
+                <field name="default_approval_authority"/>
+                <field name="is_dismissal"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_discipline_severity_level_form" model="ir.ui.view">
+        <field name="name">discipline.severity.level.form</field>
+        <field name="model">discipline.severity.level</field>
+        <field name="arch" type="xml">
+            <form string="Disciplinary Severity Level">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Severity Level Name"/>
+                        <h1><field name="name" placeholder="e.g. Level 1 (Critical - Dismissal)"/></h1>
+                    </div>
+                    <group>
+                        <group string="Basic Configuration">
+                            <field name="code" placeholder="e.g. level_1"/>
+                            <field name="sequence"/>
+                            <field name="is_dismissal"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Default Penalties &amp; Routing">
+                            <field name="default_punishment_type"/>
+                            <field name="default_approval_authority"/>
+                            <field name="default_reset_window_months"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Non-Managerial Default Fines">
+                            <field name="default_non_managerial_penalty_pct"/>
+                            <field name="default_non_managerial_fine_days"/>
+                        </group>
+                        <group string="Managerial Default Fines">
+                            <field name="default_managerial_penalty_pct"/>
+                            <field name="default_managerial_fine_days"/>
+                        </group>
+                    </group>
+                    <group string="Description &amp; Guidelines">
+                        <field name="description" placeholder="Policy guidelines, evidence requirements, and punishment rationale..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_discipline_severity_level" model="ir.actions.act_window">
+        <field name="name">Severity Levels</field>
+        <field name="res_model">discipline.severity.level</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Disciplinary Severity Level
+            </p>
+            <p>
+                Configure custom severity ranks, default punishment types, penalty percentages, and mandatory approval authorities.
+            </p>
+        </field>
+    </record>
+</odoo>

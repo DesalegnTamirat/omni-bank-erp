@@ -39,8 +39,6 @@
                                 <field name="offense_ids" readonly="1">
                                     <list>
                                         <field name="name"/>
-                                        <field name="severity_level"/>
-                                        <field name="punishment_type"/>
                                     </list>
                                 </field>
                             </page>
@@ -62,12 +60,9 @@
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
                 <list>
-                    <field name="severity_level"/>
                     <field name="name"/>
                     <field name="category_id"/>
-                    <field name="punishment_type"/>
-                    <field name="penalty_percentage"/>
-                    <field name="approval_authority"/>
+                    <field name="policy_version_id"/>
                     <field name="active"/>
                 </list>
             </field>
@@ -84,17 +79,29 @@
                             <group string="Offense Attributes">
                                 <field name="name"/>
                                 <field name="category_id"/>
-                                <field name="severity_level"/>
                                 <field name="policy_version_id"/>
                             </group>
-                            <group string="Standard Punishment &amp; Approval Rules">
-                                <field name="punishment_type"/>
-                                <field name="penalty_percentage"/>
-                                <field name="approval_authority"/>
+                            <group string="Status">
                                 <field name="active"/>
                             </group>
                         </group>
                         <notebook>
+                            <page string="Severity Escalation Matrix &amp; Rules">
+                                <button name="action_populate_default_severity_lines" string="Auto-Populate Configured Severity Levels" type="object" class="btn-outline-primary mb-2"/>
+                                <field name="line_ids">
+                                    <list editable="bottom">
+                                        <field name="occurrence_number"/>
+                                        <field name="severity_level_id"/>
+                                        <field name="punishment_type"/>
+                                        <field name="non_managerial_penalty_pct"/>
+                                        <field name="non_managerial_fine_days"/>
+                                        <field name="managerial_penalty_pct"/>
+                                        <field name="managerial_fine_days"/>
+                                        <field name="reset_window_months"/>
+                                        <field name="approval_authority"/>
+                                    </list>
+                                </field>
+                            </page>
                             <page string="Guidelines &amp; Policy Description">
                                 <field name="description" placeholder="Enter policy guidelines, evidence requirements, and punishment rationale..."/>
                             </page>

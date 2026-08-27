@@ -49,10 +49,8 @@ class HrAttendance(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
-        for rec in records:
-            rec._check_attendance_discipline_threshold()
-        return records
+        # Pure attendance record creation (no synchronous discipline case triggers on hot path)
+        return super().create(vals_list)
 
     @api.model
     def _cron_escalate_attendance_violations(self):
@@ -66,37 +64,45 @@ class HrAttendance(models.Model):
         employees = recent_attendances.mapped('employee_id')
         for emp in employees:
             emp_atts = recent_attendances.filtered(lambda a: a.employee_id == emp)
-            # Count force check-outs or repeated lateness
             forced_or_late_count = len(emp_atts.filtered(
-                lambda a: getattr(a, 'is_force_checkout', False) or getattr(a, 'is_forced_checkout', False) or a.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(a, 'is_late', False) or (a.check_in and a.check_out and (a.check_out - a.check_in).total_seconds() < 14400)
+                lambda a: getattr(a, 'is_forced_checkout', False) or getattr(a, 'is_late', False) or (a.check_in and a.check_out and (a.check_out - a.check_in).total_seconds() < 14400)
             ))
             if forced_or_late_count >= threshold_count or len(emp_atts) >= threshold_count:
                 Category = self.env['discipline.offense.category']
                 cat = Category.search([('name', '=ilike', 'Attendance')], limit=1)
                 if not cat:
                     cat = Category.create({'name': 'Attendance', 'code': 'ATT_CAT'})
-                
+
                 Offense = self.env['discipline.offense']
                 offense = Offense.search([('category_id', '=', cat.id)], limit=1)
+                sev_level = self.env['discipline.severity.level'].search([('code', '=', 'level_1')], limit=1) or self.env['discipline.severity.level'].search([], limit=1)
                 if not offense:
                     offense = Offense.create({
                         'name': 'Repeated Lateness / Attendance Violation',
                         'category_id': cat.id,
-                        'severity_level': 'level_4',
-                        'punishment_type': 'first_warning_penalty',
+                        'severity_level_id': sev_level.id if sev_level else False,
                     })
-                
+
+                target_sev_id = offense.severity_level_id.id if offense.severity_level_id else (sev_level.id if sev_level else False)
+                if not target_sev_id:
+                    continue
+
                 existing = self.env['discipline.case'].search([
                     ('employee_id', '=', emp.id),
                     ('offense_id', '=', offense.id),
                     ('state', 'in', ['draft', 'initiated', 'investigating']),
                     ('is_system_generated', '=', True)
                 ], limit=1)
+
                 if not existing:
+                    # Assign designated reviewer to Coach or Manager (parent_id)
+                    reviewer_user = (emp.coach_id.user_id or emp.parent_id.user_id) if (emp.coach_id or emp.parent_id) else False
                     self.env['discipline.case'].create({
                         'employee_id': emp.id,
                         'offense_id': offense.id,
+                        'severity_level_id': target_sev_id,
                         'incident_date': fields.Date.context_today(self),
                         'is_system_generated': True,
-                        'description': _('Scheduled Escalation: Employee %s exceeded attendance violation threshold (%d instances recorded in past %d days).') % (emp.name, forced_or_late_count or len(emp_atts), rolling_days),
+                        'reviewer_id': reviewer_user.id if reviewer_user else False,
+                        'description': _('Scheduled Escalation: Employee %s exceeded attendance violation threshold (%d instances recorded in past %d days). Review and approval by Coach/Manager required.') % (emp.name, forced_or_late_count or len(emp_atts), rolling_days),
                     })
