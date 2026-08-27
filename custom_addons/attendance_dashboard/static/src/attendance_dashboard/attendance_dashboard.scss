@@ -19,39 +19,56 @@
     width: 100%;
     overflow-y: auto !important;
     overflow-x: hidden;
-    padding: 1.25rem 1.5rem 3.5rem 1.5rem;
+    padding: 1.25rem 1.5rem 4rem 1.5rem;
     background-color: #f8fafc;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
+    /* Bunna Color Utilities */
+    .text-navy { color: var(--bunna-deep-navy) !important; }
+    .text-forest-green { color: var(--bunna-primary-green) !important; }
+    .text-terracotta { color: var(--bunna-terracotta-gold) !important; }
+    .text-olive-gold { color: var(--bunna-olive-gold) !important; }
+    .text-crimson { color: var(--bunna-crimson-hero) !important; }
+
     /* Hero Header */
     .bunna_hero_header {
         background: linear-gradient(135deg, var(--bunna-crimson-hero) 0%, var(--bunna-dark-forest) 100%);
-        border-radius: 10px;
-        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        padding: 1.15rem 1.35rem;
         color: #ffffff;
-        box-shadow: 0 4px 15px rgba(84, 24, 24, 0.18);
-        margin-bottom: 1.25rem;
+        box-shadow: 0 6px 20px rgba(84, 24, 24, 0.2);
 
         .bunna_hero_title {
             font-weight: 800;
-            font-size: 1.4rem;
+            font-size: 1.35rem;
             letter-spacing: -0.02em;
         }
 
-        .bunna_date_select {
+        .bunna_tab_btn_group, .bunna_view_btn_group {
+            .btn {
+                font-size: 0.85rem;
+                padding: 0.4rem 0.9rem;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+                font-weight: 700;
+            }
+        }
+
+        .bunna_filter_select {
             background-color: #ffffff !important;
             color: var(--bunna-deep-navy) !important;
-            border: 1px solid rgba(255, 255, 255, 0.5) !important;
-            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.6) !important;
+            font-weight: 600;
+            font-size: 0.82rem;
             border-radius: 6px;
-            padding: 0.35rem 0.85rem;
+            padding: 0.3rem 0.75rem;
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
             width: auto;
-            min-width: 150px;
+            min-width: 140px;
 
             option {
                 background-color: #ffffff !important;
@@ -62,39 +79,13 @@
         .bunna_date_picker {
             background-color: #ffffff !important;
             color: var(--bunna-deep-navy) !important;
-            border: 1px solid rgba(255, 255, 255, 0.5) !important;
-            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.6) !important;
+            font-weight: 600;
+            font-size: 0.82rem;
             border-radius: 6px;
-            padding: 0.35rem 0.65rem;
+            padding: 0.25rem 0.6rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
             width: auto;
-        }
-
-        .bunna_nav_tabs {
-            gap: 6px;
-
-            .nav-link {
-                color: rgba(255, 255, 255, 0.85);
-                font-weight: 700;
-                font-size: 0.88rem;
-                border: 1px solid transparent;
-                padding: 0.4rem 1rem;
-                border-radius: 6px;
-                background: transparent;
-                transition: all 0.2s ease;
-
-                &:hover {
-                    color: #ffffff;
-                    background: rgba(255, 255, 255, 0.15);
-                }
-
-                &.active {
-                    color: #ffffff;
-                    background-color: rgba(255, 255, 255, 0.22);
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-                    border: 1px solid rgba(255, 255, 255, 0.35);
-                }
-            }
         }
     }
 
@@ -116,19 +107,21 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: transform 0.15s ease;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
 
             &:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
             }
         }
 
         .o_ad_kpi_label {
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             color: #64748b;
             margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
         }
 
         .o_ad_kpi_value {
@@ -137,12 +130,6 @@
             font-weight: 800;
             line-height: 1.1;
         }
-
-        .o_ad_kpi_total { color: #3b82f6; }
-        .o_ad_kpi_present { color: #10b981; }
-        .o_ad_kpi_late { color: #1e293b; }
-        .o_ad_kpi_leave { color: #f59e0b; }
-        .o_ad_kpi_absent { color: #ef4444; }
     }
 
     /* Corporate Charts Grid */
@@ -161,10 +148,10 @@
             min-height: 330px;
 
             h3 {
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 700;
                 margin-bottom: 16px;
-                color: #1e293b;
+                color: var(--bunna-deep-navy);
                 text-align: center;
             }
         }
@@ -186,7 +173,7 @@
         border-radius: 12px;
         border: 1px solid var(--bunna-card-border);
         padding: 1.1rem;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -195,7 +182,7 @@
 
         &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.09);
         }
 
         .stat_header_box {
@@ -249,7 +236,7 @@
         background: #ffffff;
         border-radius: 12px;
         border: 1px solid var(--bunna-card-border);
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
         height: 100%;
         min-height: 300px;
         display: flex;
@@ -300,6 +287,7 @@
         }
     }
 }
+
 
 
 

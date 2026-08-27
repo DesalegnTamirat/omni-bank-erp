@@ -4,39 +4,95 @@
 <t t-name="custom_hr_attendance.AttendanceDashboard">
     <div class="o_attendance_dashboard">
 
-        <!-- Top Header & Navigation Tabs -->
-        <div class="bunna_hero_header d-flex flex-wrap align-items-center justify-content-between mb-3">
-            <div class="d-flex align-items-center">
-                <i class="fa fa-university fa-2x me-3 text-warning"/>
-                <div>
-                    <div class="bunna_hero_title">
-                        <t t-if="state.currentTab === 'corporate'">Attendance Dashboard</t>
-                        <t t-else="">My Personal Attendance Dashboard</t>
+        <!-- ============================================================== -->
+        <!-- TOP HERO HEADER: TITLE & TABS ON TOP ROW, FILTERS ON ROW BELOW -->
+        <!-- ============================================================== -->
+        <div class="bunna_hero_header mb-3">
+            <!-- TOP ROW: TITLE & NAVIGATION TABS -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 border-bottom border-white border-opacity-10">
+                <div class="d-flex align-items-center">
+                    <i class="fa fa-university fa-2x me-3 text-warning"/>
+                    <div>
+                        <div class="bunna_hero_title d-flex align-items-center gap-2">
+                            <t t-if="state.currentTab === 'corporate'">Corporate Attendance Command Center</t>
+                            <t t-else="">My Personal Attendance Dashboard</t>
+                            <span class="badge bg-white bg-opacity-20 text-white fs-7 fw-semibold rounded-pill px-3 py-1" t-esc="state.userRoleLabel"/>
+                        </div>
+                        <div class="text-white-50 small">
+                            <t t-if="state.currentTab === 'corporate'">Bank-Wide &amp; Unit Operations Radar</t>
+                            <t t-elif="state.personal and state.personal.employee_name">
+                                <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> &amp;bull; <span t-esc="state.personal.job_title"/>
+                            </t>
+                            <t t-else="">Personal Attendance History &amp; Performance Radar</t>
+                        </div>
                     </div>
-                    <div class="text-white-50 small">
-                        <t t-if="state.currentTab === 'corporate'">Bank-Wide Workforce Analytics &amp; Operations Command Center</t>
-                        <t t-elif="state.personal and state.personal.employee_name">
-                            <span class="fw-bold text-white" t-esc="state.personal.employee_name"/> &amp;bull; <span t-esc="state.personal.job_title"/>
-                        </t>
-                        <t t-else="">Personal Attendance History &amp; Metric Radar</t>
+                </div>
+
+                <!-- NAVIGATION TABS (CORPORATE vs PERSONAL) -->
+                <div t-if="state.hasCorporateAccess" class="d-flex align-items-center gap-2">
+                    <div class="btn-group bunna_tab_btn_group" role="group">
+                        <button type="button" t-attf-class="btn #{state.currentTab === 'corporate' ? 'btn-warning text-dark fw-bold shadow-sm' : 'btn-outline-light'}" t-on-click="() => this.switchTab('corporate')">
+                            <i class="fa fa-building me-1"/> Corporate Dashboard
+                        </button>
+                        <button type="button" t-attf-class="btn #{state.currentTab === 'personal' ? 'btn-warning text-dark fw-bold shadow-sm' : 'btn-outline-light'}" t-on-click="() => this.switchTab('personal')">
+                            <i class="fa fa-user me-1"/> My Personal Dashboard
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div class="d-flex align-items-center gap-3 flex-wrap">
-                <!-- CORPORATE SINGLE DATE FILTER -->
-                <div t-if="state.currentTab === 'corporate'" class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm bunna_date_select" t-att-value="state.filter" t-on-change="onFilterChange">
-                        <option value="today">Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="specific">Select Date...</option>
-                    </select>
-                    <input t-if="state.filter === 'specific'" type="date" class="form-control form-control-sm bunna_date_picker" t-att-value="state.specificDate" t-on-change="onSpecificDateChange"/>
+            <!-- BOTTOM ROW: STACKED FILTER CONTROLS TOOLBAR (UP & DOWN STRUCTURE) -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-2">
+                
+                <!-- CORPORATE FILTERS (SHOWN WHEN CORPORATE TAB IS ACTIVE) -->
+                <div t-if="state.currentTab === 'corporate' and state.hasCorporateAccess" class="d-flex align-items-center gap-3 flex-wrap w-100 justify-content-between">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <!-- MERGED DISTRICT / DIRECTORATE FILTER -->
+                        <div t-if="state.filterOptions.districts_and_directorates and state.filterOptions.districts_and_directorates.length > 0" class="d-flex align-items-center gap-1">
+                            <span class="text-white-50 small fw-bold">District / Directorate:</span>
+                            <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.selectedDeptOrDist" t-on-change="onDeptOrDistChange">
+                                <option value="">All Districts &amp; Directorates</option>
+                                <optgroup label="📍 Regional Districts (Branch Networks)">
+                                    <t t-foreach="state.filterOptions.districts_and_directorates" t-as="item" t-key="item.id">
+                                        <option t-if="item.group === 'Districts'" t-att-value="item.id" t-esc="item.name"/>
+                                    </t>
+                                </optgroup>
+                                <optgroup label="🏛️ Head Office Directorates">
+                                    <t t-foreach="state.filterOptions.districts_and_directorates" t-as="item" t-key="item.id">
+                                        <option t-if="item.group === 'Directorates'" t-att-value="item.id" t-esc="item.name"/>
+                                    </t>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- OPERATING UNIT / BRANCH FILTER -->
+                        <div t-if="state.filterOptions.operating_units and state.filterOptions.operating_units.length > 0" class="d-flex align-items-center gap-1">
+                            <span class="text-white-50 small fw-bold">Operating Unit:</span>
+                            <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.selectedOU" t-on-change="onOUChange">
+                                <option value="">All Operating Units</option>
+                                <t t-foreach="state.filterOptions.operating_units" t-as="ou" t-key="ou.id">
+                                    <option t-att-value="ou.id" t-esc="ou.name"/>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- CORPORATE DATE (SINGLE SPECIFIC DATE FILTER) -->
+                    <div class="d-flex align-items-center gap-1 ms-auto">
+                        <span class="text-white-50 small fw-bold">Date:</span>
+                        <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.filter" t-on-change="onFilterChange">
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="specific">Select Date...</option>
+                        </select>
+                        <input t-if="state.filter === 'specific'" type="date" class="form-control form-control-sm bunna_date_picker" t-att-value="state.specificDate" t-on-change="onSpecificDateChange"/>
+                    </div>
                 </div>
 
-                <!-- PERSONAL MULTI-PERIOD FILTER -->
-                <div t-if="state.currentTab === 'personal'" class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm bunna_date_select" t-att-value="state.personalPeriod" t-on-change="onPersonalPeriodChange">
+                <!-- PERSONAL PERIOD FILTER (SHOWN WHEN PERSONAL TAB IS ACTIVE) -->
+                <div t-if="state.currentTab === 'personal' or !state.hasCorporateAccess" class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="text-white-50 small fw-bold">Evaluation Period:</span>
+                    <select class="form-select form-select-sm bunna_filter_select" t-att-value="state.personalPeriod" t-on-change="onPersonalPeriodChange">
                         <option value="today">Today</option>
                         <option value="yesterday">Yesterday</option>
                         <option value="this_week">This Week</option>
@@ -50,65 +106,57 @@
                     </div>
                 </div>
 
-                <!-- ROLE NAVIGATION TABS -->
-                <ul class="nav bunna_nav_tabs">
-                    <li class="nav-item">
-                        <button t-attf-class="nav-link #{state.currentTab === 'corporate' ? 'active' : ''}" t-on-click="() => this.switchTab('corporate')">
-                            <i class="fa fa-building me-1"/> Corporate Attendance Dashboard
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button t-attf-class="nav-link #{state.currentTab === 'personal' ? 'active' : ''}" t-on-click="() => this.switchTab('personal')">
-                            <i class="fa fa-user me-1"/> My Personal Dashboard
-                        </button>
-                    </li>
-                </ul>
             </div>
         </div>
 
         <!-- LOADING INDICATOR -->
         <div t-if="state.loading" class="text-center py-5">
             <div class="spinner-border text-danger" role="status" style="width: 3.5rem; height: 3.5rem;"></div>
-            <div class="mt-3 text-muted fw-bold fs-5">Loading Attendance Dashboard...</div>
+            <div class="mt-3 text-muted fw-bold fs-5">Refreshing Attendance Dashboard...</div>
         </div>
 
         <div t-else="">
 
-            <!-- ============================================== -->
-            <!-- 1. CORPORATE ATTENDANCE DASHBOARD (SINGLE DATE) -->
-            <!-- ============================================== -->
-            <div t-if="state.currentTab === 'corporate'">
+            <!-- ======================================================== -->
+            <!-- 1. CORPORATE ATTENDANCE DASHBOARD VIEW                   -->
+            <!-- ======================================================== -->
+            <div t-if="state.currentTab === 'corporate' and state.hasCorporateAccess" class="mb-4">
+                
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold text-dark mb-0">Daily Workforce Presence Overview</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="fa fa-building me-2 text-danger"/> Corporate Attendance Overview
+                        </h5>
+                    </div>
                     <span class="badge bg-light text-dark border fs-6 fw-bold" t-esc="state.today"/>
                 </div>
 
-                <!-- 5 KPI CARDS GRID -->
+                <!-- 5 KPI CARDS IN OFFICIAL BUNNA COLORS -->
                 <div class="o_ad_kpi mb-3">
                     <div class="o_ad_kpi_card">
                         <div class="o_ad_kpi_label">Total Employees</div>
-                        <span class="o_ad_kpi_value o_ad_kpi_total" t-esc="state.kpi.total"/>
+                        <span class="o_ad_kpi_value text-navy" t-esc="state.kpi.total"/>
                     </div>
                     <div class="o_ad_kpi_card">
                         <div class="o_ad_kpi_label">Present</div>
-                        <span class="o_ad_kpi_value o_ad_kpi_present" t-esc="state.kpi.present"/>
+                        <span class="o_ad_kpi_value text-forest-green" t-esc="state.kpi.present"/>
                     </div>
                     <div class="o_ad_kpi_card">
                         <div class="o_ad_kpi_label">Late</div>
-                        <span class="o_ad_kpi_value o_ad_kpi_late" t-esc="state.kpi.late"/>
+                        <span class="o_ad_kpi_value text-terracotta" t-esc="state.kpi.late"/>
                     </div>
                     <div class="o_ad_kpi_card">
                         <div class="o_ad_kpi_label">On Leave</div>
-                        <span class="o_ad_kpi_value o_ad_kpi_leave" t-esc="state.kpi.leave"/>
+                        <span class="o_ad_kpi_value text-olive-gold" t-esc="state.kpi.leave"/>
                     </div>
                     <div class="o_ad_kpi_card">
                         <div class="o_ad_kpi_label">Absent</div>
-                        <span class="o_ad_kpi_value o_ad_kpi_absent" t-esc="state.kpi.absent"/>
+                        <span class="o_ad_kpi_value text-crimson" t-esc="state.kpi.absent"/>
                     </div>
                 </div>
 
-                <!-- 3 CHARTS GRID -->
-                <div class="o_ad_charts mb-4">
+                <!-- 3 CHARTS IN OFFICIAL BUNNA COLORS -->
+                <div class="o_ad_charts mb-3">
                     <div class="o_ad_chart_box">
                         <h3>Status Distribution</h3>
                         <div class="o_ad_canvas_wrap">
@@ -130,16 +178,24 @@
                         </div>
                     </div>
                 </div>
+
             </div>
 
 
-            <!-- ============================================== -->
-            <!-- 2. MY PERSONAL DASHBOARD (RICH BUNNA METRICS) -->
-            <!-- ============================================== -->
-            <div t-if="state.currentTab === 'personal' and state.personal">
+            <!-- ======================================================== -->
+            <!-- 2. MY PERSONAL DASHBOARD VIEW                            -->
+            <!-- ======================================================== -->
+            <div t-if="state.currentTab === 'personal' or !state.hasCorporateAccess" class="mb-4">
                 
-                <!-- 4 EXACT PERSONAL METRIC CARDS -->
-                <div class="row g-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="fa fa-user-circle me-2 text-success"/> My Personal Attendance Radar
+                    </h5>
+                    <span class="badge bg-light text-dark border fs-6 fw-bold" t-esc="state.personalPeriod.replace('_', ' ').toUpperCase()"/>
+                </div>
+
+                <!-- 4 PERSONAL METRIC CARDS (BUNNA STYLING) -->
+                <div class="row g-3 mb-3" t-if="state.personal">
                     <!-- CARD 1: TOTAL WORKED HOURS -->
                     <div class="col-xl-3 col-md-6">
                         <div class="bunna_pro_stat_card">
@@ -244,33 +300,28 @@
                     </div>
                 </div>
 
-                <!-- PERSONAL DATA VIZ ROW (DONUT + PROGRESSION BARS) -->
-                <div class="row g-3 mb-4">
+                <!-- PERSONAL DATA VIZ (DONUT + 3-BAR PROGRESSION) -->
+                <div class="row g-3 mb-3" t-if="state.personal">
                     <!-- PERSONAL ATTENDANCE STATUS BREAKDOWN DONUT -->
                     <div class="col-lg-5">
                         <div class="bunna_pro_card h-100" t-if="state.personal.personal_donut_svg">
                             <div class="card_pro_header">
-                                <span><i class="fa fa-pie-chart me-2"/> Personal Attendance Status Breakdown</span>
+                                <span><i class="fa fa-pie-chart me-2"/> Status Breakdown</span>
                                 <span class="badge bg-light text-dark border">Evaluation Period</span>
                             </div>
                             <div class="card_pro_body d-flex flex-column justify-content-between">
                                 <div class="d-flex align-items-center justify-content-center py-2" style="position: relative; height: 160px;">
                                     <svg viewBox="0 0 100 100" style="width: 150px; height: 150px; transform: rotate(-90deg);">
-                                        <!-- Background Circle -->
                                         <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" stroke-width="12"/>
-                                        <!-- Normal/On-Time Segment (#425727) -->
                                         <circle cx="50" cy="50" r="40" fill="transparent" stroke="#425727" stroke-width="12"
                                             t-att-stroke-dasharray="state.personal.personal_donut_svg.p_dash"
                                             t-att-stroke-dashoffset="state.personal.personal_donut_svg.p_off"/>
-                                        <!-- Late Segment (#c17540) -->
                                         <circle cx="50" cy="50" r="40" fill="transparent" stroke="#c17540" stroke-width="12"
                                             t-att-stroke-dasharray="state.personal.personal_donut_svg.l_dash"
                                             t-att-stroke-dashoffset="state.personal.personal_donut_svg.l_off"/>
-                                        <!-- Leave Segment (#726732) -->
                                         <circle cx="50" cy="50" r="40" fill="transparent" stroke="#726732" stroke-width="12"
                                             t-att-stroke-dasharray="state.personal.personal_donut_svg.lv_dash"
                                             t-att-stroke-dashoffset="state.personal.personal_donut_svg.lv_off"/>
-                                        <!-- Absent Segment (#541718) -->
                                         <circle cx="50" cy="50" r="40" fill="transparent" stroke="#541718" stroke-width="12"
                                             t-att-stroke-dasharray="state.personal.personal_donut_svg.a_dash"
                                             t-att-stroke-dashoffset="state.personal.personal_donut_svg.a_off"/>
@@ -320,7 +371,6 @@
                                     </div>
                                 </div>
 
-                                <!-- PUNCTUALITY SCORE RATING METER -->
                                 <div class="mt-2 pt-2 border-top">
                                     <div class="d-flex justify-content-between small fw-bold mb-1">
                                         <span class="text-dark"><i class="fa fa-shield text-success me-1"/> Punctuality Score Index</span>
@@ -334,11 +384,11 @@
                         </div>
                     </div>
 
-                    <!-- 3 STATUS BARS PROGRESSION CHART (WORKED, LATE, ABSENT) -->
+                    <!-- 3 STATUS BARS PROGRESSION CHART -->
                     <div class="col-lg-7">
                         <div class="bunna_pro_card h-100">
                             <div class="card_pro_header">
-                                <span><i class="fa fa-bar-chart me-2"/> Worked vs Late vs Absent Hours Progression</span>
+                                <span><i class="fa fa-bar-chart me-2"/> Worked vs Late vs Absent Progression</span>
                                 <button class="btn btn-sm btn-outline-secondary" t-on-click="openLogsModal">
                                     <i class="fa fa-list me-1"/> View Period Logs
                                 </button>
@@ -347,22 +397,18 @@
                                 <div class="d-flex align-items-end justify-content-around gap-1 flex-grow-1" style="height: 200px; padding-bottom: 20px; border-bottom: 1px solid #e2e8f0; overflow-x: hidden; width: 100%;">
                                     <div t-foreach="state.personal.progression_points" t-as="p" t-key="p.date_label" class="d-flex flex-column align-items-center flex-fill" style="height: 100%; justify-content: flex-end; min-width: 0;">
                                         <div class="d-flex gap-2 align-items-end justify-content-center" style="height: 100%;">
-                                            <!-- Worked Bar (#425727) -->
                                             <div t-attf-style="height: #{p.w_pct}%; width: #{p.bar_width_px or 28}px; background-color: #425727; border-radius: 5px 5px 0 0; min-height: #{p.w_pct > 0 ? 4 : 0}px;" t-att-title="'Worked: ' + p.worked_hours + 'h'"/>
-                                            <!-- Late Bar (#c17540) -->
                                             <div t-attf-style="height: #{p.l_pct}%; width: #{p.bar_width_px or 28}px; background-color: #c17540; border-radius: 5px 5px 0 0; min-height: #{p.l_pct > 0 ? 4 : 0}px;" t-att-title="'Late: ' + p.late_hours + 'h'"/>
-                                            <!-- Absent Bar (#541718) -->
                                             <div t-attf-style="height: #{p.a_pct}%; width: #{p.bar_width_px or 28}px; background-color: #541718; border-radius: 5px 5px 0 0; min-height: #{p.a_pct > 0 ? 4 : 0}px;" t-att-title="'Absent: ' + (p.absent_days !== undefined ? p.absent_days : p.absent_hours) + ' Days'"/>
                                         </div>
                                         <div class="small text-muted mt-1 text-truncate" style="font-size: 0.62rem; font-weight: 700; max-width: 100%; text-align: center;" t-esc="p.date_label"/>
                                     </div>
                                 </div>
 
-                                <!-- 3 STATUS BARS LEGEND -->
                                 <div class="d-flex justify-content-center gap-4 mt-3 small font-weight-bold">
-                                    <span class="text-success"><i class="fa fa-square me-1" style="color: #425727;"/> Worked Hours</span>
-                                    <span class="text-warning"><i class="fa fa-square me-1" style="color: #c17540;"/> Late Hours</span>
-                                    <span class="text-danger"><i class="fa fa-square me-1" style="color: #541718;"/> Absent Days</span>
+                                    <span style="color: #425727;"><i class="fa fa-square me-1"/> Worked Hours</span>
+                                    <span style="color: #c17540;"><i class="fa fa-square me-1"/> Late Hours</span>
+                                    <span style="color: #541718;"><i class="fa fa-square me-1"/> Absent Days</span>
                                 </div>
                             </div>
                         </div>
@@ -374,7 +420,7 @@
         </div>
 
         <!-- ============================================== -->
-        <!-- PERIOD LOGS MODAL DIALOG                      -->
+        <!-- 3. PERIOD LOGS MODAL DIALOG                    -->
         <!-- ============================================== -->
         <div t-if="state.showLogsModal" class="modal fade show d-block bunna_modal_backdrop" tabindex="-1" style="background-color: rgba(0, 0, 0, 0.5);">
             <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -422,3 +468,4 @@
 </t>
 
 </templates>
+

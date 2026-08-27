@@ -32,5 +32,4 @@ from . import discipline_case_attendance
 # ERP access gate: session-cached check-in enforcement (feature-flagged, OFF by default)
 from . import ir_http
 from . import hr_attendance_notification_log
-
-# from . import test
+from . import attendance_dashboard_service
