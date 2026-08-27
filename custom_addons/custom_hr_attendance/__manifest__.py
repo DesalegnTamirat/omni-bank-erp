@@ -48,7 +48,6 @@
         # Views
         'views/attendance_preapproval_views.xml',
         'views/location_based_exception_views.xml',
-        'views/attendance_violation_rule_views.xml',
         'views/job_shift_views.xml',
         'views/job_position_exception_views.xml',
         'views/job_position_roster_exception_views.xml',
@@ -83,7 +82,6 @@
         'data/sql_functions.xml',
         # Discipline Offense Seeds (loaded after discipline_management data)
         'data/discipline_offense_attendance_data.xml',
-        'data/attendance_violation_rule_data.xml',
         # Scheduled Actions
         'data/ir_cron_data.xml',
     ],

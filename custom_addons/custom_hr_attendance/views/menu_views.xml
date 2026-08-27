@@ -270,19 +270,7 @@
                 sequence="35"
                 groups="hr_attendance.group_hr_attendance_manager" />
 
-        <menuitem id="menu_attendance_lateness_rule"
-                name="Lateness Discipline Rules"
-                parent="menu_bunna_attendance_configuration"
-                action="action_attendance_lateness_rule"
-                sequence="36"
-                groups="hr_attendance.group_hr_attendance_manager" />
 
-        <menuitem id="menu_attendance_absence_rule"
-                name="Absence Discipline Rules"
-                parent="menu_bunna_attendance_configuration"
-                action="action_attendance_absence_rule"
-                sequence="37"
-                groups="hr_attendance.group_hr_attendance_manager" />
 
         <menuitem id="menu_over_time"
                 name="Over Time"
