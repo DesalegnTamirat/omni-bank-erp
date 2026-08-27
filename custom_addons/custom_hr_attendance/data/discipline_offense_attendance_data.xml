@@ -9,14 +9,19 @@
     <data noupdate="1">
 
         <!--
-            Repeated Lateness Violation:
+            Repeated Lateness Violation (Level 4):
             Triggered when an employee's rolling late_count_rolling reaches the
             configured threshold (default: 3 occurrences).
+            Severity mirrors discipline_management Level 4: First Written Warning + 5% penalty.
+            Approval authority: Direct Manager (as per Bunna Bank HR policy for Level 4).
         -->
         <record id="offense_repeated_lateness" model="discipline.offense">
             <field name="name">Repeated Lateness Violation</field>
             <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
-            <field name="severity_level_id" ref="discipline_management.severity_level_4"/>
+            <field name="severity_level">level_4</field>
+            <field name="punishment_type">first_warning_penalty</field>
+            <field name="penalty_percentage">5.0</field>
+            <field name="approval_authority">direct_manager</field>
             <field name="description">
                 Automatically triggered by the Attendance module when an employee exceeds the
                 configured repeated lateness threshold. Results in First Written Warning and 5%
@@ -26,14 +31,19 @@
         </record>
 
         <!--
-            Repeated Force Checkout / Attendance Irregularity:
+            Repeated Force Checkout / Attendance Irregularity (Level 3):
             Triggered when an employee's rolling force_checkout_count_rolling reaches the
             configured threshold (default: 2 occurrences).
+            Severity: Level 3 Second Written Warning + 10% penalty.
+            Approval authority: HR Manager (higher authority for repeated system-forced checkouts).
         -->
         <record id="offense_repeated_force_checkout" model="discipline.offense">
             <field name="name">Repeated Force Checkout / Attendance Irregularity</field>
             <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
-            <field name="severity_level_id" ref="discipline_management.severity_level_3"/>
+            <field name="severity_level">level_3</field>
+            <field name="punishment_type">second_warning_penalty</field>
+            <field name="penalty_percentage">10.0</field>
+            <field name="approval_authority">hr_manager</field>
             <field name="description">
                 Automatically triggered by the Attendance module when an employee repeatedly fails
                 to check out before the automatic force checkout threshold, indicating attendance
@@ -43,13 +53,18 @@
         </record>
 
         <!--
-            Repeated Absence / Unexcused Absence:
+            Repeated Absence / Unexcused Absence (Level 2):
             Triggered when an employee accumulates unexcused absence days threshold.
+            Severity: Level 2 Final Written Warning + 20% penalty.
+            Approval authority: HR Manager.
         -->
         <record id="offense_repeated_absence" model="discipline.offense">
             <field name="name">Unexcused Absence Violation</field>
             <field name="category_id" ref="discipline_management.offense_cat_attendance"/>
-            <field name="severity_level_id" ref="discipline_management.severity_level_2"/>
+            <field name="severity_level">level_2</field>
+            <field name="punishment_type">final_warning_penalty</field>
+            <field name="penalty_percentage">20.0</field>
+            <field name="approval_authority">hr_manager</field>
             <field name="description">
                 Automatically triggered by the Attendance module when an employee accumulates unexcused absence days. Results in Final Written Warning and salary deduction upon HR Manager approval.
             </field>
@@ -57,3 +72,4 @@
 
     </data>
 </odoo>
+

@@ -7,6 +7,22 @@ from datetime import datetime, time
 _logger = logging.getLogger(__name__)
 
 
+def _fmt(val):
+    """Helper to format float hours to clean AM/PM string (e.g. 8.5 -> '08:30 AM')"""
+    if val is None or val is False:
+        return ""
+    hrs = int(val) % 24
+    mins = int(round((val - int(val)) * 60))
+    if mins >= 60:
+        hrs = (hrs + 1) % 24
+        mins = 0
+    ampm = "AM" if hrs < 12 else "PM"
+    dh = hrs if hrs in (1, 12) else (hrs % 12)
+    if dh == 0:
+        dh = 12
+    return f"{dh:02d}:{mins:02d} {ampm}"
+
+
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
@@ -33,15 +49,6 @@ class HrEmployee(models.Model):
 
         checkin_buffer = self._get_param_float('hr_attendance.checkin_buffer', 0.50)
 
-        # Helper to format float hours to clean AM/PM string
-        def _fmt(val):
-            hrs = int(val) % 24
-            mins = int(round((val - int(val)) * 60))
-            ampm = "AM" if hrs < 12 else "PM"
-            dh = hrs if hrs in (1, 12) else (hrs % 12)
-            if dh == 0:
-                dh = 12
-            return f"{dh:02d}:{mins:02d} {ampm}"
 
         # ----------------------------
         # 1. Roster Exceptions (Date-Based)
@@ -435,6 +442,7 @@ class HrEmployee(models.Model):
                     current_float, shift_start, dead_time, predefined_late, is_manager=is_manager, allow_late=True
                 )
                 checkin_dt = utc_naive_dt
+            in_mode_val = 'predefined' if pre_late > 0 else self.env.context.get('attendance_mode', 'kiosk')
             vals = {
                 'employee_id': self.id,
                 # 'check_in': utc_naive_dt,
@@ -443,12 +451,15 @@ class HrEmployee(models.Model):
                 # live dashboard timer starts counting from 00:00:00 at the
                 # actual tap time instead of jumping to elapsed-since-shift-start.
                 'actual_check_in': utc_naive_dt,
+                'in_mode': in_mode_val,
+                'out_mode': False,
                 'check_in_status': status,
                 'late_time_hour': late_time,
                 'pre_defined_lateness': pre_late,
                 'shift_start_float': shift_start,
                 'shift_end_float': shift_end,
             }
+
             if geo_information:
                 vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
             _logger.info("Creating Check-in: %s", vals)
@@ -543,13 +554,16 @@ class HrEmployee(models.Model):
                     current_float, shift_end, attendance, utc_naive_dt, min_work_hour, predefined_early_exit
                 )
 
+            out_mode_val = 'predefined' if pre_early > 0 else self.env.context.get('attendance_mode', 'kiosk')
             vals = {
                 # 'check_out': utc_naive_dt,
                 'check_out': checkout_dt,
+                'out_mode': out_mode_val,
                 'check_out_status': status,
                 'early_exit_hour': early_exit,
                 'pre_approved_early_checkout': pre_early
             }
+
             if geo_information:
                 vals.update({'out_%s' % key: geo_information[key] for key in geo_information})
             attendance.write(vals)

@@ -36,12 +36,15 @@
                     <group>
                         <field name="attendance_reason_ids" widget="many2many_tags"/>
                         <field name="reason_type" readonly="1"/>
+                        <field name="in_mode" readonly="1"/>
+                        <field name="out_mode" readonly="1"/>
                         <field name="flagged_for_discipline" readonly="1"/>
                         <field name="flagged_reason" readonly="1" invisible="not flagged_for_discipline"/>
                         <field name="overtime_approved_for_payroll" readonly="1"/>
                     </group>
                 </group>
             </sheet>
+
 
             <!-- Check-in related fields -->
             <xpath expr="//field[@name='check_in']" position="before">
@@ -116,6 +119,8 @@
             <xpath expr="//field[@name='worked_hours']" position="after">
                 <field name="is_acknowledged" string="Acknowledged" readonly="1"/>
                 <field name="reason_type" string="Reason Type" readonly="1"/>
+                <field name="in_mode" string="Check-In Mode" widget="badge" optional="show"/>
+                <field name="out_mode" string="Check-Out Mode" widget="badge" optional="show"/>
 
                 <!-- Configurable Optional Columns (Manager can enable/disable via column picker) -->
                 <field name="attendance_reason_ids" string="Reasons" widget="many2many_tags" optional="hide"/>
@@ -134,3 +139,4 @@
         </field>
     </record>
 </odoo>
+
