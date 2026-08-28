@@ -142,24 +142,50 @@ class HrEmployee(models.Model):
             return morning_start, exit_time
 
         # ----------------------------
-        # 3. Default system shifts (Full Day)
+        # 3. Default system shifts (Full Day vs Dual-Session Morning/Afternoon)
         # ----------------------------
-        earliest_checkin = morning_start - checkin_buffer
-        if current_float >= earliest_checkin:
-            _logger.info("Using Default Full Day shift: %.2f - %.2f", morning_start, exit_time)
-            return morning_start, exit_time
+        enable_lunch_break = self._is_lunch_break_enabled()
+        is_saturday = (target_date.weekday() == 5) if target_date else False
 
-        # COMMENTED OUT: Manager Override bypass.
-        # ALL personnel (including Managers) must adhere to scheduled buffer windows.
-        # if is_manager:
-        #     _logger.info("Manager Override: Forcing default shift bounds.")
-        #     return morning_start, exit_time
+        if enable_lunch_break and not is_saturday:
+            lunch_out_time = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
+            lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
+            lunch_midpoint = lunch_out_time + (lunch_duration / 2.0)
+            afternoon_start = lunch_out_time + lunch_duration
 
-        raise UserError(_(
-            "Check-in is not allowed yet.\n\n"
-            "You are too early for your scheduled shift (%s - %s).\n"
-            "Check-in window opens at %s (Buffer: %d min)."
-        ) % (_fmt(morning_start), _fmt(exit_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
+            if current_float < lunch_midpoint:
+                # Morning Session (08:00 - 12:00)
+                earliest_checkin = morning_start - checkin_buffer
+                if current_float >= earliest_checkin:
+                    _logger.info("Using Morning Shift Session: %.2f - %.2f", morning_start, lunch_out_time)
+                    return morning_start, lunch_out_time
+                raise UserError(_(
+                    "Check-in is not allowed yet.\n\n"
+                    "You are too early for the Morning shift (%s - %s).\n"
+                    "Check-in window opens at %s (Buffer: %d min)."
+                ) % (_fmt(morning_start), _fmt(lunch_out_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
+            else:
+                # Afternoon Session (13:00 - 17:00)
+                earliest_afternoon_checkin = afternoon_start - checkin_buffer
+                if current_float >= earliest_afternoon_checkin:
+                    _logger.info("Using Afternoon Shift Session: %.2f - %.2f", afternoon_start, exit_time)
+                    return afternoon_start, exit_time
+                raise UserError(_(
+                    "Check-in is not allowed yet.\n\n"
+                    "You are too early for the Afternoon shift (%s - %s).\n"
+                    "Check-in window opens at %s (Buffer: %d min)."
+                ) % (_fmt(afternoon_start), _fmt(exit_time), _fmt(earliest_afternoon_checkin), int(round(checkin_buffer * 60))))
+        else:
+            earliest_checkin = morning_start - checkin_buffer
+            if current_float >= earliest_checkin:
+                _logger.info("Using Default Full Day shift: %.2f - %.2f", morning_start, exit_time)
+                return morning_start, exit_time
+
+            raise UserError(_(
+                "Check-in is not allowed yet.\n\n"
+                "You are too early for your scheduled shift (%s - %s).\n"
+                "Check-in window opens at %s (Buffer: %d min)."
+            ) % (_fmt(morning_start), _fmt(exit_time), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
 
     # ============================================================
     # Check-in Evaluation Logic
@@ -388,10 +414,13 @@ class HrEmployee(models.Model):
             ou_ids = [self.default_operating_unit_id.id]
             if hasattr(self.default_operating_unit_id, 'parent_unit') and self.default_operating_unit_id.parent_unit:
                 ou_ids.append(self.default_operating_unit_id.parent_unit.id)
+            today = fields.Date.context_today(self)
             location_exceptions = self.env['location.based.exception'].search([
                 '|', ('operating_unit_ids', 'in', ou_ids),
                      ('operating_unit', 'in', ou_ids),
-                ('active', '=', True)
+                ('active', '=', True),
+                ('start_date', '<=', today),
+                '|', ('end_date', '=', False), ('end_date', '>=', today)
             ])
         # ----------------------------------------------------
         # Job Position Exceptions
@@ -404,17 +433,40 @@ class HrEmployee(models.Model):
         ], order='start_date desc, id desc')
 
         # ----------------------------------------------------
-        # Determine Shift
+        # Determine Shift & Handle Dual-Session Transitions
         # ----------------------------------------------------
+        open_attendance = self.env['hr.attendance'].search([
+            ('employee_id', '=', self.id), ('check_out', '=', False)
+        ], limit=1)
+
+        enable_lunch_break = self._is_lunch_break_enabled()
+        lunch_out_time = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
+        lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
+        lunch_midpoint = lunch_out_time + (lunch_duration / 2.0)
+
+        # Self-healing Half-Time Transition: If open morning session exists and employee checks in during afternoon:
+        if open_attendance and enable_lunch_break and self.attendance_state != 'lunch_out':
+            is_morning_session = (
+                (open_attendance.shift_end_float and open_attendance.shift_end_float <= (lunch_out_time + 0.1)) or
+                (open_attendance.check_in and open_attendance.check_in.time().hour < int(lunch_out_time))
+            )
+            if is_morning_session and current_float >= (lunch_midpoint + 0.25):
+                _logger.info("Auto Lunch Checkout triggered for %s (Morning session left unclosed).", self.name)
+                lunch_checkout_utc = self._float_to_utc_datetime(lunch_out_time, local_dt)
+                open_attendance.write({
+                    'check_out': lunch_checkout_utc,
+                    'check_out_status': 'Auto Lunch Checkout',
+                    'is_force_checkout': False,
+                })
+                self.write({'attendance_state': 'checked_out'})
+                open_attendance = False
+
         shift_start, shift_end = self._select_applicable_shift(
             current_float, morning_start, exit_time, location_exceptions, job_position_exceptions
         )
         # Convert float shift times to Odoo-ready UTC datetimes
         shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
         shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt)
-        open_attendance = self.env['hr.attendance'].search([
-            ('employee_id', '=', self.id), ('check_out', '=', False)
-        ], limit=1)
 
         # ----------------------------------------------------
         # CHECK-IN (when no open attendance exists)

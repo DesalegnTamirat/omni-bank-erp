@@ -24,30 +24,30 @@ class LocationBasedException(models.Model):
         tracking=True,
         help="Optional end date. If left blank, exception continues indefinitely until edited. If set, reverts to default after this date."
     )
-    is_active_today = fields.Boolean(
-        string="Active Today",
-        compute="_compute_is_active_today",
-        store=True
-    )
+    # is_active_today = fields.Boolean(
+    #     string="Active Today",
+    #     compute="_compute_is_active_today",
+    #     store=True
+    # )
 
-    @api.depends('start_date', 'end_date', 'active')
-    def _compute_is_active_today(self):
-        today = fields.Date.context_today(self)
-        for rec in self:
-            if not rec.active:
-                rec.is_active_today = False
-            elif rec.start_date and rec.start_date > today:
-                rec.is_active_today = False
-            elif rec.end_date and rec.end_date < today:
-                rec.is_active_today = False
-            else:
-                rec.is_active_today = True
+    # @api.depends('start_date', 'end_date', 'active')
+    # def _compute_is_active_today(self):
+    #     today = fields.Date.context_today(self)
+    #     for rec in self:
+    #         if not rec.active:
+    #             rec.is_active_today = False
+    #         elif rec.start_date and rec.start_date > today:
+    #             rec.is_active_today = False
+    #         elif rec.end_date and rec.end_date < today:
+    #             rec.is_active_today = False
+    #         else:
+    #             rec.is_active_today = True
 
     @api.constrains('start_date', 'end_date')
     def _check_date_boundaries(self):
         for rec in self:
             if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
-                raise ValidationError(_("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
+                raise ValidationError(("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
     @api.constrains('operating_unit_ids', 'operating_unit', 'active')
     def _check_operating_unit_required(self):
