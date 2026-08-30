@@ -7,27 +7,14 @@
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="priority">500</field>
         <field name="arch" type="xml">
-            <!-- Header buttons for Flag for Discipline and Approve Overtime for Payroll -->
+            <!-- Header buttons for Approve Overtime for Payroll -->
             <sheet position="before">
                 <header>
-                    <button name="action_flag_for_discipline" string="Flag for Discipline" type="object" class="btn-warning"
-                            invisible="flagged_for_discipline"
-                            help="Flag this attendance record for HR discipline review."/>
                     <button name="action_approve_overtime_for_payroll" string="Approve Overtime for Payroll" type="object" class="btn-success"
                             invisible="over_time_hour &lt;= 0 or overtime_approved_for_payroll"
                             groups="hr_attendance.group_hr_attendance_manager"
                             help="Approve overtime and transmit payload to payroll."/>
                 </header>
-            </sheet>
-
-            <!-- Smart button box for Discipline Cases -->
-            <sheet position="inside">
-                <div class="oe_button_box" name="button_box">
-                    <button type="object" class="oe_stat_button" icon="fa-gavel"
-                            invisible="discipline_case_count == 0">
-                        <field name="discipline_case_count" widget="statinfo" string="Discipline Cases"/>
-                    </button>
-                </div>
             </sheet>
 
             <!-- Attendance Reason -->
@@ -38,8 +25,6 @@
                         <field name="reason_type" readonly="1"/>
                         <field name="in_mode" readonly="1"/>
                         <field name="out_mode" readonly="1"/>
-                        <field name="flagged_for_discipline" readonly="1"/>
-                        <field name="flagged_reason" readonly="1" invisible="not flagged_for_discipline"/>
                         <field name="overtime_approved_for_payroll" readonly="1"/>
                     </group>
                 </group>
@@ -125,8 +110,6 @@
                 <!-- Configurable Optional Columns (Manager can enable/disable via column picker) -->
                 <field name="attendance_reason_ids" string="Reasons" widget="many2many_tags" optional="hide"/>
                 <field name="is_force_checkout" string="Force Checkout" optional="hide"/>
-                <field name="flagged_for_discipline" string="Flagged for Discipline" optional="hide"/>
-                <field name="flagged_reason" string="Flag Reason" optional="hide"/>
                 <field name="overtime_approved_for_payroll" string="Overtime Approved for Payroll" optional="hide"/>
                 <field name="check_in_ip" string="Check-in IP" optional="hide"/>
                 <field name="check_in_device_info" string="Check-in Device" optional="hide"/>
