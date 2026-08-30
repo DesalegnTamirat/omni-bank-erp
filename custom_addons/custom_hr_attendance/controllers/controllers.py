@@ -465,6 +465,8 @@ class BunnaMyAttendance(http.Controller):
             'is_admin': is_admin,
             'settings': {
                 'enable_checkin_restriction': _bool('hr_attendance.enable_checkin_restriction', True),
+                'enable_checkin_grace': _bool('hr_attendance.enable_checkin_grace', True),
+                'checkin_grace_period': _float('hr_attendance.checkin_grace_period', 0.25),
                 'enable_checkout_restriction': _bool('hr_attendance.enable_checkout_restriction', True),
                 'enable_saturday_halfday': _bool('hr_attendance.enable_saturday_halfday', True),
                 'saturday_halfday_district': _bool('hr_attendance.saturday_halfday_district', True),
@@ -473,7 +475,7 @@ class BunnaMyAttendance(http.Controller):
                 'enable_checkin_gate': _bool('hr_attendance.enable_checkin_gate', False),
                 'morning_time': _float('hr_attendance.morning_time', 8.0),
                 'exit_time': _float('hr_attendance.exit_time', 17.0),
-                'dead_time': _float('hr_attendance.dead_time', 0.25),
+                'dead_time': _float('hr_attendance.dead_time', 0.33),
                 'checkin_buffer': _float('hr_attendance.checkin_buffer', 0.5),
                 'post_shift_grace_hours': _float('hr_attendance.post_shift_grace_hours', 3.0),
                 'saturday_exit_time': _float('hr_attendance.saturday_exit_time', 12.0),
@@ -496,12 +498,12 @@ class BunnaMyAttendance(http.Controller):
             return {'error': 'No settings provided'}
         params = request.env['ir.config_parameter'].sudo()
         bool_keys = [
-            'enable_checkin_restriction', 'enable_checkout_restriction',
+            'enable_checkin_restriction', 'enable_checkin_grace', 'enable_checkout_restriction',
             'enable_saturday_halfday', 'saturday_halfday_district',
             'enable_lunch_break', 'enable_auto_absence', 'enable_checkin_gate',
         ]
         float_keys = [
-            'morning_time', 'exit_time', 'dead_time', 'checkin_buffer',
+            'morning_time', 'exit_time', 'checkin_grace_period', 'dead_time', 'checkin_buffer',
             'post_shift_grace_hours', 'saturday_exit_time',
             'lunch_out_time', 'lunch_duration', 'lunch_grace_time',
             'lateness_hours_violation_threshold'

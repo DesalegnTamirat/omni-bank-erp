@@ -149,17 +149,29 @@ class ResConfigSettings(models.TransientModel):
         config_parameter="hr_attendance.exit_time",
         help="Default Exit time  (in 24-hour format, e.g., 17.00 for 5:00 PM)"
     )
-    dead_time = fields.Float(
-        string='Default Dead Time',
+    enable_checkin_grace = fields.Boolean(
+        string='Enable Check-in Grace Period',
+        default=True,
+        config_parameter="hr_attendance.enable_checkin_grace",
+        help="When enabled, arrivals within the grace period are recorded as Normal check-in with no penalties."
+    )
+    checkin_grace_period = fields.Float(
+        string='Check-in Grace Period (Hours)',
         default=0.25,
+        config_parameter="hr_attendance.checkin_grace_period",
+        help="Grace period in hours after shift start where check-in is considered Normal (e.g., 0.25 for 15 minutes)"
+    )
+    dead_time = fields.Float(
+        string='Late Tolerance Window (Dead Time)',
+        default=0.33,
         config_parameter="hr_attendance.dead_time",
-        help="Default Dead time  (in 24-hour format, e.g., 0.25 for 15 Minutes,  0.5 for 30 Minutes)"
+        help="Tolerance in hours after the grace period where late check-in is allowed before being blocked (e.g., 0.33 for 20 min)"
     )
     checkin_buffer = fields.Float(
         string='Check-in Buffer (Hours)',
-        default=1.00,
+        default=0.50,
         config_parameter="hr_attendance.checkin_buffer",
-        help="Allowed early check-in buffer before shift start (e.g., 1.0 = 60 minutes)"
+        help="Allowed early check-in buffer before shift start (e.g., 0.50 = 30 minutes)"
     )
     force_checkout_hours = fields.Float(
         string='Post-Shift Force Checkout Grace (Hours)',

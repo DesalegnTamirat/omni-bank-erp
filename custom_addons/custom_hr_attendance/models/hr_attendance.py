@@ -245,15 +245,25 @@ class HrAttendance(models.Model):
             if eff_check_out > eff_check_in:
                 raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
                 
+                lunch_start_float = shift_info.get('lunch_out_time', 12.0) if (shift_info and shift_info.get('has_lunch_break')) else 12.0
+                lunch_dur = shift_info.get('lunch_duration', default_lunch_duration) if (shift_info and shift_info.get('has_lunch_break')) else default_lunch_duration
+                lunch_end_float = lunch_start_float + lunch_dur
+
+                check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
+                check_out_float = check_out_local.hour + (check_out_local.minute / 60.0)
+
                 # Check real punches first
                 if hasattr(rec, 'lunch_out') and hasattr(rec, 'lunch_in') and rec.lunch_out and rec.lunch_in:
                     lunch_hrs = (rec.lunch_in - rec.lunch_out).total_seconds() / 3600.0
                 elif hasattr(rec, 'lunch_break_hours') and rec.lunch_break_hours > 0:
                     lunch_hrs = rec.lunch_break_hours
-                elif shift_info and shift_info.get('has_lunch_break'):
-                    lunch_hrs = shift_info.get('lunch_duration', default_lunch_duration if enable_lunch else 0.0)
-                elif enable_lunch:
-                    lunch_hrs = default_lunch_duration
+                elif (shift_info and shift_info.get('has_lunch_break')) or enable_lunch:
+                    # Deduct lunch ONLY if this single attendance record spans across the entire lunch break window
+                    if check_in_float < lunch_start_float and check_out_float > lunch_end_float:
+                        lunch_hrs = lunch_dur
+                    else:
+                        # Session is either purely morning or purely afternoon -> 0 lunch deduction
+                        lunch_hrs = 0.0
                 else:
                     lunch_hrs = 0.0
 

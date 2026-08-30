@@ -15,8 +15,12 @@
                         <!-- ========================================= -->
                         <block title="Attendance Features" name="custom_attendance_feature_toggles">
                             <setting string="Check-in Time Restriction"
-                                     help="Enforce morning check-in time window. When OFF, employees can check in at any time.">
+                                     help="Enforce check-in cutoff window (Dead Time). When OFF, late check-ins are permitted at any time.">
                                 <field name="enable_checkin_restriction"/>
+                            </setting>
+                            <setting string="Check-in Grace Period"
+                                     help="Enable grace period tolerance where arrivals after shift start are still marked Normal with 0 deduction.">
+                                <field name="enable_checkin_grace"/>
                             </setting>
                             <setting string="Check-out Time Restriction"
                                      help="Enforce shift-end check-out time restriction. When OFF, employees can check out freely.">
@@ -54,12 +58,16 @@
                         <!-- ========================================= -->
                         <block title="Attendance Policies &amp; Grace Periods" name="custom_attendance_policy_settings">
                             <setting string="Check-in Buffer (Hours)"
-                                     help="How early (in hours) employees are allowed to check in before shift start"
-                                     invisible="not enable_checkin_restriction">
+                                     help="How early (in hours) employees are allowed to check in before shift start (e.g., 0.50 = 30 min)">
                                 <field name="checkin_buffer" widget="float_time"/>
                             </setting>
-                            <setting string="Dead Time (Grace Period, Hours)"
-                                     help="Grace period in hours around check-in/out times before marking as late"
+                            <setting string="Check-in Grace Period (Normal)"
+                                     help="Tolerance window after shift start where check-in is Normal (e.g., 0.25 = 15 min)"
+                                     invisible="not enable_checkin_grace">
+                                <field name="checkin_grace_period" widget="float_time"/>
+                            </setting>
+                            <setting string="Late Tolerance Window (Dead Time)"
+                                     help="Window after grace period where late check-in is allowed before being blocked"
                                      invisible="not enable_checkin_restriction">
                                 <field name="dead_time" widget="float_time"/>
                             </setting>
@@ -67,15 +75,6 @@
                                      help="Duration of the lunch break (e.g., 1.0 = 1 hour, 0.5 = 30 minutes)"
                                      invisible="not enable_lunch_break">
                                 <field name="lunch_duration" widget="float_time"/>
-                            </setting>
-                            <setting string="Lunch Grace Time (Hours)"
-                                     help="Allowed tolerance before/after the lunch window (e.g., 0.25 = ±15 min)"
-                                     invisible="not enable_lunch_break">
-                                <field name="lunch_grace_time" widget="float_time"/>
-                            </setting>
-                            <setting string="Force Checkout Threshold (Hours)"
-                                     help="Hours after check-in before automatic force checkout is performed">
-                                <field name="force_checkout_hours" widget="float_time"/>
                             </setting>
                         </block>
 
