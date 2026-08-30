@@ -327,8 +327,13 @@ class BunnaMyAttendance(http.Controller):
                     monthly_completed_hours += duration
             else:
                 now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
-                live_start_dt = fields.Datetime.context_timestamp(employee, att.actual_check_in or att.check_in)
-                duration = max(0.0, (now_dt - live_start_dt).total_seconds() / 3600.0)
+                # For Normal check-in (snapped to shift start), payable live timer starts from official check_in
+                live_ref_dt = att.check_in if (att.check_in_status == 'Normal' and att.check_in) else (att.actual_check_in or att.check_in)
+                live_start_dt = fields.Datetime.context_timestamp(employee, live_ref_dt)
+                if now_dt >= live_start_dt:
+                    duration = max(0.0, (now_dt - live_start_dt).total_seconds() / 3600.0)
+                else:
+                    duration = 0.0
                 if in_week:
                     daily_checked_in[day_idx] = True
 
@@ -392,14 +397,8 @@ class BunnaMyAttendance(http.Controller):
 
         if open_att and open_att.check_in:
             data['attendance_state'] = 'checked_in'
-            # Drive the live dashboard timer off the *actual* wall-clock
-            # check-in moment (actual_check_in) so it starts at 00:00:00
-            # when the employee taps Check In, rather than off the
-            # shift-aligned `check_in` field used for worked_hours/payroll.
-            # Fall back to check_in for older records created before this
-            # field existed.
-            live_check_in = open_att.actual_check_in or open_att.check_in
-            # Append 'Z' so JS Luxon knows this is UTC and converts to local properly
+            # For Normal check-in snapped to official shift start, timer starts from official check_in
+            live_check_in = open_att.check_in if (open_att.check_in_status == 'Normal' and open_att.check_in) else (open_att.actual_check_in or open_att.check_in)
             data['check_in_raw'] = fields.Datetime.to_string(live_check_in).replace(' ', 'T') + 'Z'
             check_in_local = fields.Datetime.context_timestamp(employee, open_att.check_in)
             data['check_in_time_str'] = check_in_local.strftime('%I:%M %p')
@@ -416,6 +415,90 @@ class BunnaMyAttendance(http.Controller):
             data['check_in_raw'] = False
             data['check_in_time_str'] = False
             data['check_in_status'] = False
+
+        # Dual-Session Status Breakdown for Today
+        now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
+        current_float = now_dt.hour + (now_dt.minute / 60.0) + (now_dt.second / 3600.0)
+        today_shift = self._get_employee_shift_info(employee, target_date=today)
+        has_lunch = today_shift.get('has_lunch_break', False) if today_shift else False
+
+        today_start_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
+        today_end_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
+
+        today_atts = request.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('check_in', '>=', today_start_utc),
+            ('check_in', '<=', today_end_utc)
+        ], order='check_in asc')
+
+        sessions_info = []
+        if has_lunch and not today_shift.get('is_day_off'):
+            m_start = today_shift.get('start_time', 8.0)
+            m_end = today_shift.get('lunch_out_time', 12.0)
+            a_start = m_end + today_shift.get('lunch_duration', 1.0)
+            a_end = today_shift.get('end_time', 17.0)
+
+            # Morning Session Check
+            m_att = today_atts.filtered(lambda a: (a.shift_end_float and a.shift_end_float <= (m_end + 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour < int(m_end)))
+            if m_att:
+                m_att = m_att[0]
+                if m_att.check_out:
+                    m_status = 'completed'
+                    m_badge = f"Completed ({m_att.worked_hours:.2f}h)"
+                else:
+                    m_status = 'active'
+                    m_badge = "Active (Live)"
+            else:
+                if current_float >= m_end:
+                    m_status = 'absent'
+                    m_badge = "Absent (Missed)"
+                else:
+                    m_status = 'upcoming'
+                    m_badge = "Upcoming"
+
+            # Afternoon Session Check
+            a_att = today_atts.filtered(lambda a: (a.shift_start_float and a.shift_start_float >= (m_end - 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour >= int(m_end)))
+            if a_att:
+                a_att = a_att[0]
+                if a_att.check_out:
+                    a_status = 'completed'
+                    a_badge = f"Completed ({a_att.worked_hours:.2f}h)"
+                else:
+                    a_status = 'active'
+                    a_badge = "Active (Live)"
+            else:
+                if current_float >= a_end:
+                    a_status = 'absent'
+                    a_badge = "Absent (Missed)"
+                elif current_float >= (a_start - 0.25):
+                    a_status = 'ready'
+                    a_badge = "Ready to Check In"
+                else:
+                    a_status = 'upcoming'
+                    a_badge = "Upcoming"
+
+            m_start_fmt = f"{int(m_start):02d}:{int(round((m_start % 1) * 60)):02d}"
+            m_end_fmt = f"{int(m_end):02d}:{int(round((m_end % 1) * 60)):02d}"
+            a_start_fmt = f"{int(a_start):02d}:{int(round((a_start % 1) * 60)):02d}"
+            a_end_fmt = f"{int(a_end):02d}:{int(round((a_end % 1) * 60)):02d}"
+
+            sessions_info = [
+                {
+                    'session_name': 'Morning Session',
+                    'icon': 'fa-sun-o',
+                    'time_range': f"{m_start_fmt} - {m_end_fmt}",
+                    'status': m_status,
+                    'badge': m_badge
+                },
+                {
+                    'session_name': 'Afternoon Session',
+                    'icon': 'fa-cloud-sun-o',
+                    'time_range': f"{a_start_fmt} - {a_end_fmt}",
+                    'status': a_status,
+                    'badge': a_badge
+                }
+            ]
+        data['today_sessions'] = sessions_info
 
         return data
 

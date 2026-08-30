@@ -34,9 +34,9 @@
                 <div class="row g-4 mt-2">
                         <!-- LEFT COLUMN: HERO ACTION CARD -->
                     <div class="col-12 col-lg-5 col-xl-5">
-                        <div class="o_smart_hero_card premium-card p-4 p-xl-5 h-100">
+                        <div class="o_smart_hero_card premium-card p-3 p-xl-4 h-100">
                                 <!-- AVATAR CONTAINER -->
-                            <div class="o_smart_avatar_wrapper">
+                            <div class="o_smart_avatar_wrapper mb-2">
                                 <img t-if="state.employeeAvatar"
                                      t-att-src="state.employeeAvatar"
                                      class="o_smart_avatar_img"
@@ -49,14 +49,14 @@
                                       t-att-title="state.checkedIn ? 'Checked In' : 'Checked Out'"/>
                             </div>
 
-                            <h4 class="mb-1" t-esc="state.employeeName"/>
-                            <p class="text-muted mb-3" t-esc="state.jobTitle"/>
-                            <div t-if="state.departmentName" class="dept-badge mb-4">
+                            <h4 class="mb-1 fw-bold" t-esc="state.employeeName"/>
+                            <p class="text-muted mb-2 small" t-esc="state.jobTitle"/>
+                            <div t-if="state.departmentName" class="dept-badge mb-3">
                                 <t t-esc="state.departmentName"/>
                             </div>
 
                                 <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
-                            <div class="w-100 d-flex justify-content-center mt-2 mb-4">
+                            <div class="w-100 d-flex justify-content-center mt-1 mb-3">
                                 <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_day_off &amp;&amp; !state.checkedIn">
                                     <button disabled="disabled"
                                             class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
@@ -80,7 +80,7 @@
                             </div>
 
                                 <!-- ASSIGNED WORK SHIFT HEADER CARD -->
-                            <div t-if="state.shiftInfo" class="premium-card o_shift_info_card w-100 p-3 p-md-4 mb-4">
+                            <div t-if="state.shiftInfo" class="premium-card o_shift_info_card w-100 p-3 mb-3">
                                 <t t-if="state.shiftInfo.is_day_off">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #ecfdf5; color: #047857; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
@@ -160,29 +160,89 @@
                                 </t>
                             </div>
 
-                                <!-- LIVE WORKED TIMER BADGE -->
+                                <!-- LIVE WORKED TIMER BADGE WITH INTEGRATED DUAL SESSION BREAKDOWN -->
                             <div class="w-100 mt-auto">
                                 <t t-if="state.checkedIn">
-                                    <div class="o_timer_box active-timer p-4 text-center">
-                                        <div class="timer-title small fw-bold mb-2">
-                                            <i class="fa fa-circle me-1 pulse-dot"/> ACTIVE SESSION TIME
+                                    <div class="o_timer_box active-timer p-3 text-center">
+                                        <div class="timer-title small fw-bold mb-1" style="font-size: 0.8rem;">
+                                            <i class="fa fa-circle me-1 pulse-dot text-success"/> ACTIVE SESSION TIME
                                         </div>
-                                        <div class="h2 mb-1" t-esc="state.liveWorkedTimer"/>
-                                        <div t-if="state.checkInTimeStr" class="text-muted small mt-2" style="font-weight: 500;">
+                                        <div class="h2 mb-1 fw-bold text-dark" t-esc="state.liveWorkedTimer"/>
+                                        <div t-if="state.checkInTimeStr" class="text-muted small mb-3" style="font-weight: 500; font-size: 0.8rem;">
                                             Checked in at <span class="text-dark fw-bold" t-esc="state.checkInTimeStr"/>
                                             <span t-if="state.checkInStatus"
                                                   t-attf-class="badge rounded-pill ms-2 {{ state.checkInStatus === 'Late' ? 'bg-warning text-dark' : 'bg-success text-white' }}"
                                                   t-esc="state.checkInStatus"/>
                                         </div>
+
+                                        <!-- Integrated compact session breakdown -->
+                                        <div t-if="state.todaySessions &amp;&amp; state.todaySessions.length" class="d-flex flex-column gap-1 pt-2 border-top" style="border-color: rgba(0,0,0,0.06) !important;">
+                                            <t t-foreach="state.todaySessions" t-as="sess" t-key="sess.session_name">
+                                                <div class="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style="background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.05); font-size: 0.775rem;">
+                                                    <div class="d-flex align-items-center gap-1.5 text-start">
+                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : 'text-muted'))}"/>
+                                                        <span class="fw-semibold text-dark" t-esc="sess.session_name"/>
+                                                        <span class="text-muted small ms-1" t-esc="'(' + sess.time_range + ')'"/>
+                                                    </div>
+                                                    <div>
+                                                        <span t-if="sess.status === 'completed'" class="badge bg-success text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-check-circle me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'active'" class="badge bg-dark text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-dot-circle-o me-1 pulse-dot text-success"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'absent'" class="badge bg-danger text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-times-circle me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'ready'" class="badge bg-warning text-dark rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-clock-o me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-else="" class="badge bg-secondary text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-hourglass-start me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
                                     </div>
                                 </t>
                                 <t t-else="">
-                                    <div class="o_timer_box p-4 text-center">
-                                        <div class="text-muted small fw-bold mb-2 text-uppercase">
+                                    <div class="o_timer_box p-3 text-center">
+                                        <div class="text-muted small fw-bold mb-1 text-uppercase" style="font-size: 0.8rem;">
                                             <i class="fa fa-history me-1"/> Total Worked Today
                                         </div>
-                                        <div class="h2 mb-1" t-esc="state.hoursToday"/>
-                                        <div class="text-muted small mt-2" style="font-weight: 500;">Ready to start your day</div>
+                                        <div class="h2 mb-1 fw-bold text-dark" t-esc="state.hoursToday"/>
+                                        <div class="text-muted small mb-3" style="font-weight: 500; font-size: 0.8rem;">Ready to start your day</div>
+
+                                        <!-- Integrated compact session breakdown -->
+                                        <div t-if="state.todaySessions &amp;&amp; state.todaySessions.length" class="d-flex flex-column gap-1 pt-2 border-top" style="border-color: rgba(0,0,0,0.06) !important;">
+                                            <t t-foreach="state.todaySessions" t-as="sess" t-key="sess.session_name">
+                                                <div class="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style="background: #ffffff; border: 1px solid rgba(0,0,0,0.05); font-size: 0.775rem;">
+                                                    <div class="d-flex align-items-center gap-1.5 text-start">
+                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : 'text-muted'))}"/>
+                                                        <span class="fw-semibold text-dark" t-esc="sess.session_name"/>
+                                                        <span class="text-muted small ms-1" t-esc="'(' + sess.time_range + ')'"/>
+                                                    </div>
+                                                    <div>
+                                                        <span t-if="sess.status === 'completed'" class="badge bg-success text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-check-circle me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'active'" class="badge bg-dark text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-dot-circle-o me-1 pulse-dot text-success"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'absent'" class="badge bg-danger text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-times-circle me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'ready'" class="badge bg-warning text-dark rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-clock-o me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-else="" class="badge bg-secondary text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                                            <i class="fa fa-hourglass-start me-1"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </t>
+                                        </div>
                                     </div>
                                 </t>
                             </div>

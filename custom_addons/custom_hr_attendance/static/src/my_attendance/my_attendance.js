@@ -40,6 +40,7 @@ export class MyAttendance extends Component {
             weeklyHoursFormatted: "00h 00m",
             monthlyHoursFormatted: "00h 00m",
             dailyBreakdown: [],
+            todaySessions: [],
             checkInTimeStr: "",
             checkInStatus: "",
             checkInRaw: false,
@@ -184,6 +185,7 @@ export class MyAttendance extends Component {
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
         this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];
+        this.state.todaySessions = data.today_sessions || [];
         this.state.checkInTimeStr = data.check_in_time_str || "";
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;

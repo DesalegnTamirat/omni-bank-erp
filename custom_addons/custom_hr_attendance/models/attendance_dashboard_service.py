@@ -653,7 +653,33 @@ class HrAttendanceDashboardService(models.Model):
             return (dt_loc - datetime.timedelta(days=1)).date() if dt_loc.hour < 4 else dt_loc.date()
 
         recorded_days = len(set(_get_att_work_date(att) for att in range_atts if _get_att_work_date(att)))
-        absent_count = max(0, elapsed_days - recorded_days)
+        full_day_absent = max(0, elapsed_days - recorded_days)
+
+        # Evaluate Missed Half-Day Sessions for days with partial attendance or today's missed morning
+        missed_sessions_count = 0
+        now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
+        current_float = now_dt.hour + (now_dt.minute / 60.0)
+        
+        cur_d = s_d
+        while cur_d <= eval_end_d:
+            d_shift = employee._get_employee_shift_info(target_date=cur_d) if hasattr(employee, '_get_employee_shift_info') else None
+            if d_shift and d_shift.get('has_lunch_break') and not d_shift.get('is_day_off'):
+                d_atts = [a for a in range_atts if _get_att_work_date(a) == cur_d]
+                m_end = d_shift.get('lunch_out_time', 12.0)
+                a_end = d_shift.get('end_time', 17.0)
+                
+                has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
+                has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                
+                if cur_d < today:
+                    if not has_morning: missed_sessions_count += 1
+                    if not has_afternoon: missed_sessions_count += 1
+                elif cur_d == today:
+                    if not has_morning and current_float >= m_end: missed_sessions_count += 1
+                    if not has_afternoon and current_float >= a_end: missed_sessions_count += 1
+            cur_d += datetime.timedelta(days=1)
+
+        absent_count = full_day_absent + round(missed_sessions_count * 0.5, 1)
 
         # Card 4: Approvals
         acknowledged_count = sum(1 for att in range_atts if (getattr(att, 'is_acknowledged', False) or (getattr(att, 'acknowledged_late', 0.0) or 0.0) > 0 or (getattr(att, 'acknowledged_exit', 0.0) or 0.0) > 0))
