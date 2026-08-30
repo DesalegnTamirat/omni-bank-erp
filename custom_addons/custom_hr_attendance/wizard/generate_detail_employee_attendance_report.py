@@ -7,8 +7,17 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
     _name = 'generate.detail.employee.attendance.report'
     _description = 'Generate Detail Employee Attendance Report Wizard'
 
-    date_from = fields.Date(string="Date From", required=True)
-    date_to = fields.Date(string="Date To", required=True)
+    @api.model
+    def _default_date_from(self):
+        today = fields.Date.context_today(self)
+        return today.replace(day=1)
+
+    @api.model
+    def _default_date_to(self):
+        return fields.Date.context_today(self)
+
+    date_from = fields.Date(string="Date From", required=True, default=_default_date_from)
+    date_to = fields.Date(string="Date To", required=True, default=_default_date_to)
     report_type = fields.Selection([
         ('attendance_summary', 'Attendance Summary'),
         ('attendance_preapproval', 'PreDefined Attendance'),

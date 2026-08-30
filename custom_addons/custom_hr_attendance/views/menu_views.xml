@@ -156,7 +156,16 @@
                 action="action_reporting_attendances_pivot"
                 sequence="5" />
 
-        <!-- 6.2 Employee Attendance Summary -->
+        <!-- 6.1 Generate Attendance Reports (Wizard) -->
+        <menuitem
+                id="menu_generate_attendance_reports_wizard"
+                name="Generate Attendance Reports"
+                action="action_generate_detail_employee_attendance_report_wizard"
+                parent="hr_attendance.menu_hr_attendance_reporting"
+                groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
+                sequence="5" />
+
+        <!-- 6.2 Employee Attendance Summary (View Report Table) -->
         <menuitem
                 id="menu_generated_employee_attendance_details"
                 name="Employee Attendance Summary"

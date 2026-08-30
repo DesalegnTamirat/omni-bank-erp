@@ -836,11 +836,11 @@ class HrAttendance(models.Model):
     @api.model
     def cron_automatic_force_checkout(self):
         """
-        Executes high-performance PostgreSQL routine process_automated_force_checkouts()
-        to perform lunch-time and shift-end auto checkouts while protecting night shifts.
+        Executes high-performance PostgreSQL routine auto_checkout_all_employees()
+        to perform shift-aware auto checkouts for all unclosed attendances past shift end.
         """
-        self.env.cr.execute("SELECT process_automated_force_checkouts();")
-        _logger.info("Executed process_automated_force_checkouts PostgreSQL function.")
+        self.env.cr.execute("SELECT auto_checkout_all_employees();")
+        _logger.info("Executed auto_checkout_all_employees PostgreSQL function.")
 
     @api.model
     def cron_automatic_absence_detection(self):
@@ -1060,7 +1060,14 @@ class HrAttendance(models.Model):
                     write_date = NOW()
                 FROM resolved_shifts rs
                 WHERE ha.id = rs.att_id
-                  AND NOW() >= (rs.shift_end_utc + INTERVAL '3 hours');
+                  AND NOW() >= rs.shift_end_utc;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE OR REPLACE FUNCTION process_automated_force_checkouts()
+            RETURNS void AS $$
+            BEGIN
+                PERFORM auto_checkout_all_employees();
             END;
             $$ LANGUAGE plpgsql;
         """)

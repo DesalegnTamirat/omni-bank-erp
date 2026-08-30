@@ -433,33 +433,11 @@ class HrEmployee(models.Model):
         ], order='start_date desc, id desc')
 
         # ----------------------------------------------------
-        # Determine Shift & Handle Dual-Session Transitions
+        # Determine Shift
         # ----------------------------------------------------
         open_attendance = self.env['hr.attendance'].search([
             ('employee_id', '=', self.id), ('check_out', '=', False)
         ], limit=1)
-
-        enable_lunch_break = self._is_lunch_break_enabled()
-        lunch_out_time = self._get_param_float('hr_attendance.lunch_out_time', 12.0)
-        lunch_duration = self._get_param_float('hr_attendance.lunch_duration', 1.0)
-        lunch_midpoint = lunch_out_time + (lunch_duration / 2.0)
-
-        # Self-healing Half-Time Transition: If open morning session exists and employee checks in during afternoon:
-        if open_attendance and enable_lunch_break and self.attendance_state != 'lunch_out':
-            is_morning_session = (
-                (open_attendance.shift_end_float and open_attendance.shift_end_float <= (lunch_out_time + 0.1)) or
-                (open_attendance.check_in and open_attendance.check_in.time().hour < int(lunch_out_time))
-            )
-            if is_morning_session and current_float >= (lunch_midpoint + 0.25):
-                _logger.info("Auto Lunch Checkout triggered for %s (Morning session left unclosed).", self.name)
-                lunch_checkout_utc = self._float_to_utc_datetime(lunch_out_time, local_dt)
-                open_attendance.write({
-                    'check_out': lunch_checkout_utc,
-                    'check_out_status': 'Auto Lunch Checkout',
-                    'is_force_checkout': False,
-                })
-                self.write({'attendance_state': 'checked_out'})
-                open_attendance = False
 
         shift_start, shift_end = self._select_applicable_shift(
             current_float, morning_start, exit_time, location_exceptions, job_position_exceptions
