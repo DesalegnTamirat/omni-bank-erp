@@ -179,7 +179,7 @@ class HrEmployeePrivate(models.Model):
     # ============================================================
     # SHIFT SELECTION HELPER
     # ============================================================
-    def _select_applicable_shift(self, current_float, morning_start, exit_time, location_exceptions=None, job_position_exceptions=None, target_date=None):
+    def _select_applicable_shift(self, current_float, morning_start, exit_time, location_exceptions=None, job_position_exceptions=None, target_date=None, is_manager=False, **kwargs):
         if not target_date:
             target_date = fields.Date.context_today(self)
 
@@ -189,7 +189,8 @@ class HrEmployeePrivate(models.Model):
 
         sched = self._resolve_employee_full_schedule(current_float=current_float, target_date=target_date)
         if sched.get('is_day_off'):
-            raise UserError(_("Attendance cannot be recorded.\n\nYou have a scheduled Day Off today."))
+            if not is_manager:
+                raise UserError(_("Attendance cannot be recorded.\n\nYou have a scheduled Day Off today."))
 
         if sched['has_lunch']:
             morning_s = sched['shift_start']
@@ -202,7 +203,7 @@ class HrEmployeePrivate(models.Model):
             if current_float < lunch_midpoint:
                 # Morning Session
                 earliest_checkin = morning_s - checkin_buffer
-                if current_float >= earliest_checkin or not enable_checkin_restriction:
+                if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
                     _logger.info("Using Morning Shift Session: %.2f - %.2f", morning_s, morning_e)
                     return morning_s, morning_e
                 raise UserError(_(
@@ -212,7 +213,7 @@ class HrEmployeePrivate(models.Model):
                 ) % (_fmt(morning_s), _fmt(morning_e), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
             else:
                 # Afternoon Session
-                if current_float >= afternoon_buffer_start or not enable_checkin_restriction:
+                if current_float >= afternoon_buffer_start or not enable_checkin_restriction or is_manager:
                     _logger.info("Using Afternoon Shift Session: %.2f - %.2f", afternoon_s, afternoon_e)
                     return afternoon_s, afternoon_e
                 raise UserError(_(
@@ -224,10 +225,10 @@ class HrEmployeePrivate(models.Model):
             # Single Continuous Shift
             earliest_checkin = sched['shift_start'] - checkin_buffer
             if sched['is_night_shift']:
-                if current_float >= earliest_checkin or current_float <= sched['shift_end'] or not enable_checkin_restriction:
+                if current_float >= earliest_checkin or current_float <= sched['shift_end'] or not enable_checkin_restriction or is_manager:
                     return sched['shift_start'], sched['shift_end']
             else:
-                if current_float >= earliest_checkin or not enable_checkin_restriction:
+                if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
                     return sched['shift_start'], sched['shift_end']
 
             raise UserError(_(

@@ -629,7 +629,11 @@ class HrAttendance(models.Model):
             dt_local = pytz.utc.localize(self.check_in).astimezone(local_tz)
             f_time = dt_local.hour + dt_local.minute / 60 + dt_local.second / 3600
 
-            s_start, s_end = emp._select_applicable_shift(f_time, m_start,  e_time, loc_ex, job_ex, is_manager=True)
+            s_start, s_end = emp._select_applicable_shift(
+                f_time, m_start, e_time, loc_ex, job_ex, 
+                target_date=dt_local.date(), 
+                is_manager=True
+            )
             if self.shift_start_float:
                 s_start = self.shift_start_float
 
