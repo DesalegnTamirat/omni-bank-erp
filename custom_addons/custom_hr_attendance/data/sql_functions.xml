@@ -77,11 +77,63 @@ BEGIN
             AND (att.active = TRUE OR att.active IS NULL)
         LEFT JOIN LATERAL (
             SELECT SUM(
-                CASE 
-                    WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                    WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
-                    ELSE 0.0
-                END
+                COALESCE(
+                    (
+                        SELECT 0.0
+                        FROM hr_leave l
+                        WHERE l.employee_id = emp.id
+                          AND l.state = 'validate'
+                          AND l.date_from::date <= d::date
+                          AND l.date_to::date >= d::date
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT CASE 
+                            WHEN rl.schedule_type = 'day_off' THEN 0.0
+                            WHEN js.id IS NOT NULL THEN 
+                                GREATEST(0.0, (js.end_time - js.start_time) - CASE WHEN js.has_lunch_break THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                            ELSE 8.0
+                        END
+                        FROM job_position_roster_exception_line rl
+                        JOIN job_position_roster_exception re ON rl.roster_id = re.id
+                        LEFT JOIN job_shift js ON rl.shift_id = js.id
+                        WHERE (rl.employee_id = emp.id OR re.employee_id = emp.id)
+                          AND re.status = 'active'
+                          AND (re.active = TRUE OR re.active IS NULL)
+                          AND rl.date = d::date
+                        ORDER BY re.start_date DESC, re.id DESC
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT GREATEST(0.0, (js.end_time - js.start_time) - CASE WHEN js.has_lunch_break THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                        FROM job_position_exception jpe
+                        JOIN job_shift js ON jpe.shift_id = js.id
+                        WHERE jpe.employee_id = emp.id
+                          AND jpe.status = 'active'
+                          AND (jpe.active = TRUE OR jpe.active IS NULL)
+                          AND jpe.start_date <= d::date
+                          AND (jpe.end_date IS NULL OR jpe.end_date >= d::date)
+                        ORDER BY jpe.start_date DESC, jpe.id DESC
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT GREATEST(0.0, (COALESCE(js.end_time, lbe.end_time, 17.0) - COALESCE(js.start_time, lbe.start_time, 8.0)) - CASE WHEN COALESCE(js.has_lunch_break, lbe.has_lunch_break, FALSE) THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                        FROM location_based_exception lbe
+                        LEFT JOIN job_shift js ON lbe.shift_id = js.id
+                        WHERE (lbe.active = TRUE OR lbe.active IS NULL)
+                          AND (lbe.operating_unit = emp.default_operating_unit_id OR lbe.id IN (
+                              SELECT location_exception_id FROM rel_location_exception_operating_unit WHERE operating_unit_id = emp.default_operating_unit_id
+                          ))
+                          AND lbe.start_date <= d::date
+                          AND (lbe.end_date IS NULL OR lbe.end_date >= d::date)
+                        LIMIT 1
+                    ),
+                    CASE 
+                        WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
+                        WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
+                        ELSE 0.0
+                    END
+                )
             ) AS total_wh
             FROM generate_series(p_from, p_to, '1 day'::interval) d
         ) exp_wh ON TRUE
