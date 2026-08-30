@@ -14,13 +14,20 @@ class HrAttendanceManualWizard(models.TransientModel):
     3. Finacle EOD Rest Entry (Morning OFF, Afternoon OFF, Full Day OFF for bank ops staff & drivers)
     """
     _name = 'hr.attendance.manual.wizard'
-    _description = 'Manual Attendance Entry Wizard'
-
     entry_type = fields.Selection([
         ('individual', 'Individual Employee (Single Day)'),
         ('batch', 'Batch Operating Unit (Multi-Day / Outage)'),
-        ('finacle_rest', 'Duty OFF(Half-Day / Full-Day)')
     ], string='Entry Mode', default='individual', required=True)
+
+    is_hr_admin = fields.Boolean(
+        string='Is HR Admin',
+        compute='_compute_is_hr_admin',
+    )
+
+    def _compute_is_hr_admin(self):
+        is_admin = self.env.user.has_group('hr_attendance.group_hr_attendance_manager')
+        for rec in self:
+            rec.is_hr_admin = is_admin
 
     # --- Individual Mode Fields ---
     attendance_mode = fields.Selection([
@@ -129,11 +136,6 @@ class HrAttendanceManualWizard(models.TransientModel):
         store=True,
     )
 
-    rest_type = fields.Selection([
-        ('morning_off', 'Morning OFF'),
-        ('afternoon_off', 'Afternoon OFF'),
-        ('full_day_off', 'Full Day OFF')
-    ], string='Rest / Exception Type', default='morning_off')
 
     use_employee_shifts = fields.Boolean(
         string='Use Individual Assigned Shifts & Lunch Splits',
@@ -576,142 +578,20 @@ class HrAttendanceManualWizard(models.TransientModel):
                 }
 
         # ----------------------------------------------------
-        # SCENARIO 2: BATCH OPERATING UNIT ENTRY
+        # SCENARIO 2: BATCH OPERATING UNIT ENTRY (HR ADMIN DIRECT GENERATION)
         # ----------------------------------------------------
         elif self.entry_type == 'batch':
+            if not self.env.user.has_group('hr_attendance.group_hr_attendance_manager'):
+                raise ValidationError(_('Batch Operating Unit attendance entry is strictly restricted to HR Administrators.'))
+
             if not self.employee_ids or not self.start_date or not self.end_date:
-                raise ValidationError(_('Employees, Start Date, and End Date are required for batch entry.'))
+                raise ValidationError(_('Operating Unit, Employees, Start Date, and End Date are required for Batch entry.'))
 
-            duration = (self.end_date - self.start_date).days + 1
+            if self.start_date > self.end_date:
+                raise ValidationError(_('Start Date cannot be greater than End Date.'))
 
-            # ROUTING RULE FOR >3 DAYS: Requires Coach Approval
-            if duration > 3:
-                coach = self.env.user.employee_id.coach_id if self.env.user.employee_id else None
-                if not coach:
-                    coach = self.env.user.employee_id.parent_id if self.env.user.employee_id else None
-                
-                req_vals = {
-                    'name': _('Batch Request (%s to %s)') % (self.start_date, self.end_date),
-                    'manager_id': self.env.user.id,
-                    'coach_id': coach.id if coach else False,
-                    'start_date': self.start_date,
-                    'end_date': self.end_date,
-                    'reason': self.justification,
-                    'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-                    'employee_ids': [(6, 0, self.employee_ids.ids)],
-                    'use_employee_shifts': self.use_employee_shifts,
-                    'overwrite_existing': self.overwrite_existing,
-                    'check_in_time_only': self.check_in_time_only,
-                    'check_out_time_only': self.check_out_time_only,
-                    'state': 'submitted',
-                }
-                batch_req = self.env['hr.attendance.batch.request'].sudo().create(req_vals)
-                
-                return {
-                    'name': _('Batch Request Submitted for Coach Approval'),
-                    'type': 'ir.actions.act_window',
-                    'res_model': 'hr.attendance.batch.request',
-                    'res_id': batch_req.id,
-                    'view_mode': 'form',
-                    'target': 'current',
-                }
-
-            # <= 3 DAYS: Generate directly
+            # Direct generation with zero approval hierarchy
             return self._generate_batch_attendances()
-
-        # ----------------------------------------------------
-        # SCENARIO 3: FINACLE EOD REST ENTRY
-        # ----------------------------------------------------
-        elif self.entry_type == 'finacle_rest':
-            if not self.employee_ids or not self.work_date:
-                raise ValidationError(_('Employees and Target Rest Date are required for Duty OFF entry.'))
-
-            created_attendances = []
-            for emp in self.employee_ids:
-                shift_info = emp._get_employee_shift_info(target_date=self.work_date)
-                s_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
-                s_end = shift_info.get('end_time', 17.0) if shift_info else 17.0
-                has_lunch = shift_info.get('has_lunch_break', False) if shift_info else False
-                lunch_start = shift_info.get('lunch_start_time', 12.0) if shift_info else 12.0
-                lunch_dur = shift_info.get('lunch_duration', 1.0) if shift_info else 1.0
-                lunch_end = lunch_start + lunch_dur
-
-                if self.rest_type == 'morning_off':
-                    actual_start = lunch_end if has_lunch else (s_start + (s_end - s_start) / 2.0)
-                    dt_in = self._float_time_to_utc_dt(self.work_date, actual_start)
-                    dt_out = self._float_time_to_utc_dt(self.work_date, s_end)
-                    vals = {
-                        'employee_id': emp.id,
-                        'work_date': self.work_date,
-                        'check_in': dt_in,
-                        'check_out': dt_out,
-                        'actual_check_in': dt_in,
-                        'in_mode': 'batch',
-                        'out_mode': 'batch',
-                        'shift_start_float': actual_start,
-                        'shift_end_float': s_end,
-                        'check_in_status': 'Normal',
-                        'is_acknowledged': True,
-                        'acknowledged_by': self.env.user.id,
-                        'acknowledged_date': fields.Datetime.now(),
-                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-                    }
-                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
-                    created_attendances.append(att.id)
-
-                elif self.rest_type == 'afternoon_off':
-                    actual_end = lunch_start if has_lunch else (s_start + (s_end - s_start) / 2.0)
-                    dt_in = self._float_time_to_utc_dt(self.work_date, s_start)
-                    dt_out = self._float_time_to_utc_dt(self.work_date, actual_end)
-                    vals = {
-                        'employee_id': emp.id,
-                        'work_date': self.work_date,
-                        'check_in': dt_in,
-                        'check_out': dt_out,
-                        'actual_check_in': dt_in,
-                        'in_mode': 'batch',
-                        'out_mode': 'batch',
-                        'shift_start_float': s_start,
-                        'shift_end_float': actual_end,
-                        'check_in_status': 'Normal',
-                        'is_acknowledged': True,
-                        'acknowledged_by': self.env.user.id,
-                        'acknowledged_date': fields.Datetime.now(),
-                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-                    }
-                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
-                    created_attendances.append(att.id)
-
-                elif self.rest_type == 'full_day_off':
-                    dt_in = self._float_time_to_utc_dt(self.work_date, s_start)
-                    dt_out = self._float_time_to_utc_dt(self.work_date, s_end)
-                    vals = {
-                        'employee_id': emp.id,
-                        'work_date': self.work_date,
-                        'check_in': dt_in,
-                        'check_out': dt_out,
-                        'actual_check_in': dt_in,
-                        'in_mode': 'batch',
-                        'out_mode': 'batch',
-                        'shift_start_float': s_start,
-                        'shift_end_float': s_end,
-                        'check_in_status': 'Normal',
-                        'is_acknowledged': True,
-                        'acknowledged_by': self.env.user.id,
-                        'acknowledged_date': fields.Datetime.now(),
-                        'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
-                    }
-                    att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
-                    created_attendances.append(att.id)
-
-            return {
-                'name': _('Duty OFF Attendances Created'),
-                'type': 'ir.actions.act_window',
-                'res_model': 'hr.attendance',
-                'view_mode': 'list,form',
-                'domain': [('id', 'in', created_attendances)],
-                'target': 'current',
-            }
 
     def _generate_batch_attendances(self):
         """Helper to create attendance records across date range."""

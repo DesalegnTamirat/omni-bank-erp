@@ -6,11 +6,12 @@
             <field name="model">hr.attendance.manual.wizard</field>
             <field name="arch" type="xml">
                 <form string="Manual Attendance Entry">
+                    <field name="is_hr_admin" invisible="1"/>
                     <div class="alert alert-info" role="alert">
-                        <strong>Manual Attendance &amp; Duty OFF Manager Entry</strong><br/>
-                        Select mode: Individual employee correction, Batch Operating Unit entry (multi-date / outage), or Duty OFF (Half-Day / Full-Day). Note: Manual entry is strictly allowed for past dates or today.
+                        <strong>Manual Attendance Entry</strong><br/>
+                        Select mode: Individual employee correction or Batch Operating Unit entry (multi-date / outage). Note: Manual entry is strictly allowed for past dates or today.
                     </div>
-                    <group>
+                    <group invisible="not is_hr_admin">
                         <field name="entry_type" widget="radio" class="oe_inline"/>
                     </group>
 
@@ -36,12 +37,10 @@
                         </group>
                     </group>
 
-
-
-                    <!-- BATCH OPERATING UNIT MODE -->
+                    <!-- BATCH OPERATING UNIT MODE (HR ADMIN ONLY) -->
                     <group invisible="entry_type != 'batch'">
                         <group string="Operating Unit &amp; Date Range">
-                            <field name="operating_unit_id" readonly="1"/>
+                            <field name="operating_unit_id" options="{'no_create': True}" required="entry_type == 'batch'"/>
                             <field name="start_date" required="entry_type == 'batch'"/>
                             <field name="end_date" required="entry_type == 'batch'"/>
                             <field name="duration_days" readonly="1"/>
@@ -58,21 +57,9 @@
                         <i class="fa fa-exclamation-triangle me-2"/> <strong>Overwrite Warning:</strong> Enabling 'Overwrite Existing Attendances' will replace existing attendance records for the selected employees on these dates.
                     </div>
 
-                    <group string="Select Employees Under Management" invisible="entry_type == 'individual'">
-                        <field name="employee_ids" widget="many2many_tags" placeholder="Select 2 or more employees..."/>
+                    <group string="Select Employees" invisible="entry_type == 'individual'">
+                        <field name="employee_ids" widget="many2many_tags" placeholder="Select one, multiple, or all employees under this operating unit..."/>
                     </group>
-
-                    <!-- FINACLE EOD REST MODE -->
-                    <group invisible="entry_type != 'finacle_rest'">
-                        <group string="Target Date &amp; Rest Type">
-                            <field name="work_date" string="Target Rest Date" required="entry_type == 'finacle_rest'"/>
-                            <field name="rest_type" required="entry_type == 'finacle_rest'"/>
-                        </group>
-                    </group>
-
-                    <div class="alert alert-warning" role="alert" invisible="entry_type != 'batch' or duration_days &lt;= 3">
-                        <i class="fa fa-exclamation-triangle me-2"/> <strong>Coach Approval Required:</strong> Batch requests for more than 3 days (%s days) will be submitted to your Coach / Supervisor for formal approval before attendance records are generated.
-                    </div>
 
                     <!-- REASON & JUSTIFICATION -->
                     <group string="Reason &amp; Justification">
@@ -81,7 +68,7 @@
                     </group>
 
                     <footer>
-                        <button string="Create / Submit Attendance" name="action_create_manual_attendance" type="object" class="btn-primary"/>
+                        <button string="Create Attendance" name="action_create_manual_attendance" type="object" class="btn-primary"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

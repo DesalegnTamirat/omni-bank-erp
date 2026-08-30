@@ -42,7 +42,7 @@ class ResConfigSettings(models.TransientModel):
         string='Enable Overtime Payout for Payroll',
         default=False,
         config_parameter="custom_hr_attendance.enable_overtime_payroll",
-        help="When OFF (Default), extra shift work is compensated via Duty OFF (Half-Day/Full-Day). When ON, managers can record and approve overtime for payroll payout."
+        help="When ON, managers can record and approve overtime for payroll payout."
     )
 
     # ----------------------------------------------------------

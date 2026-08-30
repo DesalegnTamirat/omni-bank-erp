@@ -48,7 +48,7 @@
                                 <field name="enable_checkin_gate"/>
                             </setting>
                             <setting string="Overtime Payroll Payout Policy"
-                                     help="When OFF (Default), extra shift work is compensated via Duty OFF. When ON, overtime hours are exported for payroll payout.">
+                                     help="When enabled, overtime hours are exported for payroll payout.">
                                 <field name="enable_overtime_payroll"/>
                             </setting>
                         </block>
