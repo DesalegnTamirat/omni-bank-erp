@@ -639,10 +639,9 @@ class HrAttendanceDashboardService(models.Model):
         late_mins_int = int(round((period_late_hours_float - late_hrs_int) * 60))
         late_hours_formatted = f"{late_hrs_int:02d}:{late_mins_int:02d}"
 
-        # Card 3: Offenses
+        # Card 3: Offenses & Shift-Aware Absence Evaluation
         force_checkout_count = sum(1 for att in range_atts if (att.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(att, 'is_force_checkout', False) or getattr(att, 'is_forced_checkout', False)))
         eval_end_d = min(e_d, today)
-        elapsed_days = max(0, (eval_end_d - s_d).days + 1)
 
         def _get_att_work_date(a):
             if getattr(a, 'work_date', False):
@@ -652,31 +651,54 @@ class HrAttendanceDashboardService(models.Model):
             dt_loc = pytz.utc.localize(a.check_in).astimezone(local_tz) if not a.check_in.tzinfo else a.check_in.astimezone(local_tz)
             return (dt_loc - datetime.timedelta(days=1)).date() if dt_loc.hour < 4 else dt_loc.date()
 
-        recorded_days = len(set(_get_att_work_date(att) for att in range_atts if _get_att_work_date(att)))
-        full_day_absent = max(0, elapsed_days - recorded_days)
-
-        # Evaluate Missed Half-Day Sessions for days with partial attendance or today's missed morning
-        missed_sessions_count = 0
         now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
         current_float = now_dt.hour + (now_dt.minute / 60.0)
-        
+
+        # Date-by-date absence evaluation
+        full_day_absent = 0
+        missed_sessions_count = 0
         cur_d = s_d
         while cur_d <= eval_end_d:
             d_shift = employee._get_employee_shift_info(target_date=cur_d) if hasattr(employee, '_get_employee_shift_info') else None
-            if d_shift and d_shift.get('has_lunch_break') and not d_shift.get('is_day_off'):
+            is_day_off = bool(d_shift.get('is_day_off')) if d_shift else (cur_d.weekday() == 6)
+
+            # Check approved leave on cur_d
+            on_leave = False
+            if 'hr.leave' in self.env:
+                on_leave = self.env['hr.leave'].sudo().search_count([
+                    ('employee_id', '=', employee.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', datetime.datetime.combine(cur_d, datetime.time.max)),
+                    ('date_to', '>=', datetime.datetime.combine(cur_d, datetime.time.min))
+                ]) > 0
+
+            if not is_day_off and not on_leave:
                 d_atts = [a for a in range_atts if _get_att_work_date(a) == cur_d]
-                m_end = d_shift.get('lunch_out_time', 12.0)
-                a_end = d_shift.get('end_time', 17.0)
-                
-                has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
-                has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
-                
+                m_start = d_shift.get('start_time', 8.0) if d_shift else 8.0
+                m_end = d_shift.get('lunch_out_time', 12.0) if d_shift else 12.0
+                a_end = d_shift.get('end_time', 17.0) if d_shift else 17.0
+
                 if cur_d < today:
-                    if not has_morning: missed_sessions_count += 1
-                    if not has_afternoon: missed_sessions_count += 1
+                    if not d_atts:
+                        full_day_absent += 1
+                    elif d_shift and d_shift.get('has_lunch_break'):
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        if not has_morning: missed_sessions_count += 1
+                        if not has_afternoon: missed_sessions_count += 1
                 elif cur_d == today:
-                    if not has_morning and current_float >= m_end: missed_sessions_count += 1
-                    if not has_afternoon and current_float >= a_end: missed_sessions_count += 1
+                    # For today: only evaluate if shift/session has already elapsed
+                    if not d_atts:
+                        if current_float >= a_end:
+                            full_day_absent += 1
+                        elif d_shift and d_shift.get('has_lunch_break') and current_float >= m_end:
+                            missed_sessions_count += 1
+                    elif d_shift and d_shift.get('has_lunch_break'):
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        if not has_morning and current_float >= m_end: missed_sessions_count += 1
+                        if not has_afternoon and current_float >= a_end: missed_sessions_count += 1
+
             cur_d += datetime.timedelta(days=1)
 
         absent_count = full_day_absent + round(missed_sessions_count * 0.5, 1)
@@ -748,9 +770,18 @@ class HrAttendanceDashboardService(models.Model):
             w_h = round(sum(a.worked_hours or 0.0 for a in b_atts), 2)
             l_h = round(sum(a.late_time_hour or 0.0 for a in b_atts), 2)
             b_days = (block['end_date'] - block['start_date']).days + 1
-            working_days = sum(1 for d in (block['start_date'] + datetime.timedelta(days=i) for i in range(b_days)) if d.weekday() != 6)
-            expected_hours = working_days * 8.0
-            a_h = max(0.0, round(expected_hours - w_h, 2))
+            
+            # Count only elapsed or past working days
+            past_working_days = sum(1 for d in (block['start_date'] + datetime.timedelta(days=i) for i in range(b_days)) if d.weekday() != 6 and d < today)
+            if block['start_date'] <= today <= block['end_date'] and today.weekday() != 6:
+                # Include today only if today's shift cutoff has passed
+                t_shift = employee._get_employee_shift_info(target_date=today) if hasattr(employee, '_get_employee_shift_info') else None
+                t_end = t_shift.get('end_time', 17.0) if t_shift else 17.0
+                if current_float >= t_end:
+                    past_working_days += 1
+
+            expected_past_hours = past_working_days * 8.0
+            a_h = max(0.0, round(expected_past_hours - w_h, 2)) if past_working_days > 0 else 0.0
             a_days = round(a_h / 8.0, 1)
             a_days_formatted = int(a_days) if (a_days % 1 == 0) else a_days
             max_bar_h = max(max_bar_h, w_h, l_h, a_h)
