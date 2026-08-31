@@ -18,9 +18,10 @@
         <field name="implied_ids" eval="[(4, ref('custom_hr_attendance.group_hr_attendance_manual_user'))]"/>
     </record>
 
-    <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances -->
+    <!-- Rename Officer: Manage all attendances -> Manager: Manage all attendances & Grant Export Access -->
     <record id="hr_attendance.group_hr_attendance_user" model="res.groups">
         <field name="name">Manager: Manage all attendances</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_allow_export'))]"/>
     </record>
 
     <!-- Job Position Manager (Manager + Job Position Exceptions & Job Shifts) -->
