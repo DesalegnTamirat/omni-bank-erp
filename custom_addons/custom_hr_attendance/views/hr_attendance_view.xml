@@ -17,48 +17,72 @@
                 </header>
             </sheet>
 
-            <!-- Attendance Reason -->
-            <sheet position="inside">
-                <group name="reason">
-                    <group>
-                        <field name="attendance_reason_ids" widget="many2many_tags"/>
-                        <field name="reason_type" readonly="1"/>
-                        <field name="in_mode" readonly="1"/>
-                        <field name="out_mode" readonly="1"/>
-                        <field name="overtime_approved_for_payroll" readonly="1"/>
-                    </group>
-                </group>
-            </sheet>
-
-
-            <!-- Check-in related fields -->
-            <xpath expr="//field[@name='check_in']" position="before">
+            <!-- Work date under employee -->
+            <xpath expr="//field[@name='employee_id']" position="after">
                 <field name="work_date" readonly="1" string="Shift / Work Date"/>
-                <field name="actual_check_in" readonly="1" string="Actual Punch Time"/>
             </xpath>
+
+            <!-- Check-in related enhancements -->
             <xpath expr="//field[@name='check_in']" position="after">
-                <field name="check_in_status" readonly="1"/>
-		        <field name="late_time_hour" readonly="1" widget="float_time"/>
-		        <field name="acknowledged_late" readonly="1" widget="float_time"/>
-                <field name="over_time_hour" readonly="1" widget="float_time"/>
+                <field name="check_in_status" widget="badge" 
+                       decoration-success="check_in_status in ('Normal', 'On-Time', 'On Time', 'Acknowledged Check-In')" 
+                       decoration-warning="check_in_status == 'Late'" 
+                       decoration-danger="check_in_status in ('Technical Failure', 'Window Closed (Missed)')" 
+                       readonly="1"/>
+                <field name="late_time_hour" widget="float_time" invisible="late_time_hour &lt;= 0" readonly="1"/>
+                <field name="in_mode" widget="badge" readonly="1"/>
             </xpath>
 
-            <!-- Lunch Break fields (shown between check_in and check_out group) -->
-            <xpath expr="//field[@name='check_out']" position="before">
-                <field name="lunch_out" readonly="1"/>
-                <field name="lunch_in" readonly="1"/>
-                <field name="lunch_break_hours" readonly="1" widget="float_time"/>
-            </xpath>
-
-            <!-- Check-out related fields -->
+            <!-- Check-out related enhancements -->
             <xpath expr="//field[@name='check_out']" position="after">
-                <field name="check_out_status" readonly="1"/>
-                <field name="is_force_checkout" readonly="1"/>
-		        <field name="early_exit_hour" readonly="1" widget="float_time"/>
-		        <field name="acknowledged_exit" readonly="1"/>
-                <field name="active" readonly="1"/>
+                <field name="check_out_status" widget="badge" 
+                       decoration-success="check_out_status in ('Normal', 'Acknowledged Check-Out')" 
+                       decoration-warning="check_out_status == 'Early Check-out'" 
+                       decoration-danger="check_out_status == 'Force Checkout'" 
+                       invisible="not check_out" 
+                       readonly="1"/>
+                <field name="early_exit_hour" widget="float_time" invisible="early_exit_hour &lt;= 0" readonly="1"/>
+                <field name="over_time_hour" widget="float_time" invisible="over_time_hour &lt;= 0" readonly="1"/>
+                <field name="out_mode" widget="badge" invisible="not check_out" readonly="1"/>
             </xpath>
 
+            <!-- Notebook tabs for Contextual Details -->
+            <sheet position="inside">
+                <notebook>
+                    <!-- Tab 1: Manager Justification & Acknowledgement (Visible only if acknowledged/reasons exist) -->
+                    <page string="Manager Acknowledgement" name="acknowledgement" invisible="not is_acknowledged and not attendance_reason_ids and acknowledged_late &lt;= 0 and acknowledged_exit &lt;= 0">
+                        <group>
+                            <group string="Justification &amp; Reasons">
+                                <field name="attendance_reason_ids" widget="many2many_tags" readonly="1"/>
+                                <field name="reason_type" readonly="1"/>
+                                <field name="is_acknowledged" readonly="1"/>
+                            </group>
+                            <group string="Approved Exception Credits">
+                                <field name="acknowledged_late" widget="float_time" invisible="acknowledged_late &lt;= 0" readonly="1"/>
+                                <field name="acknowledged_exit" widget="float_time" invisible="acknowledged_exit &lt;= 0" readonly="1"/>
+                                <field name="acknowledged_by" readonly="1"/>
+                                <field name="acknowledged_date" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+
+                    <!-- Tab 2: System & Audit Details -->
+                    <page string="System &amp; Audit Details" name="system_audit">
+                        <group>
+                            <group string="Device &amp; Session Info">
+                                <field name="actual_check_in" readonly="1"/>
+                                <field name="is_force_checkout" readonly="1"/>
+                                <field name="shift_start_float" widget="float_time" readonly="1"/>
+                                <field name="shift_end_float" widget="float_time" readonly="1"/>
+                            </group>
+                            <group string="Payroll &amp; Technical Flags">
+                                <field name="overtime_approved_for_payroll" readonly="1"/>
+                                <field name="active" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+                </notebook>
+            </sheet>
         </field>
     </record>
 
