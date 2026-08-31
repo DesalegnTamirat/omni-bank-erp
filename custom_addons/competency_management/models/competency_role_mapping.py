@@ -14,7 +14,7 @@ class CompetencyRoleMapping(models.Model):
     mapping_name = fields.Char(
         string='Role Mapping', compute='_compute_mapping_name', store=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position', required=True, tracking=True)
-    grade_id = fields.Many2one('employee.grade', string='Employee Grade', tracking=True)
+    grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
     line_ids = fields.One2many('competency.role.mapping.line', 'mapping_id', string='Competency Lines')
     cluster_ids = fields.Many2many('competency.cluster', string='Competency Clusters')
     version = fields.Char(string='Version', default='v1.0', required=True, tracking=True)
@@ -35,6 +35,15 @@ class CompetencyRoleMapping(models.Model):
         ('job_version_uniq', 'unique(job_position_id, version)',
          'A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead.'),
     ]
+
+    @api.depends('job_position_id')
+    def _compute_grade_id(self):
+        for rec in self:
+            if rec.job_position_id:
+                job = rec.job_position_id
+                rec.grade_id = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+            else:
+                rec.grade_id = False
 
     @api.depends('job_position_id', 'grade_id')
     def _compute_mapping_name(self):
@@ -149,6 +158,27 @@ class CompetencyRoleMapping(models.Model):
                 'approval_date': fields.Datetime.now(),
             })
             rec.message_post(body=_('Role-competency mapping %s (Version %s) approved.') % (rec.mapping_name, rec.version))
+            rec._notify_assigned_employees()
+
+    def _notify_assigned_employees(self):
+        """Notify all employees assigned to this job position about updated competency expectations."""
+        for rec in self:
+            if not rec.job_position_id:
+                continue
+            employees = self.env['hr.employee'].search([('job_id', '=', rec.job_position_id.id)])
+            users = employees.mapped('user_id')
+            for u in users:
+                if not u.partner_id:
+                    continue
+                msg = _(
+                    "Competency expectations for your job position '%s' have been updated (Version %s). "
+                    "Please review your role mapping to prepare and improve before upcoming assessments."
+                ) % (rec.job_position_id.name, rec.version)
+                rec.message_post(
+                    body=msg,
+                    partner_ids=[u.partner_id.id],
+                    subtype_xmlid='mail.mt_comment'
+                )
 
     def action_archive(self):
         self.with_context(force_write=True).write({'state': 'archived'})
@@ -231,8 +261,14 @@ class CompetencyRoleMappingLine(models.Model):
         'competency.role.mapping', string='Role Mapping', required=True, ondelete='cascade')
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade',
-        domain="[('approved_framework_ids', '!=', False)]")
-    
+        domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
+
+    @api.constrains('competency_id')
+    def _check_competency_status(self):
+        for line in self:
+            if line.competency_id and line.competency_id.state == 'retired':
+                raise ValidationError(_("The competency '%s' is retired and cannot be mapped.") % line.competency_id.name)
+
     override_default = fields.Boolean(
         string='Override Default', default=False,
         help='Enable to customize the required proficiency level away from the Matrix Configuration default.')
@@ -265,7 +301,7 @@ class CompetencyRoleMappingLine(models.Model):
 
     @api.depends('competency_id', 'mapping_id.job_position_id', 'mapping_id.grade_id')
     def _compute_matrix_proficiency(self):
-        """Rules 2 & 3: Compute default proficiency level from Matrix Configuration."""
+        """Multi-tiered Matrix Level Calculation: 1. Job Position Matrix -> 2. Job Grade Matrix -> 3. Standard Baseline."""
         for line in self:
             if not line.competency_id:
                 line.is_matrix_configured = False
@@ -274,20 +310,11 @@ class CompetencyRoleMappingLine(models.Model):
             
             grade = line.mapping_id.grade_id if line.mapping_id else False
             job = line.mapping_id.job_position_id if line.mapping_id else False
-            
             config = self.env['competency.matrix.config'].get_active_config()
             matrix_lvl = False
             
-            if config.proficiency_determinant == 'job_grade' and grade:
-                g_line = self.env['competency.grade.matrix'].search([
-                    ('config_id', '=', config.id),
-                    ('grade_id', '=', grade.id)
-                ], limit=1)
-                if g_line:
-                    matrix_lvl = g_line.required_core_level if line.competency_id.pillar == 'core' else (
-                        g_line.required_leadership_level if line.competency_id.pillar == 'leadership' and g_line.required_leadership_level != '0' else g_line.required_technical_level
-                    )
-            elif config.proficiency_determinant == 'job_position' and job:
+            # 1. First priority: Check Job Position Matrix
+            if job:
                 j_line = self.env['competency.job.matrix'].search([
                     ('config_id', '=', config.id),
                     ('job_id', '=', job.id)
@@ -296,8 +323,23 @@ class CompetencyRoleMappingLine(models.Model):
                     matrix_lvl = j_line.required_core_level if line.competency_id.pillar == 'core' else (
                         j_line.required_leadership_level if line.competency_id.pillar == 'leadership' and j_line.required_leadership_level != '0' else j_line.required_technical_level
                     )
-                    
-            if matrix_lvl and matrix_lvl in ('1', '2', '3', '4'):
+            
+            # 2. Second priority: If not set in Job Position Matrix, check Job Grade Matrix
+            if (not matrix_lvl or matrix_lvl not in ('1', '2', '3', '4')) and grade:
+                g_line = self.env['competency.grade.matrix'].search([
+                    ('config_id', '=', config.id),
+                    ('grade_id', '=', grade.id)
+                ], limit=1)
+                if g_line:
+                    matrix_lvl = g_line.required_core_level if line.competency_id.pillar == 'core' else (
+                        g_line.required_leadership_level if line.competency_id.pillar == 'leadership' and g_line.required_leadership_level != '0' else g_line.required_technical_level
+                    )
+            
+            # 3. Third priority: Baseline Fallback if not configured in either matrix
+            if not matrix_lvl or matrix_lvl not in ('1', '2', '3', '4'):
+                matrix_lvl = '3' if line.competency_id.pillar == 'technical' else '2'
+
+            if matrix_lvl in ('1', '2', '3', '4'):
                 line.is_matrix_configured = True
                 line.default_proficiency = matrix_lvl
                 if not line.override_default:
@@ -326,12 +368,6 @@ class CompetencyRoleMappingLine(models.Model):
                     'override_default': False,
                     'required_proficiency': line.default_proficiency,
                 })
-
-    @api.constrains('competency_id')
-    def _check_competency_on_approved_framework(self):
-        for line in self:
-            if line.competency_id and not line.competency_id.approved_framework_ids:
-                raise ValidationError(_("The competency '%s' does not belong to any Approved Competency Framework. Only competencies on an approved framework can be mapped to job roles.") % line.competency_id.name)
 
     @api.model_create_multi
     def create(self, vals_list):

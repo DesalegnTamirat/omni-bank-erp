@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Snapshot List View -->
+        <record id="view_competency_dashboard_snapshot_list" model="ir.ui.view">
+            <field name="name">competency.dashboard.snapshot.list</field>
+            <field name="model">competency.dashboard.snapshot</field>
+            <field name="arch" type="xml">
+                <list string="Cycle Trend Snapshots" create="false" edit="false">
+                    <field name="snapshot_date"/>
+                    <field name="cycle_id"/>
+                    <field name="department_id"/>
+                    <field name="pillar" widget="badge"/>
+                    <field name="total_assessed"/>
+                    <field name="avg_gap"/>
+                    <field name="below_count"/>
+                    <field name="meets_count"/>
+                    <field name="exceeds_count"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Snapshot Pivot View -->
+        <record id="view_competency_dashboard_snapshot_pivot" model="ir.ui.view">
+            <field name="name">competency.dashboard.snapshot.pivot</field>
+            <field name="model">competency.dashboard.snapshot</field>
+            <field name="arch" type="xml">
+                <pivot string="Cycle Trend Analytics Pivot">
+                    <field name="cycle_id" type="row"/>
+                    <field name="department_id" type="row"/>
+                    <field name="pillar" type="col"/>
+                    <field name="avg_gap" type="measure"/>
+                    <field name="below_count" type="measure"/>
+                    <field name="meets_count" type="measure"/>
+                    <field name="exceeds_count" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Snapshot Graph View -->
+        <record id="view_competency_dashboard_snapshot_graph" model="ir.ui.view">
+            <field name="name">competency.dashboard.snapshot.graph</field>
+            <field name="model">competency.dashboard.snapshot</field>
+            <field name="arch" type="xml">
+                <graph string="Multi-Cycle Gap Trend" type="line">
+                    <field name="cycle_id"/>
+                    <field name="avg_gap" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- Snapshot Search View -->
+        <record id="view_competency_dashboard_snapshot_search" model="ir.ui.view">
+            <field name="name">competency.dashboard.snapshot.search</field>
+            <field name="model">competency.dashboard.snapshot</field>
+            <field name="arch" type="xml">
+                <search string="Search Cycle Trend Snapshots">
+                    <field name="cycle_id"/>
+                    <field name="department_id"/>
+                    <field name="pillar"/>
+                    <filter string="Bank-Wide Snapshots" name="filter_bankwide" domain="[('department_id', '=', False)]"/>
+                    <separator/>
+                    <filter string="Core Pillar" name="filter_core" domain="[('pillar', '=', 'core')]"/>
+                    <filter string="Leadership Pillar" name="filter_leadership" domain="[('pillar', '=', 'leadership')]"/>
+                    <filter string="Technical Pillar" name="filter_technical" domain="[('pillar', '=', 'technical')]"/>
+                    <group>
+                        <filter string="Assessment Cycle" name="group_by_cycle" context="{'group_by': 'cycle_id'}"/>
+                        <filter string="Department" name="group_by_dept" context="{'group_by': 'department_id'}"/>
+                        <filter string="Pillar" name="group_by_pillar" context="{'group_by': 'pillar'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- Action for Cycle Trend Snapshots -->
+        <record id="action_competency_dashboard_snapshot" model="ir.actions.act_window">
+            <field name="name">Multi-Cycle Trend Snapshots</field>
+            <field name="res_model">competency.dashboard.snapshot</field>
+            <field name="view_mode">graph,pivot,list</field>
+            <field name="search_view_id" ref="view_competency_dashboard_snapshot_search"/>
+        </record>
+
+    </data>
+</odoo>

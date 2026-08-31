@@ -31,6 +31,7 @@
                     <field name="name"/>
                     <field name="pillar" widget="badge"/>
                     <field name="functional_domain"/>
+                    <field name="state" widget="badge"/>
                     <field name="status" widget="badge"/>
                     <field name="active"/>
                 </list>
@@ -43,19 +44,26 @@
             <field name="model">competency.competency</field>
             <field name="arch" type="xml">
                 <form>
+                    <header>
+                        <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve Competency" type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'"/>
+                        <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,retired"/>
+                    </header>
                     <sheet>
-                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="status != 'retired'"/>
+                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="state != 'retired'"/>
                         <group>
                             <group string="Identity">
-                                <field name="name" readonly="status == 'retired'"/>
-                                <field name="code" readonly="status == 'retired'"/>
-                                <field name="pillar" readonly="status == 'retired'"/>
-                                <field name="functional_domain" readonly="status == 'retired'"/>
-                                <field name="rating_model_id" readonly="status == 'retired'"/>
+                                <field name="name" readonly="state in ('approved', 'retired')"/>
+                                <field name="code" readonly="state in ('approved', 'retired')"/>
+                                <field name="pillar" readonly="state in ('approved', 'retired')"/>
+                                <field name="functional_domain" readonly="state in ('approved', 'retired')"/>
+                                <field name="rating_model_id" readonly="state in ('approved', 'retired')"/>
                             </group>
-                            <group string="Status">
-                                <field name="status"/>
-                                <field name="active"/>
+                            <group string="Status &amp; Approval">
+                                <field name="status" widget="badge" readonly="1"/>
+                                <field name="active" readonly="1"/>
                             </group>
                         </group>
                         <group string="Definition">

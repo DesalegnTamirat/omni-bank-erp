@@ -10,7 +10,6 @@ class TestStateBasedLocking(TransactionCase):
         super().setUp()
         self.Job = self.env['hr.job']
         self.Competency = self.env['competency.competency']
-        self.Framework = self.env['competency.framework']
         self.Mapping = self.env['competency.role.mapping']
         self.Cycle = self.env['competency.assessment.cycle']
         self.Assessment = self.env['competency.assessment']
@@ -44,25 +43,7 @@ class TestStateBasedLocking(TransactionCase):
                 'behavioral_indicators': 'Test Indicators',
             })
 
-    def test_02_approved_framework_locking_and_versioning(self):
-        """2. Lock approved framework fields and lines; allow versioning."""
-        fw = self.Framework.create({
-            'name': 'Locking Framework Test',
-            'code': 'LFT_001',
-            'version': 'v1.0',
-            'line_ids': [(0, 0, {'competency_id': self.competency.id})]
-        })
-        fw.action_submit_for_approval()
-        fw.action_approve()
-        
-        with self.assertRaises(ValidationError):
-            fw.with_user(self.user_test).write({'name': 'Edited Framework Name'})
-            
-        # Action create new version succeeds
-        res = fw.action_create_new_version()
-        new_fw = self.Framework.browse(res['res_id'])
-        self.assertEqual(new_fw.state, 'draft')
-        self.assertEqual(new_fw.version, 'v1.1')
+
 
     def test_03_approved_role_mapping_locking_and_versioning(self):
         """3. Lock approved role mapping fields and lines; allow versioning."""

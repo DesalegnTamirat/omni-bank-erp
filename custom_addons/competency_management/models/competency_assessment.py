@@ -11,6 +11,7 @@ class CompetencyAssessmentCycle(models.Model):
     _order = 'id desc'
 
     name = fields.Char(string='Cycle Name', required=True)
+    code = fields.Char(string='Cycle Code', index=True)
     period_start = fields.Date(string='Period Start', required=True, default=fields.Date.context_today)
     period_end = fields.Date(string='Period End')
     assessment_deadline = fields.Date(string='Assessment Deadline')
@@ -41,14 +42,18 @@ class CompetencyAssessmentCycle(models.Model):
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s opened. Deadline: %s.') % (rec.name, rec.assessment_deadline or 'Not set'))
             # Schedule activity notifications for supervisors and employees in scope
-            assessments = rec.assessment_ids
             for asm in assessments:
-                if asm.employee_id and asm.employee_id.user_id:
+                target_name = asm.employee_id.name if asm.employee_id else _('yourself')
+                atype = dict(asm._fields['assessment_type'].selection).get(asm.assessment_type, asm.assessment_type)
+                # Notify Assessor (Self, Supervisor, Peer, Team)
+                if asm.assessor_id:
                     asm.activity_schedule(
                         'mail.mail_activity_data_todo',
-                        summary=_('New Assessment Cycle Started: %s') % rec.name,
-                        note=_('Assessment cycle %s is now open. Deadline is %s.') % (rec.name, rec.assessment_deadline or 'N/A'),
-                        user_id=asm.employee_id.user_id.id,
+                        summary=_('Competency Assessment Required: %s (%s)') % (target_name, atype),
+                        note=_('Assessment cycle %s is now open! Please log in to complete your evaluation for %s (%s). Deadline: %s.') % (
+                            rec.name, target_name, atype, rec.assessment_deadline or 'N/A'
+                        ),
+                        user_id=asm.assessor_id.id,
                         date_deadline=rec.assessment_deadline or fields.Date.context_today(self),
                     )
 
@@ -85,6 +90,8 @@ class CompetencyAssessment(models.Model):
     employee_id = fields.Many2one(
         'hr.employee', string='Employee', required=True, tracking=True,
         domain=lambda self: self._get_allowed_employee_domain())
+    department_id = fields.Many2one(related='employee_id.department_id', string='Department', store=True, readonly=True)
+    job_id = fields.Many2one(related='employee_id.job_id', string='Job Position', store=True, readonly=True)
 
     @api.model
     def _get_assessment_type_selection(self):
@@ -142,7 +149,7 @@ class CompetencyAssessment(models.Model):
 
     @api.onchange('assessment_type')
     def _onchange_assessment_type_set_employee_domain(self):
-        """Rule 2: Restrict employee selection domain based on chosen assessment type."""
+        """Rule 2: Restrict employee selection domain strictly based on chosen assessment type and auto-assign valid default."""
         user = self.env.user
         emp = user.employee_id
         
@@ -150,29 +157,60 @@ class CompetencyAssessment(models.Model):
             if emp:
                 self.employee_id = emp.id
             return {'domain': {'employee_id': [('id', '=', emp.id if emp else False)]}}
-        
-        self.employee_id = False
-        
-        if not self.assessment_type:
-            return {'domain': {'employee_id': [('id', '=', False)]}}
-            
-        if self.env.su or user.has_group('competency_management.group_competency_admin'):
-            return {'domain': {'employee_id': []}}
 
         if not emp:
+            self.employee_id = False
             return {'domain': {'employee_id': [('id', '=', False)]}}
 
         if self.assessment_type == 'peer':
-            domain = [('parent_id', '=', emp.parent_id.id), ('id', '!=', emp.id)] if emp.parent_id else [('id', '=', False)]
-            return {'domain': {'employee_id': domain}}
+            # Peer selection: same manager or same department (excluding self)
+            peers = self.env['hr.employee']
+            if emp.parent_id:
+                peers |= self.env['hr.employee'].search([('parent_id', '=', emp.parent_id.id), ('id', '!=', emp.id)])
+            if emp.department_id:
+                peers |= self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
+            if not peers:
+                peers = self.env['hr.employee'].search([('id', '!=', emp.id)], limit=50)
+            
+            self.employee_id = peers[0].id if peers else False
+            return {'domain': {'employee_id': [('id', 'in', peers.ids)]}}
             
         elif self.assessment_type == 'supervisor':
-            domain = [('id', '=', emp.parent_id.id)] if emp.parent_id else [('id', '=', False)]
-            return {'domain': {'employee_id': domain}}
+            # Supervisor selection: parent_id, coach_id, or department manager
+            supervisors = self.env['hr.employee']
+            if emp.parent_id:
+                supervisors |= emp.parent_id
+            if getattr(emp, 'coach_id', False) and emp.coach_id:
+                supervisors |= emp.coach_id
+            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.id != emp.id:
+                supervisors |= emp.department_id.manager_id
+
+            if not supervisors and emp.department_id:
+                # Fallback to parent department manager
+                dept = emp.department_id.parent_id
+                while dept and not supervisors:
+                    if dept.manager_id and dept.manager_id.id != emp.id:
+                        supervisors |= dept.manager_id
+                    dept = dept.parent_id
+
+            if not supervisors:
+                # Fallback to employees with manager/director in job title
+                supervisors = self.env['hr.employee'].search([
+                    ('id', '!=', emp.id),
+                    '|', ('job_id.name', 'ilike', 'manager'), ('job_id.name', 'ilike', 'director')
+                ], limit=30)
+
+            self.employee_id = supervisors[0].id if supervisors else False
+            return {'domain': {'employee_id': [('id', 'in', supervisors.ids)]}}
             
         elif self.assessment_type == 'team':
-            domain = [('id', 'child_of', emp.id), ('id', '!=', emp.id)]
-            return {'domain': {'employee_id': domain}}
+            # Team selection: direct reports or subordinates
+            subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)])
+            if not subordinates and emp.department_id and emp.department_id.manager_id.id == emp.id:
+                subordinates = self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
+            
+            self.employee_id = subordinates[0].id if subordinates else False
+            return {'domain': {'employee_id': [('id', 'in', subordinates.ids)]}}
 
         return {'domain': {'employee_id': []}}
     state = fields.Selection([
@@ -184,6 +222,9 @@ class CompetencyAssessment(models.Model):
         ('locked', 'Locked'),
     ], string='Status', default='draft', tracking=True)
     line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Competency Ratings')
+    core_line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Core Competencies', domain=[('pillar', '=', 'core')])
+    leadership_line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Leadership Competencies', domain=[('pillar', '=', 'leadership')])
+    technical_line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Technical Competencies', domain=[('pillar', '=', 'technical')])
     average_gap = fields.Float(string='Average Gap', compute='_compute_average_gap', store=True)
     is_locked = fields.Boolean(string='Locked', compute='_compute_is_locked')
     notes = fields.Text(string='Notes')
@@ -272,83 +313,7 @@ class CompetencyAssessment(models.Model):
             if not record.name:
                 record.name = self.env['ir.sequence'].sudo().next_by_code('competency.assessment') or \
                     'CMP-A-%s' % record.id
-            if record.employee_id and not record.line_ids:
-                record._auto_fill_lines_from_mapping_or_matrix()
         return records
-
-    def _auto_fill_lines_from_mapping_or_matrix(self):
-        """Rule 4: Auto-populate rating lines from employee's assigned role mapping or matrix."""
-        for rec in self:
-            if not rec.employee_id or rec.line_ids:
-                continue
-            job_pos = rec.employee_id.job_position or rec.employee_id.job_id
-            mapping = False
-            if job_pos:
-                mapping = self.env['competency.role.mapping'].search([
-                    ('job_position_id', '=', job_pos.id),
-                    ('state', '=', 'approved'),
-                ], limit=1)
-
-            lines = []
-            if mapping and mapping.line_ids:
-                for mline in mapping.line_ids:
-                    lines.append((0, 0, {
-                        'competency_id': mline.competency_id.id,
-                        'current_level': '1',
-                        'required_level': mline.required_proficiency,
-                    }))
-            else:
-                framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
-                if framework:
-                    grade_rec = getattr(rec.employee_id, 'grade_id', False) or getattr(rec.employee_id, 'job_grade', False)
-                    j_name = job_pos.name if job_pos else ''
-                    for fw_line in framework.line_ids:
-                        comp = fw_line.competency_id
-                        req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
-                        lines.append((0, 0, {
-                            'competency_id': comp.id,
-                            'current_level': '1',
-                            'required_level': req_lvl,
-                        }))
-            if lines:
-                rec.write({'line_ids': lines})
-
-    @api.onchange('employee_id')
-    def _onchange_employee_id_populate_competencies(self):
-        """Rule 4: When selecting an employee on assessment, auto-populate assigned competencies."""
-        if not self.employee_id:
-            return
-        job_pos = self.employee_id.job_position or self.employee_id.job_id
-        mapping = False
-        if job_pos:
-            mapping = self.env['competency.role.mapping'].search([
-                ('job_position_id', '=', job_pos.id),
-                ('state', '=', 'approved'),
-            ], limit=1)
-
-        new_lines = self.env['competency.assessment.line']
-        if mapping and mapping.line_ids:
-            for mline in mapping.line_ids:
-                new_lines += self.env['competency.assessment.line'].new({
-                    'competency_id': mline.competency_id.id,
-                    'current_level': '1',
-                    'required_level': mline.required_proficiency,
-                })
-        else:
-            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
-            if framework:
-                grade_rec = getattr(self.employee_id, 'grade_id', False) or getattr(self.employee_id, 'job_grade', False)
-                j_name = job_pos.name if job_pos else ''
-                for fw_line in framework.line_ids:
-                    comp = fw_line.competency_id
-                    req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
-                    new_lines += self.env['competency.assessment.line'].new({
-                        'competency_id': comp.id,
-                        'current_level': '1',
-                        'required_level': req_lvl,
-                    })
-
-        self.line_ids = new_lines
 
     @api.model
     def _get_matrix_required_level(self, pillar, grade=False, job=False, job_name=''):
@@ -422,7 +387,7 @@ class CompetencyAssessment(models.Model):
         else: return '2'
 
     def action_populate_competencies(self):
-        """Rule 4: Performance-optimized manual button to populate competency rating lines."""
+        """Populate competency rating lines explicitly upon user clicking 'Populate Competencies'."""
         self.ensure_one()
         if self.state != 'draft':
             raise UserError(_("Competencies can only be populated when the assessment is in Draft state."))
@@ -434,102 +399,109 @@ class CompetencyAssessment(models.Model):
         mapping = False
         if job_pos:
             mapping = self.env['competency.role.mapping'].search([
-                ('job_position_id', '=', job_pos.id),
-                ('state', '=', 'approved'),
-            ], limit=1)
+                ('job_position_id', '=', job_pos.id)
+            ], order='state desc, id desc', limit=1)
 
-        lines = []
+        line_vals = []
         if mapping and mapping.line_ids:
             for mline in mapping.line_ids:
-                lines.append((0, 0, {
-                    'competency_id': mline.competency_id.id,
-                    'current_level': '1',
-                    'required_level': mline.required_proficiency,
-                }))
+                if mline.competency_id:
+                    line_vals.append({
+                        'assessment_id': self.id,
+                        'competency_id': mline.competency_id.id,
+                        'current_level': False,
+                        'required_level': mline.required_proficiency or '2',
+                    })
             mapping_name_str = mapping.mapping_name
         else:
-            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
-            if not framework:
-                raise UserError(_('No approved Competency Framework or Role Mapping found for job %s.') % (job_pos.name if job_pos else employee.name))
-            
+            # Fallback: Populate Core + Leadership (if managerial) + Relevant Technical Domain Competencies
             grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
             j_name = job_pos.name if job_pos else ''
-            
-            for fw_line in framework.line_ids:
-                comp = fw_line.competency_id
-                req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
-                lines.append((0, 0, {
+            j_lower = j_name.lower()
+            is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp'])
+
+            # 1. Core Competencies
+            core_comps = self.env['competency.competency'].search([('pillar', '=', 'core'), ('status', '=', 'active')])
+            for comp in core_comps:
+                req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name)
+                line_vals.append({
+                    'assessment_id': self.id,
                     'competency_id': comp.id,
-                    'current_level': '1',
-                    'required_level': req_lvl,
-                }))
+                    'current_level': False,
+                    'required_level': req_lvl or '2',
+                })
+
+            # 2. Leadership Competencies (if managerial or supervisor)
+            if is_managerial:
+                lead_comps = self.env['competency.competency'].search([('pillar', '=', 'leadership'), ('status', '=', 'active')])
+                for comp in lead_comps:
+                    req_lvl = self._get_matrix_required_level('leadership', grade=grade_rec, job=job_pos, job_name=j_name)
+                    line_vals.append({
+                        'assessment_id': self.id,
+                        'competency_id': comp.id,
+                        'current_level': False,
+                        'required_level': req_lvl or '2',
+                    })
+
+            # 3. Relevant Domain Technical Competencies
+            tech_comps = self.env['competency.competency']
+            if job_pos and getattr(job_pos, 'department_id', False):
+                dept_name = job_pos.department_id.name
+                tech_comps = self.env['competency.competency'].search([
+                    ('pillar', '=', 'technical'),
+                    ('status', '=', 'active'),
+                    ('functional_domain', '=ilike', dept_name)
+                ])
+            if not tech_comps:
+                tech_comps = self.env['competency.competency'].search([
+                    ('pillar', '=', 'technical'),
+                    ('status', '=', 'active')
+                ], limit=15)
+
+            for comp in tech_comps:
+                req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name)
+                line_vals.append({
+                    'assessment_id': self.id,
+                    'competency_id': comp.id,
+                    'current_level': False,
+                    'required_level': req_lvl or '2',
+                })
+
             mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
 
-        self.line_ids.unlink()
-        self.write({'line_ids': lines})
-        self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, len(lines)))
+        self.line_ids.sudo().unlink()
+        if line_vals:
+            created_lines = self.env['competency.assessment.line'].sudo().create(line_vals)
+            cnt = len(created_lines)
+        else:
+            cnt = 0
+
+        self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, cnt))
         return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Competencies Populated'),
-                'message': _('%d competency lines were populated successfully.') % len(lines),
-                'type': 'success',
-                'sticky': False,
-            },
+            'type': 'ir.actions.act_window',
+            'name': _('Competency Assessment'),
+            'res_model': 'competency.assessment',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'target': 'main',
         }
 
     def action_auto_fill_lines(self):
         return self.action_populate_competencies()
-            
-        job_pos = employee.job_position or employee.job_id
-        mapping = False
-        if job_pos:
-            mapping = self.env['competency.role.mapping'].search([
-                ('job_position_id', '=', job_pos.id),
-                ('state', '=', 'approved'),
-            ], limit=1)
 
-        lines = []
-        if mapping and mapping.line_ids:
-            for mline in mapping.line_ids:
-                lines.append((0, 0, {
-                    'competency_id': mline.competency_id.id,
-                    'current_level': '1',
-                    'required_level': mline.required_proficiency,
-                }))
-            mapping_name_str = mapping.mapping_name
-        else:
-            # Fallback: Auto-fill framework competencies using matrix guidelines based on Job Position and Grade
-            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
-            if not framework:
-                raise UserError(_('No approved Competency Framework or Role Mapping found for job %s.') % (job_pos.name if job_pos else employee.name))
-            
-            grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
-            j_name = job_pos.name if job_pos else ''
-            
-            for fw_line in framework.line_ids:
-                comp = fw_line.competency_id
-                req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job_name=j_name)
-                lines.append((0, 0, {
-                    'competency_id': comp.id,
-                    'current_level': '1',
-                    'required_level': req_lvl,
-                }))
-            mapping_name_str = _("Competency Matrix Guidelines (%s / Grade %s)") % (j_name or 'Default', grade_rec.grade_name if grade_rec else 'Unassigned')
-
-        self.write({'line_ids': lines})
-        self.message_post(body=_('Rating lines auto-filled from %s.') % mapping_name_str)
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Lines Added'),
-                'message': _('%s competency lines were added.') % len(lines),
-                'type': 'success',
-                'sticky': False,
-            },
-        }
+    def action_submit(self):
+        """Draft -> Submitted with unrated checks and employee activity notification."""
+        for rec in self:
+            if not rec.line_ids:
+                raise UserError(_('Add at least one competency rating line before submitting.'))
+            unrated = rec.line_ids.filtered(lambda l: not l.current_level)
+            if unrated:
+                unrated_names = ", ".join(unrated.mapped('competency_id.name')[:5])
+                raise UserError(_('Please rate your current proficiency level for all competencies before submitting. %d competency(ies) remaining unrated: %s%s') % (
+                    len(unrated), unrated_names, "..." if len(unrated) > 5 else ""
+                ))
+            rec.with_context(force_write=True).write({'state': 'submitted'})
+            rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
@@ -590,23 +562,7 @@ class CompetencyAssessment(models.Model):
             rec.with_context(force_write=True).write({'state': 'approved'})
             rec.message_post(body=_('Assessment %s approved.') % rec.name)
             
-            # Auto-generate mandatory IDP for negative gaps
             gap_lines = rec.line_ids.filtered(lambda l: int(l.current_level or 1) < int(l.required_level or 1))
-            if gap_lines:
-                existing_idp = self.env['competency.idp'].search([
-                    ('employee_id', '=', rec.employee_id.id),
-                    ('assessment_id', '=', rec.id),
-                    ('state', 'in', ['draft', 'submitted', 'approved', 'active'])
-                ], limit=1)
-                if not existing_idp:
-                    self.env['competency.idp'].create({
-                        'employee_id': rec.employee_id.id,
-                        'assessment_id': rec.id,
-                        'mandatory': True,
-                        'state': 'draft',
-                        'notes': _('Mandatory IDP auto-generated for %d competency gap(s) identified in Assessment %s.') % (len(gap_lines), rec.name)
-                    })
-                    
             # Auto-feed TNA entry into EDS cycle if EDS is available
             if 'eds.tna.entry' in self.env:
                 cycle = self.env['eds.tna.cycle'].search([('state', 'in', ['draft', 'collecting'])], limit=1)
@@ -653,14 +609,40 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _cron_pending_assessment_reminders(self):
-        """Daily cron: pending assessment reminders & overdue notifications (FR-COM-046, FR-COM-048)."""
+        """Daily cron: pending assessment reminders, upcoming deadline alerts & overdue escalations (FR-COM-046, FR-COM-048)."""
         today = fields.Date.context_today(self)
-        pending_assessments = self.search([
+        
+        # 1. Upcoming Deadline Alerts (7 days, 3 days, 1 day before deadline)
+        upcoming_assessments = self.search([
+            ('state', 'in', ['draft', 'submitted', 'supervisor_review']),
+            ('cycle_id.assessment_deadline', '!=', False),
+            ('cycle_id.assessment_deadline', '>', today)
+        ])
+        for asm in upcoming_assessments:
+            days_left = (asm.cycle_id.assessment_deadline - today).days
+            if days_left in (7, 3, 1):
+                target_user = False
+                if asm.state in ('draft', 'submitted') and asm.employee_id.user_id:
+                    target_user = asm.employee_id.user_id
+                elif asm.state == 'supervisor_review' and asm.employee_id.parent_id and asm.employee_id.parent_id.user_id:
+                    target_user = asm.employee_id.parent_id.user_id
+                    
+                if target_user:
+                    asm.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name),
+                        note=_('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (asm.name, days_left, asm.cycle_id.assessment_deadline),
+                        user_id=target_user.id,
+                        date_deadline=asm.cycle_id.assessment_deadline,
+                    )
+
+        # 2. Overdue Assessments (Deadline reached or passed)
+        overdue_assessments = self.search([
             ('state', 'in', ['draft', 'submitted', 'supervisor_review']),
             ('cycle_id.assessment_deadline', '!=', False),
             ('cycle_id.assessment_deadline', '<=', today)
         ])
-        for asm in pending_assessments:
+        for asm in overdue_assessments:
             target_user = False
             if asm.state in ('draft', 'submitted') and asm.employee_id.user_id:
                 target_user = asm.employee_id.user_id
@@ -670,9 +652,10 @@ class CompetencyAssessment(models.Model):
             if target_user:
                 asm.activity_schedule(
                     'mail.mail_activity_data_todo',
-                    summary=_('REMINDER: Overdue Competency Assessment %s') % asm.name,
-                    note=_('Assessment %s is pending/overdue (Deadline: %s).') % (asm.name, asm.cycle_id.assessment_deadline),
+                    summary=_('OVERDUE: Competency Assessment %s') % asm.name,
+                    note=_('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (asm.name, asm.cycle_id.assessment_deadline),
                     user_id=target_user.id,
+                    date_deadline=today,
                 )
 
 
@@ -683,23 +666,107 @@ class CompetencyAssessmentLine(models.Model):
 
     assessment_id = fields.Many2one(
         'competency.assessment', string='Assessment', required=True, ondelete='cascade')
+    cycle_id = fields.Many2one(related='assessment_id.cycle_id', string='Assessment Cycle', store=True, readonly=True, index=True)
+    employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
+    department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
+    operating_unit_id = fields.Many2one(related='assessment_id.employee_id.operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
+    job_id = fields.Many2one(related='assessment_id.job_id', string='Job Position', store=True, readonly=True, index=True)
+    state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
+
+    tna_measure = fields.Selection([
+        ('below', 'Underqualified'),
+        ('meets', 'Fit'),
+        ('exceeds', 'Overqualified'),
+    ], string='Fitness Status', compute='_compute_tna_measure', store=True, index=True)
+
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade',
-        domain="[('approved_framework_ids', '!=', False)]")
+        domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
+    competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', readonly=True)
+    pillar = fields.Selection(related='competency_id.pillar', string='Pillar', readonly=True, store=True)
+    
+    indicator_level_1 = fields.Text(string='Level 1 (Basic) Indicator', compute='_compute_level_indicators')
+    indicator_level_2 = fields.Text(string='Level 2 (Intermediate) Indicator', compute='_compute_level_indicators')
+    indicator_level_3 = fields.Text(string='Level 3 (Advanced) Indicator', compute='_compute_level_indicators')
+    indicator_level_4 = fields.Text(string='Level 4 (Expert) Indicator', compute='_compute_level_indicators')
+    current_level_indicator = fields.Text(string='Level Indicator Preview', compute='_compute_current_level_indicator')
+    
+    behavioral_guide_html = fields.Html(string='Proficiency Behavioral Indicators Guide', compute='_compute_level_indicators')
+
+    @api.depends('current_level', 'indicator_level_1', 'indicator_level_2', 'indicator_level_3', 'indicator_level_4')
+    def _compute_current_level_indicator(self):
+        for rec in self:
+            lvl = str(rec.current_level or '1')
+            if lvl == '1':
+                rec.current_level_indicator = rec.indicator_level_1 or 'Level 1 Basic behavioral indicator.'
+            elif lvl == '2':
+                rec.current_level_indicator = rec.indicator_level_2 or 'Level 2 Intermediate behavioral indicator.'
+            elif lvl == '3':
+                rec.current_level_indicator = rec.indicator_level_3 or 'Level 3 Advanced behavioral indicator.'
+            elif lvl == '4':
+                rec.current_level_indicator = rec.indicator_level_4 or 'Level 4 Expert behavioral indicator.'
+            else:
+                rec.current_level_indicator = False
+
+    @api.depends('competency_id')
+    def _compute_level_indicators(self):
+        matrix_config = self.env['competency.matrix.config'].get_active_config()
+        for rec in self:
+            if rec.competency_id:
+                levels = self.env['competency.proficiency.level'].search([
+                    ('competency_id', '=', rec.competency_id.id)
+                ])
+                l_map = {l.level: l.behavioral_indicators for l in levels if l.behavioral_indicators}
+                
+                l1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1') if rec.competency_id.pillar == 'technical' else 'Level 1 (Basic) behavioral indicators.')
+                l2 = l_map.get('2') or (getattr(matrix_config, 'tech_indicator_level_2') if rec.competency_id.pillar == 'technical' else 'Level 2 (Intermediate) behavioral indicators.')
+                l3 = l_map.get('3') or (getattr(matrix_config, 'tech_indicator_level_3') if rec.competency_id.pillar == 'technical' else 'Level 3 (Advanced) behavioral indicators.')
+                l4 = l_map.get('4') or (getattr(matrix_config, 'tech_indicator_level_4') if rec.competency_id.pillar == 'technical' else 'Level 4 (Expert) behavioral indicators.')
+                
+                rec.indicator_level_1 = l1
+                rec.indicator_level_2 = l2
+                rec.indicator_level_3 = l3
+                rec.indicator_level_4 = l4
+                
+                rec.behavioral_guide_html = f"""
+                <div style="font-family: inherit; font-size: 13px; color: #1d2b32;">
+                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #726732; border-radius: 4px;">
+                        <strong style="color: #726732;">Level 1 (Basic):</strong> {l1}
+                    </div>
+                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #1d2b32; border-radius: 4px;">
+                        <strong style="color: #1d2b32;">Level 2 (Intermediate):</strong> {l2}
+                    </div>
+                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #c17540; border-radius: 4px;">
+                        <strong style="color: #c17540;">Level 3 (Advanced):</strong> {l3}
+                    </div>
+                    <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #541718; border-radius: 4px;">
+                        <strong style="color: #541718;">Level 4 (Expert):</strong> {l4}
+                    </div>
+                </div>
+                """
+            else:
+                rec.indicator_level_1 = False
+                rec.indicator_level_2 = False
+                rec.indicator_level_3 = False
+                rec.indicator_level_4 = False
+                rec.behavioral_guide_html = False
+
     current_level = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),
         ('3', 'Level 3 - Advanced'),
         ('4', 'Level 4 - Expert'),
-    ], string='Current Proficiency', required=True, default='1')
+    ], string='Current Proficiency', required=False, default=False)
     required_level = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),
         ('3', 'Level 3 - Advanced'),
         ('4', 'Level 4 - Expert'),
     ], string='Required Proficiency', required=True, default='2')
-    gap = fields.Integer(string='Gap', compute='_compute_gap', store=True,
+    gap = fields.Integer(string='Gap', compute='_compute_gap', store=True, group_operator='avg',
                          help='Required minus Current proficiency (positive = development gap).')
+    current_level_num = fields.Integer(string='Current Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
+    required_level_num = fields.Integer(string='Required Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
     achievement_status = fields.Selection([
         ('exceeds', 'Exceeds Required Level'),
         ('meets', 'Meets Required Level'),
@@ -714,19 +781,46 @@ class CompetencyAssessmentLine(models.Model):
     evidence_attachment_ids = fields.Many2many('ir.attachment', string='Supporting Evidence')
 
     @api.constrains('competency_id')
-    def _check_competency_on_approved_framework(self):
+    def _check_competency_status(self):
         for line in self:
-            if line.competency_id and not line.competency_id.approved_framework_ids:
-                raise ValidationError(_("The competency '%s' does not belong to any Approved Competency Framework. Only framework-approved competencies can be assessed.") % line.competency_id.name)
+            if line.competency_id and line.competency_id.state == 'retired':
+                raise ValidationError(_("The competency '%s' is retired and cannot be assessed.") % line.competency_id.name)
+
+    @api.depends('current_level', 'required_level')
+    def _compute_level_nums(self):
+        for rec in self:
+            rec.current_level_num = int(rec.current_level) if rec.current_level and str(rec.current_level).isdigit() else 0
+            rec.required_level_num = int(rec.required_level) if rec.required_level and str(rec.required_level).isdigit() else 0
 
     @api.depends('current_level', 'required_level')
     def _compute_gap(self):
         for rec in self:
-            rec.gap = int(rec.required_level or 0) - int(rec.current_level or 0)
+            if rec.current_level and rec.required_level:
+                rec.gap = int(rec.required_level) - int(rec.current_level)
+            else:
+                rec.gap = 0
+
+    @api.depends('gap', 'current_level', 'required_level')
+    def _compute_tna_measure(self):
+        for rec in self:
+            if not rec.current_level:
+                rec.tna_measure = False
+                continue
+            gap_val = rec.gap or 0
+            if gap_val > 0:
+                rec.tna_measure = 'below'
+            elif gap_val == 0:
+                rec.tna_measure = 'meets'
+            else:
+                rec.tna_measure = 'exceeds'
 
     @api.depends('gap', 'current_level', 'required_level')
     def _compute_achievement_status_and_priority(self):
         for rec in self:
+            if not rec.current_level:
+                rec.achievement_status = False
+                rec.gap_priority = False
+                continue
             gap_val = rec.gap or 0
             if gap_val < 0:
                 rec.achievement_status = 'exceeds'

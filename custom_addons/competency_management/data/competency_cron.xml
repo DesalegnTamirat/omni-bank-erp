@@ -13,28 +13,6 @@
             <field name="active">True</field>
         </record>
 
-        <!-- Daily Cron: IDP Checkpoint Reminders -->
-        <record id="cron_idp_checkpoint_reminders" model="ir.cron">
-            <field name="name">Competency Management: IDP Checkpoint Reminders</field>
-            <field name="model_id" ref="model_competency_idp"/>
-            <field name="state">code</field>
-            <field name="code">model._cron_idp_checkpoint_reminders()</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="active">True</field>
-        </record>
-
-        <!-- Daily Cron: Mandatory IDP Escalation -->
-        <record id="cron_escalate_mandatory_idps" model="ir.cron">
-            <field name="name">Competency Management: Mandatory IDP Escalation</field>
-            <field name="model_id" ref="model_competency_idp"/>
-            <field name="state">code</field>
-            <field name="code">model._cron_escalate_mandatory_idps()</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="active">True</field>
-        </record>
-
         <!-- Daily Cron: Data Quality & Governance Audit (FR-DQ-COM-001..003) -->
         <record id="cron_competency_data_quality_audit" model="ir.cron">
             <field name="name">Competency Management: Data Quality &amp; Governance Audit</field>
@@ -42,6 +20,28 @@
             <field name="state">code</field>
             <field name="code">model._cron_validate_competency_data_quality()</field>
             <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Daily Cron: Take Dashboard Cycle Trend Snapshot (FR-RPT-010) -->
+        <record id="cron_take_competency_dashboard_snapshot" model="ir.cron">
+            <field name="name">Competency Management: Take Dashboard Cycle Trend Snapshot</field>
+            <field name="model_id" ref="model_competency_dashboard_snapshot"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_take_dashboard_snapshot()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+
+        <!-- Weekly Cron: Scheduled Report Distribution (FR-RPT-008) -->
+        <record id="cron_send_scheduled_competency_reports" model="ir.cron">
+            <field name="name">Competency Management: Scheduled Report Distribution</field>
+            <field name="model_id" ref="model_competency_dashboard"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_send_scheduled_competency_reports()</field>
+            <field name="interval_number">7</field>
             <field name="interval_type">days</field>
             <field name="active">True</field>
         </record>

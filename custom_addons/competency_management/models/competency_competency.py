@@ -182,9 +182,9 @@ class Competency(models.Model):
     name = fields.Char(string='Competency Name', required=True, tracking=True)
     code = fields.Char(string='Competency Code', required=True, tracking=True)
     pillar = fields.Selection([
-        ('core', 'Core Competency'),
-        ('leadership', 'Leadership Competency'),
-        ('technical', 'Technical Competency'),
+        ('core', 'Core Competencies'),
+        ('leadership', 'Leadership Competencies'),
+        ('technical', 'Technical Competencies'),
     ], string='Pillar', required=True, tracking=True)
     functional_domain = fields.Char(string='Functional Domain')
     definition = fields.Text(string='Definition', tracking=True)
@@ -206,36 +206,50 @@ class Competency(models.Model):
             rec.applicable_job_ids = lines.mapped('mapping_id.job_position_id')
     change_log_ids = fields.One2many(
         'competency.level.change.log', 'competency_id', string='Definition Change Logs', readonly=True)
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('approved', 'Approved'),
+        ('retired', 'Retired'),
+    ], string='Approval State', default='draft', tracking=True)
+
     status = fields.Selection([
         ('active', 'Active'),
-        ('retired', 'Retired'),
-    ], string='Status', default='active', tracking=True)
+        ('inactive', 'Inactive'),
+    ], string='Status', compute='_compute_status', store=True)
+
     active = fields.Boolean(default=True, tracking=True)
-    framework_line_ids = fields.One2many(
-        'competency.framework.line', 'competency_id', string='Framework Lines')
-    approved_framework_ids = fields.Many2many(
-        'competency.framework', string='Approved Frameworks',
-        compute='_compute_approved_framework_ids',
-        search='_search_approved_framework_ids')
 
-    def _compute_approved_framework_ids(self):
-        FrameworkLine = self.env['competency.framework.line']
+    @api.depends('state')
+    def _compute_status(self):
         for rec in self:
-            lines = FrameworkLine.search([
-                ('competency_id', '=', rec.id),
-                ('framework_id.state', '=', 'approved')
-            ])
-            rec.approved_framework_ids = lines.mapped('framework_id')
+            if rec.state == 'approved':
+                rec.status = 'active'
+            else:
+                rec.status = 'inactive'
 
-    def _search_approved_framework_ids(self, operator, value):
-        FrameworkLine = self.env['competency.framework.line']
-        lines = FrameworkLine.search([('framework_id.state', '=', 'approved')])
-        competency_ids = lines.mapped('competency_id').ids
-        if operator in ('!=', 'not in') and not value:
-            return [('id', 'in', competency_ids)]
-        elif operator in ('=', 'in') and not value:
-            return [('id', 'not in', competency_ids)]
-        return [('id', 'in', competency_ids)]
+    def action_submit(self):
+        for rec in self:
+            if not rec.proficiency_level_ids or len(rec.proficiency_level_ids) < 4:
+                raise ValidationError(_("Competency '%s' must have all 4 proficiency levels defined before submitting for approval.") % rec.name)
+            rec.write({'state': 'submitted'})
+
+    def action_approve(self):
+        for rec in self:
+            rec.write({'state': 'approved', 'active': True})
+
+    def action_retire(self):
+        """Retire/inactivate competency and auto-disappear from clusters & job mappings."""
+        for rec in self:
+            rec.write({'state': 'retired', 'active': False})
+            # Auto-disappear from clusters and role mappings
+            self.env['competency.cluster.line'].search([('competency_id', '=', rec.id)]).unlink()
+            self.env['competency.role.mapping.line'].search([('competency_id', '=', rec.id)]).unlink()
+            rec.message_post(body=_("Competency '%s' has been retired and automatically unlinked from all clusters and role mappings.") % rec.name)
+
+    def action_reset_draft(self):
+        for rec in self:
+            rec.write({'state': 'draft', 'active': True})
 
     @api.constrains('name')
     def _check_unique_name_case_insensitive(self):

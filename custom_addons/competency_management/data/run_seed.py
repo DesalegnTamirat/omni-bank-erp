@@ -113,7 +113,14 @@ def seed_bunna_competencies(dbname='ERP'):
                     'functional_domain': domain if pillar == 'technical' else 'Bank-Wide',
                     'definition': f"Bunna Bank {pillar.capitalize()} Competency: {cname}",
                     'rating_model_id': rating_model.id,
+                    'state': 'approved',
                     'status': 'active',
+                })
+            else:
+                comp.with_context(force_write=True).write({
+                    'state': 'approved',
+                    'status': 'active',
+                    'pillar': pillar,
                 })
             comp_records[cname] = comp
 
@@ -135,36 +142,16 @@ def seed_bunna_competencies(dbname='ERP'):
                         'behavioral_indicators': f"Level {lvl_val} ({lvl_name}) behavioral indicators for {cname}.",
                     })
 
-        # 2. Create / Ensure Approved Competency Framework
-        framework = env['competency.framework'].search([('code', '=', 'BUNNA-FW-v1.0')], limit=1)
-        if not framework:
-            framework = env['competency.framework'].create({
-                'name': "Bunna Bank Integrated Competency Framework",
-                'code': 'BUNNA-FW-v1.0',
-                'version': 'v1.0',
-                'description': "Bunna Bank's official Integrated Competency Framework comprising Core, Leadership, and Technical competencies.",
-                'state': 'draft',
-            })
-        
-        fw_existing_comps = framework.line_ids.mapped('competency_id.id')
-        fw_line_vals = []
-        for cname, comp in comp_records.items():
-            if comp.id not in fw_existing_comps:
-                fw_line_vals.append({
-                    'framework_id': framework.id,
-                    'competency_id': comp.id,
-                })
-        if fw_line_vals:
-            env['competency.framework.line'].create(fw_line_vals)
-
-        if framework.state != 'approved':
-            framework.with_context(force_write=True).write({
-                'state': 'approved',
-                'approved_by_id': env.user.id,
-                'approval_date': odoo.fields.Datetime.now(),
-            })
-
-        print(f"Competency Framework Approved with {len(framework.line_ids)} competencies!")
+        # Remove non-matrix competencies if any exist
+        matrix_comp_ids = [c.id for c in comp_records.values()]
+        non_matrix_comps = env['competency.competency'].search([('id', 'not in', matrix_comp_ids)])
+        if non_matrix_comps:
+            print(f"Removing {len(non_matrix_comps)} non-matrix competencies...")
+            for nmc in non_matrix_comps:
+                try:
+                    nmc.unlink()
+                except Exception as e:
+                    print(f"Could not unlink non-matrix competency {nmc.name}: {e}")
 
         # 3. Create Job Role Mappings
         job_mappings = {}
@@ -181,6 +168,7 @@ def seed_bunna_competencies(dbname='ERP'):
         print(f"Distinct Job Positions in Matrix: {len(job_mappings)}")
 
         mapping_count = 0
+        matrix_job_ids = []
         for jtitle, comp_dict in job_mappings.items():
             job = env['hr.job'].search([('name', '=ilike', jtitle)], limit=1)
             if not job:
@@ -188,6 +176,7 @@ def seed_bunna_competencies(dbname='ERP'):
                     'name': jtitle,
                     'description': f"Job Position for {jtitle}",
                 })
+            matrix_job_ids.append(job.id)
 
             mapping = env['competency.role.mapping'].search([('job_position_id', '=', job.id)], limit=1)
             if not mapping:
@@ -199,10 +188,12 @@ def seed_bunna_competencies(dbname='ERP'):
                     'change_description': 'Initial Bunna Bank Competency Framework role mapping import',
                 })
 
-            existing_comp_ids = mapping.line_ids.mapped('competency_id.id')
+            existing_line_map = {l.competency_id.id: l for l in mapping.line_ids}
             line_create_vals = []
             for cid, req_p in comp_dict.items():
-                if cid not in existing_comp_ids:
+                if cid in existing_line_map:
+                    existing_line_map[cid].write({'required_proficiency': req_p})
+                else:
                     line_create_vals.append({
                         'mapping_id': mapping.id,
                         'competency_id': cid,
@@ -212,6 +203,11 @@ def seed_bunna_competencies(dbname='ERP'):
             if line_create_vals:
                 env['competency.role.mapping.line'].create(line_create_vals)
 
+            # Unlink lines for competencies not in matrix for this job position
+            extra_lines = mapping.line_ids.filtered(lambda l: l.competency_id.id not in comp_dict)
+            if extra_lines:
+                extra_lines.unlink()
+
             if mapping.state != 'approved':
                 mapping.with_context(force_write=True).write({
                     'state': 'approved',
@@ -220,12 +216,111 @@ def seed_bunna_competencies(dbname='ERP'):
                 })
             mapping_count += 1
 
+        # Remove non-matrix role mappings if any exist
+        non_matrix_mappings = env['competency.role.mapping'].search([('job_position_id', 'not in', matrix_job_ids)])
+        if non_matrix_mappings:
+            print(f"Removing {len(non_matrix_mappings)} non-matrix role mappings...")
+            for nmm in non_matrix_mappings:
+                try:
+                    nmm.unlink()
+                except Exception as e:
+                    print(f"Could not unlink non-matrix mapping {nmm.mapping_name}: {e}")
+
         # 4. Seed Matrix Configuration (Job Grade & Job Position Guidelines)
         matrix_config = env['competency.matrix.config'].get_active_config()
         matrix_config._seed_matrix_guidelines()
 
+        # 5. Seed 3 Assessment Cycles (2024, 2025, 2026) & Populate Multi-Cycle Assessments
+        Cycle = env['competency.assessment.cycle']
+        Assessment = env['competency.assessment']
+        AssessmentLine = env['competency.assessment.line']
+        Employee = env['hr.employee']
+        RoleMapping = env['competency.role.mapping']
+
+        c2024 = Cycle.search([('code', '=', 'CYC-2024')], limit=1)
+        if not c2024:
+            c2024 = Cycle.create({
+                'name': '2024 Annual Competency Assessment Cycle',
+                'code': 'CYC-2024',
+                'period_start': '2024-01-01',
+                'period_end': '2024-12-31',
+                'assessment_deadline': '2024-12-15',
+                'state': 'closed',
+            })
+
+        c2025 = Cycle.search([('code', '=', 'CYC-2025')], limit=1)
+        if not c2025:
+            c2025 = Cycle.create({
+                'name': '2025 Annual Competency Assessment Cycle',
+                'code': 'CYC-2025',
+                'period_start': '2025-01-01',
+                'period_end': '2025-12-31',
+                'assessment_deadline': '2025-12-15',
+                'state': 'closed',
+            })
+
+        c2026 = Cycle.search([('code', '=', 'CYC-2026')], limit=1)
+        if not c2026:
+            c2026 = Cycle.create({
+                'name': '2026 Annual Competency Assessment Cycle',
+                'code': 'CYC-2026',
+                'period_start': '2026-01-01',
+                'period_end': '2026-12-31',
+                'assessment_deadline': '2026-12-15',
+                'state': 'open',
+            })
+
+        # Sample active employees to populate multi-cycle historical assessments
+        mapped_jobs = RoleMapping.search([('state', '=', 'approved')]).mapped('job_position_id')
+        sample_employees = Employee.search([('job_id', 'in', mapped_jobs.ids)], limit=120)
+
+        print(f"Populating 3-Cycle Assessment Data for {len(sample_employees)} Employees...")
+
+        asm_count = 0
+        for emp in sample_employees:
+            mapping = RoleMapping.search([('job_position_id', '=', emp.job_id.id), ('state', '=', 'approved')], limit=1)
+            if not mapping or not mapping.line_ids:
+                continue
+
+            for cycle, c_year, default_state in [(c2024, 2024, 'approved'), (c2025, 2025, 'approved'), (c2026, 2026, 'approved')]:
+                existing_asm = Assessment.search([('employee_id', '=', emp.id), ('cycle_id', '=', cycle.id)], limit=1)
+                if not existing_asm:
+                    asm = Assessment.create({
+                        'employee_id': emp.id,
+                        'cycle_id': cycle.id,
+                        'assessment_type': 'supervisor',
+                        'assessor_id': env.user.id,
+                        'state': default_state,
+                    })
+                    asm_count += 1
+                else:
+                    asm = existing_asm
+
+                # Ensure line population
+                existing_comp_ids = asm.line_ids.mapped('competency_id.id')
+                line_create_vals = []
+                for idx, m_line in enumerate(mapping.line_ids):
+                    if m_line.competency_id.id not in existing_comp_ids:
+                        req_int = int(m_line.required_proficiency or '2')
+                        # Progressive rating calculation across cycles (2024: initial gap, 2025: improved, 2026: target)
+                        if c_year == 2024:
+                            cur_int = max(1, req_int - (idx % 2))
+                        elif c_year == 2025:
+                            cur_int = max(1, req_int - (idx % 3 == 0 and 1 or 0))
+                        else:
+                            cur_int = min(4, req_int + (idx % 4 == 0 and 1 or 0) - (idx % 5 == 0 and 1 or 0))
+                        
+                        line_create_vals.append({
+                            'assessment_id': asm.id,
+                            'competency_id': m_line.competency_id.id,
+                            'required_level': str(req_int),
+                            'current_level': str(cur_int),
+                        })
+                if line_create_vals:
+                    AssessmentLine.create(line_create_vals)
+
         cr.commit()
-        print(f"SUCCESS: Seeded {mapping_count} Role Mappings, {len(comp_records)} Competencies, and Matrix Settings in database ERP!")
+        print(f"SUCCESS: Seeded 3 Assessment Cycles (2024, 2025, 2026), {asm_count} Historical & Current Assessments, {mapping_count} Role Mappings, {len(comp_records)} Competencies in ERP!")
 
 if __name__ == '__main__':
     seed_bunna_competencies()

@@ -14,7 +14,8 @@ class CompetencyCluster(models.Model):
     description = fields.Text(string='Description')
     competency_ids = fields.Many2many(
         'competency.competency', 'competency_cluster_rel', 'cluster_id', 'competency_id',
-        string='Competencies in Cluster', required=True)
+        string='Competencies in Cluster', required=True,
+        domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     min_proficiency = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),

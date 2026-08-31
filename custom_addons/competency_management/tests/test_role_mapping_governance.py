@@ -165,24 +165,3 @@ class TestRoleMappingGovernance(TransactionCase):
         with self.assertRaises(ValidationError) as cm:
             asm.action_approve()
         self.assertIn("You cannot approve your own assessment/IDP", str(cm.exception))
-
-    def test_07_idp_self_approval_rejection(self):
-        """7. Segregation of duties: IDP self-approval rejection (FR-COM-055)."""
-        Employee = self.env['hr.employee']
-        IDP = self.env['competency.idp']
-
-        emp = Employee.create({'name': 'Self IDP Employee', 'user_id': self.env.user.id})
-
-        idp = IDP.create({
-            'employee_id': emp.id,
-            'goal_ids': [(0, 0, {
-                'goal': 'Learn Advanced Risk Management',
-                'activity_type': 'training',
-            })]
-        })
-        idp.action_submit()
-
-        with self.assertRaises(ValidationError) as cm:
-            idp.action_approve()
-        self.assertIn("You cannot approve your own assessment/IDP", str(cm.exception))
-

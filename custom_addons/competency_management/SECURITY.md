@@ -53,3 +53,11 @@ This document outlines the technical security controls implemented across the in
 | **At Rest (Database)** | AES-256 LUKS Volume Encryption | **COMPLIANT** | Database Administrator (DBA) |
 | **At Rest (Filestore)** | Encrypted Attachment Storage | **COMPLIANT** | System Administrator |
 | **Data Governance** | Segregation of Duties (FR-COM-055) | **COMPLIANT** | Application Security Lead |
+
+---
+
+## 5. Dashboard Trend Storage & Scheduled Report Distribution (FR-RPT-008, FR-RPT-010)
+
+- **Snapshot Data Security (`competency.dashboard.snapshot`)**: Stored trend snapshots maintain strict read permissions restricted to HR Supervisors (`group_competency_supervisor`) and HR Administrators (`group_competency_admin`).
+- **Scheduled Email Distribution**: Automated cron email dispatches utilize internal system email gateways over encrypted SMTP TLS channels (`Port 587/465`) targeting authenticated HR admin accounts only.
+

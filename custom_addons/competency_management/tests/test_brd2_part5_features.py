@@ -15,8 +15,6 @@ class TestBRD2Part5Features(TransactionCase):
         self.Assessment = self.env['competency.assessment']
         self.AssessmentLine = self.env['competency.assessment.line']
         self.SkillsTest = self.env['competency.skills.test']
-        self.IDP = self.env['competency.idp']
-        self.IDPActivity = self.env['competency.idp.activity']
 
         self.job_source = self.Job.create({'name': 'Senior Risk Manager BRD2'})
         self.job_target1 = self.Job.create({'name': 'Senior Operational Risk Manager BRD2'})

@@ -20,12 +20,6 @@
             parent="menu_competency_framework_categ"
             action="action_competency_competency"
             sequence="10" />
-        <menuitem id="menu_competency_framework"
-            name="Competency Frameworks"
-            parent="menu_competency_framework_categ"
-            action="action_competency_framework"
-            sequence="20"
-            groups="competency_management.group_competency_admin" />
         <menuitem id="menu_competency_cluster"
             name="Competency Clusters"
             parent="menu_competency_framework_categ"
@@ -37,12 +31,6 @@
             parent="menu_competency_framework_categ"
             action="action_competency_role_mapping"
             sequence="40" />
-        <menuitem id="menu_competency_benchmark"
-            name="Competency Benchmarks"
-            parent="menu_competency_framework_categ"
-            action="action_competency_benchmark"
-            sequence="50"
-            groups="competency_management.group_competency_admin" />
 
         <!-- 2. Assessments Category -->
         <menuitem id="menu_competency_assessments_categ"
@@ -81,30 +69,18 @@
             sequence="50"
             groups="competency_management.group_competency_supervisor" />
 
-        <!-- 3. Development Plans Category -->
-        <menuitem id="menu_competency_idp_categ"
-            name="Development Plans"
-            parent="menu_competency_management_root"
-            sequence="30" />
-
-        <menuitem id="menu_my_competency_idp"
-            name="My Development Plans (IDP)"
-            parent="menu_competency_idp_categ"
-            action="action_my_competency_idp"
-            sequence="10"
-            groups="competency_management.group_competency_employee" />
-        <menuitem id="menu_competency_idp"
-            name="All Development Plans (IDP)"
-            parent="menu_competency_idp_categ"
-            action="action_competency_idp"
-            sequence="20"
-            groups="competency_management.group_competency_supervisor" />
-
-        <!-- 4. Reporting Category -->
+        <!-- 3. Reporting Category -->
         <menuitem id="menu_competency_reports_categ"
             name="Reporting"
             parent="menu_competency_management_root"
             sequence="40"
+            groups="competency_management.group_competency_supervisor" />
+
+        <menuitem id="menu_competency_tna_analytics_report"
+            name="Competency &amp; TNA Analytics Report"
+            parent="menu_competency_reports_categ"
+            action="action_competency_tna_analytics_report"
+            sequence="5"
             groups="competency_management.group_competency_supervisor" />
 
         <menuitem id="menu_competency_coverage_report"
@@ -113,10 +89,11 @@
             action="action_competency_coverage_report"
             sequence="10"
             groups="competency_management.group_competency_supervisor" />
-        <menuitem id="menu_competency_benchmark_comparison"
-            name="Benchmark Comparison Report"
+
+        <menuitem id="menu_competency_dashboard_snapshot"
+            name="Multi-Cycle Trend Snapshots"
             parent="menu_competency_reports_categ"
-            action="action_competency_benchmark_comparison"
+            action="action_competency_dashboard_snapshot"
             sequence="20"
             groups="competency_management.group_competency_supervisor" />
 
