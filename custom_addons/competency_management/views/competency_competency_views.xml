@@ -67,7 +67,6 @@
                                     <list editable="bottom">
                                         <field name="level"/>
                                         <field name="name" readonly="1"/>
-                                        <field name="definition"/>
                                         <field name="behavioral_indicators" required="1"/>
                                     </list>
                                 </field>

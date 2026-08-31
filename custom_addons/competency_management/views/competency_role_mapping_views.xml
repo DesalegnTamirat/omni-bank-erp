@@ -44,7 +44,11 @@
                                 <field name="effective_date" readonly="state != 'draft'"/>
                             </group>
                             <group>
-                                <field name="cluster_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                <label for="cluster_ids"/>
+                                <div class="o_row">
+                                    <field name="cluster_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                    <button name="action_populate_from_clusters" string="Populate from Clusters" type="object" class="btn btn-secondary btn-sm ms-2" invisible="state != 'draft'" icon="fa-cubes"/>
+                                </div>
                                 <field name="last_review_date"/>
                                 <field name="next_review_date"/>
                                 <field name="approved_by_id"/>
@@ -57,9 +61,13 @@
                         <group string="Required Competencies">
                             <field name="line_ids" readonly="state != 'draft'">
                                 <list editable="bottom">
+                                    <field name="is_matrix_configured" column_invisible="True"/>
+                                    <field name="default_proficiency" column_invisible="True"/>
                                     <field name="competency_id"/>
-                                    <field name="required_proficiency"/>
+                                    <field name="override_default"/>
+                                    <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
                                     <field name="weight"/>
+                                    <button name="action_reset_to_default_proficiency" title="Reset to Matrix Default Level" type="object" icon="fa-undo" invisible="not override_default or not default_proficiency"/>
                                 </list>
                             </field>
                         </group>

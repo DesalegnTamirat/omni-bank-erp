@@ -45,7 +45,8 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- Payroll Payload Views -->
+    <!-- COMMENTED OUT PER USER JOURNEY: Payroll Recovery Payloads & PMS Gap Import not explicitly in 14 Use Cases -->
+    <!--
     <record id="view_eds_payroll_payload_tree" model="ir.ui.view">
         <field name="name">eds.payroll.payload.tree</field>
         <field name="model">eds.payroll.payload</field>
@@ -68,7 +69,6 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- PMS Gap Import Wizard View -->
     <record id="view_eds_pms_gap_import_form" model="ir.ui.view">
         <field name="name">eds.pms.gap.import.form</field>
         <field name="model">eds.pms.gap.import</field>
@@ -95,4 +95,5 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+    -->
 </odoo>

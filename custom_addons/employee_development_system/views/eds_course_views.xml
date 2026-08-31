@@ -176,6 +176,7 @@
 
         <!-- ══════════════ Course Development Request ══════════════ -->
 
+        <!--
         <record id="view_eds_course_development_request_kanban" model="ir.ui.view">
             <field name="name">eds.course.development.request.kanban</field>
             <field name="model">eds.course.development.request</field>
@@ -275,6 +276,7 @@
                 </form>
             </field>
         </record>
+        -->
 
     </data>
 </odoo>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Competency Executive & Self-Service Dashboard Form View -->
+        <record id="view_competency_dashboard_form" model="ir.ui.view">
+            <field name="name">competency.dashboard.form</field>
+            <field name="model">competency.dashboard</field>
+            <field name="arch" type="xml">
+                <form string="Competency Overview Dashboard" create="false" edit="false" delete="false">
+                    <header>
+                        <button name="action_start_self_assessment" string="Start My Self-Assessment" type="object" class="oe_highlight" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: bold;"/>
+                        <button name="action_view_my_gap_chart" string="View My Competency Gap Graph" type="object" style="background-color: #1d2b32; border-color: #1d2b32; color: #FFFFFF; font-weight: bold;"/>
+                        <button name="action_open_matrix_config" string="Proficiency Matrix Settings" type="object"/>
+                        <button name="action_view_my_idp" string="View My IDP" type="object"/>
+                        <button name="action_print_my_report" string="Print My Profile Report (PDF)" type="object"/>
+                    </header>
+                    <sheet>
+                        <!-- Main Executive Header Banner: Primary Red #541718 & Slate #1d2b32 -->
+                        <div style="background-color: #541718; color: #FFFFFF; padding: 18px 22px; border-radius: 6px; margin-bottom: 20px; border-left: 6px solid #726732;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="width: 70%;">
+                                        <h1 style="margin: 0; font-size: 22px; font-weight: bold; color: #FFFFFF;">
+                                            Bunna Bank Talent Capability &amp; Competency Dashboard
+                                        </h1>
+                                        <div style="font-size: 13px; color: #c17540; margin-top: 4px;">
+                                            Real-time proficiency evaluation, gap analytics, deadline tracking, and individual development planning.
+                                        </div>
+                                    </td>
+                                    <td style="width: 30%; text-align: right; vertical-align: middle;">
+                                        <span style="font-size: 12px; font-weight: bold; background-color: #1d2b32; color: #FFFFFF; padding: 6px 12px; border-radius: 4px; border: 1px solid #c17540;">
+                                            Official HR Brand Palette
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Active Cycle & Deadline Countdown Banner -->
+                        <div style="background-color: #F4F6F7; border: 1px solid #1d2b32; border-left: 5px solid #1d2b32; padding: 14px 18px; border-radius: 4px; margin-bottom: 20px;">
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td style="width: 45%;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #1d2b32; font-weight: bold;">Current Assessment Cycle</div>
+                                        <h3 style="margin: 2px 0 0 0; color: #541718; font-weight: bold;">
+                                            <field name="active_cycle_name" readonly="1"/>
+                                        </h3>
+                                    </td>
+                                    <td style="width: 30%;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #1d2b32; font-weight: bold;">Assessment Deadline</div>
+                                        <div style="font-size: 14px; font-weight: bold; color: #1d2b32;">
+                                            <field name="active_cycle_deadline" readonly="1"/> 
+                                            (<field name="days_remaining" readonly="1"/> Days Remaining)
+                                        </div>
+                                    </td>
+                                    <td style="width: 25%; text-align: right;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #1d2b32; font-weight: bold; margin-bottom: 3px;">My Status</div>
+                                        <field name="assessment_status" widget="badge" readonly="1"/>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Personal & Gap Analytics Summary Cards -->
+                        <group string="Personal Competency Summary &amp; Gap Analytics">
+                            <group>
+                                <field name="user_employee_id" readonly="1"/>
+                                <field name="latest_assessment_state" readonly="1"/>
+                                <field name="my_avg_gap" readonly="1"/>
+                                <field name="gap_trend_label" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="my_exceeds_count" readonly="1"/>
+                                <field name="my_meets_count" readonly="1"/>
+                                <field name="my_below_count" readonly="1"/>
+                                <field name="my_idp_state" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <group string="Bank-Wide Capability &amp; Framework Metrics">
+                            <group>
+                                <field name="total_active_competencies" readonly="1"/>
+                                <field name="total_bank_assessments" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="overall_bank_avg_gap" readonly="1"/>
+                                <field name="previous_avg_gap" readonly="1"/>
+                            </group>
+                        </group>
+
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Action to open Dashboard -->
+        <record id="action_competency_overview_dashboard" model="ir.actions.server">
+            <field name="name">Competency Dashboard</field>
+            <field name="model_id" ref="model_competency_dashboard"/>
+            <field name="state">code</field>
+            <field name="code">
+action = model.action_open_dashboard()
+            </field>
+        </record>
+
+    </data>
+</odoo>

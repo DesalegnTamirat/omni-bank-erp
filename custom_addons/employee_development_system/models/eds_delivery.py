@@ -42,7 +42,7 @@ class EdsSessionAttendance(models.Model):
     employee_id = fields.Many2one('hr.employee', string='Participant', required=True,
                                   tracking=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position',
-                                      related='employee_id.job_position', readonly=True)
+                                      related='employee_id.job_id', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',
                                     related='employee_id.department_id', readonly=True)
     attendance_date = fields.Date(string='Attendance Date', default=fields.Date.context_today)

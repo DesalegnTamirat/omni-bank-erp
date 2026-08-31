@@ -81,15 +81,100 @@ class CompetencyAssessment(models.Model):
     name = fields.Char(string='Reference', readonly=True, copy=False)
     cycle_id = fields.Many2one(
         'competency.assessment.cycle', string='Assessment Cycle', required=True,
-        ondelete='cascade', tracking=True)
-    employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
-    assessor_id = fields.Many2one('res.users', string='Assessor', default=lambda self: self.env.user)
-    assessment_type = fields.Selection([
-        ('self', 'Self-Assessment'),
-        ('supervisor', 'Supervisor Assessment'),
-        ('multi_rater', 'Multi-Rater (360)'),
-        ('skills_test', 'Skills Test / Examination'),
-    ], string='Assessment Type', default='self', required=True, tracking=True)
+        domain="[('state', '=', 'open')]", ondelete='cascade', tracking=True)
+    employee_id = fields.Many2one(
+        'hr.employee', string='Employee', required=True, tracking=True,
+        domain=lambda self: self._get_allowed_employee_domain())
+
+    @api.model
+    def _get_assessment_type_selection(self):
+        """Rule 1: Dynamically filter assessment types based on logged-in user role."""
+        user = self.env.user
+        emp = user.employee_id
+        
+        selection = [('self', 'Self-Assessment')]
+        
+        if self.env.su or user.has_group('competency_management.group_competency_admin'):
+            return [
+                ('self', 'Self-Assessment'),
+                ('peer', 'Peer Assessment'),
+                ('supervisor', 'Supervisor Assessment'),
+                ('team', 'Team Assessment'),
+            ]
+            
+        if emp:
+            if emp.parent_id:
+                selection.append(('peer', 'Peer Assessment'))
+                selection.append(('supervisor', 'Supervisor Assessment'))
+            
+            subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)], limit=1)
+            if subordinates or emp.child_ids:
+                selection.append(('team', 'Team Assessment'))
+                
+        return selection
+
+    @api.model
+    def _get_allowed_employee_domain(self):
+        user = self.env.user
+        if self.env.su or user.has_group('competency_management.group_competency_admin'):
+            return []
+        
+        emp = user.employee_id
+        if not emp:
+            return [('id', '=', False)]
+            
+        allowed_ids = set()
+        allowed_ids.add(emp.id)
+        
+        subordinates = self.env['hr.employee'].search([('id', 'child_of', emp.id)])
+        allowed_ids.update(subordinates.ids)
+        
+        if emp.parent_id:
+            peers = self.env['hr.employee'].search([('parent_id', '=', emp.parent_id.id)])
+            allowed_ids.update(peers.ids)
+            
+        return [('id', 'in', list(allowed_ids))]
+
+    assessor_id = fields.Many2one('res.users', string='Assessor', default=lambda self: self.env.user, readonly=True)
+    assessment_type = fields.Selection(
+        selection='_get_assessment_type_selection', string='Assessment Type',
+        required=True, tracking=True)
+
+    @api.onchange('assessment_type')
+    def _onchange_assessment_type_set_employee_domain(self):
+        """Rule 2: Restrict employee selection domain based on chosen assessment type."""
+        user = self.env.user
+        emp = user.employee_id
+        
+        if self.assessment_type == 'self':
+            if emp:
+                self.employee_id = emp.id
+            return {'domain': {'employee_id': [('id', '=', emp.id if emp else False)]}}
+        
+        self.employee_id = False
+        
+        if not self.assessment_type:
+            return {'domain': {'employee_id': [('id', '=', False)]}}
+            
+        if self.env.su or user.has_group('competency_management.group_competency_admin'):
+            return {'domain': {'employee_id': []}}
+
+        if not emp:
+            return {'domain': {'employee_id': [('id', '=', False)]}}
+
+        if self.assessment_type == 'peer':
+            domain = [('parent_id', '=', emp.parent_id.id), ('id', '!=', emp.id)] if emp.parent_id else [('id', '=', False)]
+            return {'domain': {'employee_id': domain}}
+            
+        elif self.assessment_type == 'supervisor':
+            domain = [('id', '=', emp.parent_id.id)] if emp.parent_id else [('id', '=', False)]
+            return {'domain': {'employee_id': domain}}
+            
+        elif self.assessment_type == 'team':
+            domain = [('id', 'child_of', emp.id), ('id', '!=', emp.id)]
+            return {'domain': {'employee_id': domain}}
+
+        return {'domain': {'employee_id': []}}
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -187,37 +272,260 @@ class CompetencyAssessment(models.Model):
             if not record.name:
                 record.name = self.env['ir.sequence'].sudo().next_by_code('competency.assessment') or \
                     'CMP-A-%s' % record.id
+            if record.employee_id and not record.line_ids:
+                record._auto_fill_lines_from_mapping_or_matrix()
         return records
 
-    def action_auto_fill_lines(self):
-        """Populate rating lines from the employee's approved role-competency mapping."""
+    def _auto_fill_lines_from_mapping_or_matrix(self):
+        """Rule 4: Auto-populate rating lines from employee's assigned role mapping or matrix."""
+        for rec in self:
+            if not rec.employee_id or rec.line_ids:
+                continue
+            job_pos = rec.employee_id.job_position or rec.employee_id.job_id
+            mapping = False
+            if job_pos:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job_pos.id),
+                    ('state', '=', 'approved'),
+                ], limit=1)
+
+            lines = []
+            if mapping and mapping.line_ids:
+                for mline in mapping.line_ids:
+                    lines.append((0, 0, {
+                        'competency_id': mline.competency_id.id,
+                        'current_level': '1',
+                        'required_level': mline.required_proficiency,
+                    }))
+            else:
+                framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
+                if framework:
+                    grade_rec = getattr(rec.employee_id, 'grade_id', False) or getattr(rec.employee_id, 'job_grade', False)
+                    j_name = job_pos.name if job_pos else ''
+                    for fw_line in framework.line_ids:
+                        comp = fw_line.competency_id
+                        req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
+                        lines.append((0, 0, {
+                            'competency_id': comp.id,
+                            'current_level': '1',
+                            'required_level': req_lvl,
+                        }))
+            if lines:
+                rec.write({'line_ids': lines})
+
+    @api.onchange('employee_id')
+    def _onchange_employee_id_populate_competencies(self):
+        """Rule 4: When selecting an employee on assessment, auto-populate assigned competencies."""
+        if not self.employee_id:
+            return
+        job_pos = self.employee_id.job_position or self.employee_id.job_id
+        mapping = False
+        if job_pos:
+            mapping = self.env['competency.role.mapping'].search([
+                ('job_position_id', '=', job_pos.id),
+                ('state', '=', 'approved'),
+            ], limit=1)
+
+        new_lines = self.env['competency.assessment.line']
+        if mapping and mapping.line_ids:
+            for mline in mapping.line_ids:
+                new_lines += self.env['competency.assessment.line'].new({
+                    'competency_id': mline.competency_id.id,
+                    'current_level': '1',
+                    'required_level': mline.required_proficiency,
+                })
+        else:
+            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
+            if framework:
+                grade_rec = getattr(self.employee_id, 'grade_id', False) or getattr(self.employee_id, 'job_grade', False)
+                j_name = job_pos.name if job_pos else ''
+                for fw_line in framework.line_ids:
+                    comp = fw_line.competency_id
+                    req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
+                    new_lines += self.env['competency.assessment.line'].new({
+                        'competency_id': comp.id,
+                        'current_level': '1',
+                        'required_level': req_lvl,
+                    })
+
+        self.line_ids = new_lines
+
+    @api.model
+    def _get_matrix_required_level(self, pillar, grade=False, job=False, job_name=''):
+        """Determine required proficiency level (1..4) based on configured Competency Matrix settings."""
+        config = self.env['competency.matrix.config'].get_active_config()
+        
+        # 1. Configured Determinant Mode Check
+        if config.proficiency_determinant == 'job_grade' and grade:
+            g_line = self.env['competency.grade.matrix'].search([
+                ('config_id', '=', config.id),
+                ('grade_id', '=', grade.id)
+            ], limit=1)
+            if g_line:
+                if pillar == 'core': return g_line.required_core_level
+                elif pillar == 'leadership': return g_line.required_leadership_level if g_line.required_leadership_level != '0' else '1'
+                else: return g_line.required_technical_level
+                
+        elif config.proficiency_determinant == 'job_position' and job:
+            j_line = self.env['competency.job.matrix'].search([
+                ('config_id', '=', config.id),
+                ('job_id', '=', job.id)
+            ], limit=1)
+            if j_line:
+                if pillar == 'core': return j_line.required_core_level
+                elif pillar == 'leadership': return j_line.required_leadership_level if j_line.required_leadership_level != '0' else '1'
+                else: return j_line.required_technical_level
+
+        # Fallback to standard guidelines
+        g_name = (grade.grade_name or '').lower() if grade else ''
+        j_name = (job.name if job else job_name or '').lower()
+        
+        # Chief & D/Chief
+        if 'chief' in g_name or 'chief' in j_name:
+            if pillar == 'core': return '4'
+            elif pillar == 'leadership': return '4'
+            else: return '2'
+            
+        # Director I, II & ToT Leaders
+        if 'director' in g_name or 'director' in j_name or 'tot leader' in j_name:
+            if pillar == 'core': return '4'
+            elif pillar == 'leadership': return '3'
+            else: return '3'
+            
+        # BM-II, III, Division Managers & STL
+        if 'division manager' in j_name or 'bm-ii' in j_name or 'bm-iii' in j_name or 'stl' in j_name:
+            if pillar == 'core': return '3'
+            elif pillar == 'leadership': return '2'
+            else: return '3'
+            
+        # Team Leader, BM-I & related
+        if 'team leader' in j_name or 'bm-i' in j_name or 'manager' in j_name:
+            if pillar == 'core': return '3'
+            elif pillar == 'leadership': return '2'
+            else: return '4'
+            
+        # Non Supervisory Job Grade 11-12
+        if any(x in g_name for x in ['11', '12', 'xi', 'xii']):
+            if pillar == 'core': return '2'
+            elif pillar == 'leadership': return '1'
+            else: return '4'
+            
+        # Non Supervisory Job Grade 7-10
+        if any(x in g_name for x in ['7', '8', '9', '10', 'vii', 'viii', 'ix', 'x']):
+            if pillar == 'core': return '2'
+            elif pillar == 'leadership': return '1'
+            else: return '3'
+            
+        # Default / Grade 6 and below
+        if pillar == 'core': return '1'
+        elif pillar == 'leadership': return '1'
+        else: return '2'
+
+    def action_populate_competencies(self):
+        """Rule 4: Performance-optimized manual button to populate competency rating lines."""
         self.ensure_one()
-        if self.line_ids:
-            raise UserError(_('This assessment already has rating lines.'))
+        if self.state != 'draft':
+            raise UserError(_("Competencies can only be populated when the assessment is in Draft state."))
+        if not self.cycle_id or not self.assessment_type or not self.employee_id:
+            raise UserError(_("Assessment Cycle, Assessment Type, and Employee are required before populating competencies."))
+        
         employee = self.employee_id
-        if not employee or not employee.job_position:
-            raise UserError(_('The employee has no Job Position set; auto-fill is not possible.'))
-        mapping = self.env['competency.role.mapping'].search([
-            ('job_position_id', '=', employee.job_position.id),
-            ('state', '=', 'approved'),
-        ], limit=1)
-        if not mapping:
-            raise UserError(_('No approved role-competency mapping found for job %s.') % employee.job_position.name)
+        job_pos = employee.job_position or employee.job_id
+        mapping = False
+        if job_pos:
+            mapping = self.env['competency.role.mapping'].search([
+                ('job_position_id', '=', job_pos.id),
+                ('state', '=', 'approved'),
+            ], limit=1)
+
         lines = []
-        for mline in mapping.line_ids:
-            lines.append((0, 0, {
-                'competency_id': mline.competency_id.id,
-                'current_level': '1',
-                'required_level': mline.required_proficiency,
-            }))
+        if mapping and mapping.line_ids:
+            for mline in mapping.line_ids:
+                lines.append((0, 0, {
+                    'competency_id': mline.competency_id.id,
+                    'current_level': '1',
+                    'required_level': mline.required_proficiency,
+                }))
+            mapping_name_str = mapping.mapping_name
+        else:
+            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
+            if not framework:
+                raise UserError(_('No approved Competency Framework or Role Mapping found for job %s.') % (job_pos.name if job_pos else employee.name))
+            
+            grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
+            j_name = job_pos.name if job_pos else ''
+            
+            for fw_line in framework.line_ids:
+                comp = fw_line.competency_id
+                req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job=job_pos, job_name=j_name)
+                lines.append((0, 0, {
+                    'competency_id': comp.id,
+                    'current_level': '1',
+                    'required_level': req_lvl,
+                }))
+            mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
+
+        self.line_ids.unlink()
         self.write({'line_ids': lines})
-        self.message_post(body=_('Rating lines auto-filled from approved role mapping %s.') % mapping.mapping_name)
+        self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, len(lines)))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Competencies Populated'),
+                'message': _('%d competency lines were populated successfully.') % len(lines),
+                'type': 'success',
+                'sticky': False,
+            },
+        }
+
+    def action_auto_fill_lines(self):
+        return self.action_populate_competencies()
+            
+        job_pos = employee.job_position or employee.job_id
+        mapping = False
+        if job_pos:
+            mapping = self.env['competency.role.mapping'].search([
+                ('job_position_id', '=', job_pos.id),
+                ('state', '=', 'approved'),
+            ], limit=1)
+
+        lines = []
+        if mapping and mapping.line_ids:
+            for mline in mapping.line_ids:
+                lines.append((0, 0, {
+                    'competency_id': mline.competency_id.id,
+                    'current_level': '1',
+                    'required_level': mline.required_proficiency,
+                }))
+            mapping_name_str = mapping.mapping_name
+        else:
+            # Fallback: Auto-fill framework competencies using matrix guidelines based on Job Position and Grade
+            framework = self.env['competency.framework'].search([('state', '=', 'approved')], limit=1)
+            if not framework:
+                raise UserError(_('No approved Competency Framework or Role Mapping found for job %s.') % (job_pos.name if job_pos else employee.name))
+            
+            grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
+            j_name = job_pos.name if job_pos else ''
+            
+            for fw_line in framework.line_ids:
+                comp = fw_line.competency_id
+                req_lvl = self._get_matrix_required_level(comp.pillar, grade=grade_rec, job_name=j_name)
+                lines.append((0, 0, {
+                    'competency_id': comp.id,
+                    'current_level': '1',
+                    'required_level': req_lvl,
+                }))
+            mapping_name_str = _("Competency Matrix Guidelines (%s / Grade %s)") % (j_name or 'Default', grade_rec.grade_name if grade_rec else 'Unassigned')
+
+        self.write({'line_ids': lines})
+        self.message_post(body=_('Rating lines auto-filled from %s.') % mapping_name_str)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Lines Added'),
-                'message': _('%s competency lines were added.') % len(mapping.line_ids),
+                'message': _('%s competency lines were added.') % len(lines),
                 'type': 'success',
                 'sticky': False,
             },

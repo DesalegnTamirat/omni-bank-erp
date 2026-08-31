@@ -65,12 +65,15 @@
                   action="action_eds_curriculum"
                   sequence="30"
                   groups="employee_development_system.group_eds_officer"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: Course Development Requests not explicitly in 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_dev_requests"
                   name="Course Development Requests"
                   parent="menu_eds_root"
                   action="action_eds_course_development_request"
                   sequence="40"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
 
         <!-- Annual L&D Plan & Calendar -->
         <menuitem id="menu_eds_annual_plans"
@@ -227,12 +230,15 @@
                   action="action_eds_assessment"
                   sequence="59"
                   groups="employee_development_system.group_eds_trainer"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: International Training tracking omitted from 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_international_training"
                   name="International Training"
                   parent="menu_eds_delivery"
                   action="action_eds_international_training"
                   sequence="60"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
 
         <menuitem id="menu_eds_my_nominations"
                   name="My Nominations"
@@ -272,12 +278,15 @@
                   action="action_eds_evaluation_level3"
                   sequence="30"
                   groups="employee_development_system.group_eds_line_manager"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: Level 4 Business Impact & ROI omitted from 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_eval_level4"
                   name="Level 4 Business Impact &amp; ROI"
                   parent="menu_eds_evaluations"
                   action="action_eds_evaluation_level4"
                   sequence="40"
                   groups="employee_development_system.group_eds_manager"/>
+        -->
         <menuitem id="menu_eds_eval_instruments"
                   name="Evaluation Questionnaires"
                   parent="menu_eds_evaluations"
@@ -318,12 +327,15 @@
                   action="action_eds_budget"
                   sequence="10"
                   groups="employee_development_system.group_eds_officer"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: Strategic Learning Partnerships not explicitly in 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_learning_partners"
                   name="Strategic Learning Partnerships"
                   parent="menu_eds_finance"
                   action="action_eds_learning_partner"
                   sequence="20"
                   groups="employee_development_system.group_eds_officer"/>
+        -->
 
         <!-- Sponsorship & Education -->
         <menuitem id="menu_eds_sponsorship_education"
@@ -372,18 +384,24 @@
                   action="action_eds_lms_routing"
                   sequence="20"
                   groups="employee_development_system.group_eds_admin"/>
+        <!-- COMMENTED OUT PER USER JOURNEY: Payroll Recovery Payloads not explicitly in 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_payroll_payloads"
                   name="Payroll Recovery Payloads"
                   parent="menu_eds_integrations"
                   action="action_eds_payroll_payload"
                   sequence="30"
                   groups="employee_development_system.group_eds_admin"/>
+        -->
+        <!-- COMMENTED OUT PER USER JOURNEY: PMS Gap Import action omitted from 14 Use Cases -->
+        <!--
         <menuitem id="menu_eds_pms_import"
                   name="Import Gaps from PMS"
                   parent="menu_eds_integrations"
                   action="action_eds_pms_gap_import"
                   sequence="40"
                   groups="employee_development_system.group_eds_admin"/>
+        -->
 
         <!-- Reporting & Analytics -->
         <menuitem id="menu_eds_reports"

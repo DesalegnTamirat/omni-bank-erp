@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRoleMapping(models.Model):
@@ -44,17 +44,22 @@ class CompetencyRoleMapping(models.Model):
                 parts.append('(%s)' % rec.grade_id.grade_name)
             rec.mapping_name = ' '.join(parts)
 
-    @api.constrains('job_position_id', 'version')
-    def _check_unique_job_position_version(self):
+    @api.constrains('job_position_id', 'state')
+    def _check_single_active_mapping_per_job(self):
+        """Rule 1: Prevent multiple non-archived mapping records for the same Job Position."""
         for rec in self:
-            if rec.job_position_id and rec.version:
-                duplicates = self.search([
+            if rec.job_position_id and rec.state in ('draft', 'under_approval', 'approved'):
+                active_mappings = self.search([
                     ('job_position_id', '=', rec.job_position_id.id),
-                    ('version', '=', rec.version),
+                    ('state', 'in', ('draft', 'under_approval', 'approved')),
                     ('id', '!=', rec.id)
                 ])
-                if duplicates:
-                    raise ValidationError(_("A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead."))
+                if active_mappings:
+                    states_str = ', '.join(set(active_mappings.mapped('state')))
+                    raise ValidationError(_(
+                        "A role-competency mapping for Job Position '%s' already exists in '%s' status. "
+                        "Only one active/draft mapping is allowed per Job Position. Please archive or retire the existing mapping first."
+                    ) % (rec.job_position_id.name, states_str))
 
     @api.onchange('cluster_ids')
     def _onchange_cluster_ids(self):
@@ -73,12 +78,42 @@ class CompetencyRoleMapping(models.Model):
                     existing_comp_ids.add(comp.id)
                     new_virtual_lines += self.env['competency.role.mapping.line'].new({
                         'competency_id': comp.id,
-                        'required_proficiency': cluster.min_proficiency or '2',
+                        'override_default': False,
                         'weight': 1.0,
                     })
 
         if new_virtual_lines:
             self.line_ids = self.line_ids + new_virtual_lines
+
+    def action_populate_from_clusters(self):
+        """Rule 5: Populate competency lines from selected clusters taking the UNION (deduplicating)."""
+        for rec in self:
+            if not rec.cluster_ids:
+                raise UserError(_("Please select at least one cluster first."))
+            
+            cluster_comps = rec.cluster_ids.mapped('competency_ids')
+            existing_comp_ids = set(rec.line_ids.mapped('competency_id.id'))
+            
+            new_lines_vals = []
+            added_count = 0
+            for comp in cluster_comps:
+                if comp.id not in existing_comp_ids:
+                    existing_comp_ids.add(comp.id)
+                    new_lines_vals.append({
+                        'mapping_id': rec.id,
+                        'competency_id': comp.id,
+                        'override_default': False,
+                        'weight': 1.0,
+                    })
+                    added_count += 1
+            
+            if new_lines_vals:
+                created_lines = self.env['competency.role.mapping.line'].create(new_lines_vals)
+                for l in created_lines:
+                    l._compute_matrix_proficiency()
+                rec.message_post(body=_("Populated %d new unique competency lines from selected clusters.") % added_count)
+            else:
+                rec.message_post(body=_("All competencies from selected clusters are already mapped."))
 
     @api.constrains('line_ids')
     def _check_unique_competency_lines(self):
@@ -98,8 +133,6 @@ class CompetencyRoleMapping(models.Model):
     def action_approve(self):
         """Under Approval -> Approved with version supersession."""
         for rec in self:
-            
-            # Automatically supersede/archive prior approved versions of the same job position
             prior_approved = self.search([
                 ('job_position_id', '=', rec.job_position_id.id),
                 ('state', '=', 'approved'),
@@ -130,7 +163,7 @@ class CompetencyRoleMapping(models.Model):
         return super().write(vals)
 
     def action_create_new_version(self):
-        """Copy approved mapping into a new draft version (version control FR-COM-006)."""
+        """Copy approved mapping into a new draft version after archiving the prior version."""
         self.ensure_one()
         if self.state != 'approved':
             raise ValidationError(_('Only approved mappings can be versioned.'))
@@ -138,6 +171,10 @@ class CompetencyRoleMapping(models.Model):
         new_version_str = self._bump_version(self.version)
         change_desc = self.env.context.get('change_description') or _("New version created from %s.") % self.version
         
+        # Archive current approved mapping to satisfy single-active constraint
+        self.with_context(force_write=True).write({'state': 'archived'})
+        self.message_post(body=_("Mapping version %s archived to allow creation of new version %s.") % (self.version, new_version_str))
+
         new_mapping = self.copy(default={
             'version': new_version_str,
             'state': 'draft',
@@ -195,12 +232,28 @@ class CompetencyRoleMappingLine(models.Model):
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade',
         domain="[('approved_framework_ids', '!=', False)]")
+    
+    override_default = fields.Boolean(
+        string='Override Default', default=False,
+        help='Enable to customize the required proficiency level away from the Matrix Configuration default.')
+    
+    is_matrix_configured = fields.Boolean(
+        string='Has Matrix Default', compute='_compute_matrix_proficiency', store=True)
+        
+    default_proficiency = fields.Selection([
+        ('1', 'Level 1 - Basic'),
+        ('2', 'Level 2 - Intermediate'),
+        ('3', 'Level 3 - Advanced'),
+        ('4', 'Level 4 - Expert'),
+    ], string='Matrix Default Level', compute='_compute_matrix_proficiency', store=True)
+
     required_proficiency = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),
         ('3', 'Level 3 - Advanced'),
         ('4', 'Level 4 - Expert'),
-    ], string='Required Proficiency', required=True, default='2')
+    ], string='Required Proficiency', required=True, default='2', store=True)
+
     weight = fields.Float(
         string='Weight', default=1.0,
         help='Relative importance of this competency for the role.')
@@ -209,6 +262,70 @@ class CompetencyRoleMappingLine(models.Model):
         ('mapping_competency_uniq', 'unique(mapping_id, competency_id)',
          'This competency is already mapped for the role!'),
     ]
+
+    @api.depends('competency_id', 'mapping_id.job_position_id', 'mapping_id.grade_id')
+    def _compute_matrix_proficiency(self):
+        """Rules 2 & 3: Compute default proficiency level from Matrix Configuration."""
+        for line in self:
+            if not line.competency_id:
+                line.is_matrix_configured = False
+                line.default_proficiency = False
+                continue
+            
+            grade = line.mapping_id.grade_id if line.mapping_id else False
+            job = line.mapping_id.job_position_id if line.mapping_id else False
+            
+            config = self.env['competency.matrix.config'].get_active_config()
+            matrix_lvl = False
+            
+            if config.proficiency_determinant == 'job_grade' and grade:
+                g_line = self.env['competency.grade.matrix'].search([
+                    ('config_id', '=', config.id),
+                    ('grade_id', '=', grade.id)
+                ], limit=1)
+                if g_line:
+                    matrix_lvl = g_line.required_core_level if line.competency_id.pillar == 'core' else (
+                        g_line.required_leadership_level if line.competency_id.pillar == 'leadership' and g_line.required_leadership_level != '0' else g_line.required_technical_level
+                    )
+            elif config.proficiency_determinant == 'job_position' and job:
+                j_line = self.env['competency.job.matrix'].search([
+                    ('config_id', '=', config.id),
+                    ('job_id', '=', job.id)
+                ], limit=1)
+                if j_line:
+                    matrix_lvl = j_line.required_core_level if line.competency_id.pillar == 'core' else (
+                        j_line.required_leadership_level if line.competency_id.pillar == 'leadership' and j_line.required_leadership_level != '0' else j_line.required_technical_level
+                    )
+                    
+            if matrix_lvl and matrix_lvl in ('1', '2', '3', '4'):
+                line.is_matrix_configured = True
+                line.default_proficiency = matrix_lvl
+                if not line.override_default:
+                    line.required_proficiency = matrix_lvl
+            else:
+                line.is_matrix_configured = False
+                line.default_proficiency = False
+                if not line.override_default and not line.required_proficiency:
+                    line.required_proficiency = '2'
+
+    @api.onchange('competency_id', 'mapping_id.job_position_id', 'mapping_id.grade_id')
+    def _onchange_competency_for_matrix_level(self):
+        if self.competency_id:
+            self._compute_matrix_proficiency()
+
+    @api.onchange('override_default')
+    def _onchange_override_default(self):
+        if not self.override_default and self.default_proficiency:
+            self.required_proficiency = self.default_proficiency
+
+    def action_reset_to_default_proficiency(self):
+        """Rule 2: Button to fall back to the default proficiency configured in the matrix."""
+        for line in self:
+            if line.default_proficiency:
+                line.write({
+                    'override_default': False,
+                    'required_proficiency': line.default_proficiency,
+                })
 
     @api.constrains('competency_id')
     def _check_competency_on_approved_framework(self):

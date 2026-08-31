@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- PDF Report Action -->
+        <record id="action_report_competency_assessment" model="ir.actions.report">
+            <field name="name">Competency Profile &amp; Gap Analysis Report</field>
+            <field name="model">competency.assessment</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_assessment_document</field>
+            <field name="report_file">competency_management.report_competency_assessment_document</field>
+            <field name="print_report_name">'Competency_Profile_%s_%s' % (object.employee_id.name or '', object.name or '')</field>
+            <field name="binding_model_id" ref="model_competency_assessment"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- QWeb Report Document Template -->
+        <template id="report_competency_assessment_document">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 13px; color: #1d2b32;">
+                            
+                            <!-- Document Header Banner: Primary Red #541718 with Gold/Olive #726732 accent -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 4px; margin-bottom: 20px; border-bottom: 3px solid #726732;">
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="width: 70%; text-align: left; vertical-align: middle;">
+                                            <h2 style="margin: 0; font-size: 22px; font-weight: bold; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                            <h4 style="margin: 3px 0 0 0; font-size: 14px; font-weight: normal; color: #c17540;">Competency Profile &amp; Gap Analysis Report</h4>
+                                        </td>
+                                        <td style="width: 30%; text-align: right; vertical-align: middle;">
+                                            <span style="font-size: 12px; font-weight: bold; background: #1d2b32; color: #FFFFFF; padding: 5px 10px; border-radius: 3px; border: 1px solid #c17540;">
+                                                <t t-out="doc.name"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Employee Profile Header Card: #1d2b32 border & light grey tint -->
+                            <div style="border: 1px solid #1d2b32; border-radius: 4px; padding: 12px; margin-bottom: 20px; background-color: #F4F6F7;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="width: 18%; font-weight: bold; color: #541718; padding: 4px;">Employee Name:</td>
+                                        <td style="width: 32%; padding: 4px;"><t t-out="doc.employee_id.name"/></td>
+                                        <td style="width: 18%; font-weight: bold; color: #541718; padding: 4px;">Job Position:</td>
+                                        <td style="width: 32%; padding: 4px;"><t t-out="doc.employee_id.job_title or doc.employee_id.job_id.name or 'N/A'"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Job Grade:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.employee_id.grade_id.grade_name or doc.employee_id.job_grade.grade_name or 'N/A'"/></td>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Department:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.employee_id.department_id.name or 'N/A'"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Assessment Cycle:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.cycle_id.name"/></td>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Assessment Type:</td>
+                                        <td style="padding: 4px;"><t t-out="dict(doc._fields['assessment_type'].selection).get(doc.assessment_type)"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Assessor / Supervisor:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.assessor_id.name or doc.employee_id.parent_id.name or 'N/A'"/></td>
+                                        <td style="font-weight: bold; color: #541718; padding: 4px;">Status:</td>
+                                        <td style="padding: 4px;">
+                                            <span style="font-weight: bold; text-transform: uppercase; color: #541718;">
+                                                <t t-out="dict(doc._fields['state'].selection).get(doc.state)"/>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Executive Metric Summary Boxes: using Bank palette -->
+                            <table style="width: 100%; margin-bottom: 20px; border-spacing: 10px; border-collapse: separate;">
+                                <tr>
+                                    <td style="width: 20%; background-color: #F4F6F7; border: 1px solid #1d2b32; border-radius: 4px; padding: 10px; text-align: center;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #1d2b32; font-weight: bold;">Competencies Rated</div>
+                                        <div style="font-size: 20px; font-weight: bold; color: #1d2b32; margin-top: 4px;"><t t-out="len(doc.line_ids)"/></div>
+                                    </td>
+                                    <td style="width: 20%; background-color: #EBF4EC; border: 1px solid #425727; border-radius: 4px; padding: 10px; text-align: center;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #425727; font-weight: bold;">Exceeds Target</div>
+                                        <div style="font-size: 20px; font-weight: bold; color: #425727; margin-top: 4px;">
+                                            <t t-out="len(doc.line_ids.filtered(lambda l: l.achievement_status == 'exceeds'))"/>
+                                        </div>
+                                    </td>
+                                    <td style="width: 20%; background-color: #FDF3EC; border: 1px solid #c17540; border-radius: 4px; padding: 10px; text-align: center;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #c17540; font-weight: bold;">Meets Target</div>
+                                        <div style="font-size: 20px; font-weight: bold; color: #c17540; margin-top: 4px;">
+                                            <t t-out="len(doc.line_ids.filtered(lambda l: l.achievement_status == 'meets'))"/>
+                                        </div>
+                                    </td>
+                                    <td style="width: 20%; background-color: #FADBD8; border: 1px solid #541718; border-radius: 4px; padding: 10px; text-align: center;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #541718; font-weight: bold;">Below Target</div>
+                                        <div style="font-size: 20px; font-weight: bold; color: #541718; margin-top: 4px;">
+                                            <t t-out="len(doc.line_ids.filtered(lambda l: l.achievement_status == 'below'))"/>
+                                        </div>
+                                    </td>
+                                    <td style="width: 20%; background-color: #F5EEF8; border: 1px solid #726732; border-radius: 4px; padding: 10px; text-align: center;">
+                                        <div style="font-size: 11px; text-transform: uppercase; color: #726732; font-weight: bold;">Average Gap</div>
+                                        <div style="font-size: 20px; font-weight: bold; color: #726732; margin-top: 4px;"><t t-out="doc.average_gap"/></div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Detailed Competency Ratings & Gap Analysis Table -->
+                            <h4 style="color: #541718; border-bottom: 2px solid #541718; padding-bottom: 4px; margin-bottom: 12px; font-weight: bold;">Competency Evaluation Breakdown</h4>
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px;">
+                                <thead>
+                                    <tr style="background-color: #1d2b32; color: #FFFFFF; font-size: 11px; text-transform: uppercase;">
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: left;">Competency Name</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Pillar</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Required</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Assessed</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Gap</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Achievement</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: center;">Priority</th>
+                                        <th style="padding: 8px; border: 1px solid #1d2b32; text-align: left;">Remarks / Evidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="doc.line_ids" t-as="line">
+                                        <tr style="font-size: 12px; border-bottom: 1px solid #E5E7E9;">
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; font-weight: bold;">
+                                                <t t-out="line.competency_id.name"/>
+                                                <div style="font-size: 10px; font-weight: normal; color: #7F8C8D;"><t t-out="line.competency_id.code"/></div>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center; text-transform: capitalize;">
+                                                <t t-out="line.competency_id.pillar"/>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center; font-weight: bold;">
+                                                Level <t t-out="line.required_level"/>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center; font-weight: bold;">
+                                                Level <t t-out="line.current_level"/>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center; font-weight: bold;">
+                                                <span t-attf-style="color: #{'#541718' if line.gap > 0 else '#425727'};">
+                                                    <t t-out="line.gap"/>
+                                                </span>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center;">
+                                                <span t-if="line.achievement_status == 'exceeds'" style="background: #EBF4EC; color: #425727; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">EXCEEDS</span>
+                                                <span t-if="line.achievement_status == 'meets'" style="background: #FDF3EC; color: #c17540; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">MEETS</span>
+                                                <span t-if="line.achievement_status == 'below'" style="background: #FADBD8; color: #541718; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">BELOW</span>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; text-align: center; font-size: 10px; font-weight: bold;">
+                                                <t t-out="dict(line._fields['gap_priority'].selection).get(line.gap_priority)"/>
+                                            </td>
+                                            <td style="padding: 7px; border: 1px solid #D5D8DC; font-size: 11px; color: #566573;">
+                                                <t t-out="line.comments or 'No remarks provided.'"/>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Sign-Off Section -->
+                            <div style="margin-top: 40px; page-break-inside: avoid;">
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #1d2b32; width: 80%; margin: 0 auto 5px auto;"></div>
+                                            <div style="font-weight: bold; color: #1d2b32;">Employee Signature</div>
+                                            <div style="font-size: 11px; color: #7F8C8D;">Date: ____/____/20__</div>
+                                        </td>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #1d2b32; width: 80%; margin: 0 auto 5px auto;"></div>
+                                            <div style="font-weight: bold; color: #1d2b32;">Supervisor Signature</div>
+                                            <div style="font-size: 11px; color: #7F8C8D;">Date: ____/____/20__</div>
+                                        </td>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #1d2b32; width: 80%; margin: 0 auto 5px auto;"></div>
+                                            <div style="font-weight: bold; color: #541718;">HR / CPCO Verification</div>
+                                            <div style="font-size: 11px; color: #7F8C8D;">Date: ____/____/20__</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+    </data>
+</odoo>

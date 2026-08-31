@@ -10,4 +10,6 @@ from . import competency_coverage_report
 from . import competency_data_validator
 from . import competency_benchmark
 from . import hr_employee
+from . import competency_dashboard
+from . import competency_matrix_config
 from ..wizards import competency_role_mapping_clone_wizard

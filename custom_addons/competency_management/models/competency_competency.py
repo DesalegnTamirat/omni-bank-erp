@@ -337,3 +337,363 @@ class Competency(models.Model):
                 raise ValidationError(_('Retired competencies cannot be deleted.'))
         return super().unlink()
 
+    @api.model
+    def action_seed_matrix_data(self):
+        """Seed competencies, framework, clusters, and role mappings from docs/edited Final Comptency Matrix......xlsx."""
+        import os, zipfile, re, logging
+        import xml.etree.ElementTree as ET
+
+        _logger = logging.getLogger(__name__)
+
+        possible_paths = [
+            r'docs/edited Final Comptency Matrix......xlsx',
+            r'/mnt/extra-addons/competency_management/data/competency_matrix.xlsx',
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'docs', 'edited Final Comptency Matrix......xlsx')),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'competency_matrix.xlsx')),
+        ]
+        
+        target_path = False
+        for p in possible_paths:
+            if os.path.exists(p):
+                target_path = p
+                break
+                
+        if not target_path:
+            _logger.info("Matrix XLSX seed file not found. Skipping auto-seed.")
+            return True
+
+        with zipfile.ZipFile(target_path, 'r') as z:
+            strings_xml = z.read('xl/sharedStrings.xml')
+            stree = ET.fromstring(strings_xml)
+            shared_strings = [''.join(t.text or '' for t in si.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')) for si in stree.findall('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}si')]
+
+            def get_val(cell):
+                t = cell.attrib.get('t')
+                v = cell.find('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}v')
+                if v is None: return ''
+                val = v.text
+                if t == 's': return shared_strings[int(val)] if int(val) < len(shared_strings) else val
+                return val
+
+            wb_xml = z.read('xl/workbook.xml')
+            wbtree = ET.fromstring(wb_xml)
+            sheets_info = [child.attrib['name'] for child in wbtree.find('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}sheets')]
+
+            raw_mappings = []
+            domain_comps_map = {}
+            for idx, sname in enumerate(sheets_info, 1):
+                if sname == 'Proficiency': continue
+                try:
+                    sheet_xml = z.read(f'xl/worksheets/sheet{idx}.xml')
+                except Exception:
+                    continue
+                stree = ET.fromstring(sheet_xml)
+                rows = list(stree.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row'))
+                if not rows: continue
+                
+                for r in rows[1:]:
+                    vals = [get_val(c).strip() for c in r.findall('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}c')]
+                    if len(vals) >= 4 and vals[1].strip():
+                        cat = vals[0].strip()
+                        cname = re.sub(r'\s+', ' ', vals[1].strip())
+                        jtitle = re.sub(r'\s+', ' ', vals[2].strip())
+                        prof = vals[3].strip()
+                        wunit = vals[4].strip() if len(vals) > 4 else ''
+                        raw_mappings.append((cat, cname, jtitle, prof, wunit, sname))
+                        domain_comps_map.setdefault(sname, set()).add(cname)
+
+        rating_model = self.env['competency.rating.model'].search([('code', '=', '4SCALE')], limit=1)
+        if not rating_model:
+            rating_model = self.env['competency.rating.model'].create({
+                'name': '4-Point Proficiency Scale',
+                'code': '4SCALE',
+                'max_rating': 4,
+                'description': 'Standard 4-Level scale (Level 1 Basic, Level 2 Intermediate, Level 3 Advanced, Level 4 Expert)'
+            })
+
+        core_names = {'Execution Mastery', 'Professional Authenticity', 'Ethical Influence', 'Collaboration', 'Creativity'}
+        leadership_names = {'Strategy Management', 'Continuous Improvement', 'Prudential Decision Making', 'Self Leadership', 'People Leadership', 'Ambidexterity Leadership', 'Ambidextrous Leadership', 'Self-Leadership'}
+
+        distinct_comps = {}
+        for cat, cname, jtitle, prof, wunit, sname in raw_mappings:
+            cname_clean = cname.replace('Ambidexterity Leadership', 'Ambidextrous Leadership').replace('Self Leadership', 'Self-Leadership')
+            cat_lower = cat.lower()
+            if 'core' in cat_lower or cname_clean in core_names:
+                pillar = 'core'
+            elif 'lead' in cat_lower or cname_clean in leadership_names:
+                pillar = 'leadership'
+            else:
+                pillar = 'technical'
+            
+            if cname_clean not in distinct_comps:
+                distinct_comps[cname_clean] = (pillar, sname)
+
+        # Parse definitions from docx file if present
+        doc_defs = {}
+        docx_path = False
+        possible_docx = [
+            r'docs/Final Competency Framework Reviesd.docx',
+            os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'docs', 'Final Competency Framework Reviesd.docx')),
+        ]
+        for dp in possible_docx:
+            if os.path.exists(dp):
+                docx_path = dp
+                break
+        if docx_path:
+            try:
+                import docx
+                d_doc = docx.Document(docx_path)
+                for tbl in d_doc.tables:
+                    if len(tbl.columns) >= 2:
+                        for row in tbl.rows:
+                            tc1 = row.cells[0].text.strip() if len(row.cells) > 0 else ''
+                            tc2 = row.cells[1].text.strip() if len(row.cells) > 1 else ''
+                            if tc1 and tc2 and tc1 not in ('Competency', 'Framework Pillar', 'Pillar', 'Instead of...'):
+                                c1_clean = ' '.join(tc1.split()).lower()
+                                c2_clean = ' '.join(tc2.split())
+                                doc_defs[c1_clean] = c2_clean
+            except Exception:
+                pass
+
+        matrix_config = self.env['competency.matrix.config'].get_active_config()
+
+        tech_counter = 1
+        comp_records = {}
+        for cname, (pillar, domain) in sorted(distinct_comps.items()):
+            comp = self.env['competency.competency'].search([('name', '=ilike', cname)], limit=1)
+            rich_def = doc_defs.get(cname.lower(), f"Bunna Bank {pillar.capitalize()} Competency: {cname}")
+            
+            if not comp:
+                if pillar == 'core':
+                    c_cnt = len([c for c in comp_records.values() if c.pillar == 'core']) + 1
+                    code = f"CORE-{c_cnt:02d}"
+                elif pillar == 'leadership':
+                    c_cnt = len([c for c in comp_records.values() if c.pillar == 'leadership']) + 1
+                    code = f"LEAD-{c_cnt:02d}"
+                else:
+                    code = f"TECH-{tech_counter:03d}"
+                    tech_counter += 1
+
+                comp = self.env['competency.competency'].create({
+                    'name': cname,
+                    'code': code,
+                    'pillar': pillar,
+                    'functional_domain': domain if pillar == 'technical' else 'Bank-Wide',
+                    'definition': rich_def,
+                    'rating_model_id': rating_model.id,
+                    'status': 'active',
+                })
+            else:
+                if not comp.definition or comp.definition.startswith("Bunna Bank "):
+                    comp.write({'definition': rich_def})
+
+            comp_records[cname] = comp
+
+            for lvl_val, lvl_name in [
+                ('1', 'Basic'),
+                ('2', 'Intermediate'),
+                ('3', 'Advanced'),
+                ('4', 'Expert'),
+            ]:
+                if pillar == 'technical':
+                    b_ind = getattr(matrix_config, f'tech_indicator_level_{lvl_val}', f"Level {lvl_val} ({lvl_name}) technical behavioral indicator for {cname}.")
+                else:
+                    b_ind = f"Level {lvl_val} ({lvl_name}) behavioral indicators for {cname}."
+
+                existing_lvl = self.env['competency.proficiency.level'].search([
+                    ('competency_id', '=', comp.id),
+                    ('level', '=', lvl_val)
+                ], limit=1)
+                if not existing_lvl:
+                    self.env['competency.proficiency.level'].create({
+                        'competency_id': comp.id,
+                        'level': lvl_val,
+                        'behavioral_indicators': b_ind,
+                    })
+                else:
+                    existing_lvl.write({'behavioral_indicators': b_ind})
+
+        framework = self.env['competency.framework'].search([('code', '=', 'BUNNA-FW-v1.0')], limit=1)
+        if not framework:
+            framework = self.env['competency.framework'].create({
+                'name': "Bunna Bank Integrated Competency Framework",
+                'code': 'BUNNA-FW-v1.0',
+                'version': 'v1.0',
+                'description': "Bunna Bank's official Integrated Competency Framework comprising Core, Leadership, and Technical competencies.",
+                'state': 'draft',
+            })
+        
+        fw_existing_comps = framework.line_ids.mapped('competency_id.id')
+        fw_line_vals = []
+        for cname, comp in comp_records.items():
+            if comp.id not in fw_existing_comps:
+                fw_line_vals.append({
+                    'framework_id': framework.id,
+                    'competency_id': comp.id,
+                })
+        if fw_line_vals:
+            self.env['competency.framework.line'].create(fw_line_vals)
+
+        if framework.state != 'approved':
+            framework.with_context(force_write=True).write({
+                'state': 'approved',
+                'approved_by_id': self.env.user.id,
+                'approval_date': fields.Datetime.now(),
+            })
+
+        clusters = {}
+        core_comps = [c.id for c in comp_records.values() if c.pillar == 'core']
+        core_cluster = self.env['competency.cluster'].search([('code', '=', 'CLUSTER-CORE')], limit=1)
+        if not core_cluster:
+            core_cluster = self.env['competency.cluster'].create({
+                'name': 'Core Competency Cluster',
+                'code': 'CLUSTER-CORE',
+                'description': 'Universal Core Competencies required across all Bunna Bank roles.',
+                'competency_ids': [(6, 0, core_comps)],
+                'min_proficiency': '2',
+            })
+        else:
+            core_cluster.write({'competency_ids': [(6, 0, core_comps)]})
+        clusters['core'] = core_cluster
+
+        lead_comps = [c.id for c in comp_records.values() if c.pillar == 'leadership']
+        lead_cluster = self.env['competency.cluster'].search([('code', '=', 'CLUSTER-LEAD')], limit=1)
+        if not lead_cluster:
+            lead_cluster = self.env['competency.cluster'].create({
+                'name': 'Leadership Capability Cluster',
+                'code': 'CLUSTER-LEAD',
+                'description': 'Leadership and Supervisory Competencies for managerial and leadership roles.',
+                'competency_ids': [(6, 0, lead_comps)],
+                'min_proficiency': '2',
+            })
+        else:
+            lead_cluster.write({'competency_ids': [(6, 0, lead_comps)]})
+        clusters['leadership'] = lead_cluster
+
+        for sname, cnames in domain_comps_map.items():
+            domain_comp_ids = [comp_records[cn].id for cn in cnames if cn in comp_records]
+            code_safe = re.sub(r'[^A-Z0-9]', '', sname.upper())[:10]
+            cluster_code = f"CLUSTER-TECH-{code_safe}"
+            t_cluster = self.env['competency.cluster'].search([('code', '=', cluster_code)], limit=1)
+            if not t_cluster and domain_comp_ids:
+                t_cluster = self.env['competency.cluster'].create({
+                    'name': f"{sname} Technical Cluster",
+                    'code': cluster_code,
+                    'description': f"Technical Competency Cluster for {sname} functional domain.",
+                    'competency_ids': [(6, 0, domain_comp_ids)],
+                    'min_proficiency': '2',
+                })
+            elif t_cluster and domain_comp_ids:
+                t_cluster.write({'competency_ids': [(6, 0, domain_comp_ids)]})
+            clusters[sname] = t_cluster
+
+        job_mappings = {}
+        job_domains = {}
+        for cat, cname, jtitle, prof, wunit, sname in raw_mappings:
+            if not jtitle: continue
+            cname_clean = cname.replace('Ambidexterity Leadership', 'Ambidextrous Leadership').replace('Self Leadership', 'Self-Leadership')
+            comp = comp_records.get(cname_clean)
+            if not comp: continue
+            
+            prof_str = str(prof).strip()
+            req_prof = prof_str if prof_str in ('1', '2', '3', '4') else '2'
+            job_mappings.setdefault(jtitle, {})[comp.id] = req_prof
+            job_domains.setdefault(jtitle, set()).add(sname)
+
+        mapping_count = 0
+        for jtitle, comp_dict in job_mappings.items():
+            job = self.env['hr.job'].search([('name', '=ilike', jtitle)], limit=1)
+            if not job:
+                job = self.env['hr.job'].create({
+                    'name': jtitle,
+                    'description': f"Job Position for {jtitle}",
+                })
+
+            mapping = self.env['competency.role.mapping'].search([('job_position_id', '=', job.id)], limit=1)
+            if not mapping:
+                applicable_cluster_ids = [core_cluster.id]
+                j_lower = jtitle.lower()
+                if any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor']):
+                    applicable_cluster_ids.append(lead_cluster.id)
+                for dom in job_domains.get(jtitle, []):
+                    if dom in clusters and clusters[dom]:
+                        applicable_cluster_ids.append(clusters[dom].id)
+
+                mapping = self.env['competency.role.mapping'].create({
+                    'job_position_id': job.id,
+                    'version': 'v1.0',
+                    'state': 'draft',
+                    'effective_date': fields.Date.context_today(self),
+                    'change_description': 'Official Bunna Bank Competency Framework matrix import',
+                    'cluster_ids': [(6, 0, list(set(applicable_cluster_ids)))],
+                })
+
+            existing_comp_ids = mapping.line_ids.mapped('competency_id.id')
+            line_create_vals = []
+            for cid, req_p in comp_dict.items():
+                if cid not in existing_comp_ids:
+                    line_create_vals.append({
+                        'mapping_id': mapping.id,
+                        'competency_id': cid,
+                        'required_proficiency': req_p,
+                        'weight': 1.0,
+                    })
+            if line_create_vals:
+                self.env['competency.role.mapping.line'].create(line_create_vals)
+
+            if mapping.state != 'approved':
+                mapping.with_context(force_write=True).write({
+                    'state': 'approved',
+                    'approved_by_id': self.env.user.id,
+                    'approval_date': fields.Datetime.now(),
+                })
+            mapping_count += 1
+
+        # Seed default Job Position Matrix lines
+        for job in self.env['hr.job'].search([]):
+            j_line = self.env['competency.job.matrix'].search([
+                ('config_id', '=', matrix_config.id),
+                ('job_id', '=', job.id)
+            ], limit=1)
+            if not j_line:
+                core_l = self.env['competency.assessment']._get_matrix_required_level('core', job_name=job.name)
+                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', job_name=job.name)
+                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', job_name=job.name)
+                self.env['competency.job.matrix'].create({
+                    'config_id': matrix_config.id,
+                    'job_id': job.id,
+                    'required_core_level': core_l,
+                    'required_leadership_level': lead_l,
+                    'required_technical_level': tech_l,
+                })
+
+        # Seed default Job Grade Matrix lines
+        for grade in self.env['employee.grade'].search([]):
+            g_line = self.env['competency.grade.matrix'].search([
+                ('config_id', '=', matrix_config.id),
+                ('grade_id', '=', grade.id)
+            ], limit=1)
+            if not g_line:
+                core_l = self.env['competency.assessment']._get_matrix_required_level('core', grade=grade)
+                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', grade=grade)
+                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', grade=grade)
+                self.env['competency.grade.matrix'].create({
+                    'config_id': matrix_config.id,
+                    'grade_id': grade.id,
+                    'required_core_level': core_l,
+                    'required_leadership_level': lead_l,
+                    'required_technical_level': tech_l,
+                })
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Matrix Seeding Complete'),
+                'message': _('Seeded %s competencies (with docx definitions), %s clusters, and %s job position role mappings successfully.') % (len(comp_records), len(clusters), mapping_count),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+

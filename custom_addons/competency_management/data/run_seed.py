@@ -220,8 +220,12 @@ def seed_bunna_competencies(dbname='ERP'):
                 })
             mapping_count += 1
 
+        # 4. Seed Matrix Configuration (Job Grade & Job Position Guidelines)
+        matrix_config = env['competency.matrix.config'].get_active_config()
+        matrix_config._seed_matrix_guidelines()
+
         cr.commit()
-        print(f"SUCCESS: Seeded {mapping_count} Role Mappings and {len(comp_records)} Competencies in database ERP!")
+        print(f"SUCCESS: Seeded {mapping_count} Role Mappings, {len(comp_records)} Competencies, and Matrix Settings in database ERP!")
 
 if __name__ == '__main__':
     seed_bunna_competencies()

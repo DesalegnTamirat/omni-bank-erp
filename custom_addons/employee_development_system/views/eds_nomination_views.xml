@@ -89,10 +89,10 @@
                         <group>
                             <group string="Nomination">
                                 <field name="name" readonly="1"/>
-                                <field name="session_id"/>
+                                <field name="session_id" domain="[('status', 'in', ('draft', 'scheduled', 'ongoing'))]" options="{'no_create': True}"/>
                                 <field name="course_name" readonly="1"/>
                                 <field name="nomination_type"/>
-                                <field name="tna_entry_id" invisible="nomination_type != 'tna_based'"/>
+                                <field name="tna_entry_id" domain="[('state', 'in', ('approved', 'converted'))]" invisible="nomination_type != 'tna_based'" options="{'no_create': True}"/>
                                 <field name="justification" invisible="nomination_type != 'ad_hoc'"/>
                             </group>
                             <group string="Employee">

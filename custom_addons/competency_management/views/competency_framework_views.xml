@@ -12,6 +12,8 @@
                     <field name="name"/>
                     <field name="version"/>
                     <field name="effective_date"/>
+                    <field name="next_review_date"/>
+                    <field name="review_status" widget="badge"/>
                     <field name="state" widget="badge"/>
                     <field name="approved_by_id"/>
                 </list>
@@ -37,15 +39,25 @@
                     </header>
                     <sheet>
                         <group>
-                            <group>
+                            <group string="Framework Identification">
                                 <field name="name" readonly="state in ('approved','retired')"/>
                                 <field name="code" readonly="state in ('approved','retired')"/>
                                 <field name="version" readonly="state in ('approved','retired')"/>
                                 <field name="effective_date" readonly="state in ('approved','retired')"/>
                             </group>
-                            <group>
+                            <group string="Governance &amp; Approval">
                                 <field name="approved_by_id"/>
                                 <field name="approval_date"/>
+                            </group>
+                        </group>
+                        <group string="Periodic Framework Review Schedule">
+                            <group>
+                                <field name="review_frequency_months" readonly="state in ('approved','retired')"/>
+                                <field name="last_review_date"/>
+                            </group>
+                            <group>
+                                <field name="next_review_date"/>
+                                <field name="review_status" widget="badge"/>
                             </group>
                         </group>
                         <group string="Change Description" invisible="not change_description">
@@ -88,8 +100,11 @@
                     <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
                     <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
                     <separator/>
+                    <filter string="Review Due / Overdue" name="review_due" domain="[('review_status','in',['due_soon','overdue'])]"/>
+                    <separator/>
                     <group name="group_by">
                         <filter string="State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Review Status" name="group_review_status" context="{'group_by':'review_status'}"/>
                     </group>
                 </search>
             </field>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Competency Matrix Configuration Form View -->
+        <record id="view_competency_matrix_config_form" model="ir.ui.view">
+            <field name="name">competency.matrix.config.form</field>
+            <field name="model">competency.matrix.config</field>
+            <field name="arch" type="xml">
+                <form string="Competency Matrix &amp; Proficiency Level Settings">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 20px;">
+                            <h1 style="color: #541718; font-weight: bold;">
+                                Competency Proficiency Level &amp; Matrix Configuration
+                            </h1>
+                            <div style="font-size: 13px; color: #1d2b32;">
+                                Configure whether required proficiency levels (1-4) are determined by Job Grade or Job Position, and define standard technical behavioral indicators.
+                            </div>
+                        </div>
+
+                        <!-- Determination Mode Banner -->
+                        <div style="background-color: #F4F6F7; border: 1px solid #1d2b32; border-left: 5px solid #541718; padding: 14px 18px; border-radius: 4px; margin-bottom: 20px;">
+                            <group>
+                                <field name="proficiency_determinant" widget="radio" class="oe_inline"/>
+                            </group>
+                            <div style="font-size: 12px; color: #566573; margin-top: 6px;">
+                                <strong>Note:</strong> Selecting <em>By Job Grade</em> applies proficiency levels based on employee/role grade. Selecting <em>By Job Position</em> applies proficiency levels based on job position title. The required level for technical competencies will be automatically enforced from this configuration table.
+                            </div>
+                        </div>
+
+                        <notebook>
+                            <!-- Tab 1: Job Grade Matrix -->
+                            <page string="Job Grade Matrix Guidelines" invisible="proficiency_determinant != 'job_grade'">
+                                <field name="grade_matrix_line_ids">
+                                    <list editable="bottom">
+                                        <field name="grade_id"/>
+                                        <field name="required_leadership_level"/>
+                                        <field name="required_core_level"/>
+                                        <field name="required_technical_level"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- Tab 2: Job Position Matrix -->
+                            <page string="Job Position Matrix Guidelines" invisible="proficiency_determinant != 'job_position'">
+                                <field name="job_matrix_line_ids">
+                                    <list editable="bottom">
+                                        <field name="job_id"/>
+                                        <field name="required_leadership_level"/>
+                                        <field name="required_core_level"/>
+                                        <field name="required_technical_level"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- Tab 3: Configurable Technical Behavioral Indicators -->
+                            <page string="Standard Technical Behavioral Indicators">
+                                <div style="margin-bottom: 12px; color: #541718; font-weight: bold;">
+                                    Configure standard global behavioral indicators for technical competencies across Levels 1 through 4:
+                                </div>
+                                <group>
+                                    <field name="tech_indicator_level_1" placeholder="Level 1 (Basic) behavioral expectations..."/>
+                                    <field name="tech_indicator_level_2" placeholder="Level 2 (Intermediate) behavioral expectations..."/>
+                                    <field name="tech_indicator_level_3" placeholder="Level 3 (Advanced) behavioral expectations..."/>
+                                    <field name="tech_indicator_level_4" placeholder="Level 4 (Expert) behavioral expectations..."/>
+                                </group>
+                            </page>
+                        </notebook>
+
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Window Action for Matrix Configuration -->
+        <record id="action_competency_matrix_config" model="ir.actions.server">
+            <field name="name">Proficiency Matrix Settings</field>
+            <field name="model_id" ref="model_competency_matrix_config"/>
+            <field name="state">code</field>
+            <field name="code">
+config = env['competency.matrix.config'].get_active_config()
+action = {
+    'type': 'ir.actions.act_window',
+    'name': 'Competency Proficiency Matrix Configuration',
+    'res_model': 'competency.matrix.config',
+    'res_id': config.id,
+    'view_mode': 'form',
+    'target': 'current',
+}
+            </field>
+        </record>
+
+    </data>
+</odoo>

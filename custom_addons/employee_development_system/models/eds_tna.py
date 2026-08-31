@@ -384,7 +384,7 @@ class EdsTnaEntry(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
-            self.job_position_id = self.employee_id.job_position
+            self.job_position_id = self.employee_id.job_id
             self.department_id = self.employee_id.department_id
             if not self.work_unit_id:
                 self.work_unit_id = self.employee_id.default_operating_unit_id \

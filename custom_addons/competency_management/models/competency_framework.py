@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 
 
 class CompetencyFramework(models.Model):
-    """Version-controlled competency framework ,/005)."""
+    """Version-controlled competency framework (FR-CFD-004, FR-CFD-005, Competency Review Schedule)."""
     _name = 'competency.framework'
     _description = 'Competency Framework'
     _inherit = ['mail.thread', 'mail.activity.mixin']
@@ -24,11 +26,42 @@ class CompetencyFramework(models.Model):
     line_ids = fields.One2many('competency.framework.line', 'framework_id', string='Competency Lines')
     change_description = fields.Text(
         string='Change Description',
-        help='Reason for this version change .')
+        help='Reason for this version change.')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
     approval_history_ids = fields.One2many(
         'competency.approval.history', 'framework_id', string='Approval History', copy=False)
+
+    # Periodic Competency Framework Review Schedule fields
+    review_frequency_months = fields.Integer(
+        string='Review Frequency (Months)', default=12,
+        help='Configurable periodic framework review interval in months.')
+    last_review_date = fields.Date(string='Last Review Date', tracking=True)
+    next_review_date = fields.Date(
+        string='Next Review Date', compute='_compute_review_schedule', store=True, tracking=True)
+    review_status = fields.Selection([
+        ('on_schedule', 'On Schedule'),
+        ('due_soon', 'Review Due Soon'),
+        ('overdue', 'Review Overdue'),
+    ], string='Review Status', compute='_compute_review_schedule', store=True, tracking=True)
+
+    @api.depends('effective_date', 'last_review_date', 'review_frequency_months')
+    def _compute_review_schedule(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            base_date = rec.last_review_date or rec.effective_date or today
+            if base_date and (rec.review_frequency_months or 0) > 0:
+                next_date = base_date + relativedelta(months=rec.review_frequency_months)
+                rec.next_review_date = next_date
+                if next_date < today:
+                    rec.review_status = 'overdue'
+                elif (next_date - today).days <= 30:
+                    rec.review_status = 'due_soon'
+                else:
+                    rec.review_status = 'on_schedule'
+            else:
+                rec.next_review_date = False
+                rec.review_status = 'on_schedule'
 
     _sql_constraints = [
         ('code_version_uniq', 'unique(code, version)',

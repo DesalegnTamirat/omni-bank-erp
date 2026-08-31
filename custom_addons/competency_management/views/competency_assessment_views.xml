@@ -97,8 +97,8 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_auto_fill_lines" string="Auto-Fill from Role Mapping"
-                                type="object" invisible="line_ids or state != 'draft'"/>
+                        <button name="action_populate_competencies" string="Populate Competencies"
+                                type="object" class="oe_highlight" invisible="state != 'draft'" icon="fa-list-ol"/>
                         <button name="action_submit" string="Submit"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_supervisor_review" string="Supervisor Review"
@@ -118,12 +118,12 @@
                         <group>
                             <group>
                                 <field name="name" readonly="1"/>
-                                <field name="employee_id" readonly="is_locked or state in ('submitted','supervisor_review','hr_verified','approved','locked')"/>
-                                <field name="cycle_id" readonly="is_locked or state != 'draft'"/>
+                                <field name="cycle_id" readonly="state != 'draft'" domain="[('state', '=', 'open')]"/>
+                                <field name="assessment_type" readonly="state != 'draft'"/>
+                                <field name="employee_id" readonly="state != 'draft' or not assessment_type or assessment_type == 'self'"/>
                             </group>
                             <group>
-                                <field name="assessment_type" readonly="is_locked or state != 'draft'"/>
-                                <field name="assessor_id" readonly="is_locked"/>
+                                <field name="assessor_id" readonly="1" force_save="1"/>
                                 <field name="average_gap"/>
                                 <field name="is_locked"/>
                             </group>
@@ -157,31 +157,27 @@
             <field name="model">competency.assessment</field>
             <field name="arch" type="xml">
                 <search>
+                    <field name="name"/>
                     <field name="employee_id"/>
                     <field name="cycle_id"/>
                     <field name="assessment_type"/>
-                    <filter string="Open Cycle Assessments" name="open_cycle_assessments"
-                            domain="[('cycle_id.state','=','open')]"/>
-                    <filter string="My Assessments" name="my_assessments"
-                            domain="[('employee_id.user_id','=',uid)]"/>
-                    <filter string="Open Assessments" name="open_assessments"
-                            domain="[('state','in',('draft','submitted','supervisor_review','hr_verified'))]"/>
-                    <filter string="Locked" name="locked" domain="[('state','=','locked')]"/>
-                    <separator/>
-                    <group name="group_by">
-                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
-                        <filter string="Type" name="group_type" context="{'group_by':'assessment_type'}"/>
+                    <field name="assessor_id"/>
+                    <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                    <filter string="Submitted" name="state_submitted" domain="[('state','=','submitted')]"/>
+                    <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
+                    <group>
                         <filter string="Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
+                        <filter string="Assessment Type" name="group_type" context="{'group_by':'assessment_type'}"/>
+                        <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
                     </group>
                 </search>
             </field>
         </record>
 
         <record id="action_competency_assessment" model="ir.actions.act_window">
-            <field name="name">Competency Assessments</field>
+            <field name="name">All Competency Assessments</field>
             <field name="res_model">competency.assessment</field>
             <field name="view_mode">list,form</field>
-            <field name="context">{'search_default_open_cycle_assessments': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
         </record>
 
@@ -190,7 +186,6 @@
             <field name="res_model">competency.assessment</field>
             <field name="view_mode">list,form</field>
             <field name="domain">[('employee_id.user_id', '=', uid)]</field>
-            <field name="context">{'search_default_my_assessments': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
         </record>
 

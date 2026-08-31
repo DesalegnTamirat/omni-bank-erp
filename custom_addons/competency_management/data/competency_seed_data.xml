@@ -92,5 +92,8 @@
 
         </record>
 
+        <!-- Automatically trigger seeding of matrix competencies, framework, clusters & role mappings -->
+        <function model="competency.competency" name="action_seed_matrix_data"/>
+
     </data>
 </odoo>

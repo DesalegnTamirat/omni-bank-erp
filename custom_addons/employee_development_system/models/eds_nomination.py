@@ -29,7 +29,7 @@ class EdsNomination(models.Model):
                                  ondelete='cascade', index=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True,
                                   tracking=True)
-    job_position_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_position',
+    job_position_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_id',
                                       readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',
                                     related='employee_id.department_id', readonly=True)
@@ -362,7 +362,7 @@ class EdsEnrollment(models.Model):
                                  ondelete='cascade', index=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position',
-                                      related='employee_id.job_position', readonly=True)
+                                      related='employee_id.job_id', readonly=True)
     department_id = fields.Many2one('hr.department', string='Department',
                                     related='employee_id.department_id', readonly=True)
     nomination_id = fields.Many2one('eds.nomination', string='Nomination', ondelete='cascade')
