@@ -438,6 +438,14 @@ class BunnaMyAttendance(http.Controller):
             a_start = m_end + today_shift.get('lunch_duration', 1.0)
             a_end = today_shift.get('end_time', 17.0)
 
+            enable_checkin_restriction = request.env['ir.config_parameter'].sudo().get_param(
+                'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
+            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
+            checkin_grace = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
+
+            m_cutoff = m_start + checkin_grace + dead_time
+            a_cutoff = a_start + dead_time
+
             # Morning Session Check
             m_att = today_atts.filtered(lambda a: (a.shift_end_float and a.shift_end_float <= (m_end + 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour < int(m_end)))
             if m_att:
@@ -449,9 +457,15 @@ class BunnaMyAttendance(http.Controller):
                     m_status = 'active'
                     m_badge = "Active (Live)"
             else:
-                if current_float >= m_end:
+                if enable_checkin_restriction and current_float > m_cutoff:
+                    m_status = 'absent'
+                    m_badge = "Window Closed (Missed)"
+                elif current_float >= m_end:
                     m_status = 'absent'
                     m_badge = "Absent (Missed)"
+                elif current_float >= (m_start - 0.50):
+                    m_status = 'ready'
+                    m_badge = "Ready to Check In"
                 else:
                     m_status = 'upcoming'
                     m_badge = "Upcoming"
@@ -467,7 +481,10 @@ class BunnaMyAttendance(http.Controller):
                     a_status = 'active'
                     a_badge = "Active (Live)"
             else:
-                if current_float >= a_end:
+                if enable_checkin_restriction and current_float > a_cutoff:
+                    a_status = 'absent'
+                    a_badge = "Window Closed (Missed)"
+                elif current_float >= a_end:
                     a_status = 'absent'
                     a_badge = "Absent (Missed)"
                 elif current_float >= (a_start - 0.25):

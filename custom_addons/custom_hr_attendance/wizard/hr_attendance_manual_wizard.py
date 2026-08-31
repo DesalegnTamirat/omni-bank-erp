@@ -341,6 +341,11 @@ class HrAttendanceManualWizard(models.TransientModel):
             shift_info = self.employee_id._get_employee_shift_info(target_date=self.work_date)
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
             shift_end = shift_info.get('end_time', 17.0) if shift_info else 17.0
+            has_lunch = shift_info.get('has_lunch_break', False) if shift_info else False
+            lunch_start = shift_info.get('lunch_out_time', 12.0) if shift_info else 12.0
+            lunch_dur = shift_info.get('lunch_duration', 1.0) if shift_info else 1.0
+            afternoon_start = lunch_start + lunch_dur
+            lunch_midpoint = (lunch_start + afternoon_start) / 2.0 if has_lunch else 0.0
 
             # ------------------------------------------------
             # 1.1 CHECK-OUT ONLY (Complete Active Session)
@@ -370,12 +375,12 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if dt_check_out <= open_att.check_in:
                     raise ValidationError(_('Check-Out time must be strictly after the recorded Check-In time (%s).') % fields.Datetime.to_string(open_att.check_in))
 
-                s_end = open_att.shift_end_float or shift_end
+                s_end = open_att.shift_end_float or (lunch_start if (has_lunch and self.check_out_time <= lunch_midpoint) else shift_end)
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
                 over_time_hour = 0.0
                 if self.check_out_time < s_end:
-                    early_exit_hour = s_end - self.check_out_time
+                    early_exit_hour = round(s_end - self.check_out_time, 4)
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
                 else:
@@ -444,14 +449,21 @@ class HrAttendanceManualWizard(models.TransientModel):
                     ], limit=1)
                 if existing_open:
                     raise ValidationError(_(
-                        "Employee '%s' already has an active open check-in session for %s. "
-                        "Please select 'Check-Out Only' to complete the existing session."
+                        "Employee '%s' already has an active open check-in record for %s. "
+                        "Please select 'Check-Out Only' to close the open session."
                     ) % (self.employee_id.name, self.work_date))
 
                 dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
 
-                if self.check_in_time > shift_start:
-                    late_hours = self.check_in_time - shift_start
+                if has_lunch and self.check_in_time >= lunch_midpoint:
+                    session_start = afternoon_start
+                    session_end = shift_end
+                else:
+                    session_start = shift_start
+                    session_end = lunch_start if has_lunch else shift_end
+
+                if self.check_in_time > session_start:
+                    late_hours = round(self.check_in_time - session_start, 4)
                     status = 'Acknowledged Lateness'
                     late_time_hour = late_hours
                     acknowledged_late = late_hours
@@ -469,8 +481,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'actual_check_in': dt_check_in,
                     'in_mode': in_mode_val,
                     'out_mode': False,
-                    'shift_start_float': shift_start,
-                    'shift_end_float': shift_end,
+                    'shift_start_float': session_start,
+                    'shift_end_float': session_end,
                     'check_in_status': status,
                     'late_time_hour': late_time_hour,
                     'acknowledged_late': acknowledged_late,
@@ -518,9 +530,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                     ], limit=1)
                 if existing_open:
                     raise ValidationError(_(
-                        "Employee '%s' already has an active open check-in session for %s. "
-                        "You cannot create a 'Both (Check-In & Check-Out)' record while a session is active. "
-                        "Please select 'Check-Out Only' to complete the active session."
+                        "Employee '%s' already has an active open check-in record for %s. "
+                        "Please select 'Check-Out Only' to close the open session."
                     ) % (self.employee_id.name, self.work_date))
 
                 if self.check_in_time is False or not self.check_out_time:
@@ -532,8 +543,19 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if dt_check_out <= dt_check_in:
                     raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))
 
-                if self.check_in_time > shift_start:
-                    late_hours = self.check_in_time - shift_start
+                if has_lunch:
+                    if self.check_in_time >= lunch_midpoint:
+                        session_start = afternoon_start
+                        session_end = shift_end
+                    else:
+                        session_start = shift_start
+                        session_end = lunch_start if self.check_out_time <= afternoon_start else shift_end
+                else:
+                    session_start = shift_start
+                    session_end = shift_end
+
+                if self.check_in_time > session_start:
+                    late_hours = round(self.check_in_time - session_start, 4)
                     status = 'Acknowledged Lateness'
                     late_time_hour = late_hours
                     acknowledged_late = late_hours
@@ -545,13 +567,13 @@ class HrAttendanceManualWizard(models.TransientModel):
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
                 over_time_hour = 0.0
-                if self.check_out_time < shift_end:
-                    early_exit_hour = shift_end - self.check_out_time
+                if self.check_out_time < session_end:
+                    early_exit_hour = round(session_end - self.check_out_time, 4)
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
                 else:
-                    if self.check_out_time > shift_end:
-                        over_time_hour = round(self.check_out_time - shift_end, 2)
+                    if self.check_out_time > session_end:
+                        over_time_hour = round(self.check_out_time - session_end, 2)
                     check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
 
                 mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
@@ -563,8 +585,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'actual_check_in': dt_check_in,
                     'in_mode': mode_val,
                     'out_mode': mode_val,
-                    'shift_start_float': shift_start,
-                    'shift_end_float': shift_end,
+                    'shift_start_float': session_start,
+                    'shift_end_float': session_end,
                     'check_in_status': status,
                     'late_time_hour': late_time_hour,
                     'acknowledged_late': acknowledged_late,

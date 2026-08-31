@@ -512,12 +512,11 @@ class HrEmployeePrivate(models.Model):
                         self.write({'attendance_state': 'checked_in', 'last_attendance_id': new_att.id})
                         return new_att
                     else:
-                        # Past Afternoon Cutoff
-                        self.write({'attendance_state': 'checked_out'})
-                        raise UserError(_(
-                            "Morning session has been closed (Force Checkout).\n\n"
-                            "Afternoon check-in is not allowed because you are past the allowed late threshold (%s)."
-                        ) % _fmt(afternoon_late_cutoff))
+                        # Past Afternoon Cutoff:
+                        # Morning session was force-closed at lunch_start. Commit state cleanly without rollback.
+                        self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
+                        _logger.warning("Morning session Force Checkout committed for %s. Afternoon entry blocked (past cutoff %s).", self.name, _fmt(afternoon_late_cutoff))
+                        return attendance
 
             # Regular Shift-End Check-Out (Afternoon or Full-Day)
             target_shift_end = attendance.shift_end_float or sched['shift_end']
