@@ -7,6 +7,25 @@
         <field name="inherit_id" ref="hr_attendance.hr_attendance_view_form"/>
         <field name="priority">500</field>
         <field name="arch" type="xml">
+            <!-- Strict View-Only Form Attributes -->
+            <xpath expr="//form" position="attributes">
+                <attribute name="create">0</attribute>
+                <attribute name="edit">0</attribute>
+                <attribute name="delete">0</attribute>
+                <attribute name="duplicate">0</attribute>
+            </xpath>
+
+            <!-- Make core fields strictly readonly -->
+            <xpath expr="//field[@name='employee_id']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='check_in']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='check_out']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
+
             <!-- Header buttons for Approve Overtime for Payroll -->
             <sheet position="before">
                 <header>
@@ -93,6 +112,14 @@
         <field name="inherit_id" ref="hr_attendance.view_attendance_tree"/>
         <field name="priority">500</field>
         <field name="arch" type="xml">
+            <!-- Strict View-Only List Attributes -->
+            <xpath expr="//list" position="attributes">
+                <attribute name="create">0</attribute>
+                <attribute name="edit">0</attribute>
+                <attribute name="delete">0</attribute>
+                <attribute name="duplicate">0</attribute>
+            </xpath>
+
             <!-- Hide standard Odoo overtime fields in tree view -->
             <xpath expr="//field[@name='overtime_hours']" position="attributes">
                 <attribute name="column_invisible">1</attribute>

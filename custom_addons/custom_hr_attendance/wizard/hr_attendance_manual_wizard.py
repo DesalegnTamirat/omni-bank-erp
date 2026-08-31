@@ -202,7 +202,7 @@ class HrAttendanceManualWizard(models.TransientModel):
             ])
             self.employee_ids = [(6, 0, emps.ids)]
 
-    @api.onchange('employee_id', 'work_date', 'entry_type', 'attendance_mode')
+    @api.onchange('employee_id', 'work_date', 'entry_type', 'attendance_mode', 'target_session')
     def _onchange_employee_work_date(self):
         if self.entry_type == 'individual' and self.employee_id:
             target_date = self.work_date or fields.Date.context_today(self)
@@ -210,14 +210,63 @@ class HrAttendanceManualWizard(models.TransientModel):
             if shift_info and not shift_info.get('is_day_off'):
                 s_start = shift_info.get('start_time', 8.0)
                 s_end = shift_info.get('end_time', 17.0)
+                has_lunch = shift_info.get('has_lunch_break', False)
+                lunch_start = shift_info.get('lunch_out_time', 12.0)
+                lunch_dur = shift_info.get('lunch_duration', 1.0)
+                afternoon_start = lunch_start + lunch_dur
                 s_name = shift_info.get('name', 'Standard Shift')
-                self.detected_shift_name = s_name
-                self.detected_shift_info = f"{s_name} ({self._float_to_time_str(s_start)} - {self._float_to_time_str(s_end)})"
             else:
                 s_start = 8.0
                 s_end = 17.0
-                self.detected_shift_name = 'Default Global Shift'
-                self.detected_shift_info = 'Default Global Shift (08:00 AM - 05:00 PM)'
+                has_lunch = False
+                lunch_start = 12.0
+                lunch_dur = 1.0
+                afternoon_start = 13.0
+                s_name = 'Default Global Shift'
+
+            self.detected_shift_name = s_name
+            self.detected_shift_info = f"{s_name} ({self._float_to_time_str(s_start)} - {self._float_to_time_str(s_end)})"
+
+            # Auto-detect if morning session is already completed on target_date
+            existing_closed_morning = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('work_date', '=', target_date),
+                ('check_out', '!=', False),
+            ], limit=1)
+            
+            # If employee already has a closed morning session, disable Full Day and Morning Session
+            warning_dict = {}
+            if existing_closed_morning:
+                if self.target_session == 'full_day':
+                    self.target_session = 'afternoon'
+                    warning_dict = {
+                        'title': _('Morning Attendance Already Exists'),
+                        'message': _(
+                            "Employee '%s' already has a recorded morning attendance for %s. "
+                            "'Full Day' is disabled to prevent duplicate morning entries. "
+                            "Switched to 'Afternoon Session'."
+                        ) % (self.employee_id.name, target_date)
+                    }
+                elif self.target_session == 'morning':
+                    self.target_session = 'afternoon'
+                    warning_dict = {
+                        'title': _('Morning Attendance Already Exists'),
+                        'message': _(
+                            "Employee '%s' already has a recorded morning attendance for %s. "
+                            "Switched to 'Afternoon Session'."
+                        ) % (self.employee_id.name, target_date)
+                    }
+
+            # Resolve session timings based on target_session
+            if self.target_session == 'afternoon':
+                session_start = afternoon_start if has_lunch else s_start
+                session_end = s_end
+            elif self.target_session == 'morning':
+                session_start = s_start
+                session_end = lunch_start if has_lunch else s_end
+            else:
+                session_start = s_start
+                session_end = s_end
 
             # Find active open check-in on that date or open check-in in general
             open_att = self.env['hr.attendance'].sudo().search([
@@ -251,8 +300,8 @@ class HrAttendanceManualWizard(models.TransientModel):
                             ) % (self.employee_id.name, target_date)
                         }
                     }
-                self.check_in_time = s_start
-                self.check_out_time = s_end
+                self.check_in_time = session_start
+                self.check_out_time = session_end
 
             elif self.attendance_mode == 'check_in':
                 if open_att:
@@ -268,7 +317,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                             ) % (self.employee_id.name, target_date)
                         }
                     }
-                self.check_in_time = s_start
+                self.check_in_time = session_start
                 self.check_out_time = False
 
             elif self.attendance_mode == 'check_out':
@@ -289,8 +338,11 @@ class HrAttendanceManualWizard(models.TransientModel):
                     local_dt = fields.Datetime.context_timestamp(self.employee_id, open_att.check_in)
                     self.check_in_time = local_dt.hour + (local_dt.minute / 60.0)
                 else:
-                    self.check_in_time = s_start
-                self.check_out_time = s_end
+                    self.check_in_time = session_start
+                self.check_out_time = session_end
+
+            if warning_dict:
+                return {'warning': warning_dict}
 
     @api.constrains('work_date', 'start_date', 'end_date', 'entry_type')
     def _check_back_date(self):
@@ -342,6 +394,18 @@ class HrAttendanceManualWizard(models.TransientModel):
 
             if not self.attendance_mode:
                 raise ValidationError(_('Please select an Attendance Action (Check-In Only, Check-Out Only, or Both).'))
+
+            existing_closed_morning = self.env['hr.attendance'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+                ('work_date', '=', self.work_date),
+                ('check_out', '!=', False),
+            ], limit=1)
+
+            if existing_closed_morning and self.target_session in ('morning', 'full_day'):
+                raise ValidationError(_(
+                    "Employee '%s' already has a recorded morning attendance for %s. "
+                    "Please select 'Afternoon Session' to record afternoon attendance."
+                ) % (self.employee_id.name, self.work_date))
 
             shift_info = self.employee_id._get_employee_shift_info(target_date=self.work_date)
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0

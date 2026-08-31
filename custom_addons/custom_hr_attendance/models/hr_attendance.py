@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 import datetime
 import pytz
 import logging
@@ -326,10 +326,12 @@ class HrAttendance(models.Model):
 
 
     def unlink(self):
-        """ Soft delete: Archive records instead of removing them from database """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+        if not self.env.context.get('force_unlink_attendance'):
+            raise UserError(_('Attendance records cannot be deleted. All attendance data is strictly retained for compliance and audit.'))
+        return super().unlink()
+
+    def action_archive(self):
+        raise UserError(_('Attendance records cannot be archived. All attendance data must remain permanently active.'))
 
     def _compute_discipline_case_count(self):
         """Count discipline cases referencing this attendance record."""
