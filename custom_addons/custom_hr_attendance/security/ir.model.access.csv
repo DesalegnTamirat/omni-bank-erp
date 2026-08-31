@@ -1,5 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_my_shift_schedule_user,my_shift_schedule_user,model_my_shift_schedule,base.group_user,1,1,1,1
+access_my_shift_schedule_line_user,my_shift_schedule_line_user,model_my_shift_schedule_line,base.group_user,1,1,1,1
 access_hr_attendance_user,hr_attendance_user,model_hr_attendance,hr_attendance.group_hr_attendance_user,1,1,1,0
 access_hr_attendance_manual_user,hr_attendance_manual_user,model_hr_attendance,custom_hr_attendance.group_hr_attendance_manual_user,1,1,1,0
 access_preapproval_user,preapproval_user,model_attendance_preapproval,custom_hr_attendance.group_hr_attendance_manual_user,1,1,1,0

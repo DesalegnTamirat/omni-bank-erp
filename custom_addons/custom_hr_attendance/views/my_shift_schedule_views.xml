@@ -57,6 +57,23 @@
                             <field name="lunch_time_range" readonly="1"/>
                         </group>
                     </group>
+
+                    <notebook invisible="assignment_source != 'roster'">
+                        <page string="Weekly Roster Schedule" name="roster_schedule">
+                            <field name="roster_line_ids" readonly="1">
+                                <list string="Weekly Roster" decoration-info="is_today" decoration-muted="schedule_type == 'day_off'">
+                                    <field name="is_today" column_invisible="1"/>
+                                    <field name="date"/>
+                                    <field name="day_name"/>
+                                    <field name="schedule_type" widget="badge" decoration-success="schedule_type == 'shift'" decoration-warning="schedule_type == 'day_off'"/>
+                                    <field name="shift_id"/>
+                                    <field name="time_range"/>
+                                    <field name="duration"/>
+                                    <field name="lunch_time_range"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

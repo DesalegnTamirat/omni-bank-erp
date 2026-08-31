@@ -33,11 +33,18 @@ class MyShiftSchedule(models.TransientModel):
     start_date = fields.Date(string="Start Date", readonly=True)
     end_date = fields.Date(string="End Date", readonly=True)
 
+    roster_line_ids = fields.One2many(
+        'my.shift.schedule.line',
+        'schedule_id',
+        string="Weekly Roster Schedule",
+        readonly=True
+    )
+
     @api.model
     def action_open_my_shift(self):
         """
         Resolves the logged-in user's active shift hierarchy
-        and opens a clean My Shift Schedule transient view.
+        and opens a clean My Shift Schedule transient view with full weekly roster details.
         """
         user = self.env.user
         employee = user.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
@@ -64,6 +71,7 @@ class MyShiftSchedule(models.TransientModel):
         time_range = "08:00 - 17:00"
         start_date = today
         end_date = False
+        roster_lines_vals = []
 
         if employee:
             # Priority 1: Job Position Roster Exception (Date-based)
@@ -77,9 +85,47 @@ class MyShiftSchedule(models.TransientModel):
             if roster:
                 assignment_source = 'roster'
                 schedule_name = roster.name or _('Job Position Roster Exception')
-                shift_obj = roster.shift_id
+                today_line = roster.line_ids.filtered(lambda l: l.date == today)[:1]
+                if today_line:
+                    if today_line.schedule_type == 'day_off':
+                        schedule_name = _("%s (Day Off Today)") % (roster.name or _('Roster'))
+                        shift_obj = False
+                    else:
+                        shift_obj = today_line.shift_id
+                else:
+                    shift_obj = False
                 start_date = roster.start_date
                 end_date = roster.end_date
+
+                # Build all weekly schedule lines for display
+                for l in roster.line_ids.sorted(key=lambda r: r.date or fields.Date.today()):
+                    l_time_range = _("Day Off")
+                    l_duration = 0.0
+                    l_lunch = _("No Lunch Break")
+                    if l.schedule_type == 'shift' and l.shift_id:
+                        s_time = l.shift_id.start_time
+                        e_time = l.shift_id.end_time
+                        gross = e_time - s_time
+                        if gross < 0:
+                            gross += 24.0
+                        l_duration = max(0.0, round(gross - (l.shift_id.lunch_duration if l.shift_id.has_lunch_break else 0.0), 2))
+                        l_time_range = l.shift_id.time_range or f"{_fmt(s_time)} - {_fmt(e_time)}"
+                        if l.shift_id.has_lunch_break:
+                            l_end = l.shift_id.lunch_start_time + l.shift_id.lunch_duration
+                            l_lunch = f"{_fmt(l.shift_id.lunch_start_time)} - {_fmt(l_end)} ({l.shift_id.lunch_duration:.1f}h)"
+                        else:
+                            l_lunch = _("No Lunch Break")
+
+                    roster_lines_vals.append((0, 0, {
+                        'date': l.date,
+                        'day_name': l.day_name or (l.date.strftime('%A') if l.date else ''),
+                        'schedule_type': l.schedule_type,
+                        'shift_id': l.shift_id.id if l.shift_id else False,
+                        'time_range': l_time_range,
+                        'duration': l_duration,
+                        'lunch_time_range': l_lunch,
+                        'is_today': (l.date == today),
+                    }))
 
             else:
                 # Priority 2: Job Position Exception (Static)
@@ -140,6 +186,12 @@ class MyShiftSchedule(models.TransientModel):
                 lunch_time_range = f"{_fmt(lunch_start_time)} - {_fmt(l_end)} ({lunch_duration:.1f}h)"
             else:
                 lunch_time_range = _("No Lunch Break")
+        elif assignment_source == 'roster':
+            start_time = 0.0
+            end_time = 0.0
+            duration = 0.0
+            time_range = _("Day Off")
+            lunch_time_range = _("Day Off")
         elif assignment_source == 'default':
             ICP = self.env['ir.config_parameter'].sudo()
             start_time = float(ICP.get_param('hr_attendance.morning_time', '8.0'))
@@ -177,13 +229,33 @@ class MyShiftSchedule(models.TransientModel):
             'lunch_time_range': lunch_time_range,
             'start_date': start_date,
             'end_date': end_date,
+            'roster_line_ids': roster_lines_vals,
         })
 
         return {
             'type': 'ir.actions.act_window',
             'name': _('My Shift Schedule'),
             'res_model': 'my.shift.schedule',
-            'domain': [('id', '=', rec.id)],
-            'view_mode': 'list,form',
+            'res_id': rec.id,
+            'view_mode': 'form',
             'target': 'current',
         }
+
+
+class MyShiftScheduleLine(models.TransientModel):
+    _name = 'my.shift.schedule.line'
+    _description = 'My Shift Schedule Line'
+    _order = 'date asc, id asc'
+
+    schedule_id = fields.Many2one('my.shift.schedule', ondelete='cascade')
+    date = fields.Date(string="Date", readonly=True)
+    day_name = fields.Char(string="Day of Week", readonly=True)
+    schedule_type = fields.Selection([
+        ('shift', 'Assigned Shift'),
+        ('day_off', 'Day Off')
+    ], string="Schedule Type", readonly=True)
+    shift_id = fields.Many2one('job.shift', string="Assigned Shift", readonly=True)
+    time_range = fields.Char(string="Working Hours", readonly=True)
+    duration = fields.Float(string="Duration (Hours)", readonly=True)
+    lunch_time_range = fields.Char(string="Lunch Break", readonly=True)
+    is_today = fields.Boolean(string="Is Today", readonly=True)
