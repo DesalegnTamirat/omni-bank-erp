@@ -229,6 +229,9 @@ class OverTime(models.Model):
             if record.end_time <= record.start_time:
                 raise ValidationError("End time must be after start time.")
 
+            if self.env.context.get('skip_past_date_check') or self.env.context.get('from_attendance'):
+                continue
+
             user_tz = self.env.user.tz or 'UTC'
             tz = pytz.timezone(user_tz)
             now = datetime.now(tz)

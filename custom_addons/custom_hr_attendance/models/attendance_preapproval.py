@@ -221,10 +221,15 @@ class AttendancePreApproval(models.Model):
     def action_approve(self):
         is_admin = self.env.user.has_group('hr_attendance.group_hr_attendance_manager')
         current_uid = self.env.uid
+        user_emp = self.env.user.employee_id
         for rec in self:
-            if rec.create_uid.id == current_uid and not is_admin:
-                raise ValidationError("You are not allowed to approve your own request.")
             emp = rec.employee_id
+            emp_user = emp.user_id if emp else False
+
+            # Strict Anti-Self-Approval
+            if (emp_user and emp_user.id == current_uid) or (user_emp and emp.id == user_emp.id) or (rec.create_uid.id == current_uid):
+                raise ValidationError(_("You cannot approve your own predefined attendance request. Approval must come from your supervisor, coach, or another administrator."))
+
             is_manager = False
             if emp:
                 if emp.parent_id and emp.parent_id.user_id and emp.parent_id.user_id.id == current_uid:
@@ -233,7 +238,7 @@ class AttendancePreApproval(models.Model):
                     is_manager = True
 
             if not (is_admin or is_manager):
-                raise ValidationError("Only the employee's manager or an administrator can approve this request.")
+                raise ValidationError(_("Only the employee's manager or an administrator can approve this request."))
 
             rec.write({
                 'state': 'approved',

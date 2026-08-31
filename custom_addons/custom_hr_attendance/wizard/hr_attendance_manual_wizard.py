@@ -329,6 +329,12 @@ class HrAttendanceManualWizard(models.TransientModel):
             if not self.employee_id or not self.work_date:
                 raise ValidationError(_('Employee and Attendance Date are required for individual entry.'))
 
+            # Anti-Self Acknowledgement: Users cannot create/acknowledge manual attendance for themselves
+            emp_user = self.employee_id.user_id
+            user_emp = self.env.user.employee_id
+            if (emp_user and emp_user.id == self.env.uid) or (user_emp and self.employee_id.id == user_emp.id):
+                raise ValidationError(_("You cannot create or acknowledge manual attendance for yourself. Your attendance must be recorded/acknowledged by your supervisor or HR Administrator."))
+
             if not self.attendance_mode:
                 raise ValidationError(_('Please select an Attendance Action (Check-In Only, Check-Out Only, or Both).'))
 
@@ -367,11 +373,14 @@ class HrAttendanceManualWizard(models.TransientModel):
                 s_end = open_att.shift_end_float or shift_end
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
+                over_time_hour = 0.0
                 if self.check_out_time < s_end:
                     early_exit_hour = s_end - self.check_out_time
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
                 else:
+                    if self.check_out_time > s_end:
+                        over_time_hour = round(self.check_out_time - s_end, 2)
                     check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
 
                 out_mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
@@ -381,12 +390,22 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'check_out_status': check_out_status,
                     'early_exit_hour': early_exit_hour,
                     'acknowledged_exit': acknowledged_exit,
+                    'over_time_hour': over_time_hour,
                     'is_acknowledged': True,
                     'acknowledged_by': self.env.user.id,
                     'acknowledged_date': fields.Datetime.now(),
                 })
                 if self.attendance_reason_ids:
                     open_att.sudo().write({'attendance_reason_ids': [(4, rid) for rid in self.attendance_reason_ids.ids]})
+
+                if over_time_hour > 0 and self.env.get('over.time'):
+                    self.env['over.time'].sudo().with_context(skip_past_date_check=True).create({
+                        'employee_id': self.employee_id.id,
+                        'date': self.work_date,
+                        'start_time': s_end,
+                        'end_time': self.check_out_time,
+                        'over_time_reason': self.justification or _('Manual Attendance Overtime'),
+                    })
 
                 if self.work_date == today:
                     self.employee_id.sudo().write({
@@ -426,7 +445,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if existing_open:
                     raise ValidationError(_(
                         "Employee '%s' already has an active open check-in session for %s. "
-                        "Please select 'Check-Out Only' to complete the active session."
+                        "Please select 'Check-Out Only' to complete the existing session."
                     ) % (self.employee_id.name, self.work_date))
 
                 dt_check_in = self._float_time_to_utc_dt(self.work_date, self.check_in_time)
@@ -525,13 +544,15 @@ class HrAttendanceManualWizard(models.TransientModel):
 
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
+                over_time_hour = 0.0
                 if self.check_out_time < shift_end:
                     early_exit_hour = shift_end - self.check_out_time
                     acknowledged_exit = early_exit_hour
                     check_out_status = 'Acknowledged Early Exit'
                 else:
+                    if self.check_out_time > shift_end:
+                        over_time_hour = round(self.check_out_time - shift_end, 2)
                     check_out_status = 'Acknowledged Check-Out' if self.attendance_reason_ids else 'Manager Manual Check-Out'
-
 
                 mode_val = 'acknowledged' if self.attendance_reason_ids else 'manual'
                 vals = {
@@ -550,14 +571,23 @@ class HrAttendanceManualWizard(models.TransientModel):
                     'check_out_status': check_out_status,
                     'early_exit_hour': early_exit_hour,
                     'acknowledged_exit': acknowledged_exit,
+                    'over_time_hour': over_time_hour,
                     'is_acknowledged': True,
                     'acknowledged_by': self.env.user.id,
                     'acknowledged_date': fields.Datetime.now(),
                     'attendance_reason_ids': [(6, 0, self.attendance_reason_ids.ids)],
                 }
 
-
                 att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
+
+                if over_time_hour > 0 and self.env.get('over.time'):
+                    self.env['over.time'].sudo().with_context(skip_past_date_check=True).create({
+                        'employee_id': self.employee_id.id,
+                        'date': self.work_date,
+                        'start_time': shift_end,
+                        'end_time': self.check_out_time,
+                        'over_time_reason': self.justification or _('Manual Attendance Overtime'),
+                    })
 
                 if self.work_date == today:
                     self.employee_id.sudo().write({
