@@ -28,16 +28,27 @@
                     </div>
                 </div>
 
-                <!-- NAVIGATION TABS (CORPORATE vs PERSONAL) -->
-                <div t-if="state.hasCorporateAccess" class="d-flex align-items-center gap-2">
-                    <div class="btn-group bunna_tab_btn_group" role="group">
-                        <button type="button" t-attf-class="btn #{state.currentTab === 'corporate' ? 'btn-warning text-dark fw-bold shadow-sm' : 'btn-outline-light'}" t-on-click="() => this.switchTab('corporate')">
-                            <i class="fa fa-building me-1"/> Corporate Dashboard
-                        </button>
-                        <button type="button" t-attf-class="btn #{state.currentTab === 'personal' ? 'btn-warning text-dark fw-bold shadow-sm' : 'btn-outline-light'}" t-on-click="() => this.switchTab('personal')">
-                            <i class="fa fa-user me-1"/> My Personal Dashboard
-                        </button>
-                    </div>
+                <!-- NAVIGATION DROPDOWN (CORPORATE vs PERSONAL) -->
+                <div t-if="state.hasCorporateAccess" class="dropdown">
+                    <button class="btn btn-warning text-dark fw-bold dropdown-toggle d-flex align-items-center gap-2 shadow-sm px-3 py-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i t-attf-class="fa #{state.currentTab === 'corporate' ? 'fa-building' : 'fa-user'}"/>
+                        <span><t t-if="state.currentTab === 'corporate'">Corporate Dashboard</t><t t-else="">My Personal Dashboard</t></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="#" t-on-click.prevent="() => this.switchTab('corporate')" t-att-class="{'active fw-bold': state.currentTab === 'corporate'}">
+                                <i class="fa fa-building text-warning"/> Corporate Attendance Command Center
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="#" t-on-click.prevent="() => this.switchTab('personal')" t-att-class="{'active fw-bold': state.currentTab === 'personal'}">
+                                <i class="fa fa-user text-primary"/> My Personal Dashboard
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div t-else="" class="badge bg-white bg-opacity-20 text-white fs-6 px-3 py-2 rounded-pill d-flex align-items-center gap-2">
+                    <i class="fa fa-user text-warning"/> <span>My Personal Dashboard</span>
                 </div>
             </div>
 

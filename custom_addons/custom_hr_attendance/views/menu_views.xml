@@ -76,8 +76,8 @@
                 name="Attendance Dashboard"
                 parent="hr_attendance.menu_hr_attendance_root"
                 action="action_executive_attendance_dashboard"
-                sequence="4"
-                groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
+                groups="base.group_user"
+                sequence="4" />
 
         <!-- ====================================================
          5. Manager Menu (Accessible by Managers only)
