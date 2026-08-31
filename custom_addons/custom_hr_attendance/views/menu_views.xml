@@ -126,7 +126,32 @@
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
                 sequence="40" />
 
-        <!-- 5.5 Manual Attendance Entry Wizard -->
+        <!-- 5.5 Acknowledged Attendances (Manager List) -->
+        <record id="action_manager_acknowledged_attendances" model="ir.actions.act_window">
+            <field name="name">Acknowledged Attendances</field>
+            <field name="res_model">hr.attendance</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">['|', ('is_acknowledged', '=', True), ('in_mode', '=', 'acknowledged')]</field>
+            <field name="context">{'search_default_today': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No acknowledged attendances found.
+                </p>
+                <p>
+                    All manager-acknowledged attendance records and justifications will appear here.
+                </p>
+            </field>
+        </record>
+
+        <menuitem
+                id="menu_manager_acknowledged_attendances"
+                name="Acknowledged Attendances"
+                parent="hr_attendance.menu_hr_attendance_view_attendances_management"
+                action="action_manager_acknowledged_attendances"
+                sequence="45"
+                groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
+
+        <!-- 5.6 Manual Attendance Entry Wizard -->
         <menuitem
                 id="menu_manual_attendance_wizard"
                 name="Manual Attendance Entry"
@@ -135,7 +160,7 @@
                 sequence="50"
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
 
-        <!-- 5.6 Batch Attendance Requests (Coach Approval) -->
+        <!-- 5.7 Batch Attendance Requests (Coach Approval) -->
         <menuitem
                 id="menu_batch_attendance_requests"
                 name="Batch Attendance Requests"

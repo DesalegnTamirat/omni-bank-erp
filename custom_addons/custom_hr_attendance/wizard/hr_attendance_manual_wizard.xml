@@ -23,6 +23,7 @@
                         <group string="Employee &amp; Date">
                             <field name="employee_id" required="entry_type == 'individual'"/>
                             <field name="work_date" required="entry_type == 'individual'"/>
+                            <field name="target_session" required="entry_type == 'individual'"/>
                             <field name="attendance_mode" placeholder="Select Action..." required="entry_type == 'individual'"/>
                         </group>
                         <group string="Timestamps (Time Only)">
