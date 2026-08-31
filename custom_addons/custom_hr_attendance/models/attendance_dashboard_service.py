@@ -622,9 +622,11 @@ class HrAttendanceDashboardService(models.Model):
 
         # Card 1: Total Worked Hours & Target Hours
         period_worked_hours = round(sum(att.worked_hours or 0.0 for att in range_atts), 2)
+        period_predefined_hours = round(sum((att.pre_defined_lateness or 0.0) + (getattr(att, 'pre_approved_early_checkout', 0.0) or 0.0) for att in range_atts), 2)
+        period_compensable_hours = round(period_worked_hours + period_predefined_hours + sum((att.acknowledged_late or 0.0) + (att.acknowledged_exit or 0.0) for att in range_atts), 2)
         period_days = (e_d - s_d).days + 1
         target_hours = 160.0 if (date_range == 'this_month' or period_days > 14) else round(period_days * 8.0, 1)
-        worked_hours_pct = min(100.0, round((period_worked_hours / max(1.0, target_hours)) * 100, 1))
+        worked_hours_pct = min(100.0, round((period_compensable_hours / max(1.0, target_hours)) * 100, 1))
         avg_daily_hours = round(period_worked_hours / max(1, period_days), 1)
 
         # Card 2: Cumulative Late Hours & Punctuality Rating
@@ -780,8 +782,9 @@ class HrAttendanceDashboardService(models.Model):
                 if current_float >= t_end:
                     past_working_days += 1
 
+            comp_h = w_h + round(sum((a.pre_defined_lateness or 0.0) + (getattr(a, 'pre_approved_early_checkout', 0.0) or 0.0) + (a.acknowledged_late or 0.0) + (a.acknowledged_exit or 0.0) for a in b_atts), 2)
             expected_past_hours = past_working_days * 8.0
-            a_h = max(0.0, round(expected_past_hours - w_h, 2)) if past_working_days > 0 else 0.0
+            a_h = max(0.0, round(expected_past_hours - comp_h, 2)) if past_working_days > 0 else 0.0
             a_days = round(a_h / 8.0, 1)
             a_days_formatted = int(a_days) if (a_days % 1 == 0) else a_days
             max_bar_h = max(max_bar_h, w_h, l_h, a_h)

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Custom Time Off Type Form View - Streamlined to only needed fields
+         ============================================================ -->
+    <record id="view_hr_leave_type_form_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.leave.type.form.inherit.custom</field>
+        <field name="model">hr.leave.type</field>
+        <field name="inherit_id" ref="hr_holidays.edit_holiday_status_form"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+
+            <!-- Hide default unwanted fields & groups -->
+            <xpath expr="//field[@name='request_unit']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='responsible_ids']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//group[@name='leave_validation']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//group[@name='allocation_validation']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//group[@name='configuration']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//group[@name='negative_cap']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <!-- Add custom clean Rules & Configuration section -->
+            <xpath expr="//group[hasclass('mw-100')]" position="before">
+                <group string="Configuration &amp; Rules">
+                    <group>
+                        <field name="check_accrual_balance" widget="boolean_toggle"/>
+                        <field name="is_exact_days" widget="boolean_toggle"/>
+                        <field name="exact_days" invisible="not is_exact_days" placeholder="e.g. 30.0"/>
+                        <field name="max_allowed_days" placeholder="0.0 = no maximum limit"/>
+                    </group>
+                    <group>
+                        <field name="include_public_holidays_in_duration"/>
+                        <field name="support_document" string="Require Supporting Document" widget="boolean_toggle"/>
+                        <field name="hide_on_dashboard"/>
+                    </group>
+                </group>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

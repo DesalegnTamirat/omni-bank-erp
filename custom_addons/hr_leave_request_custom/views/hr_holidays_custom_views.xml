@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Main custom view - applies to the base Time Off form
+         ============================================================ -->
+    <record id="view_hr_leave_form_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.leave.form.inherit.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_form"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+
+            <!-- Add custom buttons and statusbar to header -->
+            <xpath expr="//header" position="inside">
+                <div class="d-flex flex-wrap gap-2 my-1">
+                    <button name="action_save_custom"
+                            type="object"
+                            string="Save"
+                            class="btn-primary"
+                            invisible="not show_save_btn"/>
+                    <button name="action_notify_request"
+                            type="object"
+                            string="Notify Request"
+                            class="btn-primary"
+                            invisible="not show_notify_btn"/>
+                    <button name="action_edit_custom"
+                            type="object"
+                            string="Edit"
+                            class="btn-primary"
+                            invisible="not show_edit_btn"/>
+                    <button name="action_admin_approve_edit"
+                            type="object"
+                            string="Approve"
+                            class="btn-primary"
+                            invisible="not show_approve_btn"/>
+                    <button name="action_discard_custom"
+                            type="object"
+                            string="Discard"
+                            class="btn-secondary"
+                            invisible="not show_discard_btn"/>
+                    <button name="action_cancel"
+                            type="object"
+                            string="Cancel"
+                            class="btn-secondary"
+                            groups="hr_holidays.group_hr_holidays_manager"
+                            invisible="not show_cancel_btn"/>
+                </div>
+                <field name="leave_request_status"
+                       widget="statusbar"
+                       statusbar_visible="fetch,draft,notify"/>
+                <field name="custom_saved" invisible="1"/>
+                <field name="is_edit_mode" invisible="1"/>
+                <field name="fields_readonly" invisible="1"/>
+                <field name="show_save_btn" invisible="1"/>
+                <field name="show_discard_btn" invisible="1"/>
+                <field name="show_edit_btn" invisible="1"/>
+                <field name="show_notify_btn" invisible="1"/>
+                <field name="show_approve_btn" invisible="1"/>
+                <field name="show_cancel_btn" invisible="1"/>
+                <field name="show_compute_btn" invisible="1"/>
+                <field name="is_hr_admin" invisible="1"/>
+                <field name="is_computed" invisible="1"/>
+                <field name="is_exact_days" invisible="1"/>
+                <field name="is_duration_readonly" invisible="1"/>
+                <field name="is_single_half_day" invisible="1"/>
+                <field name="is_multi_half_day" invisible="1"/>
+            </xpath>
+
+            <!-- Hide all base state statusbars -->
+            <xpath expr="//header/field[@name='state']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="(//header/field[@name='state'])[2]" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <!-- Hide all base buttons in header -->
+            <xpath expr="//header/button[@name='action_approve']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="(//header/button[@name='action_approve'])[2]" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_back_to_approval']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_refuse']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='action_cancel']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <!-- Hide base title and display_name details -->
+            <xpath expr="//div[@name='title']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='display_name']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <!-- Hide base warning alerts & original content -->
+            <xpath expr="//field[@name='dashboard_warning_message']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='leave_type_increases_duration']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//div[hasclass('o_hr_leave_content')]" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//div[hasclass('o_attachment_preview')]" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//chatter" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <!-- Add custom Leave Request form inside sheet -->
+            <xpath expr="//sheet" position="inside">
+                <div class="oe_title">
+                    <h1>
+                        <span>Leave Request</span>
+                    </h1>
+                </div>
+
+                <div class="row">
+                    <!-- Left Column: Requester Information & Balances -->
+                    <div class="col-md-6 col-12">
+                        <group string="Requester Information">
+                            <field name="employee_id"
+                                   string="Requester Name"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="job_position"
+                                   string="Job Position"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="job_grade"
+                                   string="Job Grade"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="job_category"
+                                   string="Job Category"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="operating_unit"
+                                   string="Operating Unit"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="accrued_leave_balance"
+                                   string="Accrued Leave Balance"
+                                   readonly="1"/>
+                            <field name="scheduled_leave_balance"
+                                   string="Scheduled Leave Balance"
+                                   readonly="1"/>
+                            <field name="fetch_status" invisible="1"/>
+                        </group>
+
+                        <group string="Computed Leave Details" class="mt-4">
+                            <field name="computed_leave"
+                                   string="Computed Leave (Days)"
+                                   readonly="1"
+                                   force_save="1"/>
+                            <field name="date_from" invisible="1"/>
+                            <field name="date_to" invisible="1"/>
+                            <field name="request_date_from" invisible="1"/>
+                            <field name="request_date_to" invisible="1"/>
+                            <field name="state" invisible="1"/>
+                        </group>
+                    </div>
+
+                    <!-- Right Column: Leave Details -->
+                    <div class="col-md-6 col-12">
+                        <group string="Leave Details">
+                            <field name="holiday_status_id"
+                                   string="Leave Reason"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="fields_readonly"/>
+                            <field name="support_document" invisible="1"/>
+                            <field name="attachment"
+                                   filename="attachment_name"
+                                   widget="binary"
+                                   string="Attachment"
+                                   readonly="fields_readonly"
+                                   invisible="not support_document"/>
+                            <field name="attachment_name" invisible="1"/>
+                            <field name="comments"
+                                   string="Comments"
+                                   placeholder=""
+                                   widget="text"
+                                   readonly="fields_readonly"/>
+                            <field name="leave_start_date"
+                                   string="Start Date"
+                                   readonly="fields_readonly"/>
+                            <field name="number_of_days"
+                                   string="Duration (Days)"
+                                   readonly="is_duration_readonly"
+                                   force_save="1"/>
+                            <field name="single_half_day_period"
+                                   string="Half Day Period"
+                                   widget="radio"
+                                   options="{'horizontal': true}"
+                                   invisible="not is_single_half_day"
+                                   readonly="fields_readonly"/>
+                            <field name="multi_half_day_period"
+                                   string="Select Half Day"
+                                   widget="radio"
+                                   options="{'horizontal': true}"
+                                   invisible="not is_multi_half_day"
+                                   readonly="fields_readonly"/>
+                            <field name="leave_end_date"
+                                   string="End Date"
+                                   readonly="fields_readonly"/>
+                            <field name="starting_half_day" invisible="1"/>
+                            <field name="ending_half_day" invisible="1"/>
+                            <field name="half_day" invisible="1"/>
+                            <field name="delegated_employee_id"
+                                   string="Delegated Employee"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="fields_readonly"/>
+                        </group>
+                    </div>
+                </div>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Manager view override to prevent duplicate fields
+         ============================================================ -->
+    <record id="view_hr_leave_form_manager_inherit_custom" model="ir.ui.view">
+        <field name="name">hr.leave.form.manager.inherit.custom</field>
+        <field name="model">hr.leave</field>
+        <field name="inherit_id" ref="hr_holidays.hr_leave_view_form_manager"/>
+        <field name="priority">100</field>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='title']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='employee_id'][@widget='many2one_avatar_employee']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='company_id']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+            <xpath expr="//field[@name='department_id']" position="attributes">
+                <attribute name="invisible">True</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Filter out unsaved leaves from lists & dashboards
+         ============================================================ -->
+    <record id="hr_holidays.hr_leave_action_my" model="ir.actions.act_window">
+        <field name="domain">[('user_id', '=', uid), ('custom_saved', '=', True)]</field>
+    </record>
+
+    <record id="hr_holidays.hr_leave_action_action_approve_department" model="ir.actions.act_window">
+        <field name="domain">[('employee_id.company_id', 'in', allowed_company_ids), ('custom_saved', '=', True)]</field>
+    </record>
+
+    <!-- ============================================================
+         Safety-net cron
+         ============================================================ -->
+    <record id="ir_cron_cleanup_abandoned_leave_requests" model="ir.cron">
+        <field name="name">Time Off: Clean up abandoned auto-saved leave requests</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_cleanup_abandoned_leave_requests()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>

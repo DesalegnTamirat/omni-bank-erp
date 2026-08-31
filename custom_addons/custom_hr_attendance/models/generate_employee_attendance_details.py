@@ -21,6 +21,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
     remarks = fields.Char(string="Remarks")
 
     worked_hours = fields.Float(string="Worked Hours")
+    payable_hours = fields.Float(string="Total Compensable (Hours)")
     leave_hours = fields.Float(string="Leave Hours")
     late_time_hour = fields.Float(string="Late Time (Hours)")
     early_exit_hour = fields.Float(string="Early Exit (Hours)")
@@ -100,6 +101,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     work_unit,
                     job_title,
                     worked_hours,
+                    payable_hours,
                     late_time_hour,
                     early_exit_hour,
                     over_time_hour,
@@ -125,6 +127,11 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                         ELSE COALESCE(job.name::text, '')
                     END AS job_title,
                     COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
+                    (COALESCE(SUM(att.worked_hours), 0.0) 
+                     + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                     + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                     + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                     + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
                     COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
                     COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
                     COALESCE(SUM(att.over_time_hour), 0.0) AS over_time_hour,
@@ -136,10 +143,22 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     COALESCE(exp_wh.total_wh, 0.0) AS working_hours,
                     CASE 
                         WHEN COALESCE(exp_wh.total_wh, 0.0) > 0 THEN 
-                            ROUND(CAST((COALESCE(SUM(att.worked_hours), 0.0) / exp_wh.total_wh) * 100 AS numeric), 2)
+                            ROUND(CAST((LEAST(exp_wh.total_wh, 
+                                COALESCE(SUM(att.worked_hours), 0.0) 
+                                + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                                + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                                + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                                + COALESCE(SUM(att.acknowledged_exit), 0.0)
+                            ) / exp_wh.total_wh) * 100 AS numeric), 2)
                         ELSE 0.0 
                     END AS attendance_percentage,
-                    GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - COALESCE(SUM(att.worked_hours), 0.0)) AS absent_hours,
+                    GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
+                        COALESCE(SUM(att.worked_hours), 0.0) 
+                        + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                        + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_exit), 0.0)
+                    )) AS absent_hours,
                     NOW(),
                     NOW()
                 FROM hr_employee emp
@@ -236,6 +255,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     checkout_time,
                     remarks,
                     worked_hours,
+                    payable_hours,
                     late_time_hour,
                     early_exit_hour,
                     over_time_hour,
@@ -266,6 +286,11 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     att.check_out AS checkout_time,
                     COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
                     COALESCE(att.worked_hours, 0.0) AS worked_hours,
+                    (COALESCE(att.worked_hours, 0.0) 
+                     + COALESCE(att.pre_defined_lateness, 0.0) 
+                     + COALESCE(att.pre_approved_early_checkout, 0.0) 
+                     + COALESCE(att.acknowledged_late, 0.0) 
+                     + COALESCE(att.acknowledged_exit, 0.0)) AS payable_hours,
                     COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
                     COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
                     COALESCE(att.over_time_hour, 0.0) AS over_time_hour,

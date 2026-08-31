@@ -26,6 +26,7 @@ BEGIN
             work_unit,
             job_title,
             worked_hours,
+            payable_hours,
             late_time_hour,
             early_exit_hour,
             over_time_hour,
@@ -51,6 +52,11 @@ BEGIN
                 ELSE COALESCE(job.name::text, '')
             END AS job_title,
             COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
+            (COALESCE(SUM(att.worked_hours), 0.0) 
+             + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+             + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+             + COALESCE(SUM(att.acknowledged_late), 0.0) 
+             + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
             COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
             COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
             COALESCE(SUM(att.over_time_hour), 0.0) AS over_time_hour,
@@ -62,10 +68,22 @@ BEGIN
             COALESCE(exp_wh.total_wh, 0.0) AS working_hours,
             CASE 
                 WHEN COALESCE(exp_wh.total_wh, 0.0) > 0 THEN 
-                    ROUND(CAST((COALESCE(SUM(att.worked_hours), 0.0) / exp_wh.total_wh) * 100 AS numeric), 2)
+                    ROUND(CAST((LEAST(exp_wh.total_wh, 
+                        COALESCE(SUM(att.worked_hours), 0.0) 
+                        + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                        + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_exit), 0.0)
+                    ) / exp_wh.total_wh) * 100 AS numeric), 2)
                 ELSE 0.0 
             END AS attendance_percentage,
-            GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - COALESCE(SUM(att.worked_hours), 0.0)) AS absent_hours,
+            GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
+                COALESCE(SUM(att.worked_hours), 0.0) 
+                + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                + COALESCE(SUM(att.acknowledged_exit), 0.0)
+            )) AS absent_hours,
             NOW(),
             NOW()
         FROM hr_employee emp
@@ -139,6 +157,7 @@ BEGIN
         ) exp_wh ON TRUE
         WHERE emp.active = TRUE
         GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh;
+
     ELSE
         -- Daily Employee Attendance Detail mode (per-attendance row)
         INSERT INTO generate_employee_attendance_details (
@@ -156,6 +175,7 @@ BEGIN
             checkout_time,
             remarks,
             worked_hours,
+            payable_hours,
             late_time_hour,
             early_exit_hour,
             over_time_hour,
@@ -183,6 +203,11 @@ BEGIN
             att.check_out AS checkout_time,
             COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
             COALESCE(att.worked_hours, 0.0) AS worked_hours,
+            (COALESCE(att.worked_hours, 0.0) 
+             + COALESCE(att.pre_defined_lateness, 0.0) 
+             + COALESCE(att.pre_approved_early_checkout, 0.0) 
+             + COALESCE(att.acknowledged_late, 0.0) 
+             + COALESCE(att.acknowledged_exit, 0.0)) AS payable_hours,
             COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
             COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
             COALESCE(att.over_time_hour, 0.0) AS over_time_hour,
