@@ -102,6 +102,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     job_title,
                     worked_hours,
                     payable_hours,
+                    leave_hours,
                     late_time_hour,
                     early_exit_hour,
                     over_time_hour,
@@ -128,10 +129,12 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     END AS job_title,
                     COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
                     (COALESCE(SUM(att.worked_hours), 0.0) 
+                     + COALESCE(leave_agg.total_leave_hours, 0.0)
                      + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
                      + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
                      + COALESCE(SUM(att.acknowledged_late), 0.0) 
                      + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
+                    COALESCE(leave_agg.total_leave_hours, 0.0) AS leave_hours,
                     COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
                     COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
                     COALESCE(SUM(att.over_time_hour), 0.0) AS over_time_hour,
@@ -145,6 +148,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                         WHEN COALESCE(exp_wh.total_wh, 0.0) > 0 THEN 
                             ROUND(CAST((LEAST(exp_wh.total_wh, 
                                 COALESCE(SUM(att.worked_hours), 0.0) 
+                                + COALESCE(leave_agg.total_leave_hours, 0.0)
                                 + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
                                 + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
                                 + COALESCE(SUM(att.acknowledged_late), 0.0) 
@@ -154,6 +158,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     END AS attendance_percentage,
                     GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
                         COALESCE(SUM(att.worked_hours), 0.0) 
+                        + COALESCE(leave_agg.total_leave_hours, 0.0)
                         + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
                         + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
                         + COALESCE(SUM(att.acknowledged_late), 0.0) 
@@ -168,6 +173,20 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     AND att.check_in >= p_from::timestamp 
                     AND att.check_in <= (p_to + interval '1 day')::timestamp
                     AND (att.active = TRUE OR att.active IS NULL)
+                LEFT JOIN LATERAL (
+                    SELECT SUM(
+                        CASE 
+                            WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
+                            WHEN l.number_of_hours > 0 THEN l.number_of_hours
+                            ELSE 8.0
+                        END
+                    ) AS total_leave_hours
+                    FROM hr_leave l
+                    WHERE l.employee_id = emp.id
+                      AND l.state = 'validate'
+                      AND l.date_from::date <= p_to
+                      AND l.date_to::date >= p_from
+                ) leave_agg ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT SUM(
                         COALESCE(
@@ -236,7 +255,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     FROM generate_series(p_from, p_to, '1 day'::interval) d
                 ) exp_wh ON TRUE
                 WHERE emp.active = TRUE
-                GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh;
+                GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh, leave_agg.total_leave_hours;
 
             ELSE
                 -- Daily Employee Attendance Detail mode (per-attendance row)

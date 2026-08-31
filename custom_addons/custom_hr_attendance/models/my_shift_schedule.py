@@ -11,6 +11,7 @@ class MyShiftSchedule(models.TransientModel):
     operating_unit_id = fields.Many2one('operating.unit', string="Operating Unit / Branch", readonly=True)
     
     assignment_source = fields.Selection([
+        ('leave', 'Approved Time Off'),
         ('roster', 'Job Position Roster Exception'),
         ('job_position', 'Job Position Exception'),
         ('location', 'Location Based Exception'),
@@ -74,13 +75,39 @@ class MyShiftSchedule(models.TransientModel):
         roster_lines_vals = []
 
         if employee:
-            # Priority 1: Job Position Roster Exception (Date-based)
-            roster = self.env['job.position.roster.exception'].sudo().search([
+            # Priority 0: Approved Time Off / Leave (hr.leave)
+            leave = self.env['hr.leave'].sudo().search([
                 ('employee_id', '=', employee.id),
-                ('active', '=', True),
-                ('start_date', '<=', today),
-                ('end_date', '>=', today)
-            ], order='start_date desc, id desc', limit=1)
+                ('state', '=', 'validate'),
+                ('date_from', '<=', datetime.datetime.combine(today, datetime.time.max)),
+                ('date_to', '>=', datetime.datetime.combine(today, datetime.time.min)),
+            ], limit=1)
+
+            if leave:
+                assignment_source = 'leave'
+                l_name = leave.holiday_status_id.name or _('Time Off')
+                if isinstance(l_name, dict):
+                    l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else _('Time Off')
+                s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or (leave.date_from.date() if leave.date_from else today)
+                e_d = getattr(leave, 'request_date_to', False) or getattr(leave, 'leave_end_date', False) or (leave.date_to.date() if leave.date_to else today)
+                schedule_name = _("Approved Time Off - %s") % l_name
+                start_date = s_d
+                end_date = e_d
+                shift_obj = False
+                start_time = 0.0
+                end_time = 0.0
+                duration = 0.0
+                time_range = _("On Approved Time Off")
+                lunch_time_range = _("On Approved Time Off")
+
+            else:
+                # Priority 1: Job Position Roster Exception (Date-based)
+                roster = self.env['job.position.roster.exception'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('active', '=', True),
+                    ('start_date', '<=', today),
+                    ('end_date', '>=', today)
+                ], order='start_date desc, id desc', limit=1)
 
             if roster:
                 assignment_source = 'roster'

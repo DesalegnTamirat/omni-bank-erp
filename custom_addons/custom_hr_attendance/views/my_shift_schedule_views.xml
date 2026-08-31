@@ -27,6 +27,7 @@
                         <label for="schedule_name" string="Active Shift Schedule"/>
                         <h1><field name="schedule_name" readonly="1" class="text-primary"/></h1>
                         <field name="assignment_source" widget="badge" readonly="1"
+                               decoration-danger="assignment_source == 'leave'"
                                decoration-info="assignment_source == 'location'"
                                decoration-warning="assignment_source == 'job_position'"
                                decoration-success="assignment_source == 'roster'"

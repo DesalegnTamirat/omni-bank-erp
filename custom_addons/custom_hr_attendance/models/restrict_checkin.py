@@ -58,6 +58,46 @@ class HrEmployeePrivate(models.Model):
 
         is_saturday = (target_date.weekday() == 5) if target_date else False
 
+        # 0. Approved Time Off / Leave (hr.leave)
+        leave = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', datetime.datetime.combine(target_date, datetime.time.max)),
+            ('date_to', '>=', datetime.datetime.combine(target_date, datetime.time.min)),
+        ], limit=1)
+
+        if leave:
+            l_name = leave.holiday_status_id.name or _('Time Off')
+            if isinstance(l_name, dict):
+                l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else _('Time Off')
+            is_half = bool(getattr(leave, 'request_unit_half', False) or getattr(leave, 'half_day', False) or (getattr(leave, 'number_of_days', 1.0) == 0.5))
+            half_period = getattr(leave, 'request_date_from_period', False) or getattr(leave, 'single_half_day_period', 'am')
+            if is_half:
+                if half_period == 'am':
+                    return {
+                        'shift_start': 13.0, 'shift_end': default_exit_time,
+                        'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                        'is_on_leave': False, 'is_half_day_leave': True,
+                        'leave_name': l_name, 'shift_name': f"Afternoon Shift (Morning on {l_name})"
+                    }
+                else:
+                    return {
+                        'shift_start': default_morning_time, 'shift_end': 12.0,
+                        'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                        'is_on_leave': False, 'is_half_day_leave': True,
+                        'leave_name': l_name, 'shift_name': f"Morning Shift (Afternoon on {l_name})"
+                    }
+            else:
+                return {
+                    'shift_start': 0.0, 'shift_end': 0.0,
+                    'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                    'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                    'is_on_leave': True, 'leave_name': l_name,
+                    'shift_name': f"Approved Time Off ({l_name})"
+                }
+
         # 1. Roster Exception (Date-Based)
         roster_exceptions = self.env['job.position.roster.exception'].search([
             ('employee_id', '=', self.id),
@@ -188,7 +228,10 @@ class HrEmployeePrivate(models.Model):
             'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
 
         sched = self._resolve_employee_full_schedule(current_float=current_float, target_date=target_date)
-        if sched.get('is_day_off'):
+        if sched.get('is_on_leave'):
+            if not is_manager:
+                raise UserError(_("Attendance cannot be recorded.\n\nYou have an approved Time Off today: %s.") % sched.get('leave_name', 'Time Off'))
+        elif sched.get('is_day_off'):
             if not is_manager:
                 raise UserError(_("Attendance cannot be recorded.\n\nYou have a scheduled Day Off today."))
 

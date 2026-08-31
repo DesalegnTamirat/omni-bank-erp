@@ -620,10 +620,21 @@ class HrAttendanceDashboardService(models.Model):
             ('check_in', '<=', range_e_utc)
         ], order='check_in desc')
 
+        # Query approved leaves (hr.leave) in range
+        range_leaves = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', datetime.datetime.combine(e_d, datetime.time.max)),
+            ('date_to', '>=', datetime.datetime.combine(s_d, datetime.time.min)),
+        ])
+        period_leave_days = sum(l.number_of_days or 1.0 for l in range_leaves)
+        period_leave_hours = round(period_leave_days * 8.0, 2)
+        period_leave_count = len(range_leaves)
+
         # Card 1: Total Worked Hours & Target Hours
         period_worked_hours = round(sum(att.worked_hours or 0.0 for att in range_atts), 2)
         period_predefined_hours = round(sum((att.pre_defined_lateness or 0.0) + (getattr(att, 'pre_approved_early_checkout', 0.0) or 0.0) for att in range_atts), 2)
-        period_compensable_hours = round(period_worked_hours + period_predefined_hours + sum((att.acknowledged_late or 0.0) + (att.acknowledged_exit or 0.0) for att in range_atts), 2)
+        period_compensable_hours = round(period_worked_hours + period_leave_hours + period_predefined_hours + sum((att.acknowledged_late or 0.0) + (att.acknowledged_exit or 0.0) for att in range_atts), 2)
         period_days = (e_d - s_d).days + 1
         target_hours = 160.0 if (date_range == 'this_month' or period_days > 14) else round(period_days * 8.0, 1)
         worked_hours_pct = min(100.0, round((period_compensable_hours / max(1.0, target_hours)) * 100, 1))
@@ -632,7 +643,6 @@ class HrAttendanceDashboardService(models.Model):
         # Card 2: Cumulative Late Hours & Punctuality Rating
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
         period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
-        period_leave_count = sum(1 for att in range_atts if 'Rest' in (att.check_in_status or ''))
         period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
         total_sessions = len(range_atts)
         punctuality_score = round(((total_sessions - period_late_count) / max(1, total_sessions)) * 100, 1) if total_sessions > 0 else 100.0
@@ -782,7 +792,9 @@ class HrAttendanceDashboardService(models.Model):
                 if current_float >= t_end:
                     past_working_days += 1
 
-            comp_h = w_h + round(sum((a.pre_defined_lateness or 0.0) + (getattr(a, 'pre_approved_early_checkout', 0.0) or 0.0) + (a.acknowledged_late or 0.0) + (a.acknowledged_exit or 0.0) for a in b_atts), 2)
+            b_leaves = [l for l in range_leaves if l.date_from and l.date_to and l.date_from.date() <= block['end_date'] and l.date_to.date() >= block['start_date']]
+            b_leave_h = round(sum((l.number_of_days or 1.0) * 8.0 for l in b_leaves), 2)
+            comp_h = w_h + b_leave_h + round(sum((a.pre_defined_lateness or 0.0) + (getattr(a, 'pre_approved_early_checkout', 0.0) or 0.0) + (a.acknowledged_late or 0.0) + (a.acknowledged_exit or 0.0) for a in b_atts), 2)
             expected_past_hours = past_working_days * 8.0
             a_h = max(0.0, round(expected_past_hours - comp_h, 2)) if past_working_days > 0 else 0.0
             a_days = round(a_h / 8.0, 1)
