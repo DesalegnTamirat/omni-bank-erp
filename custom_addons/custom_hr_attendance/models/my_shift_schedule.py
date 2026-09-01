@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
+import datetime
+import pytz
 
 class MyShiftSchedule(models.TransientModel):
     _name = 'my.shift.schedule'
@@ -109,88 +111,88 @@ class MyShiftSchedule(models.TransientModel):
                     ('end_date', '>=', today)
                 ], order='start_date desc, id desc', limit=1)
 
-            if roster:
-                assignment_source = 'roster'
-                schedule_name = roster.name or _('Job Position Roster Exception')
-                today_line = roster.line_ids.filtered(lambda l: l.date == today)[:1]
-                if today_line:
-                    if today_line.schedule_type == 'day_off':
-                        schedule_name = _("%s (Day Off Today)") % (roster.name or _('Roster'))
-                        shift_obj = False
-                    else:
-                        shift_obj = today_line.shift_id
-                else:
-                    shift_obj = False
-                start_date = roster.start_date
-                end_date = roster.end_date
-
-                # Build all weekly schedule lines for display
-                for l in roster.line_ids.sorted(key=lambda r: r.date or fields.Date.today()):
-                    l_time_range = _("Day Off")
-                    l_duration = 0.0
-                    l_lunch = _("No Lunch Break")
-                    if l.schedule_type == 'shift' and l.shift_id:
-                        s_time = l.shift_id.start_time
-                        e_time = l.shift_id.end_time
-                        gross = e_time - s_time
-                        if gross < 0:
-                            gross += 24.0
-                        l_duration = max(0.0, round(gross - (l.shift_id.lunch_duration if l.shift_id.has_lunch_break else 0.0), 2))
-                        l_time_range = l.shift_id.time_range or f"{_fmt(s_time)} - {_fmt(e_time)}"
-                        if l.shift_id.has_lunch_break:
-                            l_end = l.shift_id.lunch_start_time + l.shift_id.lunch_duration
-                            l_lunch = f"{_fmt(l.shift_id.lunch_start_time)} - {_fmt(l_end)} ({l.shift_id.lunch_duration:.1f}h)"
+                if roster:
+                    assignment_source = 'roster'
+                    schedule_name = roster.name or _('Job Position Roster Exception')
+                    today_line = roster.line_ids.filtered(lambda l: l.date == today)[:1]
+                    if today_line:
+                        if today_line.schedule_type == 'day_off':
+                            schedule_name = _("%s (Day Off Today)") % (roster.name or _('Roster'))
+                            shift_obj = False
                         else:
-                            l_lunch = _("No Lunch Break")
+                            shift_obj = today_line.shift_id
+                    else:
+                        shift_obj = False
+                    start_date = roster.start_date
+                    end_date = roster.end_date
 
-                    roster_lines_vals.append((0, 0, {
-                        'date': l.date,
-                        'day_name': l.day_name or (l.date.strftime('%A') if l.date else ''),
-                        'schedule_type': l.schedule_type,
-                        'shift_id': l.shift_id.id if l.shift_id else False,
-                        'time_range': l_time_range,
-                        'duration': l_duration,
-                        'lunch_time_range': l_lunch,
-                        'is_today': (l.date == today),
-                    }))
+                    # Build all weekly schedule lines for display
+                    for l in roster.line_ids.sorted(key=lambda r: r.date or fields.Date.today()):
+                        l_time_range = _("Day Off")
+                        l_duration = 0.0
+                        l_lunch = _("No Lunch Break")
+                        if l.schedule_type == 'shift' and l.shift_id:
+                            s_time = l.shift_id.start_time
+                            e_time = l.shift_id.end_time
+                            gross = e_time - s_time
+                            if gross < 0:
+                                gross += 24.0
+                            l_duration = max(0.0, round(gross - (l.shift_id.lunch_duration if l.shift_id.has_lunch_break else 0.0), 2))
+                            l_time_range = l.shift_id.time_range or f"{_fmt(s_time)} - {_fmt(e_time)}"
+                            if l.shift_id.has_lunch_break:
+                                l_end = l.shift_id.lunch_start_time + l.shift_id.lunch_duration
+                                l_lunch = f"{_fmt(l.shift_id.lunch_start_time)} - {_fmt(l_end)} ({l.shift_id.lunch_duration:.1f}h)"
+                            else:
+                                l_lunch = _("No Lunch Break")
 
-            else:
-                # Priority 2: Job Position Exception (Static)
-                job_ex = self.env['job.position.exception'].sudo().search([
-                    ('employee_id', '=', employee.id),
-                    ('active', '=', True),
-                    ('start_date', '<=', today),
-                    '|', ('end_date', '=', False), ('end_date', '>=', today)
-                ], order='start_date desc, id desc', limit=1)
-
-                if job_ex:
-                    assignment_source = 'job_position'
-                    schedule_name = job_ex.job_position_exception_name or _('Job Position Exception')
-                    shift_obj = job_ex.shift_id
-                    start_date = job_ex.start_date
-                    end_date = job_ex.end_date
+                        roster_lines_vals.append((0, 0, {
+                            'date': l.date,
+                            'day_name': l.day_name or (l.date.strftime('%A') if l.date else ''),
+                            'schedule_type': l.schedule_type,
+                            'shift_id': l.shift_id.id if l.shift_id else False,
+                            'time_range': l_time_range,
+                            'duration': l_duration,
+                            'lunch_time_range': l_lunch,
+                            'is_today': (l.date == today),
+                        }))
 
                 else:
-                    # Priority 3: Location Based Exception (Branch / Operating Unit)
-                    if employee.default_operating_unit_id:
-                        ou_ids = [employee.default_operating_unit_id.id]
-                        if hasattr(employee.default_operating_unit_id, 'parent_unit') and employee.default_operating_unit_id.parent_unit:
-                            ou_ids.append(employee.default_operating_unit_id.parent_unit.id)
+                    # Priority 2: Job Position Exception (Static)
+                    job_ex = self.env['job.position.exception'].sudo().search([
+                        ('employee_id', '=', employee.id),
+                        ('active', '=', True),
+                        ('start_date', '<=', today),
+                        '|', ('end_date', '=', False), ('end_date', '>=', today)
+                    ], order='start_date desc, id desc', limit=1)
 
-                        loc_ex = self.env['location.based.exception'].sudo().search([
-                            '|', ('operating_unit_ids', 'in', ou_ids),
-                                 ('operating_unit', 'in', ou_ids),
-                            ('active', '=', True),
-                            ('start_date', '<=', today),
-                            '|', ('end_date', '=', False), ('end_date', '>=', today)
-                        ], order='start_date desc, id desc', limit=1)
+                    if job_ex:
+                        assignment_source = 'job_position'
+                        schedule_name = job_ex.job_position_exception_name or _('Job Position Exception')
+                        shift_obj = job_ex.shift_id
+                        start_date = job_ex.start_date
+                        end_date = job_ex.end_date
 
-                        if loc_ex:
-                            assignment_source = 'location'
-                            schedule_name = loc_ex.schedule_name or _('Location Based Exception')
-                            shift_obj = loc_ex.shift_id
-                            start_date = loc_ex.start_date
-                            end_date = loc_ex.end_date
+                    else:
+                        # Priority 3: Location Based Exception (Branch / Operating Unit)
+                        if employee.default_operating_unit_id:
+                            ou_ids = [employee.default_operating_unit_id.id]
+                            if hasattr(employee.default_operating_unit_id, 'parent_unit') and employee.default_operating_unit_id.parent_unit:
+                                ou_ids.append(employee.default_operating_unit_id.parent_unit.id)
+
+                            loc_ex = self.env['location.based.exception'].sudo().search([
+                                '|', ('operating_unit_ids', 'in', ou_ids),
+                                     ('operating_unit', 'in', ou_ids),
+                                ('active', '=', True),
+                                ('start_date', '<=', today),
+                                '|', ('end_date', '=', False), ('end_date', '>=', today)
+                            ], order='start_date desc, id desc', limit=1)
+
+                            if loc_ex:
+                                assignment_source = 'location'
+                                schedule_name = loc_ex.schedule_name or _('Location Based Exception')
+                                shift_obj = loc_ex.shift_id
+                                start_date = loc_ex.start_date
+                                end_date = loc_ex.end_date
 
         has_lunch_break = False
         lunch_start_time = 12.0
@@ -213,6 +215,15 @@ class MyShiftSchedule(models.TransientModel):
                 lunch_time_range = f"{_fmt(lunch_start_time)} - {_fmt(l_end)} ({lunch_duration:.1f}h)"
             else:
                 lunch_time_range = _("No Lunch Break")
+        elif assignment_source == 'leave':
+            start_time = 0.0
+            end_time = 0.0
+            duration = 0.0
+            has_lunch_break = False
+            lunch_start_time = 0.0
+            lunch_duration = 0.0
+            time_range = _("On Approved Time Off")
+            lunch_time_range = _("On Approved Time Off")
         elif assignment_source == 'roster':
             start_time = 0.0
             end_time = 0.0
