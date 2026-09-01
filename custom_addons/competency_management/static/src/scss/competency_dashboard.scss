@@ -1,0 +1,34 @@
+/* Competency Management System — OWL Dashboard SCSS Styling */
+/* Primary Brand Color: #541718 Deep Maroon | Secondary: #1d2b32 Navy | Accents: #c17540 Orange, #726732 Olive */
+
+.o_competency_dashboard_owl {
+    background-color: #fcfbfa;
+
+    .table-bordered {
+        border-color: #e2e8f0;
+        
+        th {
+            background-color: #f8fafc;
+            color: #1d2b32;
+            font-weight: 600;
+        }
+
+        td {
+            transition: opacity 0.15s ease-in-out;
+            &:hover {
+                opacity: 0.85;
+            }
+        }
+    }
+
+    .badge {
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+}

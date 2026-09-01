@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Form View for Report Filter Wizard -->
+        <record id="view_competency_report_wizard_form" model="ir.ui.view">
+            <field name="name">competency.report.wizard.form</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Competency Report Generator">
+                    <sheet>
+                        <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; border-left: 5px solid #c17540;">
+                            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">
+                                Bunna Bank S.C. — Competency Report Generator
+                            </h3>
+                            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
+                                Generate role-scoped competency capability reports, TNA gap matrices, and organizational benchmarks.
+                            </div>
+                        </div>
+
+                        <group>
+                            <group string="Report Configuration">
+                                <field name="report_type" widget="radio"/>
+                                <field name="cycle_id" options="{'no_create': True, 'no_open': True}"/>
+                                <field name="employee_id" invisible="report_type != 'individual'" required="report_type == 'individual'" options="{'no_create': True, 'no_open': True}"/>
+                            </group>
+                            <group string="Filters &amp; Scope" invisible="report_type == 'individual'">
+                                <field name="pillar" widget="radio"/>
+                                <field name="department_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                            </group>
+                        </group>
+
+                    </sheet>
+                    <footer>
+                        <button name="action_print_pdf" string="Generate PDF Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600;"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Window Action for Report Wizard -->
+        <record id="action_competency_report_wizard" model="ir.actions.act_window">
+            <field name="name">Competency Report Generator</field>
+            <field name="res_model">competency.report.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

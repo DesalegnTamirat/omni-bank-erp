@@ -386,64 +386,68 @@ class CompetencyAssessment(models.Model):
         elif pillar == 'leadership': return '1'
         else: return '2'
 
-    def action_populate_competencies(self):
-        """Populate competency rating lines explicitly upon user clicking 'Populate Competencies'."""
-        self.ensure_one()
-        if self.state != 'draft':
-            raise UserError(_("Competencies can only be populated when the assessment is in Draft state."))
-        if not self.cycle_id or not self.assessment_type or not self.employee_id:
-            raise UserError(_("Assessment Cycle, Assessment Type, and Employee are required before populating competencies."))
-        
+    @api.onchange('employee_id')
+    def _onchange_employee_id_populate_competencies(self):
+        """Automatically populate/refresh competency rating lines when employee_id changes in draft state."""
+        if self.state == 'draft' and self.employee_id:
+            self._do_populate_lines()
+
+    def _do_populate_lines(self):
+        """Internal helper to populate competency rating lines for self.employee_id."""
+        if not self.employee_id:
+            self.line_ids = [(5, 0, 0)]
+            return 0, ''
         employee = self.employee_id
-        job_pos = employee.job_position or employee.job_id
+        job_pos = employee.job_id or getattr(employee, 'job_position', False)
         mapping = False
         if job_pos:
             mapping = self.env['competency.role.mapping'].search([
-                ('job_position_id', '=', job_pos.id)
-            ], order='state desc, id desc', limit=1)
+                ('job_position_id', '=', job_pos.id),
+                ('state', '=', 'approved')
+            ], order='id desc', limit=1)
+            if not mapping:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job_pos.id)
+                ], order='id desc', limit=1)
 
-        line_vals = []
+        raw_line_vals = []
         if mapping and mapping.line_ids:
             for mline in mapping.line_ids:
                 if mline.competency_id:
-                    line_vals.append({
-                        'assessment_id': self.id,
+                    raw_line_vals.append({
                         'competency_id': mline.competency_id.id,
+                        'pillar': mline.competency_id.pillar or 'technical',
                         'current_level': False,
                         'required_level': mline.required_proficiency or '2',
                     })
             mapping_name_str = mapping.mapping_name
         else:
-            # Fallback: Populate Core + Leadership (if managerial) + Relevant Technical Domain Competencies
             grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
             j_name = job_pos.name if job_pos else ''
             j_lower = j_name.lower()
-            is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp'])
+            is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp']) or getattr(employee, 'is_managerial', False)
 
-            # 1. Core Competencies
             core_comps = self.env['competency.competency'].search([('pillar', '=', 'core'), ('status', '=', 'active')])
             for comp in core_comps:
                 req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name)
-                line_vals.append({
-                    'assessment_id': self.id,
+                raw_line_vals.append({
                     'competency_id': comp.id,
+                    'pillar': 'core',
                     'current_level': False,
                     'required_level': req_lvl or '2',
                 })
 
-            # 2. Leadership Competencies (if managerial or supervisor)
             if is_managerial:
                 lead_comps = self.env['competency.competency'].search([('pillar', '=', 'leadership'), ('status', '=', 'active')])
                 for comp in lead_comps:
                     req_lvl = self._get_matrix_required_level('leadership', grade=grade_rec, job=job_pos, job_name=j_name)
-                    line_vals.append({
-                        'assessment_id': self.id,
+                    raw_line_vals.append({
                         'competency_id': comp.id,
+                        'pillar': 'leadership',
                         'current_level': False,
                         'required_level': req_lvl or '2',
                     })
 
-            # 3. Relevant Domain Technical Competencies
             tech_comps = self.env['competency.competency']
             if job_pos and getattr(job_pos, 'department_id', False):
                 dept_name = job_pos.department_id.name
@@ -456,26 +460,44 @@ class CompetencyAssessment(models.Model):
                 tech_comps = self.env['competency.competency'].search([
                     ('pillar', '=', 'technical'),
                     ('status', '=', 'active')
-                ], limit=15)
+                ], limit=5)
 
             for comp in tech_comps:
                 req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name)
-                line_vals.append({
-                    'assessment_id': self.id,
+                raw_line_vals.append({
                     'competency_id': comp.id,
+                    'pillar': 'technical',
                     'current_level': False,
                     'required_level': req_lvl or '2',
                 })
 
             mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
 
-        self.line_ids.sudo().unlink()
-        if line_vals:
-            created_lines = self.env['competency.assessment.line'].sudo().create(line_vals)
-            cnt = len(created_lines)
+        # Check if record is saved (real database integer ID) or unsaved (onchange/NewId)
+        if isinstance(self.id, int):
+            self.line_ids.sudo().unlink()
+            if raw_line_vals:
+                create_vals = [dict(v, assessment_id=self.id) for v in raw_line_vals]
+                created_lines = self.env['competency.assessment.line'].sudo().create(create_vals)
+                cnt = len(created_lines)
+            else:
+                cnt = 0
         else:
-            cnt = 0
+            commands = [(5, 0, 0)] + [(0, 0, v) for v in raw_line_vals]
+            self.line_ids = commands
+            cnt = len(raw_line_vals)
 
+        return cnt, mapping_name_str
+
+    def action_populate_competencies(self):
+        """Populate competency rating lines explicitly upon user clicking 'Populate Competencies'."""
+        self.ensure_one()
+        if self.state != 'draft':
+            raise UserError(_("Competencies can only be populated when the assessment is in Draft state."))
+        if not self.cycle_id or not self.assessment_type or not self.employee_id:
+            raise UserError(_("Assessment Cycle, Assessment Type, and Employee are required before populating competencies."))
+        
+        cnt, mapping_name_str = self._do_populate_lines()
         self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, cnt))
         return {
             'type': 'ir.actions.act_window',
@@ -657,6 +679,46 @@ class CompetencyAssessment(models.Model):
                     user_id=target_user.id,
                     date_deadline=today,
                 )
+
+    def get_achievement_summary_sentence(self):
+        """Returns plain-language alignment sentence (FR-RPT-001 / FR-GAP-007)."""
+        self.ensure_one()
+        total = len(self.line_ids)
+        if not total:
+            return _("No competencies rated for position %s.") % (self.job_id.name if self.job_id else 'N/A')
+        meets_or_exceeds = len(self.line_ids.filtered(lambda l: l.achievement_status in ('meets', 'exceeds')))
+        pct = round((meets_or_exceeds / total) * 100, 1)
+        job_name = self.job_id.name if self.job_id else 'assigned position'
+        return _("Employee meets %d of %d required competencies (%s%% alignment) for position %s.") % (
+            meets_or_exceeds, total, pct, job_name
+        )
+
+    def get_recommended_development_actions(self):
+        """Returns recommended action mappings for below-status competencies (FR-GAP-004)."""
+        self.ensure_one()
+        below_lines = self.line_ids.filtered(lambda l: l.achievement_status == 'below')
+        recommendations = []
+        for line in below_lines:
+            comp_name = line.competency_id.name
+            pillar = line.pillar or 'technical'
+            gap = line.gap or 1
+            if pillar == 'core':
+                action = _("Structured Corporate Culture & Execution Workshop / Peer Coaching")
+            elif pillar == 'leadership':
+                action = _("Executive Leadership Mentoring & Supervisory Management Seminar")
+            else:
+                if gap > 1:
+                    action = _("Formal Technical Training Program & Intensive Hands-on Workshop")
+                else:
+                    action = _("On-the-job Coaching & Guided Shadowing with Senior Officer")
+            recommendations.append({
+                'competency': comp_name,
+                'pillar': pillar.capitalize(),
+                'gap': gap,
+                'priority': (line.gap_priority or 'medium').capitalize(),
+                'action': action,
+            })
+        return recommendations
 
 
 class CompetencyAssessmentLine(models.Model):

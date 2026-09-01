@@ -51,8 +51,16 @@ Key Features:
         'views/competency_report_templates.xml',
         'views/hr_employee_views.xml',
         'wizards/competency_role_mapping_clone_wizard_views.xml',
+        'wizards/competency_report_wizard_views.xml',
         'views/competency_menus.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'competency_management/static/src/scss/competency_dashboard.scss',
+            'competency_management/static/src/js/competency_dashboard.js',
+            'competency_management/static/src/xml/competency_dashboard.xml',
+        ],
+    },
     'installable': True,
     'application': True,
     'auto_install': False,

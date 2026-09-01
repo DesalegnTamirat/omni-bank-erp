@@ -6,7 +6,7 @@
         <menuitem id="menu_competency_management_root"
             name="Competency Management"
             web_icon="competency_management,static/description/icon.svg"
-            action="action_competency_overview_dashboard"
+            action="action_competency_dashboard_client"
             sequence="60" />
 
         <!-- 1. Framework & Roles Category -->
@@ -75,6 +75,13 @@
             parent="menu_competency_management_root"
             sequence="40"
             groups="competency_management.group_competency_supervisor" />
+
+        <menuitem id="menu_competency_report_wizard"
+            name="Competency Report Generator"
+            parent="menu_competency_reports_categ"
+            action="action_competency_report_wizard"
+            sequence="1"
+            groups="competency_management.group_competency_employee" />
 
         <menuitem id="menu_competency_tna_analytics_report"
             name="Competency &amp; TNA Analytics Report"
