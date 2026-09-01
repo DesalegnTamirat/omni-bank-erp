@@ -33,8 +33,90 @@ class BunnaMyAttendance(http.Controller):
 
         today_date = fields.Date.context_today(request.env.user)
 
-        # Tier 1: Check active Roster Exception (job.position.roster.exception)
+        # Tier 0: Approved Time Off / Leave (hr.leave)
+        leave = env['hr.leave'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', datetime.datetime.combine(target_date, datetime.time.max)),
+            ('date_to', '>=', datetime.datetime.combine(target_date, datetime.time.min)),
+        ], limit=1)
 
+        if leave:
+            l_name = leave.holiday_status_id.name or 'Time Off'
+            if isinstance(l_name, dict):
+                l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else 'Time Off'
+            is_half = bool(getattr(leave, 'request_unit_half', False) or getattr(leave, 'half_day', False) or (getattr(leave, 'number_of_days', 1.0) == 0.5))
+            half_period = getattr(leave, 'request_date_from_period', False) or getattr(leave, 'single_half_day_period', 'am')
+            s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or (leave.date_from.date() if leave.date_from else target_date)
+            e_d = getattr(leave, 'request_date_to', False) or getattr(leave, 'leave_end_date', False) or (leave.date_to.date() if leave.date_to else target_date)
+            date_range_str = f"{s_d.strftime('%b %d')} - {e_d.strftime('%b %d')}" if s_d != e_d else s_d.strftime('%b %d')
+            dur = getattr(leave, 'number_of_days', 1.0)
+
+            if is_half:
+                if half_period == 'am':
+                    return {
+                        'name': f"Approved Time Off - {l_name} (Morning)",
+                        'code': 'LEAVE_HALF_AM',
+                        'time_range': 'Afternoon Shift (13:00 - 17:00)',
+                        'start_time': 13.0,
+                        'end_time': 17.0,
+                        'start_time_str': '01:00 PM',
+                        'end_time_str': '05:00 PM',
+                        'is_night_shift': False,
+                        'has_lunch_break': False,
+                        'lunch_time_str': 'No Lunch Break',
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'is_on_leave': True,
+                        'is_half_day_leave': True,
+                        'leave_name': l_name,
+                        'leave_date_range': date_range_str,
+                        'leave_duration': f"{dur:.1f} Day(s)",
+                        'source_label': f"Approved Leave ({l_name})"
+                    }
+                else:
+                    return {
+                        'name': f"Approved Time Off - {l_name} (Afternoon)",
+                        'code': 'LEAVE_HALF_PM',
+                        'time_range': 'Morning Shift (08:00 - 12:00)',
+                        'start_time': 8.0,
+                        'end_time': 12.0,
+                        'start_time_str': '08:00 AM',
+                        'end_time_str': '12:00 PM',
+                        'is_night_shift': False,
+                        'has_lunch_break': False,
+                        'lunch_time_str': 'No Lunch Break',
+                        'is_custom_exception': True,
+                        'is_day_off': False,
+                        'is_on_leave': True,
+                        'is_half_day_leave': True,
+                        'leave_name': l_name,
+                        'leave_date_range': date_range_str,
+                        'leave_duration': f"{dur:.1f} Day(s)",
+                        'source_label': f"Approved Leave ({l_name})"
+                    }
+            else:
+                return {
+                    'name': f"Approved Time Off - {l_name}",
+                    'code': 'LEAVE',
+                    'time_range': f"Excused All Day ({date_range_str})",
+                    'start_time': 0.0,
+                    'end_time': 0.0,
+                    'start_time_str': '--:--',
+                    'end_time_str': '--:--',
+                    'is_night_shift': False,
+                    'has_lunch_break': False,
+                    'lunch_time_str': 'No Lunch Break',
+                    'is_custom_exception': True,
+                    'is_day_off': True,
+                    'is_on_leave': True,
+                    'leave_name': l_name,
+                    'leave_date_range': date_range_str,
+                    'leave_duration': f"{dur:.1f} Day(s)",
+                    'source_label': 'Approved Time Off'
+                }
+
+        # Tier 1: Check active Roster Exception (job.position.roster.exception)
         roster = env['job.position.roster.exception'].sudo().search([
             ('employee_id', '=', employee.id),
             ('status', '=', 'active'),
@@ -357,18 +439,29 @@ class BunnaMyAttendance(http.Controller):
 
             day_shift = self._get_employee_shift_info(employee, target_date=cur_date)
             is_day_off = day_shift.get('is_day_off', False) if day_shift else False
+            is_on_leave = day_shift.get('is_on_leave', False) if day_shift else False
+            leave_name = day_shift.get('leave_name', 'Time Off') if day_shift else 'Time Off'
 
             pct = min(100, int((hrs / 9.0) * 100))
+
+            if is_on_leave and hrs == 0:
+                hours_formatted = f"🌴 {leave_name}"
+            elif is_day_off and hrs == 0:
+                hours_formatted = 'Day Off'
+            else:
+                hours_formatted = f"{hours_int:02d}h {mins_int:02d}m"
 
             daily_breakdown.append({
                 'day_name': day_names[d],
                 'date_str': cur_date.strftime('%b %d'),
                 'hours': hrs,
-                'hours_formatted': 'Day Off' if (is_day_off and hrs == 0) else f"{hours_int:02d}h {mins_int:02d}m",
+                'hours_formatted': hours_formatted,
                 'percentage': pct,
                 'is_today': cur_date == today,
                 'checked_in': daily_checked_in[d],
-                'is_day_off': is_day_off
+                'is_day_off': is_day_off,
+                'is_on_leave': is_on_leave,
+                'leave_name': leave_name,
             })
 
         # Format weekly & monthly hours
@@ -432,7 +525,25 @@ class BunnaMyAttendance(http.Controller):
         ], order='check_in asc')
 
         sessions_info = []
-        if has_lunch and not today_shift.get('is_day_off'):
+        if today_shift and today_shift.get('is_on_leave') and not today_shift.get('is_half_day_leave'):
+            l_name = today_shift.get('leave_name', 'Time Off')
+            sessions_info = [
+                {
+                    'session_name': 'Morning Session',
+                    'icon': 'fa-sun-o',
+                    'time_range': '08:00 - 12:00',
+                    'status': 'leave',
+                    'badge': f"Approved Time Off ({l_name})"
+                },
+                {
+                    'session_name': 'Afternoon Session',
+                    'icon': 'fa-cloud-sun-o',
+                    'time_range': '13:00 - 17:00',
+                    'status': 'leave',
+                    'badge': f"Approved Time Off ({l_name})"
+                }
+            ]
+        elif has_lunch and not today_shift.get('is_day_off'):
             m_start = today_shift.get('start_time', 8.0)
             m_end = today_shift.get('lunch_out_time', 12.0)
             a_start = m_end + today_shift.get('lunch_duration', 1.0)

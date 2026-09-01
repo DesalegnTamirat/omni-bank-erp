@@ -54,10 +54,18 @@
                             <div t-if="state.departmentName" class="dept-badge mb-3">
                                 <t t-esc="state.departmentName"/>
                             </div>
-
                                 <!-- PRIMARY CHECK IN / OUT ACTION BUTTON -->
                             <div class="w-100 d-flex justify-content-center mt-1 mb-3">
-                                <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_day_off &amp;&amp; !state.checkedIn">
+                                <t t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_on_leave &amp;&amp; !state.checkedIn">
+                                    <button disabled="disabled"
+                                            class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
+                                            style="background: #eff6ff !important; color: #1d4ed8 !important; border: 1px solid #bfdbfe !important; cursor: not-allowed;"
+                                            t-attf-title="You are on approved time off today ({{ state.shiftInfo.leave_name || 'Time Off' }}). Check-in is disabled.">
+                                        <i class="fa fa-umbrella fa-lg text-primary"/>
+                                        <span>ON APPROVED TIME OFF</span>
+                                    </button>
+                                </t>
+                                <t t-elif="state.shiftInfo &amp;&amp; state.shiftInfo.is_day_off &amp;&amp; !state.checkedIn">
                                     <button disabled="disabled"
                                             class="btn o_smart_action_btn w-50 d-flex align-items-center justify-content-center gap-2 opacity-75"
                                             style="background: #f1f5f9 !important; color: #64748b !important; border: 1px solid #cbd5e1 !important; cursor: not-allowed;"
@@ -81,7 +89,25 @@
 
                                 <!-- ASSIGNED WORK SHIFT HEADER CARD -->
                             <div t-if="state.shiftInfo" class="premium-card o_shift_info_card w-100 p-3 mb-3">
-                                <t t-if="state.shiftInfo.is_day_off">
+                                <t t-if="state.shiftInfo.is_on_leave">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #eff6ff; color: #1d4ed8; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
+                                            <i class="fa fa-umbrella fa-lg"/>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <h5 class="fw-bold mb-0 text-dark" t-esc="state.shiftInfo.name"/>
+                                                <span class="badge rounded-pill px-2.5 py-1 small" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-weight: 600;">
+                                                    🌴 Approved Time Off
+                                                </span>
+                                            </div>
+                                            <div class="text-muted small mt-1" style="font-weight: 500;">
+                                                Duration: <span class="fw-semibold text-dark" t-esc="state.shiftInfo.leave_duration"/> | Schedule Window: <span class="fw-semibold text-dark" t-esc="state.shiftInfo.time_range"/>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </t>
+                                <t t-elif="state.shiftInfo.is_day_off">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="o_shift_icon_box d-flex align-items-center justify-content-center" style="background: #ecfdf5; color: #047857; width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;">
                                             <i class="fa fa-coffee fa-lg"/>
@@ -160,12 +186,12 @@
                                 </t>
                             </div>
 
-                                <!-- LIVE WORKED TIMER BADGE WITH INTEGRATED DUAL SESSION BREAKDOWN -->
-                            <div class="w-100 mt-auto">
+                                <!-- REAL-TIME STATUS & TIMER CARD -->
+                            <div class="premium-card o_timer_card w-100 mb-3">
                                 <t t-if="state.checkedIn">
-                                    <div class="o_timer_box active-timer p-3 text-center">
-                                        <div class="timer-title small fw-bold mb-1" style="font-size: 0.8rem;">
-                                            <i class="fa fa-circle me-1 pulse-dot text-success"/> ACTIVE SESSION TIME
+                                    <div class="o_timer_box p-3 text-center" style="background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
+                                        <div class="text-success small fw-bold mb-1 text-uppercase" style="font-size: 0.8rem;">
+                                            <i class="fa fa-circle text-success me-1 pulse-dot"/> Currently Working
                                         </div>
                                         <div class="h2 mb-1 fw-bold text-dark" t-esc="state.liveWorkedTimer"/>
                                         <div t-if="state.checkInTimeStr" class="text-muted small mb-3" style="font-weight: 500; font-size: 0.8rem;">
@@ -180,7 +206,7 @@
                                             <t t-foreach="state.todaySessions" t-as="sess" t-key="sess.session_name">
                                                 <div class="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style="background: rgba(255,255,255,0.75); border: 1px solid rgba(0,0,0,0.05); font-size: 0.775rem;">
                                                     <div class="d-flex align-items-center gap-1.5 text-start">
-                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : 'text-muted'))}"/>
+                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : (sess.status === 'leave' ? 'text-primary' : 'text-muted')))}"/>
                                                         <span class="fw-semibold text-dark" t-esc="sess.session_name"/>
                                                         <span class="text-muted small ms-1" t-esc="'(' + sess.time_range + ')'"/>
                                                     </div>
@@ -190,6 +216,9 @@
                                                         </span>
                                                         <span t-elif="sess.status === 'active'" class="badge bg-dark text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
                                                             <i class="fa fa-dot-circle-o me-1 pulse-dot text-success"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'leave'" class="badge rounded-pill px-2 py-0.5" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.7rem;">
+                                                            <i class="fa fa-umbrella me-1"/> <t t-esc="sess.badge"/>
                                                         </span>
                                                         <span t-elif="sess.status === 'absent'" class="badge bg-danger text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
                                                             <i class="fa fa-times-circle me-1"/> <t t-esc="sess.badge"/>
@@ -212,14 +241,17 @@
                                             <i class="fa fa-history me-1"/> Total Worked Today
                                         </div>
                                         <div class="h2 mb-1 fw-bold text-dark" t-esc="state.hoursToday"/>
-                                        <div class="text-muted small mb-3" style="font-weight: 500; font-size: 0.8rem;">Ready to start your day</div>
+                                        <div t-if="state.shiftInfo &amp;&amp; state.shiftInfo.is_on_leave" class="small mb-3 fw-bold" style="font-size: 0.8rem; color: #1d4ed8;">
+                                            🌴 On Approved Time Off (Excused)
+                                        </div>
+                                        <div t-else="" class="text-muted small mb-3" style="font-weight: 500; font-size: 0.8rem;">Ready to start your day</div>
 
                                         <!-- Integrated compact session breakdown -->
                                         <div t-if="state.todaySessions &amp;&amp; state.todaySessions.length" class="d-flex flex-column gap-1 pt-2 border-top" style="border-color: rgba(0,0,0,0.06) !important;">
                                             <t t-foreach="state.todaySessions" t-as="sess" t-key="sess.session_name">
                                                 <div class="d-flex align-items-center justify-content-between px-2 py-1 rounded-2" style="background: #ffffff; border: 1px solid rgba(0,0,0,0.05); font-size: 0.775rem;">
                                                     <div class="d-flex align-items-center gap-1.5 text-start">
-                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : 'text-muted'))}"/>
+                                                        <i t-attf-class="fa #{sess.icon} #{sess.status === 'completed' ? 'text-success' : (sess.status === 'active' ? 'text-primary' : (sess.status === 'absent' ? 'text-danger' : (sess.status === 'leave' ? 'text-primary' : 'text-muted')))}"/>
                                                         <span class="fw-semibold text-dark" t-esc="sess.session_name"/>
                                                         <span class="text-muted small ms-1" t-esc="'(' + sess.time_range + ')'"/>
                                                     </div>
@@ -229,6 +261,9 @@
                                                         </span>
                                                         <span t-elif="sess.status === 'active'" class="badge bg-dark text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
                                                             <i class="fa fa-dot-circle-o me-1 pulse-dot text-success"/> <t t-esc="sess.badge"/>
+                                                        </span>
+                                                        <span t-elif="sess.status === 'leave'" class="badge rounded-pill px-2 py-0.5" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.7rem;">
+                                                            <i class="fa fa-umbrella me-1"/> <t t-esc="sess.badge"/>
                                                         </span>
                                                         <span t-elif="sess.status === 'absent'" class="badge bg-danger text-white rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
                                                             <i class="fa fa-times-circle me-1"/> <t t-esc="sess.badge"/>
@@ -249,24 +284,19 @@
                         </div>
                     </div>
 
-                        <!-- RIGHT COLUMN: METRICS & DAILY BREAKDOWN -->
+                        <!-- RIGHT COLUMN: STATS AND RECENT ACTIVITY -->
                     <div class="col-12 col-lg-7 col-xl-7">
-
-
-                            <!-- STAT CARDS ROW -->
-                        <div class="row g-4 mb-4">
+                        <div class="row g-3 mb-4">
                             <div class="col-12 col-md-4">
                                 <div class="premium-card o_stat_card h-100">
-                                    <div class="o_stat_icon icon-daily">
+                                    <div class="o_stat_icon icon-today">
                                         <i class="fa fa-clock-o fa-2x"/>
                                     </div>
                                     <div>
                                         <div class="stat-label">TODAY'S WORKED HOURS</div>
-                                        <div class="stat-value">
-                                            <t t-esc="state.todayTotalFormatted"/>
-                                        </div>
+                                        <div class="stat-value" t-esc="state.hoursToday"/>
                                         <div class="stat-sub">
-                                            <t t-if="state.checkedIn">Completed + live session</t>
+                                            <t t-if="state.checkedIn">Tracking live</t>
                                             <t t-else="">Recorded today</t>
                                         </div>
                                     </div>
@@ -332,7 +362,12 @@
 
                                             <!-- HOURS VALUE -->
                                         <div style="width: 100px;" class="text-end hours-val">
-                                            <t t-if="day.is_day_off &amp;&amp; day.hours == 0">
+                                            <t t-if="day.is_on_leave &amp;&amp; day.hours == 0">
+                                                <span class="badge rounded-pill px-2.5 py-1" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 0.725rem; font-weight: 600;" t-att-title="day.leave_name">
+                                                    🌴 TIME OFF
+                                                </span>
+                                            </t>
+                                            <t t-elif="day.is_day_off &amp;&amp; day.hours == 0">
                                                 <span class="badge rounded-pill px-2.5 py-1" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 0.725rem; font-weight: 600;">
                                                     🌴 DAY OFF
                                                 </span>
