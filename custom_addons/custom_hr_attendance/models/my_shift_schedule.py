@@ -183,6 +183,7 @@ class MyShiftSchedule(models.TransientModel):
                                 '|', ('operating_unit_ids', 'in', ou_ids),
                                      ('operating_unit', 'in', ou_ids),
                                 ('active', '=', True),
+                                ('state', '=', 'active'),
                                 ('start_date', '<=', today),
                                 '|', ('end_date', '=', False), ('end_date', '>=', today)
                             ], order='start_date desc, id desc', limit=1)

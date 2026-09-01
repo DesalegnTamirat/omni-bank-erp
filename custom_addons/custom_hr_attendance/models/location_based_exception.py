@@ -9,6 +9,43 @@ class LocationBasedException(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     active = fields.Boolean(string="Active", default=True, index=True)
+    state = fields.Selection([
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('cancelled', 'Cancelled')
+    ], string="Status", default='draft', tracking=True, index=True)
+    applied_by_id = fields.Many2one('res.users', string="Applied By", readonly=True, copy=False)
+    applied_date = fields.Datetime(string="Applied Date", readonly=True, copy=False)
+
+    def action_apply(self):
+        for rec in self:
+            if not rec.shift_id:
+                raise ValidationError("Please select a Shift Template before applying this exception.")
+            if not rec.operating_unit_ids and not rec.operating_unit:
+                raise ValidationError("A Location-Based Exception must specify at least one Location / Operating Unit.")
+            rec.write({
+                'state': 'active',
+                'active': True,
+                'applied_by_id': self.env.user.id,
+                'applied_date': fields.Datetime.now()
+            })
+            rec.message_post(body=f"Shift Exception <b>{rec.shift_id.name}</b> applied and activated by {self.env.user.name}.")
+
+    def action_cancel(self):
+        for rec in self:
+            rec.write({
+                'state': 'cancelled',
+                'active': False
+            })
+            rec.message_post(body=f"Shift Exception cancelled by {self.env.user.name}.")
+
+    def action_draft(self):
+        for rec in self:
+            rec.write({
+                'state': 'draft',
+                'active': True
+            })
+
     start_date = fields.Date(
         string="Start Date",
         required=True,
@@ -24,24 +61,6 @@ class LocationBasedException(models.Model):
         tracking=True,
         help="Optional end date. If left blank, exception continues indefinitely until edited. If set, reverts to default after this date."
     )
-    # is_active_today = fields.Boolean(
-    #     string="Active Today",
-    #     compute="_compute_is_active_today",
-    #     store=True
-    # )
-
-    # @api.depends('start_date', 'end_date', 'active')
-    # def _compute_is_active_today(self):
-    #     today = fields.Date.context_today(self)
-    #     for rec in self:
-    #         if not rec.active:
-    #             rec.is_active_today = False
-    #         elif rec.start_date and rec.start_date > today:
-    #             rec.is_active_today = False
-    #         elif rec.end_date and rec.end_date < today:
-    #             rec.is_active_today = False
-    #         else:
-    #             rec.is_active_today = True
 
     @api.constrains('start_date', 'end_date')
     def _check_date_boundaries(self):
@@ -49,11 +68,11 @@ class LocationBasedException(models.Model):
             if rec.end_date and rec.start_date and rec.end_date < rec.start_date:
                 raise ValidationError(("End Date (%s) cannot be earlier than Start Date (%s).") % (rec.end_date, rec.start_date))
 
-    @api.constrains('operating_unit_ids', 'operating_unit', 'active')
+    @api.constrains('operating_unit_ids', 'operating_unit', 'active', 'state')
     def _check_operating_unit_required(self):
         for rec in self:
-            if rec.active and not rec.operating_unit_ids and not rec.operating_unit:
-                raise ValidationError(_("A Location-Based Exception must specify at least one Location / Operating Unit."))
+            if rec.state == 'active' and not rec.operating_unit_ids and not rec.operating_unit:
+                raise ValidationError("A Location-Based Exception must specify at least one Location / Operating Unit.")
 
     schedule_name = fields.Char(
         string="Schedule Name",
@@ -98,12 +117,35 @@ class LocationBasedException(models.Model):
         string="Allowed Shifts"
     )
 
-    shift_id = fields.Many2one('job.shift', string="Shift Template", help="Link to an applicable shift definition")
+    shift_id = fields.Many2one('job.shift', string="Shift Template", required=True, help="Link to an applicable shift definition")
 
+    @api.depends('operating_unit_ids', 'operating_unit', 'district_id')
     def _compute_allowed_shift_ids(self):
         for rec in self:
-            allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=rec.operating_unit)
-            rec.allowed_shift_ids = [(6, 0, allowed)]
+            allowed_ids = set()
+            targets = rec.operating_unit_ids or (rec.district_id if rec.district_id else self.env['operating.unit'].browse())
+            if targets:
+                for target_ou in targets:
+                    allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=target_ou)
+                    allowed_ids.update(allowed)
+            else:
+                allowed_ids.update(self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=False))
+            rec.allowed_shift_ids = [(6, 0, list(allowed_ids))]
+
+    @api.onchange('operating_unit_ids', 'district_id')
+    def _onchange_locations_allowed_shifts(self):
+        allowed_ids = set()
+        targets = self.operating_unit_ids or (self.district_id if self.district_id else self.env['operating.unit'].browse())
+        if targets:
+            for target_ou in targets:
+                allowed = self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=target_ou)
+                allowed_ids.update(allowed)
+        else:
+            allowed_ids.update(self.env.user.sudo()._get_allowed_job_shift_ids(target_operating_unit=False))
+        self.allowed_shift_ids = [(6, 0, list(allowed_ids))]
+        if self.shift_id and self.shift_id.id not in allowed_ids:
+            self.shift_id = False
+        return {'domain': {'shift_id': [('id', 'in', list(allowed_ids))]}}
 
     start_time = fields.Float(string="Start Time", compute="_compute_shift_details", store=True, readonly=True)
     end_time = fields.Float(string="End Time", compute="_compute_shift_details", store=True, readonly=True)

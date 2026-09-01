@@ -126,6 +126,19 @@ export class MyAttendance extends Component {
                             String(tHrs).padStart(2, '0') + ":" +
                             String(tMins).padStart(2, '0') + ":" +
                             String(tSecs).padStart(2, '0');
+                        this.state.hoursToday =
+                            String(tHrs).padStart(2, '0') + "h " +
+                            String(tMins).padStart(2, '0') + "m";
+
+                        // Synchronize today's row in weekly breakdown live
+                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length) {
+                            const todayRow = this.state.dailyBreakdown.find(d => d.is_today);
+                            if (todayRow) {
+                                todayRow.hours_formatted = this.state.hoursToday;
+                                todayRow.hours = totalSecsToday / 3600.0;
+                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / 8.0) * 100));
+                            }
+                        }
 
                         // WEEKLY TOTAL = completed sessions this week + live elapsed
                         const completedSecsWeek = Math.round((this.state.hoursCompletedWeek || 0) * 3600);
@@ -158,6 +171,12 @@ export class MyAttendance extends Component {
             }
         } else {
             this.state.liveWorkedTimer = "00:00:00";
+            const completedSecsToday = Math.round((this.state.hoursCompletedToday || 0) * 3600);
+            const tHrs = Math.floor(completedSecsToday / 3600);
+            const tMins = Math.floor((completedSecsToday % 3600) / 60);
+            this.state.hoursToday =
+                String(tHrs).padStart(2, '0') + "h " +
+                String(tMins).padStart(2, '0') + "m";
             this.state.todayTotalFormatted = this.state.hoursToday;
         }
     }
@@ -181,7 +200,11 @@ export class MyAttendance extends Component {
         this.state.employeeAvatar = data.employee_avatar || "";
         this.state.jobTitle = data.job_title || "Employee";
         this.state.departmentName = data.department_name || "";
-        this.state.hoursToday = this.formatFloatTime(data.hours_today || 0);
+        const hToday = data.hours_today || 0;
+        const hHrs = Math.floor(hToday);
+        const hMins = Math.floor((hToday - hHrs) * 60);
+        this.state.hoursToday = String(hHrs).padStart(2, '0') + "h " + String(hMins).padStart(2, '0') + "m";
+
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
         this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];

@@ -164,6 +164,7 @@ class HrEmployeePrivate(models.Model):
                 '|', ('operating_unit_ids', 'in', ou_ids),
                      ('operating_unit', 'in', ou_ids),
                 ('active', '=', True),
+                ('state', '=', 'active'),
                 ('start_date', '<=', target_date),
                 '|', ('end_date', '=', False), ('end_date', '>=', target_date)
             ], limit=1)
