@@ -216,15 +216,40 @@ def seed_bunna_competencies(dbname='ERP'):
                 })
             mapping_count += 1
 
-        # Remove non-matrix role mappings if any exist
-        non_matrix_mappings = env['competency.role.mapping'].search([('job_position_id', 'not in', matrix_job_ids)])
-        if non_matrix_mappings:
-            print(f"Removing {len(non_matrix_mappings)} non-matrix role mappings...")
-            for nmm in non_matrix_mappings:
-                try:
-                    nmm.unlink()
-                except Exception as e:
-                    print(f"Could not unlink non-matrix mapping {nmm.mapping_name}: {e}")
+        # Automatically Map All Remaining hr.job Positions to Approved Role Mappings
+        all_jobs = env['hr.job'].search([])
+        approved_bm = list(env['competency.role.mapping'].search([('state', '=', 'approved')]))
+        default_bm = approved_bm[0] if approved_bm else False
+        
+        for job in all_jobs:
+            m = env['competency.role.mapping'].search([('job_position_id', '=', job.id)], limit=1)
+            if not m:
+                j_name = (job.name or '').lower()
+                best_bm = default_bm
+                if approved_bm:
+                    for bm in approved_bm:
+                        bm_title = (bm.job_position_id.name or '').lower()
+                        if ('manager' in j_name and 'manager' in bm_title) or \
+                           ('leader' in j_name and 'leader' in bm_title) or \
+                           ('officer' in j_name and 'officer' in bm_title) or \
+                           ('chief' in j_name and 'chief' in bm_title) or \
+                           ('director' in j_name and 'director' in bm_title):
+                            best_bm = bm
+                            break
+                m = env['competency.role.mapping'].create({
+                    'job_position_id': job.id,
+                    'version': 'v1.0',
+                    'state': 'approved',
+                    'approved_by_id': env.user.id,
+                    'approval_date': odoo.fields.Datetime.now(),
+                    'change_description': 'Auto-mapped via Bunna Bank Competency Framework Governance',
+                })
+                if best_bm:
+                    line_vals = [{'mapping_id': m.id, 'competency_id': l.competency_id.id, 'required_proficiency': l.required_proficiency, 'weight': l.weight or 1.0} for l in best_bm.line_ids]
+                    if line_vals:
+                        env['competency.role.mapping.line'].create(line_vals)
+            elif m.state != 'approved':
+                m.with_context(force_write=True).write({'state': 'approved'})
 
         # 4. Seed Matrix Configuration (Job Grade & Job Position Guidelines)
         matrix_config = env['competency.matrix.config'].get_active_config()
