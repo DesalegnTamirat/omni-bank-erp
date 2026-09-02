@@ -30,6 +30,18 @@ class CompetencyAssessmentCycle(models.Model):
         for rec in self:
             rec.assessment_count = len(rec.assessment_ids)
 
+    def action_view_assessments(self):
+        """Smart button action to view all paginated assessments for this cycle."""
+        self.ensure_one()
+        return {
+            'name': _('Assessments: %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'competency.assessment',
+            'view_mode': 'list,form',
+            'domain': [('cycle_id', '=', self.id)],
+            'context': {'default_cycle_id': self.id},
+        }
+
     @api.constrains('period_start', 'period_end')
     def _check_periods(self):
         for rec in self:
@@ -37,33 +49,154 @@ class CompetencyAssessmentCycle(models.Model):
                 raise ValidationError(_('Period End cannot be before Period Start.'))
 
     def action_start(self):
-        """Draft -> Open with notifications (FR-COM-045)."""
+        """Draft -> Open: Automatically generate 360-degree assessments (Self, Supervisor, Team, Peer, Subordinate) with random sampling caps."""
         self.with_context(force_write=True).write({'state': 'open'})
         for rec in self:
-            rec.message_post(body=_('Assessment cycle %s opened. Deadline: %s.') % (rec.name, rec.assessment_deadline or 'Not set'))
-            # Schedule activity notifications for supervisors and employees in scope
-            for asm in assessments:
-                target_name = asm.employee_id.name if asm.employee_id else _('yourself')
-                atype = dict(asm._fields['assessment_type'].selection).get(asm.assessment_type, asm.assessment_type)
-                # Notify Assessor (Self, Supervisor, Peer, Team)
-                if asm.assessor_id:
-                    asm.activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('Competency Assessment Required: %s (%s)') % (target_name, atype),
-                        note=_('Assessment cycle %s is now open! Please log in to complete your evaluation for %s (%s). Deadline: %s.') % (
-                            rec.name, target_name, atype, rec.assessment_deadline or 'N/A'
-                        ),
-                        user_id=asm.assessor_id.id,
-                        date_deadline=rec.assessment_deadline or fields.Date.context_today(self),
-                    )
+            rec._generate_cycle_assessments_batch()
+            rec.message_post(body=_('Assessment cycle %s opened and 360-degree evaluations generated. Deadline: %s.') % (rec.name, rec.assessment_deadline or 'Not set'))
+        return True
+
+    def _generate_cycle_assessments_batch(self):
+        """Generate pre-populated 360-degree assessments for all active employees for this cycle in lightning-fast O(N) bulk."""
+        self.ensure_one()
+        import random
+
+        config = self.env['competency.matrix.config'].get_active_config()
+        max_peers = config.max_peer_assessments or 3
+        max_subs = config.max_subordinate_assessments or 2
+
+        active_employees = self.env['hr.employee'].search([('active', '=', True)])
+        
+        # Track created assessments to avoid duplicates (cycle_id, employee_id, assessor_id, assessment_type)
+        existing_pairs = set(
+            self.env['competency.assessment'].search([('cycle_id', '=', self.id)]).mapped(
+                lambda a: (a.employee_id.id, a.assessor_id.id if a.assessor_id else False, a.assessment_type)
+            )
+        )
+
+        # Fast O(1) in-memory dict mapping for enterprise employee scale (3,800+ employees)
+        emp_map = {}
+        coach_to_reports = {}
+        for emp in active_employees:
+            emp_user = emp.user_id
+            if not emp_user:
+                continue
+            c_id = emp.coach_id.id if emp.coach_id else (emp.parent_id.id if emp.parent_id else False)
+            j_id = emp.job_id.id if emp.job_id else False
+            emp_map[emp.id] = {
+                'user_id': emp_user.id,
+                'coach_id': c_id,
+                'job_id': j_id,
+            }
+            if c_id:
+                coach_to_reports.setdefault(c_id, []).append(emp.id)
+
+        assessments_to_create = []
+
+        for emp_id, info in emp_map.items():
+            u_id = info['user_id']
+
+            # 1. Self Assessment (mandatory)
+            pair_self = (emp_id, u_id, 'self')
+            if pair_self not in existing_pairs:
+                assessments_to_create.append({
+                    'cycle_id': self.id,
+                    'employee_id': emp_id,
+                    'assessor_id': u_id,
+                    'assessment_type': 'self',
+                })
+                existing_pairs.add(pair_self)
+
+            # 2. Supervisor Assessment
+            c_id = info['coach_id']
+            if c_id and c_id in emp_map and emp_map[c_id]['user_id']:
+                pair_sup = (c_id, u_id, 'supervisor')
+                if pair_sup not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': c_id,
+                        'assessor_id': u_id,
+                        'assessment_type': 'supervisor',
+                    })
+                    existing_pairs.add(pair_sup)
+
+            # 3. Team Assessment (direct reports)
+            reports = coach_to_reports.get(emp_id, [])
+            for dr_id in reports:
+                pair_team = (dr_id, u_id, 'team')
+                if pair_team not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': dr_id,
+                        'assessor_id': u_id,
+                        'assessment_type': 'team',
+                    })
+                    existing_pairs.add(pair_team)
+
+            # 4 & 5. Peer & Subordinate Assessments
+            if c_id:
+                siblings = [s for s in coach_to_reports.get(c_id, []) if s != emp_id]
+                peers = [s for s in siblings if emp_map[s]['job_id'] == info['job_id']]
+                subs = [s for s in siblings if emp_map[s]['job_id'] != info['job_id']]
+
+                sampled_peers = random.sample(peers, min(len(peers), max_peers)) if peers else []
+                sampled_subs = random.sample(subs, min(len(subs), max_subs)) if subs else []
+
+                for p_id in sampled_peers:
+                    pair_peer = (p_id, u_id, 'peer')
+                    if pair_peer not in existing_pairs:
+                        assessments_to_create.append({
+                            'cycle_id': self.id,
+                            'employee_id': p_id,
+                            'assessor_id': u_id,
+                            'assessment_type': 'peer',
+                        })
+                        existing_pairs.add(pair_peer)
+
+                for s_id in sampled_subs:
+                    pair_sub = (s_id, u_id, 'subordinate')
+                    if pair_sub not in existing_pairs:
+                        assessments_to_create.append({
+                            'cycle_id': self.id,
+                            'employee_id': s_id,
+                            'assessor_id': u_id,
+                            'assessment_type': 'subordinate',
+                        })
+                        existing_pairs.add(pair_sub)
+
+        if not assessments_to_create:
+            return self.env['competency.assessment']
+
+        import threading
+
+        chunk_size = 500
+        created_asms = self.env['competency.assessment']
+        AssessmentSudo = self.env['competency.assessment'].with_context(
+            tracking_disable=True,
+            mail_create_nolog=True,
+            mail_create_nosubscribe=True,
+        )
+
+        is_test_mode = self.env.context.get('test_mode') or getattr(threading.current_thread(), 'testing', False)
+
+        for i in range(0, len(assessments_to_create), chunk_size):
+            chunk = assessments_to_create[i:i + chunk_size]
+            asms_chunk = AssessmentSudo.create(chunk)
+            created_asms |= asms_chunk
+            if not is_test_mode:
+                self.env.cr.commit()
+
+        return created_asms
 
     def action_start_review(self):
         self.with_context(force_write=True).write({'state': 'in_review'})
+        return True
 
     def action_close(self):
         self.with_context(force_write=True).write({'state': 'closed'})
         for rec in self:
             rec.message_post(body=_('Assessment cycle %s closed.') % rec.name)
+        return True
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
@@ -87,60 +220,22 @@ class CompetencyAssessment(models.Model):
     cycle_id = fields.Many2one(
         'competency.assessment.cycle', string='Assessment Cycle', required=True,
         domain="[('state', '=', 'open')]", ondelete='cascade', tracking=True)
-    employee_id = fields.Many2one(
-        'hr.employee', string='Employee', required=True, tracking=True,
-        domain=lambda self: self._get_allowed_employee_domain())
+    employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
     department_id = fields.Many2one(related='employee_id.department_id', string='Department', store=True, readonly=True)
     job_id = fields.Many2one(related='employee_id.job_id', string='Job Position', store=True, readonly=True)
 
     @api.model
     def _get_assessment_type_selection(self):
-        """Rule 1: Dynamically filter assessment types based on logged-in user role."""
-        user = self.env.user
-        emp = user.employee_id
-        
-        selection = [('self', 'Self-Assessment')]
-        
-        if self.env.su or user.has_group('competency_management.group_competency_admin'):
-            return [
-                ('self', 'Self-Assessment'),
-                ('peer', 'Peer Assessment'),
-                ('supervisor', 'Supervisor Assessment'),
-                ('team', 'Team Assessment'),
-            ]
-            
-        if emp:
-            if emp.parent_id:
-                selection.append(('peer', 'Peer Assessment'))
-                selection.append(('supervisor', 'Supervisor Assessment'))
-            
-            subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)], limit=1)
-            if subordinates or emp.child_ids:
-                selection.append(('team', 'Team Assessment'))
-                
-        return selection
+        """Complete 360-degree assessment type selection options."""
+        return [
+            ('self', 'Self-Assessment'),
+            ('peer', 'Peer Assessment'),
+            ('subordinate', 'Subordinate Assessment'),
+            ('supervisor', 'Supervisor Assessment'),
+            ('team', 'Team Assessment'),
+        ]
 
-    @api.model
-    def _get_allowed_employee_domain(self):
-        user = self.env.user
-        if self.env.su or user.has_group('competency_management.group_competency_admin'):
-            return []
-        
-        emp = user.employee_id
-        if not emp:
-            return [('id', '=', False)]
-            
-        allowed_ids = set()
-        allowed_ids.add(emp.id)
-        
-        subordinates = self.env['hr.employee'].search([('id', 'child_of', emp.id)])
-        allowed_ids.update(subordinates.ids)
-        
-        if emp.parent_id:
-            peers = self.env['hr.employee'].search([('parent_id', '=', emp.parent_id.id)])
-            allowed_ids.update(peers.ids)
-            
-        return [('id', 'in', list(allowed_ids))]
+
 
     assessor_id = fields.Many2one('res.users', string='Assessor', default=lambda self: self.env.user, readonly=True)
     assessment_type = fields.Selection(
@@ -308,12 +403,11 @@ class CompetencyAssessment(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
-        for record in records:
-            if not record.name:
-                record.name = self.env['ir.sequence'].sudo().next_by_code('competency.assessment') or \
-                    'CMP-A-%s' % record.id
-        return records
+        seq = self.env['ir.sequence'].sudo()
+        for vals in vals_list:
+            if not vals.get('name'):
+                vals['name'] = seq.next_by_code('competency.assessment') or 'CMP-A-NEW'
+        return super().create(vals_list)
 
     @api.model
     def _get_matrix_required_level(self, pillar, grade=False, job=False, job_name=''):
@@ -393,18 +487,47 @@ class CompetencyAssessment(models.Model):
             self._do_populate_lines()
 
     def _do_populate_lines(self):
-        """Internal helper to populate competency rating lines for self.employee_id."""
+        """Internal helper to populate competency rating lines for self.employee_id according to configured pillar scope."""
+        self = self.sudo()
         if not self.employee_id:
             self.line_ids = [(5, 0, 0)]
             return 0, ''
+        
+        # Determine allowed pillars for this assessment_type from configuration
+        config = self.env['competency.matrix.config'].get_active_config()
+        allowed_pillars = config.get_allowed_pillars_for_type(self.assessment_type or 'self')
+
         employee = self.employee_id
         job_pos = employee.job_id or getattr(employee, 'job_position', False)
         mapping = False
         if job_pos:
-            mapping = self.env['competency.role.mapping'].search([
-                ('job_position_id', '=', job_pos.id),
-                ('state', '=', 'approved')
-            ], order='id desc', limit=1)
+            emp_ou = getattr(employee, 'default_operating_unit_id', False) or getattr(employee.department_id, 'operating_unit_id', False)
+            
+            # Priority 1: Specific Operating Unit Mapping
+            if emp_ou:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job_pos.id),
+                    ('state', '=', 'approved'),
+                    ('is_operating_unit_specific', '=', True),
+                    ('operating_unit_ids', 'in', [emp_ou.id])
+                ], order='id desc', limit=1)
+
+            # Priority 2: Global / All Operating Units Mapping
+            if not mapping:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job_pos.id),
+                    ('state', '=', 'approved'),
+                    ('is_operating_unit_specific', '=', False)
+                ], order='id desc', limit=1)
+
+            # Priority 3: General Fallback (any approved)
+            if not mapping:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job_pos.id),
+                    ('state', '=', 'approved')
+                ], order='id desc', limit=1)
+
+            # Priority 4: Draft/Any mapping
             if not mapping:
                 mapping = self.env['competency.role.mapping'].search([
                     ('job_position_id', '=', job_pos.id)
@@ -414,12 +537,14 @@ class CompetencyAssessment(models.Model):
         if mapping and mapping.line_ids:
             for mline in mapping.line_ids:
                 if mline.competency_id:
-                    raw_line_vals.append({
-                        'competency_id': mline.competency_id.id,
-                        'pillar': mline.competency_id.pillar or 'technical',
-                        'current_level': False,
-                        'required_level': mline.required_proficiency or '2',
-                    })
+                    cpillar = mline.competency_id.pillar or 'technical'
+                    if cpillar in allowed_pillars:
+                        raw_line_vals.append({
+                            'competency_id': mline.competency_id.id,
+                            'pillar': cpillar,
+                            'current_level': False,
+                            'required_level': mline.required_proficiency or '2',
+                        })
             mapping_name_str = mapping.mapping_name
         else:
             grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
@@ -427,17 +552,18 @@ class CompetencyAssessment(models.Model):
             j_lower = j_name.lower()
             is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp']) or getattr(employee, 'is_managerial', False)
 
-            core_comps = self.env['competency.competency'].search([('pillar', '=', 'core'), ('status', '=', 'active')])
-            for comp in core_comps:
-                req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name)
-                raw_line_vals.append({
-                    'competency_id': comp.id,
-                    'pillar': 'core',
-                    'current_level': False,
-                    'required_level': req_lvl or '2',
-                })
+            if 'core' in allowed_pillars:
+                core_comps = self.env['competency.competency'].search([('pillar', '=', 'core'), ('status', '=', 'active')])
+                for comp in core_comps:
+                    req_lvl = self._get_matrix_required_level('core', grade=grade_rec, job=job_pos, job_name=j_name)
+                    raw_line_vals.append({
+                        'competency_id': comp.id,
+                        'pillar': 'core',
+                        'current_level': False,
+                        'required_level': req_lvl or '2',
+                    })
 
-            if is_managerial:
+            if 'leadership' in allowed_pillars and is_managerial:
                 lead_comps = self.env['competency.competency'].search([('pillar', '=', 'leadership'), ('status', '=', 'active')])
                 for comp in lead_comps:
                     req_lvl = self._get_matrix_required_level('leadership', grade=grade_rec, job=job_pos, job_name=j_name)
@@ -448,28 +574,29 @@ class CompetencyAssessment(models.Model):
                         'required_level': req_lvl or '2',
                     })
 
-            tech_comps = self.env['competency.competency']
-            if job_pos and getattr(job_pos, 'department_id', False):
-                dept_name = job_pos.department_id.name
-                tech_comps = self.env['competency.competency'].search([
-                    ('pillar', '=', 'technical'),
-                    ('status', '=', 'active'),
-                    ('functional_domain', '=ilike', dept_name)
-                ])
-            if not tech_comps:
-                tech_comps = self.env['competency.competency'].search([
-                    ('pillar', '=', 'technical'),
-                    ('status', '=', 'active')
-                ], limit=5)
+            if 'technical' in allowed_pillars:
+                tech_comps = self.env['competency.competency']
+                if job_pos and getattr(job_pos, 'department_id', False):
+                    dept_name = job_pos.department_id.name
+                    tech_comps = self.env['competency.competency'].search([
+                        ('pillar', '=', 'technical'),
+                        ('status', '=', 'active'),
+                        ('functional_domain', '=ilike', dept_name)
+                    ])
+                if not tech_comps:
+                    tech_comps = self.env['competency.competency'].search([
+                        ('pillar', '=', 'technical'),
+                        ('status', '=', 'active')
+                    ], limit=5)
 
-            for comp in tech_comps:
-                req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name)
-                raw_line_vals.append({
-                    'competency_id': comp.id,
-                    'pillar': 'technical',
-                    'current_level': False,
-                    'required_level': req_lvl or '2',
-                })
+                for comp in tech_comps:
+                    req_lvl = self._get_matrix_required_level('technical', grade=grade_rec, job=job_pos, job_name=j_name)
+                    raw_line_vals.append({
+                        'competency_id': comp.id,
+                        'pillar': 'technical',
+                        'current_level': False,
+                        'required_level': req_lvl or '2',
+                    })
 
             mapping_name_str = _("Competency Matrix Guidelines (%s)") % (j_name or 'Default')
 
@@ -733,6 +860,7 @@ class CompetencyAssessmentLine(models.Model):
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
     job_id = fields.Many2one(related='assessment_id.job_id', string='Job Position', store=True, readonly=True, index=True)
+    grade_id = fields.Many2one(related='assessment_id.employee_id.grade_id', string='Job Grade', store=True, readonly=True, index=True)
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
 
     tna_measure = fields.Selection([
@@ -744,6 +872,7 @@ class CompetencyAssessmentLine(models.Model):
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade',
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
+    functional_domain = fields.Char(related='competency_id.functional_domain', string='Functional Domain', store=True, readonly=True)
     competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', readonly=True)
     pillar = fields.Selection(related='competency_id.pillar', string='Pillar', readonly=True, store=True)
     
@@ -829,6 +958,84 @@ class CompetencyAssessmentLine(models.Model):
                          help='Required minus Current proficiency (positive = development gap).')
     current_level_num = fields.Integer(string='Current Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
     required_level_num = fields.Integer(string='Required Level (Numeric)', compute='_compute_level_nums', store=True, group_operator='avg')
+
+    # 360 Multi-Rater Ratings Breakdown
+    self_rating = fields.Float(string='Self Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
+    peer_avg = fields.Float(string='Peer Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
+    subordinate_avg = fields.Float(string='Subordinate Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
+    supervisor_avg = fields.Float(string='Supervisor Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
+    team_avg = fields.Float(string='Team Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
+    weighted_current_level = fields.Float(string='Weighted Current Level', compute='_compute_360_ratings', store=True, group_operator='avg')
+
+    @api.depends('assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id', 'current_level')
+    def _compute_360_ratings(self):
+        config = self.env['competency.matrix.config'].sudo().get_active_config()
+        w_self = float(config.weight_self or 2.0)
+        w_peer = float(config.weight_peer or 1.0)
+        w_sub = float(config.weight_subordinate or 1.0)
+        w_sup = float(config.weight_supervisor or 3.0)
+        w_team = float(config.weight_team or 0.0)
+
+        for line in self:
+            emp = line.employee_id
+            cycle = line.cycle_id
+            comp = line.competency_id
+
+            if not (emp and cycle and comp):
+                s_init = int(line.current_level) if line.current_level and str(line.current_level).isdigit() else 0.0
+                line.self_rating = s_init
+                line.peer_avg = 0.0
+                line.subordinate_avg = 0.0
+                line.supervisor_avg = 0.0
+                line.team_avg = 0.0
+                line.weighted_current_level = s_init
+                continue
+
+            comp_lines = self.env['competency.assessment.line'].search([
+                ('employee_id', '=', emp.id),
+                ('cycle_id', '=', cycle.id),
+                ('competency_id', '=', comp.id),
+                ('current_level', '!=', False)
+            ])
+
+            self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self']
+            peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer']
+            sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate']
+            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'supervisor']
+            team_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'team']
+
+            s_val = int(self_lines[0].current_level) if self_lines and str(self_lines[0].current_level).isdigit() else (int(line.current_level) if line.current_level and str(line.current_level).isdigit() else 0.0)
+            p_val = round(sum(int(l.current_level) for l in peer_lines if str(l.current_level).isdigit()) / len(peer_lines), 2) if peer_lines else 0.0
+            sub_val = round(sum(int(l.current_level) for l in sub_lines if str(l.current_level).isdigit()) / len(sub_lines), 2) if sub_lines else 0.0
+            sup_val = round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0
+            t_val = round(sum(int(l.current_level) for l in team_lines if str(l.current_level).isdigit()) / len(team_lines), 2) if team_lines else 0.0
+
+            line.self_rating = float(s_val)
+            line.peer_avg = float(p_val)
+            line.subordinate_avg = float(sub_val)
+            line.supervisor_avg = float(sup_val)
+            line.team_avg = float(t_val)
+
+            num = 0.0
+            den = 0.0
+            if s_val:
+                num += s_val * w_self
+                den += w_self
+            if p_val:
+                num += p_val * w_peer
+                den += w_peer
+            if sub_val:
+                num += sub_val * w_sub
+                den += w_sub
+            if sup_val:
+                num += sup_val * w_sup
+                den += w_sup
+            if t_val:
+                num += t_val * w_team
+                den += w_team
+
+            line.weighted_current_level = round(num / den, 2) if den > 0 else float(s_val or 0.0)
+
     achievement_status = fields.Selection([
         ('exceeds', 'Exceeds Required Level'),
         ('meets', 'Meets Required Level'),

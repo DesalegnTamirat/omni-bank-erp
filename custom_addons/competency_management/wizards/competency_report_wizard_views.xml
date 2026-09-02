@@ -2,38 +2,57 @@
 <odoo>
     <data>
 
-        <!-- Form View for Report Filter Wizard -->
+        <!-- Form View matching corporate Reference UI for Competency Reports & Analytics -->
         <record id="view_competency_report_wizard_form" model="ir.ui.view">
             <field name="name">competency.report.wizard.form</field>
             <field name="model">competency.report.wizard</field>
             <field name="arch" type="xml">
-                <form string="Competency Report Generator">
+                <form string="Competency Reports &amp; Analytics (Excel / PDF)">
                     <sheet>
-                        <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; border-left: 5px solid #c17540;">
-                            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">
-                                Bunna Bank S.C. — Competency Report Generator
-                            </h3>
-                            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
-                                Generate role-scoped competency capability reports, TNA gap matrices, and organizational benchmarks.
+                        <field name="is_dept_readonly" invisible="1"/>
+                        <field name="is_ou_readonly" invisible="1"/>
+                        <field name="is_emp_readonly" invisible="1"/>
+                        <field name="is_status_readonly" invisible="1"/>
+
+                        <div style="background-color: #e0f2fe; color: #0369a1; padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; border: 1px solid #bae6fd;">
+                            <div style="font-size: 13px; font-weight: 500;">
+                                📊 <strong>Multi-Rater Reporting &amp; Capability Analytics:</strong> Generate high-definition Excel spreadsheets (.xlsx) and printable PDF reports with corporate matrix ratings, variance indices, and capability gap analysis across all organizational units.
                             </div>
                         </div>
 
-                        <group>
+                        <group col="2">
                             <group string="Report Configuration">
                                 <field name="report_type" widget="radio"/>
+                                <field name="export_format" widget="radio"/>
                                 <field name="cycle_id" options="{'no_create': True, 'no_open': True}"/>
-                                <field name="employee_id" invisible="report_type != 'individual'" required="report_type == 'individual'" options="{'no_create': True, 'no_open': True}"/>
                             </group>
-                            <group string="Filters &amp; Scope" invisible="report_type == 'individual'">
-                                <field name="pillar" widget="radio"/>
-                                <field name="department_ids" widget="many2many_tags" options="{'no_create': True}"/>
+
+                            <group string="Evaluation &amp; Status Filters">
+                                <field name="achievement_status" string="Proficiency Filter" readonly="is_status_readonly"/>
+                                <field name="stage_filter" string="Assessment Stage"/>
+                                <field name="required_level" string="Required Proficiency Levels"/>
+                                <field name="pillar" string="Competency Pillars / Categories"/>
+                                <field name="competency_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select Competencies..."/>
                             </group>
                         </group>
 
+                        <notebook>
+                            <page string="Organizational Filters" name="org_filters">
+                                <group>
+                                    <field name="department_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_dept_readonly" placeholder="All Departments"/>
+                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_ou_readonly" placeholder="All Workunits / Branches"/>
+                                    <field name="job_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Roles / Positions"/>
+                                    <field name="grade_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Grades"/>
+                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_emp_readonly" placeholder="All Employees"/>
+                                </group>
+                            </page>
+                        </notebook>
+
                     </sheet>
                     <footer>
-                        <button name="action_print_pdf" string="Generate PDF Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600;"/>
-                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                        <button name="action_generate_report" string="Generate Report" type="object" class="btn-primary" style="background-color: #541718; border-color: #541718; color: #FFFFFF; font-weight: 600; padding: 6px 18px;"/>
+                        <button name="action_apply_filter" string="🔍 View Filtered Tree" type="object" class="btn-secondary" style="font-weight: 600;"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>
             </field>
@@ -41,7 +60,7 @@
 
         <!-- Window Action for Report Wizard -->
         <record id="action_competency_report_wizard" model="ir.actions.act_window">
-            <field name="name">Competency Report Generator</field>
+            <field name="name">Competency Reports &amp; Analytics (Excel / PDF)</field>
             <field name="res_model">competency.report.wizard</field>
             <field name="view_mode">form</field>
             <field name="target">new</field>

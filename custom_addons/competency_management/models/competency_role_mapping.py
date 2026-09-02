@@ -31,10 +31,15 @@ class CompetencyRoleMapping(models.Model):
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
     approval_date = fields.Datetime(string='Approval Date', readonly=True)
 
-    _sql_constraints = [
-        ('job_version_uniq', 'unique(job_position_id, version)',
-         'A mapping for this Job Position at this version already exists. Edit the existing record or create a new version instead.'),
-    ]
+
+
+    is_operating_unit_specific = fields.Boolean(
+        string='Specific to Operating Unit', default=False, tracking=True,
+        help="Check this if this competency mapping applies only to specific Operating Units (e.g. specific Branches/Districts). If left unchecked, it applies globally to all operating units."
+    )
+    operating_unit_ids = fields.Many2many(
+        'operating.unit', string='Specific Operating Units', tracking=True
+    )
 
     @api.depends('job_position_id')
     def _compute_grade_id(self):
@@ -45,30 +50,37 @@ class CompetencyRoleMapping(models.Model):
             else:
                 rec.grade_id = False
 
-    @api.depends('job_position_id', 'grade_id')
+    @api.depends('job_position_id', 'grade_id', 'is_operating_unit_specific', 'operating_unit_ids')
     def _compute_mapping_name(self):
         for rec in self:
             parts = [rec.job_position_id.name] if rec.job_position_id else ['(No Job)']
             if rec.grade_id:
                 parts.append('(%s)' % rec.grade_id.grade_name)
+            if rec.is_operating_unit_specific and rec.operating_unit_ids:
+                ou_names = ", ".join(rec.operating_unit_ids.mapped('name'))
+                parts.append('[OU: %s]' % ou_names)
             rec.mapping_name = ' '.join(parts)
 
-    @api.constrains('job_position_id', 'state')
+    @api.constrains('job_position_id', 'state', 'is_operating_unit_specific', 'operating_unit_ids')
     def _check_single_active_mapping_per_job(self):
-        """Rule 1: Prevent multiple non-archived mapping records for the same Job Position."""
+        """Allow multiple active mappings per Job Position if they target distinct Operating Units."""
         for rec in self:
             if rec.job_position_id and rec.state in ('draft', 'under_approval', 'approved'):
-                active_mappings = self.search([
+                domain = [
                     ('job_position_id', '=', rec.job_position_id.id),
                     ('state', 'in', ('draft', 'under_approval', 'approved')),
-                    ('id', '!=', rec.id)
-                ])
+                    ('id', '!=', rec.id),
+                    ('is_operating_unit_specific', '=', rec.is_operating_unit_specific),
+                ]
+                if rec.is_operating_unit_specific and rec.operating_unit_ids:
+                    domain.append(('operating_unit_ids', 'in', rec.operating_unit_ids.ids))
+
+                active_mappings = self.search(domain)
                 if active_mappings:
-                    states_str = ', '.join(set(active_mappings.mapped('state')))
                     raise ValidationError(_(
-                        "A role-competency mapping for Job Position '%s' already exists in '%s' status. "
-                        "Only one active/draft mapping is allowed per Job Position. Please archive or retire the existing mapping first."
-                    ) % (rec.job_position_id.name, states_str))
+                        "A matching active competency mapping for Job Position '%s' already exists (%s). "
+                        "Please archive or update the existing mapping."
+                    ) % (rec.job_position_id.name, active_mappings[0].mapping_name))
 
     @api.onchange('cluster_ids')
     def _onchange_cluster_ids(self):
@@ -262,6 +274,7 @@ class CompetencyRoleMappingLine(models.Model):
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade',
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
+    pillar = fields.Selection(related='competency_id.pillar', string='Pillar', store=True, readonly=True)
 
     @api.constrains('competency_id')
     def _check_competency_status(self):

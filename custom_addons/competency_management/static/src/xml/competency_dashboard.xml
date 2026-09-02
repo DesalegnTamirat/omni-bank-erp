@@ -13,13 +13,25 @@
                     <span style="color: rgba(255,255,255,0.4); font-size: 18px;">|</span>
                     <span style="font-size: 16px; font-weight: 600; color: #ffffff;">Competency &amp; TNA Decision Support Dashboard</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
                     <!-- Cycle Selector Dropdown -->
-                    <select class="form-select form-select-sm" style="width: 180px; background: #ffffff; color: #1d2b32; font-weight: 600; border-radius: 6px;"
+                    <select class="form-select form-select-sm" style="min-width: 190px; background: #ffffff; color: #1d2b32; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px;"
                             t-on-change="onCycleChange">
+                        <option value="">All Assessment Cycles</option>
                         <t t-foreach="state.data.all_cycles" t-as="cyc" t-key="cyc.id">
                             <option t-att-value="cyc.id" t-att-selected="state.cycleId == cyc.id">
                                 <t t-out="cyc.name"/>
+                            </option>
+                        </t>
+                    </select>
+
+                    <!-- Department / Unit Filter Dropdown -->
+                    <select class="form-select form-select-sm" style="min-width: 190px; background: #ffffff; color: #1d2b32; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px;"
+                            t-on-change="onDepartmentChange">
+                        <option value="">All Departments / Units</option>
+                        <t t-foreach="state.data.all_departments" t-as="dept" t-key="dept.id">
+                            <option t-att-value="dept.id" t-att-selected="state.departmentId == dept.id">
+                                <t t-out="dept.name"/>
                             </option>
                         </t>
                     </select>
@@ -34,16 +46,20 @@
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 13px; font-weight: 600; color: #726732;">Persona</span>
                     <div style="background-color: #e2e8f0; border-radius: 6px; padding: 3px; display: flex; gap: 4px;">
-                        <button t-attf-class="btn btn-sm"
-                                t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'executive' ? '#541718' : 'transparent'}; color: #{state.persona === 'executive' ? '#ffffff' : '#1d2b32'};"
-                                t-on-click="() => this.onPersonaChange('executive')">
-                            Executive
-                        </button>
-                        <button t-attf-class="btn btn-sm"
-                                t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'supervisor' ? '#541718' : 'transparent'}; color: #{state.persona === 'supervisor' ? '#ffffff' : '#1d2b32'};"
-                                t-on-click="() => this.onPersonaChange('supervisor')">
-                            Manager
-                        </button>
+                        <t t-if="state.data.user &amp;&amp; state.data.user.is_admin">
+                            <button t-attf-class="btn btn-sm"
+                                    t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'executive' ? '#541718' : 'transparent'}; color: #{state.persona === 'executive' ? '#ffffff' : '#1d2b32'};"
+                                    t-on-click="() => this.onPersonaChange('executive')">
+                                Executive
+                            </button>
+                        </t>
+                        <t t-if="state.data.user &amp;&amp; (state.data.user.is_admin || state.data.user.is_supervisor || state.data.user.has_subordinates)">
+                            <button t-attf-class="btn btn-sm"
+                                    t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'supervisor' ? '#541718' : 'transparent'}; color: #{state.persona === 'supervisor' ? '#ffffff' : '#1d2b32'};"
+                                    t-on-click="() => this.onPersonaChange('supervisor')">
+                                Manager
+                            </button>
+                        </t>
                         <button t-attf-class="btn btn-sm"
                                 t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'employee' ? '#541718' : 'transparent'}; color: #{state.persona === 'employee' ? '#ffffff' : '#1d2b32'};"
                                 t-on-click="() => this.onPersonaChange('employee')">
@@ -115,7 +131,7 @@
                                 <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
-                                <canvas t-ref="tnaChart"/>
+                                <canvas id="competencyTnaDonutChart" style="width: 100%; height: 230px; display: block;"></canvas>
                             </div>
                         </div>
 
@@ -126,7 +142,7 @@
                                 <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
-                                <canvas t-ref="pillarChart"/>
+                                <canvas id="competencyPillarBarChart" style="width: 100%; height: 230px; display: block;"></canvas>
                             </div>
                         </div>
 
@@ -137,7 +153,7 @@
                                 <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
-                                <canvas t-ref="radarChart"/>
+                                <canvas id="competencyRadarChart" style="width: 100%; height: 230px; display: block;"></canvas>
                             </div>
                         </div>
 

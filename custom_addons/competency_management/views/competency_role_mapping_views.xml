@@ -55,6 +55,14 @@
                                 <field name="approval_date"/>
                             </group>
                         </group>
+                        <group string="Operating Unit Target Boundaries">
+                            <group>
+                                <field name="is_operating_unit_specific" widget="boolean_toggle" readonly="state != 'draft'"/>
+                            </group>
+                            <group invisible="not is_operating_unit_specific">
+                                <field name="operating_unit_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}" placeholder="Select specific Operating Units (leave empty to apply globally)..."/>
+                            </group>
+                        </group>
                         <group string="Version Governance &amp; Change Log">
                             <field name="change_description" readonly="state != 'draft'" placeholder="Describe changes introduced in this version..."/>
                         </group>
@@ -64,6 +72,7 @@
                                     <field name="is_matrix_configured" column_invisible="True"/>
                                     <field name="default_proficiency" column_invisible="True"/>
                                     <field name="competency_id"/>
+                                    <field name="pillar" widget="badge" readonly="1"/>
                                     <field name="override_default"/>
                                     <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
                                     <field name="weight"/>

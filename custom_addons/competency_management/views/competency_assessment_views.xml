@@ -34,6 +34,11 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_assessments" type="object" class="oe_stat_button" icon="fa-file-text-o">
+                                <field name="assessment_count" widget="statinfo" string="Assessments"/>
+                            </button>
+                        </div>
                         <div class="oe_title">
                             <label for="name" string="Cycle Name"/>
                             <h1><field name="name" placeholder="e.g. Annual Assessment 2026" readonly="state == 'closed'"/></h1>
@@ -51,7 +56,7 @@
                         <notebook>
                             <page string="Assessments">
                                 <field name="assessment_ids" readonly="1">
-                                    <list create="false" edit="false" delete="false">
+                                    <list limit="20" create="false" edit="false" delete="false">
                                         <field name="name"/>
                                         <field name="employee_id"/>
                                         <field name="assessment_type"/>
@@ -105,9 +110,15 @@
                             <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
                         </div>
                         
-                        <group string="Competency Definition">
-                            <field name="competency_definition" readonly="1" nolabel="1"/>
-                        </group>
+                        <!-- Full-width Competency Definition Callout Container -->
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; width: 100%;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
 
                         <div style="margin-top: 15px; margin-bottom: 10px;">
                             <h3 style="color: #1d2b32; border-bottom: 2px solid #541718; padding-bottom: 5px;">
@@ -183,9 +194,9 @@
                         <group>
                             <group>
                                 <field name="name" readonly="1"/>
-                                <field name="cycle_id" readonly="state != 'draft'" domain="[('state', '=', 'open')]"/>
-                                <field name="assessment_type" readonly="state != 'draft'"/>
-                                <field name="employee_id" readonly="state != 'draft' or not assessment_type or assessment_type in ('self', 'supervisor')" force_save="1" options="{'no_open': True, 'no_create': True}"/>
+                                <field name="cycle_id" readonly="1" force_save="1" domain="[('state', '=', 'open')]"/>
+                                <field name="assessment_type" readonly="1" force_save="1"/>
+                                <field name="employee_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
                             </group>
                             <group>
                                 <field name="assessor_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
@@ -195,48 +206,65 @@
                         </group>
                         <notebook>
                             <page string="Core Competencies" icon="fa-star">
-                                <field name="core_line_ids" readonly="is_locked">
-                                    <list create="false" delete="false">
+                                <field name="core_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
                                         <field name="competency_id" readonly="1" string="Core Competency"/>
                                         <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Leadership Competencies" icon="fa-users">
-                                <field name="leadership_line_ids" readonly="is_locked">
-                                    <list create="false" delete="false">
+                                <field name="leadership_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
                                         <field name="competency_id" readonly="1" string="Leadership Competency"/>
                                         <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Technical Competencies" icon="fa-cogs">
-                                <field name="technical_line_ids" readonly="is_locked">
-                                    <list create="false" delete="false">
+                                <field name="technical_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
                                         <field name="competency_id" readonly="1" string="Technical Competency"/>
                                         <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes" readonly="is_locked"/>
+                                <field name="notes" readonly="state != 'draft' or is_locked"/>
                             </page>
                         </notebook>
                     </sheet>
                     <chatter/>
                 </form>
+            </field>
+        </record>
+
+        <!-- Dedicated List View for My Competency Assessments (create="false") -->
+        <record id="view_competency_assessment_my_list" model="ir.ui.view">
+            <field name="name">competency.assessment.my.list</field>
+            <field name="model">competency.assessment</field>
+            <field name="arch" type="xml">
+                <list create="false" delete="false">
+                    <field name="name"/>
+                    <field name="cycle_id"/>
+                    <field name="assessment_type" widget="badge"/>
+                    <field name="employee_id" string="Evaluatee (Employee Name)" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="department_id"/>
+                    <field name="average_gap"/>
+                    <field name="state" widget="badge"/>
+                </list>
             </field>
         </record>
 
@@ -274,7 +302,8 @@
             <field name="name">My Competency Assessments</field>
             <field name="res_model">competency.assessment</field>
             <field name="view_mode">list,form</field>
-            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="domain">[('assessor_id', '=', uid)]</field>
+            <field name="view_id" ref="view_competency_assessment_my_list"/>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
         </record>
 
@@ -289,10 +318,17 @@
                     <field name="operating_unit_id"/>
                     <field name="department_id"/>
                     <field name="job_id"/>
+                    <field name="grade_id"/>
                     <field name="competency_id"/>
+                    <field name="functional_domain"/>
                     <field name="pillar" widget="badge"/>
+                    <field name="self_rating" optional="show"/>
+                    <field name="peer_avg" optional="show"/>
+                    <field name="subordinate_avg" optional="show"/>
+                    <field name="supervisor_avg" optional="show"/>
+                    <field name="team_avg" optional="hide"/>
+                    <field name="weighted_current_level" string="Weighted Current Level"/>
                     <field name="required_level"/>
-                    <field name="current_level"/>
                     <field name="gap"/>
                     <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
                     <field name="state" widget="badge"/>

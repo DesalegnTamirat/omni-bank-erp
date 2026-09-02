@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
+from odoo import api, fields, models, tools, _
 
 
 class CompetencyMatrixConfig(models.Model):
@@ -33,6 +33,59 @@ class CompetencyMatrixConfig(models.Model):
         default="Shapes technical standards and strategic direction at an enterprise level. Designs overall framework governance, drives innovation, and builds institutional capability."
     )
 
+    # 360-Degree Evaluator Weights for Gap Math
+    weight_self = fields.Float(string='Self Assessment Weight', default=2.0, required=True)
+    weight_peer = fields.Float(string='Peer Assessment Weight', default=1.0, required=True)
+    weight_subordinate = fields.Float(string='Subordinate Assessment Weight', default=1.0, required=True)
+    weight_supervisor = fields.Float(string='Supervisor Assessment Weight', default=3.0, required=True)
+    weight_team = fields.Float(string='Team Assessment Weight', default=0.0, required=True)
+
+    # 360-Degree Random Sampling Caps
+    max_peer_assessments = fields.Integer(
+        string='Max Peer Assessments Per Evaluator', default=3, required=True,
+        help="Maximum number of peer assessments randomly assigned to an evaluator per cycle."
+    )
+    max_subordinate_assessments = fields.Integer(
+        string='Max Subordinate Assessments Per Evaluator', default=2, required=True,
+        help="Maximum number of subordinate assessments randomly assigned to an evaluator per cycle."
+    )
+
+    # 360-Degree Evaluator Pillar Scope Rules
+    peer_eval_core = fields.Boolean(string='Peer: Core Pillar', default=True)
+    peer_eval_leadership = fields.Boolean(string='Peer: Leadership Pillar', default=True)
+    peer_eval_technical = fields.Boolean(string='Peer: Technical Pillar', default=True)
+
+    subordinate_eval_core = fields.Boolean(string='Subordinate: Core Pillar', default=True)
+    subordinate_eval_leadership = fields.Boolean(string='Subordinate: Leadership Pillar', default=True)
+    subordinate_eval_technical = fields.Boolean(string='Subordinate: Technical Pillar', default=True)
+
+    supervisor_eval_core = fields.Boolean(string='Supervisor: Core Pillar', default=True)
+    supervisor_eval_leadership = fields.Boolean(string='Supervisor: Leadership Pillar', default=True)
+    supervisor_eval_technical = fields.Boolean(string='Supervisor: Technical Pillar', default=True)
+
+    team_eval_core = fields.Boolean(string='Team: Core Pillar', default=True)
+    team_eval_leadership = fields.Boolean(string='Team: Leadership Pillar', default=True)
+    team_eval_technical = fields.Boolean(string='Team: Technical Pillar', default=True)
+
+    self_eval_core = fields.Boolean(string='Self: Core Pillar', default=True)
+    self_eval_leadership = fields.Boolean(string='Self: Leadership Pillar', default=True)
+    self_eval_technical = fields.Boolean(string='Self: Technical Pillar', default=True)
+
+    def get_allowed_pillars_for_type(self, assessment_type):
+        """Return list of allowed pillars ('core', 'leadership', 'technical') for an assessment type."""
+        self.ensure_one()
+        pillars = []
+        prefix = assessment_type if assessment_type in ('peer', 'subordinate', 'supervisor', 'team', 'self') else 'self'
+        
+        if getattr(self, f'{prefix}_eval_core', True):
+            pillars.append('core')
+        if getattr(self, f'{prefix}_eval_leadership', True):
+            pillars.append('leadership')
+        if getattr(self, f'{prefix}_eval_technical', True):
+            pillars.append('technical')
+            
+        return pillars or ['core', 'leadership', 'technical']
+
     grade_matrix_line_ids = fields.One2many(
         'competency.grade.matrix', 'config_id', string='Job Grade Proficiency Matrix'
     )
@@ -40,9 +93,21 @@ class CompetencyMatrixConfig(models.Model):
         'competency.job.matrix', 'config_id', string='Job Position Proficiency Matrix'
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        self.clear_caches()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        self.clear_caches()
+        return res
+
     @api.model
+    @tools.ormcache()
     def get_active_config(self):
-        """Helper to return singleton active matrix configuration record."""
+        """Helper to return singleton active matrix configuration record (cached via ORM cache)."""
         config = self.search([], limit=1)
         if not config:
             config = self.create({'name': 'Bunna Bank Competency Matrix Configuration'})

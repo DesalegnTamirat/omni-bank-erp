@@ -2,7 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
-import { Component, onWillStart, onMounted, useState, useRef } from "@odoo/owl";
+import { Component, onWillStart, onMounted, useEffect, useState, useRef } from "@odoo/owl";
 import { loadBundle } from "@web/core/assets";
 
 export class CompetencyDashboard extends Component {
@@ -47,6 +47,15 @@ export class CompetencyDashboard extends Component {
         onMounted(async () => {
             await this.loadData();
         });
+
+        useEffect(
+            () => {
+                if (!this.state.loading) {
+                    this.renderCharts();
+                }
+            },
+            () => [this.state.loading, this.state.persona, this.state.cycleId]
+        );
     }
 
     async loadData() {
@@ -69,7 +78,6 @@ export class CompetencyDashboard extends Component {
             }
 
             this.state.loading = false;
-            setTimeout(() => this.renderCharts(), 50);
         } catch (e) {
             console.error("Failed to load competency dashboard data:", e);
             this.state.loading = false;
@@ -78,7 +86,7 @@ export class CompetencyDashboard extends Component {
 
     onPersonaChange(newPersona) {
         this.state.persona = newPersona;
-        setTimeout(() => this.renderCharts(), 50);
+        this.loadData();
     }
 
     onCycleChange(ev) {
@@ -100,15 +108,16 @@ export class CompetencyDashboard extends Component {
         if (!ChartLib) return;
 
         // 1. TNA Donut Chart
-        if (this.tnaCanvasRef.el) {
+        const tnaCanvas = document.getElementById("competencyTnaDonutChart");
+        if (tnaCanvas) {
             if (this.tnaChartInstance) this.tnaChartInstance.destroy();
             const cdata = (this.state.data.charts && this.state.data.charts.tna_donut) || {};
-            this.tnaChartInstance = new ChartLib(this.tnaCanvasRef.el, {
+            this.tnaChartInstance = new ChartLib(tnaCanvas, {
                 type: 'doughnut',
                 data: {
                     labels: cdata.labels || ['Underqualified', 'Fit', 'Overqualified'],
                     datasets: [{
-                        data: cdata.data || [266, 1141, 277],
+                        data: cdata.data && cdata.data.length ? cdata.data : [266, 1141, 277],
                         backgroundColor: cdata.colors || ['#541718', '#726732', '#c17540'],
                         borderWidth: 2,
                     }]
@@ -122,29 +131,18 @@ export class CompetencyDashboard extends Component {
         }
 
         // 2. Pillar Bar Chart (Grouped Bar)
-        if (this.pillarCanvasRef.el) {
+        const pillarCanvas = document.getElementById("competencyPillarBarChart");
+        if (pillarCanvas) {
             if (this.pillarChartInstance) this.pillarChartInstance.destroy();
             const pdata = (this.state.data.charts && this.state.data.charts.pillar_bar) || {};
-            this.pillarChartInstance = new ChartLib(this.pillarCanvasRef.el, {
+            this.pillarChartInstance = new ChartLib(pillarCanvas, {
                 type: 'bar',
                 data: {
-                    labels: pdata.labels || ['Core', 'Leadership', 'Technical'],
-                    datasets: [
-                        {
-                            label: 'Core',
-                            data: [33, 37, 25],
-                            backgroundColor: '#541718',
-                        },
-                        {
-                            label: 'Leadership',
-                            data: [28, 27, 43],
-                            backgroundColor: '#c17540',
-                        },
-                        {
-                            label: 'Technical',
-                            data: [14, 34, 31],
-                            backgroundColor: '#726732',
-                        }
+                    labels: pdata.labels || ['Core Pillar', 'Leadership Pillar', 'Technical Pillar'],
+                    datasets: pdata.datasets && pdata.datasets.length ? pdata.datasets : [
+                        { label: 'Below Target', data: [0, 0, 0], backgroundColor: '#541718' },
+                        { label: 'Meets Target', data: [0, 0, 0], backgroundColor: '#726732' },
+                        { label: 'Exceeds Target', data: [0, 0, 0], backgroundColor: '#c17540' }
                     ]
                 },
                 options: {
@@ -157,20 +155,29 @@ export class CompetencyDashboard extends Component {
         }
 
         // 3. Radar Chart (Spider/Radar)
-        if (this.radarCanvasRef.el) {
+        const radarCanvas = document.getElementById("competencyRadarChart");
+        if (radarCanvas) {
             if (this.radarChartInstance) this.radarChartInstance.destroy();
             const rdata = (this.state.data.charts && this.state.data.charts.employee_radar) || {};
-            this.radarChartInstance = new ChartLib(this.radarCanvasRef.el, {
+            this.radarChartInstance = new ChartLib(radarCanvas, {
                 type: 'radar',
                 data: {
-                    labels: rdata.labels || ['Core', 'Leadership', 'Skills', 'Diversity', 'Technical'],
+                    labels: rdata.labels || ['Core Values', 'Execution', 'Communication', 'Technical Skills', 'Problem Solving'],
                     datasets: [
                         {
-                            label: 'Target Profile',
-                            data: [4.5, 3.8, 3.2, 4.0, 3.5],
+                            label: 'My Assessed Level',
+                            data: rdata.assessed || [3, 2, 4, 3, 2],
                             backgroundColor: 'rgba(84, 23, 24, 0.2)',
                             borderColor: '#541718',
                             pointBackgroundColor: '#541718',
+                        },
+                        {
+                            label: 'All Competencies Target',
+                            data: rdata.required || [4, 3, 4, 4, 3],
+                            backgroundColor: 'rgba(193, 117, 64, 0.1)',
+                            borderColor: '#c17540',
+                            borderDash: [5, 5],
+                            pointBackgroundColor: '#c17540',
                         }
                     ]
                 },
@@ -188,7 +195,7 @@ export class CompetencyDashboard extends Component {
             name: "Underqualified Competency Lines",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
-            view_mode: "list,graph,pivot,form",
+            views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
             domain: [["achievement_status", "=", "below"]],
         });
     }
@@ -198,7 +205,7 @@ export class CompetencyDashboard extends Component {
             name: "Fit / Qualified Competency Lines",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
-            view_mode: "list,graph,pivot,form",
+            views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
             domain: [["achievement_status", "=", "meets"]],
         });
     }
@@ -208,7 +215,7 @@ export class CompetencyDashboard extends Component {
             name: "Overqualified Competency Lines",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
-            view_mode: "list,graph,pivot,form",
+            views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
             domain: [["achievement_status", "=", "exceeds"]],
         });
     }
@@ -218,7 +225,7 @@ export class CompetencyDashboard extends Component {
             name: "Proficiency Matrix Configuration",
             type: "ir.actions.act_window",
             res_model: "competency.matrix.config",
-            view_mode: "form",
+            views: [[false, "form"]],
             res_id: 1,
         });
     }
@@ -228,7 +235,7 @@ export class CompetencyDashboard extends Component {
             name: "Comprehensive TNA Report",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
-            view_mode: "list,graph,pivot,form",
+            views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
         });
     }
 
@@ -240,14 +247,14 @@ export class CompetencyDashboard extends Component {
                 type: "ir.actions.act_window",
                 res_model: "competency.assessment",
                 res_id: asmId,
-                view_mode: "form",
+                views: [[false, "form"]],
             });
         } else {
             this.actionService.doAction({
                 name: "Create My Assessment",
                 type: "ir.actions.act_window",
                 res_model: "competency.assessment",
-                view_mode: "form",
+                views: [[false, "form"]],
                 target: "current",
             });
         }
@@ -260,7 +267,7 @@ export class CompetencyDashboard extends Component {
                 type: "ir.actions.act_window",
                 res_model: "competency.assessment",
                 res_id: asmId,
-                view_mode: "form",
+                views: [[false, "form"]],
             });
         }
     }
@@ -274,7 +281,7 @@ export class CompetencyDashboard extends Component {
             name: "Filtered Heatmap Lines",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
-            view_mode: "list,graph,pivot,form",
+            views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
             domain: domain,
         });
     }

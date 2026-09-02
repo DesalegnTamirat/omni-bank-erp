@@ -67,7 +67,7 @@
                             </group>
                         </group>
                         <group string="Definition">
-                            <field name="definition" readonly="status == 'retired'" placeholder="Define the competency and what it covers..."/>
+                            <field name="definition" readonly="status == 'retired'" placeholder="Define the competency and what it covers..." colspan="2"/>
                         </group>
                         <notebook>
                             <page string="Proficiency Levels">

@@ -112,10 +112,16 @@
             groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
 
         <menuitem id="menu_competency_matrix_config"
-            name="Proficiency Matrix Settings"
+            name="Proficiency Matrix Guidelines"
             parent="menu_competency_config_categ"
-            action="action_competency_matrix_config"
+            action="action_competency_matrix_guidelines_config"
             sequence="10"
+            groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
+        <menuitem id="menu_competency_360_config"
+            name="Behavioral &amp; 360° Assessment Rules"
+            parent="menu_competency_config_categ"
+            action="action_competency_360_config"
+            sequence="15"
             groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
         <menuitem id="menu_competency_rating_models"
             name="Rating Models"
