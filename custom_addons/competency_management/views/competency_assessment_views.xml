@@ -307,6 +307,15 @@
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
         </record>
 
+        <!-- My Competency Evaluation Results Action (Employee View) -->
+        <record id="action_my_competency_evaluations" model="ir.actions.act_window">
+            <field name="name">My Competency Evaluation Results</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="search_view_id" ref="competency_management.view_competency_assessment_line_report_search"/>
+        </record>
+
         <!-- Detailed Competency & TNA Analytics Views -->
         <record id="view_competency_assessment_line_report_list" model="ir.ui.view">
             <field name="name">competency.assessment.line.report.list</field>

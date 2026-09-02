@@ -549,6 +549,28 @@ class CompetencyDashboard(models.TransientModel):
             if not cycle:
                 cycle = self.env['competency.assessment.cycle'].search([], order='id desc', limit=1)
 
+        # Active Assessment Cycle Info for Dashboard Header Banner
+        open_cycle = self.env['competency.assessment.cycle'].search([('state', 'in', ['open', 'in_review'])], order='id desc', limit=1)
+        active_cycle_info = {}
+        if open_cycle:
+            p_start = open_cycle.period_start.strftime('%b %d, %Y') if open_cycle.period_start else 'N/A'
+            p_end = open_cycle.period_end.strftime('%b %d, %Y') if open_cycle.period_end else 'N/A'
+            deadline = open_cycle.assessment_deadline.strftime('%b %d, %Y') if open_cycle.assessment_deadline else 'N/A'
+            state_label = 'Open for Submissions' if open_cycle.state == 'open' else 'In Review'
+            active_cycle_info = {
+                'has_active': True,
+                'name': open_cycle.name,
+                'state': open_cycle.state,
+                'state_label': state_label,
+                'period_start': p_start,
+                'period_end': p_end,
+                'deadline': deadline,
+            }
+        else:
+            active_cycle_info = {
+                'has_active': False,
+            }
+
         # Available Cycles list
         all_cycles = self.env['competency.assessment.cycle'].search_read([], ['id', 'name', 'state', 'assessment_deadline'], order='id desc')
 
@@ -761,6 +783,7 @@ class CompetencyDashboard(models.TransientModel):
                 'name': cycle.name if cycle else 'No Cycle Selected',
                 'deadline': str(cycle.assessment_deadline) if cycle and cycle.assessment_deadline else '',
             },
+            'active_cycle_info': active_cycle_info,
             'all_cycles': all_cycles,
             'all_departments': all_departments,
             'stats': {

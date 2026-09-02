@@ -97,6 +97,42 @@
                         </div>
                     </t>
 
+                    <!-- ── Active Assessment Campaign Status Banner ── -->
+                    <t t-if="state.data.active_cycle_info &amp;&amp; state.data.active_cycle_info.has_active">
+                        <div style="background: linear-gradient(135deg, #ffffff 0%, #fdf8f5 100%); border: 1px solid #e2e8f0; border-left: 6px solid #541718; border-radius: 10px; padding: 16px 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="background-color: rgba(84, 23, 24, 0.1); color: #541718; font-size: 22px; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    📅
+                                </div>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="badge bg-success" style="font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                            <t t-out="state.data.active_cycle_info.state_label"/>
+                                        </span>
+                                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1d2b32;">
+                                            <t t-out="state.data.active_cycle_info.name"/>
+                                        </h4>
+                                    </div>
+                                    <div style="font-size: 13px; color: #64748b; margin-top: 3px;">
+                                        <span>Evaluation Range: <strong style="color: #1d2b32;"><t t-out="state.data.active_cycle_info.period_start"/> – <t t-out="state.data.active_cycle_info.period_end"/></strong></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 16px; text-align: right;">
+                                <div style="font-size: 11px; font-weight: 700; color: #c17540; text-transform: uppercase; letter-spacing: 0.5px;">Submission Deadline</div>
+                                <div style="font-size: 15px; font-weight: 800; color: #541718;"><t t-out="state.data.active_cycle_info.deadline"/></div>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #94a3b8; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 18px;">ℹ️</span>
+                            <span style="font-size: 13px; font-weight: 600; color: #64748b;">
+                                No active assessment campaign is currently open.
+                            </span>
+                        </div>
+                    </t>
+
                     <!-- ── 5 KPI Cards Row ── -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
                         <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
