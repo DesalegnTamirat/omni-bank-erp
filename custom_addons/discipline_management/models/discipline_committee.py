@@ -470,6 +470,22 @@ class DisciplineCommitteeSignature(models.Model):
     is_signed = fields.Boolean(string='Signed', default=False)
     comments = fields.Text(string='Deliberation Remarks / Justification')
 
+    is_locked_pending_prior_signoff = fields.Boolean(
+        string='Locked Pending Prior Sign-off',
+        compute='_compute_is_locked_pending_prior_signoff',
+        help='FR-DIS-020.3: the Chairperson (CPCO) final-approval signature stays '
+             'disabled/locked until the Immediate Director has signed first.'
+    )
+
+    @api.depends('role', 'meeting_id.signature_line_ids.is_signed', 'meeting_id.signature_line_ids.role')
+    def _compute_is_locked_pending_prior_signoff(self):
+        for rec in self:
+            if rec.role == 'chair':
+                dir_line = rec.meeting_id.signature_line_ids.filtered(lambda l: l.role == 'director')
+                rec.is_locked_pending_prior_signoff = bool(dir_line and not dir_line[0].is_signed)
+            else:
+                rec.is_locked_pending_prior_signoff = False
+
     def action_save_signature(self):
         """Save signature drawn by user via signature widget."""
         for rec in self:

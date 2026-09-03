@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
+from odoo.exceptions import UserError, ValidationError
 from datetime import timedelta
 
 
@@ -111,6 +112,67 @@ class HrEmployee(models.Model):
                 emp.is_managerial = True
             else:
                 emp.is_managerial = False
+
+    def action_request_transfer(self):
+        """FR-DIS-021.3: Self-Initiated Transfer Request must be blocked while the employee
+        has an active disciplinary penalty. This is the method the employee-portal
+        "Request Transfer" button should call; it either proceeds (returning an act_window
+        to the standard transfer wizard/request, if installed) or raises the required
+        blocking error message.
+        """
+        self.ensure_one()
+        eligible, reason = self.check_discipline_eligibility()
+        if not eligible:
+            raise UserError(_(
+                'Candidate is currently ineligible for transfer due to an active disciplinary penalty. %s'
+            ) % reason)
+        # Hand off to whatever transfer-request flow exists in the deployment (e.g. a
+        # dedicated employee-portal wizard); this module only enforces the eligibility gate.
+        return True
+
+    def action_forced_transfer(self, new_department_id=False, new_job_id=False, reason=None):
+        """FR-DIS-021.4: HR/Management-initiated Forced / Administrative Transfer.
+
+        Unlike action_request_transfer, this deliberately bypasses the disciplinary
+        eligibility gate — a forced transfer is often itself the disciplinary or
+        operational reassignment action, so it must remain available even for an employee
+        currently ineligible for a self-service transfer.
+        """
+        for emp in self:
+            if not self.env.user.has_group('discipline_management.group_discipline_manager'):
+                raise UserError(_('Only HR or Management can process a Forced / Administrative Transfer.'))
+            vals = {}
+            if new_department_id:
+                vals['department_id'] = new_department_id
+            if new_job_id:
+                vals['job_id'] = new_job_id
+            if vals:
+                emp.sudo().with_context(no_leave_resource_calendar_update=True).write(vals)
+            emp.message_post(body=_('Forced / Administrative Transfer processed by %s. %s') % (
+                self.env.user.name, reason or ''
+            ))
+        return True
+
+    @api.model
+    def _get_promotion_ineligible_domain(self):
+        """Domain fragment recruiters/hiring managers can AND into a candidate search to
+        automatically filter out disciplinarily-ineligible employees (FR-DIS-021.2)."""
+        return [('is_ineligible_for_promotion_transfer', '=', False), ('is_suspended', '=', False)]
+
+    def write(self, vals):
+        """FR-DIS-021.2: if an HR user manually attempts to promote (change job_id on) an
+        ineligible employee, block it with the required error message. Demotion enforcement
+        (action_apply_demotion) bypasses this via context flag since that write IS the
+        disciplinary action itself, not a promotion."""
+        if 'job_id' in vals and not self.env.context.get('discipline_demotion_in_progress'):
+            for emp in self:
+                new_job_id = vals.get('job_id')
+                if emp.is_ineligible_for_promotion_transfer and new_job_id and new_job_id != emp.job_id.id:
+                    raise ValidationError(_(
+                        'Candidate is currently ineligible for promotion due to an active disciplinary '
+                        'penalty. (Employee: %s)'
+                    ) % emp.name)
+        return super().write(vals)
 
     def action_view_discipline_cases(self):
         self.ensure_one()

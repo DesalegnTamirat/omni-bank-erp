@@ -33,6 +33,15 @@
             <field name="comment">Can record investigation findings, evidence, and initiate cases.</field>
         </record>
 
+        <!-- Group: Audit Directorate (FR-DIS-013/014/026) -->
+        <record id="group_discipline_auditor" model="res.groups">
+            <field name="name">Audit Directorate</field>
+            <field name="sequence">25</field>
+            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
+            <field name="comment">Conducts investigations, records findings, submits to the Disciplinary Committee, and initiates/requests approval of suspensions per FR-DIS-026.</field>
+        </record>
+
         <!-- Group: Manager / Approver -->
         <record id="group_discipline_manager" model="res.groups">
             <field name="name">Manager / Line Manager</field>

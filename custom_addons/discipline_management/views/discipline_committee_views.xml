@@ -144,6 +144,11 @@
             <field name="arch" type="xml">
                 <form string="Digital Signature Submission">
                     <sheet>
+                        <field name="is_locked_pending_prior_signoff" invisible="1"/>
+                        <div class="alert alert-warning shadow-sm" role="alert" invisible="not is_locked_pending_prior_signoff">
+                            <strong>Locked:</strong> As Chairperson (CPCO), your final-approval signature is
+                            disabled until the Immediate Director has signed first (FR-DIS-020.3).
+                        </div>
                         <group>
                             <group>
                                 <field name="meeting_id" readonly="1"/>
@@ -157,14 +162,15 @@
                             </group>
                         </group>
                         <group string="Deliberation Remarks &amp; Justification">
-                            <field name="comments" placeholder="Provide any comments or concurrence notes..."/>
+                            <field name="comments" placeholder="Provide any comments or concurrence notes..." readonly="is_locked_pending_prior_signoff"/>
                         </group>
                         <group string="Sign using Signature Pad">
-                            <field name="signature" widget="signature"/>
+                            <field name="signature" widget="signature" readonly="is_locked_pending_prior_signoff"/>
                         </group>
                     </sheet>
                     <footer>
-                        <button name="action_save_signature" string="Confirm &amp; Submit Signature" type="object" class="btn-success"/>
+                        <button name="action_save_signature" string="Confirm &amp; Submit Signature" type="object" class="btn-success"
+                                invisible="is_locked_pending_prior_signoff"/>
                         <button string="Cancel" class="btn-secondary" special="cancel"/>
                     </footer>
                 </form>

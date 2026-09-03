@@ -25,7 +25,14 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning" invisible="state != 'draft'"/>
+                        <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve_suspension" string="Approve" type="object" class="btn-success"
+                                invisible="state != 'submitted' or not can_current_user_approve"/>
+                        <button name="action_reject_suspension" string="Reject" type="object" class="btn-danger"
+                                invisible="state != 'submitted' or not can_current_user_approve"/>
+                        <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning"
+                                invisible="state != 'approved'"
+                                groups="discipline_management.group_discipline_admin"/>
                         <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success" invisible="state not in ('active', 'extended')"/>
                         <!-- Convert active/extended suspension to dismissal (Admin only) -->
                         <button name="action_convert_to_dismissal" string="Convert to Dismissal" type="object" class="btn-danger"
@@ -33,15 +40,20 @@
                                 groups="discipline_management.group_discipline_admin"
                                 confirm="This will convert the suspension into a DISMISSAL. The employee will be permanently separated. Proceed?"
                                 help="Escalate this suspension to a full dismissal action."/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,active,completed,converted_dismissal"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,active,completed,converted_dismissal"/>
                     </header>
                     <sheet>
+                        <div class="alert alert-info shadow-sm" role="alert" invisible="not approval_authority">
+                            <strong>Required Approving Authority (FR-DIS-030A):</strong> <field name="approval_authority" readonly="1" nolabel="1"/>
+                        </div>
+                        <field name="can_current_user_approve" invisible="1"/>
                         <group>
                             <group string="Suspension Details">
                                 <field name="name"/>
                                 <field name="case_id"/>
                                 <field name="employee_id"/>
                                 <field name="department_id"/>
+                                <field name="is_rmcd_iad_staff"/>
                             </group>
                             <group string="Type &amp; Duration Rules">
                                 <field name="suspension_type"/>
@@ -49,6 +61,17 @@
                                 <field name="end_date"/>
                                 <field name="working_days_count"/>
                                 <field name="days_remaining"/>
+                            </group>
+                        </group>
+                        <group>
+                            <group string="Routing (FR-DIS-026)">
+                                <field name="initiating_directorate"/>
+                                <field name="initiator_id" readonly="1"/>
+                            </group>
+                            <group string="Approval">
+                                <field name="approver_id" readonly="1"/>
+                                <field name="approval_date" readonly="1"/>
+                                <field name="rejection_reason" invisible="state != 'rejected'"/>
                             </group>
                         </group>
                         <notebook>

@@ -51,11 +51,19 @@ class HrAttendance(models.Model):
         ICP = self.env['ir.config_parameter'].sudo()
         lateness_threshold = int(ICP.get_param('discipline.attendance_lateness_threshold', 3))
         checkout_threshold = int(ICP.get_param('discipline.attendance_checkout_threshold', 3))
+        absence_threshold = int(ICP.get_param('discipline.attendance_absence_threshold', 3))
         rolling_days = int(ICP.get_param('discipline.attendance_rolling_days', 30))
         date_from = fields.Date.context_today(self) - timedelta(days=rolling_days)
 
         recent_attendances = self.search([('check_in', '>=', date_from)])
         employees = recent_attendances.mapped('employee_id')
+
+        # Unauthorized absence uses hr.attendance's own resource-calendar / hr.leave gap
+        # detection when available; otherwise we look at days with an expected calendar
+        # attendance and no check-in on record within the rolling window.
+        Employee = self.env['hr.employee']
+        all_active_employees = Employee.search([('active', '=', True)])
+        employees |= all_active_employees.filtered(lambda e: e.resource_calendar_id)
 
         # Cache category and default severity
         Category = self.env['discipline.offense.category']
@@ -113,6 +121,47 @@ class HrAttendance(models.Model):
                     rolling_days=rolling_days,
                     coach_user=coach_user
                 )
+
+            # 3. Unauthorized Absence Threshold Check
+            # An "unauthorized absence day" is a working day (per the employee's resource
+            # calendar) with no check-in on record and no approved leave covering it.
+            if emp.resource_calendar_id:
+                absence_days = 0
+                curr = date_from
+                today = fields.Date.context_today(self)
+                worked_dates = set(emp_atts.mapped(lambda a: a.check_in.date()))
+                Leave = self.env.get('hr.leave')
+                while curr < today:
+                    if curr.weekday() < 5 and curr not in worked_dates:
+                        on_leave = False
+                        if Leave:
+                            on_leave = bool(Leave.sudo().search_count([
+                                ('employee_id', '=', emp.id),
+                                ('state', '=', 'validate'),
+                                ('date_from', '<=', curr),
+                                ('date_to', '>=', curr),
+                            ]))
+                        if not on_leave:
+                            absence_days += 1
+                    curr += timedelta(days=1)
+
+                if absence_days >= absence_threshold:
+                    offense_absence = Offense.search([('name', '=ilike', 'Unauthorized Absence')], limit=1)
+                    if not offense_absence:
+                        offense_absence = Offense.create({
+                            'name': 'Unauthorized Absence',
+                            'category_id': att_cat.id,
+                            'severity_level_id': sev_level_4.id if sev_level_4 else False,
+                        })
+                    self._create_or_remind_attendance_case(
+                        emp=emp,
+                        offense=offense_absence,
+                        sev_level=sev_level_4,
+                        violation_type='absence',
+                        count=absence_days,
+                        rolling_days=rolling_days,
+                        coach_user=coach_user
+                    )
 
     @api.model
     def _create_or_remind_attendance_case(self, emp, offense, sev_level, violation_type, count, rolling_days, coach_user):

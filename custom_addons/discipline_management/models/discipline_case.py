@@ -364,10 +364,13 @@ class DisciplineCase(models.Model):
 
     @api.depends('employee_id', 'employee_id.job_id', 'severity_level', 'punishment_type')
     def _compute_required_final_authority(self):
+        """Only Dismissal (Level 1) cases require executive CEO/CPCO sign-off via the
+        Disciplinary Committee route. A non-dismissal case must NEVER be forced into this
+        field just because the affected employee's job title looks managerial — doing so
+        used to block Managers/Directors/Chiefs from directly deciding and enforcing cases
+        per FR-DIS-006/007/011, which is the core requested behaviour."""
         for rec in self:
-            job_name = (rec.employee_id.job_id.name or '').lower() if rec.employee_id and rec.employee_id.job_id else ''
-            is_executive = any(kw in job_name for kw in ['manager', 'director', 'chief', 'vp', 'executive', 'head'])
-            if is_executive or rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
+            if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
                 rec.required_final_authority = 'ceo'
             else:
                 rec.required_final_authority = 'cpco'
@@ -462,32 +465,46 @@ class DisciplineCase(models.Model):
                          rec.incident_date, same_severity[0].name))
 
     def _validate_segregation_of_duties(self):
+        """Segregation-of-duties guard.
+
+        NOTE (BRD alignment fix): Managers/Directors/Chiefs/CEO are explicitly allowed by the
+        BRD (FR-DIS-006/007/011) to decide and enforce a case they themselves initiated or
+        escalated — "without any intervention" up to the point a case is a dismissal. The
+        Initiator vs Approver check that used to live here made that impossible (it always
+        fired on a direct decide-and-enforce, since the deciding manager IS the initiator).
+        That check is removed. We still keep Reviewer vs Approver/Initiator segregation,
+        because that protects the integrity of a real Audit Directorate investigation
+        (FR-DIS-013/014): the person who investigated must not also be the one who initiated
+        or gives final sign-off outside the Committee process.
+        """
         for rec in self:
             current_user = self.env.user
             if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Reviewer must be different individuals.'))
-            if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Approver must be different individuals.'))
+                raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Investigator/Reviewer must be different individuals.'))
             if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
+                raise ValidationError(_('Segregation of Duties Violation: Case Investigator/Reviewer and Approver must be different individuals.'))
 
-            if rec.severity_level == 'level_1' or rec.required_final_authority == 'ceo':
+            # The CEO/CPCO executive-authority safeguard below only applies to the
+            # Dismissal / Disciplinary-Committee route. It must never block a Manager,
+            # Director, or Chief from directly deciding and enforcing a non-dismissal case,
+            # even where the affected employee happens to hold a managerial job title.
+            if rec.is_dismissal_action:
                 if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
                     raise ValidationError(_(
-                        'Approval Restriction: Decisions requiring CEO / Senior Executive Authority are restricted '
-                        'exclusively to authorized executive approvers.'
+                        'Approval Restriction: Dismissal decisions require CEO / Senior Executive Authority and are '
+                        'restricted exclusively to authorized executive approvers.'
                     ))
                 if not rec.dismissal_authority_id:
                     raise ValidationError(_(
-                        'Authority Record Required: For executive or dismissal cases, you must record the designated '
+                        'Authority Record Required: For dismissal cases, you must record the designated '
                         'CEO or CPCO approver in the "Dismissal Authority" field.'
                     ))
                 if rec.required_final_authority == 'ceo' and rec.dismissal_authority_id:
                     if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_ceo') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
                         raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CEO / Executive approval authority.'))
-            elif rec.required_final_authority == 'cpco' and rec.dismissal_authority_id:
-                if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_cpco') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
-                    raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CPCO approval authority.'))
+                elif rec.required_final_authority == 'cpco' and rec.dismissal_authority_id:
+                    if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_cpco') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
+                        raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CPCO approval authority.'))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -829,7 +846,14 @@ class DisciplineCase(models.Model):
         """Gap 1: Demotion execution preserving basic salary while downgrading position scale/allowances."""
         for rec in self:
             if rec.new_job_id:
-                rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({'job_id': rec.new_job_id.id})
+                # This write IS the disciplinary action, so it must bypass the
+                # promotion-eligibility guard on hr.employee (FR-DIS-021.2), which otherwise
+                # would (correctly, for a normal promotion) block writes to job_id on an
+                # employee already flagged ineligible.
+                rec.employee_id.sudo().with_context(
+                    no_leave_resource_calendar_update=True,
+                    discipline_demotion_in_progress=True,
+                ).write({'job_id': rec.new_job_id.id})
                 rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved.') % rec.new_job_id.name)
 
     def action_approve_dismissal(self):
