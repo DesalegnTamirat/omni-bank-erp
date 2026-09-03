@@ -529,12 +529,12 @@ class CompetencyDashboard(models.TransientModel):
         is_admin = user.has_group('competency_management.group_competency_admin')
         is_supervisor = user.has_group('competency_management.group_competency_supervisor') or is_admin
 
-        # Determine Operating Unit boundary for current user
+        # Determine Operating Unit boundary for current user (direct access, declared dependency)
         user_ou_ids = []
         if not is_admin:
-            if hasattr(user, 'operating_unit_ids') and user.operating_unit_ids:
+            if user.operating_unit_ids:
                 user_ou_ids = user.operating_unit_ids.ids
-            elif hasattr(user, 'default_operating_unit_id') and user.default_operating_unit_id:
+            elif user.default_operating_unit_id:
                 user_ou_ids = [user.default_operating_unit_id.id]
             elif emp:
                 emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
@@ -574,9 +574,9 @@ class CompetencyDashboard(models.TransientModel):
         # Available Cycles list
         all_cycles = self.env['competency.assessment.cycle'].search_read([], ['id', 'name', 'state', 'assessment_deadline'], order='id desc')
 
-        # Available Departments list: If non-admin user is restricted to Operating Units, filter available departments to their Operating Units only!
+        # Available Departments list
         if user_ou_ids:
-            dept_domain = ['|', ('operating_unit_id', 'in', user_ou_ids), ('id', 'in', self.env['hr.employee'].search(['|', ('default_operating_unit_id', 'in', user_ou_ids), ('operating_unit_id', 'in', user_ou_ids)]).mapped('department_id.id'))]
+            dept_domain = ['|', ('operating_unit_id', 'in', user_ou_ids), ('id', 'in', self.env['hr.employee'].sudo().search(['|', ('default_operating_unit_id', 'in', user_ou_ids), ('operating_unit_id', 'in', user_ou_ids)]).mapped('department_id.id'))]
             all_departments = self.env['hr.department'].search_read(dept_domain, ['id', 'name'], order='name asc')
         else:
             all_departments = self.env['hr.department'].search_read([], ['id', 'name'], order='name asc')
@@ -590,7 +590,7 @@ class CompetencyDashboard(models.TransientModel):
 
         # Operating Unit Strict Boundary Restriction for non-admin users
         if user_ou_ids:
-            ou_emp_ids = self.env['hr.employee'].search([
+            ou_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('default_operating_unit_id', 'in', user_ou_ids),
                 '|', ('operating_unit_id', 'in', user_ou_ids),
                 ('department_id.operating_unit_id', 'in', user_ou_ids)
@@ -607,10 +607,10 @@ class CompetencyDashboard(models.TransientModel):
             line_domain.append(('employee_id', '=', emp.id))
             asm_domain.append(('employee_id', '=', emp.id))
         elif (persona == 'supervisor' or persona == 'manager') and emp:
-            subordinate_emp_ids = self.env['hr.employee'].search([('id', 'child_of', emp.id)]).ids
+            subordinate_emp_ids = self.env['hr.employee'].sudo().search([('id', 'child_of', emp.id)]).ids
             dept_emp_ids = []
             if emp.department_id:
-                dept_emp_ids = self.env['hr.employee'].search([('department_id', 'child_of', emp.department_id.id)]).ids
+                dept_emp_ids = self.env['hr.employee'].sudo().search([('department_id', 'child_of', emp.department_id.id)]).ids
             scoped_emp_ids = list(set(subordinate_emp_ids + dept_emp_ids + [emp.id]))
             line_domain.append(('employee_id', 'in', scoped_emp_ids))
             asm_domain.append(('employee_id', 'in', scoped_emp_ids))
@@ -620,31 +620,40 @@ class CompetencyDashboard(models.TransientModel):
 
         lines = self.env['competency.assessment.line'].search(line_domain)
         asms_total = self.env['competency.assessment'].search_count(asm_domain)
+        has_real_data = bool(lines)
 
         below_cnt = len(lines.filtered(lambda l: l.achievement_status == 'below'))
         meets_cnt = len(lines.filtered(lambda l: l.achievement_status == 'meets'))
         exceeds_cnt = len(lines.filtered(lambda l: l.achievement_status == 'exceeds'))
-
-        if not (below_cnt or meets_cnt or exceeds_cnt):
-            below_cnt = int(asms_total * 0.23) if asms_total else 266
-            meets_cnt = int(asms_total * 0.53) if asms_total else 1141
-            exceeds_cnt = int(asms_total * 0.24) if asms_total else 277
 
         # Pillar Average Gaps
         core_lines = lines.filtered(lambda l: l.pillar == 'core')
         lead_lines = lines.filtered(lambda l: l.pillar == 'leadership')
         tech_lines = lines.filtered(lambda l: l.pillar == 'technical')
 
-        core_avg = round(sum([l.gap for l in core_lines if l.gap is not None]) / len(core_lines), 2) if core_lines else 0.25
-        lead_avg = round(sum([l.gap for l in lead_lines if l.gap is not None]) / len(lead_lines), 2) if lead_lines else 0.30
-        tech_avg = round(sum([l.gap for l in tech_lines if l.gap is not None]) / len(tech_lines), 2) if tech_lines else 0.20
-        bank_avg = round(sum([l.gap for l in lines if l.gap is not None]) / len(lines), 2) if lines else 0.24
+        core_avg = round(sum([l.gap for l in core_lines if l.gap is not None]) / len(core_lines), 2) if core_lines else 0.0
+        lead_avg = round(sum([l.gap for l in lead_lines if l.gap is not None]) / len(lead_lines), 2) if lead_lines else 0.0
+        tech_avg = round(sum([l.gap for l in tech_lines if l.gap is not None]) / len(tech_lines), 2) if tech_lines else 0.0
+        bank_avg = round(sum([l.gap for l in lines if l.gap is not None]) / len(lines), 2) if lines else 0.0
 
-        # Data Quality Counters (FR-CFD-006)
-        total_jobs = self.env['hr.job'].search_count([])
-        mapped_job_ids = set(self.env['competency.role.mapping'].search([('state', '=', 'approved')]).mapped('job_position_id.id'))
-        unmapped_cnt = max(0, total_jobs - len(mapped_job_ids))
-        missing_sups_cnt = self.env['hr.employee'].search_count([('active', '=', True), ('parent_id', '=', False)])
+        # Data Quality Counters (Scoped to User OU if non-admin)
+        if user_ou_ids:
+            ou_emp_domain = [
+                '|', ('default_operating_unit_id', 'in', user_ou_ids),
+                '|', ('operating_unit_id', 'in', user_ou_ids),
+                ('department_id.operating_unit_id', 'in', user_ou_ids)
+            ]
+            ou_employees = self.env['hr.employee'].sudo().search(ou_emp_domain)
+            ou_jobs = ou_employees.mapped('job_id')
+            total_jobs = len(ou_jobs)
+            mapped_job_ids = set(self.env['competency.role.mapping'].search([('state', '=', 'approved'), ('job_position_id', 'in', ou_jobs.ids)]).mapped('job_position_id.id'))
+            unmapped_cnt = max(0, total_jobs - len(mapped_job_ids))
+            missing_sups_cnt = len(ou_employees.filtered(lambda e: e.active and not e.parent_id))
+        else:
+            total_jobs = self.env['hr.job'].search_count([])
+            mapped_job_ids = set(self.env['competency.role.mapping'].search([('state', '=', 'approved')]).mapped('job_position_id.id'))
+            unmapped_cnt = max(0, total_jobs - len(mapped_job_ids))
+            missing_sups_cnt = self.env['hr.employee'].search_count([('active', '=', True), ('parent_id', '=', False)])
 
         # Personal Metrics (Employee)
         my_asm = False
@@ -654,7 +663,7 @@ class CompetencyDashboard(models.TransientModel):
                 ('cycle_id', '=', cycle.id)
             ], limit=1)
 
-        # Radar chart labels and values (My Competencies Assessed vs All Competencies Target Requirement)
+        # Radar chart labels and values
         radar_labels = []
         radar_assessed = []
         radar_required = []
@@ -665,8 +674,7 @@ class CompetencyDashboard(models.TransientModel):
                 r_val = int(l.required_level) if l.required_level and str(l.required_level).isdigit() else 0
                 radar_assessed.append(c_val)
                 radar_required.append(r_val)
-        else:
-            # Aggregate across scoped lines (e.g. Team / Org)
+        elif lines:
             grouped_comp = {}
             for l in lines[:50]:
                 cid = l.competency_id
@@ -680,8 +688,8 @@ class CompetencyDashboard(models.TransientModel):
 
             for comp, vals in list(grouped_comp.items())[:6]:
                 radar_labels.append(comp.name)
-                avg_ass = round(sum(vals['assessed']) / len(vals['assessed']), 1) if vals['assessed'] else 2.5
-                avg_req = round(sum(vals['required']) / len(vals['required']), 1) if vals['required'] else 3.0
+                avg_ass = round(sum(vals['assessed']) / len(vals['assessed']), 1) if vals['assessed'] else 0.0
+                avg_req = round(sum(vals['required']) / len(vals['required']), 1) if vals['required'] else 0.0
                 radar_assessed.append(avg_ass)
                 radar_required.append(avg_req)
 
@@ -720,53 +728,34 @@ class CompetencyDashboard(models.TransientModel):
                     'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if top_gaps else 'Fit / Qualified'
                 })
 
-        # Fallback for all_cycles if empty
-        if not all_cycles:
-            all_cycles = [{'id': 1, 'name': 'Cycle 2026'}]
-
         # Department Heatmap Data Matrix
-        if user_ou_ids:
-            heatmap_dept_domain = ['|', ('operating_unit_id', 'in', user_ou_ids), ('id', 'in', self.env['hr.employee'].search(['|', ('default_operating_unit_id', 'in', user_ou_ids), ('operating_unit_id', 'in', user_ou_ids)]).mapped('department_id.id'))]
-            heatmap_depts = self.env['hr.department'].search(heatmap_dept_domain, order='name asc', limit=15)
-        else:
-            heatmap_depts = self.env['hr.department'].search([], order='name asc', limit=15)
-
         heatmap_rows = []
-        for d in heatmap_depts:
-            d_lines = lines.filtered(lambda l: l.department_id.id == d.id)
-            d_asms = self.env['competency.assessment'].search([('cycle_id', '=', cycle.id if cycle else 0), ('department_id', '=', d.id)])
-            
-            d_core = [l.gap for l in d_lines if l.pillar == 'core' and l.gap is not None]
-            d_lead = [l.gap for l in d_lines if l.pillar == 'leadership' and l.gap is not None]
-            d_tech = [l.gap for l in d_lines if l.pillar == 'technical' and l.gap is not None]
-            
-            asm_gaps = [a.average_gap for a in d_asms if a.average_gap is not None]
-            fallback_gap = round(sum(asm_gaps) / len(asm_gaps), 2) if asm_gaps else 0.24
+        if has_real_data:
+            if user_ou_ids:
+                heatmap_dept_domain = ['|', ('operating_unit_id', 'in', user_ou_ids), ('id', 'in', self.env['hr.employee'].search(['|', ('default_operating_unit_id', 'in', user_ou_ids), ('operating_unit_id', 'in', user_ou_ids)]).mapped('department_id.id'))]
+                heatmap_depts = self.env['hr.department'].search(heatmap_dept_domain, order='name asc', limit=15)
+            else:
+                heatmap_depts = self.env['hr.department'].search([], order='name asc', limit=15)
 
-            c_val = round(sum(d_core)/len(d_core), 2) if d_core else fallback_gap
-            l_val = round(sum(d_lead)/len(d_lead), 2) if d_lead else fallback_gap
-            t_val = round(sum(d_tech)/len(d_tech), 2) if d_tech else fallback_gap
-
-            heatmap_rows.append({
-                'dept_id': d.id,
-                'dept_name': d.name,
-                'core': c_val,
-                'leadership': l_val,
-                'technical': t_val,
-                'overall': round((c_val + l_val + t_val) / 3.0, 2),
-            })
-
-        if not heatmap_rows:
-            sample_name = emp.department_id.name if emp and emp.department_id else 'Main Branch Operations'
-            sample_depts = [sample_name]
-            for idx, name in enumerate(sample_depts):
+            for d in heatmap_depts:
+                d_lines = lines.filtered(lambda l: l.department_id.id == d.id)
+                if not d_lines:
+                    continue
+                d_core = [l.gap for l in d_lines if l.pillar == 'core' and l.gap is not None]
+                d_lead = [l.gap for l in d_lines if l.pillar == 'leadership' and l.gap is not None]
+                d_tech = [l.gap for l in d_lines if l.pillar == 'technical' and l.gap is not None]
+                
+                c_val = round(sum(d_core)/len(d_core), 2) if d_core else 0.0
+                l_val = round(sum(d_lead)/len(d_lead), 2) if d_lead else 0.0
+                t_val = round(sum(d_tech)/len(d_tech), 2) if d_tech else 0.0
+                
                 heatmap_rows.append({
-                    'dept_id': idx + 1,
-                    'dept_name': name,
-                    'core': 0.24,
-                    'leadership': 0.24,
-                    'technical': 0.24,
-                    'overall': 0.24,
+                    'dept_id': d.id,
+                    'dept_name': d.name,
+                    'core': c_val,
+                    'leadership': l_val,
+                    'technical': t_val,
+                    'overall': round((c_val + l_val + t_val) / 3.0, 2),
                 })
 
         return {
@@ -787,6 +776,7 @@ class CompetencyDashboard(models.TransientModel):
             'all_cycles': all_cycles,
             'all_departments': all_departments,
             'stats': {
+                'has_data': has_real_data,
                 'bank_avg_gap': bank_avg,
                 'below_cnt': below_cnt,
                 'meets_cnt': meets_cnt,

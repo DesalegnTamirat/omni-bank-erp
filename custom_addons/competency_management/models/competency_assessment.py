@@ -23,6 +23,9 @@ class CompetencyAssessmentCycle(models.Model):
     ], string='Status', default='draft', tracking=True)
     assessment_ids = fields.One2many('competency.assessment', 'cycle_id', string='Assessments')
     assessment_count = fields.Integer(string='Assessments', compute='_compute_assessment_count')
+    sampling_audit_log = fields.Text(string='360 Rater Sampling Audit Trail', readonly=True)
+    eligible_rater_count = fields.Integer(string='Eligible Raters Pool Size', default=0, readonly=True)
+    selected_rater_count = fields.Integer(string='Sampled Raters Size', default=0, readonly=True)
     notes = fields.Text(string='Notes')
 
     @api.depends('assessment_ids')
@@ -92,6 +95,8 @@ class CompetencyAssessmentCycle(models.Model):
                 coach_to_reports.setdefault(c_id, []).append(emp.id)
 
         assessments_to_create = []
+        total_eligible_raters = 0
+        total_sampled_raters = 0
 
         for emp_id, info in emp_map.items():
             u_id = info['user_id']
@@ -142,6 +147,9 @@ class CompetencyAssessmentCycle(models.Model):
                 sampled_peers = random.sample(peers, min(len(peers), max_peers)) if peers else []
                 sampled_subs = random.sample(subs, min(len(subs), max_subs)) if subs else []
 
+                total_eligible_raters += len(peers) + len(subs)
+                total_sampled_raters += len(sampled_peers) + len(sampled_subs)
+
                 for p_id in sampled_peers:
                     pair_peer = (p_id, u_id, 'peer')
                     if pair_peer not in existing_pairs:
@@ -164,6 +172,13 @@ class CompetencyAssessmentCycle(models.Model):
                         })
                         existing_pairs.add(pair_sub)
 
+        # Record auditable sampling log
+        self.sudo().write({
+            'eligible_rater_count': total_eligible_raters,
+            'selected_rater_count': total_sampled_raters,
+            'sampling_audit_log': f"360 Sampling Audit: Total Eligible Candidate Raters={total_eligible_raters}, Total Sampled Raters={total_sampled_raters}, Created Assessments={len(assessments_to_create)}",
+        })
+
         if not assessments_to_create:
             return self.env['competency.assessment']
 
@@ -177,14 +192,10 @@ class CompetencyAssessmentCycle(models.Model):
             mail_create_nosubscribe=True,
         )
 
-        is_test_mode = self.env.context.get('test_mode') or getattr(threading.current_thread(), 'testing', False)
-
         for i in range(0, len(assessments_to_create), chunk_size):
             chunk = assessments_to_create[i:i + chunk_size]
             asms_chunk = AssessmentSudo.create(chunk)
             created_asms |= asms_chunk
-            if not is_test_mode:
-                self.env.cr.commit()
 
         return created_asms
 
@@ -991,7 +1002,7 @@ class CompetencyAssessmentLine(models.Model):
                 line.weighted_current_level = s_init
                 continue
 
-            comp_lines = self.env['competency.assessment.line'].search([
+            comp_lines = self.env['competency.assessment.line'].sudo().search([
                 ('employee_id', '=', emp.id),
                 ('cycle_id', '=', cycle.id),
                 ('competency_id', '=', comp.id),

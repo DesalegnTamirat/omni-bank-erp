@@ -69,8 +69,18 @@
                 </div>
             </div>
 
+            <!-- Error Banner -->
+            <t t-if="state.error">
+                <div style="margin: 30px 28px; background-color: #fff2f0; border: 1px solid #ffccc7; border-left: 5px solid #ff4d4f; border-radius: 8px; padding: 20px 24px; text-align: center;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
+                    <h5 style="color: #cf1322; font-weight: 700; margin-bottom: 6px;">Failed to load dashboard data</h5>
+                    <p style="color: #595959; font-size: 13px; margin-bottom: 14px;">An error occurred while communicating with the server. Please verify network connection or retry.</p>
+                    <button class="btn btn-sm btn-danger" t-on-click="loadData" style="font-weight: 600;">🔄 Retry Loading</button>
+                </div>
+            </t>
+
             <!-- Loading Spinner -->
-            <t t-if="state.loading">
+            <t t-elif="state.loading">
                 <div style="text-align: center; padding: 60px;">
                     <div class="spinner-border" role="status" style="color: #541718 !important;"></div>
                     <div style="margin-top: 12px; font-weight: 600; color: #1d2b32;">Loading Analytics Dashboard...</div>
@@ -79,6 +89,15 @@
 
             <t t-else="">
                 <div style="padding: 0 28px;">
+
+                    <!-- Empty Data State Banner -->
+                    <t t-if="state.data &amp;&amp; state.data.stats &amp;&amp; !state.data.stats.has_data">
+                        <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #726732; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; text-align: center;">
+                            <div style="font-size: 24px; margin-bottom: 6px;">📊</div>
+                            <h6 style="color: #1d2b32; font-weight: 700; margin-bottom: 4px;">No Assessment Data Available Yet for this Selection</h6>
+                            <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">There are currently no completed assessment ratings recorded for the selected assessment cycle or department scope.</p>
+                        </div>
+                    </t>
 
                     <!-- ── Data Quality Governance Banner (FR-CFD-006) ── -->
                     <t t-if="state.persona === 'executive' &amp;&amp; !state.alertDismissed &amp;&amp; (state.data.stats.unmapped_cnt &gt; 0 || state.data.stats.missing_sups_cnt &gt; 0)">

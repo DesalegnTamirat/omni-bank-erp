@@ -208,8 +208,8 @@
                             <page string="Core Competencies" icon="fa-star">
                                 <field name="core_line_ids" readonly="state != 'draft' or is_locked">
                                     <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Core Competency"/>
-                                        <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
                                         <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>
@@ -220,8 +220,8 @@
                             <page string="Leadership Competencies" icon="fa-users">
                                 <field name="leadership_line_ids" readonly="state != 'draft' or is_locked">
                                     <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Leadership Competency"/>
-                                        <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
                                         <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>
@@ -232,8 +232,8 @@
                             <page string="Technical Competencies" icon="fa-cogs">
                                 <field name="technical_line_ids" readonly="state != 'draft' or is_locked">
                                     <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Technical Competency"/>
-                                        <field name="competency_definition" readonly="1"/>
                                         <field name="required_level" readonly="1"/>
                                         <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
                                         <field name="gap" readonly="1"/>

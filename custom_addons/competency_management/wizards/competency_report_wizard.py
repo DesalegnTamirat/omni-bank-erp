@@ -2,6 +2,7 @@
 import io
 import csv
 import base64
+import xlsxwriter
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
@@ -218,8 +219,28 @@ class CompetencyReportWizard(models.TransientModel):
         return {'domain': {'competency_ids': []}}
 
     def _build_line_domain(self):
-        """Construct domain based on wizard selections."""
+        """Construct domain based on wizard selections and enforce server-side OU isolation."""
         domain = [('cycle_id', '=', self.cycle_id.id)]
+
+        # Server-side Operating-Unit Boundary Scoping for non-admins
+        user = self.env.user
+        is_admin = user.has_group('competency_management.group_competency_admin')
+        if not is_admin:
+            user_ou_ids = []
+            if user.operating_unit_ids:
+                user_ou_ids = user.operating_unit_ids.ids
+            elif user.default_operating_unit_id:
+                user_ou_ids = [user.default_operating_unit_id.id]
+            elif user.employee_id:
+                emp = user.employee_id
+                emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+                if emp_ou:
+                    user_ou_ids = [emp_ou.id]
+            if user_ou_ids:
+                domain.append('|')
+                domain.append(('employee_id.default_operating_unit_id', 'in', user_ou_ids))
+                domain.append(('department_id.operating_unit_id', 'in', user_ou_ids))
+
         if self.department_ids:
             domain.append(('department_id', 'in', self.department_ids.ids))
         if self.operating_unit_ids:
@@ -331,8 +352,22 @@ class CompetencyReportWizard(models.TransientModel):
 
             final_rating = round(weighted_num / weighted_den, 2) if weighted_den > 0 else (self_val or 0.0)
 
-            req_str = comp_lines[0].required_level or '1'
-            req_val = int(req_str) if req_str.isdigit() else 1
+            # Authoritative Role-Mapping required level lookup (Item 10)
+            role_map = self.env['competency.role.mapping'].sudo().search([
+                ('job_position_id', '=', emp.job_id.id if emp.job_id else 0),
+                ('state', '=', 'approved')
+            ], limit=1)
+            req_val = None
+            if role_map:
+                map_line = role_map.line_ids.filtered(lambda l: l.competency_id.id == comp.id)
+                if map_line and map_line[0].required_proficiency:
+                    try:
+                        req_val = int(map_line[0].required_proficiency)
+                    except (ValueError, TypeError):
+                        req_val = None
+            if req_val is None:
+                req_str = comp_lines[0].required_level or '1'
+                req_val = int(req_str) if str(req_str).isdigit() else 1
             gap_val = round(req_val - final_rating, 2)
 
             if gap_val > 0:
@@ -406,8 +441,71 @@ class CompetencyReportWizard(models.TransientModel):
         }
 
     def action_export_xlsx(self):
-        """Action: Export report dataset as Excel (.xlsx) file."""
-        return self.action_export_csv()
+        """Action: Export report dataset as Excel (.xlsx) file using xlsxwriter (FR-RPT-009)."""
+        self.ensure_one()
+        rows = self._get_360_report_data_rows()
+
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = workbook.add_worksheet('360 Competency Report')
+
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#541718',
+            'font_color': '#FFFFFF',
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        })
+        cell_format = workbook.add_format({'border': 1, 'valign': 'vcenter'})
+        num_format = workbook.add_format({'border': 1, 'valign': 'vcenter', 'num_format': '0.00'})
+
+        headers = [
+            'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+            'Competency Name', 'Pillar', 'Functional Domain',
+            'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
+            'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
+        ]
+
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header, header_format)
+            worksheet.set_column(col_num, col_num, 18)
+
+        for row_num, r in enumerate(rows, start=1):
+            worksheet.write(row_num, 0, r['cycle_name'], cell_format)
+            worksheet.write(row_num, 1, r['emp_id_code'], cell_format)
+            worksheet.write(row_num, 2, r['emp_name'], cell_format)
+            worksheet.write(row_num, 3, r['operating_unit_name'], cell_format)
+            worksheet.write(row_num, 4, r['department_name'], cell_format)
+            worksheet.write(row_num, 5, r['job_name'], cell_format)
+            worksheet.write(row_num, 6, r['grade_name'], cell_format)
+            worksheet.write(row_num, 7, r['competency_name'], cell_format)
+            worksheet.write(row_num, 8, r['pillar_name'], cell_format)
+            worksheet.write(row_num, 9, r['domain_name'], cell_format)
+            worksheet.write(row_num, 10, r['self_rating'], num_format if isinstance(r['self_rating'], (int, float)) else cell_format)
+            worksheet.write(row_num, 11, r['peer_avg'], num_format if isinstance(r['peer_avg'], (int, float)) else cell_format)
+            worksheet.write(row_num, 12, r['subordinate_avg'], num_format if isinstance(r['subordinate_avg'], (int, float)) else cell_format)
+            worksheet.write(row_num, 13, r['supervisor_avg'], num_format if isinstance(r['supervisor_avg'], (int, float)) else cell_format)
+            worksheet.write(row_num, 14, r['team_avg'], num_format if isinstance(r['team_avg'], (int, float)) else cell_format)
+            worksheet.write(row_num, 15, r['weighted_rating'], num_format)
+            worksheet.write(row_num, 16, r['required_level'], cell_format)
+            worksheet.write(row_num, 17, r['weighted_gap'], num_format)
+            worksheet.write(row_num, 18, r['achievement_status'], cell_format)
+
+        workbook.close()
+        xlsx_bytes = output.getvalue()
+        output.close()
+
+        attachment = self.env['ir.attachment'].create({
+            'name': f'Competency_360_Report_{self.cycle_id.name}.xlsx',
+            'datas': base64.b64encode(xlsx_bytes),
+            'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f'/web/content/{attachment.id}?download=true',
+            'target': 'self',
+        }
 
     def action_print_pdf(self):
         """Action: Print QWeb PDF report."""
@@ -423,6 +521,10 @@ class CompetencyReportWizard(models.TransientModel):
             return self.env.ref('competency_management.action_report_competency_assessment_individual').report_action(asm)
         elif self.report_type == 'dept_role_gap':
             return self.env.ref('competency_management.action_report_competency_team_gap').report_action(self)
+        elif self.report_type == 'detailed_matrix':
+            return self.env.ref('competency_management.action_report_competency_detailed_matrix').report_action(self)
+        elif self.report_type == 'campaign_progress':
+            return self.env.ref('competency_management.action_report_competency_campaign_progress').report_action(self)
         else:
             return self.env.ref('competency_management.action_report_competency_org_capability').report_action(self)
 

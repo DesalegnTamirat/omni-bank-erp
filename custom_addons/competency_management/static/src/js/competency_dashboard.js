@@ -22,13 +22,14 @@ export class CompetencyDashboard extends Component {
             cycleId: false,
             departmentId: false,
             loading: true,
+            error: false,
             alertDismissed: false,
             data: {
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
                 all_cycles: [],
                 all_departments: [],
-                stats: { bank_avg_gap: 0.24, total_assessments: 1141, below_cnt: 266, meets_cnt: 1141, exceeds_cnt: 277 },
+                stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
                 charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
                 team_roster: [],
                 heatmap_rows: [],
@@ -50,7 +51,7 @@ export class CompetencyDashboard extends Component {
 
         useEffect(
             () => {
-                if (!this.state.loading) {
+                if (!this.state.loading && !this.state.error) {
                     this.renderCharts();
                 }
             },
@@ -60,6 +61,7 @@ export class CompetencyDashboard extends Component {
 
     async loadData() {
         this.state.loading = true;
+        this.state.error = false;
         try {
             const result = await this.orm.call(
                 "competency.dashboard",
@@ -80,7 +82,18 @@ export class CompetencyDashboard extends Component {
             this.state.loading = false;
         } catch (e) {
             console.error("Failed to load competency dashboard data:", e);
+            this.state.error = true;
             this.state.loading = false;
+            this.state.data = {
+                user: { name: "", is_admin: false, is_supervisor: false },
+                cycle: { id: false, name: "", deadline: "" },
+                all_cycles: [],
+                all_departments: [],
+                stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
+                charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
+                team_roster: [],
+                heatmap_rows: [],
+            };
         }
     }
 

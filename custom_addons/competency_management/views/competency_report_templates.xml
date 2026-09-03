@@ -38,6 +38,26 @@
             <field name="print_report_name">'Organizational_Capability_Report'</field>
         </record>
 
+        <!-- Detailed Competency Performance & Gap Matrix Report -->
+        <record id="action_report_competency_detailed_matrix" model="ir.actions.report">
+            <field name="name">Detailed Competency Performance &amp; Gap Matrix Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_detailed_matrix</field>
+            <field name="report_file">competency_management.report_competency_detailed_matrix</field>
+            <field name="print_report_name">'Detailed_Competency_Matrix_Report'</field>
+        </record>
+
+        <!-- Assessment Campaign Progress Tracking Report -->
+        <record id="action_report_competency_campaign_progress" model="ir.actions.report">
+            <field name="name">Assessment Campaign Progress Tracking Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_campaign_progress</field>
+            <field name="report_file">competency_management.report_competency_campaign_progress</field>
+            <field name="print_report_name">'Campaign_Progress_Tracking_Report'</field>
+        </record>
+
 
         <!-- QWEB REPORT DOCUMENT TEMPLATES -->
 
@@ -404,6 +424,100 @@
                                 </tbody>
                             </table>
 
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+        <!-- Detailed Competency Performance & Gap Matrix QWeb Template -->
+        <template id="report_competency_detailed_matrix">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                    Detailed Competency Performance &amp; 360 Multi-Rater Gap Matrix
+                                </div>
+                            </div>
+                            <t t-set="rows" t-value="doc._get_360_report_data_rows()"/>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                                <thead>
+                                    <tr style="background-color: #541718; color: #ffffff;">
+                                        <th style="padding: 5px; text-align: left;">Employee</th>
+                                        <th style="padding: 5px; text-align: left;">Job Position</th>
+                                        <th style="padding: 5px; text-align: left;">Competency</th>
+                                        <th style="padding: 5px; text-align: center;">Self</th>
+                                        <th style="padding: 5px; text-align: center;">Peer</th>
+                                        <th style="padding: 5px; text-align: center;">Supervisor</th>
+                                        <th style="padding: 5px; text-align: center;">Weighted</th>
+                                        <th style="padding: 5px; text-align: center;">Required</th>
+                                        <th style="padding: 5px; text-align: center;">Gap</th>
+                                        <th style="padding: 5px; text-align: center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="rows" t-as="r">
+                                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 4px;"><t t-out="r['emp_name']"/></td>
+                                            <td style="padding: 4px;"><t t-out="r['job_name']"/></td>
+                                            <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['self_rating']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['peer_avg']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['supervisor_avg']"/></td>
+                                            <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['weighted_rating']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['weighted_gap']"/></td>
+                                            <td style="padding: 4px; text-align: center; font-weight: 600;"><t t-out="r['achievement_status']"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+        <!-- Assessment Campaign Progress Tracking QWeb Template -->
+        <template id="report_competency_campaign_progress">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                    Assessment Campaign Completion &amp; Progress Tracking Report
+                                </div>
+                            </div>
+                            <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px;">
+                                <strong>Assessment Campaign:</strong> <t t-out="doc.cycle_id.name"/><br/>
+                                <strong>Deadline:</strong> <t t-out="doc.cycle_id.assessment_deadline"/>
+                            </div>
+                            <t t-set="odata" t-value="doc.get_org_capability_data()"/>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                                        <th style="padding: 6px; text-align: left;">Department</th>
+                                        <th style="padding: 6px; text-align: center;">Total Assessments</th>
+                                        <th style="padding: 6px; text-align: center;">Approved / Locked</th>
+                                        <th style="padding: 6px; text-align: center;">Completion Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="odata['dept_completion']" t-as="d">
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="padding: 6px;"><t t-out="d['name']"/></td>
+                                            <td style="padding: 6px; text-align: center;"><t t-out="d['total']"/></td>
+                                            <td style="padding: 6px; text-align: center;"><t t-out="d['approved']"/></td>
+                                            <td style="padding: 6px; text-align: center; font-weight: 700; color: #726732;"><t t-out="d['rate']"/>%</td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
                         </div>
                     </t>
                 </t>

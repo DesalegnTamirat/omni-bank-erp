@@ -83,12 +83,29 @@
         <record id="rule_hr_employee_competency_read" model="ir.rule">
             <field name="name">360 Competency Evaluation HR Employee Read Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), '|', ('parent_id.user_id', '=', user.id), '|', ('default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="global" eval="True"/>
+            <field name="groups" eval="[(5, 0, 0)]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Dashboard Snapshot: supervisor / manager sees own Operating Unit snapshots -->
+        <record id="rule_competency_dashboard_snapshot_supervisor" model="ir.rule">
+            <field name="name">Supervisor Operating Unit Dashboard Snapshots</field>
+            <field name="model_id" ref="competency_management.model_competency_dashboard_snapshot"/>
+            <field name="domain_force">['|', ('operating_unit_id', '=', False), '|', ('operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
+        </record>
+
+        <!-- Dashboard Snapshot: admin sees all snapshots -->
+        <record id="rule_competency_dashboard_snapshot_admin" model="ir.rule">
+            <field name="name">Admin All Dashboard Snapshots</field>
+            <field name="model_id" ref="competency_management.model_competency_dashboard_snapshot"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
         </record>
 
         <!-- Assessment lines: mirror the parent assessment rules -->

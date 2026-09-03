@@ -123,7 +123,7 @@ class CompetencyProficiencyLevel(models.Model):
         for rec in self:
             if rec.competency_id and rec.competency_id.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
                 raise ValidationError(_("Cannot modify proficiency levels on a retired competency (%s).") % rec.competency_id.name)
-
+            
         if 'level' in vals or 'name' in vals:
             for rec in self:
                 lvl = str(vals.get('level', rec.level) or '1')

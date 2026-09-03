@@ -275,6 +275,32 @@ class CompetencyRoleMappingLine(models.Model):
         'competency.competency', string='Competency', required=True, ondelete='cascade',
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     pillar = fields.Selection(related='competency_id.pillar', string='Pillar', store=True, readonly=True)
+    competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', store=True, readonly=True)
+
+    indicator_level_1 = fields.Text(string='Level 1 Indicator', compute='_compute_level_indicators')
+    indicator_level_2 = fields.Text(string='Level 2 Indicator', compute='_compute_level_indicators')
+    indicator_level_3 = fields.Text(string='Level 3 Indicator', compute='_compute_level_indicators')
+    indicator_level_4 = fields.Text(string='Level 4 Indicator', compute='_compute_level_indicators')
+
+    @api.depends('competency_id')
+    def _compute_level_indicators(self):
+        matrix_config = self.env['competency.matrix.config'].sudo().get_active_config()
+        for rec in self:
+            if rec.competency_id:
+                levels = self.env['competency.proficiency.level'].search([
+                    ('competency_id', '=', rec.competency_id.id)
+                ])
+                l_map = {l.level: l.behavioral_indicators for l in levels if l.behavioral_indicators}
+                
+                rec.indicator_level_1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1') if rec.competency_id.pillar == 'technical' else 'Level 1 (Basic) behavioral indicators.')
+                rec.indicator_level_2 = l_map.get('2') or (getattr(matrix_config, 'tech_indicator_level_2') if rec.competency_id.pillar == 'technical' else 'Level 2 (Intermediate) behavioral indicators.')
+                rec.indicator_level_3 = l_map.get('3') or (getattr(matrix_config, 'tech_indicator_level_3') if rec.competency_id.pillar == 'technical' else 'Level 3 (Advanced) behavioral indicators.')
+                rec.indicator_level_4 = l_map.get('4') or (getattr(matrix_config, 'tech_indicator_level_4') if rec.competency_id.pillar == 'technical' else 'Level 4 (Expert) behavioral indicators.')
+            else:
+                rec.indicator_level_1 = False
+                rec.indicator_level_2 = False
+                rec.indicator_level_3 = False
+                rec.indicator_level_4 = False
 
     @api.constrains('competency_id')
     def _check_competency_status(self):

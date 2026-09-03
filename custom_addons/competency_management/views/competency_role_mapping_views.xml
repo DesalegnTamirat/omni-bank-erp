@@ -18,6 +18,73 @@
             </field>
         </record>
 
+        <!-- Form view for competency.role.mapping.line popup modal -->
+        <record id="view_competency_role_mapping_line_form" model="ir.ui.view">
+            <field name="name">competency.role.mapping.line.form</field>
+            <field name="model">competency.role.mapping.line</field>
+            <field name="arch" type="xml">
+                <form string="Role Competency Requirements &amp; Behavioral Guidance">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 15px;">
+                            <h1 style="color: #541718;"><field name="competency_id" readonly="mapping_id.state != 'draft'"/></h1>
+                            <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
+                        </div>
+                        
+                        <!-- Full-width Competency Definition Callout Container -->
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; width: 100%;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; margin-bottom: 10px;">
+                            <h3 style="color: #1d2b32; border-bottom: 2px solid #541718; padding-bottom: 5px;">
+                                📖 Proficiency Level Behavioral Indicators (Levels 1 to 4)
+                            </h3>
+                            <p class="text-muted">Review the expected behaviors for each level below before configuring the required proficiency for this role.</p>
+                        </div>
+
+                        <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fcfbfa; border-left: 5px solid #726732; border-radius: 4px;">
+                                <h4 style="color: #726732; margin-top: 0; margin-bottom: 6px;">🟡 Level 1 — Basic</h4>
+                                <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #f8f9fa; border-left: 5px solid #1d2b32; border-radius: 4px;">
+                                <h4 style="color: #1d2b32; margin-top: 0; margin-bottom: 6px;">🔵 Level 2 — Intermediate</h4>
+                                <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fdf8f5; border-left: 5px solid #c17540; border-radius: 4px;">
+                                <h4 style="color: #c17540; margin-top: 0; margin-bottom: 6px;">🟠 Level 3 — Advanced</h4>
+                                <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="padding: 12px 15px; background-color: #faf4f5; border-left: 5px solid #541718; border-radius: 4px;">
+                                <h4 style="color: #541718; margin-top: 0; margin-bottom: 6px;">🔴 Level 4 — Expert</h4>
+                                <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <group string="Required Proficiency &amp; Weighting Configuration" style="margin-top: 20px;">
+                            <group>
+                                <field name="is_matrix_configured" invisible="1"/>
+                                <field name="default_proficiency" readonly="1"/>
+                                <field name="override_default"/>
+                                <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
+                            </group>
+                            <group>
+                                <field name="weight"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <!-- Role Mapping Form -->
         <record id="view_competency_role_mapping_form" model="ir.ui.view">
             <field name="name">competency.role.mapping.form</field>
@@ -68,9 +135,14 @@
                         </group>
                         <group string="Required Competencies">
                             <field name="line_ids" readonly="state != 'draft'">
-                                <list editable="bottom">
+                                <list>
                                     <field name="is_matrix_configured" column_invisible="True"/>
                                     <field name="default_proficiency" column_invisible="True"/>
+                                    <field name="competency_definition" column_invisible="True"/>
+                                    <field name="indicator_level_1" column_invisible="True"/>
+                                    <field name="indicator_level_2" column_invisible="True"/>
+                                    <field name="indicator_level_3" column_invisible="True"/>
+                                    <field name="indicator_level_4" column_invisible="True"/>
                                     <field name="competency_id"/>
                                     <field name="pillar" widget="badge" readonly="1"/>
                                     <field name="override_default"/>
