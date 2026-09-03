@@ -24,6 +24,7 @@ export class CompetencyDashboard extends Component {
             loading: true,
             error: false,
             alertDismissed: false,
+            radarHasData: false,
             data: {
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
@@ -125,12 +126,16 @@ export class CompetencyDashboard extends Component {
         if (tnaCanvas) {
             if (this.tnaChartInstance) this.tnaChartInstance.destroy();
             const cdata = (this.state.data.charts && this.state.data.charts.tna_donut) || {};
+            // Real counts only. An empty/undefined dataset (e.g. RPC error, or genuinely zero
+            // assessment lines) must render as zeros, never as invented sample numbers — showing
+            // fabricated bank-wide figures here would mislead executives making real decisions.
+            const tnaValues = Array.isArray(cdata.data) ? cdata.data : [0, 0, 0];
             this.tnaChartInstance = new ChartLib(tnaCanvas, {
                 type: 'doughnut',
                 data: {
                     labels: cdata.labels || ['Underqualified', 'Fit', 'Overqualified'],
                     datasets: [{
-                        data: cdata.data && cdata.data.length ? cdata.data : [266, 1141, 277],
+                        data: tnaValues,
                         backgroundColor: cdata.colors || ['#541718', '#726732', '#c17540'],
                         borderWidth: 2,
                     }]
@@ -167,39 +172,43 @@ export class CompetencyDashboard extends Component {
             });
         }
 
-        // 3. Radar Chart (Spider/Radar)
+        // 3. Radar Chart (Spider/Radar) — real per-competency data only, never fabricated samples.
         const radarCanvas = document.getElementById("competencyRadarChart");
         if (radarCanvas) {
             if (this.radarChartInstance) this.radarChartInstance.destroy();
             const rdata = (this.state.data.charts && this.state.data.charts.employee_radar) || {};
-            this.radarChartInstance = new ChartLib(radarCanvas, {
-                type: 'radar',
-                data: {
-                    labels: rdata.labels || ['Core Values', 'Execution', 'Communication', 'Technical Skills', 'Problem Solving'],
-                    datasets: [
-                        {
-                            label: 'My Assessed Level',
-                            data: rdata.assessed || [3, 2, 4, 3, 2],
-                            backgroundColor: 'rgba(84, 23, 24, 0.2)',
-                            borderColor: '#541718',
-                            pointBackgroundColor: '#541718',
-                        },
-                        {
-                            label: 'All Competencies Target',
-                            data: rdata.required || [4, 3, 4, 4, 3],
-                            backgroundColor: 'rgba(193, 117, 64, 0.1)',
-                            borderColor: '#c17540',
-                            borderDash: [5, 5],
-                            pointBackgroundColor: '#c17540',
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { r: { beginAtZero: true, max: 5 } }
-                }
-            });
+            const hasRadarData = !!rdata.has_data && Array.isArray(rdata.labels) && rdata.labels.length > 0;
+            this.state.radarHasData = hasRadarData;
+            if (hasRadarData) {
+                this.radarChartInstance = new ChartLib(radarCanvas, {
+                    type: 'radar',
+                    data: {
+                        labels: rdata.labels,
+                        datasets: [
+                            {
+                                label: 'My Assessed Level',
+                                data: rdata.assessed,
+                                backgroundColor: 'rgba(84, 23, 24, 0.2)',
+                                borderColor: '#541718',
+                                pointBackgroundColor: '#541718',
+                            },
+                            {
+                                label: 'Required Level',
+                                data: rdata.required,
+                                backgroundColor: 'rgba(193, 117, 64, 0.1)',
+                                borderColor: '#c17540',
+                                borderDash: [5, 5],
+                                pointBackgroundColor: '#c17540',
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { r: { beginAtZero: true, max: 5 } }
+                    }
+                });
+            }
         }
     }
 

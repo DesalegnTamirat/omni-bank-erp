@@ -11,6 +11,30 @@ class CompetencyReportWizard(models.TransientModel):
     _name = 'competency.report.wizard'
     _description = 'Competency Cascading Report & Export Wizard'
 
+    @api.model
+    def _get_user_scope_ou_ids(self, user):
+        """Resolve the Operating Unit boundary for a non-admin user.
+
+        `assigned_operating_unit_ids` (the manager's supervisory/reporting scope, set on
+        Job Position assignment) is authoritative and MUST take priority over the broader
+        `operating_unit_ids` (general multi-branch working access, e.g. teller access) so
+        that report/wizard scoping matches the ir.rule record rules in
+        security/competency_security.xml exactly. Falling back to the wrong field here would
+        let a manager export data for branches they are not assigned to supervise.
+        """
+        if getattr(user, 'assigned_operating_unit_ids', False):
+            return user.assigned_operating_unit_ids.ids
+        if getattr(user, 'operating_unit_ids', False):
+            return user.operating_unit_ids.ids
+        if getattr(user, 'default_operating_unit_id', False):
+            return [user.default_operating_unit_id.id]
+        emp = user.employee_id
+        if emp:
+            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+            if emp_ou:
+                return [emp_ou.id]
+        return []
+
     # Report Configuration & Format Selection
     report_type = fields.Selection([
         ('detailed_matrix', 'Comprehensive Competency Performance & Gap Matrix (Detailed)'),
@@ -94,15 +118,7 @@ class CompetencyReportWizard(models.TransientModel):
         is_supervisor = user.has_group('competency_management.group_competency_supervisor')
         emp = user.employee_id
 
-        user_ou_ids = []
-        if hasattr(user, 'operating_unit_ids') and user.operating_unit_ids:
-            user_ou_ids = user.operating_unit_ids.ids
-        elif hasattr(user, 'default_operating_unit_id') and user.default_operating_unit_id:
-            user_ou_ids = [user.default_operating_unit_id.id]
-        elif emp:
-            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
-            if emp_ou:
-                user_ou_ids = [emp_ou.id]
+        user_ou_ids = self._get_user_scope_ou_ids(user)
 
         for rec in self:
             if is_admin or not emp:
@@ -126,15 +142,7 @@ class CompetencyReportWizard(models.TransientModel):
         is_admin = user.has_group('competency_management.group_competency_admin')
         is_supervisor = user.has_group('competency_management.group_competency_supervisor')
 
-        user_ou_ids = []
-        if hasattr(user, 'operating_unit_ids') and user.operating_unit_ids:
-            user_ou_ids = user.operating_unit_ids.ids
-        elif hasattr(user, 'default_operating_unit_id') and user.default_operating_unit_id:
-            user_ou_ids = [user.default_operating_unit_id.id]
-        elif emp:
-            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
-            if emp_ou:
-                user_ou_ids = [emp_ou.id]
+        user_ou_ids = self._get_user_scope_ou_ids(user)
 
         if emp and not is_admin:
             if is_supervisor:
@@ -226,16 +234,7 @@ class CompetencyReportWizard(models.TransientModel):
         user = self.env.user
         is_admin = user.has_group('competency_management.group_competency_admin')
         if not is_admin:
-            user_ou_ids = []
-            if user.operating_unit_ids:
-                user_ou_ids = user.operating_unit_ids.ids
-            elif user.default_operating_unit_id:
-                user_ou_ids = [user.default_operating_unit_id.id]
-            elif user.employee_id:
-                emp = user.employee_id
-                emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
-                if emp_ou:
-                    user_ou_ids = [emp_ou.id]
+            user_ou_ids = self._get_user_scope_ou_ids(user)
             if user_ou_ids:
                 domain.append('|')
                 domain.append(('employee_id.default_operating_unit_id', 'in', user_ou_ids))

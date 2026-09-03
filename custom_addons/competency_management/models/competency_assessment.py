@@ -363,31 +363,58 @@ class CompetencyAssessment(models.Model):
                 rec.anonymized_rater_label = _("Unassigned")
 
     def action_consolidate_multi_source(self):
-        """Consolidate Self, Manager, 360 Feedback, and Skills Test scores into one achievement determination (FR-ASM-005)."""
+        """Consolidate Self, Manager, 360 Feedback, and Skills Test scores into one weighted
+        achievement determination (FR-ASM-005).
+
+        Uses the same configured rater weights (competency.matrix.config) as the live 360°
+        calculation on assessment lines (_compute_360_ratings), so the consolidated result is
+        consistent with Scenario 5's Weighted Gap Calculation instead of a naive unweighted
+        average across however many raters happened to submit.
+        """
+        config = self.env['competency.matrix.config'].sudo().get_active_config()
+        weight_by_type = {
+            'self': float(config.weight_self or 2.0),
+            'peer': float(config.weight_peer or 1.0),
+            'subordinate': float(config.weight_subordinate or 1.0),
+            'supervisor': float(config.weight_supervisor or 3.0),
+            'team': float(config.weight_team or 0.0),
+        }
+        # Verified skills-test evidence is treated with the same authority as a supervisor rating.
+        skills_test_weight = weight_by_type['supervisor']
+
         for parent in self:
             if not parent.employee_id:
                 continue
-            
+
+            # cid -> list of (score, weight) pairs
             competency_scores = {}
             competency_reqs = {}
-            
-            # 1. Child 360 raters
+
+            # 1. Child 360 raters, weighted by rater/assessment type
             for child in parent.child_assessment_ids.filtered(lambda c: c.state in ('submitted', 'supervisor_review', 'hr_verified', 'approved', 'locked')):
+                rater_weight = weight_by_type.get(child.assessment_type, 1.0)
                 for line in child.line_ids:
+                    if not line.current_level:
+                        continue
                     cid = line.competency_id.id
-                    competency_scores.setdefault(cid, []).append(int(line.current_level or 1))
+                    competency_scores.setdefault(cid, []).append((int(line.current_level), rater_weight))
                     competency_reqs[cid] = line.required_level
-                    
-            # 2. Skills Tests (FR-ASM-003)
+
+            # 2. Skills Tests (FR-ASM-003) — verified/objective evidence
             skills_tests = self.env['competency.skills.test'].search([('employee_id', '=', parent.employee_id.id)])
             for test in skills_tests:
                 if test.verified_level:
                     cid = test.competency_id.id
-                    competency_scores.setdefault(cid, []).append(int(test.verified_level))
+                    competency_scores.setdefault(cid, []).append((int(test.verified_level), skills_test_weight))
 
-            # Update line ratings
-            for cid, score_list in competency_scores.items():
-                avg_score = round(sum(score_list) / len(score_list))
+            # Update line ratings using the same weighted-average formula as the live 360 engine
+            for cid, weighted_pairs in competency_scores.items():
+                num = sum(score * w for score, w in weighted_pairs)
+                den = sum(w for score, w in weighted_pairs)
+                if den > 0:
+                    avg_score = round(num / den)
+                else:
+                    avg_score = round(sum(score for score, w in weighted_pairs) / len(weighted_pairs))
                 lvl_str = str(max(1, min(4, avg_score)))
                 existing_line = parent.line_ids.filtered(lambda l: l.competency_id.id == cid)
                 if existing_line:
@@ -399,7 +426,7 @@ class CompetencyAssessment(models.Model):
                         'current_level': lvl_str,
                         'required_level': competency_reqs.get(cid, '2'),
                     })
-            parent.message_post(body=_("Multi-source assessment scores (360 feedback + Skills Tests) consolidated into final achievement levels."))
+            parent.message_post(body=_("Multi-source assessment scores (360 feedback + Skills Tests) consolidated into final achievement levels using configured rater weights."))
 
     @api.depends('line_ids', 'line_ids.gap')
     def _compute_average_gap(self):
@@ -650,7 +677,7 @@ class CompetencyAssessment(models.Model):
         return self.action_populate_competencies()
 
     def action_submit(self):
-        """Draft -> Submitted with unrated checks and employee activity notification."""
+        """Draft -> Submitted with unrated checks and employee confirmation notification (FR-COM-047)."""
         for rec in self:
             if not rec.line_ids:
                 raise UserError(_('Add at least one competency rating line before submitting.'))
@@ -663,6 +690,14 @@ class CompetencyAssessment(models.Model):
             rec.with_context(force_write=True).write({'state': 'submitted'})
             rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
+            if rec.employee_id and rec.employee_id.user_id:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('Assessment Submitted: %s') % rec.name,
+                    note=_('Your competency assessment %s has been submitted successfully.') % rec.name,
+                    user_id=rec.employee_id.user_id.id,
+                )
+
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
 
@@ -673,28 +708,12 @@ class CompetencyAssessment(models.Model):
             assessor_user = rec.assessor_id or False
             creator_user = rec.create_uid or False
             current_user = self.env.user
-            
+
             if not self.env.su:
                 if (subject_user and current_user == subject_user) or \
                    (assessor_user and current_user == assessor_user) or \
                    (creator_user and current_user == creator_user):
                     raise ValidationError(_("You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."))
-
-    def action_submit(self):
-        """Draft -> Submitted workflow with employee confirmation (FR-COM-047)."""
-        for rec in self:
-            if not rec.line_ids:
-                raise UserError(_('Add at least one competency rating line before submitting.'))
-            rec.with_context(force_write=True).write({'state': 'submitted'})
-            rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
-            
-            if rec.employee_id and rec.employee_id.user_id:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Assessment Submitted: %s') % rec.name,
-                    note=_('Your competency assessment %s has been submitted successfully.') % rec.name,
-                    user_id=rec.employee_id.user_id.id,
-                )
 
     def action_supervisor_review(self):
         """Submitted -> Supervisor Review with supervisor activity notification (FR-COM-048)."""

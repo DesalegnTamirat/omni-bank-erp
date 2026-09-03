@@ -529,10 +529,15 @@ class CompetencyDashboard(models.TransientModel):
         is_admin = user.has_group('competency_management.group_competency_admin')
         is_supervisor = user.has_group('competency_management.group_competency_supervisor') or is_admin
 
-        # Determine Operating Unit boundary for current user (direct access, declared dependency)
+        # Determine Operating Unit boundary for current user (direct access, declared dependency).
+        # `assigned_operating_unit_ids` is the manager's supervisory/reporting scope (Scenario 2 boundary);
+        # it takes priority over the broader `operating_unit_ids` (general multi-branch access) so that
+        # dashboard scoping matches the record rules in security/competency_security.xml exactly.
         user_ou_ids = []
         if not is_admin:
-            if user.operating_unit_ids:
+            if getattr(user, 'assigned_operating_unit_ids', False):
+                user_ou_ids = user.assigned_operating_unit_ids.ids
+            elif getattr(user, 'operating_unit_ids', False):
                 user_ou_ids = user.operating_unit_ids.ids
             elif user.default_operating_unit_id:
                 user_ou_ids = [user.default_operating_unit_id.id]
@@ -831,9 +836,13 @@ class CompetencyDashboard(models.TransientModel):
                     ]
                 },
                 'employee_radar': {
-                    'labels': radar_labels or ['Core Values', 'Execution', 'Communication', 'Technical Skills', 'Problem Solving'],
-                    'assessed': radar_assessed or [3, 2, 4, 3, 2],
-                    'required': radar_required or [4, 3, 4, 4, 3],
+                    # Real per-competency ratings only — never fabricate sample values here.
+                    # An empty payload means "no assessment recorded yet"; the widget must show
+                    # an explicit empty state rather than invented numbers.
+                    'has_data': bool(radar_labels),
+                    'labels': radar_labels,
+                    'assessed': radar_assessed,
+                    'required': radar_required,
                 },
                 'employee_trend': {
                     'labels': trend_labels,
