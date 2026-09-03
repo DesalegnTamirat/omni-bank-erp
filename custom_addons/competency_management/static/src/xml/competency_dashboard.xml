@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="competency_management.CompetencyDashboard">
-        <div class="o_competency_dashboard_owl" style="background-color: #fcfbfa; min-height: 100vh; padding-bottom: 40px; font-family: system-ui, -apple-system, sans-serif;">
+        <div class="o_competency_dashboard_owl" style="background-color: #fcfbfa; height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 60px; font-family: system-ui, -apple-system, sans-serif;">
             
             <!-- ── Top Maroon Header Bar (#541718) ── -->
             <div style="background-color: #541718; color: #ffffff; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">

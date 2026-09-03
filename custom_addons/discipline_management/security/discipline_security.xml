@@ -35,11 +35,38 @@
 
         <!-- Group: Manager / Approver -->
         <record id="group_discipline_manager" model="res.groups">
-            <field name="name">Manager / Approver</field>
+            <field name="name">Manager / Line Manager</field>
             <field name="sequence">30</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
-            <field name="comment">Can review cases, participate in committee meetings, and approve standard cases.</field>
+            <field name="comment">Can initiate cases, review, decide minor/moderate cases, or escalate to Director.</field>
+        </record>
+
+        <!-- Group: Directorate Director -->
+        <record id="group_discipline_director" model="res.groups">
+            <field name="name">Director / Directorate Director</field>
+            <field name="sequence">32</field>
+            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_manager'))]"/>
+            <field name="comment">Can review escalated cases, decide &amp; enforce non-dismissals, or escalate to Chief.</field>
+        </record>
+
+        <!-- Group: Chief Officer -->
+        <record id="group_discipline_chief" model="res.groups">
+            <field name="name">Chief / Executive Chief Officer</field>
+            <field name="sequence">35</field>
+            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_director'))]"/>
+            <field name="comment">Can decide &amp; enforce non-dismissals, forward to CEO, or forward directly to Audit (with CEO notification).</field>
+        </record>
+
+        <!-- Group: Disciplinary Committee Secretary -->
+        <record id="group_discipline_committee_secretary" model="res.groups">
+            <field name="name">Disciplinary Committee Secretary</field>
+            <field name="sequence">38</field>
+            <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_director'))]"/>
+            <field name="comment">Schedules committee meetings, records minutes, and initiates vote collection.</field>
         </record>
 
         <!-- Group: HR Administrator (Senior Authority) -->
@@ -47,7 +74,7 @@
             <field name="name">HR Administrator</field>
             <field name="sequence">40</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
-            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_chief')), (4, ref('discipline_management.group_discipline_committee_secretary'))]"/>
             <field name="comment">Full access to discipline configuration, policies, level 1 dismissal approvals, and case revocations.</field>
         </record>
 
@@ -57,7 +84,7 @@
             <field name="sequence">50</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_admin'))]"/>
-            <field name="comment">Approval authority for non-executive disciplinary cases.</field>
+            <field name="comment">Disciplinary Committee Chair and final approval authority for non-executive cases.</field>
         </record>
 
         <!-- Group: Chief Executive Officer (CEO) -->
@@ -66,7 +93,7 @@
             <field name="sequence">60</field>
             <field name="privilege_id" ref="discipline_management.res_groups_privilege_discipline"/>
             <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_cpco'))]"/>
-            <field name="comment">Final approval authority for executive cases and level 1 dismissals.</field>
+            <field name="comment">Executive authority receiving Chief/Audit escalations and approving executive dismissals.</field>
         </record>
 
     </data>

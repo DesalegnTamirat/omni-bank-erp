@@ -8,9 +8,9 @@
                     <t t-call="web.external_layout">
                         <div class="page" style="font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; line-height: 1.6;">
                             
-                            <div class="row text-center mb-4" style="border-bottom: 2px solid #800000; padding-bottom: 15px;">
+                            <div class="row text-center mb-4" style="border-bottom: 2px solid #541718; padding-bottom: 15px;">
                                 <div class="col-12">
-                                    <h2 style="color: #800000; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
+                                    <h2 style="color: #541718; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
                                     <h4 style="color: #333; font-weight: 600;">HUMAN RESOURCES MANAGEMENT DIRECTORATE</h4>
                                     <h5 style="color: #666; text-transform: uppercase; letter-spacing: 1px;">
                                         OFFICIAL DISCIPLINARY NOTICE &amp; WARNING LETTER
@@ -37,7 +37,7 @@
 
                             <!-- Employee Information Box -->
                             <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
                                     EMPLOYEE PARTICULARS
                                 </h6>
                                 <div class="row">
@@ -56,19 +56,19 @@
 
                             <!-- Incident & Misconduct Summary -->
                             <div class="mb-4">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
                                     1. SUMMARY OF MISCONDUCT &amp; INCIDENT
                                 </h6>
                                 <p><strong>Incident Date:</strong> <span t-field="doc.incident_date"/></p>
                                 <p><strong>Offense Title:</strong> <span t-field="doc.offense_id.name"/> (<span t-field="doc.offense_category_id.name"/>)</p>
-                                <p style="text-align: justify; background: #fff; border-left: 3px solid #800000; padding: 10px; font-style: italic;">
+                                <p style="text-align: justify; background: #fff; border-left: 3px solid #541718; padding: 10px; font-style: italic;">
                                     <span t-field="doc.description"/>
                                 </p>
                             </div>
 
                             <!-- Enforcement & Penalty Action -->
                             <div class="mb-4">
-                                <h6 style="color: #800000; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
                                     2. DISCIPLINARY DECISION &amp; ENFORCED ACTION
                                 </h6>
                                 <table class="table table-bordered table-sm" style="margin-top: 10px;">
@@ -124,6 +124,139 @@
                                     <strong><span t-field="doc.employee_id.name"/></strong><br/>
                                     Signature &amp; Date</p>
                                 </div>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+        <!-- Official Disciplinary Committee Minutes Template (FR-DIS-020) -->
+        <template id="report_disciplinary_committee_minute_template">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: 'Helvetica', 'Arial', sans-serif; font-size: 13px; line-height: 1.6;">
+                            
+                            <div class="row text-center mb-4" style="border-bottom: 2px solid #541718; padding-bottom: 15px;">
+                                <div class="col-12">
+                                    <h2 style="color: #541718; font-weight: bold; margin-bottom: 5px;">BUNNA BANK S.C.</h2>
+                                    <h4 style="color: #333; font-weight: 600;">DISCIPLINARY COMMITTEE</h4>
+                                    <h5 style="color: #666; text-transform: uppercase; letter-spacing: 1px;">
+                                        OFFICIAL HEARING MINUTES &amp; DECISION RECORD
+                                    </h5>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <strong>Meeting Reference:</strong> <span t-field="doc.name"/><br/>
+                                    <strong>Disciplinary Case:</strong> <span t-field="doc.case_id.name"/><br/>
+                                    <strong>Meeting Date &amp; Time:</strong> <span t-field="doc.meeting_date"/> - <span t-field="doc.meeting_end_time"/>
+                                </div>
+                                <div class="col-6 text-end">
+                                    <strong>Quorum Status:</strong> 
+                                    <t t-if="doc.is_quorum_met">
+                                        <span class="badge bg-success">Quorum Met (100% Present)</span>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="badge bg-danger">Quorum Incomplete</span>
+                                    </t><br/>
+                                    <strong>Location:</strong> <span t-field="doc.location"/>
+                                </div>
+                            </div>
+
+                            <!-- Employee Information -->
+                            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
+                                    EMPLOYEE UNDER INVESTIGATION
+                                </h6>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <strong>Name:</strong> <span t-field="doc.employee_id.name"/><br/>
+                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.registration_number"/><br/>
+                                        <strong>Job Title:</strong> <span t-field="doc.employee_id.job_id.name"/>
+                                    </div>
+                                    <div class="col-6">
+                                        <strong>Department:</strong> <span t-field="doc.department_id.name"/><br/>
+                                        <strong>Offense:</strong> <span t-field="doc.case_id.offense_id.name"/><br/>
+                                        <strong>Severity Level:</strong> <span t-field="doc.case_id.severity_level"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Deliberation & Minutes -->
+                            <div class="mb-4">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                    1. AGENDA &amp; HEARING PROCEEDINGS
+                                </h6>
+                                <p><strong>Agenda:</strong> <span t-field="doc.agenda"/></p>
+                                <p style="text-align: justify; background: #fff; border-left: 3px solid #541718; padding: 10px;">
+                                    <span t-field="doc.meeting_minutes"/>
+                                </p>
+                            </div>
+
+                            <!-- Final Decided Punishment -->
+                            <div class="mb-4">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                    2. COMMITTEE SANCTION DECISION
+                                </h6>
+                                <table class="table table-bordered table-sm" style="margin-top: 10px;">
+                                    <thead style="background-color: #f2f2f2;">
+                                        <tr>
+                                            <th>Decided Sanction</th>
+                                            <th>Salary Penalty (%)</th>
+                                            <th>Fine Days</th>
+                                            <th>New Position (Demotion)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong><span t-field="doc.decided_punishment_type"/></strong></td>
+                                            <td><span t-field="doc.decided_penalty_percentage"/> %</td>
+                                            <td><span t-field="doc.decided_fine_days"/></td>
+                                            <td><span t-field="doc.new_job_id.name"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p><strong>Recommendation / Remarks:</strong> <span t-field="doc.final_recommendation"/></p>
+                            </div>
+
+                            <!-- Digital Signatures Table -->
+                            <div class="mb-4" style="page-break-inside: avoid;">
+                                <h6 style="color: #541718; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                                    3. STATUTORY COMMITTEE DIGITAL SIGN-OFF &amp; VERIFICATION (FR-DIS-020)
+                                </h6>
+                                <table class="table table-bordered table-sm mt-3">
+                                    <thead style="background-color: #f2f2f2;">
+                                        <tr>
+                                            <th>Order</th>
+                                            <th>Role</th>
+                                            <th>Member Name</th>
+                                            <th>Signed Date</th>
+                                            <th>Digital Signature</th>
+                                            <th>Comments</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="doc.signature_line_ids" t-as="sig">
+                                            <td><span t-field="sig.sign_sequence"/></td>
+                                            <td><span t-field="sig.role_description"/></td>
+                                            <td><span t-field="sig.member_id.name"/></td>
+                                            <td><span t-field="sig.signed_date"/></td>
+                                            <td>
+                                                <t t-if="sig.signature">
+                                                    <img t-att-src="image_data_uri(sig.signature)" style="max-height: 40px;"/>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="text-muted">Pending</span>
+                                                </t>
+                                            </td>
+                                            <td><span t-field="sig.comments"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
                         </div>

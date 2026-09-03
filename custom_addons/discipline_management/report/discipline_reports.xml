@@ -14,5 +14,17 @@
             <field name="binding_type">report</field>
         </record>
 
+        <!-- Official Committee Meeting Minutes Report Action (FR-DIS-020) -->
+        <record id="action_report_disciplinary_committee_minute" model="ir.actions.report">
+            <field name="name">Disciplinary Committee Meeting Minutes</field>
+            <field name="model">discipline.committee.meeting</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">discipline_management.report_disciplinary_committee_minute_template</field>
+            <field name="report_file">Disciplinary_Committee_Minute</field>
+            <field name="print_report_name">'Disciplinary_Minute_%s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_discipline_committee_meeting"/>
+            <field name="binding_type">report</field>
+        </record>
+
     </data>
 </odoo>

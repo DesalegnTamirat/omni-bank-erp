@@ -26,8 +26,8 @@
                             <line x1="34" y1="25" x2="30" y2="28" stroke="white" stroke-width="1.5"/>
                             <defs>
                                 <linearGradient id="shieldGrad" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#1e3a8a"/>
-                                    <stop offset="100%" stop-color="#1e40af"/>
+                                    <stop offset="0%" stop-color="#541718"/>
+                                    <stop offset="100%" stop-color="#C17540"/>
                                 </linearGradient>
                             </defs>
                         </svg>
@@ -375,28 +375,28 @@
                         <div class="disc-summary-stats">
                             <div class="disc-sum-row">
                                 <span class="disc-sum-label">
-                                    <span class="disc-sum-dot" style="background: #ef4444;"></span>
+                                     <span class="disc-sum-dot" style="background: #991b1b;"></span>
                                     Level 1 (Dismissal)
                                 </span>
                                 <span class="disc-sum-val"><t t-esc="state.stats.level1_cases"/></span>
                             </div>
                             <div class="disc-sum-row">
                                 <span class="disc-sum-label">
-                                    <span class="disc-sum-dot" style="background: #3b82f6;"></span>
+                                     <span class="disc-sum-dot" style="background: #541718;"></span>
                                     Total Active
                                 </span>
                                 <span class="disc-sum-val"><t t-esc="state.stats.active_cases"/></span>
                             </div>
                             <div class="disc-sum-row">
                                 <span class="disc-sum-label">
-                                    <span class="disc-sum-dot" style="background: #8b5cf6;"></span>
+                                     <span class="disc-sum-dot" style="background: #c17540;"></span>
                                     Pending Approval
                                 </span>
                                 <span class="disc-sum-val"><t t-esc="state.stats.pending_approval"/></span>
                             </div>
                             <div class="disc-sum-row">
                                 <span class="disc-sum-label">
-                                    <span class="disc-sum-dot" style="background: #10b981;"></span>
+                                     <span class="disc-sum-dot" style="background: #425727;"></span>
                                     Revoked Cases
                                 </span>
                                 <span class="disc-sum-val"><t t-esc="state.stats.revoked_cases"/></span>

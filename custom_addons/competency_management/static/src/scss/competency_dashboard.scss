@@ -2,8 +2,30 @@
 /* Primary Brand Color: #541718 Deep Maroon | Secondary: #1d2b32 Navy | Accents: #c17540 Orange, #726732 Olive */
 /* NOTE: brand colors above are intentionally NOT modified anywhere in this file. */
 
+.o_action:has(.o_competency_dashboard_owl),
+.o_content:has(.o_competency_dashboard_owl) {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
 .o_competency_dashboard_owl {
     background-color: #fcfbfa;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 60px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 4px;
+    }
 
     * {
         box-sizing: border-box;

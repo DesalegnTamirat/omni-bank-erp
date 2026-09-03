@@ -169,3 +169,11 @@ class DisciplineInvestigation(models.Model):
                 'Investigation findings officially reviewed and accepted by %s on %s.'
             ) % (rec.reviewed_by_id.name, rec.management_review_date))
 
+    def action_forward_to_committee(self):
+        """Forward investigation findings to Disciplinary Committee (FR-DIS-014)."""
+        for rec in self:
+            if rec.state != 'approved':
+                rec.action_accept_findings()
+            rec.case_id.action_audit_submit_to_committee()
+            rec.message_post(body=_('Investigation report submitted to Disciplinary Committee for hearing.'))
+

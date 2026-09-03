@@ -56,7 +56,21 @@ class DisciplineAppeal(models.Model):
     supporting_document = fields.Binary(string='Supporting Appeal Document', attachment=True)
     document_filename = fields.Char(string='Document Filename')
 
-    reviewer_id = fields.Many2one('res.users', string='Appeal Authority / Chair', tracking=True)
+    # Two-Level Appeal Routing (FR-DIS-033)
+    appeal_level = fields.Selection([
+        ('level_1', 'First Appeal'),
+        ('level_2', 'Second Appeal (Final)'),
+    ], string='Appeal Level', default='level_1', required=True, tracking=True)
+
+    appeal_source_type = fields.Selection([
+        ('manager', 'Appeal against Line Manager / Director Decision'),
+        ('committee', 'Appeal against Disciplinary Committee Decision'),
+    ], string='Decision Source Type', compute='_compute_appeal_source_type', store=True, tracking=True)
+
+    submitted_on_behalf = fields.Boolean(string='Submitted on Behalf of Employee', default=False, tracking=True)
+    submitted_by_id = fields.Many2one('res.users', string='Submitted By', default=lambda self: self.env.user, tracking=True)
+
+    reviewer_id = fields.Many2one('res.users', string='Appeal Authority / Reviewer', compute='_compute_appeal_reviewer', store=True, readonly=False, tracking=True)
     review_date = fields.Date(string='Review Date', tracking=True)
 
     # Appeal Tracking & Decision Outcome
@@ -80,10 +94,49 @@ class DisciplineAppeal(models.Model):
 
     state = fields.Selection([
         ('submitted', 'Appeal Submitted'),
-        ('under_review', 'Under Appeal Committee Review'),
+        ('under_review', 'Under Appeal Review'),
         ('decided', 'Final Decision Rendered'),
         ('rejected_expired', 'Rejected (Window Expired)'),
     ], string='Status', default='submitted', required=True, tracking=True)
+
+    @api.depends('case_id', 'case_id.committee_meeting_ids')
+    def _compute_appeal_source_type(self):
+        for rec in self:
+            if rec.case_id and rec.case_id.committee_meeting_ids:
+                rec.appeal_source_type = 'committee'
+            else:
+                rec.appeal_source_type = 'manager'
+
+    @api.depends('appeal_level', 'appeal_source_type', 'case_id')
+    def _compute_appeal_reviewer(self):
+        """FR-DIS-033:
+
+        Line Manager Decision:
+          Level 1 -> Respective Directorate
+          Level 2 -> CPCO
+        Committee Decision:
+          Level 1 -> Disciplinary Committee Secretary
+          Level 2 -> CEO
+        """
+        for rec in self:
+            case = rec.case_id
+            if rec.appeal_source_type == 'manager':
+                if rec.appeal_level == 'level_1':
+                    rec.reviewer_id = case.director_id if case and case.director_id else self.env.user
+                else:
+                    cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+                    cpco_u = cpco_group.user_ids[0] if (cpco_group and cpco_group.user_ids) else (cpco_group.all_user_ids[0] if (cpco_group and cpco_group.all_user_ids) else False)
+                    rec.reviewer_id = cpco_u or self.env.user
+            else:
+                # Committee decision
+                if rec.appeal_level == 'level_1':
+                    sec_group = self.env.ref('discipline_management.group_discipline_committee_secretary', raise_if_not_found=False)
+                    sec_u = sec_group.user_ids[0] if (sec_group and sec_group.user_ids) else (sec_group.all_user_ids[0] if (sec_group and sec_group.all_user_ids) else False)
+                    rec.reviewer_id = sec_u or self.env.user
+                else:
+                    ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+                    ceo_u = ceo_group.user_ids[0] if (ceo_group and ceo_group.user_ids) else (ceo_group.all_user_ids[0] if (ceo_group and ceo_group.all_user_ids) else False)
+                    rec.reviewer_id = ceo_u or (case.ceo_id if case and case.ceo_id else self.env.user)
 
     # Appeal Window Enforcement (10 Calendar Days)
     @api.constrains('submission_date', 'case_id')

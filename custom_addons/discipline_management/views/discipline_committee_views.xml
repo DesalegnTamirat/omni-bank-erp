@@ -5,16 +5,19 @@
             <field name="name">discipline.committee.meeting.list</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="arch" type="xml">
-                <list>
+                <list decoration-success="state == 'completed'" decoration-warning="state == 'signing'">
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
                     <field name="meeting_date"/>
-                    <field name="meeting_end_time"/>
-                    <field name="committee_chair_id"/>
+                    <field name="chair_id"/>
+                    <field name="secretary_id"/>
+                    <field name="signed_signatures_count" string="Signed Count"/>
+                    <field name="total_signatures_count" string="Total Required"/>
+                    <field name="all_signed" widget="boolean"/>
                     <field name="is_quorum_met" widget="boolean"/>
-                    <field name="final_recommendation"/>
-                    <field name="state"/>
+                    <field name="decided_punishment_type"/>
+                    <field name="state" widget="badge"/>
                 </list>
             </field>
         </record>
@@ -23,73 +26,106 @@
             <field name="name">discipline.committee.meeting.form</field>
             <field name="model">discipline.committee.meeting</field>
             <field name="arch" type="xml">
-                <form>
+                <form string="Disciplinary Committee Meeting">
                     <header>
-                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <!-- Sequential sign-off flow -->
-                        <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
-                                invisible="state != 'in_progress'"
-                                help="Submit agenda to Department Director for sign-off before voting."/>
-                        <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
-                                invisible="state != 'director_review'"
-                                help="Director confirms review and opens voting for committee members."/>
-                        <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
-                                invisible="state not in ('voting', 'in_progress')"/>
-                        <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
-                                invisible="state != 'minutes_recorded'"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,minutes_recorded,completed"/>
+                        <!-- Phase 1: Secretary schedules meeting -->
+                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Members" type="object" class="oe_highlight"
+                                invisible="state != 'scheduling'"/>
+
+                        <!-- Phase 2: Start Meeting / Hearing -->
+                        <button name="action_start_meeting" string="Start Deliberation" type="object" class="btn-primary"
+                                invisible="state != 'scheduled'"/>
+
+                        <!-- Phase 3: Secretary initiates vote/signature collection -->
+                        <button name="action_request_signatures" string="Collect Votes / Send for Signatures" type="object" class="btn-warning"
+                                invisible="state != 'in_progress'"/>
+
+                        <!-- Member Action: Sign Minute via Signature Widget Popup -->
+                        <button name="action_member_sign_popup" string="Sign Minute" type="object" class="btn-success" icon="fa-pencil"
+                                invisible="not can_current_user_sign"/>
+
+                        <!-- Phase 4: Finalize & Enforce Decision -->
+                        <button name="action_finalize_and_enforce" string="Finalize &amp; Enforce Decision" type="object" class="btn-success"
+                                invisible="state != 'signing' or not all_signed"/>
+
+                        <field name="state" widget="statusbar" statusbar_visible="scheduling,scheduled,in_progress,signing,completed"/>
                     </header>
                     <sheet>
-                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="not is_quorum_met"/>
+                        <widget name="web_ribbon" title="Finalized &amp; Enforced" bg_color="text-bg-success" invisible="state != 'completed'"/>
+                        <widget name="web_ribbon" title="All Signed" bg_color="text-bg-primary" invisible="not all_signed or state == 'completed'"/>
+                        <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-info" invisible="not is_quorum_met or state == 'completed'"/>
+
                         <div class="oe_title">
                             <h1>
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
-                        
-                            <group string="Meeting Schedule &amp; Case">
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
-                                <field name="meeting_date"/>
-                                <field name="meeting_end_time"/>
-                                <field name="location"/>
-                            </group>
+
+                        <!-- Phase Guidance Banners (Bunna Bank Brand Styled) -->
+                        <div class="alert alert-info shadow-sm" style="border-left: 5px solid #1d2b32; background-color: #f3f6f8; color: #1d2b32; border-radius: 6px;" role="alert" invisible="state != 'scheduling'">
+                            <strong>Secretary Scheduling Phase:</strong> Set the scheduled date, time, location, and link. Case details and punishments are locked until the hearing starts.
+                        </div>
+                        <div class="alert alert-warning shadow-sm" style="border-left: 5px solid #c17540; background-color: #fffbf7; color: #9e5b2e; border-radius: 6px;" role="alert" invisible="state != 'in_progress'">
+                            <strong>Hearing &amp; Deliberation:</strong> Secretary records minutes and adjusts punishments below. Unilateral direct decision is disabled; digital signatures must be collected.
+                        </div>
+                        <div class="alert alert-success shadow-sm" style="border-left: 5px solid #425727; background-color: #f4f6f5; color: #425727; border-radius: 6px;" role="alert" invisible="state != 'signing'">
+                            <strong>Signing Phase:</strong> Committee members must review official minutes and provide digital signatures using the signature pad.
+                        </div>
+
                         <group>
-                            <group string="Committee &amp; Quorum">
-                                <field name="committee_chair_id"/>
-                                <field name="member_ids" widget="many2many_tags"/>
-                                <field name="total_expected_members"/>
-                                <field name="present_members_count"/>
-                                <field name="required_quorum_percentage"/>
-                                <field name="is_quorum_met" widget="boolean"/>
+                            <group string="Hearing Schedule &amp; Case">
+                                <field name="is_current_user_secretary" invisible="1"/>
+                                <field name="is_current_user_member" invisible="1"/>
+                                <field name="can_current_user_sign" invisible="1"/>
+                                <field name="case_id" readonly="state != 'scheduling'"/>
+                                <field name="employee_id" readonly="1"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="meeting_date" readonly="state not in ('scheduling', 'scheduled')"/>
+                                <field name="meeting_end_time" readonly="state not in ('scheduling', 'scheduled')"/>
+                                <field name="location" readonly="state not in ('scheduling', 'scheduled')"/>
+                                <field name="virtual_meeting_link" readonly="state not in ('scheduling', 'scheduled')"/>
                             </group>
-                            <!-- Director sign-off tracking -->
-                            <group string="Director Sign-off ">
-                                <field name="director_signed_off" widget="boolean"/>
-                                <field name="director_signoff_by_id" readonly="1"/>
-                                <field name="director_signoff_date" readonly="1"/>
+                            <group string="Statutory Committee Members (FR-DIS-015)">
+                                <field name="chair_id" readonly="state != 'scheduling'"/>
+                                <field name="director_member_id" readonly="state != 'scheduling'"/>
+                                <field name="legal_member_id" readonly="state != 'scheduling'"/>
+                                <field name="secretary_id" readonly="state != 'scheduling'"/>
+                                <field name="is_quorum_met" widget="boolean"/>
+                                <field name="all_signed" widget="boolean"/>
                             </group>
                         </group>
+
+                        <group string="Punishment Deliberation &amp; Adjustments (Secretary Only during Session)">
+                            <group>
+                                <field name="decided_punishment_type" readonly="state != 'in_progress'"/>
+                                <field name="decided_penalty_percentage" readonly="state != 'in_progress'"/>
+                                <field name="decided_fine_days" readonly="state != 'in_progress'"/>
+                            </group>
+                            <group>
+                                <field name="new_job_id" invisible="decided_punishment_type != 'demotion'" readonly="state != 'in_progress'"/>
+                                <field name="new_grade_id" invisible="decided_punishment_type != 'demotion'" readonly="state != 'in_progress'"/>
+                                <field name="final_recommendation" readonly="state != 'in_progress'"/>
+                            </group>
+                        </group>
+
                         <notebook>
-                            <page string="Agenda &amp; Minutes">
+                            <page string="Official Meeting Minutes &amp; Deliberation">
                                 <group>
-                                    <field name="agenda" placeholder="Meeting agenda topics..."/>
-                                    <field name="meeting_minutes" placeholder="Record official meeting minutes, discussion points, and evidence review..."/>
-                                    <field name="final_recommendation"/>
+                                    <field name="agenda" placeholder="Hearing agenda..." readonly="state not in ('scheduling', 'scheduled', 'in_progress')"/>
+                                    <field name="meeting_minutes" placeholder="Record official discussion, employee defense, witness testimony, and findings..." readonly="state not in ('in_progress')"/>
+                                    <field name="minute_filename" invisible="1"/>
+                                    <field name="minute_document" filename="minute_filename" readonly="1" invisible="not minute_document"/>
                                 </group>
                             </page>
-                            <page string="Committee Member Votes">
-                                <group>
-                                    <group>
-                                        <field name="in_favor_count"/>
-                                        <field name="against_count"/>
-                                        <field name="abstain_count"/>
-                                    </group>
-                                </group>
-                                <field name="vote_ids">
-                                    <list editable="bottom">
-                                        <field name="member_id"/>
-                                        <field name="vote"/>
+                            <page string="Member Digital Signatures (FR-DIS-020)">
+                                <field name="signature_line_ids" readonly="1">
+                                    <list string="Signatures">
+                                        <field name="sign_sequence" string="Seq"/>
+                                        <field name="role_description" string="Committee Role"/>
+                                        <field name="member_id" string="Member Name"/>
+                                        <field name="is_signed" widget="boolean"/>
+                                        <field name="signed_date"/>
+                                        <field name="signature" widget="image" options="{'size': [150, 50]}"/>
                                         <field name="comments"/>
                                     </list>
                                 </field>
@@ -97,6 +133,40 @@
                         </notebook>
                     </sheet>
                     <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Digital Signature Popup Form -->
+        <record id="view_discipline_committee_signature_form" model="ir.ui.view">
+            <field name="name">discipline.committee.signature.form</field>
+            <field name="model">discipline.committee.signature</field>
+            <field name="arch" type="xml">
+                <form string="Digital Signature Submission">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="meeting_id" readonly="1"/>
+                                <field name="member_id" readonly="1"/>
+                                <field name="role_description" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="sign_sequence" readonly="1"/>
+                                <field name="is_signed" readonly="1"/>
+                                <field name="signed_date" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Deliberation Remarks &amp; Justification">
+                            <field name="comments" placeholder="Provide any comments or concurrence notes..."/>
+                        </group>
+                        <group string="Sign using Signature Pad">
+                            <field name="signature" widget="signature"/>
+                        </group>
+                    </sheet>
+                    <footer>
+                        <button name="action_save_signature" string="Confirm &amp; Submit Signature" type="object" class="btn-success"/>
+                        <button string="Cancel" class="btn-secondary" special="cancel"/>
+                    </footer>
                 </form>
             </field>
         </record>

@@ -191,7 +191,7 @@ class TestDisciplineCase(TransactionCase):
         self.assertIn('under active disciplinary suspension', reason)
 
     def test_06_committee_meeting_completion_required_for_enforcement(self):
-        """Test that case enforcement requires linked committee meeting to be completed with sign-off and quorum."""
+        """Test that committee route enforcement requires all member signatures and completed state."""
         today = Date.today()
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
@@ -202,110 +202,172 @@ class TestDisciplineCase(TransactionCase):
             'reviewer_id': self.user_reviewer.id,
             'approver_id': self.user_approver.id,
         })
-        
-        meeting = self.env['discipline.committee.meeting'].create({
-            'case_id': case.id,
-            'meeting_date': fields.Datetime.now(),
-            'committee_chair_id': self.user_approver.id,
-            'member_ids': [(6, 0, [self.user_reviewer.id, self.user_approver.id])],
-        })
         case.action_send_to_committee()
-
+        
+        meeting = case.committee_meeting_ids[0]
         # Attempting enforcement while committee meeting is incomplete must raise UserError
         with self.assertRaises(UserError):
             case.with_user(self.user_approver).action_approve_and_enforce()
 
-        # Complete meeting
-        meeting.write({'state': 'completed', 'director_signed_off': True, 'present_members_count': 2})
-        case.action_committee_feedback_received()
+        # Fill digital signatures for all statutory members
+        for line in meeting.signature_line_ids:
+            line.write({
+                'signature': b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+                'is_signed': True,
+                'signed_date': fields.Date.context_today(self),
+            })
+        meeting.write({'state': 'completed'})
         case.with_user(self.user_approver).action_approve_and_enforce()
         self.assertEqual(case.state, 'enforced')
 
-    def test_07_monthly_suspension_payroll_penalty_cron(self):
-        """Test monthly suspension penalty cron execution for active without-pay suspensions."""
+    def test_07_direct_decision_non_dismissal_by_manager(self):
+        """Test manager can directly decide and enforce non-dismissal cases without committee."""
         today = Date.today()
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
             'incident_date': today,
-            'description': 'Suspension cron incident.',
+            'description': 'Tardiness incident.',
+            'initiator_id': self.user_initiator.id,
+            'manager_id': self.user_initiator.id,
         })
-        suspension = self.env['discipline.suspension'].create({
-            'case_id': case.id,
-            'suspension_type': 'without_pay',
-            'start_date': today,
-            'end_date': today + timedelta(days=10),
-            'reason': 'Investigation pending.',
-        })
-        suspension.action_activate_suspension()
+        case.action_initiate()
+        self.assertEqual(case.state, 'initiated')
 
-        # Run monthly penalty cron
-        self.env['discipline.suspension']._cron_process_monthly_suspension_penalties()
+        # Directly decide and enforce
+        case.with_user(self.user_initiator).action_decide_and_enforce()
+        self.assertEqual(case.state, 'enforced')
+        self.assertTrue(self.employee.active_disciplinary_action)
+
+    def test_08_direct_decision_dismissal_blocked(self):
+        """Test manager/director cannot directly enforce dismissal (dismissal must go to committee)."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'description': 'Severe theft incident.',
+            'initiator_id': self.user_initiator.id,
+        })
+        case.action_initiate()
         
-        penalty = self.env['discipline.payroll.penalty'].search([('suspension_id', '=', suspension.id)])
-        self.assertTrue(penalty.id)
-        self.assertEqual(penalty.penalty_type, 'suspension_without_pay')
-
-    def test_08_immutable_finalized_case_write_guard(self):
-        """Test that enforced/closed/appealed cases block field updates on write()."""
-        today = Date.today()
-        case = self.env['discipline.case'].create({
-            'employee_id': self.employee.id,
-            'offense_id': self.offense_level4.id,
-            'incident_date': today,
-            'description': 'Immutability test incident.',
-            'initiator_id': self.user_initiator.id,
-            'reviewer_id': self.user_reviewer.id,
-            'approver_id': self.user_approver.id,
-        })
-        case.action_initiate()
-        case.action_submit_for_approval()
-        case.with_user(self.user_approver).action_approve_and_enforce()
-
-        # Attempting to edit description of enforced case must fail
+        # Calling action_decide_and_enforce on a dismissal case must raise UserError
         with self.assertRaises(UserError):
-            case.write({'description': 'Tampered description'})
+            case.action_decide_and_enforce()
 
-    def test_09_demotion_enforcement_and_managerial_penalty(self):
-        """Test demotion enforcement preserving basic wage and managerial penalty days computation."""
+    def test_09_escalation_chain_to_audit_and_ceo_notification(self):
+        """Test escalation flow: Manager -> Director -> Chief -> Audit with automated CEO alert."""
         today = Date.today()
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
-            'offense_id': self.offense_demotion.id,
+            'offense_id': self.offense_level1.id,
             'incident_date': today,
-            'description': 'Demotion test incident.',
+            'description': 'High severity financial embezzlement.',
             'initiator_id': self.user_initiator.id,
-            'reviewer_id': self.user_reviewer.id,
-            'approver_id': self.user_approver.id,
-            'dismissal_authority_id': self.user_approver.id,
-            'new_job_id': self.job_junior.id,
+            'director_id': self.user_reviewer.id,
+            'chief_id': self.user_reviewer.id,
+            'ceo_id': self.user_approver.id,
         })
         case.action_initiate()
-        case.action_submit_for_approval()
-        case.with_user(self.user_approver).action_approve_and_enforce()
+        self.assertEqual(case.state, 'initiated')
 
-        # Verify job position updated to junior position, basic wage unchanged
-        self.assertEqual(self.employee.job_id.id, self.job_junior.id)
-        if self.contract:
-            self.assertTrue(self.contract.id)
+        # Step 1: Escalate to Director
+        case.action_escalate_to_director()
+        self.assertEqual(case.state, 'escalated_director')
 
-    def test_10_attendance_discipline_threshold(self):
-        """Test auto-creation of draft discipline case when attendance lateness threshold is exceeded."""
+        # Step 2: Escalate to Chief
+        case.action_escalate_to_chief()
+        self.assertEqual(case.state, 'escalated_chief')
+
+        # Step 3: Chief forwards directly to Audit (CEO is automatically alerted per FR-DIS-012)
+        case.action_chief_forward_to_audit()
+        self.assertEqual(case.state, 'investigating')
+        self.assertTrue(len(case.investigation_ids) > 0)
+
+        # Step 4: Audit submits to Disciplinary Committee
+        case.action_audit_submit_to_committee()
+        self.assertEqual(case.state, 'committee_review')
+        self.assertTrue(len(case.committee_meeting_ids) > 0)
+        self.assertEqual(case.committee_meeting_ids[0].state, 'scheduling')
+
+    def test_10_statutory_committee_secretary_and_signatures(self):
+        """Test statutory committee secretary scheduling, deliberation lock, and sequential signatures."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'description': 'Embezzlement audit case.',
+        })
+        case.action_audit_submit_to_committee()
+        meeting = case.committee_meeting_ids[0]
+        self.assertEqual(meeting.state, 'scheduling')
+
+        # Secretary schedules
+        meeting.action_schedule_and_notify()
+        self.assertEqual(meeting.state, 'scheduled')
+
+        # Hearing begins
+        meeting.action_start_meeting()
+        self.assertEqual(meeting.state, 'in_progress')
+
+        # Secretary modifies punishment and requests signatures
+        meeting.write({
+            'decided_punishment_type': 'final_warning_penalty',
+            'decided_penalty_percentage': 20.0,
+            'meeting_minutes': 'Comprehensive defense heard. Sanction set to Final Warning + 20% penalty.',
+        })
+        meeting.action_request_signatures()
+        self.assertEqual(meeting.state, 'signing')
+
+        # Members sign sequentially: Director line must sign before Chair line
+        dir_line = meeting.signature_line_ids.filtered(lambda l: l.role == 'director')
+        chair_line = meeting.signature_line_ids.filtered(lambda l: l.role == 'chair')
+        dummy_sig = b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+        # Chair attempting to sign before Director must be blocked
+        with self.assertRaises(UserError):
+            chair_line.write({'signature': dummy_sig})
+
+        # All sign in correct order
+        for line in meeting.signature_line_ids.sorted(key=lambda l: l.sign_sequence):
+            line.write({'signature': dummy_sig})
+
+        self.assertTrue(meeting.all_signed)
+
+        # Finalize and enforce
+        meeting.action_finalize_and_enforce()
+        self.assertEqual(meeting.state, 'completed')
+        self.assertEqual(case.state, 'enforced')
+        self.assertEqual(case.punishment_type, 'final_warning_penalty')
+
+    def test_11_attendance_discipline_coach_assignment(self):
+        """Test attendance threshold breach auto-initiates case assigned to coach with reminder."""
+        coach_emp = self.env['hr.employee'].create({
+            'name': 'Assigned Coach',
+            'user_id': self.user_initiator.id,
+        })
+        self.employee.coach_id = coach_emp.id
+
         today = fields.Datetime.now()
         for i in range(3):
-            self.env['hr.attendance'].with_context(skip_duplicate_check=True, tracking_disable=True).create({
+            self.env['hr.attendance'].create({
                 'employee_id': self.employee.id,
-                'check_in': today - timedelta(days=5 - i * 2),
-                'check_out': today - timedelta(days=5 - i * 2, hours=-8),
+                'check_in': today - timedelta(days=5 - i),
+                'check_out': today - timedelta(days=5 - i, hours=-2), # forced checkout / short duration
             })
-        
-        sys_case = self.env['discipline.case'].search([
-            ('employee_id', '=', self.employee.id),
-            ('is_system_generated', '=', True)
-        ], limit=1)
-        self.assertTrue(sys_case.id)
 
-    def test_11_payroll_and_analytics_payload_apis(self):
+        self.env['hr.attendance']._cron_escalate_attendance_violations()
+        
+        case = self.env['discipline.case'].search([
+            ('employee_id', '=', self.employee.id),
+            ('is_attendance_case', '=', True),
+        ], limit=1)
+        self.assertTrue(case.id)
+        self.assertEqual(case.coach_id.id, coach_emp.id)
+        self.assertEqual(case.state, 'initiated')
+
+    def test_12_payroll_and_analytics_payload_apis(self):
         """Test public API methods for Payroll Transmission and Analytics integration."""
         today = Date.today()
         case = self.env['discipline.case'].create({
