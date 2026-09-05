@@ -5,7 +5,7 @@
             <field name="name">discipline.payroll.penalty.list</field>
             <field name="model">discipline.payroll.penalty</field>
             <field name="arch" type="xml">
-                <list>
+                <list create="false">
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
@@ -24,7 +24,7 @@
             <field name="name">discipline.payroll.penalty.form</field>
             <field name="model">discipline.payroll.penalty</field>
             <field name="arch" type="xml">
-                <form>
+                <form create="false">
                     <header>
                         <button name="action_transmit_to_payroll" string="Transmit to Payroll" type="object" class="oe_highlight" invisible="state != 'pending'"/>
                         <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success" invisible="state != 'transferred'"/>

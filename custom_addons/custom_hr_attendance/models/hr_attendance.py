@@ -943,27 +943,30 @@ class HrAttendance(models.Model):
         res = super()._auto_init()
         # Partial index: open attendance records (WHERE check_out IS NULL).
         # Used by every check-out lookup — avoid full-table scans.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
-            ON hr_attendance (employee_id)
-            WHERE check_out IS NULL;
-        """)
-        # Composite index for date-range queries on attendance per employee.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
-            ON hr_attendance (employee_id, check_in);
-        """)
-        # Index on check_in_status for discipline counter queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
-            ON hr_attendance (check_in_status);
-        """)
-        # Partial index on is_force_checkout for discipline and reporting queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
-            ON hr_attendance (employee_id)
-            WHERE is_force_checkout = TRUE;
-        """)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
+                    ON hr_attendance (employee_id)
+                    WHERE check_out IS NULL;
+                """)
+                self.env.cr.execute("""
+                    CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
+                    ON hr_attendance (employee_id, check_in);
+                """)
+                # Index on check_in_status for discipline counter queries.
+                self.env.cr.execute("""
+                    CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
+                    ON hr_attendance (check_in_status);
+                """)
+                # Partial index on is_force_checkout for discipline and reporting queries.
+                self.env.cr.execute("""
+                    CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
+                    ON hr_attendance (employee_id)
+                    WHERE is_force_checkout = TRUE;
+                """)
+        except Exception:
+            pass
         return res
 
     # ============================================================

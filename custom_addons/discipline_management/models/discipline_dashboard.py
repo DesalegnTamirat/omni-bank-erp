@@ -30,33 +30,33 @@ class DisciplineCaseDashboard(models.Model):
             ('final_decision_date', '>=', first_of_month),
         ])
 
-        # Related Model Counts
+        user = self.env.user
+        is_manager_or_officer = (
+            user.has_group('discipline_management.group_discipline_officer') or
+            user.has_group('discipline_management.group_discipline_manager') or
+            user.has_group('base.group_system')
+        )
+
+        # Related Model Counts (Only accessible to managers and officers)
         inv_model = self.env.get('discipline.investigation')
-        # discipline.investigation valid states: draft/submitted/approved
-        investigations = inv_model.search_count([('state', '!=', 'approved')]) if inv_model else 0
+        investigations = inv_model.search_count([('state', '!=', 'approved')]) if (inv_model and is_manager_or_officer) else 0
 
         comm_model = self.env.get('discipline.committee.meeting')
-        # discipline.committee.meeting valid terminal state: 'completed' (not 'concluded')
         committee_meetings = comm_model.search_count([
             ('state', 'not in', ['completed', 'cancelled'])
-        ]) if comm_model else 0
+        ]) if (comm_model and is_manager_or_officer) else 0
 
         susp_model = self.env.get('discipline.suspension')
         active_suspensions = susp_model.search_count([
             ('state', 'in', ['active', 'extended'])
-        ]) if susp_model else 0
+        ]) if (susp_model and is_manager_or_officer) else 0
 
         appeal_model = self.env.get('discipline.appeal')
         pending_appeals = appeal_model.search_count([
             ('state', 'in', ['submitted', 'under_review'])
         ]) if appeal_model else 0
 
-        payroll_model = self.env.get('discipline.payroll.penalty')
-        payroll_penalties = payroll_model.search_count([
-            ('state', '=', 'pending')
-        ]) if payroll_model else 0
-
-        # Recent Cases
+        # Recent Cases (Record rules automatically filter to own cases for normal employees)
         recent_case_ids = self.search([], limit=10, order='incident_date desc, id desc')
         recent_cases = []
         for case in recent_case_ids:
@@ -68,20 +68,20 @@ class DisciplineCaseDashboard(models.Model):
                 'state': case.state,
                 'incident_date': str(case.incident_date) if case.incident_date else False,
                 'sla_deadline': str(case.sla_deadline) if case.sla_deadline else False,
-                'is_sla_exceeded': case.is_sla_exceeded,
+                'is_sla_exceeded': case.is_sla_exceeded if is_manager_or_officer else False,
             })
 
         return {
+            'is_manager_or_officer': is_manager_or_officer,
             'stats': {
                 'total_cases': total_cases,
                 'active_cases': active_cases,
-                'pending_approval': pending_approval,
-                'sla_breached': sla_breached,
+                'pending_approval': pending_approval if is_manager_or_officer else 0,
+                'sla_breached': sla_breached if is_manager_or_officer else 0,
                 'investigations': investigations,
                 'committee_meetings': committee_meetings,
                 'active_suspensions': active_suspensions,
                 'pending_appeals': pending_appeals,
-                'payroll_penalties': payroll_penalties,
                 'level1_cases': level1_cases,
                 'level2_cases': level2_cases,
                 'level3_cases': level3_cases,

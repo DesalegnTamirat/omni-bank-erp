@@ -43,7 +43,7 @@
                                 <div class="row">
                                     <div class="col-6">
                                         <strong>Employee Name:</strong> <span t-field="doc.employee_id.name"/><br/>
-                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.registration_number"/><br/>
+                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.identification_id"/><br/>
                                         <strong>Job Title:</strong> <span t-field="doc.job_id.name"/>
                                     </div>
                                     <div class="col-6">
@@ -175,7 +175,7 @@
                                 <div class="row">
                                     <div class="col-6">
                                         <strong>Name:</strong> <span t-field="doc.employee_id.name"/><br/>
-                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.registration_number"/><br/>
+                                        <strong>Employee ID:</strong> <span t-field="doc.employee_id.identification_id"/><br/>
                                         <strong>Job Title:</strong> <span t-field="doc.employee_id.job_id.name"/>
                                     </div>
                                     <div class="col-6">

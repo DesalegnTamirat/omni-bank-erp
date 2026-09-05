@@ -220,6 +220,45 @@ class DisciplineCommitteeMeeting(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.committee.meeting') or _('New')
+
+            # Auto-populate statutory committee members if not passed
+            case = self.env['discipline.case'].browse(vals.get('case_id')) if vals.get('case_id') else False
+            emp = case.employee_id if case else False
+
+            if not vals.get('chair_id'):
+                cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+                cpco_user = cpco_group.user_ids[0] if (cpco_group and cpco_group.user_ids) else (cpco_group.all_user_ids[0] if (cpco_group and cpco_group.all_user_ids) else False)
+                vals['chair_id'] = cpco_user.id if cpco_user else self.env.uid
+
+            if not vals.get('director_member_id'):
+                director_user = False
+                dept = emp.department_id if emp else False
+                if dept and dept.manager_id and dept.manager_id.user_id:
+                    director_user = dept.manager_id.user_id
+                elif dept and dept.parent_id and dept.parent_id.manager_id and dept.parent_id.manager_id.user_id:
+                    director_user = dept.parent_id.manager_id.user_id
+                elif emp and emp.parent_id and emp.parent_id.parent_id and emp.parent_id.parent_id.user_id:
+                    director_user = emp.parent_id.parent_id.user_id
+                if not director_user:
+                    dir_group = self.env.ref('discipline_management.group_discipline_director', raise_if_not_found=False)
+                    director_user = dir_group.user_ids[0] if (dir_group and dir_group.user_ids) else (dir_group.all_user_ids[0] if (dir_group and dir_group.all_user_ids) else False)
+                vals['director_member_id'] = director_user.id if director_user else self.env.uid
+
+            if not vals.get('legal_member_id'):
+                legal_dept = self.env['hr.department'].search([('name', 'ilike', 'Legal Services')], limit=1)
+                legal_user = legal_dept.manager_id.user_id if legal_dept and legal_dept.manager_id and legal_dept.manager_id.user_id else False
+                if not legal_user:
+                    legal_user = self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
+                vals['legal_member_id'] = legal_user.id if legal_user else self.env.uid
+
+            if not vals.get('secretary_id'):
+                sec_group = self.env.ref('discipline_management.group_discipline_committee_secretary', raise_if_not_found=False)
+                sec_user = sec_group.user_ids[0] if (sec_group and sec_group.user_ids) else (sec_group.all_user_ids[0] if (sec_group and sec_group.all_user_ids) else False)
+                if not sec_user:
+                    pomd_dept = self.env['hr.department'].search(['|', ('name', 'ilike', 'People Operation'), ('name', 'ilike', 'POMD')], limit=1)
+                    sec_user = pomd_dept.manager_id.user_id if pomd_dept and pomd_dept.manager_id and pomd_dept.manager_id.user_id else False
+                vals['secretary_id'] = sec_user.id if sec_user else self.env.uid
+
         meetings = super().create(vals_list)
         for m in meetings:
             m._ensure_signature_lines()
@@ -408,7 +447,7 @@ class DisciplineCommitteeMeeting(models.Model):
         report_ref = 'discipline_management.action_report_disciplinary_committee_minute'
         try:
             report = self.env.ref(report_ref, raise_if_not_found=True)
-            pdf_content, _ = self.env['ir.actions.report']._render_qweb_pdf(report, [self.id])
+            pdf_content, unused_format = self.env['ir.actions.report']._render_qweb_pdf(report, [self.id])
             filename = 'Minute_%s.pdf' % self.name.replace('/', '_')
             self.minute_document = base64.b64encode(pdf_content)
             self.minute_filename = filename
@@ -486,6 +525,19 @@ class DisciplineCommitteeSignature(models.Model):
             else:
                 rec.is_locked_pending_prior_signoff = False
 
+    def write(self, vals):
+        if 'signature' in vals or vals.get('is_signed'):
+            for rec in self:
+                if rec.role == 'chair' and (vals.get('signature') or vals.get('is_signed')):
+                    dir_line = rec.meeting_id.signature_line_ids.filtered(lambda l: l.role == 'director')
+                    if dir_line and not dir_line[0].is_signed and dir_line[0].id not in self.ids:
+                        raise UserError(_('Sequential Sign-off Required: The Immediate Director must sign first before Chairperson approval.'))
+            if 'signature' in vals and 'is_signed' not in vals:
+                vals['is_signed'] = bool(vals['signature'])
+                if not vals.get('signed_date'):
+                    vals['signed_date'] = fields.Datetime.now()
+        return super().write(vals)
+
     def action_save_signature(self):
         """Save signature drawn by user via signature widget."""
         for rec in self:
@@ -496,7 +548,7 @@ class DisciplineCommitteeSignature(models.Model):
             if rec.role == 'chair':
                 dir_line = rec.meeting_id.signature_line_ids.filtered(lambda l: l.role == 'director')
                 if dir_line and not dir_line[0].is_signed:
-                    raise ValidationError(_('Sequential Sign-off Required: The Immediate Director must sign first before Chairperson approval.'))
+                    raise UserError(_('Sequential Sign-off Required: The Immediate Director must sign first before Chairperson approval.'))
 
             rec.write({
                 'is_signed': True,

@@ -14,6 +14,7 @@ class TestDisciplineCase(TransactionCase):
         self.group_base_user = self.env.ref('base.group_user')
         self.group_user = self.env.ref('discipline_management.group_discipline_user')
         self.group_officer = self.env.ref('discipline_management.group_discipline_officer')
+        self.group_manager = self.env.ref('discipline_management.group_discipline_manager')
         self.group_admin = self.env.ref('discipline_management.group_discipline_admin')
         self.group_ceo = self.env.ref('discipline_management.group_discipline_ceo')
 
@@ -22,7 +23,7 @@ class TestDisciplineCase(TransactionCase):
             'name': 'Initiator User',
             'login': 'initiator_user',
             'email': False,
-            'group_ids': [(6, 0, [self.group_base_user.id, self.group_user.id])]
+            'group_ids': [(6, 0, [self.group_base_user.id, self.group_user.id, self.group_manager.id])]
         })
         self.user_reviewer = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Reviewer User',
@@ -68,35 +69,33 @@ class TestDisciplineCase(TransactionCase):
             'code': 'OP_MISCONDUCT',
         })
 
+        self.level_1 = self.env['discipline.severity.level'].search([('code', '=', 'level_1')], limit=1)
+        self.level_2 = self.env['discipline.severity.level'].search([('code', '=', 'level_2')], limit=1)
+        self.level_4 = self.env['discipline.severity.level'].search([('code', '=', 'level_4')], limit=1)
+
         # Level 1 Critical Offense (Dismissal)
         self.offense_level1 = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Fraud & Embezzlement',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_1',
-            'punishment_type': 'dismissal',
-            'penalty_percentage': 0.0,
-            'approval_authority': 'executive',
+            'severity_level_id': self.level_1.id,
         })
+        self.offense_level1.action_populate_default_severity_lines()
 
         # Level 4 Moderate Offense (5% penalty)
         self.offense_level4 = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Unauthorized Absence',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_4',
-            'punishment_type': 'first_warning_penalty',
-            'penalty_percentage': 5.0,
-            'approval_authority': 'direct_manager',
+            'severity_level_id': self.level_4.id,
         })
+        self.offense_level4.action_populate_default_severity_lines()
 
         # Demotion Offense
         self.offense_demotion = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Serious Operational Failures',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_2',
-            'punishment_type': 'demotion',
-            'penalty_percentage': 0.0,
-            'approval_authority': 'executive',
+            'severity_level_id': self.level_2.id,
         })
+        self.offense_demotion.action_populate_default_severity_lines()
 
     def test_01_duplicate_case_prevention(self):
         """Test that duplicate active disciplinary cases on same incident date are blocked."""
@@ -153,6 +152,56 @@ class TestDisciplineCase(TransactionCase):
                 'end_date': end_d,
                 'reason': 'Excessive suspension duration test.',
             })
+
+    def test_03b_suspension_delegated_authority_workflow(self):
+        """Test suspension approval routing per BRD Page 10:
+        1. Non-managerial -> POMD
+        2. Managerial -> CPCO
+        3. RMCD & IAD -> BOD (via CEO)
+        4. Exceeding delegated authority is blocked.
+        """
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level4.id,
+            'incident_date': today,
+            'description': 'Delegated authority test.',
+        })
+
+        # 1. Non-managerial employee routes to POMD
+        self.employee.job_id = self.job_senior
+        susp_non_mgr = self.env['discipline.suspension'].create({
+            'case_id': case.id,
+            'start_date': today,
+            'end_date': today + timedelta(days=5),
+            'reason': 'Non-managerial suspension test.',
+        })
+        self.assertEqual(susp_non_mgr.approval_authority, 'pomd')
+
+        # Submit and attempt approval by unauthorized user
+        susp_non_mgr.action_submit_for_approval()
+        with self.assertRaises(UserError):
+            susp_non_mgr.with_user(self.user_initiator).action_approve_suspension()
+
+        # 2. Managerial employee routes to CPCO
+        self.employee.job_id = self.job_manager
+        susp_mgr = self.env['discipline.suspension'].create({
+            'case_id': case.id,
+            'start_date': today,
+            'end_date': today + timedelta(days=5),
+            'reason': 'Managerial suspension test.',
+        })
+        self.assertEqual(susp_mgr.approval_authority, 'cpco')
+
+        # 3. RMCD / IAD staff routes to BOD
+        susp_rmcd = self.env['discipline.suspension'].create({
+            'case_id': case.id,
+            'start_date': today,
+            'end_date': today + timedelta(days=5),
+            'reason': 'RMCD staff suspension test.',
+            'is_rmcd_iad_staff': True,
+        })
+        self.assertEqual(susp_rmcd.approval_authority, 'bod')
 
     def test_04_appeal_window_constraint(self):
         """Test that appeals submitted after 10 calendar days are rejected by constraint."""
@@ -347,12 +396,16 @@ class TestDisciplineCase(TransactionCase):
             'name': 'Assigned Coach',
             'user_id': self.user_initiator.id,
         })
-        self.employee.coach_id = coach_emp.id
+        attendance_emp = self.env['hr.employee'].create({
+            'name': 'Attendance Violation Employee',
+            'coach_id': coach_emp.id,
+            'job_id': self.job_senior.id,
+        })
 
         today = fields.Datetime.now()
         for i in range(3):
             self.env['hr.attendance'].create({
-                'employee_id': self.employee.id,
+                'employee_id': attendance_emp.id,
                 'check_in': today - timedelta(days=5 - i),
                 'check_out': today - timedelta(days=5 - i, hours=-2), # forced checkout / short duration
             })
@@ -360,7 +413,7 @@ class TestDisciplineCase(TransactionCase):
         self.env['hr.attendance']._cron_escalate_attendance_violations()
         
         case = self.env['discipline.case'].search([
-            ('employee_id', '=', self.employee.id),
+            ('employee_id', '=', attendance_emp.id),
             ('is_attendance_case', '=', True),
         ], limit=1)
         self.assertTrue(case.id)
@@ -390,3 +443,39 @@ class TestDisciplineCase(TransactionCase):
         analytics = self.env['discipline.case'].get_discipline_analytics_payload()
         self.assertIn('total_cases', analytics)
         self.assertIn('cases_by_state', analytics)
+
+    def test_13_manager_team_scope_constraint(self):
+        """Test that a manager can only initiate cases for employees beside them (in their team)."""
+        manager_emp = self.env['hr.employee'].create({
+            'name': 'Operations Line Manager',
+            'user_id': self.user_initiator.id,
+            'job_id': self.job_manager.id,
+        })
+        team_emp = self.env['hr.employee'].create({
+            'name': 'Team Member Subordinate',
+            'parent_id': manager_emp.id,
+            'job_id': self.job_junior.id,
+        })
+        outside_emp = self.env['hr.employee'].create({
+            'name': 'Outside Directorate Employee',
+            'job_id': self.job_junior.id,
+        })
+
+        today = Date.today()
+        # Manager initiating for own team member succeeds
+        case_team = self.env['discipline.case'].with_user(self.user_initiator).create({
+            'employee_id': team_emp.id,
+            'offense_id': self.offense_level4.id,
+            'incident_date': today,
+            'description': 'Team member disciplinary incident.',
+        })
+        self.assertTrue(case_team.id)
+
+        # Manager attempting to initiate for outside employee must fail with ValidationError
+        with self.assertRaises(ValidationError):
+            self.env['discipline.case'].with_user(self.user_initiator).create({
+                'employee_id': outside_emp.id,
+                'offense_id': self.offense_level4.id,
+                'incident_date': today,
+                'description': 'Outside employee incident.',
+            })

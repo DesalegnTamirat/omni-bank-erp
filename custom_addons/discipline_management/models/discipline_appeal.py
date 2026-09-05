@@ -99,6 +99,20 @@ class DisciplineAppeal(models.Model):
         ('rejected_expired', 'Rejected (Window Expired)'),
     ], string='Status', default='submitted', required=True, tracking=True)
 
+    can_review = fields.Boolean(compute='_compute_can_review', string='Can Current User Review Appeal')
+    is_current_user_appellant = fields.Boolean(compute='_compute_can_review', string='Is Current User Appellant')
+
+    def _compute_can_review(self):
+        user = self.env.user
+        is_officer = (
+            user.has_group('discipline_management.group_discipline_officer') or
+            user.has_group('discipline_management.group_discipline_admin') or
+            user.has_group('base.group_system')
+        )
+        for rec in self:
+            rec.is_current_user_appellant = bool(rec.employee_id.user_id and rec.employee_id.user_id.id == user.id)
+            rec.can_review = (is_officer or (rec.reviewer_id and rec.reviewer_id.id == user.id)) and not rec.is_current_user_appellant
+
     @api.depends('case_id', 'case_id.committee_meeting_ids')
     def _compute_appeal_source_type(self):
         for rec in self:

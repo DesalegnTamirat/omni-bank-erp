@@ -169,10 +169,10 @@ class HrAttendance(models.Model):
         today = fields.Date.context_today(self)
         existing = self.env['discipline.case'].search([
             ('employee_id', '=', emp.id),
-            ('offense_id', '=', offense.id),
             ('state', 'in', ['draft', 'initiated', 'escalated_director', 'escalated_chief']),
-            ('is_system_generated', '=', True),
-            ('incident_date', '>=', today - timedelta(days=rolling_days))
+            '|',
+            ('offense_id', '=', offense.id),
+            ('incident_date', '=', today),
         ], limit=1)
 
         labels = {

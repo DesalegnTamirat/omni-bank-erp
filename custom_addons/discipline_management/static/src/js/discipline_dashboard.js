@@ -2,6 +2,7 @@
 
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
+import { user } from "@web/core/user";
 import { Component, useState, onMounted, onWillUnmount } from "@odoo/owl";
 
 class DisciplineDashboard extends Component {
@@ -14,6 +15,7 @@ class DisciplineDashboard extends Component {
 
         this.state = useState({
             isLoading: true,
+            is_manager_or_officer: true,
             stats: {
                 total_cases: 0,
                 active_cases: 0,
@@ -23,7 +25,6 @@ class DisciplineDashboard extends Component {
                 committee_meetings: 0,
                 active_suspensions: 0,
                 pending_appeals: 0,
-                payroll_penalties: 0,
                 enforced_this_month: 0,
                 level1_cases: 0,
                 revoked_cases: 0,
@@ -73,6 +74,11 @@ class DisciplineDashboard extends Component {
 
     async _loadDashboardDataFallback() {
         try {
+            const isOfficer = await user.hasGroup("discipline_management.group_discipline_officer");
+            const isManager = await user.hasGroup("discipline_management.group_discipline_manager");
+            const isManagerOrOfficer = isOfficer || isManager;
+            this.state.is_manager_or_officer = isManagerOrOfficer;
+
             const [
                 allCases,
                 activeCases,
@@ -82,7 +88,6 @@ class DisciplineDashboard extends Component {
                 committeeMeetings,
                 activeSuspensions,
                 pendingAppeals,
-                payrollPenalties,
                 level1Cases,
                 revokedCases,
             ] = await Promise.all([
@@ -90,13 +95,12 @@ class DisciplineDashboard extends Component {
                 this.orm.searchCount("discipline.case", [
                     ["state", "in", ["initiated", "investigating", "committee_review", "pending_approval"]],
                 ]),
-                this.orm.searchCount("discipline.case", [["state", "=", "pending_approval"]]),
-                this.orm.searchCount("discipline.case", [["is_sla_exceeded", "=", true]]),
-                this.orm.searchCount("discipline.investigation", [["state", "!=", "concluded"]]),
-                this.orm.searchCount("discipline.committee.meeting", [["state", "not in", ["concluded", "cancelled"]]]),
-                this.orm.searchCount("discipline.suspension", [["state", "in", ["active", "extended"]]]),
+                isManagerOrOfficer ? this.orm.searchCount("discipline.case", [["state", "=", "pending_approval"]]) : Promise.resolve(0),
+                isManagerOrOfficer ? this.orm.searchCount("discipline.case", [["is_sla_exceeded", "=", true]]) : Promise.resolve(0),
+                isManagerOrOfficer ? this.orm.searchCount("discipline.investigation", [["state", "!=", "concluded"]]) : Promise.resolve(0),
+                isManagerOrOfficer ? this.orm.searchCount("discipline.committee.meeting", [["state", "not in", ["concluded", "cancelled"]]]) : Promise.resolve(0),
+                isManagerOrOfficer ? this.orm.searchCount("discipline.suspension", [["state", "in", ["active", "extended"]]]) : Promise.resolve(0),
                 this.orm.searchCount("discipline.appeal", [["state", "in", ["submitted", "under_review"]]]),
-                this.orm.searchCount("discipline.payroll.penalty", [["state", "=", "pending"]]),
                 this.orm.searchCount("discipline.case", [["severity_level", "=", "level_1"]]),
                 this.orm.searchCount("discipline.case", [["state", "=", "revoked"]]),
             ]);
@@ -122,7 +126,6 @@ class DisciplineDashboard extends Component {
                 committee_meetings: committeeMeetings,
                 active_suspensions: activeSuspensions,
                 pending_appeals: pendingAppeals,
-                payroll_penalties: payrollPenalties,
                 level1_cases: level1Cases,
                 revoked_cases: revokedCases,
                 enforced_this_month: 0,
@@ -155,6 +158,9 @@ class DisciplineDashboard extends Component {
     }
 
     openPendingApproval() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "Pending Approval",
@@ -165,6 +171,9 @@ class DisciplineDashboard extends Component {
     }
 
     openSlaBreached() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "SLA Breached Cases",
@@ -175,6 +184,9 @@ class DisciplineDashboard extends Component {
     }
 
     openInvestigations() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "Active Investigations",
@@ -185,6 +197,9 @@ class DisciplineDashboard extends Component {
     }
 
     openCommitteeMeetings() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "Committee Meetings",
@@ -195,6 +210,9 @@ class DisciplineDashboard extends Component {
     }
 
     openActiveSuspensions() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "Active Suspensions",
@@ -214,16 +232,6 @@ class DisciplineDashboard extends Component {
         });
     }
 
-    openPayrollPenalties() {
-        this.action.doAction({
-            type: "ir.actions.act_window",
-            name: "Pending Payroll Penalties",
-            res_model: "discipline.payroll.penalty",
-            views: [[false, "list"], [false, "form"]],
-            domain: [["state", "=", "pending"]],
-        });
-    }
-
     openLevel1Cases() {
         this.action.doAction({
             type: "ir.actions.act_window",
@@ -235,6 +243,9 @@ class DisciplineDashboard extends Component {
     }
 
     createNewCase() {
+        if (!this.state.is_manager_or_officer) {
+            return;
+        }
         this.action.doAction({
             type: "ir.actions.act_window",
             name: "New Disciplinary Case",

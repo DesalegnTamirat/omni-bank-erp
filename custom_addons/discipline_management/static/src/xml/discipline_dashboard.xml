@@ -34,7 +34,8 @@
                     </div>
                     <div class="disc-header-text">
                         <h1>Discipline Management</h1>
-                        <p>Bunna Bank — HR Governance &amp; Compliance Dashboard</p>
+                        <p t-if="state.is_manager_or_officer">Bunna Bank — HR Governance &amp; Compliance Dashboard</p>
+                        <p t-else="">Bunna Bank — Disciplinary Cases &amp; Appeals Overview</p>
                     </div>
                 </div>
                 <div class="disc-header-actions">
@@ -42,7 +43,7 @@
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
                         Refresh
                     </button>
-                    <button class="disc-btn disc-btn-primary" t-on-click="createNewCase">
+                    <button t-if="state.is_manager_or_officer" class="disc-btn disc-btn-primary" t-on-click="createNewCase">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                         New Case
                     </button>
@@ -50,7 +51,7 @@
             </div>
 
             <!-- Critical Alert Banner (SLA Breached) -->
-            <div t-if="state.stats.sla_breached > 0" class="disc-alert-banner" t-on-click="openSlaBreached">
+            <div t-if="state.is_manager_or_officer and state.stats.sla_breached > 0" class="disc-alert-banner" t-on-click="openSlaBreached">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                 <span><strong><t t-esc="state.stats.sla_breached"/> SLA Breach Alert(s)</strong> — Immediate attention required for overdue disciplinary cases. Click to review.</span>
                 <svg class="disc-alert-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
@@ -58,7 +59,8 @@
 
             <!-- KPI Cards Row 1 - Primary Metrics -->
             <div class="disc-section-label">
-                <span>CASE OVERVIEW</span>
+                <span t-if="state.is_manager_or_officer">CASE OVERVIEW</span>
+                <span t-else="">MY DISCIPLINARY OVERVIEW</span>
             </div>
             <div class="disc-kpi-grid disc-kpi-grid-4">
 
@@ -68,8 +70,8 @@
                     </div>
                     <div class="disc-kpi-content">
                         <div class="disc-kpi-value"><t t-esc="state.stats.total_cases"/></div>
-                        <div class="disc-kpi-label">Total Cases</div>
-                        <div class="disc-kpi-sub">All time records</div>
+                        <div class="disc-kpi-label"><t t-if="state.is_manager_or_officer">Total Cases</t><t t-else="">My Cases</t></div>
+                        <div class="disc-kpi-sub"><t t-if="state.is_manager_or_officer">All time records</t><t t-else="">Cases concerning you</t></div>
                     </div>
                     <div class="disc-kpi-trend">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
@@ -82,102 +84,125 @@
                     </div>
                     <div class="disc-kpi-content">
                         <div class="disc-kpi-value disc-kpi-warning"><t t-esc="state.stats.active_cases"/></div>
-                        <div class="disc-kpi-label">Active Cases</div>
-                        <div class="disc-kpi-sub">Require action</div>
+                        <div class="disc-kpi-label"><t t-if="state.is_manager_or_officer">Active Cases</t><t t-else="">Under Review</t></div>
+                        <div class="disc-kpi-sub"><t t-if="state.is_manager_or_officer">Require action</t><t t-else="">Pending decision</t></div>
                     </div>
                     <div class="disc-kpi-trend">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
                     </div>
                 </div>
 
-                <div class="disc-kpi-card disc-kpi-pending" t-on-click="openPendingApproval">
-                    <div class="disc-kpi-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
+                <t t-if="state.is_manager_or_officer">
+                    <div class="disc-kpi-card disc-kpi-pending" t-on-click="openPendingApproval">
+                        <div class="disc-kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value disc-kpi-accent"><t t-esc="state.stats.pending_approval"/></div>
+                            <div class="disc-kpi-label">Pending Approval</div>
+                            <div class="disc-kpi-sub">Awaiting decision</div>
+                        </div>
+                        <div class="disc-kpi-trend">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                        </div>
                     </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value disc-kpi-accent"><t t-esc="state.stats.pending_approval"/></div>
-                        <div class="disc-kpi-label">Pending Approval</div>
-                        <div class="disc-kpi-sub">Awaiting decision</div>
-                    </div>
-                    <div class="disc-kpi-trend">
-                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
-                    </div>
-                </div>
 
-                <div class="disc-kpi-card disc-kpi-danger" t-on-click="openSlaBreached">
-                    <div class="disc-kpi-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="disc-kpi-card disc-kpi-danger" t-on-click="openSlaBreached">
+                        <div class="disc-kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value disc-kpi-red"><t t-esc="state.stats.sla_breached"/></div>
+                            <div class="disc-kpi-label">SLA Breached</div>
+                            <div class="disc-kpi-sub">Overdue resolution</div>
+                        </div>
+                        <div class="disc-kpi-trend disc-kpi-trend-alert" t-if="state.stats.sla_breached > 0">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        </div>
+                        <div class="disc-kpi-trend" t-else="">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                        </div>
                     </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value disc-kpi-red"><t t-esc="state.stats.sla_breached"/></div>
-                        <div class="disc-kpi-label">SLA Breached</div>
-                        <div class="disc-kpi-sub">Overdue resolution</div>
+                </t>
+                <t t-else="">
+                    <div class="disc-kpi-card disc-kpi-pending" t-on-click="openPendingAppeals">
+                        <div class="disc-kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value disc-kpi-accent"><t t-esc="state.stats.pending_appeals"/></div>
+                            <div class="disc-kpi-label">My Appeals</div>
+                            <div class="disc-kpi-sub">Appeals submitted</div>
+                        </div>
+                        <div class="disc-kpi-trend">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                        </div>
                     </div>
-                    <div class="disc-kpi-trend disc-kpi-trend-alert" t-if="state.stats.sla_breached > 0">
-                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+
+                    <div class="disc-kpi-card disc-kpi-total" t-on-click="openAllCases">
+                        <div class="disc-kpi-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value" style="color: #425727;"><t t-esc="state.stats.enforced_this_month"/></div>
+                            <div class="disc-kpi-label">Decided Cases</div>
+                            <div class="disc-kpi-sub">Enforced outcomes</div>
+                        </div>
+                        <div class="disc-kpi-trend">
+                            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                        </div>
                     </div>
-                    <div class="disc-kpi-trend" t-else="">
-                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
-                    </div>
-                </div>
+                </t>
             </div>
 
-            <!-- KPI Cards Row 2 - Workflow Metrics -->
-            <div class="disc-section-label">
-                <span>WORKFLOW METRICS</span>
-            </div>
-            <div class="disc-kpi-grid disc-kpi-grid-5">
+            <!-- KPI Cards Row 2 - Workflow Metrics (Managers & Officers Only) -->
+            <t t-if="state.is_manager_or_officer">
+                <div class="disc-section-label">
+                    <span>WORKFLOW METRICS</span>
+                </div>
+                <div class="disc-kpi-grid disc-kpi-grid-4">
 
-                <div class="disc-kpi-card disc-kpi-sm disc-kpi-inv" t-on-click="openInvestigations">
-                    <div class="disc-kpi-icon-sm">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+                    <div class="disc-kpi-card disc-kpi-sm disc-kpi-inv" t-on-click="openInvestigations">
+                        <div class="disc-kpi-icon-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value-sm"><t t-esc="state.stats.investigations"/></div>
+                            <div class="disc-kpi-label-sm">Investigations</div>
+                        </div>
                     </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.investigations"/></div>
-                        <div class="disc-kpi-label-sm">Investigations</div>
+
+                    <div class="disc-kpi-card disc-kpi-sm disc-kpi-comm" t-on-click="openCommitteeMeetings">
+                        <div class="disc-kpi-icon-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value-sm"><t t-esc="state.stats.committee_meetings"/></div>
+                            <div class="disc-kpi-label-sm">Committee</div>
+                        </div>
+                    </div>
+
+                    <div class="disc-kpi-card disc-kpi-sm disc-kpi-susp" t-on-click="openActiveSuspensions">
+                        <div class="disc-kpi-icon-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value-sm"><t t-esc="state.stats.active_suspensions"/></div>
+                            <div class="disc-kpi-label-sm">Suspensions</div>
+                        </div>
+                    </div>
+
+                    <div class="disc-kpi-card disc-kpi-sm disc-kpi-app" t-on-click="openPendingAppeals">
+                        <div class="disc-kpi-icon-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                        </div>
+                        <div class="disc-kpi-content">
+                            <div class="disc-kpi-value-sm"><t t-esc="state.stats.pending_appeals"/></div>
+                            <div class="disc-kpi-label-sm">Appeals</div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="disc-kpi-card disc-kpi-sm disc-kpi-comm" t-on-click="openCommitteeMeetings">
-                    <div class="disc-kpi-icon-sm">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                    </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.committee_meetings"/></div>
-                        <div class="disc-kpi-label-sm">Committee</div>
-                    </div>
-                </div>
-
-                <div class="disc-kpi-card disc-kpi-sm disc-kpi-susp" t-on-click="openActiveSuspensions">
-                    <div class="disc-kpi-icon-sm">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
-                    </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.active_suspensions"/></div>
-                        <div class="disc-kpi-label-sm">Suspensions</div>
-                    </div>
-                </div>
-
-                <div class="disc-kpi-card disc-kpi-sm disc-kpi-app" t-on-click="openPendingAppeals">
-                    <div class="disc-kpi-icon-sm">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
-                    </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.pending_appeals"/></div>
-                        <div class="disc-kpi-label-sm">Appeals</div>
-                    </div>
-                </div>
-
-                <div class="disc-kpi-card disc-kpi-sm disc-kpi-pay" t-on-click="openPayrollPenalties">
-                    <div class="disc-kpi-icon-sm">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                    <div class="disc-kpi-content">
-                        <div class="disc-kpi-value-sm"><t t-esc="state.stats.payroll_penalties"/></div>
-                        <div class="disc-kpi-label-sm">Payroll Deductions</div>
-                    </div>
-                </div>
-            </div>
+            </t>
 
             <!-- Main Content: Two Columns -->
             <div class="disc-main-grid">
@@ -325,25 +350,25 @@
                             </div>
                         </div>
                         <div class="disc-actions-grid">
-                            <button class="disc-action-btn" t-on-click="createNewCase">
+                            <button t-if="state.is_manager_or_officer" class="disc-action-btn" t-on-click="createNewCase">
                                 <div class="disc-action-icon disc-action-blue">
                                     <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                                 </div>
                                 <span>New Case</span>
                             </button>
-                            <button class="disc-action-btn" t-on-click="openInvestigations">
+                            <button t-if="state.is_manager_or_officer" class="disc-action-btn" t-on-click="openInvestigations">
                                 <div class="disc-action-icon disc-action-purple">
                                     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 9a2 2 0 114 0 2 2 0 01-4 0z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a4 4 0 00-3.446 6.032l-2.261 2.26a1 1 0 101.414 1.415l2.261-2.261A4 4 0 1011 5z" clip-rule="evenodd"/></svg>
                                 </div>
                                 <span>Investigations</span>
                             </button>
-                            <button class="disc-action-btn" t-on-click="openCommitteeMeetings">
+                            <button t-if="state.is_manager_or_officer" class="disc-action-btn" t-on-click="openCommitteeMeetings">
                                 <div class="disc-action-icon disc-action-amber">
                                     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
                                 </div>
                                 <span>Committee</span>
                             </button>
-                            <button class="disc-action-btn" t-on-click="openActiveSuspensions">
+                            <button t-if="state.is_manager_or_officer" class="disc-action-btn" t-on-click="openActiveSuspensions">
                                 <div class="disc-action-icon disc-action-orange">
                                     <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
                                 </div>
@@ -355,11 +380,11 @@
                                 </div>
                                 <span>Appeals</span>
                             </button>
-                            <button class="disc-action-btn" t-on-click="openPayrollPenalties">
-                                <div class="disc-action-icon disc-action-green">
-                                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/></svg>
+                            <button t-if="!state.is_manager_or_officer" class="disc-action-btn" t-on-click="openAllCases">
+                                <div class="disc-action-icon disc-action-blue">
+                                    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
                                 </div>
-                                <span>Payroll</span>
+                                <span>My Cases</span>
                             </button>
                         </div>
                     </div>

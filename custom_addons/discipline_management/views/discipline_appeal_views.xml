@@ -22,37 +22,38 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info" invisible="state != 'submitted'"/>
-                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success" invisible="state != 'under_review'"/>
+                        <field name="can_review" invisible="1"/>
+                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info" invisible="state != 'submitted' or not can_review"/>
+                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success" invisible="state != 'under_review' or not can_review"/>
                         <field name="state" widget="statusbar" statusbar_visible="submitted,under_review,decided"/>
                     </header>
                     <sheet>
                         <group>
                             <group string="Original Case Information">
                                 <field name="name"/>
-                                <field name="case_id"/>
+                                <field name="case_id" domain="[('employee_id.user_id', '=', uid), ('state', 'in', ['enforced', 'closed'])] if not can_review else [('state', 'in', ['enforced', 'closed'])]" readonly="state != 'submitted'"/>
                                 <field name="employee_id"/>
                                 <field name="original_offense_id"/>
                                 <field name="original_decision_date"/>
                             </group>
                             <group string="Appeal Submission">
-                                <field name="submission_date"/>
-                                <field name="reviewer_id"/>
-                                <field name="review_date"/>
-                                <field name="supporting_document" filename="document_filename"/>
+                                <field name="submission_date" readonly="state != 'submitted'"/>
+                                <field name="reviewer_id" readonly="not can_review"/>
+                                <field name="review_date" readonly="not can_review"/>
+                                <field name="supporting_document" filename="document_filename" readonly="state != 'submitted'"/>
                                 <field name="document_filename" invisible="1"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Appeal Grounds">
-                                <field name="appeal_grounds" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
+                                <field name="appeal_grounds" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..." readonly="state != 'submitted'"/>
                             </page>
-                            <page string="Decision Outcome &amp; Revised Actions">
+                            <page string="Decision Outcome &amp; Revised Actions" invisible="not can_review and state != 'decided'">
                                 <group>
-                                    <field name="decision_outcome"/>
-                                    <field name="revised_punishment_type"/>
-                                    <field name="revised_penalty_percentage"/>
-                                    <field name="appeal_decision_notes" placeholder="Board justification for upholding, overturning, or reducing penalty..."/>
+                                    <field name="decision_outcome" readonly="not can_review"/>
+                                    <field name="revised_punishment_type" readonly="not can_review"/>
+                                    <field name="revised_penalty_percentage" readonly="not can_review"/>
+                                    <field name="appeal_decision_notes" placeholder="Board justification for upholding, overturning, or reducing penalty..." readonly="not can_review"/>
                                 </group>
                             </page>
                         </notebook>

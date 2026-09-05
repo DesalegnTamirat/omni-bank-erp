@@ -86,10 +86,10 @@
                                 <field name="virtual_meeting_link" readonly="state not in ('scheduling', 'scheduled')"/>
                             </group>
                             <group string="Statutory Committee Members (FR-DIS-015)">
-                                <field name="chair_id" readonly="state != 'scheduling'"/>
-                                <field name="director_member_id" readonly="state != 'scheduling'"/>
-                                <field name="legal_member_id" readonly="state != 'scheduling'"/>
-                                <field name="secretary_id" readonly="state != 'scheduling'"/>
+                                <field name="chair_id" readonly="1"/>
+                                <field name="director_member_id" readonly="1"/>
+                                <field name="legal_member_id" readonly="1"/>
+                                <field name="secretary_id" readonly="1"/>
                                 <field name="is_quorum_met" widget="boolean"/>
                                 <field name="all_signed" widget="boolean"/>
                             </group>

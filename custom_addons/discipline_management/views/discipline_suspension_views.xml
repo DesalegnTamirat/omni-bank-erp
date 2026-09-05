@@ -43,32 +43,32 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,active,completed,converted_dismissal"/>
                     </header>
                     <sheet>
-                        <div class="alert alert-info shadow-sm" role="alert" invisible="not approval_authority">
-                            <strong>Required Approving Authority (FR-DIS-030A):</strong> <field name="approval_authority" readonly="1" nolabel="1"/>
+                        <div class="alert alert-info shadow-sm" role="alert" invisible="not approval_authority" style="border-left: 5px solid #541718; background-color: #fdfbfb; color: #541718; border-radius: 6px;">
+                            <strong>Delegated Approving Authority (BRD Page 10):</strong> <field name="approval_authority" readonly="1" nolabel="1"/>
                         </div>
                         <field name="can_current_user_approve" invisible="1"/>
                         <group>
                             <group string="Suspension Details">
-                                <field name="name"/>
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
-                                <field name="department_id"/>
-                                <field name="is_rmcd_iad_staff"/>
+                                <field name="name" readonly="1"/>
+                                <field name="case_id" readonly="state != 'draft'"/>
+                                <field name="employee_id" readonly="1"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="is_rmcd_iad_staff" readonly="state != 'draft'"/>
                             </group>
                             <group string="Type &amp; Duration Rules">
-                                <field name="suspension_type"/>
-                                <field name="start_date"/>
-                                <field name="end_date"/>
-                                <field name="working_days_count"/>
-                                <field name="days_remaining"/>
+                                <field name="suspension_type" readonly="state != 'draft'"/>
+                                <field name="start_date" readonly="state != 'draft'"/>
+                                <field name="end_date" readonly="state != 'draft'"/>
+                                <field name="working_days_count" readonly="1"/>
+                                <field name="days_remaining" readonly="1"/>
                             </group>
                         </group>
                         <group>
-                            <group string="Routing (FR-DIS-026)">
-                                <field name="initiating_directorate"/>
+                            <group string="Delegated Authority (BRD Page 10)">
+                                <field name="approval_authority" readonly="1"/>
                                 <field name="initiator_id" readonly="1"/>
                             </group>
-                            <group string="Approval">
+                            <group string="Approval Execution">
                                 <field name="approver_id" readonly="1"/>
                                 <field name="approval_date" readonly="1"/>
                                 <field name="rejection_reason" invisible="state != 'rejected'"/>
@@ -76,7 +76,7 @@
                         </group>
                         <notebook>
                             <page string="Reason &amp; Conditions">
-                                <field name="reason" placeholder="Detailed reason for suspension pending investigation..."/>
+                                <field name="reason" placeholder="Detailed reason for suspension pending investigation..." readonly="state != 'draft'"/>
                             </page>
                         </notebook>
                     </sheet>

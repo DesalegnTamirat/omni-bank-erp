@@ -38,26 +38,18 @@ class DisciplineSuspension(models.Model):
     ], string='Status', default='draft', required=True, tracking=True, index=True)
 
     # -------------------------------------------------------------
-    # Suspending Authority Routing (FR-DIS-026 / FR-DIS-030A)
+    # Suspending Authority Routing per BRD (Page 10)
     # -------------------------------------------------------------
-    initiating_directorate = fields.Selection([
-        ('respective', 'Respective Directorate (of the employee)'),
-        ('audit', 'Audit Directorate'),
-        ('pomd', 'People Operations Management Directorate (POMD)'),
-    ], string='Initiated By', required=True, default='respective', tracking=True,
-        help='FR-DIS-026: Determines who must approve this suspension. Cases initiated by the '
-             'respective Directorate or by POMD are approved by that same initiating Directorate/POMD. '
-             'Cases initiated by the Audit Directorate must be sent to POMD for approval.')
-
     approval_authority = fields.Selection([
-        ('respective', 'Initiating Directorate (self-approval)'),
-        ('pomd', 'People Operations Management Directorate (POMD)'),
         ('cpco', 'Chief People & Culture Officer (CPCO)'),
-        ('bod', 'Board of Directors (via CEO referral)'),
+        ('pomd', 'People Operations Management Directorate (POMD)'),
+        ('bod', 'Board of Directors (BOD via CEO Referral)'),
     ], string='Required Approving Authority', compute='_compute_approval_authority', store=True, tracking=True,
-        help='FR-DIS-030A: Managerial-staff suspensions tied to the Disciplinary Committee route '
-             'require CPCO approval. Non-managerial staff route through POMD. RMCD/IAD staff are '
-             'referred by the CEO to the Board of Directors (BOD).')
+        help='Suspension Approval Authority per BRD: '
+             '1. For managerial employees related with discipline committee: Chief People & Culture Officer (CPCO). '
+             '2. For non-managerial employees: People Operations Management Directorate (POMD). '
+             '3. For (RMCD & IAD): CEO refers the matter to the Board of Directors (BOD) for the appropriate decision. '
+             'The system prevents a user from approving or executing a suspension that exceeds his/her delegated authority.')
 
     initiator_id = fields.Many2one('res.users', string='Suspension Initiator', default=lambda self: self.env.user, readonly=True, tracking=True)
     approver_id = fields.Many2one('res.users', string='Approved By', readonly=True, tracking=True)
@@ -66,13 +58,26 @@ class DisciplineSuspension(models.Model):
 
     is_rmcd_iad_staff = fields.Boolean(
         string='RMCD / IAD Staff',
-        default=False,
+        compute='_compute_is_rmcd_iad_staff',
+        store=True,
+        readonly=False,
         tracking=True,
-        help='Risk Management & Compliance Directorate or Internal Audit Directorate staff. '
-             'Per FR-DIS-030A the CEO must refer such cases to the Board of Directors.'
+        help='Risk Management & Compliance Directorate (RMCD) or Internal Audit Directorate (IAD) staff. '
+             'For RMCD & IAD staff, the CEO shall refer the matter to the Board of Directors (BOD) for the appropriate decision.'
     )
 
     can_current_user_approve = fields.Boolean(string='Can Current User Approve', compute='_compute_can_current_user_approve')
+
+    @api.depends('employee_id', 'employee_id.department_id')
+    def _compute_is_rmcd_iad_staff(self):
+        for rec in self:
+            emp = rec.employee_id
+            dept_name = (emp.department_id.name or '').upper() if emp and emp.department_id else ''
+            dept_code = (getattr(emp.department_id, 'code', '') or '').upper() if emp and emp.department_id else ''
+            if any(kw in dept_name for kw in ['RMCD', 'RISK', 'IAD', 'AUDIT', 'COMPLIANCE']) or dept_code in ('RMCD', 'IAD'):
+                rec.is_rmcd_iad_staff = True
+            elif not rec.is_rmcd_iad_staff:
+                rec.is_rmcd_iad_staff = False
 
     @api.depends('employee_id', 'employee_id.is_managerial', 'is_rmcd_iad_staff')
     def _compute_approval_authority(self):
@@ -81,12 +86,10 @@ class DisciplineSuspension(models.Model):
                 rec.approval_authority = 'bod'
             elif rec.employee_id and rec.employee_id.is_managerial:
                 rec.approval_authority = 'cpco'
-            elif rec.initiating_directorate == 'audit':
-                rec.approval_authority = 'pomd'
             else:
-                rec.approval_authority = 'respective'
+                rec.approval_authority = 'pomd'
 
-    @api.depends('state', 'approval_authority', 'initiator_id')
+    @api.depends('state', 'approval_authority')
     def _compute_can_current_user_approve(self):
         user = self.env.user
         is_admin = user.has_group('discipline_management.group_discipline_admin')
@@ -100,12 +103,15 @@ class DisciplineSuspension(models.Model):
             if rec.approval_authority == 'cpco':
                 rec.can_current_user_approve = user.has_group('discipline_management.group_discipline_cpco')
             elif rec.approval_authority == 'pomd':
-                rec.can_current_user_approve = user.has_group('discipline_management.group_discipline_committee_secretary')
+                rec.can_current_user_approve = (
+                    user.has_group('discipline_management.group_discipline_pomd') or
+                    user.has_group('discipline_management.group_discipline_committee_secretary') or
+                    user.has_group('discipline_management.group_discipline_director')
+                )
             elif rec.approval_authority == 'bod':
-                # CEO refers to BOD; system records the CEO's referral action as the approval step.
                 rec.can_current_user_approve = user.has_group('discipline_management.group_discipline_ceo')
-            else:  # 'respective' — the initiating directorate approves its own case
-                rec.can_current_user_approve = (rec.initiator_id.id == user.id) or user.has_group('discipline_management.group_discipline_director')
+            else:
+                rec.can_current_user_approve = False
 
     days_remaining = fields.Integer(string='Days Remaining', compute='_compute_days_remaining')
 
@@ -164,13 +170,12 @@ class DisciplineSuspension(models.Model):
                 'Suspension %s submitted for approval. Required approving authority: %s.'
             ) % (rec.name, authority_label))
 
-            # Notify the relevant approver group
+            # Notify the relevant approver group per BRD
             group_xmlid = {
                 'cpco': 'discipline_management.group_discipline_cpco',
-                'pomd': 'discipline_management.group_discipline_committee_secretary',
+                'pomd': 'discipline_management.group_discipline_pomd',
                 'bod': 'discipline_management.group_discipline_ceo',
-                'respective': 'discipline_management.group_discipline_director',
-            }.get(rec.approval_authority)
+            }.get(rec.approval_authority, 'discipline_management.group_discipline_pomd')
             grp = self.env.ref(group_xmlid, raise_if_not_found=False) if group_xmlid else False
             approver_user = (grp.user_ids[0] if grp and grp.user_ids else False)
             if approver_user:
@@ -182,25 +187,33 @@ class DisciplineSuspension(models.Model):
                 )
 
     def action_approve_suspension(self):
-        """FR-DIS-030A: only the designated authority for this employee category may approve.
-
-        The system prevents a user from approving/executing a suspension that exceeds
-        their delegated authority.
+        """Enforces delegated authority per BRD Page 10:
+        1. Managerial employees related with discipline committee: Chief People & Culture Officer (CPCO).
+        2. Non-managerial employees: People Operations Management Directorate (POMD).
+        3. RMCD & IAD: CEO refers to the Board of Directors (BOD).
+        Prevents any user from approving a suspension that exceeds their delegated authority.
         """
         for rec in self:
             if rec.state != 'submitted':
                 raise UserError(_('Only suspensions in "Submitted for Approval" state can be approved.'))
             if not rec.can_current_user_approve:
-                raise UserError(_(
-                    'Authority Violation: You are not authorized to approve this suspension. '
-                    'Required approving authority: %s.'
-                ) % dict(rec._fields['approval_authority'].selection).get(rec.approval_authority))
+                if rec.approval_authority == 'cpco':
+                    msg = _('Delegated Authority Violation: For managerial employees, only the Chief People & Culture Officer (CPCO) has the delegated authority to approve this suspension.')
+                elif rec.approval_authority == 'pomd':
+                    msg = _('Delegated Authority Violation: For non-managerial employees, such cases shall be handled and approved through People Operations Management Directorate (POMD).')
+                elif rec.approval_authority == 'bod':
+                    msg = _('Delegated Authority Violation: For RMCD and IAD staff, the CEO shall refer the matter to the Board of Directors (BOD) for the appropriate decision.')
+                else:
+                    msg = _('Delegated Authority Violation: You do not possess the required approving authority for this suspension.')
+                raise UserError(msg)
             rec.write({
                 'state': 'approved',
                 'approver_id': self.env.user.id,
                 'approval_date': fields.Date.context_today(self),
             })
-            rec.case_id.message_post(body=_('Suspension %s approved by %s.') % (rec.name, self.env.user.name))
+            rec.case_id.message_post(body=_('Suspension %s approved by %s (%s).') % (
+                rec.name, self.env.user.name, dict(rec._fields['approval_authority'].selection).get(rec.approval_authority)
+            ))
             rec.action_activate_suspension()
 
     def action_reject_suspension(self):
@@ -208,22 +221,21 @@ class DisciplineSuspension(models.Model):
             if rec.state != 'submitted':
                 raise UserError(_('Only suspensions in "Submitted for Approval" state can be rejected.'))
             if not rec.can_current_user_approve:
-                raise UserError(_('Authority Violation: You are not authorized to reject this suspension.'))
+                raise UserError(_('Delegated Authority Violation: You are not authorized to reject this suspension.'))
             if not rec.rejection_reason:
                 raise UserError(_('A rejection reason is required.'))
             rec.write({'state': 'rejected'})
             rec.case_id.message_post(body=_('Suspension %s rejected by %s: %s') % (rec.name, self.env.user.name, rec.rejection_reason))
 
     def action_activate_suspension(self):
-        """Support employee suspension from work/salary pending investigation.
-
-        Only reachable after approval (FR-DIS-030A), or directly by an HR Administrator.
-        Also deactivates the employee's ERP account effective on the suspension start date,
-        matching the same access-revocation rule applied to dismissals (FR-DIS-029).
+        """Execute and activate suspension.
+        The system prevents a user from approving or executing a suspension that exceeds his/her delegated authority.
         """
         for rec in self:
             if rec.state not in ('approved',) and not self.env.user.has_group('discipline_management.group_discipline_admin'):
                 raise UserError(_('Suspension %s must be Approved before it can be activated.') % rec.name)
+            if not rec.can_current_user_approve and not self.env.user.has_group('discipline_management.group_discipline_admin'):
+                raise UserError(_('Delegated Authority Violation: You do not have the delegated authority to execute this suspension.'))
             rec.write({'state': 'active'})
             rec.employee_id.is_suspended = True
             rec.employee_id.suspension_type = rec.suspension_type

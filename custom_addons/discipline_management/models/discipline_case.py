@@ -12,10 +12,18 @@ class DisciplineCase(models.Model):
 
     name = fields.Char(string='Case Reference', required=True, copy=False, readonly=True, default=lambda self: _('New'))
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
-    department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True, readonly=True)
-    job_id = fields.Many2one('hr.job', string='Job Position', related='employee_id.job_id', store=True, readonly=True)
-    work_location_id = fields.Many2one('hr.work.location', string='Work Location', related='employee_id.work_location_id', store=True, readonly=True)
+    department_id = fields.Many2one('hr.department', string='Department', compute='_compute_employee_org_details', store=True, readonly=True, compute_sudo=True)
+    job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_employee_org_details', store=True, readonly=True, compute_sudo=True)
+    work_location_id = fields.Many2one('hr.work.location', string='Work Location', compute='_compute_employee_org_details', store=True, readonly=True, compute_sudo=True)
     company_id = fields.Many2one('res.company', string='Company', required=True, default=lambda self: self.env.company)
+
+    @api.depends('employee_id')
+    def _compute_employee_org_details(self):
+        for rec in self:
+            emp = rec.employee_id.sudo() if rec.employee_id else False
+            rec.department_id = emp.department_id if emp else False
+            rec.job_id = emp.job_id if emp else False
+            rec.work_location_id = emp.work_location_id if emp else False
 
     offense_id = fields.Many2one('discipline.offense', string='Offense Type', required=True, tracking=True)
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='offense_id.category_id', store=True, readonly=True)
@@ -114,17 +122,37 @@ class DisciplineCase(models.Model):
         """Re-trigger rule resolution immediately when severity level, offense, or employee changes."""
         self._compute_punishment_details()
 
+    @api.onchange('employee_id')
+    def _onchange_employee_info_populate(self):
+        if self.employee_id:
+            emp = self.employee_id.sudo()
+            self.department_id = emp.department_id
+            self.job_id = emp.job_id
+            self.work_location_id = emp.work_location_id
+            self.coach_id = emp.coach_id
+
+    @api.onchange('offense_id')
+    def _onchange_offense_info_populate(self):
+        if self.offense_id:
+            self.offense_category_id = self.offense_id.sudo().category_id
+
     penalty_percentage = fields.Float(string='Penalty Percentage (%)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
     fine_days = fields.Float(string='Salary Fine (Days)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
     property_repair_cost = fields.Float(string='Property Repair / Replacement Cost (ETB)', tracking=True)
-    is_managerial = fields.Boolean(string='Is Managerial Employee', related='employee_id.is_managerial', store=True, readonly=True)
+    is_managerial = fields.Boolean(string='Is Managerial Employee', compute='_compute_is_managerial_case', compute_sudo=True, store=True, readonly=True)
+
+    @api.depends('employee_id')
+    def _compute_is_managerial_case(self):
+        for rec in self:
+            emp = rec.employee_id.sudo() if rec.employee_id else False
+            rec.is_managerial = emp.is_managerial if emp else False
+
     staff_category_display = fields.Char(string='Staff Category', compute='_compute_staff_category_display', store=True)
 
     def _default_initiator_type(self):
         user = self.env.user
-        audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
         user_dept_name = (user.employee_id.department_id.name or '').lower() if user.employee_id and user.employee_id.department_id else ''
-        is_audit = (audit_group and audit_group in user.groups_id) or ('audit' in user_dept_name or 'compliance' in user_dept_name)
+        is_audit = user.has_group('discipline_management.group_discipline_auditor') or ('audit' in user_dept_name or 'compliance' in user_dept_name)
         return 'audit' if is_audit else 'manager'
 
     initiator_type = fields.Selection([
@@ -138,21 +166,127 @@ class DisciplineCase(models.Model):
         string='Allowed Severity Levels'
     )
 
+    @api.model
+    def _get_allowed_subordinate_employee_ids(self):
+        user = self.env.user
+        is_admin_or_audit = (
+            user.has_group('discipline_management.group_discipline_admin') or
+            user.has_group('discipline_management.group_discipline_auditor') or
+            user.has_group('discipline_management.group_discipline_ceo') or
+            self.env.su
+        )
+        user_emp = user.employee_id.sudo() if user.employee_id else False
+
+        if is_admin_or_audit or not user_emp:
+            return self.env['hr.employee'].search([('active', '=', True)])
+        elif user.has_group('discipline_management.group_discipline_chief'):
+            dept = user_emp.department_id
+            depts = self.env['hr.department'].search([('id', 'child_of', dept.id)]) if dept else self.env['hr.department']
+            return self.env['hr.employee'].search([
+                '|', ('id', 'child_of', user_emp.id),
+                ('department_id', 'in', depts.ids),
+                ('active', '=', True),
+                ('id', '!=', user_emp.id)
+            ])
+        elif user.has_group('discipline_management.group_discipline_director'):
+            dept = user_emp.department_id
+            depts = self.env['hr.department'].search([('id', 'child_of', dept.id)]) if dept else self.env['hr.department']
+            return self.env['hr.employee'].search([
+                '|', ('id', 'child_of', user_emp.id),
+                ('department_id', 'in', depts.ids),
+                ('active', '=', True),
+                ('id', '!=', user_emp.id)
+            ])
+        elif user.has_group('discipline_management.group_discipline_manager'):
+            # Manager: only his team (direct/indirect subordinates or coached employees)
+            subordinates = self.env['hr.employee'].search([
+                ('id', 'child_of', user_emp.id),
+                ('id', '!=', user_emp.id),
+                ('active', '=', True)
+            ])
+            coached = self.env['hr.employee'].search([
+                ('coach_id', '=', user_emp.id),
+                ('id', '!=', user_emp.id),
+                ('active', '=', True)
+            ])
+            return subordinates | coached
+        else:
+            return self.env['hr.employee'].search([
+                '|', ('parent_id', '=', user_emp.id), ('coach_id', '=', user_emp.id),
+                ('id', '!=', user_emp.id),
+                ('active', '=', True)
+            ])
+
     subordinate_employee_ids = fields.Many2many(
         'hr.employee',
         compute='_compute_subordinate_employee_ids',
+        default=lambda self: self._get_allowed_subordinate_employee_ids(),
         string='Subordinate Employees'
     )
 
-    @api.depends('reported_by_id', 'create_uid')
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        if 'subordinate_employee_ids' in fields_list:
+            res['subordinate_employee_ids'] = [(6, 0, self._get_allowed_subordinate_employee_ids().ids)]
+        return res
+
+    @api.depends_context('uid')
     def _compute_subordinate_employee_ids(self):
+        allowed = self._get_allowed_subordinate_employee_ids()
         for rec in self:
-            reporter = rec.reported_by_id or self.env.user.employee_id
-            if reporter:
-                subs = self.env['hr.employee'].search([('id', 'child_of', reporter.id)])
-                rec.subordinate_employee_ids = subs
-            else:
-                rec.subordinate_employee_ids = self.env['hr.employee'].search([])
+            rec.subordinate_employee_ids = allowed
+
+    @api.constrains('employee_id')
+    def _check_initiator_employee_scope(self):
+        """Strictly enforce that case initiator can only select employees beside them (e.g. manager only his team)."""
+        for rec in self:
+            if rec.is_system_generated or self.env.su:
+                continue
+            user = self.env.user
+            is_admin_or_audit = (
+                user.has_group('discipline_management.group_discipline_admin') or
+                user.has_group('discipline_management.group_discipline_auditor') or
+                user.has_group('discipline_management.group_discipline_ceo')
+            )
+            if is_admin_or_audit:
+                continue
+            user_emp = user.employee_id
+            if not user_emp:
+                continue
+
+            emp = rec.employee_id
+            if not emp:
+                continue
+
+            if emp == user_emp:
+                raise ValidationError(_('Self-Reporting Violation: You cannot initiate a disciplinary case against yourself.'))
+
+            if user.has_group('discipline_management.group_discipline_manager') and not user.has_group('discipline_management.group_discipline_director'):
+                is_subordinate = (
+                    emp.parent_id == user_emp or 
+                    emp.coach_id == user_emp or 
+                    emp.id in user_emp.child_ids.ids
+                )
+                if not is_subordinate:
+                    curr = emp.parent_id
+                    while curr and not is_subordinate:
+                        if curr == user_emp:
+                            is_subordinate = True
+                            break
+                        curr = curr.parent_id
+                if not is_subordinate:
+                    raise ValidationError(_(
+                        'Organizational Scope Violation: As a Line Manager, you can only initiate disciplinary cases for employees within your direct team or subordinates.'
+                    ))
+            elif user.has_group('discipline_management.group_discipline_director') and not user.has_group('discipline_management.group_discipline_chief'):
+                dept = user_emp.department_id
+                is_in_dept = emp.department_id and (emp.department_id == dept or emp.department_id.parent_id == dept)
+                is_subordinate = is_in_dept or emp.parent_id == user_emp or (emp.id in user_emp.child_ids.ids)
+                if not is_subordinate:
+                    raise ValidationError(_(
+                        'Organizational Scope Violation: As a Directorate Director, you can only initiate disciplinary cases for employees within your directorate.'
+                    ))
 
     @api.depends('offense_id', 'offense_id.line_ids')
     def _compute_allowed_severity_level_ids(self):
@@ -228,16 +362,37 @@ class DisciplineCase(models.Model):
 
     # Hierarchical Handlers & Resolution
     coach_id = fields.Many2one('hr.employee', string='Employee Coach', related='employee_id.coach_id', store=True, readonly=True)
-    coach_user_id = fields.Many2one('res.users', string='Coach User', compute='_compute_hierarchy_roles', store=True)
-    manager_id = fields.Many2one('res.users', string='Line Manager', compute='_compute_hierarchy_roles', store=True, readonly=False, tracking=True)
-    director_id = fields.Many2one('res.users', string='Directorate Director', compute='_compute_hierarchy_roles', store=True, readonly=False, tracking=True)
-    chief_id = fields.Many2one('res.users', string='Respective Chief', compute='_compute_hierarchy_roles', store=True, readonly=False, tracking=True)
-    ceo_id = fields.Many2one('res.users', string='Chief Executive Officer (CEO)', compute='_compute_hierarchy_roles', store=True, readonly=False, tracking=True)
-    current_handler_user_id = fields.Many2one('res.users', string='Current Responsible Handler', compute='_compute_current_handler', store=True)
+    coach_user_id = fields.Many2one('res.users', string='Coach User', compute='_compute_hierarchy_roles', store=True, readonly=True)
+    manager_id = fields.Many2one('res.users', string='Line Manager', compute='_compute_hierarchy_roles', store=True, readonly=True, tracking=True)
+    director_id = fields.Many2one('res.users', string='Directorate Director', compute='_compute_hierarchy_roles', store=True, readonly=True, tracking=True)
+    chief_id = fields.Many2one('res.users', string='Respective Chief', compute='_compute_hierarchy_roles', store=True, readonly=True, tracking=True)
+    ceo_id = fields.Many2one('res.users', string='Chief Executive Officer (CEO)', compute='_compute_hierarchy_roles', store=True, readonly=True, tracking=True)
+    current_handler_user_id = fields.Many2one('res.users', string='Current Responsible Handler', compute='_compute_current_handler', store=True, readonly=True)
 
     can_current_user_decide = fields.Boolean(string='Can Current User Decide', compute='_compute_handler_permissions')
     can_current_user_escalate = fields.Boolean(string='Can Current User Escalate', compute='_compute_handler_permissions')
     is_dismissal_action = fields.Boolean(string='Is Dismissal Action', compute='_compute_is_dismissal_action')
+
+    # Role & Visibility helper fields for regular employees vs management
+    is_current_user_accused = fields.Boolean(string='Is Accused Employee', compute='_compute_current_user_visibility')
+    is_manager_or_officer = fields.Boolean(string='Is Manager or Officer', compute='_compute_current_user_visibility')
+    is_case_decided = fields.Boolean(string='Is Case Decided', compute='_compute_current_user_visibility')
+    show_decision_details = fields.Boolean(string='Show Decision Details', compute='_compute_current_user_visibility')
+
+    @api.depends_context('uid')
+    @api.depends('state', 'employee_id.user_id')
+    def _compute_current_user_visibility(self):
+        user = self.env.user
+        is_mgr_or_officer = (
+            user.has_group('discipline_management.group_discipline_officer') or
+            user.has_group('discipline_management.group_discipline_manager') or
+            user.has_group('base.group_system')
+        )
+        for rec in self:
+            rec.is_manager_or_officer = is_mgr_or_officer
+            rec.is_current_user_accused = bool(rec.employee_id.user_id and rec.employee_id.user_id.id == user.id)
+            rec.is_case_decided = rec.state in ('enforced', 'appealed', 'closed', 'revoked')
+            rec.show_decision_details = is_mgr_or_officer or rec.is_case_decided
 
     @api.depends('punishment_type', 'severity_level', 'decided_punishment_type')
     def _compute_is_dismissal_action(self):
@@ -259,11 +414,18 @@ class DisciplineCase(models.Model):
             else:
                 rec.current_handler_user_id = False
 
-    @api.depends('state', 'current_handler_user_id', 'is_dismissal_action')
+    @api.depends_context('uid')
+    @api.depends('state', 'current_handler_user_id', 'is_dismissal_action', 'employee_id.user_id')
     def _compute_handler_permissions(self):
         current_uid = self.env.uid
         is_admin = self.env.user.has_group('discipline_management.group_discipline_admin')
         for rec in self:
+            # Accused employee can NEVER decide or escalate his own case
+            if rec.employee_id.user_id and rec.employee_id.user_id.id == current_uid:
+                rec.can_current_user_decide = False
+                rec.can_current_user_escalate = False
+                continue
+
             if is_admin:
                 rec.can_current_user_decide = not rec.is_dismissal_action if rec.state in ('draft', 'initiated', 'escalated_director', 'escalated_chief') else True
                 rec.can_current_user_escalate = rec.state in ('draft', 'initiated', 'escalated_director', 'escalated_chief', 'escalated_ceo')
@@ -511,6 +673,16 @@ class DisciplineCase(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].next_by_code('discipline.case') or _('New')
+            if not vals.get('severity_level_id') and vals.get('offense_id'):
+                offense = self.env['discipline.offense'].browse(vals['offense_id'])
+                if offense.severity_level_id:
+                    vals['severity_level_id'] = offense.severity_level_id.id
+                elif offense.line_ids and offense.line_ids[0].severity_level_id:
+                    vals['severity_level_id'] = offense.line_ids[0].severity_level_id.id
+                else:
+                    lvl = self.env['discipline.severity.level'].search([('active', '=', True)], limit=1)
+                    if lvl:
+                        vals['severity_level_id'] = lvl.id
         cases = super().create(vals_list)
         return cases
 
@@ -750,43 +922,52 @@ class DisciplineCase(models.Model):
             if rec.punishment_type == 'demotion':
                 rec.action_apply_demotion()
 
-            # Trigger Payroll Penalty Deduction: Managerial (Daily Wage Units) vs Non-Managerial (%)
+            # Automatic Payroll Deduction Integration: Managerial (Daily Wage Units) vs Non-Managerial (%)
             if rec.is_managerial and rec.fine_days > 0.0:
-                self.env['discipline.payroll.penalty'].create({
+                pen = self.env['discipline.payroll.penalty'].create({
                     'case_id': rec.id,
                     'employee_id': rec.employee_id.id,
                     'penalty_type': 'managerial',
                     'managerial_days': int(rec.fine_days),
                     'effective_date': rec.final_decision_date,
-                    'state': 'pending',
+                    'state': 'transferred',
                     'notes': _('Managerial salary fine deduction of %s day(s) from Case %s.') % (rec.fine_days, rec.name)
                 })
+                rec.message_post(body=_(
+                    '<strong>Automatic Payroll Integration:</strong> Managerial salary fine deduction of %s working day(s) automatically integrated with Payroll.'
+                ) % rec.fine_days)
             elif rec.penalty_percentage > 0.0:
-                self.env['discipline.payroll.penalty'].create({
+                pen = self.env['discipline.payroll.penalty'].create({
                     'case_id': rec.id,
                     'employee_id': rec.employee_id.id,
                     'penalty_type': 'percentage',
                     'penalty_percentage': rec.penalty_percentage,
                     'effective_date': rec.final_decision_date,
-                    'state': 'pending',
+                    'state': 'transferred',
                     'notes': _('Automatic percentage penalty of %s%% from Case %s.') % (rec.penalty_percentage, rec.name)
                 })
+                rec.message_post(body=_(
+                    '<strong>Automatic Payroll Integration:</strong> Salary penalty deduction of %s%% automatically integrated with Payroll.'
+                ) % rec.penalty_percentage)
 
-            # Suspension without-pay deduction for active suspensions
+            # Automatic without-pay suspension deduction integration
             active_swp = rec.suspension_ids.filtered(
                 lambda s: s.suspension_type == 'without_pay' and s.state in ['active', 'extended', 'completed']
             )
             for susp in active_swp:
-                self.env['discipline.payroll.penalty'].create({
+                pen = self.env['discipline.payroll.penalty'].create({
                     'case_id': rec.id,
                     'employee_id': rec.employee_id.id,
                     'penalty_type': 'suspension_without_pay',
                     'suspension_id': susp.id,
                     'suspension_days': susp.working_days_count,
                     'effective_date': rec.final_decision_date,
-                    'state': 'pending',
+                    'state': 'transferred',
                     'notes': _('Without-pay suspension deduction for %d days from Suspension %s.') % (susp.working_days_count, susp.name)
                 })
+                rec.message_post(body=_(
+                    '<strong>Automatic Payroll Integration:</strong> Without-pay suspension deduction (%s working days) automatically integrated with Payroll.'
+                ) % susp.working_days_count)
 
             # Dismissal Handling & Separation Workflow
             if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':

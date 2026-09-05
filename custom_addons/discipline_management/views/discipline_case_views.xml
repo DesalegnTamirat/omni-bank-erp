@@ -51,40 +51,42 @@
             <field name="arch" type="xml">
                 <form string="Disciplinary Case">
                     <header>
-                        <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <field name="is_manager_or_officer" invisible="1"/>
+                        <field name="is_current_user_accused" invisible="1"/>
+                        <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft' or not is_manager_or_officer"/>
                         
                         <!-- Direct Decision & Enforcement (Allowed for non-dismissals) -->
                         <button name="action_decide_and_enforce" string="Decide &amp; Enforce" type="object" class="btn-success"
-                                invisible="state not in ('draft', 'initiated', 'escalated_director', 'escalated_chief', 'escalated_ceo') or not can_current_user_decide or is_dismissal_action"
+                                invisible="state not in ('draft', 'initiated', 'escalated_director', 'escalated_chief', 'escalated_ceo') or not can_current_user_decide or is_dismissal_action or is_current_user_accused"
                                 help="Directly decide and enforce penalty without further intervention."/>
 
                         <!-- Manager Escalation -->
                         <button name="action_escalate_to_director" string="Escalate to Director" type="object" class="btn-warning"
-                                invisible="state != 'initiated' or not can_current_user_escalate"/>
+                                invisible="state not in ('draft', 'initiated') or not can_current_user_escalate or is_current_user_accused"/>
 
                         <!-- Director Escalation -->
                         <button name="action_escalate_to_chief" string="Escalate to Chief" type="object" class="btn-warning"
-                                invisible="state != 'escalated_director' or not can_current_user_escalate"/>
+                                invisible="state != 'escalated_director' or not can_current_user_escalate or is_current_user_accused"/>
 
                         <!-- Chief Options -->
                         <button name="action_chief_forward_to_ceo" string="Forward to CEO" type="object" class="btn-primary"
-                                invisible="state != 'escalated_chief' or not can_current_user_escalate"/>
+                                invisible="state != 'escalated_chief' or not can_current_user_escalate or is_current_user_accused"/>
                         <button name="action_chief_forward_to_audit" string="Forward to Audit Directorate (Notify CEO)" type="object" class="btn-danger"
-                                invisible="state != 'escalated_chief' or not can_current_user_escalate"
+                                invisible="state != 'escalated_chief' or not can_current_user_escalate or is_current_user_accused"
                                 help="Forward to Audit Directorate for investigation. The CEO is automatically notified."/>
 
                         <!-- CEO Options -->
                         <button name="action_ceo_forward_to_audit" string="Forward to Audit Directorate" type="object" class="btn-danger"
-                                invisible="state != 'escalated_ceo' or not can_current_user_escalate"/>
+                                invisible="state != 'escalated_ceo' or not can_current_user_escalate or is_current_user_accused"/>
 
                         <!-- Audit Option -->
                         <button name="action_audit_submit_to_committee" string="Submit to Disciplinary Committee" type="object" class="btn-warning"
-                                invisible="state != 'investigating'"/>
+                                invisible="state != 'investigating' or not is_manager_or_officer"/>
 
                         <button name="action_return_revision" string="Return for Revision" type="object" class="btn-secondary"
-                                invisible="state not in ('escalated_director', 'escalated_chief', 'escalated_ceo')"/>
+                                invisible="state not in ('escalated_director', 'escalated_chief', 'escalated_ceo') or not is_manager_or_officer"/>
                         <button name="action_reject" string="Reject Case" type="object" class="btn-secondary"
-                                invisible="state not in ('initiated', 'escalated_director', 'escalated_chief', 'escalated_ceo')"/>
+                                invisible="state not in ('initiated', 'escalated_director', 'escalated_chief', 'escalated_ceo') or not is_manager_or_officer"/>
 
                         <!-- Submit Appeal button — only when window is open -->
                         <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
@@ -93,10 +95,14 @@
                         <button name="action_create_appeal_on_behalf" string="Lodge Appeal (On Behalf)" type="object" class="btn-info"
                                 invisible="state not in ('enforced', 'closed') or not is_hr_admin"
                                 help="HR Admin can lodge an appeal on behalf of a suspended or dismissed employee."/>
-                        <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
+                        <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked or not is_manager_or_officer"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,initiated,escalated_director,escalated_chief,investigating,committee_review,enforced"/>
                     </header>
                     <sheet>
+                        <field name="is_manager_or_officer" invisible="1"/>
+                        <field name="is_current_user_accused" invisible="1"/>
+                        <field name="is_case_decided" invisible="1"/>
+                        <field name="show_decision_details" invisible="1"/>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
                         <widget name="web_ribbon" title="Enforced" bg_color="text-bg-success" invisible="state != 'enforced'"/>
                         <widget name="web_ribbon" title="Appeal Window Open" bg_color="text-bg-warning" invisible="not is_appeal_window_open"/>
@@ -126,56 +132,56 @@
                         <group>
                             <group string="Employee Information">
                                 <field name="subordinate_employee_ids" invisible="1"/>
-                                <field name="employee_id" domain="[('id', 'in', subordinate_employee_ids)] if not is_hr_admin else []" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="employee_id" domain="[('id', 'in', subordinate_employee_ids)]" readonly="is_current_user_accused or state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="coach_id" readonly="1"/>
                                 <field name="reported_by_id" readonly="1"/>
-                                <field name="department_id"/>
-                                <field name="job_id"/>
-                                <field name="work_location_id"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="job_id" readonly="1"/>
+                                <field name="work_location_id" readonly="1"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group string="Misconduct &amp; Offense Classification">
                                 <field name="allowed_severity_level_ids" invisible="1"/>
                                 <field name="staff_category_display" readonly="1"/>
-                                <field name="offense_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="offense_category_id"/>
-                                <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="punishment_type" readonly="1"/>
-                                <field name="penalty_percentage" readonly="1"/>
-                                <field name="fine_days" readonly="1"/>
+                                <field name="offense_id" readonly="is_current_user_accused or state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="offense_category_id" readonly="1"/>
+                                <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="is_current_user_accused or state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="punishment_type" readonly="1" invisible="not show_decision_details"/>
+                                <field name="penalty_percentage" readonly="1" invisible="not show_decision_details"/>
+                                <field name="fine_days" readonly="1" invisible="not show_decision_details"/>
                                 <field name="is_attendance_case" invisible="not is_attendance_case" readonly="1"/>
                                 <field name="attendance_violation_type" invisible="not is_attendance_case" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="property_repair_cost" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="incident_date" readonly="is_current_user_accused or state in ('enforced', 'closed', 'revoked')"/>
                             </group>
                         </group>
                         <group>
-                            <group string="Workflow &amp; Hierarchy Governance">
+                            <group string="Workflow &amp; Hierarchy Governance" invisible="not is_manager_or_officer">
                                 <field name="is_hr_admin" invisible="1"/>
                                 <field name="can_current_user_decide" invisible="1"/>
                                 <field name="can_current_user_escalate" invisible="1"/>
                                 <field name="is_dismissal_action" invisible="1"/>
                                 <field name="initiator_id" readonly="1"/>
                                 <field name="coach_user_id" readonly="1"/>
-                                <field name="manager_id"/>
-                                <field name="director_id"/>
-                                <field name="chief_id"/>
-                                <field name="ceo_id"/>
+                                <field name="manager_id" readonly="1"/>
+                                <field name="director_id" readonly="1"/>
+                                <field name="chief_id" readonly="1"/>
+                                <field name="ceo_id" readonly="1"/>
                                 <field name="current_handler_user_id" readonly="1"/>
                                 <field name="dismissal_authority_id"
                                        invisible="not is_dismissal_action"
                                        string="Dismissal Authority (CEO/CPCO)"/>
                             </group>
                             <group string="SLA &amp; Appeal Timelines">
-                                <field name="sla_target_days"/>
-                                <field name="sla_deadline"/>
-                                <field name="is_sla_exceeded" widget="boolean"/>
-                                <field name="final_decision_date"/>
-                                <field name="appeal_deadline"/>
-                                <field name="is_appeal_window_open" widget="boolean"/>
+                                <field name="sla_target_days" invisible="not is_manager_or_officer"/>
+                                <field name="sla_deadline" invisible="not is_manager_or_officer"/>
+                                <field name="is_sla_exceeded" widget="boolean" invisible="not is_manager_or_officer"/>
+                                <field name="final_decision_date" invisible="not show_decision_details" readonly="1"/>
+                                <field name="appeal_deadline" invisible="not show_decision_details" readonly="1"/>
+                                <field name="is_appeal_window_open" widget="boolean" invisible="not show_decision_details" readonly="1"/>
                             </group>
                         </group>
-                        <group string="Committee Decided Outcome" invisible="state not in ('committee_review', 'enforced', 'appealed') and not is_punishment_modified_by_committee">
+                        <group string="Committee Decided Outcome" invisible="not is_manager_or_officer or (state not in ('committee_review', 'enforced', 'appealed') and not is_punishment_modified_by_committee)">
                             <group string="Standard Offense Punishment">
                                 <field name="original_punishment_type" readonly="1"/>
                                 <field name="original_penalty_percentage" readonly="1"/>
@@ -190,10 +196,10 @@
                         </group>
                         <notebook>
                             <page string="Detailed Incident Description">
-                                <field name="description" placeholder="Provide complete facts, dates, time, witnesses, and details of misconduct..." readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="description" placeholder="Provide complete facts, dates, time, witnesses, and details of misconduct..." readonly="is_current_user_accused or state in ('enforced', 'closed', 'revoked')"/>
                             </page>
-                            <page string="Investigations &amp; Findings">
-                                <field name="investigation_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                            <page string="Investigations &amp; Findings" invisible="not is_manager_or_officer and not is_case_decided">
+                                <field name="investigation_ids" readonly="1">
                                     <list string="Investigations">
                                         <field name="name"/>
                                         <field name="investigator_id"/>
@@ -203,7 +209,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Committee Meetings" invisible="initiator_type == 'manager'">
+                            <page string="Committee Meetings" invisible="not is_manager_or_officer or initiator_type == 'manager'">
                                 <field name="committee_meeting_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Committee Meetings">
                                         <field name="name"/>
@@ -215,7 +221,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Suspensions" invisible="initiator_type == 'manager'">
+                            <page string="Suspensions" invisible="not is_manager_or_officer or initiator_type == 'manager'">
                                 <field name="suspension_ids" readonly="state in ('enforced', 'closed', 'revoked')">
                                     <list string="Suspensions">
                                         <field name="name"/>
@@ -228,22 +234,11 @@
                                 </field>
                             </page>
                             <page string="Appeals" invisible="appeal_count == 0">
-                                <field name="appeal_ids" readonly="state in ('enforced', 'closed', 'revoked')">
+                                <field name="appeal_ids" readonly="1">
                                     <list string="Appeals">
                                         <field name="name"/>
                                         <field name="submission_date"/>
                                         <field name="decision_outcome"/>
-                                        <field name="state"/>
-                                    </list>
-                                </field>
-                            </page>
-                            <page string="Payroll Deductions">
-                                <field name="payroll_penalty_ids" readonly="1">
-                                    <list string="Payroll Penalties">
-                                        <field name="name"/>
-                                        <field name="penalty_percentage"/>
-                                        <field name="calculated_amount"/>
-                                        <field name="effective_date"/>
                                         <field name="state"/>
                                     </list>
                                 </field>

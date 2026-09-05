@@ -61,24 +61,7 @@ class DisciplineOffense(models.Model):
         if lines:
             self.line_ids = [(5, 0, 0)] + lines
 
-    @api.depends('severity_level_id', 'severity_level_id.default_punishment_type', 'severity_level_id.default_penalty_percentage', 'severity_level_id.default_approval_authority')
-    def _compute_severity_defaults(self):
-        """Driven directly from the selected Severity Level master configuration."""
-        for rec in self:
-            if rec.severity_level_id:
-                rec.punishment_type = rec.severity_level_id.default_punishment_type
-                rec.penalty_percentage = rec.severity_level_id.default_penalty_percentage
-                rec.approval_authority = rec.severity_level_id.default_approval_authority
-            else:
-                rec.punishment_type = False
-                rec.penalty_percentage = 0.0
-                rec.approval_authority = 'hr_manager'
 
-    @api.constrains('penalty_percentage')
-    def _check_penalty_percentage(self):
-        for rec in self:
-            if rec.penalty_percentage < 0.0 or rec.penalty_percentage > 100.0:
-                raise ValidationError(_('Penalty percentage must be between 0% and 100%.'))
 
     @api.model_create_multi
     def create(self, vals_list):
