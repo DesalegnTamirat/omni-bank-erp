@@ -65,6 +65,13 @@ class EdsCourse(models.Model):
     material_ids = fields.One2many('eds.material', 'course_id', string='Training Materials')
     material_count = fields.Integer(string='Materials', compute='_compute_counts')
 
+    # Competency Framework Architecture & Outcomes Engine
+    competency_count = fields.Integer(string='Mapped Competencies', compute='_compute_competency_stats', store=True)
+    target_pillar_summary = fields.Char(string='Target Competency Pillars', compute='_compute_competency_stats', store=True)
+    learning_outcomes = fields.Html(
+        string='Expected Learning Outcomes & Behavioral Objectives',
+        help='Auto-compiled from mapped competencies and their proficiency level behavioral indicators.')
+
     # ── Training delivery sourcing recommendation () ─────────────────
     recommended_source = fields.Selection([
         ('internal', 'Internal Delivery'),
@@ -124,12 +131,56 @@ class EdsCourse(models.Model):
             approved = rec.curriculum_ids.filtered(lambda c: c.state == 'approved')
             rec.current_curriculum_id = approved.sorted('id', reverse=True).ids[0] if approved else False
 
-    @api.depends('curriculum_ids', 'development_request_ids', 'material_ids')
+    @api.depends('curriculum_ids', 'development_request_ids', 'material_ids', 'competency_line_ids')
     def _compute_counts(self):
         for rec in self:
             rec.curriculum_count = len(rec.curriculum_ids)
             rec.development_request_count = len(rec.development_request_ids)
             rec.material_count = len(rec.material_ids)
+
+    @api.depends('competency_line_ids', 'competency_line_ids.competency_id', 'competency_line_ids.competency_pillar')
+    def _compute_competency_stats(self):
+        for rec in self:
+            rec.competency_count = len(rec.competency_line_ids)
+            pillars = set(rec.competency_line_ids.mapped('competency_pillar'))
+            pillar_names = [p.capitalize() for p in pillars if p]
+            rec.target_pillar_summary = ", ".join(pillar_names) if pillar_names else _("Not Specified")
+
+    def action_generate_learning_objectives(self):
+        """Auto-compile course description, syllabus, and expected behavioral learning outcomes from mapped competencies."""
+        for rec in self:
+            if not rec.competency_line_ids:
+                raise UserError(_("Please map at least one competency to this course before generating learning outcomes."))
+            
+            outcomes_html = ["<div class='o_eds_learning_outcomes' style='font-family: inherit; line-height: 1.6;'>"]
+            outcomes_html.append("<div class='alert alert-info mb-3'><strong>%s:</strong> %s</div>" % (
+                _("Course Curriculum Competency Alignment"),
+                _("Upon completion of this course, participants will demonstrate the following proficiency standards aligned with the Bunna Bank Competency Framework.")
+            ))
+            
+            for line in rec.competency_line_ids:
+                comp = line.competency_id
+                lvl_label = dict(line._fields['required_level'].selection).get(line.required_level, line.required_level)
+                pillar_raw = getattr(comp, 'pillar', 'technical') or 'technical'
+                pillar_label = pillar_raw.capitalize()
+                
+                outcomes_html.append("<div style='margin-bottom: 14px; padding: 12px 16px; background: #ffffff; border: 1px solid #e0e0e0; border-left: 5px solid #726732; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);'>")
+                outcomes_html.append("<div class='d-flex justify-content-between align-items-center mb-1'>")
+                outcomes_html.append("<h5 style='margin:0; color: #1d2b32;'><strong>%s</strong> <span style='font-size: 12px; color: #666;'>[%s]</span></h5>" % (comp.name, pillar_label))
+                outcomes_html.append("<span class='badge bg-primary' style='font-size: 12px; padding: 4px 8px;'>Target: %s</span>" % lvl_label)
+                outcomes_html.append("</div>")
+                
+                if comp.description:
+                    outcomes_html.append("<p style='margin: 4px 0 8px 0; font-size: 13px; color: #555;'><em>%s</em></p>" % comp.description)
+                if line.behavioral_indicators:
+                    outcomes_html.append("<div style='font-size: 13px; color: #222; background: #fdfdfd; padding: 8px 12px; border-radius: 4px; border: 1px dashed #d5d5d5;'>")
+                    outcomes_html.append("<strong>%s:</strong><br/>%s" % (_("Demonstrated Behavioral Indicators"), line.behavioral_indicators.replace('\n', '<br/>')))
+                    outcomes_html.append("</div>")
+                outcomes_html.append("</div>")
+            
+            outcomes_html.append("</div>")
+            rec.learning_outcomes = "".join(outcomes_html)
+            rec.message_post(body=_("Course learning objectives and behavioral indicators successfully auto-compiled from %d mapped competencies.") % len(rec.competency_line_ids))
 
     def action_view_materials(self):
         self.ensure_one()
@@ -146,27 +197,21 @@ class EdsCourse(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('code', _('New')) == _('New'):
-                vals['code'] = self.env['ir.sequence'].sudo().next_by_code('eds.course') or _('New')
+                vals['code'] = self.env['ir.sequence'].next_by_code('eds.course') or _('New')
         return super().create(vals_list)
 
-    def action_mark_active(self):
+    def action_activate(self):
         for rec in self:
-            if rec.status != 'draft':
-                raise UserError(_('Only draft courses can be activated.'))
             rec.status = 'active'
             rec.message_post(body=_('Course %s activated.') % rec.name)
 
     def action_suspend(self):
         for rec in self:
-            if rec.status not in ('draft', 'active'):
-                raise UserError(_('Only draft or active courses can be suspended.'))
             rec.status = 'suspended'
             rec.message_post(body=_('Course %s suspended.') % rec.name)
 
     def action_retire(self):
         for rec in self:
-            if rec.status not in ('draft', 'active', 'suspended'):
-                raise UserError(_('This course is already retired.'))
             rec.status = 'retired'
             rec.message_post(body=_('Course %s retired.') % rec.name)
 
@@ -177,25 +222,56 @@ class EdsCourse(models.Model):
 
 
 class EdsCourseCompetencyLine(models.Model):
-    """Course -> competency mapping with the required proficiency level ()."""
+    """Course -> competency mapping with target proficiency level and behavioral indicators."""
     _name = 'eds.course.competency.line'
     _description = 'Course Competency Mapping Line'
+    _order = 'course_id, competency_id'
 
     course_id = fields.Many2one('eds.course', string='Course', required=True, ondelete='cascade')
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade')
+    competency_code = fields.Char(related='competency_id.code', string='Code', readonly=True)
+    competency_pillar = fields.Selection(
+        related='competency_id.pillar', string='Pillar', store=True, readonly=True)
     required_level = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),
         ('3', 'Level 3 - Advanced'),
         ('4', 'Level 4 - Expert'),
-    ], string='Required Proficiency Level', default='3', required=True)
-    notes = fields.Text(string='Notes')
+    ], string='Target Proficiency Level', default='3', required=True,
+        help='Proficiency standard participants will achieve upon successfully completing this course.')
+    weight_pct = fields.Float(string='Weight in Course (%)', default=100.0)
+    level_definition = fields.Text(string='Level Definition', compute='_compute_level_indicators', store=True)
+    behavioral_indicators = fields.Text(
+        string='Demonstrated Behavioral Indicators', compute='_compute_level_indicators', store=True,
+        help='Behavioral outcomes expected from the official Bunna Bank Competency Framework for this proficiency level.')
+    notes = fields.Text(string='Learning Focus / Module Scope')
 
-    _sql_constraints = [
-        ('course_competency_uniq', 'unique(course_id, competency_id)',
-         'This competency is already mapped to the course!'),
-    ]
+    @api.constrains('course_id', 'competency_id')
+    def _check_unique_course_competency(self):
+        for rec in self:
+            if rec.course_id and rec.competency_id:
+                domain = [('course_id', '=', rec.course_id.id), ('competency_id', '=', rec.competency_id.id), ('id', '!=', rec.id)]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("The competency '%s' is already mapped to this course.") % rec.competency_id.name)
+
+    @api.depends('competency_id', 'required_level')
+    def _compute_level_indicators(self):
+        for rec in self:
+            if rec.competency_id and rec.required_level:
+                prof_level = self.env['competency.proficiency.level'].search([
+                    ('competency_id', '=', rec.competency_id.id),
+                    ('level', '=', rec.required_level)
+                ], limit=1)
+                if prof_level:
+                    rec.level_definition = prof_level.definition or ''
+                    rec.behavioral_indicators = prof_level.behavioral_indicators or ''
+                else:
+                    rec.level_definition = ''
+                    rec.behavioral_indicators = ''
+            else:
+                rec.level_definition = ''
+                rec.behavioral_indicators = ''
 
 
 class EdsCourseDevelopmentRequest(models.Model):

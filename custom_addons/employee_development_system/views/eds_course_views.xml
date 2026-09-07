@@ -12,6 +12,8 @@
                     <field name="code"/>
                     <field name="name"/>
                     <field name="category" widget="badge"/>
+                    <field name="competency_count" string="Competencies"/>
+                    <field name="target_pillar_summary" optional="show"/>
                     <field name="delivery_method"/>
                     <field name="duration_days"/>
                     <field name="version"/>
@@ -83,8 +85,10 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_mark_active" string="Activate Course"
+                        <button name="action_activate" string="Activate Course"
                                 type="object" class="oe_highlight" invisible="status != 'draft'"/>
+                        <button name="action_generate_learning_objectives" string="Auto-Compile Learning Outcomes"
+                                type="object" class="btn-secondary" icon="fa-magic" invisible="status == 'retired'"/>
                         <button name="action_suspend" string="Suspend"
                                 type="object" invisible="status not in ('draft','active')"/>
                         <button name="action_retire" string="Retire"
@@ -94,6 +98,9 @@
                     </header>
                     <sheet>
                         <div class="oe_button_box" colspan="2">
+                            <button class="oe_stat_button" icon="fa-bookmark">
+                                <field name="competency_count" widget="statinfo" string="Competencies"/>
+                            </button>
                             <button name="%(employee_development_system.action_eds_curriculum)d"
                                     type="action" class="oe_stat_button" icon="fa-book"
                                     groups="employee_development_system.group_eds_officer">
@@ -146,16 +153,27 @@
                             <field name="description"/>
                         </group>
                         <notebook>
-                            <page string="Competency Mapping ()">
+                            <page string="Competency Mapping &amp; Behavioral Standards" name="competency_mapping">
                                 <field name="competency_line_ids">
                                     <list editable="bottom">
                                         <field name="competency_id"/>
+                                        <field name="competency_code" optional="show"/>
+                                        <field name="competency_pillar" widget="badge" optional="show"/>
                                         <field name="required_level"/>
-                                        <field name="notes"/>
+                                        <field name="weight_pct"/>
+                                        <field name="level_definition" optional="hide"/>
+                                        <field name="behavioral_indicators" optional="show"/>
+                                        <field name="notes" placeholder="Focus area / learning modules..."/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Training Materials ()">
+                            <page string="Expected Learning Outcomes &amp; Behavioral Objectives" name="learning_outcomes">
+                                <div class="alert alert-info" role="alert" invisible="learning_outcomes">
+                                    Click <strong>Auto-Compile Learning Outcomes</strong> in the header to automatically assemble structured course learning objectives and demonstrated behavioral indicators from the mapped competencies.
+                                </div>
+                                <field name="learning_outcomes" widget="html"/>
+                            </page>
+                            <page string="Training Materials ()" name="materials">
                                 <field name="material_ids">
                                     <list editable="bottom">
                                         <field name="name" readonly="1"/>

@@ -388,6 +388,16 @@ class EdsTnaEntry(models.Model):
     pms_kpi_reference = fields.Char(string='PMS KPI / Objective Ref', help='Performance evaluation objective or KPI code.')
     pms_appraisal_score = fields.Float(string='PMS Performance Score', help='Employee appraisal score for the evaluation period.')
 
+    # Intelligent Catalog Matching Engine
+    recommended_course_id = fields.Many2one(
+        'eds.course', string='Catalog Matching Course', compute='_compute_recommended_course', store=True,
+        help='Automatically matched course from the Course Catalog addressing this diagnosed competency.')
+    course_match_status = fields.Selection([
+        ('exact', 'Catalog Exact Match'),
+        ('higher', 'Related Tier Match'),
+        ('no_course', 'New Course Development Required'),
+    ], string='Catalog Match Status', compute='_compute_recommended_course', store=True)
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -455,6 +465,48 @@ class EdsTnaEntry(models.Model):
             'future_capability': 'score_future_capability',
         }
         return self[mapping[criteria]] or 0.0
+
+    @api.depends('competency_id', 'proposed_program')
+    def _compute_recommended_course(self):
+        Course = self.env['eds.course']
+        for rec in self:
+            if not rec.competency_id:
+                rec.recommended_course_id = False
+                rec.course_match_status = 'no_course'
+                continue
+
+            course_line = self.env['eds.course.competency.line'].search([
+                ('competency_id', '=', rec.competency_id.id),
+                ('course_id.status', 'in', ('active', 'draft'))
+            ], limit=1)
+
+            if course_line:
+                rec.recommended_course_id = course_line.course_id.id
+                rec.course_match_status = 'exact'
+            else:
+                c_search = Course.search([
+                    '|',
+                    ('name', 'ilike', rec.competency_id.name),
+                    ('name', 'ilike', rec.proposed_program or '')
+                ], limit=1)
+                if c_search:
+                    rec.recommended_course_id = c_search.id
+                    rec.course_match_status = 'higher'
+                else:
+                    rec.recommended_course_id = False
+                    rec.course_match_status = 'no_course'
+
+    def action_view_recommended_course(self):
+        self.ensure_one()
+        if not self.recommended_course_id:
+            raise UserError(_("No matching catalog course found for this competency need."))
+        return {
+            'name': _('Catalog Matching Course'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'eds.course',
+            'res_id': self.recommended_course_id.id,
+            'view_mode': 'form',
+        }
 
     @api.depends('score_strategic_alignment', 'score_tom_impact', 'score_gap_severity',
                  'score_risk_level', 'score_regulatory', 'score_future_capability')

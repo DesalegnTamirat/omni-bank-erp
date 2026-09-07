@@ -151,6 +151,8 @@
                     <field name="work_unit_id"/>
                     <field name="competency_id"/>
                     <field name="gap_severity" widget="badge"/>
+                    <field name="course_match_status" widget="badge" optional="show"/>
+                    <field name="recommended_course_id" optional="show"/>
                     <field name="delivery_mode" widget="badge"/>
                     <field name="source"/>
                     <field name="priority_score"/>
@@ -205,10 +207,19 @@
                                 <field name="estimated_cost" readonly="state != 'draft'"/>
                             </group>
                         </group>
-                        <group string="Business Justification &amp; Impact">
-                            <field name="justification" placeholder="Explain the business need, competency gap, or regulatory requirement..." readonly="state != 'draft'"/>
-                            <field name="excluded_reason" invisible="state != 'excluded'" readonly="1"/>
-                            <field name="converted_course_ref" invisible="state != 'converted'" readonly="1"/>
+                        <group>
+                            <group string="Catalog Alignment &amp; Course Match">
+                                <field name="course_match_status" widget="badge"/>
+                                <field name="recommended_course_id" readonly="1"/>
+                                <button name="action_view_recommended_course" string="Open Mapped Catalog Course"
+                                        type="object" class="btn-outline-primary" icon="fa-arrow-right"
+                                        invisible="not recommended_course_id"/>
+                            </group>
+                            <group string="Business Justification &amp; Impact">
+                                <field name="justification" placeholder="Explain the business need, competency gap, or regulatory requirement..." readonly="state != 'draft'"/>
+                                <field name="excluded_reason" invisible="state != 'excluded'" readonly="1"/>
+                                <field name="converted_course_ref" invisible="state != 'converted'" readonly="1"/>
+                            </group>
                         </group>
                         <notebook groups="employee_development_system.group_eds_officer">
                             <page string="L&amp;D Consolidation &amp; Priority Analysis">
