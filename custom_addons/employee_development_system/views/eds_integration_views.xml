@@ -67,32 +67,4 @@
         <field name="res_model">eds.payroll.payload</field>
         <field name="view_mode">list,form</field>
     </record>
-
-    <!-- PMS Gap Import Wizard View -->
-    <record id="view_eds_pms_gap_import_form" model="ir.ui.view">
-        <field name="name">eds.pms.gap.import.form</field>
-        <field name="model">eds.pms.gap.import</field>
-        <field name="arch" type="xml">
-            <form string="Import Competency Gaps from PMS">
-                <sheet>
-                    <group>
-                        <field name="cycle_id"/>
-                        <field name="csv_file" filename="filename"/>
-                        <field name="filename" invisible="1"/>
-                    </group>
-                </sheet>
-                <footer>
-                    <button name="action_import_gaps" string="Import Gaps" type="object" class="oe_highlight"/>
-                    <button string="Cancel" class="btn-secondary" special="cancel"/>
-                </footer>
-            </form>
-        </field>
-    </record>
-
-    <record id="action_eds_pms_gap_import" model="ir.actions.act_window">
-        <field name="name">Import Gaps from PMS</field>
-        <field name="res_model">eds.pms.gap.import</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-    </record>
 </odoo>

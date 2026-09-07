@@ -11,11 +11,79 @@
                     <button name="action_view_eds_tna_entries" type="object"
                             class="oe_stat_button" icon="fa-graduation-cap">
                         <field name="eds_tna_entry_count" widget="statinfo"
-                               string="Training Needs (TNA)"/>
+                               string="Training Needs"/>
                     </button>
+                    <button name="action_view_eds_certificates" type="object"
+                            class="oe_stat_button" icon="fa-certificate">
+                        <field name="eds_certificate_count" widget="statinfo"
+                               string="Certificates"/>
+                    </button>
+                    <button name="action_view_eds_sponsorships" type="object"
+                            class="oe_stat_button" icon="fa-file-text-o">
+                        <field name="active_sponsorship_count" widget="statinfo"
+                               string="Active Bonds"/>
+                    </button>
+                </xpath>
+
+                <xpath expr="//notebook" position="inside">
+                    <page string="EDS &amp; Service Bonds" name="eds_service_bonds"
+                          groups="employee_development_system.group_eds_officer">
+                        <div class="alert alert-danger d-flex align-items-center mb-3" role="alert"
+                             invisible="not has_active_bond_obligation">
+                            <i class="fa fa-exclamation-triangle fa-2x me-3" role="img" aria-label="Warning" title="Warning"/>
+                            <div>
+                                <strong>Active Service Bond Obligation Notice (HR Clearance):</strong><br/>
+                                This employee currently has unamortized training/education service bond obligations totaling 
+                                <b><field name="total_unamortized_bond_amount" readonly="1"/></b>. 
+                                Clearance must not be issued upon resignation/separation until bond recovery or authorized CEO waiver is completed.
+                            </div>
+                        </div>
+                        <group>
+                            <group string="Bond Obligation Summary">
+                                <field name="has_active_bond_obligation" invisible="1"/>
+                                <field name="active_sponsorship_count" readonly="1"/>
+                                <field name="total_unamortized_bond_amount" readonly="1"/>
+                            </group>
+                            <group string="Training History Summary">
+                                <field name="eds_certificate_count" readonly="1"/>
+                                <field name="eds_tna_entry_count" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Sponsorship &amp; Service Bond Agreements">
+                            <field name="eds_sponsorship_ids" nolabel="1" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="program_name"/>
+                                    <field name="sponsorship_type"/>
+                                    <field name="approved_amount"/>
+                                    <field name="bond_start_date"/>
+                                    <field name="bond_end_date"/>
+                                    <field name="outstanding_obligation" decoration-danger="outstanding_obligation > 0"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'completed'"
+                                           decoration-info="state == 'active'"
+                                           decoration-danger="state == 'breached'"/>
+                                </list>
+                            </field>
+                        </group>
+                        <group string="Issued Professional Certificates">
+                            <field name="eds_certificate_ids" nolabel="1" readonly="1">
+                                <list>
+                                    <field name="code"/>
+                                    <field name="course_id"/>
+                                    <field name="issue_date"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'issued'"
+                                           decoration-muted="state == 'pending'"
+                                           decoration-danger="state == 'void'"/>
+                                </list>
+                            </field>
+                        </group>
+                    </page>
                 </xpath>
             </field>
         </record>
 
     </data>
 </odoo>
+

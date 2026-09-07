@@ -132,19 +132,50 @@ class EdsNomination(models.Model):
 
     # ── Eligibility & guards ─────────────────────────────────────────────────
     def _check_submission_rules(self):
-        """/025: TNA-based needs an approved entry; ad-hoc needs a justification."""
+        """Validate TNA basis, justifications, prerequisites, and service tenure."""
         self.ensure_one()
         if self.nomination_type == 'tna_based':
             if not self.tna_entry_id:
-                raise UserError(_('TNA-based nominations must reference an approved training '
-                                  'need .'))
+                raise UserError(_('TNA-based nominations must reference an approved training need.'))
             if self.tna_entry_id.state not in ('approved', 'converted'):
-                raise UserError(_('The referenced training need is not approved yet .'))
+                raise UserError(_('The referenced training need is not approved yet.'))
             if self.tna_entry_id.employee_id and self.tna_entry_id.employee_id != self.employee_id:
-                raise UserError(_('The training need belongs to a different employee .'))
+                raise UserError(_('The training need belongs to a different employee.'))
         elif self.nomination_type == 'ad_hoc' and not self.justification:
-            raise UserError(_('Ad-hoc nominations require a mandatory justification and L&D '
-                              'approval .'))
+            raise UserError(_('Ad-hoc nominations require a mandatory justification and L&D approval.'))
+
+        # Check Course Prerequisites & Minimum Service Tenure
+        course = self.session_id.course_id
+        if course:
+            # 1. Prerequisite courses check
+            if course.prerequisite_course_ids:
+                cert_courses = self.env['eds.certificate'].search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('state', '=', 'active'),
+                ]).mapped('course_id')
+                completed_att_courses = self.env['eds.session.attendance'].search([
+                    ('employee_id', '=', self.employee_id.id),
+                    ('attended', '=', True),
+                ]).mapped('session_id.course_id')
+                passed_courses = set((cert_courses | completed_att_courses).ids)
+                missing = course.prerequisite_course_ids.filtered(lambda p: p.id not in passed_courses)
+                if missing:
+                    missing_names = ", ".join(missing.mapped('name'))
+                    raise ValidationError(_(
+                        "Prerequisite Violation: %s has not completed the required prerequisite course(s): %s."
+                    ) % (self.employee_id.name, missing_names))
+
+            # 2. Minimum Tenure check (if configured on course)
+            if getattr(course, 'min_tenure_months', 0) > 0:
+                emp = self.employee_id
+                hire_date = getattr(emp, 'hire_date', False) or getattr(emp, 'join_date', False) or (emp.first_contract_date if hasattr(emp, 'first_contract_date') else False)
+                if hire_date:
+                    tenure_days = (date.today() - hire_date).days
+                    tenure_months = tenure_days // 30
+                    if tenure_months < course.min_tenure_months:
+                        raise ValidationError(_(
+                            "Tenure Eligibility Violation: Course '%s' requires minimum %d months of service tenure. %s has only %d months."
+                        ) % (course.name, course.min_tenure_months, emp.name, tenure_months))
 
     def _require_group(self, group_xml_id):
         if not (self.env.su or self.env.user.has_group('employee_development_system.' + group_xml_id)):

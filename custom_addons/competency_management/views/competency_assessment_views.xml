@@ -34,21 +34,29 @@
                         <field name="state" widget="statusbar" statusbar_visible="draft,open,in_review,closed"/>
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_assessments" type="object" class="oe_stat_button" icon="fa-file-text-o">
+                                <field name="assessment_count" widget="statinfo" string="Assessments"/>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="name" string="Cycle Name"/>
+                            <h1><field name="name" placeholder="e.g. Annual Assessment 2026" readonly="state == 'closed'"/></h1>
+                        </div>
                         <group>
-                            <group>
-                                <field name="name"/>
-                                <field name="period_start"/>
-                                <field name="period_end"/>
-                                <field name="assessment_deadline"/>
+                            <group string="Evaluation Timeline">
+                                <field name="period_start" string="Evaluation Period Start" readonly="state == 'closed'"/>
+                                <field name="period_end" string="Evaluation Period End" readonly="state == 'closed'"/>
+                                <field name="assessment_deadline" string="Submission Deadline" readonly="state == 'closed'"/>
                             </group>
-                            <group>
+                            <group string="Cycle Metrics">
                                 <field name="assessment_count"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Assessments">
-                                <field name="assessment_ids">
-                                    <list>
+                                <field name="assessment_ids" readonly="1">
+                                    <list limit="20" create="false" edit="false" delete="false">
                                         <field name="name"/>
                                         <field name="employee_id"/>
                                         <field name="assessment_type"/>
@@ -58,7 +66,7 @@
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes"/>
+                                <field name="notes" placeholder="Enter cycle description or instructions..." readonly="state == 'closed'"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -80,13 +88,81 @@
             <field name="arch" type="xml">
                 <list>
                     <field name="name"/>
-                    <field name="employee_id"/>
+                    <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
                     <field name="cycle_id"/>
                     <field name="assessment_type"/>
-                    <field name="assessor_id"/>
+                    <field name="assessor_id" options="{'no_open': True, 'no_create': True}"/>
                     <field name="average_gap"/>
                     <field name="state" widget="badge"/>
                 </list>
+            </field>
+        </record>
+
+        <!-- Form view for competency.assessment.line popup -->
+        <record id="view_competency_assessment_line_form" model="ir.ui.view">
+            <field name="name">competency.assessment.line.form</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <form string="Competency Behavioral Guidance &amp; Rating">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 15px;">
+                            <h1 style="color: #541718;"><field name="competency_id" readonly="1"/></h1>
+                            <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
+                        </div>
+                        
+                        <!-- Full-width Competency Definition Callout Container -->
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; width: 100%;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; margin-bottom: 10px;">
+                            <h3 style="color: #1d2b32; border-bottom: 2px solid #541718; padding-bottom: 5px;">
+                                📖 Proficiency Level Behavioral Indicators (Levels 1 to 4)
+                            </h3>
+                            <p class="text-muted">Review the expected behaviors for each level below before selecting your current proficiency rating.</p>
+                        </div>
+
+                        <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fcfbfa; border-left: 5px solid #726732; border-radius: 4px;">
+                                <h4 style="color: #726732; margin-top: 0; margin-bottom: 6px;">🟡 Level 1 — Basic</h4>
+                                <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #f8f9fa; border-left: 5px solid #1d2b32; border-radius: 4px;">
+                                <h4 style="color: #1d2b32; margin-top: 0; margin-bottom: 6px;">🔵 Level 2 — Intermediate</h4>
+                                <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fdf8f5; border-left: 5px solid #c17540; border-radius: 4px;">
+                                <h4 style="color: #c17540; margin-top: 0; margin-bottom: 6px;">🟠 Level 3 — Advanced</h4>
+                                <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="padding: 12px 15px; background-color: #faf4f5; border-left: 5px solid #541718; border-radius: 4px;">
+                                <h4 style="color: #541718; margin-top: 0; margin-bottom: 6px;">🔴 Level 4 — Expert</h4>
+                                <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <group string="Your Self-Rating &amp; Supporting Remarks" style="margin-top: 20px;">
+                            <group>
+                                <field name="required_level" readonly="1"/>
+                                <field name="current_level" string="Select Current Proficiency Level" required="1"/>
+                                <field name="gap" readonly="1"/>
+                                <field name="achievement_status" widget="badge" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="comments" placeholder="Enter remarks or justification for your rating..."/>
+                                <field name="evidence_attachment_ids" widget="many2many_binary"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
             </field>
         </record>
 
@@ -97,8 +173,8 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_auto_fill_lines" string="Auto-Fill from Role Mapping"
-                                type="object" invisible="line_ids or state != 'draft'"/>
+                        <button name="action_populate_competencies" string="Populate Competencies"
+                                type="object" class="oe_highlight" invisible="state != 'draft'" icon="fa-list-ol"/>
                         <button name="action_submit" string="Submit"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_supervisor_review" string="Supervisor Review"
@@ -118,36 +194,77 @@
                         <group>
                             <group>
                                 <field name="name" readonly="1"/>
-                                <field name="employee_id" readonly="state in ('submitted','supervisor_review','hr_verified','approved','locked')"/>
-                                <field name="cycle_id" readonly="state != 'draft'"/>
+                                <field name="cycle_id" readonly="1" force_save="1" domain="[('state', '=', 'open')]"/>
+                                <field name="assessment_type" readonly="1" force_save="1"/>
+                                <field name="employee_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
                             </group>
                             <group>
-                                <field name="assessment_type" readonly="state != 'draft'"/>
-                                <field name="assessor_id"/>
+                                <field name="assessor_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
                                 <field name="average_gap"/>
                                 <field name="is_locked"/>
                             </group>
                         </group>
                         <notebook>
-                            <page string="Competency Ratings">
-                                <field name="line_ids">
-                                    <list editable="bottom">
-                                        <field name="competency_id"/>
-                                        <field name="current_level"/>
-                                        <field name="required_level"/>
-                                        <field name="gap"/>
-                                        <field name="evidence_attachment_ids" widget="many2many_tags"/>
-                                        <field name="comments"/>
+                            <page string="Core Competencies" icon="fa-star">
+                                <field name="core_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
+                                        <field name="competency_id" readonly="1" string="Core Competency"/>
+                                        <field name="required_level" readonly="1"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
+                                        <field name="gap" readonly="1"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Leadership Competencies" icon="fa-users">
+                                <field name="leadership_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
+                                        <field name="competency_id" readonly="1" string="Leadership Competency"/>
+                                        <field name="required_level" readonly="1"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
+                                        <field name="gap" readonly="1"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Technical Competencies" icon="fa-cogs">
+                                <field name="technical_line_ids" readonly="state != 'draft' or is_locked">
+                                    <list create="false" delete="false" decoration-info="current_level != False">
+                                        <field name="competency_definition" column_invisible="True"/>
+                                        <field name="competency_id" readonly="1" string="Technical Competency"/>
+                                        <field name="required_level" readonly="1"/>
+                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked"/>
+                                        <field name="gap" readonly="1"/>
+                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes"/>
+                                <field name="notes" readonly="state != 'draft' or is_locked"/>
                             </page>
                         </notebook>
                     </sheet>
                     <chatter/>
                 </form>
+            </field>
+        </record>
+
+        <!-- Dedicated List View for My Competency Assessments (create="false") -->
+        <record id="view_competency_assessment_my_list" model="ir.ui.view">
+            <field name="name">competency.assessment.my.list</field>
+            <field name="model">competency.assessment</field>
+            <field name="arch" type="xml">
+                <list create="false" delete="false">
+                    <field name="name"/>
+                    <field name="cycle_id"/>
+                    <field name="assessment_type" widget="badge"/>
+                    <field name="employee_id" string="Evaluatee (Employee Name)" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="department_id"/>
+                    <field name="average_gap"/>
+                    <field name="state" widget="badge"/>
+                </list>
             </field>
         </record>
 
@@ -157,27 +274,150 @@
             <field name="model">competency.assessment</field>
             <field name="arch" type="xml">
                 <search>
+                    <field name="name"/>
                     <field name="employee_id"/>
                     <field name="cycle_id"/>
                     <field name="assessment_type"/>
-                    <filter string="Open Assessments" name="open_assessments"
-                            domain="[('state','in',('draft','submitted','supervisor_review','hr_verified'))]"/>
-                    <filter string="Locked" name="locked" domain="[('state','=','locked')]"/>
-                    <separator/>
-                    <group name="group_by">
-                        <filter string="State" name="group_state" context="{'group_by':'state'}"/>
-                        <filter string="Type" name="group_type" context="{'group_by':'assessment_type'}"/>
+                    <field name="assessor_id"/>
+                    <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                    <filter string="Submitted" name="state_submitted" domain="[('state','=','submitted')]"/>
+                    <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
+                    <group>
                         <filter string="Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
+                        <filter string="Assessment Type" name="group_type" context="{'group_by':'assessment_type'}"/>
+                        <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
                     </group>
                 </search>
             </field>
         </record>
 
         <record id="action_competency_assessment" model="ir.actions.act_window">
-            <field name="name">Competency Assessments</field>
+            <field name="name">All Competency Assessments</field>
             <field name="res_model">competency.assessment</field>
             <field name="view_mode">list,form</field>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
+        </record>
+
+        <record id="action_my_competency_assessment" model="ir.actions.act_window">
+            <field name="name">My Competency Assessments</field>
+            <field name="res_model">competency.assessment</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('assessor_id', '=', uid)]</field>
+            <field name="view_id" ref="view_competency_assessment_my_list"/>
+            <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
+        </record>
+
+        <!-- Detailed Competency & TNA Analytics Views -->
+        <record id="view_competency_assessment_line_report_list" model="ir.ui.view">
+            <field name="name">competency.assessment.line.report.list</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <list string="Competency &amp; TNA Analytics Lines" create="false" edit="false" delete="false">
+                    <field name="cycle_id"/>
+                    <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="operating_unit_id"/>
+                    <field name="department_id"/>
+                    <field name="job_id"/>
+                    <field name="grade_id"/>
+                    <field name="competency_id"/>
+                    <field name="functional_domain"/>
+                    <field name="pillar" widget="badge"/>
+                    <field name="self_rating" optional="show"/>
+                    <field name="peer_avg" optional="show"/>
+                    <field name="subordinate_avg" optional="show"/>
+                    <field name="supervisor_avg" optional="show"/>
+                    <field name="team_avg" optional="hide"/>
+                    <field name="weighted_current_level" string="Weighted Current Level"/>
+                    <field name="required_level"/>
+                    <field name="gap"/>
+                    <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_assessment_line_report_pivot" model="ir.ui.view">
+            <field name="name">competency.assessment.line.report.pivot</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <pivot string="Competency &amp; TNA Analytics Pivot">
+                    <field name="cycle_id" type="row"/>
+                    <field name="department_id" type="row"/>
+                    <field name="tna_measure" type="col"/>
+                    <field name="gap" type="measure"/>
+                    <field name="current_level_num" string="Avg Current Level" type="measure"/>
+                    <field name="required_level_num" string="Avg Required Level" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_competency_assessment_line_report_graph" model="ir.ui.view">
+            <field name="name">competency.assessment.line.report.graph</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <graph string="Competency &amp; TNA Analytics Graph" type="bar">
+                    <field name="department_id"/>
+                    <field name="tna_measure"/>
+                    <field name="gap" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_competency_assessment_line_report_search" model="ir.ui.view">
+            <field name="name">competency.assessment.line.report.search</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <search string="Search Competency &amp; TNA Analytics">
+                    <field name="cycle_id"/>
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="competency_id"/>
+                    <field name="pillar"/>
+                    <field name="tna_measure"/>
+                    <field name="state"/>
+                    <filter string="Approved Assessments" name="filter_approved" domain="[('state', 'in', ['approved', 'locked'])]"/>
+                    <separator/>
+                    <filter string="Core Pillar" name="filter_core" domain="[('pillar', '=', 'core')]"/>
+                    <filter string="Leadership Pillar" name="filter_leadership" domain="[('pillar', '=', 'leadership')]"/>
+                    <filter string="Technical Pillar" name="filter_technical" domain="[('pillar', '=', 'technical')]"/>
+                    <separator/>
+                    <filter string="🚨 Underqualified (Training Needed)" name="filter_below" domain="[('tna_measure', '=', 'below')]"/>
+                    <filter string="✅ Fit / Qualified" name="filter_meets" domain="[('tna_measure', '=', 'meets')]"/>
+                    <filter string="⭐ Overqualified" name="filter_exceeds" domain="[('tna_measure', '=', 'exceeds')]"/>
+                    <group>
+                        <filter string="Assessment Cycle" name="group_by_cycle" context="{'group_by': 'cycle_id'}"/>
+                        <filter string="Operating Unit" name="group_by_ou" context="{'group_by': 'operating_unit_id'}"/>
+                        <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                        <filter string="Employee" name="group_by_employee" context="{'group_by': 'employee_id'}"/>
+                        <filter string="Competency" name="group_by_competency" context="{'group_by': 'competency_id'}"/>
+                        <filter string="Pillar" name="group_by_pillar" context="{'group_by': 'pillar'}"/>
+                        <filter string="Fitness Status" name="group_by_tna" context="{'group_by': 'tna_measure'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- My Competency Evaluation Results Action (Employee View) -->
+        <record id="action_my_competency_evaluations" model="ir.actions.act_window">
+            <field name="name">My Competency Evaluation Results</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+            <field name="search_view_id" ref="competency_management.view_competency_assessment_line_report_search"/>
+        </record>
+
+        <record id="action_competency_tna_analytics_report" model="ir.actions.act_window">
+            <field name="name">Competency &amp; TNA Assessment Line Report</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">list,graph,pivot,form</field>
+            <field name="search_view_id" ref="view_competency_assessment_line_report_search"/>
+            <field name="context">{}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No competency assessment lines found for analysis.
+                </p>
+            </field>
         </record>
 
     </data>

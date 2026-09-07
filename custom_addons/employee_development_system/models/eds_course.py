@@ -52,6 +52,9 @@ class EdsCourse(models.Model):
     prerequisite_course_ids = fields.Many2many(
         'eds.course', 'eds_course_prereq_rel', 'course_id', 'prerequisite_id',
         string='Prerequisite Courses')
+    min_tenure_months = fields.Integer(
+        string='Minimum Service Tenure (Months)', default=0,
+        help='Minimum tenure required in bank service before nomination eligibility.')
     development_request_ids = fields.One2many(
         'eds.course.development.request', 'course_id', string='Development Requests')
     development_request_count = fields.Integer(

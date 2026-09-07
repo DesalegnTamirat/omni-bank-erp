@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ===================================================================== -->
+        <!-- REPORT ACTIONS                                                        -->
+        <!-- ===================================================================== -->
+
+        <!-- Tier 1: Individual Competency Profile Report (Employee Scope) -->
+        <record id="action_report_competency_assessment_individual" model="ir.actions.report">
+            <field name="name">My Competency Profile Report</field>
+            <field name="model">competency.assessment</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_assessment_individual</field>
+            <field name="report_file">competency_management.report_competency_assessment_individual</field>
+            <field name="print_report_name">'Competency_Profile_%s_%s' % (object.employee_id.name or '', object.name or '')</field>
+            <field name="binding_model_id" ref="model_competency_assessment"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Tier 2: Team Competency Gap Report (Supervisor Scope) -->
+        <record id="action_report_competency_team_gap" model="ir.actions.report">
+            <field name="name">Team Competency Gap Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_team_gap</field>
+            <field name="report_file">competency_management.report_competency_team_gap</field>
+            <field name="print_report_name">'Team_Competency_Gap_Report'</field>
+        </record>
+
+        <!-- Tier 3: Organizational Capability Report (Admin Scope) -->
+        <record id="action_report_competency_org_capability" model="ir.actions.report">
+            <field name="name">Organizational Capability Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_org_capability</field>
+            <field name="report_file">competency_management.report_competency_org_capability</field>
+            <field name="print_report_name">'Organizational_Capability_Report'</field>
+        </record>
+
+        <!-- Detailed Competency Performance & Gap Matrix Report -->
+        <record id="action_report_competency_detailed_matrix" model="ir.actions.report">
+            <field name="name">Detailed Competency Performance &amp; Gap Matrix Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_detailed_matrix</field>
+            <field name="report_file">competency_management.report_competency_detailed_matrix</field>
+            <field name="print_report_name">'Detailed_Competency_Matrix_Report'</field>
+        </record>
+
+        <!-- Assessment Campaign Progress Tracking Report -->
+        <record id="action_report_competency_campaign_progress" model="ir.actions.report">
+            <field name="name">Assessment Campaign Progress Tracking Report</field>
+            <field name="model">competency.report.wizard</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">competency_management.report_competency_campaign_progress</field>
+            <field name="report_file">competency_management.report_competency_campaign_progress</field>
+            <field name="print_report_name">'Campaign_Progress_Tracking_Report'</field>
+        </record>
+
+
+        <!-- QWEB REPORT DOCUMENT TEMPLATES -->
+
+        <!-- TIER 1: Individual Competency Profile & Gap Analysis Template -->
+        <template id="report_competency_assessment_individual">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            
+                            <!-- Cover Strip Header: #541718 Maroon & #726732 Accent -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
+                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                                Individual Competency Profile &amp; Gap Analysis Report (FR-RPT-001)
+                                            </div>
+                                        </td>
+                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
+                                            <div><b>Report Ref:</b> <t t-out="doc.name"/></div>
+                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Employee Identity Block -->
+                            <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; background-color: #ffffff;">
+                                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                                    <tr>
+                                        <td style="width: 18%; font-weight: 600; color: #726732; padding: 4px;">Employee Name:</td>
+                                        <td style="width: 32%; padding: 4px; font-weight: 700; color: #1d2b32;"><t t-out="doc.employee_id.name"/></td>
+                                        <td style="width: 18%; font-weight: 600; color: #726732; padding: 4px;">Job Position:</td>
+                                        <td style="width: 32%; padding: 4px; font-weight: 600; color: #1d2b32;"><t t-out="doc.job_id.name or 'N/A'"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: 600; color: #726732; padding: 4px;">Department:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.department_id.name or 'N/A'"/></td>
+                                        <td style="font-weight: 600; color: #726732; padding: 4px;">Operating Unit:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.operating_unit_id.name or 'Head Office'"/></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="font-weight: 600; color: #726732; padding: 4px;">Assessment Cycle:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.cycle_id.name"/></td>
+                                        <td style="font-weight: 600; color: #726732; padding: 4px;">Assessor / Reviewer:</td>
+                                        <td style="padding: 4px;"><t t-out="doc.assessor_id.name or 'N/A'"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Achievement Sentence Summary -->
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; padding: 10px 14px; border-radius: 4px; margin-bottom: 18px; font-size: 13px; font-weight: 600; color: #1d2b32;">
+                                <t t-out="doc.get_achievement_summary_sentence()"/>
+                            </div>
+
+                            <!-- Detailed Per-Pillar Breakdown -->
+                            <t t-foreach="['core', 'leadership', 'technical']" t-as="pillar_type">
+                                <t t-set="pillar_lines" t-value="doc.line_ids.filtered(lambda l: l.pillar == pillar_type)"/>
+                                <t t-if="pillar_lines">
+                                    <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; text-transform: capitalize; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                        <t t-out="pillar_type"/> Competencies
+                                    </div>
+                                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px;">
+                                        <thead>
+                                            <tr style="background-color: #1d2b32; color: #FFFFFF; font-weight: 600;">
+                                                <th style="padding: 6px 8px; text-align: left;">Competency Name</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 12%;">Required</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 12%;">Assessed</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 10%;">Gap</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 18%;">Status</th>
+                                                <th style="padding: 6px 8px; text-align: left; width: 25%;">Assessor Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="pillar_lines" t-as="line">
+                                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                                    <td style="padding: 6px 8px; font-weight: 600; color: #1d2b32;">
+                                                        <t t-out="line.competency_id.name"/>
+                                                    </td>
+                                                    <td style="padding: 6px 8px; text-align: center;">Level <t t-out="line.required_level"/></td>
+                                                    <td style="padding: 6px 8px; text-align: center; font-weight: 600;">
+                                                        <t t-if="line.current_level">Level <t t-out="line.current_level"/></t>
+                                                        <t t-else="">—</t>
+                                                    </td>
+                                                    <td style="padding: 6px 8px; text-align: center; font-weight: 700;">
+                                                        <t t-out="round(line.gap, 1) if line.gap else 0.0"/>
+                                                    </td>
+                                                    <td style="padding: 6px 8px; text-align: center;">
+                                                        <t t-if="line.achievement_status == 'exceeds'">
+                                                            <span style="color: #1d2b32; font-weight: 700;">⭐ Exceeds</span>
+                                                        </t>
+                                                        <t t-elif="line.achievement_status == 'meets'">
+                                                            <span style="color: #726732; font-weight: 700;">🟢 Fits</span>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span style="color: #541718; font-weight: 700;">🔴 Needs Development</span>
+                                                        </t>
+                                                    </td>
+                                                    <td style="padding: 6px 8px; color: #64748b;">
+                                                        <t t-out="line.comments or '—'"/>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </t>
+                            </t>
+
+                            <!-- Recommended Development Actions (FR-GAP-004) -->
+                            <t t-set="recs" t-value="doc.get_recommended_development_actions()"/>
+                            <t t-if="recs">
+                                <div style="margin-top: 14px; margin-bottom: 20px;">
+                                    <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                        Recommended Development Actions (FR-GAP-004)
+                                    </div>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                        <thead>
+                                            <tr style="background-color: #f8fafc; color: #1d2b32; font-weight: 600; border-bottom: 2px solid #e2e8f0;">
+                                                <th style="padding: 6px 8px; text-align: left;">Target Competency</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 12%;">Pillar</th>
+                                                <th style="padding: 6px 8px; text-align: center; width: 12%;">Priority</th>
+                                                <th style="padding: 6px 8px; text-align: left;">Action Pathway</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="recs" t-as="r">
+                                                <tr style="border-bottom: 1px solid #f1f5f9;">
+                                                    <td style="padding: 6px 8px; font-weight: 600; color: #1d2b32;"><t t-out="r['competency']"/></td>
+                                                    <td style="padding: 6px 8px; text-align: center;"><t t-out="r['pillar']"/></td>
+                                                    <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: #541718;"><t t-out="r['priority']"/></td>
+                                                    <td style="padding: 6px 8px; color: #1d2b32;"><t t-out="r['action']"/></td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </t>
+
+                            <!-- Sign-off Block -->
+                            <div style="margin-top: 30px; page-break-inside: avoid;">
+                                <table style="width: 100%; border: none; font-size: 11px;">
+                                    <tr>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #1d2b32; width: 80%; margin: 0 auto 4px auto;"></div>
+                                            <div style="font-weight: 700; color: #1d2b32;">Employee Signature</div>
+                                            <div style="color: #64748b; font-size: 10px;">Date: ____/____/20__</div>
+                                        </td>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #1d2b32; width: 80%; margin: 0 auto 4px auto;"></div>
+                                            <div style="font-weight: 700; color: #1d2b32;">Supervisor Signature</div>
+                                            <div style="color: #64748b; font-size: 10px;">Date: ____/____/20__</div>
+                                        </td>
+                                        <td style="width: 33%; text-align: center; vertical-align: bottom;">
+                                            <div style="border-bottom: 1px solid #541718; width: 80%; margin: 0 auto 4px auto;"></div>
+                                            <div style="font-weight: 700; color: #541718;">HR / CPCO Verification</div>
+                                            <div style="color: #64748b; font-size: 10px;">Date: ____/____/20__</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+
+        <!-- TIER 2: Team Competency Gap Report Template -->
+        <template id="report_competency_team_gap">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-set="tdata" t-value="doc.get_team_gap_data()"/>
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            
+                            <!-- Cover Strip Header -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
+                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                                Team Competency Gap Report (FR-GAP-006 / FR-RPT-009)
+                                            </div>
+                                        </td>
+                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
+                                            <div><b>Supervisor:</b> <t t-out="tdata['supervisor_name']"/></div>
+                                            <div><b>Cycle:</b> <t t-out="doc.cycle_id.name"/></div>
+                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Team Executive Summary Box -->
+                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px 18px; margin-bottom: 18px;">
+                                <div style="font-size: 13px; font-weight: 700; color: #1d2b32; margin-bottom: 10px;">Team Overview Metrics</div>
+                                <table style="width: 100%; text-align: center; font-size: 11px;">
+                                    <tr>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #726732; font-weight: 500;">Direct Reports</div>
+                                            <div style="font-size: 20px; font-weight: 700; color: #1d2b32; margin-top: 2px;"><t t-out="tdata['total_members']"/></div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #726732; font-weight: 500;">Assessed</div>
+                                            <div style="font-size: 20px; font-weight: 700; color: #1d2b32; margin-top: 2px;"><t t-out="tdata['assessed_members']"/> (<t t-out="tdata['completion_rate']"/>%)</div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #541718; font-weight: 500;">Underqualified Lines</div>
+                                            <div style="font-size: 20px; font-weight: 700; color: #541718; margin-top: 2px;"><t t-out="tdata['below_count']"/></div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #726732; font-weight: 500;">Team Average Gap</div>
+                                            <div style="font-size: 20px; font-weight: 700; color: #726732; margin-top: 2px;"><t t-out="tdata['avg_gap']"/> pts</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Team Member Competency Gap Roster -->
+                            <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                Direct Reports Gap Roster (FR-GAP-005)
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
+                                <thead>
+                                    <tr style="background-color: #1d2b32; color: #FFFFFF; font-weight: 600;">
+                                        <th style="padding: 8px; text-align: left;">Team Member</th>
+                                        <th style="padding: 8px; text-align: left;">Job Position</th>
+                                        <th style="padding: 8px; text-align: center;">Assessment Status</th>
+                                        <th style="padding: 8px; text-align: center;">Overall Status</th>
+                                        <th style="padding: 8px; text-align: left;">Top Critical Gap Areas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="tdata['member_roster']" t-as="m">
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="padding: 8px; font-weight: 700; color: #1d2b32;"><t t-out="m['name']"/></td>
+                                            <td style="padding: 8px; color: #1d2b32;"><t t-out="m['job']"/></td>
+                                            <td style="padding: 8px; text-align: center;"><t t-out="m['status']"/></td>
+                                            <td style="padding: 8px; text-align: center; font-weight: 700;">
+                                                <t t-if="m['overall_status'] == 'Needs Intervention'">
+                                                    <span style="color: #541718;">🔴 Needs Intervention</span>
+                                                </t>
+                                                <t t-elif="m['overall_status'] == 'Fit / Qualified'">
+                                                    <span style="color: #726732;">🟢 Fit / Qualified</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span style="color: #64748b;">⚪ Pending</span>
+                                                </t>
+                                            </td>
+                                            <td style="padding: 8px; color: #1d2b32;"><t t-out="m['top_gaps']"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+
+        <!-- TIER 3: Organizational Capability Report Template -->
+        <template id="report_competency_org_capability">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-set="odata" t-value="doc.get_org_capability_data()"/>
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            
+                            <!-- Cover Strip Header -->
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <table style="width: 100%; border: none;">
+                                    <tr>
+                                        <td style="width: 65%; text-align: left; vertical-align: middle;">
+                                            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                            <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                                Organizational Capability &amp; TNA Report (FR-RPT-001 / FR-RPT-003)
+                                            </div>
+                                        </td>
+                                        <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
+                                            <div><b>Cycle:</b> <t t-out="doc.cycle_id.name"/></div>
+                                            <div><b>Pillar Filter:</b> <t t-out="dict(doc._fields['pillar'].selection).get(doc.pillar)"/></div>
+                                            <div><b>Generated:</b> <t t-out="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d %H:%M')"/></div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Executive Summary Boxes -->
+                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px 18px; margin-bottom: 18px;">
+                                <div style="font-size: 13px; font-weight: 700; color: #1d2b32; margin-bottom: 10px;">Framework Health &amp; Role Mapping Coverage (FR-MAP-007)</div>
+                                <table style="width: 100%; text-align: center; font-size: 11px;">
+                                    <tr>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #726732; font-weight: 500;">Core Competencies</div>
+                                            <div style="font-size: 18px; font-weight: 700; color: #1d2b32; margin-top: 2px;"><t t-out="odata['core_cnt']"/></div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #c17540; font-weight: 500;">Leadership Competencies</div>
+                                            <div style="font-size: 18px; font-weight: 700; color: #c17540; margin-top: 2px;"><t t-out="odata['lead_cnt']"/></div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #1d2b32; font-weight: 500;">Technical Competencies</div>
+                                            <div style="font-size: 18px; font-weight: 700; color: #1d2b32; margin-top: 2px;"><t t-out="odata['tech_cnt']"/></div>
+                                        </td>
+                                        <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
+                                            <div style="color: #541718; font-weight: 500;">Job Position Coverage</div>
+                                            <div style="font-size: 18px; font-weight: 700; color: #541718; margin-top: 2px;"><t t-out="odata['coverage_pct']"/>% (<t t-out="odata['mapped_count']"/> / <t t-out="odata['total_jobs']"/>)</div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- High Priority Gap Call-out Roster -->
+                            <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                High-Priority Organizational Gaps (FR-GAP-005)
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
+                                <thead>
+                                    <tr style="background-color: #1d2b32; color: #FFFFFF; font-weight: 600;">
+                                        <th style="padding: 6px 8px; text-align: left;">Competency Name</th>
+                                        <th style="padding: 6px 8px; text-align: center; width: 25%;">High-Priority Gap Lines Count</th>
+                                        <th style="padding: 6px 8px; text-align: left;">Executive Action Recommendation</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="odata['top_gaps']" t-as="gap">
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="padding: 6px 8px; font-weight: 700; color: #1d2b32;"><t t-out="gap[0]"/></td>
+                                            <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: #541718;"><t t-out="gap[1]"/> lines</td>
+                                            <td style="padding: 6px 8px; color: #1d2b32;">Priority TNA allocation &amp; Bank-wide training intervention</td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <!-- Department Completion Rate Table -->
+                            <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
+                                Assessment Cycle Completion Rate by Department
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
+                                <thead>
+                                    <tr style="background-color: #f8fafc; color: #1d2b32; font-weight: 600; border-bottom: 2px solid #e2e8f0;">
+                                        <th style="padding: 6px 8px; text-align: left;">Department</th>
+                                        <th style="padding: 6px 8px; text-align: center;">Total Assessments</th>
+                                        <th style="padding: 6px 8px; text-align: center;">Approved / Locked</th>
+                                        <th style="padding: 6px 8px; text-align: center;">Completion Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="odata['dept_completion']" t-as="d">
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="padding: 6px 8px; font-weight: 600; color: #1d2b32;"><t t-out="d['name']"/></td>
+                                            <td style="padding: 6px 8px; text-align: center;"><t t-out="d['total']"/></td>
+                                            <td style="padding: 6px 8px; text-align: center;"><t t-out="d['approved']"/></td>
+                                            <td style="padding: 6px 8px; text-align: center; font-weight: 700; color: #726732;"><t t-out="d['rate']"/>%</td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+        <!-- Detailed Competency Performance & Gap Matrix QWeb Template -->
+        <template id="report_competency_detailed_matrix">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                    Detailed Competency Performance &amp; 360 Multi-Rater Gap Matrix
+                                </div>
+                            </div>
+                            <t t-set="rows" t-value="doc._get_360_report_data_rows()"/>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                                <thead>
+                                    <tr style="background-color: #541718; color: #ffffff;">
+                                        <th style="padding: 5px; text-align: left;">Employee</th>
+                                        <th style="padding: 5px; text-align: left;">Job Position</th>
+                                        <th style="padding: 5px; text-align: left;">Competency</th>
+                                        <th style="padding: 5px; text-align: center;">Self</th>
+                                        <th style="padding: 5px; text-align: center;">Peer</th>
+                                        <th style="padding: 5px; text-align: center;">Supervisor</th>
+                                        <th style="padding: 5px; text-align: center;">Weighted</th>
+                                        <th style="padding: 5px; text-align: center;">Required</th>
+                                        <th style="padding: 5px; text-align: center;">Gap</th>
+                                        <th style="padding: 5px; text-align: center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="rows" t-as="r">
+                                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                                            <td style="padding: 4px;"><t t-out="r['emp_name']"/></td>
+                                            <td style="padding: 4px;"><t t-out="r['job_name']"/></td>
+                                            <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['self_rating']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['peer_avg']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['supervisor_avg']"/></td>
+                                            <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['weighted_rating']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['weighted_gap']"/></td>
+                                            <td style="padding: 4px; text-align: center; font-weight: 600;"><t t-out="r['achievement_status']"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+        <!-- Assessment Campaign Progress Tracking QWeb Template -->
+        <template id="report_competency_campaign_progress">
+            <t t-call="web.html_container">
+                <t t-foreach="docs" t-as="doc">
+                    <t t-call="web.external_layout">
+                        <div class="page" style="font-family: Arial, sans-serif; font-size: 12px; color: #1d2b32; padding: 10px;">
+                            <div style="background-color: #541718; color: #FFFFFF; padding: 14px 18px; border-radius: 6px; margin-bottom: 16px; border-bottom: 4px solid #726732;">
+                                <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
+                                <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
+                                    Assessment Campaign Completion &amp; Progress Tracking Report
+                                </div>
+                            </div>
+                            <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px;">
+                                <strong>Assessment Campaign:</strong> <t t-out="doc.cycle_id.name"/><br/>
+                                <strong>Deadline:</strong> <t t-out="doc.cycle_id.assessment_deadline"/>
+                            </div>
+                            <t t-set="odata" t-value="doc.get_org_capability_data()"/>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                                <thead>
+                                    <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                                        <th style="padding: 6px; text-align: left;">Department</th>
+                                        <th style="padding: 6px; text-align: center;">Total Assessments</th>
+                                        <th style="padding: 6px; text-align: center;">Approved / Locked</th>
+                                        <th style="padding: 6px; text-align: center;">Completion Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="odata['dept_completion']" t-as="d">
+                                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                                            <td style="padding: 6px;"><t t-out="d['name']"/></td>
+                                            <td style="padding: 6px; text-align: center;"><t t-out="d['total']"/></td>
+                                            <td style="padding: 6px; text-align: center;"><t t-out="d['approved']"/></td>
+                                            <td style="padding: 6px; text-align: center; font-weight: 700; color: #726732;"><t t-out="d['rate']"/>%</td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+                    </t>
+                </t>
+            </t>
+        </template>
+
+    </data>
+</odoo>

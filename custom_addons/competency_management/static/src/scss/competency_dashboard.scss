@@ -1,0 +1,127 @@
+/* Competency Management System — OWL Dashboard SCSS Styling */
+/* Primary Brand Color: #541718 Deep Maroon | Secondary: #1d2b32 Navy | Accents: #c17540 Orange, #726732 Olive */
+/* NOTE: brand colors above are intentionally NOT modified anywhere in this file. */
+
+.o_action:has(.o_competency_dashboard_owl),
+.o_content:has(.o_competency_dashboard_owl) {
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+.o_competency_dashboard_owl {
+    background-color: #fcfbfa;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-bottom: 60px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .table-bordered {
+        border-color: #e2e8f0;
+
+        th {
+            background-color: #f8fafc;
+            color: #1d2b32;
+            font-weight: 600;
+        }
+
+        td {
+            transition: background-color 0.15s ease-in-out;
+        }
+
+        tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+    }
+
+    .badge {
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Subtle lift on KPI / chart cards for better visual hierarchy without touching brand colors */
+    .o_competency_card,
+    div[style*="box-shadow: 0 4px 12px rgba(0,0,0,0.05)"] {
+        transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+    }
+    .o_competency_card:hover {
+        box-shadow: 0 8px 20px rgba(29, 43, 50, 0.09) !important;
+        transform: translateY(-1px);
+    }
+
+    /* Persona pill buttons: smooth active-state transition */
+    button.btn-sm {
+        transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    }
+
+    /* Dropdown filters: consistent focus ring using the navy brand tone, not a generic blue */
+    select.form-select:focus {
+        border-color: #726732;
+        box-shadow: 0 0 0 0.2rem rgba(114, 103, 50, 0.18);
+        outline: none;
+    }
+
+    /* Heatmap cells: clearer hover affordance since cells are clickable drill-downs */
+    .o_competency_heatmap_cell {
+        cursor: pointer;
+        transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+    }
+    .o_competency_heatmap_cell:hover {
+        transform: scale(1.04);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+        z-index: 1;
+        position: relative;
+    }
+
+    /* Thin, unobtrusive scrollbar for any horizontally scrollable tables (heatmap, roster) */
+    .o_competency_scroll {
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+
+        &::-webkit-scrollbar {
+            height: 6px;
+        }
+        &::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+    }
+
+    /* Empty-state placeholders (charts / banners with no real data yet) */
+    .o_competency_empty_state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        text-align: center;
+        gap: 6px;
+    }
+
+    @media (max-width: 992px) {
+        h2 { font-size: 17px !important; }
+    }
+}
+

@@ -204,7 +204,7 @@ class EdsAnnualPlan(models.Model):
                 'Approver must all be different individuals.'))
 
     def _log_approval_step(self, state_from, state_to, comment=''):
-        self.env['eds.approval.history'].create({
+        self.env['eds.approval.history'].sudo().create({
             'annual_plan_id': self.id,
             'state_from': state_from,
             'state_to': state_to,
@@ -223,11 +223,9 @@ class EdsAnnualPlan(models.Model):
                 raise UserError(_('Only draft plans can be submitted to Director review.'))
             if not rec.line_ids:
                 raise UserError(_('Generate the calendar before submitting the plan for approval.'))
-            rec.reviewer_id = rec.reviewer_id or self.env.user.id
-            rec._check_segregation()
             rec.state = 'director_review'
             rec._log_approval_step('draft', 'director_review')
-            rec.message_post(body=_('Annual plan %s submitted to Director PPDD review ().')
+            rec.message_post(body=_('Annual plan %s submitted to Director PPDD review.')
                              % rec.name)
 
     def action_director_approve(self):
@@ -236,8 +234,7 @@ class EdsAnnualPlan(models.Model):
             rec._require_manager()
             if rec.state != 'director_review':
                 raise UserError(_('Only plans under Director review can be endorsed by CPCO.'))
-            rec.reviewer_id = rec.reviewer_id or self.env.user.id
-            rec.endorser_id = rec.endorser_id or self.env.user.id
+            rec.reviewer_id = self.env.user.id
             rec._check_segregation()
             rec.state = 'cpco_endorsement'
             rec._log_approval_step('director_review', 'cpco_endorsement')
@@ -250,8 +247,7 @@ class EdsAnnualPlan(models.Model):
             rec._require_manager()
             if rec.state != 'cpco_endorsement':
                 raise UserError(_('Only CPCO-endorsed plans can move to SMC approval.'))
-            rec.endorser_id = rec.endorser_id or self.env.user.id
-            rec.approver_id = rec.approver_id or self.env.user.id
+            rec.endorser_id = self.env.user.id
             rec._check_segregation()
             rec.state = 'smc_approval'
             rec._log_approval_step('cpco_endorsement', 'smc_approval')
@@ -259,12 +255,12 @@ class EdsAnnualPlan(models.Model):
                              % rec.name)
 
     def action_publish(self):
-        """SMC Approval -> Published: activates the downstream sessions ()."""
+        """SMC Approval -> Published: activates the downstream sessions."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'smc_approval':
                 raise UserError(_('Only SMC-approved plans can be published.'))
-            rec.approver_id = rec.approver_id or self.env.user.id
+            rec.approver_id = self.env.user.id
             rec._check_segregation()
             rec.write({
                 'state': 'published',

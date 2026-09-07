@@ -31,6 +31,7 @@
                     <field name="name"/>
                     <field name="pillar" widget="badge"/>
                     <field name="functional_domain"/>
+                    <field name="state" widget="badge"/>
                     <field name="status" widget="badge"/>
                     <field name="active"/>
                 </list>
@@ -43,38 +44,55 @@
             <field name="model">competency.competency</field>
             <field name="arch" type="xml">
                 <form>
+                    <header>
+                        <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve Competency" type="object" class="oe_highlight" invisible="state != 'submitted'"/>
+                        <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'"/>
+                        <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,retired"/>
+                    </header>
                     <sheet>
-                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="status != 'retired'"/>
+                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="state != 'retired'"/>
                         <group>
                             <group string="Identity">
-                                <field name="name"/>
-                                <field name="code"/>
-                                <field name="pillar"/>
-                                <field name="functional_domain"/>
-                                <field name="rating_model_id"/>
+                                <field name="name" readonly="state in ('approved', 'retired')"/>
+                                <field name="code" readonly="state in ('approved', 'retired')"/>
+                                <field name="pillar" readonly="state in ('approved', 'retired')"/>
+                                <field name="functional_domain" readonly="state in ('approved', 'retired')"/>
+                                <field name="rating_model_id" readonly="state in ('approved', 'retired')"/>
                             </group>
-                            <group string="Status">
-                                <field name="status"/>
-                                <field name="active"/>
-                                <field name="is_seed"/>
+                            <group string="Status &amp; Approval">
+                                <field name="status" widget="badge" readonly="1"/>
+                                <field name="active" readonly="1"/>
                             </group>
                         </group>
                         <group string="Definition">
-                            <field name="definition" placeholder="Define the competency and what it covers..."/>
+                            <field name="definition" readonly="status == 'retired'" placeholder="Define the competency and what it covers..." colspan="2"/>
                         </group>
                         <notebook>
                             <page string="Proficiency Levels">
-                                <field name="proficiency_level_ids">
+                                <field name="proficiency_level_ids" readonly="status == 'retired'">
                                     <list editable="bottom">
                                         <field name="level"/>
-                                        <field name="name"/>
-                                        <field name="definition"/>
-                                        <field name="behavioral_indicators"/>
+                                        <field name="name" readonly="1"/>
+                                        <field name="behavioral_indicators" required="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Applicable Job Positions">
                                 <field name="applicable_job_ids" widget="many2many_tags"/>
+                            </page>
+                            <page string="Definition Change History" groups="competency_management.group_competency_admin">
+                                <field name="change_log_ids">
+                                    <list>
+                                        <field name="effective_date"/>
+                                        <field name="user_id"/>
+                                        <field name="level_id"/>
+                                        <field name="old_definition"/>
+                                        <field name="new_definition"/>
+                                        <field name="change_description"/>
+                                    </list>
+                                </field>
                             </page>
                         </notebook>
                     </sheet>
@@ -91,6 +109,9 @@
                 <search>
                     <field name="name"/>
                     <field name="code"/>
+                    <field name="pillar"/>
+                    <field name="functional_domain"/>
+                    <filter string="Active Competencies" name="active_status" domain="[('status','=','active')]"/>
                     <filter string="Core" name="pillar_core" domain="[('pillar','=','core')]"/>
                     <filter string="Leadership" name="pillar_leadership" domain="[('pillar','=','leadership')]"/>
                     <filter string="Technical" name="pillar_technical" domain="[('pillar','=','technical')]"/>
@@ -107,6 +128,7 @@
             <field name="name">Competency Dictionary</field>
             <field name="res_model">competency.competency</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_active_status': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_competency_search"/>
         </record>
 

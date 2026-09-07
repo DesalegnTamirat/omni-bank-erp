@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_competency_coverage_report_list" model="ir.ui.view">
+            <field name="name">competency.coverage.report.list</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <list create="false" edit="false" delete="false">
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <field name="mapping_status" widget="badge" decoration-success="mapping_status == 'mapped'" decoration-warning="mapping_status == 'draft'" decoration-danger="mapping_status == 'unmapped'"/>
+                    <field name="active_version"/>
+                    <field name="mapped_competencies_count"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_coverage_report_graph" model="ir.ui.view">
+            <field name="name">competency.coverage.report.graph</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <graph string="Competency Mapping Coverage" type="bar">
+                    <field name="department_id"/>
+                    <field name="mapping_status"/>
+                </graph>
+            </field>
+        </record>
+
+        <record id="view_competency_coverage_report_pivot" model="ir.ui.view">
+            <field name="name">competency.coverage.report.pivot</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <pivot string="Competency Mapping Coverage">
+                    <field name="department_id" type="row"/>
+                    <field name="mapping_status" type="col"/>
+                    <field name="mapped_competencies_count" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <record id="view_competency_coverage_report_search" model="ir.ui.view">
+            <field name="name">competency.coverage.report.search</field>
+            <field name="model">competency.coverage.report</field>
+            <field name="arch" type="xml">
+                <search string="Coverage Search">
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <filter string="Approved Mappings" name="mapped" domain="[('mapping_status', '=', 'mapped')]"/>
+                    <filter string="Draft Mappings" name="draft" domain="[('mapping_status', '=', 'draft')]"/>
+                    <filter string="Unmapped Roles" name="unmapped" domain="[('mapping_status', '=', 'unmapped')]"/>
+                    <group>
+                        <filter string="Department" name="group_by_department" context="{'group_by': 'department_id'}"/>
+                        <filter string="Coverage Status" name="group_by_status" context="{'group_by': 'mapping_status'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_coverage_report" model="ir.actions.act_window">
+            <field name="name">Competency Coverage Report</field>
+            <field name="res_model">competency.coverage.report</field>
+            <field name="view_mode">graph,pivot,list</field>
+            <field name="search_view_id" ref="view_competency_coverage_report_search"/>
+        </record>
+    </data>
+</odoo>

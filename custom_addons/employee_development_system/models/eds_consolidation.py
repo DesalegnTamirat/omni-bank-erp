@@ -297,7 +297,7 @@ class EdsTnaConsolidation(models.Model):
                 'Approver must all be different individuals.'))
 
     def _log_approval_step(self, state_from, state_to, comment=''):
-        self.env['eds.approval.history'].create({
+        self.env['eds.approval.history'].sudo().create({
             'consolidation_id': self.id,
             'state_from': state_from,
             'state_to': state_to,
@@ -311,14 +311,12 @@ class EdsTnaConsolidation(models.Model):
             raise UserError(_('This approval step requires L&D Manager authority ().'))
 
     def action_submit_ppdd(self):
-        """Draft -> PPDD Validation (starts the approval chain, )."""
+        """Draft -> PPDD Validation (starts the approval chain)."""
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('Only draft consolidations can be submitted to PPDD validation.'))
             if not rec.entry_ids:
                 raise UserError(_('Consolidate the training needs before submitting for approval.'))
-            rec.validator_id = rec.validator_id or self.env.user.id
-            rec._check_segregation()
             rec.state = 'ppdd_validation'
             rec._log_approval_step('draft', 'ppdd_validation')
             rec.message_post(body=_('Consolidation %s submitted to PPDD Validation.') % rec.name)
@@ -329,8 +327,7 @@ class EdsTnaConsolidation(models.Model):
             rec._require_manager()
             if rec.state != 'ppdd_validation':
                 raise UserError(_('Only consolidations under PPDD validation can move to Director review.'))
-            rec.validator_id = rec.validator_id or self.env.user.id
-            rec.reviewer_id = rec.reviewer_id or self.env.user.id
+            rec.validator_id = self.env.user.id
             rec._check_segregation()
             rec.state = 'director_review'
             rec._log_approval_step('ppdd_validation', 'director_review')
@@ -343,8 +340,7 @@ class EdsTnaConsolidation(models.Model):
             rec._require_manager()
             if rec.state != 'director_review':
                 raise UserError(_('Only consolidations under Director review can be endorsed by CPCO.'))
-            rec.reviewer_id = rec.reviewer_id or self.env.user.id
-            rec.endorser_id = rec.endorser_id or self.env.user.id
+            rec.reviewer_id = self.env.user.id
             rec._check_segregation()
             rec.state = 'cpco_endorsement'
             rec._log_approval_step('director_review', 'cpco_endorsement')
@@ -357,8 +353,7 @@ class EdsTnaConsolidation(models.Model):
             rec._require_manager()
             if rec.state != 'cpco_endorsement':
                 raise UserError(_('Only CPCO-endorsed consolidations can move to SMC approval.'))
-            rec.endorser_id = rec.endorser_id or self.env.user.id
-            rec.approver_id = rec.approver_id or self.env.user.id
+            rec.endorser_id = self.env.user.id
             rec._check_segregation()
             rec.state = 'smc_approval'
             rec._log_approval_step('cpco_endorsement', 'smc_approval')
@@ -366,12 +361,12 @@ class EdsTnaConsolidation(models.Model):
                              % rec.name)
 
     def action_smc_approve(self):
-        """SMC Approval -> Approved (/010)."""
+        """SMC Approval -> Approved."""
         for rec in self:
             rec._require_manager()
             if rec.state != 'smc_approval':
                 raise UserError(_('Only consolidations under SMC approval can be approved.'))
-            rec.approver_id = rec.approver_id or self.env.user.id
+            rec.approver_id = self.env.user.id
             rec._check_segregation()
             rec.write({
                 'state': 'approved',
@@ -411,3 +406,75 @@ class EdsTnaConsolidation(models.Model):
         self.state = 'approved'
         self._log_approval_step('locked', 'approved', _('Unlocked with documented change request'))
         self.message_post(body=_('Consolidation %s unlocked with a documented change request.') % self.name)
+
+    def action_generate_courses_from_tna(self):
+        """Synthesize approved consolidated TNA needs into Course Catalog (eds.course) entries."""
+        self.ensure_one()
+        if self.state not in ('approved', 'locked'):
+            raise UserError(_('Courses can only be generated from Approved or Locked TNA consolidations.'))
+
+        Course = self.env['eds.course']
+        created_courses = []
+        entries_to_convert = self.entry_ids.filtered(
+            lambda e: e.state == 'approved' and not e.is_duplicate and not e.converted_course_ref
+        )
+
+        if not entries_to_convert:
+            raise UserError(_('No approved unconverted training needs found in this consolidation.'))
+
+        grouped = {}
+        for entry in entries_to_convert:
+            prog_name = entry.proposed_program or (entry.competency_id and f"{entry.competency_id.name} Development Course") or _("New TNA Training Program")
+            grouped.setdefault(prog_name, []).append(entry)
+
+        for prog_name, entries in grouped.items():
+            first = entries[0]
+            existing_course = Course.search([('name', '=ilike', prog_name)], limit=1)
+            if not existing_course:
+                comp_lines = []
+                seen_comps = set()
+                for e in entries:
+                    if e.competency_id and e.competency_id.id not in seen_comps:
+                        seen_comps.add(e.competency_id.id)
+                        comp_lines.append((0, 0, {
+                            'competency_id': e.competency_id.id,
+                            'required_level': '2',
+                            'notes': _('Synthesized from TNA consolidation %s') % self.name,
+                        }))
+
+                target_jobs = self.env['hr.job']
+                for e in entries:
+                    if e.employee_id and e.employee_id.job_id:
+                        target_jobs |= e.employee_id.job_id
+
+                course_vals = {
+                    'name': prog_name,
+                    'delivery_method': 'internal',
+                    'description': _("Consolidated from %d TNA participant requests in %s.") % (len(entries), self.name),
+                    'status': 'draft',
+                    'competency_line_ids': comp_lines,
+                    'target_audience_ids': [(6, 0, target_jobs.ids)] if target_jobs else [],
+                }
+                existing_course = Course.create(course_vals)
+                created_courses.append(existing_course)
+
+            for entry in entries:
+                entry.write({
+                    'state': 'converted',
+                    'converted_course_ref': existing_course.name,
+                })
+
+        self.message_post(body=_(
+            "Course Synthesis: Generated %d new Course Catalog proposals and linked %d approved training needs."
+        ) % (len(created_courses), len(entries_to_convert)))
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Course Generation Complete'),
+                'message': _('Synthesized %d course catalog entries from %d approved TNA needs.') % (len(created_courses), len(entries_to_convert)),
+                'type': 'success',
+                'sticky': False,
+            }
+        }

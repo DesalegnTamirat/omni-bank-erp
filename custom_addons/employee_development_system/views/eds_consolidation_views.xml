@@ -91,6 +91,9 @@
                                 type="object" class="oe_highlight" invisible="state != 'cpco_endorsement'"/>
                         <button name="action_smc_approve" string="SMC Final Approval"
                                 type="object" class="oe_highlight" invisible="state != 'smc_approval'"/>
+                        <button name="action_generate_courses_from_tna" string="Generate Course Proposals"
+                                type="object" class="btn-success" invisible="state not in ('approved', 'locked')"
+                                confirm="Synthesize approved TNA needs into Course Catalog proposals?"/>
                         <button name="action_lock" string="Lock Register"
                                 type="object" invisible="state != 'approved'"/>
                         <button name="action_unlock" string="Unlock (Change Request)"

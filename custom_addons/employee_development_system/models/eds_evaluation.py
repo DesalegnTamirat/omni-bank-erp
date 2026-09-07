@@ -94,9 +94,15 @@ class EdsEvaluationLevel1(models.Model):
     general_comments = fields.Text(string='General Comments & Suggestions')
     recommend_to_others = fields.Selection([('yes', 'Yes'), ('no', 'No'), ('maybe', 'Maybe')], string='Would recommend course?')
 
-    _sql_constraints = [
-        ('unique_session_participant_l1', 'unique(session_id, employee_id)', 'A Level 1 evaluation already exists for this participant in this session.')
-    ]
+    @api.constrains('session_id', 'employee_id')
+    def _check_unique_session_participant(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("A Level 1 evaluation already exists for participant %s in session %s.") % (
+                        rec.employee_id.name, rec.session_id.name
+                    ))
 
     @api.depends('session_id.date_end')
     def _compute_sla_deadline(self):
@@ -167,9 +173,15 @@ class EdsEvaluationLevel2(models.Model):
         ('evaluated', 'Evaluated'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    _sql_constraints = [
-        ('unique_session_emp_l2', 'unique(session_id, employee_id)', 'A Level 2 evaluation already exists for this participant in this session.')
-    ]
+    @api.constrains('session_id', 'employee_id')
+    def _check_unique_session_participant_l2(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("A Level 2 evaluation already exists for participant %s in session %s.") % (
+                        rec.employee_id.name, rec.session_id.name
+                    ))
 
     @api.depends('pre_score', 'post_score')
     def _compute_learning_gain(self):

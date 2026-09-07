@@ -18,6 +18,73 @@
             </field>
         </record>
 
+        <!-- Form view for competency.role.mapping.line popup modal -->
+        <record id="view_competency_role_mapping_line_form" model="ir.ui.view">
+            <field name="name">competency.role.mapping.line.form</field>
+            <field name="model">competency.role.mapping.line</field>
+            <field name="arch" type="xml">
+                <form string="Role Competency Requirements &amp; Behavioral Guidance">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 15px;">
+                            <h1 style="color: #541718;"><field name="competency_id" readonly="mapping_id.state != 'draft'"/></h1>
+                            <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
+                        </div>
+                        
+                        <!-- Full-width Competency Definition Callout Container -->
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; width: 100%;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; margin-bottom: 10px;">
+                            <h3 style="color: #1d2b32; border-bottom: 2px solid #541718; padding-bottom: 5px;">
+                                📖 Proficiency Level Behavioral Indicators (Levels 1 to 4)
+                            </h3>
+                            <p class="text-muted">Review the expected behaviors for each level below before configuring the required proficiency for this role.</p>
+                        </div>
+
+                        <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fcfbfa; border-left: 5px solid #726732; border-radius: 4px;">
+                                <h4 style="color: #726732; margin-top: 0; margin-bottom: 6px;">🟡 Level 1 — Basic</h4>
+                                <field name="indicator_level_1" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #f8f9fa; border-left: 5px solid #1d2b32; border-radius: 4px;">
+                                <h4 style="color: #1d2b32; margin-top: 0; margin-bottom: 6px;">🔵 Level 2 — Intermediate</h4>
+                                <field name="indicator_level_2" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="margin-bottom: 12px; padding: 12px 15px; background-color: #fdf8f5; border-left: 5px solid #c17540; border-radius: 4px;">
+                                <h4 style="color: #c17540; margin-top: 0; margin-bottom: 6px;">🟠 Level 3 — Advanced</h4>
+                                <field name="indicator_level_3" readonly="1" nolabel="1"/>
+                            </div>
+
+                            <div style="padding: 12px 15px; background-color: #faf4f5; border-left: 5px solid #541718; border-radius: 4px;">
+                                <h4 style="color: #541718; margin-top: 0; margin-bottom: 6px;">🔴 Level 4 — Expert</h4>
+                                <field name="indicator_level_4" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <group string="Required Proficiency &amp; Weighting Configuration" style="margin-top: 20px;">
+                            <group>
+                                <field name="is_matrix_configured" invisible="1"/>
+                                <field name="default_proficiency" readonly="1"/>
+                                <field name="override_default"/>
+                                <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
+                            </group>
+                            <group>
+                                <field name="weight"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <!-- Role Mapping Form -->
         <record id="view_competency_role_mapping_form" model="ir.ui.view">
             <field name="name">competency.role.mapping.form</field>
@@ -38,24 +105,50 @@
                     <sheet>
                         <group>
                             <group>
-                                <field name="job_position_id"/>
-                                <field name="grade_id"/>
-                                <field name="version"/>
-                                <field name="effective_date"/>
+                                <field name="job_position_id" readonly="state != 'draft'"/>
+                                <field name="grade_id" readonly="1" force_save="1"/>
+                                <field name="version" readonly="state != 'draft'"/>
+                                <field name="effective_date" readonly="state != 'draft'"/>
                             </group>
                             <group>
+                                <label for="cluster_ids"/>
+                                <div class="o_row">
+                                    <field name="cluster_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}"/>
+                                    <button name="action_populate_from_clusters" string="Populate from Clusters" type="object" class="btn btn-secondary btn-sm ms-2" invisible="state != 'draft'" icon="fa-cubes"/>
+                                </div>
                                 <field name="last_review_date"/>
                                 <field name="next_review_date"/>
                                 <field name="approved_by_id"/>
                                 <field name="approval_date"/>
                             </group>
                         </group>
+                        <group string="Operating Unit Target Boundaries">
+                            <group>
+                                <field name="is_operating_unit_specific" widget="boolean_toggle" readonly="state != 'draft'"/>
+                            </group>
+                            <group invisible="not is_operating_unit_specific">
+                                <field name="operating_unit_ids" widget="many2many_tags" readonly="state != 'draft'" options="{'no_create': True}" placeholder="Select specific Operating Units (leave empty to apply globally)..."/>
+                            </group>
+                        </group>
+                        <group string="Version Governance &amp; Change Log">
+                            <field name="change_description" readonly="state != 'draft'" placeholder="Describe changes introduced in this version..."/>
+                        </group>
                         <group string="Required Competencies">
-                            <field name="line_ids">
-                                <list editable="bottom">
+                            <field name="line_ids" readonly="state != 'draft'">
+                                <list>
+                                    <field name="is_matrix_configured" column_invisible="True"/>
+                                    <field name="default_proficiency" column_invisible="True"/>
+                                    <field name="competency_definition" column_invisible="True"/>
+                                    <field name="indicator_level_1" column_invisible="True"/>
+                                    <field name="indicator_level_2" column_invisible="True"/>
+                                    <field name="indicator_level_3" column_invisible="True"/>
+                                    <field name="indicator_level_4" column_invisible="True"/>
                                     <field name="competency_id"/>
-                                    <field name="required_proficiency"/>
+                                    <field name="pillar" widget="badge" readonly="1"/>
+                                    <field name="override_default"/>
+                                    <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
                                     <field name="weight"/>
+                                    <button name="action_reset_to_default_proficiency" title="Reset to Matrix Default Level" type="object" icon="fa-undo" invisible="not override_default or not default_proficiency"/>
                                 </list>
                             </field>
                         </group>
@@ -73,8 +166,13 @@
                 <search>
                     <field name="job_position_id"/>
                     <field name="grade_id"/>
+                    <field name="version"/>
                     <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
                     <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                    <group>
+                        <filter string="Job Position" name="group_job" context="{'group_by':'job_position_id'}"/>
+                        <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
+                    </group>
                 </search>
             </field>
         </record>
@@ -83,6 +181,7 @@
             <field name="name">Role-Competency Mapping</field>
             <field name="res_model">competency.role.mapping</field>
             <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_state_approved': 1}</field>
             <field name="search_view_id" ref="competency_management.view_competency_role_mapping_search"/>
         </record>
 

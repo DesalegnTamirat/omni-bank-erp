@@ -49,9 +49,9 @@
     </data>
 
     <!-- Record Rules -->
-    <data noupdate="1">
+    <data noupdate="0">
 
-        <!-- Assessment: employee sees only own records (/058 confidentiality) -->
+        <!-- Assessment: employee sees only own records -->
         <record id="rule_competency_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
@@ -63,96 +63,145 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Assessment: supervisor sees own + team assessments -->
+        <!-- Assessment: supervisor / manager sees own + team + assigned Operating Unit assessments -->
         <record id="rule_competency_assessment_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
-            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), ('assessor_id', '=', user.id)]</field>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), '|', ('assessor_id', '=', user.id), '|', ('employee_id.default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
+        </record>
+
+        <!-- Assessment: admin sees all assessments -->
+        <record id="rule_competency_assessment_admin_all" model="ir.rule">
+            <field name="name">Admin All Competency Assessments</field>
+            <field name="model_id" ref="competency_management.model_competency_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+        </record>
+
+        <!-- HR Employee Read Access for 360 Degree Competency Evaluations -->
+        <record id="rule_hr_employee_competency_read" model="ir.rule">
+            <field name="name">360 Competency Evaluation HR Employee Read Access</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">['|', ('user_id', '=', user.id), '|', ('parent_id.user_id', '=', user.id), '|', ('default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="global" eval="False"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee')), (4, ref('competency_management.group_competency_supervisor'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_hr_employee_competency_admin_read" model="ir.rule">
+            <field name="name">360 Competency Evaluation Admin HR Employee Read Access</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="global" eval="False"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin')), (4, ref('hr.group_hr_user')), (4, ref('hr.group_hr_manager')), (4, ref('base.group_system'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Dashboard Snapshot: supervisor / manager sees own Operating Unit snapshots -->
+        <record id="rule_competency_dashboard_snapshot_supervisor" model="ir.rule">
+            <field name="name">Supervisor Operating Unit Dashboard Snapshots</field>
+            <field name="model_id" ref="competency_management.model_competency_dashboard_snapshot"/>
+            <field name="domain_force">['|', ('operating_unit_id', '=', False), '|', ('operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
+        </record>
+
+        <!-- Dashboard Snapshot: admin sees all snapshots -->
+        <record id="rule_competency_dashboard_snapshot_admin" model="ir.rule">
+            <field name="name">Admin All Dashboard Snapshots</field>
+            <field name="model_id" ref="competency_management.model_competency_dashboard_snapshot"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
         </record>
 
         <!-- Assessment lines: mirror the parent assessment rules -->
         <record id="rule_competency_assessment_line_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessment Lines</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
-            <field name="domain_force">[('assessment_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', ('assessment_id.employee_id.user_id', '=', user.id), ('assessment_id.assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
             <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
         </record>
         <record id="rule_competency_assessment_line_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Assessment Lines</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
-            <field name="domain_force">[('assessment_id.employee_id.parent_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', ('assessment_id.employee_id.parent_id.user_id', '=', user.id), ('assessment_id.assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
-        </record>
-
-        <!-- IDP: employee sees only own plans -->
-        <record id="rule_competency_idp_employee_own" model="ir.rule">
-            <field name="name">Employee Own IDPs</field>
-            <field name="model_id" ref="competency_management.model_competency_idp"/>
-            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
             <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+        <record id="rule_competency_assessment_line_admin_all" model="ir.rule">
+            <field name="name">Admin All Assessment Lines</field>
+            <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
         </record>
 
-        <!-- IDP: supervisor sees own + team plans -->
-        <record id="rule_competency_idp_supervisor_team" model="ir.rule">
-            <field name="name">Supervisor Team IDPs</field>
-            <field name="model_id" ref="competency_management.model_competency_idp"/>
-            <field name="domain_force">[('employee_id.parent_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
-        </record>
-
-        <!-- IDP activities & checkpoints: mirror the parent IDP rules -->
-        <record id="rule_competency_idp_activity_employee_own" model="ir.rule">
-            <field name="name">Employee Own IDP Activities</field>
-            <field name="model_id" ref="competency_management.model_competency_idp_activity"/>
-            <field name="domain_force">[('idp_id.employee_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
-            <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
-        </record>
-        <record id="rule_competency_idp_activity_supervisor_team" model="ir.rule">
-            <field name="name">Supervisor Team IDP Activities</field>
-            <field name="model_id" ref="competency_management.model_competency_idp_activity"/>
-            <field name="domain_force">[('idp_id.employee_id.parent_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
-        </record>
-        <record id="rule_competency_idp_checkpoint_employee_own" model="ir.rule">
-            <field name="name">Employee Own IDP Checkpoints</field>
-            <field name="model_id" ref="competency_management.model_competency_idp_checkpoint"/>
-            <field name="domain_force">[('idp_id.employee_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
-            <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
-            <field name="perm_create" eval="False"/>
-            <field name="perm_unlink" eval="False"/>
-        </record>
-        <record id="rule_competency_idp_checkpoint_supervisor_team" model="ir.rule">
-            <field name="name">Supervisor Team IDP Checkpoints</field>
-            <field name="model_id" ref="competency_management.model_competency_idp_checkpoint"/>
-            <field name="domain_force">[('idp_id.employee_id.parent_id.user_id', '=', user.id)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
-        </record>
-
-        <!-- Multi-company rules for assessment & idp -->
+        <!-- Multi-company rules for assessment -->
         <record id="rule_competency_assessment_multi_company" model="ir.rule">
             <field name="name">Competency Assessment Multi Company</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
-        <record id="rule_competency_idp_multi_company" model="ir.rule">
-            <field name="name">Competency IDP Multi Company</field>
-            <field name="model_id" ref="competency_management.model_competency_idp"/>
-            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+
+        <!-- Competency Dictionary Record Rules -->
+        <record id="rule_competency_competency_employee_approved_active" model="ir.rule">
+            <field name="name">Employee Approved Active Competencies Only</field>
+            <field name="model_id" ref="competency_management.model_competency_competency"/>
+            <field name="domain_force">[('state', '=', 'approved'), ('status', '=', 'active')]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_competency_competency_admin_all" model="ir.rule">
+            <field name="name">Admin All Competencies</field>
+            <field name="model_id" ref="competency_management.model_competency_competency"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+        </record>
+
+        <!-- Role-Competency Mapping Record Rules: Non-admin users see only their own job position mapping -->
+        <record id="rule_competency_role_mapping_employee_own" model="ir.rule">
+            <field name="name">Employee Own Job Competency Mapping</field>
+            <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
+            <field name="domain_force">['|', ('create_uid', '=', user.id), ('job_position_id', '=', user.employee_id.job_id.id)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_competency_role_mapping_supervisor_own" model="ir.rule">
+            <field name="name">Supervisor Own Job Competency Mapping</field>
+            <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
+            <field name="domain_force">['|', ('create_uid', '=', user.id), ('job_position_id', '=', user.employee_id.job_id.id)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <record id="rule_competency_role_mapping_admin_all" model="ir.rule">
+            <field name="name">Admin All Competency Role Mappings</field>
+            <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
         </record>
 
     </data>

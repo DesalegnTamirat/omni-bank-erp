@@ -272,12 +272,17 @@ class EdsSession(models.Model):
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
 
-    _sql_constraints = [
-        ('date_range_valid', 'check(date_end >= date_start)',
-         'The session end must not be before its start!'),
-        ('capacity_positive', 'check(capacity > 0)',
-         'Session capacity must be greater than zero!'),
-    ]
+    @api.constrains('date_start', 'date_end')
+    def _check_date_range(self):
+        for rec in self:
+            if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
+                raise ValidationError(_('The session end date must not be before its start date.'))
+
+    @api.constrains('capacity')
+    def _check_capacity_positive(self):
+        for rec in self:
+            if rec.capacity <= 0:
+                raise ValidationError(_('Session capacity must be greater than zero.'))
 
     @api.model
     def _get_default_capacity(self):
@@ -421,9 +426,8 @@ class EdsSession(models.Model):
             if line.status in ('planned', 'delayed', 'cancelled'):
                 line.status = 'scheduled'
 
-    # ── Conflict detection (/020) ──────────────────────────────────
     def _get_venue_conflicts(self):
-        """Other sessions using the same venue on an overlapping window."""
+        """Other non-cancelled sessions sharing this venue on an overlapping window."""
         self.ensure_one()
         if not self.venue_id or not self.date_start or not self.date_end \
                 or self.status == 'cancelled':
@@ -466,25 +470,55 @@ class EdsSession(models.Model):
 
     @api.constrains('date_start', 'date_end', 'venue_id', 'trainer_ids', 'status')
     def _check_session_conflicts(self):
-        """Blocking enforcement of the venue + trainer conflict rules (/020)."""
+        """Blocking enforcement of the venue + trainer conflict rules."""
         for rec in self:
             if rec.status in ('cancelled', 'completed'):
                 continue
             venue = rec._get_venue_conflicts()
             if venue:
                 raise ValidationError(_(
-                    'Venue Conflict : %s is already booked for session %s on an '
-                    'overlapping slot.' % (rec.venue_id.name, venue[0].name)))
+                    'Venue Conflict: %s is already booked for session %s on an overlapping slot.'
+                ) % (rec.venue_id.name, venue[0].name))
             trainers = rec._get_trainer_conflicts()
             if trainers:
                 raise ValidationError(_(
-                    'Trainer Conflict : trainer(s) %s are already assigned to an '
-                    'overlapping session.' % ', '.join(trainers.mapped('name'))))
+                    'Trainer Conflict: trainer(s) %s are already assigned to an overlapping session.'
+                ) % ', '.join(trainers.mapped('name')))
             blocked = rec._get_blocked_trainer_availability()
             if blocked:
                 raise ValidationError(_(
-                    'Trainer Unavailable : trainer(s) %s have a blocked availability '
-                    'record in this period.' % ', '.join(blocked.mapped('name'))))
+                    'Trainer Unavailable: trainer(s) %s have a blocked availability record in this period.'
+                ) % ', '.join(blocked.mapped('name')))
+
+            # Check internal trainer approved leave
+            if 'hr.leave' in self.env.registry:
+                for t in rec.trainer_ids.filtered(lambda tr: tr.trainer_type == 'internal' and tr.employee_id):
+                    emp = t.employee_id
+                    leaves = self.env['hr.leave'].search([
+                        ('employee_id', '=', emp.id),
+                        ('state', '=', 'validate'),
+                        ('date_from', '<', rec.date_end),
+                        ('date_to', '>', rec.date_start),
+                    ], limit=1)
+                    if leaves:
+                        raise ValidationError(_(
+                            "Trainer On Leave: Internal trainer %s has approved leave from %s to %s."
+                        ) % (emp.name, leaves.date_from, leaves.date_to))
+
+    def action_print_all_certificates(self):
+        """Generate and download a consolidated multi-page PDF with all certificates for this session."""
+        self.ensure_one()
+        certs = self.env['eds.certificate'].search([('session_id', '=', self.id)])
+        if not certs and self.course_id:
+            enrolled_emp_ids = self.enrollment_ids.filtered(lambda e: e.state == 'enrolled').mapped('employee_id').ids
+            if enrolled_emp_ids:
+                certs = self.env['eds.certificate'].search([
+                    ('course_id', '=', self.course_id.id),
+                    ('employee_id', 'in', enrolled_emp_ids),
+                ])
+        if not certs:
+            raise UserError(_('No issued certificates found for this training session.'))
+        return self.env.ref('employee_development_system.action_report_eds_certificate').report_action(certs)
 
     # ── Session workflow (EDS-022) ──────────────────────────────
     def action_confirm(self):

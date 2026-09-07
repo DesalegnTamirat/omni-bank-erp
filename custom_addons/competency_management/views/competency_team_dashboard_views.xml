@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Team Competency Gap Dashboard - Pivot View (FR-GAP-006) -->
+        <record id="view_competency_team_gap_pivot" model="ir.ui.view">
+            <field name="name">competency.assessment.line.team.gap.pivot</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <pivot string="Team Competency Gap Analysis">
+                    <field name="assessment_id" type="row"/>
+                    <field name="competency_id" type="col"/>
+                    <field name="gap" type="measure"/>
+                </pivot>
+            </field>
+        </record>
+
+        <!-- Team Competency Gap Dashboard - Graph View (FR-GAP-006) -->
+        <record id="view_competency_team_gap_graph" model="ir.ui.view">
+            <field name="name">competency.assessment.line.team.gap.graph</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <graph string="Team Competency Gaps by Competency" type="bar">
+                    <field name="competency_id"/>
+                    <field name="gap" type="measure"/>
+                </graph>
+            </field>
+        </record>
+
+        <!-- Team Competency Gap Dashboard - Search View (FR-GAP-006) -->
+        <record id="view_competency_assessment_line_search" model="ir.ui.view">
+            <field name="name">competency.assessment.line.search</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <search string="Competency Assessment Lines">
+                    <field name="assessment_id"/>
+                    <field name="competency_id"/>
+                    <filter string="Below Required Level" name="below_required" domain="[('achievement_status', '=', 'below')]"/>
+                    <filter string="Meets Required Level" name="meets_required" domain="[('achievement_status', '=', 'meets')]"/>
+                    <filter string="Exceeds Required Level" name="exceeds_required" domain="[('achievement_status', '=', 'exceeds')]"/>
+                    <group>
+                        <filter string="Assessment" name="group_by_assessment" context="{'group_by': 'assessment_id'}"/>
+                        <filter string="Competency" name="group_by_competency" context="{'group_by': 'competency_id'}"/>
+                        <filter string="Achievement Status" name="group_by_status" context="{'group_by': 'achievement_status'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_competency_team_gap_dashboard" model="ir.actions.act_window">
+            <field name="name">Team Competency Gap Dashboard</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">graph,pivot,list</field>
+            <field name="search_view_id" ref="view_competency_assessment_line_search"/>
+            <field name="context">{'search_default_below_required': 1}</field>
+        </record>
+    </data>
+</odoo>

@@ -37,6 +37,10 @@ class EdsTnaCycle(models.Model):
     ], string='Status', default='draft', tracking=True)
     entry_ids = fields.One2many('eds.tna.entry', 'cycle_id', string='Training Needs')
     entry_count = fields.Integer(string='Training Needs', compute='_compute_entry_count')
+    competency_gap_count = fields.Integer(string='Competency Gaps', compute='_compute_source_breakdown')
+    pms_gap_count = fields.Integer(string='PMS Gaps', compute='_compute_source_breakdown')
+    employee_sub_count = fields.Integer(string='Self-Submissions', compute='_compute_source_breakdown')
+    manager_sub_count = fields.Integer(string='Manager Requests', compute='_compute_source_breakdown')
     days_until_deadline = fields.Integer(
         string='Days Until Approval Deadline', compute='_compute_days_until_deadline')
     approved_by_id = fields.Many2one('res.users', string='Approved By', readonly=True)
@@ -50,6 +54,104 @@ class EdsTnaCycle(models.Model):
     consolidation_count = fields.Integer(
         string='Consolidations', compute='_compute_consolidation_count')
     last_reminder_date = fields.Date(string='Last Deadline Reminder', readonly=True)
+
+    @api.depends('entry_ids.source')
+    def _compute_source_breakdown(self):
+        for rec in self:
+            rec.competency_gap_count = len(rec.entry_ids.filtered(lambda e: e.source == 'competency_gap'))
+            rec.pms_gap_count = len(rec.entry_ids.filtered(lambda e: e.source == 'pms'))
+            rec.employee_sub_count = len(rec.entry_ids.filtered(lambda e: e.source == 'manual' and e.submitted_by.id == e.employee_id.user_id.id))
+            rec.manager_sub_count = len(rec.entry_ids.filtered(lambda e: e.source == 'manual' and e.submitted_by.id != e.employee_id.user_id.id))
+
+    def action_pull_competency_gaps(self):
+        """Auto-pull diagnosed gaps from the Competency Assessment framework into this TNA cycle."""
+        self.ensure_one()
+        if self.state not in ('draft', 'collecting'):
+            raise UserError(_('Competency gaps can only be pulled into Draft or Collecting cycles.'))
+
+        if 'competency.assessment.line' not in self.env:
+            raise UserError(_('Competency Management module is not installed.'))
+
+        AssessmentLine = self.env['competency.assessment.line']
+
+        # Query all active assessment lines with below proficiency
+        gap_lines = AssessmentLine.search([
+            '|',
+            ('tna_measure', '=', 'below'),
+            ('gap', '>', 0),
+            ('employee_id.active', '=', True),
+        ])
+
+        created_count = 0
+        existing_keys = set(
+            self.entry_ids.filtered(lambda e: e.employee_id and e.competency_id).mapped(
+                lambda e: (e.employee_id.id, e.competency_id.id)
+            )
+        )
+
+        new_entries = []
+        for line in gap_lines:
+            if not line.employee_id or not line.competency_id:
+                continue
+            key = (line.employee_id.id, line.competency_id.id)
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+
+            gap_val = line.gap or (int(line.required_level or 2) - int(line.current_level or 1))
+            if gap_val <= 0:
+                continue
+            severity = 'critical' if gap_val >= 3 else ('high' if gap_val == 2 else 'medium')
+
+            emp = line.employee_id
+            new_entries.append({
+                'cycle_id': self.id,
+                'employee_id': emp.id,
+                'work_unit_id': getattr(emp, 'default_operating_unit_id', False) and emp.default_operating_unit_id.id or False,
+                'department_id': emp.department_id.id if emp.department_id else False,
+                'job_position_id': emp.job_position.id if getattr(emp, 'job_position', False) else (emp.job_id.id if emp.job_id else False),
+                'competency_id': line.competency_id.id,
+                'competency_gap_level_diff': gap_val,
+                'gap_severity': severity,
+                'source': 'competency_gap',
+                'delivery_mode': 'classroom',
+                'proposed_program': _("%s Mastery Program") % line.competency_id.name,
+                'justification': _(
+                    "Automated diagnostic from Competency Assessment (%s). Required Level: %s, Current Level: %s (Gap: %d)."
+                ) % (line.assessment_id.name if line.assessment_id else 'Direct Assessment', line.required_level or '2', line.current_level or '1', gap_val),
+                'state': 'submitted',
+            })
+
+        if new_entries:
+            self.env['eds.tna.entry'].create(new_entries)
+            created_count = len(new_entries)
+
+        self.message_post(body=_(
+            "Diagnostic sync: Successfully ingested %d competency assessment gaps into cycle %s."
+        ) % (created_count, self.name))
+
+        if created_count == 0:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Competency Scan Complete'),
+                    'message': _('Scan completed. No new competency assessment gaps found to ingest into cycle %s (or all diagnosed gaps already exist).') % self.name,
+                    'type': 'warning',
+                    'sticky': False,
+                }
+            }
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Competency Gaps Ingested'),
+                'message': _('Successfully pulled %d diagnosed competency gaps into TNA Cycle %s.') % (created_count, self.name),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
 
     @api.depends('consolidation_ids')
     def _compute_consolidation_count(self):
@@ -222,13 +324,34 @@ class EdsTnaEntry(models.Model):
     _order = 'id desc'
     _rec_name = 'name'
 
+    def _default_employee_id(self):
+        return self.env['hr.employee'].search([('user_id', '=', self.env.user.id)], limit=1)
+
+    def _default_work_unit_id(self):
+        emp = self._default_employee_id()
+        if emp and hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id:
+            return emp.default_operating_unit_id
+        return getattr(self.env.user, 'default_operating_unit_id', False)
+
+    def _default_department_id(self):
+        emp = self._default_employee_id()
+        return emp.department_id if emp else False
+
+    def _default_job_position_id(self):
+        emp = self._default_employee_id()
+        return emp.job_position if emp else False
+
     name = fields.Char(string='Reference', readonly=True, copy=False)
     cycle_id = fields.Many2one(
         'eds.tna.cycle', string='TNA Cycle', required=True, ondelete='cascade', tracking=True)
-    work_unit_id = fields.Many2one('operating.unit', string='Work Unit', tracking=True)
-    department_id = fields.Many2one('hr.department', string='Department', tracking=True)
-    job_position_id = fields.Many2one('hr.job', string='Job Position', tracking=True)
-    employee_id = fields.Many2one('hr.employee', string='Employee', tracking=True)
+    work_unit_id = fields.Many2one(
+        'operating.unit', string='Work Unit', default=_default_work_unit_id, tracking=True)
+    department_id = fields.Many2one(
+        'hr.department', string='Department', default=_default_department_id, tracking=True)
+    job_position_id = fields.Many2one(
+        'hr.job', string='Job Position', default=_default_job_position_id, tracking=True)
+    employee_id = fields.Many2one(
+        'hr.employee', string='Employee', default=_default_employee_id, tracking=True)
     competency_id = fields.Many2one(
         'competency.competency', string='Competency',
         help='Linked to the approved competency framework .', tracking=True)
@@ -259,6 +382,12 @@ class EdsTnaEntry(models.Model):
     justification = fields.Text(string='Justification', required=True)
     proposed_program = fields.Char(string='Proposed Program / Course')
     estimated_cost = fields.Monetary(string='Estimated Cost', currency_field='company_currency_id')
+    # Diagnostic Gap Details (Competency & PMS)
+    competency_gap_level_diff = fields.Integer(string='Competency Gap (Levels)', default=0,
+                                               help='Difference between job required proficiency and employee current rating.')
+    pms_kpi_reference = fields.Char(string='PMS KPI / Objective Ref', help='Performance evaluation objective or KPI code.')
+    pms_appraisal_score = fields.Float(string='PMS Performance Score', help='Employee appraisal score for the evaluation period.')
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),

@@ -95,7 +95,7 @@ class EdsCurriculum(models.Model):
 
     # ── Approval chain () ────────────────────────────────────────────
     def _log_approval_step(self, state_from, state_to, comment=''):
-        self.env['eds.approval.history'].create({
+        self.env['eds.approval.history'].sudo().create({
             'curriculum_id': self.id,
             'state_from': state_from,
             'state_to': state_to,

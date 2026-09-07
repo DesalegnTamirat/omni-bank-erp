@@ -273,6 +273,8 @@
                                 invisible="status not in ('scheduled','ongoing')"/>
                         <button name="action_confirm_reschedule" string="Confirm Reschedule"
                                 type="object" class="oe_highlight" invisible="status != 'rescheduled'"/>
+                        <button name="action_print_all_certificates" string="Print All Certificates" type="object"
+                                class="btn-primary" icon="fa-print" invisible="status != 'completed'"/>
                         <button name="action_cancel" string="Cancel Session" type="object"
                                 invisible="status in ('cancelled','completed')"/>
                         <field name="status" widget="statusbar"/>

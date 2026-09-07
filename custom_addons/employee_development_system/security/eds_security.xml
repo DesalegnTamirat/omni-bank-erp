@@ -83,7 +83,7 @@
     </data>
 
     <!-- Record Rules -->
-    <data noupdate="1">
+    <data noupdate="0">
 
         <!-- TNA Entry: employee sees own submissions -->
         <record id="rule_eds_tna_entry_employee_own" model="ir.rule">
@@ -92,7 +92,7 @@
             <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('submitted_by', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
-            <field name="perm_write" eval="False"/>
+            <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
         </record>
@@ -105,16 +105,32 @@
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_line_manager'))]"/>
         </record>
 
-        <!-- TNA Cycle: employee can only read approved/locked cycles -->
+        <!-- TNA Entry: staff (L&D officer/manager/admin) sees all entries -->
+        <record id="rule_eds_tna_entry_staff" model="ir.rule">
+            <field name="name">TNA Entry L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_entry"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
+        </record>
+
+        <!-- TNA Cycle: employee can read collecting, consolidating, approved and locked cycles -->
         <record id="rule_eds_tna_cycle_employee" model="ir.rule">
-            <field name="name">Employee Approved TNA Cycles</field>
+            <field name="name">Employee Open and Approved TNA Cycles</field>
             <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
-            <field name="domain_force">[('state', 'in', ('approved', 'locked'))]</field>
+            <field name="domain_force">[('state', 'in', ('collecting', 'consolidating', 'under_approval', 'approved', 'locked'))]</field>
             <field name="groups" eval="[(4, ref('employee_development_system.group_eds_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- TNA Cycle: staff (L&D officer/manager/admin) sees all cycles -->
+        <record id="rule_eds_tna_cycle_staff" model="ir.rule">
+            <field name="name">TNA Cycle L&amp;D Staff</field>
+            <field name="model_id" ref="employee_development_system.model_eds_tna_cycle"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer'))]"/>
         </record>
 
         <!-- Multi-company rules -->
@@ -430,6 +446,19 @@
             <field name="name">International Training Multi Company</field>
             <field name="model_id" ref="employee_development_system.model_eds_international_training"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!-- HR Employee Read Access for EDS L&D Officers and Managers -->
+        <record id="rule_hr_employee_eds_officer_read" model="ir.rule">
+            <field name="name">EDS Officer HR Employee Read All</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="global" eval="False"/>
+            <field name="groups" eval="[(4, ref('employee_development_system.group_eds_officer')), (4, ref('employee_development_system.group_eds_manager')), (4, ref('employee_development_system.group_eds_admin')), (4, ref('employee_development_system.group_eds_executive'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
 
     </data>

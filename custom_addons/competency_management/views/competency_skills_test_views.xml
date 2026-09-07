@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="view_competency_skills_test_list" model="ir.ui.view">
+            <field name="name">competency.skills.test.list</field>
+            <field name="model">competency.skills.test</field>
+            <field name="arch" type="xml">
+                <list>
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="competency_id"/>
+                    <field name="test_date"/>
+                    <field name="score_percent"/>
+                    <field name="verified_level"/>
+                    <field name="status" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_competency_skills_test_form" model="ir.ui.view">
+            <field name="name">competency.skills.test.form</field>
+            <field name="model">competency.skills.test</field>
+            <field name="arch" type="xml">
+                <form>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="employee_id"/>
+                                <field name="competency_id"/>
+                                <field name="test_date"/>
+                            </group>
+                            <group>
+                                <field name="score_percent"/>
+                                <field name="verified_level"/>
+                                <field name="status"/>
+                                <field name="examiner_id"/>
+                            </group>
+                        </group>
+                        <group string="Examiner Remarks">
+                            <field name="notes" placeholder="Enter test observation and examination remarks..."/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_competency_skills_test" model="ir.actions.act_window">
+            <field name="name">Skills Tests &amp; Examinations</field>
+            <field name="res_model">competency.skills.test</field>
+            <field name="view_mode">list,form</field>
+        </record>
+    </data>
+</odoo>

@@ -41,9 +41,15 @@ class EdsCertificate(models.Model):
         ('void', 'Voided'),
     ], string='Status', default='pending', required=True, tracking=True)
 
-    _sql_constraints = [
-        ('unique_session_emp_cert', 'unique(session_id, employee_id)', 'A certificate record already exists for this participant in this session.')
-    ]
+    @api.constrains('session_id', 'employee_id')
+    def _check_unique_session_emp_cert(self):
+        for rec in self:
+            if rec.session_id and rec.employee_id:
+                domain = [('session_id', '=', rec.session_id.id), ('employee_id', '=', rec.employee_id.id), ('id', '!=', rec.id)]
+                if self.search_count(domain) > 0:
+                    raise ValidationError(_("A certificate record already exists for participant %s in session %s.") % (
+                        rec.employee_id.name, rec.session_id.name
+                    ))
 
     @api.model_create_multi
     def create(self, vals_list):

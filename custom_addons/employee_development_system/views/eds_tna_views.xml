@@ -29,6 +29,17 @@
                     <header>
                         <button name="action_start_collection" string="Start Collection"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_pull_competency_gaps" string="Pull Competency Gaps"
+                                type="object" class="btn-info" invisible="state not in ('draft', 'collecting')"
+                                confirm="Auto-pull all active below-standard competency gaps from the Competency framework into this cycle?"/>
+                        <button name="%(employee_development_system.action_eds_competency_gap_import)d"
+                                string="Import Competency CSV" type="action" class="btn-secondary"
+                                invisible="state not in ('draft', 'collecting')"
+                                context="{'default_cycle_id': id}"/>
+                        <button name="%(employee_development_system.action_eds_pms_gap_import)d"
+                                string="Import PMS Gaps CSV" type="action" class="btn-secondary"
+                                invisible="state not in ('draft', 'collecting')"
+                                context="{'default_cycle_id': id}"/>
                         <button name="action_finish_collection" string="Finish Collection"
                                 type="object" class="oe_highlight" invisible="state != 'collecting'"/>
                         <button name="action_submit_for_approval" string="Submit for Approval"
@@ -43,10 +54,19 @@
                         <button name="action_unlock" string="Unlock (Change Request)"
                                 type="object" invisible="state != 'locked'"/>
                         <field name="state" widget="statusbar"
-                               statusbar_visible="draft,collecting,consolidating,under_approval,approved,locked"/>
+                                statusbar_visible="draft,collecting,consolidating,under_approval,approved,locked"/>
                     </header>
                     <sheet>
                         <div class="oe_button_box" colspan="2">
+                            <button class="oe_stat_button" icon="fa-list-ul">
+                                <field name="entry_count" widget="statinfo" string="Total Needs"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-bullseye">
+                                <field name="competency_gap_count" widget="statinfo" string="Competency Gaps"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-line-chart">
+                                <field name="pms_gap_count" widget="statinfo" string="PMS Gaps"/>
+                            </button>
                             <button name="%(employee_development_system.action_eds_tna_consolidation)d"
                                     type="action" class="oe_stat_button" icon="fa-archive"
                                     groups="employee_development_system.group_eds_officer">
@@ -148,11 +168,14 @@
                         <button name="action_submit" string="Submit"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_validate" string="Validate"
-                                type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"/>
+                                type="object" class="oe_highlight" invisible="state not in ('submitted','validated')"
+                                groups="employee_development_system.group_eds_line_manager"/>
                         <button name="action_exclude" string="Exclude (Duplicate / Invalid)"
-                                type="object" invisible="state not in ('submitted','validated')"/>
+                                type="object" invisible="state not in ('submitted','validated')"
+                                groups="employee_development_system.group_eds_line_manager"/>
                         <button name="action_reopen_draft" string="Reopen as Draft"
-                                type="object" invisible="state not in ('submitted','excluded')"/>
+                                type="object" invisible="state not in ('submitted','excluded')"
+                                groups="employee_development_system.group_eds_line_manager"/>
                         <button name="action_create_development_request" string="Create Development Request"
                                 type="object" class="oe_highlight"
                                 invisible="state not in ('approved','converted')"
@@ -160,60 +183,65 @@
                         <field name="state" widget="statusbar"
                                statusbar_visible="draft,submitted,validated,approved,converted,excluded"/>
                     </header>
-                    <div class="alert alert-warning" role="alert" invisible="state == 'draft'">
-                        <i class="fa fa-arrow-right"/> Consolidated by <b>Priority Scoring</b> ():
-                        scores below are weighted by the active priority rules.
-                    </div>
                     <sheet>
                         <group>
-                            <group string="Training Need">
+                            <group string="Employee &amp; Organization">
                                 <field name="name" readonly="1"/>
                                 <field name="cycle_id" readonly="state != 'draft'"/>
-                                <field name="employee_id"/>
-                                <field name="work_unit_id"/>
-                                <field name="department_id"/>
-                                <field name="job_position_id"/>
+                                <field name="employee_id" readonly="state != 'draft'"/>
+                                <field name="job_position_id" readonly="1"/>
+                                <field name="department_id" readonly="1"/>
+                                <field name="work_unit_id" readonly="1"/>
                             </group>
-                            <group string="Classification">
-                                <field name="competency_id"/>
-                                <field name="gap_severity"/>
-                                <field name="source"/>
-                                <field name="delivery_mode"/>
-                                <field name="priority_score" readonly="1"/>
-                                <field name="consolidation_id" readonly="1"
-                                       groups="employee_development_system.group_eds_officer"/>
-                                <field name="is_duplicate" readonly="1"/>
-                                <field name="duplicate_of_id" readonly="1" invisible="not is_duplicate"/>
-                                <field name="exclusion_type" invisible="state == 'draft'"/>
-                            </group>
-                        </group>
-                        <group string="Program Proposal">
-                            <field name="proposed_program"/>
-                            <field name="estimated_cost"/>
-                        </group>
-                        <group string="Justification">
-                            <field name="justification" placeholder="Why is this training needed? Link to competency gap, audit finding, regulation, strategy..."/>
-                            <field name="excluded_reason" invisible="state != 'excluded'"/>
-                            <field name="converted_course_ref" invisible="state != 'converted'"/>
-                        </group>
-                        <group string="Priority Scoring ()"
-                               invisible="state in ('draft','excluded')">
-                            <group>
-                                <field name="score_strategic_alignment"/>
-                                <field name="score_tom_impact"/>
-                                <field name="score_gap_severity"/>
-                            </group>
-                            <group>
-                                <field name="score_risk_level"/>
-                                <field name="score_regulatory"/>
-                                <field name="score_future_capability"/>
+                            <group string="Learning Need Classification">
+                                <field name="competency_id" readonly="state != 'draft'"/>
+                                <field name="competency_gap_level_diff" invisible="source != 'competency_gap'" readonly="state != 'draft'"/>
+                                <field name="pms_kpi_reference" invisible="source != 'pms'" readonly="state != 'draft'"/>
+                                <field name="pms_appraisal_score" invisible="source != 'pms'" readonly="state != 'draft'"/>
+                                <field name="gap_severity" readonly="state != 'draft'"/>
+                                <field name="source" readonly="state != 'draft'"/>
+                                <field name="delivery_mode" readonly="state != 'draft'"/>
+                                <field name="proposed_program" placeholder="e.g. Advanced Microservices Security" readonly="state != 'draft'"/>
+                                <field name="estimated_cost" readonly="state != 'draft'"/>
                             </group>
                         </group>
-                        <group string="Audit" invisible="state == 'draft'">
-                            <field name="submitted_by"/>
-                            <field name="validated_by"/>
-                            <field name="validation_date"/>
+                        <group string="Business Justification &amp; Impact">
+                            <field name="justification" placeholder="Explain the business need, competency gap, or regulatory requirement..." readonly="state != 'draft'"/>
+                            <field name="excluded_reason" invisible="state != 'excluded'" readonly="1"/>
+                            <field name="converted_course_ref" invisible="state != 'converted'" readonly="1"/>
                         </group>
+                        <notebook groups="employee_development_system.group_eds_officer">
+                            <page string="L&amp;D Consolidation &amp; Priority Analysis">
+                                <group>
+                                    <group string="Consolidation Status">
+                                        <field name="priority_score" readonly="1"/>
+                                        <field name="consolidation_id" readonly="1"/>
+                                        <field name="is_duplicate" readonly="1"/>
+                                        <field name="duplicate_of_id" readonly="1" invisible="not is_duplicate"/>
+                                        <field name="exclusion_type"/>
+                                    </group>
+                                    <group string="Priority Scoring Breakdown">
+                                        <field name="score_strategic_alignment"/>
+                                        <field name="score_tom_impact"/>
+                                        <field name="score_gap_severity"/>
+                                        <field name="score_risk_level"/>
+                                        <field name="score_regulatory"/>
+                                        <field name="score_future_capability"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Audit &amp; Validation Log">
+                                <group>
+                                    <group>
+                                        <field name="submitted_by" readonly="1"/>
+                                    </group>
+                                    <group>
+                                        <field name="validated_by" readonly="1"/>
+                                        <field name="validation_date" readonly="1"/>
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
                     </sheet>
                     <chatter/>
                 </form>

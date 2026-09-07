@@ -2,57 +2,125 @@
 <odoo>
     <data>
 
-        <!-- Root app menu (top-level, appears in the app switcher) -->
+        <!-- Root app menu (top-level): Clicking Competency Management directly launches the Competency Dashboard -->
         <menuitem id="menu_competency_management_root"
             name="Competency Management"
             web_icon="competency_management,static/description/icon.svg"
+            action="action_competency_dashboard_client"
             sequence="60" />
 
-        <!-- Dictionary & Framework -->
+        <!-- 1. Framework & Roles Category -->
+        <menuitem id="menu_competency_framework_categ"
+            name="Framework &amp; Roles"
+            parent="menu_competency_management_root"
+            sequence="10" />
+
         <menuitem id="menu_competency_dictionary"
             name="Competency Dictionary"
-            parent="menu_competency_management_root"
+            parent="menu_competency_framework_categ"
             action="action_competency_competency"
             sequence="10" />
-        <menuitem id="menu_competency_framework"
-            name="Competency Frameworks"
-            parent="menu_competency_management_root"
-            action="action_competency_framework"
-            sequence="20"
+        <menuitem id="menu_competency_cluster"
+            name="Competency Clusters"
+            parent="menu_competency_framework_categ"
+            action="action_competency_cluster"
+            sequence="30"
             groups="competency_management.group_competency_admin" />
         <menuitem id="menu_competency_role_mapping"
             name="Role-Competency Mapping"
-            parent="menu_competency_management_root"
+            parent="menu_competency_framework_categ"
             action="action_competency_role_mapping"
-            sequence="30" />
+            sequence="40" />
 
-        <!-- Assessment -->
+        <!-- 2. Assessments Category -->
+        <menuitem id="menu_competency_assessments_categ"
+            name="Assessments"
+            parent="menu_competency_management_root"
+            sequence="20" />
+
+        <menuitem id="menu_my_competency_assessments"
+            name="My Competency Assessments"
+            parent="menu_competency_assessments_categ"
+            action="action_my_competency_assessment"
+            sequence="10"
+            groups="competency_management.group_competency_employee" />
+        <menuitem id="menu_my_competency_evaluations"
+            name="My Evaluations"
+            parent="menu_competency_assessments_categ"
+            action="action_my_competency_evaluations"
+            sequence="15"
+            groups="competency_management.group_competency_employee" />
+        <menuitem id="menu_competency_assessments"
+            name="All Competency Assessments"
+            parent="menu_competency_assessments_categ"
+            action="action_competency_assessment"
+            sequence="20"
+            groups="competency_management.group_competency_supervisor" />
         <menuitem id="menu_competency_assessment_cycles"
             name="Assessment Cycles"
-            parent="menu_competency_management_root"
+            parent="menu_competency_assessments_categ"
             action="action_competency_assessment_cycle"
+            sequence="30"
+            groups="competency_management.group_competency_admin" />
+
+        <!-- 3. Reporting Category -->
+        <menuitem id="menu_competency_reports_categ"
+            name="Reporting"
+            parent="menu_competency_management_root"
             sequence="40"
             groups="competency_management.group_competency_supervisor" />
-        <menuitem id="menu_competency_assessments"
-            name="Competency Assessments"
-            parent="menu_competency_management_root"
-            action="action_competency_assessment"
-            sequence="50"
+
+        <menuitem id="menu_competency_report_wizard"
+            name="Competency Report Generator"
+            parent="menu_competency_reports_categ"
+            action="action_competency_report_wizard"
+            sequence="1"
+            groups="competency_management.group_competency_employee" />
+
+        <menuitem id="menu_competency_tna_analytics_report"
+            name="Competency &amp; TNA Analytics Report"
+            parent="menu_competency_reports_categ"
+            action="action_competency_tna_analytics_report"
+            sequence="5"
             groups="competency_management.group_competency_supervisor" />
 
-        <!-- Development -->
-        <menuitem id="menu_competency_idp"
-            name="Development Plans (IDP)"
-            parent="menu_competency_management_root"
-            action="action_competency_idp"
-            sequence="60" />
+        <menuitem id="menu_competency_coverage_report"
+            name="Competency Coverage Report"
+            parent="menu_competency_reports_categ"
+            action="action_competency_coverage_report"
+            sequence="10"
+            groups="competency_management.group_competency_supervisor" />
 
-        <!-- Configuration -->
+        <!-- 5. Configuration Category -->
+        <menuitem id="menu_competency_config_categ"
+            name="Configuration"
+            parent="menu_competency_management_root"
+            sequence="50"
+            groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
+
+        <menuitem id="menu_competency_matrix_config"
+            name="Proficiency Matrix Guidelines"
+            parent="menu_competency_config_categ"
+            action="action_competency_matrix_guidelines_config"
+            sequence="10"
+            groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
+        <menuitem id="menu_competency_360_config"
+            name="Behavioral &amp; 360° Assessment Rules"
+            parent="menu_competency_config_categ"
+            action="action_competency_360_config"
+            sequence="15"
+            groups="competency_management.group_competency_admin,competency_management.group_competency_supervisor" />
         <menuitem id="menu_competency_rating_models"
             name="Rating Models"
-            parent="menu_competency_management_root"
+            parent="menu_competency_config_categ"
             action="action_competency_rating_model"
-            sequence="70"
+            sequence="20"
+            groups="competency_management.group_competency_admin" />
+        <menuitem id="menu_trigger_matrix_seeding"
+            name="Re-Seed Matrix &amp; Clusters"
+            parent="menu_competency_config_categ"
+            action="action_trigger_matrix_seeding"
+            sequence="30"
             groups="competency_management.group_competency_admin" />
 
     </data>

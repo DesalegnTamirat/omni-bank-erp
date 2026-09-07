@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Menu 1: Job Grade & Position Proficiency Matrix Configuration Form View -->
+        <record id="view_competency_matrix_config_form" model="ir.ui.view">
+            <field name="name">competency.matrix.config.form</field>
+            <field name="model">competency.matrix.config</field>
+            <field name="arch" type="xml">
+                <form string="Proficiency Matrix Guidelines">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 20px;">
+                            <h1 style="color: #541718; font-weight: bold;">
+                                Job Grade &amp; Position Proficiency Matrix Guidelines
+                            </h1>
+                            <div style="font-size: 13px; color: #1d2b32;">
+                                Configure whether required proficiency levels (1-4) are determined by Job Grade or Job Position, and manage framework guidelines.
+                            </div>
+                        </div>
+
+                        <!-- Determination Mode Banner -->
+                        <div style="background-color: #F4F6F7; border: 1px solid #1d2b32; border-left: 5px solid #541718; padding: 14px 18px; border-radius: 4px; margin-bottom: 20px;">
+                            <group>
+                                <field name="proficiency_determinant" widget="radio" class="oe_inline"/>
+                            </group>
+                            <div style="font-size: 12px; color: #566573; margin-top: 6px;">
+                                <strong>Note:</strong> Selecting <em>By Job Grade</em> applies proficiency levels based on employee/role grade. Selecting <em>By Job Position</em> applies proficiency levels based on job position title.
+                            </div>
+                        </div>
+
+                        <notebook>
+                            <!-- Tab 1: Job Grade Matrix Guidelines -->
+                            <page string="Job Grade Matrix Guidelines" invisible="proficiency_determinant != 'job_grade'">
+                                <field name="grade_matrix_line_ids">
+                                    <list editable="bottom">
+                                        <field name="grade_id"/>
+                                        <field name="required_leadership_level"/>
+                                        <field name="required_core_level"/>
+                                        <field name="required_technical_level"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <!-- Tab 2: Job Position Matrix Guidelines -->
+                            <page string="Job Position Matrix Guidelines" invisible="proficiency_determinant != 'job_position'">
+                                <field name="job_matrix_line_ids">
+                                    <list editable="bottom">
+                                        <field name="job_id"/>
+                                        <field name="required_leadership_level"/>
+                                        <field name="required_core_level"/>
+                                        <field name="required_technical_level"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Menu 2: Global Behavioral & 360° Rules Configuration Form View -->
+        <record id="view_competency_360_config_form" model="ir.ui.view">
+            <field name="name">competency.360.config.form</field>
+            <field name="model">competency.matrix.config</field>
+            <field name="arch" type="xml">
+                <form string="Behavioral &amp; 360° Rules">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 20px;">
+                            <h1 style="color: #541718; font-weight: bold;">
+                                Global Behavioral &amp; 360° Assessment Rules
+                            </h1>
+                            <div style="font-size: 13px; color: #1d2b32;">
+                                Configure 360° rating weights for gap calculations, random sampling caps per cycle, and global technical behavioral indicators.
+                            </div>
+                        </div>
+
+                        <notebook>
+                            <!-- Tab 1: 360° Evaluator Weights & Sampling Rules -->
+                            <page string="360° Rating Weights &amp; Sampling Rules">
+                                <div style="background-color: #fcfbfa; border: 1px solid #e2e8f0; border-left: 5px solid #541718; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
+                                    <h4 style="color: #541718; margin-top: 0;">360° Rating Weights for Comprehensive Gap Calculations</h4>
+                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 15px;">
+                                        Specify the relative weight of each assessment type when calculating the overall weighted gap score in reports.
+                                    </div>
+                                    <group>
+                                        <group string="Evaluator Type Weights">
+                                            <field name="weight_self"/>
+                                            <field name="weight_supervisor"/>
+                                            <field name="weight_peer"/>
+                                            <field name="weight_subordinate"/>
+                                            <field name="weight_team"/>
+                                        </group>
+                                        <group string="Random Sampling Caps per Cycle">
+                                            <field name="max_peer_assessments"/>
+                                            <field name="max_subordinate_assessments"/>
+                                        </group>
+                                    </group>
+                                </div>
+
+                                <!-- Competency Pillar Scope by Evaluator Type Container -->
+                                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #726732; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
+                                    <h4 style="color: #726732; margin-top: 0;">Competency Pillar Scope by Evaluator Type</h4>
+                                    <div style="font-size: 12px; color: #64748b; margin-bottom: 15px;">
+                                        Select which competency pillars (Core, Leadership, Technical) appear on assessments for each evaluator role. Unchecking a pillar excludes it from that evaluator type.
+                                    </div>
+                                    <group>
+                                        <group string="Peer Evaluation Pillars">
+                                            <field name="peer_eval_core" string="Include Core"/>
+                                            <field name="peer_eval_leadership" string="Include Leadership"/>
+                                            <field name="peer_eval_technical" string="Include Technical"/>
+                                        </group>
+                                        <group string="Subordinate Evaluation Pillars">
+                                            <field name="subordinate_eval_core" string="Include Core"/>
+                                            <field name="subordinate_eval_leadership" string="Include Leadership"/>
+                                            <field name="subordinate_eval_technical" string="Include Technical"/>
+                                        </group>
+                                    </group>
+                                    <group>
+                                        <group string="Supervisor Evaluation Pillars">
+                                            <field name="supervisor_eval_core" string="Include Core"/>
+                                            <field name="supervisor_eval_leadership" string="Include Leadership"/>
+                                            <field name="supervisor_eval_technical" string="Include Technical"/>
+                                        </group>
+                                        <group string="Team Evaluation Pillars">
+                                            <field name="team_eval_core" string="Include Core"/>
+                                            <field name="team_eval_leadership" string="Include Leadership"/>
+                                            <field name="team_eval_technical" string="Include Technical"/>
+                                        </group>
+                                    </group>
+                                    <group>
+                                        <group string="Self Evaluation Pillars">
+                                            <field name="self_eval_core" string="Include Core"/>
+                                            <field name="self_eval_leadership" string="Include Leadership"/>
+                                            <field name="self_eval_technical" string="Include Technical"/>
+                                        </group>
+                                    </group>
+                                </div>
+                            </page>
+
+                            <!-- Tab 2: Configurable Technical Behavioral Indicators -->
+                            <page string="Standard Technical Behavioral Indicators">
+                                <div style="margin-bottom: 12px; color: #541718; font-weight: bold;">
+                                    Configure standard global behavioral indicators for technical competencies across Levels 1 through 4:
+                                </div>
+                                <group>
+                                    <field name="tech_indicator_level_1" placeholder="Technical indicator text for Level 1..."/>
+                                    <field name="tech_indicator_level_2" placeholder="Technical indicator text for Level 2..."/>
+                                    <field name="tech_indicator_level_3" placeholder="Technical indicator text for Level 3..."/>
+                                    <field name="tech_indicator_level_4" placeholder="Technical indicator text for Level 4..."/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Window Action for Menu 1: Proficiency Matrix Guidelines -->
+        <record id="action_competency_matrix_guidelines_config" model="ir.actions.act_window">
+            <field name="name">Proficiency Matrix Guidelines</field>
+            <field name="res_model">competency.matrix.config</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_competency_matrix_config_form"/>
+            <field name="res_id">1</field>
+            <field name="target">current</field>
+        </record>
+
+        <!-- Window Action for Menu 2: Global Behavioral & 360° Rules -->
+        <record id="action_competency_360_config" model="ir.actions.act_window">
+            <field name="name">Behavioral &amp; 360° Assessment Rules</field>
+            <field name="res_model">competency.matrix.config</field>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_competency_360_config_form"/>
+            <field name="res_id">1</field>
+            <field name="target">current</field>
+        </record>
+
+    </data>
+</odoo>

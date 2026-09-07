@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Competency Executive & Self-Service Dashboard Form View -->
+        <record id="view_competency_dashboard_form" model="ir.ui.view">
+            <field name="name">competency.dashboard.form</field>
+            <field name="model">competency.dashboard</field>
+            <field name="arch" type="xml">
+                <form string="Competency Overview Dashboard" create="false" edit="false" delete="false">
+                    <sheet class="o_competency_dashboard_sheet" style="padding: 0; background-color: #fcfbfa;">
+                        <widget name="competency_dashboard_widget"/>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Client Action to open OWL Dashboard -->
+        <record id="action_competency_dashboard_client" model="ir.actions.client">
+            <field name="name">Competency &amp; TNA Dashboard</field>
+            <field name="tag">competency_dashboard_action</field>
+            <field name="target">current</field>
+        </record>
+
+        <!-- Action to open Dashboard -->
+        <record id="action_competency_overview_dashboard" model="ir.actions.server">
+            <field name="name">Competency Dashboard</field>
+            <field name="model_id" ref="model_competency_dashboard"/>
+            <field name="state">code</field>
+            <field name="code">
+action = model.action_open_dashboard()
+            </field>
+        </record>
+
+    </data>
+</odoo>
