@@ -376,3 +376,136 @@ class TestAuditRemediations(TransactionCase):
         stats = data_a.get('stats', {})
         self.assertIsNotNone(stats.get('unmapped_cnt'))
         self.assertIsNotNone(stats.get('missing_sups_cnt'))
+
+    def test_12_ormcache_environment_isolation(self):
+        """13. Verify get_active_config() works across environments without psycopg2.InterfaceError (Cursor already closed)."""
+        config_1 = self.env['competency.matrix.config'].get_active_config()
+        self.assertTrue(config_1.id)
+        
+        # Access config from a new Environment context
+        new_env = self.env(context=dict(self.env.context, test_new_ctx=True))
+        config_2 = new_env['competency.matrix.config'].get_active_config()
+        self.assertEqual(config_1.id, config_2.id)
+        self.assertEqual(config_2.env.cr, new_env.cr, "Config recordset must be bound to active request environment cursor")
+        
+        # Test get_allowed_pillars_for_type does not raise InterfaceError
+        pillars = config_2.get_allowed_pillars_for_type('self')
+        self.assertIn('core', pillars)
+
+    def test_13_submission_deadline_enforcement_and_hr_reminders(self):
+        """14. Verify deadline enforcement blocks late submission, deadline extension allows it, and HR warning action works."""
+        past_date = fields.Date.subtract(fields.Date.context_today(self), days=5)
+        future_date = fields.Date.add(fields.Date.context_today(self), days=10)
+
+        # Create cycle with past deadline
+        cycle_expired = self.Cycle.create({
+            'name': 'Expired Cycle Test',
+            'period_start': past_date,
+            'period_end': past_date,
+            'assessment_deadline': past_date,
+            'state': 'open',
+        })
+
+        asm = self.Assessment.create({
+            'cycle_id': cycle_expired.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_emp_a.id,
+            'assessment_type': 'self',
+            'state': 'draft',
+        })
+        self.AssessmentLine.create({
+            'assessment_id': asm.id,
+            'competency_id': self.comp.id,
+            'current_level': '2',
+            'required_level': '2',
+        })
+
+        # 1. Check is_deadline_passed computed flag
+        self.assertTrue(asm.is_deadline_passed)
+
+        # 2. Submission must fail when deadline has passed
+        with self.assertRaises(UserError):
+            asm.action_submit()
+
+        # 3. Form write and populate competencies must fail when deadline has passed
+        with self.assertRaises(UserError):
+            asm.action_populate_competencies()
+
+        with self.assertRaises(UserError):
+            asm.with_user(self.user_emp_a).write({'notes': 'Test editing after deadline'})
+
+        with self.assertRaises(UserError):
+            self.AssessmentLine.with_user(self.user_emp_a).create({
+                'assessment_id': asm.id,
+                'competency_id': self.comp.id,
+                'current_level': '3',
+                'required_level': '3',
+            })
+
+        # 4. Check dashboard API returns Deadline Passed state_label
+        dash_data = self.env['competency.dashboard'].get_dashboard_data(cycle_id=cycle_expired.id)
+        self.assertTrue(dash_data['active_cycle_info'].get('is_deadline_passed'))
+        self.assertEqual(dash_data['active_cycle_info'].get('state_label'), 'Deadline Passed')
+
+        # 5. Test HR Deadline Warning action
+        res = cycle_expired.action_send_deadline_reminders()
+        self.assertEqual(res.get('type'), 'ir.actions.client')
+        self.assertGreater(cycle_expired.pending_assessment_count, 0)
+
+        # 6. HR extends deadline to future date -> Submission succeeds & is_deadline_passed becomes False
+        cycle_expired.write({'assessment_deadline': future_date})
+        self.assertFalse(asm.is_deadline_passed)
+        asm.action_submit()
+        self.assertEqual(asm.state, 'submitted')
+
+    def test_14_security_roles_access_matrix(self):
+        """15. Verify 4 security roles (Employee, Supervisor, Officer, Admin) permissions and workflow guards."""
+        group_officer = self.env.ref('competency_management.group_competency_officer')
+        
+        user_officer = self.Users.with_context(no_reset_password=True, tracking_disable=True).create({
+            'name': 'Test HR Officer Unique',
+            'login': 'test_hr_officer_2026',
+            'email': 'officer_2026@test.com',
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+        })
+        user_officer.write({
+            'group_ids': [(6, 0, [group_officer.id, self.env.ref('base.group_user').id])],
+        })
+
+        # 1. Officer can draft competency but cannot approve it
+        comp_draft = self.Competency.with_user(user_officer).create({
+            'name': 'Officer Test Draft Competency',
+            'code': 'CMP-OFFICER-001',
+            'pillar': 'technical',
+            'state': 'draft',
+            'proficiency_level_ids': [
+                (0, 0, {'level': '1', 'behavioral_indicators': 'Ind 1'}),
+                (0, 0, {'level': '2', 'behavioral_indicators': 'Ind 2'}),
+                (0, 0, {'level': '3', 'behavioral_indicators': 'Ind 3'}),
+                (0, 0, {'level': '4', 'behavioral_indicators': 'Ind 4'}),
+            ]
+        })
+        comp_draft.with_user(user_officer).action_submit()
+        self.assertEqual(comp_draft.state, 'submitted')
+
+        with self.assertRaises(UserError):
+            comp_draft.with_user(user_officer).action_approve()
+
+        # Admin approves
+        comp_draft.with_user(self.user_admin).action_approve()
+        self.assertEqual(comp_draft.state, 'approved')
+
+        # 2. Officer cannot create assessment cycle
+        with self.assertRaises(UserError):
+            self.Cycle.with_user(user_officer).create({
+                'name': 'Officer Forbidden Cycle',
+                'period_start': fields.Date.context_today(self),
+            })
+
+        # Admin can create cycle
+        cycle_admin = self.Cycle.with_user(self.user_admin).create({
+            'name': 'Admin Approved Cycle',
+            'period_start': fields.Date.context_today(self),
+        })
+        self.assertTrue(cycle_admin.id)

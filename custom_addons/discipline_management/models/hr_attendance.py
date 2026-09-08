@@ -129,7 +129,7 @@ class HrAttendance(models.Model):
                 absence_days = 0
                 curr = date_from
                 today = fields.Date.context_today(self)
-                worked_dates = set(emp_atts.mapped(lambda a: a.check_in.date()))
+                worked_dates = {a.check_in.date() for a in emp_atts if a.check_in and hasattr(a.check_in, 'date')}
                 Leave = self.env.get('hr.leave')
                 while curr < today:
                     if curr.weekday() < 5 and curr not in worked_dates:

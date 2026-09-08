@@ -429,7 +429,7 @@ class DisciplineCommitteeMeeting(models.Model):
             rec._generate_minute_document()
 
             # Enforce Case decision
-            case.action_approve_and_enforce()
+            case.sudo().with_context(from_committee=True).action_approve_and_enforce()
 
             rec.case_id.message_post(
                 body=_(

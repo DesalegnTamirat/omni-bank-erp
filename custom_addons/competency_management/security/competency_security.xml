@@ -9,41 +9,50 @@
             <field name="sequence">26</field>
         </record>
 
-        <!-- Privilege (Odoo 19: groups are organised under a privilege, not directly under a category) -->
+        <!-- Privilege -->
         <record id="res_groups_privilege_competency" model="res.groups.privilege">
             <field name="name">Competency Management</field>
             <field name="sequence">10</field>
             <field name="category_id" ref="competency_management.module_category_competency_management"/>
         </record>
 
-        <!-- Group: User / Employee -->
+        <!-- 1. Group: User / Employee (Default role for all employees) -->
         <record id="group_competency_employee" model="res.groups">
             <field name="name">User / Employee</field>
             <field name="sequence">10</field>
             <field name="privilege_id" ref="competency_management.res_groups_privilege_competency"/>
-            <field name="comment">Can view own competency profile and complete self-assessments and IDPs.</field>
+            <field name="comment">Default role for all employees. Can view approved competency reference dictionary, own job position mapping, and complete assigned self-assessments.</field>
         </record>
 
         <record id="base.group_user" model="res.groups">
             <field name="implied_ids" eval="[(4, ref('group_competency_employee'))]"/>
         </record>
 
-        <!-- Group: Supervisor / Manager -->
+        <!-- 2. Group: Supervisor / Manager (Coaches & Team Managers) -->
         <record id="group_competency_supervisor" model="res.groups">
             <field name="name">Supervisor / Manager</field>
             <field name="sequence">20</field>
             <field name="privilege_id" ref="competency_management.res_groups_privilege_competency"/>
             <field name="implied_ids" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
-            <field name="comment">Can assess team members and approve their IDPs.</field>
+            <field name="comment">Can view own job mapping and team job mappings, assess team members, and generate team reporting within assigned Operating Units.</field>
         </record>
 
-        <!-- Group: Competency Administrator -->
-        <record id="group_competency_admin" model="res.groups">
-            <field name="name">Competency Administrator</field>
+        <!-- 3. Group: HR / People Solution Officer -->
+        <record id="group_competency_officer" model="res.groups">
+            <field name="name">HR / People Solution Officer</field>
             <field name="sequence">30</field>
             <field name="privilege_id" ref="competency_management.res_groups_privilege_competency"/>
             <field name="implied_ids" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
-            <field name="comment">Full access to framework, dictionary, role mappings and assessments.</field>
+            <field name="comment">Can view all competencies and role mappings, draft/edit competencies and mappings for approval, manage cycles (extend deadline, start cycle), edit matrix configuration, and view all assessments.</field>
+        </record>
+
+        <!-- 4. Group: Competency Administrator (People Solution Director / Chief) -->
+        <record id="group_competency_admin" model="res.groups">
+            <field name="name">Competency Administrator</field>
+            <field name="sequence">40</field>
+            <field name="privilege_id" ref="competency_management.res_groups_privilege_competency"/>
+            <field name="implied_ids" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
+            <field name="comment">Full admin access: create assessment cycles, approve competency dictionary entries and job mappings, close cycles, and full system configuration.</field>
         </record>
 
     </data>
@@ -67,16 +76,35 @@
         <record id="rule_competency_assessment_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
-            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), '|', ('assessor_id', '=', user.id), '|', ('employee_id.default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), '|', ('employee_id.coach_id.user_id', '=', user.id), '|', ('assessor_id', '=', user.id), '|', ('employee_id.default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
         </record>
 
-        <!-- Assessment: admin sees all assessments -->
-        <record id="rule_competency_assessment_admin_all" model="ir.rule">
-            <field name="name">Admin All Competency Assessments</field>
+        <!-- Assessment: officer & admin see all assessments -->
+        <record id="rule_competency_assessment_officer_all" model="ir.rule">
+            <field name="name">Officer All Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
+        </record>
+
+        <!-- Assessment Cycles: officer & admin see all cycles -->
+        <record id="rule_competency_assessment_cycle_officer_all" model="ir.rule">
+            <field name="name">Officer All Assessment Cycles</field>
+            <field name="model_id" ref="competency_management.model_competency_assessment_cycle"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
+        </record>
+
+        <record id="rule_competency_assessment_cycle_employee_read" model="ir.rule">
+            <field name="name">Employee All Assessment Cycles Read</field>
+            <field name="model_id" ref="competency_management.model_competency_assessment_cycle"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
 
         <!-- HR Employee Read Access for 360 Degree Competency Evaluations -->
@@ -100,15 +128,14 @@
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
         </record>
 
-        <!-- Dashboard Snapshot: admin sees all snapshots -->
-        <record id="rule_competency_dashboard_snapshot_admin" model="ir.rule">
-            <field name="name">Admin All Dashboard Snapshots</field>
+        <record id="rule_competency_dashboard_snapshot_officer" model="ir.rule">
+            <field name="name">Officer All Dashboard Snapshots</field>
             <field name="model_id" ref="competency_management.model_competency_dashboard_snapshot"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
 
-        <!-- Assessment lines: mirror the parent assessment rules -->
+        <!-- Assessment lines: mirror parent assessment rules -->
         <record id="rule_competency_assessment_line_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessment Lines</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
@@ -129,11 +156,11 @@
             <field name="perm_create" eval="True"/>
             <field name="perm_unlink" eval="True"/>
         </record>
-        <record id="rule_competency_assessment_line_admin_all" model="ir.rule">
-            <field name="name">Admin All Assessment Lines</field>
+        <record id="rule_competency_assessment_line_officer_all" model="ir.rule">
+            <field name="name">Officer All Assessment Lines</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
 
         <!-- Multi-company rules for assessment -->
@@ -155,18 +182,18 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <record id="rule_competency_competency_admin_all" model="ir.rule">
-            <field name="name">Admin All Competencies</field>
+        <record id="rule_competency_competency_officer_all" model="ir.rule">
+            <field name="name">Officer All Competencies</field>
             <field name="model_id" ref="competency_management.model_competency_competency"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
 
-        <!-- Role-Competency Mapping Record Rules: Non-admin users see only their own job position mapping -->
+        <!-- Role-Competency Mapping Record Rules -->
         <record id="rule_competency_role_mapping_employee_own" model="ir.rule">
             <field name="name">Employee Own Job Competency Mapping</field>
             <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
-            <field name="domain_force">['|', ('create_uid', '=', user.id), ('job_position_id', '=', user.employee_id.job_id.id)]</field>
+            <field name="domain_force">[('job_position_id', '=', user.employee_id.job_id.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -174,10 +201,10 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <record id="rule_competency_role_mapping_supervisor_own" model="ir.rule">
-            <field name="name">Supervisor Own Job Competency Mapping</field>
+        <record id="rule_competency_role_mapping_supervisor_team" model="ir.rule">
+            <field name="name">Supervisor Team Job Competency Mappings</field>
             <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
-            <field name="domain_force">['|', ('create_uid', '=', user.id), ('job_position_id', '=', user.employee_id.job_id.id)]</field>
+            <field name="domain_force">['|', ('job_position_id', '=', user.employee_id.job_id.id), ('job_position_id', 'in', user.employee_id.child_ids.mapped('job_id.id'))]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -185,11 +212,11 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <record id="rule_competency_role_mapping_admin_all" model="ir.rule">
-            <field name="name">Admin All Competency Role Mappings</field>
+        <record id="rule_competency_role_mapping_officer_all" model="ir.rule">
+            <field name="name">Officer All Competency Role Mappings</field>
             <field name="model_id" ref="competency_management.model_competency_role_mapping"/>
             <field name="domain_force">[(1, '=', 1)]</field>
-            <field name="groups" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_officer'))]"/>
         </record>
 
     </data>

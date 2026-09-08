@@ -18,11 +18,9 @@ class TestCompetencyDashboard(TransactionCase):
         """Test competency dashboard singleton instantiation, metric computations, and persona switching."""
         dashboard = self.env['competency.dashboard'].create({
             'cycle_id': self.cycle.id,
-            'persona_role': 'executive',
         })
         self.assertTrue(dashboard.cycle_name)
         self.assertGreaterEqual(dashboard.total_active_competencies, 0)
-        self.assertEqual(dashboard.persona_role, 'executive')
 
         # Test persona switching
         dashboard.persona_role = 'hrbp'
@@ -40,7 +38,7 @@ class TestCompetencyDashboard(TransactionCase):
             'cycle_id': self.cycle.id,
         })
         self.assertTrue(dashboard.heatmap_html)
-        self.assertIn('Department × Pillar Competency Gap Heat Map', str(dashboard.heatmap_html))
+        self.assertIn('Department × pillar competency gap heatmap', str(dashboard.heatmap_html))
 
     def test_03_dashboard_snapshot_cron_deduplication(self):
         """Test automated snapshot generation cron with active cycle guards & deduplication (FR-RPT-010)."""

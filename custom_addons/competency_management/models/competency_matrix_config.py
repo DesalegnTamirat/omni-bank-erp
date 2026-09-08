@@ -102,15 +102,30 @@ class CompetencyMatrixConfig(models.Model):
     def write(self, vals):
         res = super().write(vals)
         self.clear_caches()
+        weight_fields = {'weight_self', 'weight_peer', 'weight_subordinate', 'weight_supervisor', 'weight_team'}
+        if set(vals.keys()) & weight_fields:
+            all_lines = self.env['competency.assessment.line'].sudo().search([])
+            all_lines.with_context(skip_360_recompute=True)._compute_360_ratings()
         return res
 
     @api.model
     @tools.ormcache()
-    def get_active_config(self):
-        """Helper to return singleton active matrix configuration record (cached via ORM cache)."""
+    def _get_active_config_id(self):
+        """Return cached ID of singleton active matrix configuration record."""
         config = self.search([], limit=1)
         if not config:
             config = self.create({'name': 'Bunna Bank Competency Matrix Configuration'})
+        return config.id
+
+    @api.model
+    def get_active_config(self):
+        """Helper to return singleton active matrix configuration record bound to current environment."""
+        config_id = self._get_active_config_id()
+        config = self.browse(config_id)
+        if not config.exists():
+            self.clear_caches()
+            config_id = self._get_active_config_id()
+            config = self.browse(config_id)
         if not config.grade_matrix_line_ids or not config.job_matrix_line_ids:
             config._seed_matrix_guidelines()
         return config

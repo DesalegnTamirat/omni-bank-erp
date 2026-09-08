@@ -99,16 +99,31 @@
                         </div>
                     </t>
 
-                    <!-- ── Data Quality Governance Banner (FR-CFD-006) ── -->
+                    <!-- ── Data Quality Governance Banner ── -->
                     <t t-if="state.persona === 'executive' &amp;&amp; !state.alertDismissed &amp;&amp; (state.data.stats.unmapped_cnt &gt; 0 || state.data.stats.missing_sups_cnt &gt; 0)">
                         <div style="background-color: #fffbe6; border: 1px solid #ffe58f; border-left: 5px solid #c17540; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <span style="font-size: 18px;">⚠️</span>
                                 <div>
-                                    <span class="badge bg-secondary me-2" style="font-size: 10px;">FR-CFD-006</span>
                                     <strong style="color: #1d2b32; font-size: 13px;">Data Quality Alert:</strong>
                                     <span style="color: #726732; font-size: 13px; margin-left: 6px;">
-                                        <t t-out="state.data.stats.unmapped_cnt"/> unmapped job positions | <t t-out="state.data.stats.missing_sups_cnt"/> employees missing assigned supervisor.
+                                        <t t-if="state.data.stats.unmapped_cnt &gt; 0">
+                                            <a href="#" t-on-click.prevent="openUnmappedPositions" style="color: #541718; font-weight: 700; text-decoration: underline; cursor: pointer;">
+                                                <t t-out="state.data.stats.unmapped_cnt"/> unmapped job position<t t-out="state.data.stats.unmapped_cnt &gt; 1 ? 's' : ''"/>
+                                            </a>
+                                        </t>
+                                        <t t-else="">
+                                            <span>0 unmapped job positions</span>
+                                        </t>
+                                        <span style="margin: 0 6px;">|</span>
+                                        <t t-if="state.data.stats.missing_sups_cnt &gt; 0">
+                                            <a href="#" t-on-click.prevent="openMissingSupervisors" style="color: #541718; font-weight: 700; text-decoration: underline; cursor: pointer;">
+                                                <t t-out="state.data.stats.missing_sups_cnt"/> employee<t t-out="state.data.stats.missing_sups_cnt &gt; 1 ? 's' : ''"/> missing assigned supervisor
+                                            </a>
+                                        </t>
+                                        <t t-else="">
+                                            <span>0 employees missing assigned supervisor</span>
+                                        </t>
                                     </span>
                                 </div>
                             </div>
@@ -125,7 +140,7 @@
                                 </div>
                                 <div>
                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="badge bg-success" style="font-size: 11px; padding: 4px 8px; font-weight: 600;">
+                                        <span t-attf-class="badge #{state.data.active_cycle_info.is_deadline_passed ? 'bg-danger' : (state.data.active_cycle_info.state == 'open' ? 'bg-success' : 'bg-warning')}" style="font-size: 11px; padding: 4px 8px; font-weight: 600;">
                                             <t t-out="state.data.active_cycle_info.state_label"/>
                                         </span>
                                         <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1d2b32;">
@@ -158,7 +173,7 @@
                             <div style="font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 4px;">Bank Avg Gap</div>
                             <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.bank_avg_gap"/> pts</div>
                         </div>
-                        <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+                        <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; cursor: pointer;" t-on-click="openAssessedEmployees">
                             <div style="font-size: 12px; color: #64748b; font-weight: 500; margin-bottom: 4px;">Assessed Employees</div>
                             <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
                         </div>
@@ -183,7 +198,6 @@
                         <div style="background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                                 <span style="font-size: 15px; font-weight: 700; color: #1d2b32;">TNA breakdown</span>
-                                <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
                                 <canvas id="competencyTnaDonutChart" style="width: 100%; height: 230px; display: block;"></canvas>
@@ -194,7 +208,6 @@
                         <div style="background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                                 <span style="font-size: 15px; font-weight: 700; color: #1d2b32;">Gaps visualized</span>
-                                <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
                                 <canvas id="competencyPillarBarChart" style="width: 100%; height: 230px; display: block;"></canvas>
@@ -205,7 +218,6 @@
                         <div style="background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                                 <span style="font-size: 15px; font-weight: 700; color: #1d2b32;">My competency radar</span>
-                                <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                             </div>
                             <div style="height: 250px; position: relative;">
                                 <canvas id="competencyRadarChart" style="width: 100%; height: 230px; display: block;"
@@ -225,7 +237,6 @@
                     <div style="background: #ffffff; border-radius: 10px; padding: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 24px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                             <span style="font-size: 16px; font-weight: 700; color: #1d2b32;">Department by pillar competency gap heatmap</span>
-                            <span class="badge bg-light text-dark" style="font-size: 10px; border: 1px solid #cbd5e1;">FR-RPT-002</span>
                         </div>
                         
                         <div class="o_competency_scroll table-responsive">

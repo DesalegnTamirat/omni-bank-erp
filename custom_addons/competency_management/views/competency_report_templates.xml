@@ -75,7 +75,7 @@
                                         <td style="width: 65%; text-align: left; vertical-align: middle;">
                                             <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
                                             <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Individual Competency Profile &amp; Gap Analysis Report (FR-RPT-001)
+                                                Individual Competency Profile &amp; Gap Analysis Report
                                             </div>
                                         </td>
                                         <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
@@ -168,12 +168,12 @@
                                 </t>
                             </t>
 
-                            <!-- Recommended Development Actions (FR-GAP-004) -->
+                            <!-- Recommended Development Actions -->
                             <t t-set="recs" t-value="doc.get_recommended_development_actions()"/>
                             <t t-if="recs">
                                 <div style="margin-top: 14px; margin-bottom: 20px;">
                                     <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-                                        Recommended Development Actions (FR-GAP-004)
+                                        Recommended Development Actions
                                     </div>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                                         <thead>
@@ -243,7 +243,7 @@
                                         <td style="width: 65%; text-align: left; vertical-align: middle;">
                                             <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
                                             <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Team Competency Gap Report (FR-GAP-006 / FR-RPT-009)
+                                                Team Competency Gap Report
                                             </div>
                                         </td>
                                         <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
@@ -282,7 +282,7 @@
 
                             <!-- Team Member Competency Gap Roster -->
                             <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-                                Direct Reports Gap Roster (FR-GAP-005)
+                                Direct Reports Gap Roster
                             </div>
                             <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
                                 <thead>
@@ -339,7 +339,7 @@
                                         <td style="width: 65%; text-align: left; vertical-align: middle;">
                                             <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #FFFFFF;">BUNNA BANK S.C.</h2>
                                             <div style="font-size: 13px; font-weight: 500; color: #c17540; margin-top: 2px;">
-                                                Organizational Capability &amp; TNA Report (FR-RPT-001 / FR-RPT-003)
+                                                Organizational Capability &amp; TNA Report
                                             </div>
                                         </td>
                                         <td style="width: 35%; text-align: right; vertical-align: middle; font-size: 11px;">
@@ -353,7 +353,7 @@
 
                             <!-- Executive Summary Boxes -->
                             <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px 18px; margin-bottom: 18px;">
-                                <div style="font-size: 13px; font-weight: 700; color: #1d2b32; margin-bottom: 10px;">Framework Health &amp; Role Mapping Coverage (FR-MAP-007)</div>
+                                <div style="font-size: 13px; font-weight: 700; color: #1d2b32; margin-bottom: 10px;">Framework Health &amp; Role Mapping Coverage</div>
                                 <table style="width: 100%; text-align: center; font-size: 11px;">
                                     <tr>
                                         <td style="padding: 8px; background-color: #f8fafc; border-radius: 4px; border: 1px solid #e2e8f0;">
@@ -378,7 +378,7 @@
 
                             <!-- High Priority Gap Call-out Roster -->
                             <div style="font-size: 14px; font-weight: 700; color: #541718; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px;">
-                                High-Priority Organizational Gaps (FR-GAP-005)
+                                High-Priority Organizational Gaps
                             </div>
                             <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px;">
                                 <thead>

@@ -228,7 +228,7 @@ class CompetencyReportWizard(models.TransientModel):
 
     def _build_line_domain(self):
         """Construct domain based on wizard selections and enforce server-side OU isolation."""
-        domain = [('cycle_id', '=', self.cycle_id.id)]
+        domain = [('cycle_id', '=', self.cycle_id.id), ('is_primary_reporting_line', '=', True)]
 
         # Server-side Operating-Unit Boundary Scoping for non-admins
         user = self.env.user
@@ -386,7 +386,7 @@ class CompetencyReportWizard(models.TransientModel):
                 'operating_unit_name': ou_obj.name if ou_obj else 'N/A',
                 'department_name': emp.department_id.name if emp.department_id else 'N/A',
                 'job_name': emp.job_id.name if emp.job_id else 'N/A',
-                'grade_name': grade_obj.name if grade_obj else 'N/A',
+                'grade_name': (getattr(grade_obj, 'grade_name', False) or getattr(grade_obj, 'name', False) or 'N/A') if grade_obj else 'N/A',
                 'competency_name': comp.name,
                 'pillar_name': dict(comp._fields['pillar'].selection).get(comp.pillar, comp.pillar),
                 'domain_name': comp.functional_domain or 'General',
@@ -579,3 +579,52 @@ class CompetencyReportWizard(models.TransientModel):
             'dept_completion': dept_completion,
             '360_rows': self._get_360_report_data_rows()[:20],
         }
+
+
+class CompetencyRaterBreakdownWizard(models.TransientModel):
+    """Pop-up modal wizard to display full multi-rater 360 breakdown for a competency reporting line."""
+    _name = 'competency.rater.breakdown.wizard'
+    _description = '360° Rater Score Breakdown & Audit Wizard'
+
+    line_id = fields.Many2one('competency.assessment.line', string='Reporting Line', readonly=True)
+    employee_id = fields.Many2one('hr.employee', string='Evaluatee Employee', readonly=True)
+    department_id = fields.Many2one('hr.department', string='Department', readonly=True)
+    job_id = fields.Many2one('hr.job', string='Job Position', readonly=True)
+    cycle_id = fields.Many2one('competency.assessment.cycle', string='Assessment Cycle', readonly=True)
+    competency_id = fields.Many2one('competency.competency', string='Competency', readonly=True)
+    functional_domain = fields.Char(related='competency_id.functional_domain', string='Functional Domain', readonly=True)
+    pillar = fields.Selection(related='competency_id.pillar', string='Pillar', readonly=True)
+    competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', readonly=True)
+    required_level = fields.Selection(related='line_id.required_level', string='Required Level', readonly=True)
+
+    # 360 Multi-Rater Averages
+    self_rating = fields.Float(string='Self Rating', readonly=True)
+    peer_avg = fields.Float(string='Peer Avg', readonly=True)
+    subordinate_avg = fields.Float(string='Subordinate Avg', readonly=True)
+    supervisor_avg = fields.Float(string='Supervisor Avg', readonly=True)
+    team_avg = fields.Float(string='Team Avg', readonly=True)
+    weighted_current_level = fields.Float(string='Weighted Current Level', readonly=True)
+
+    # Detailed rater line breakdown
+    rater_line_ids = fields.One2many('competency.rater.breakdown.line', 'wizard_id', string='Individual Rater Scores', readonly=True)
+
+
+class CompetencyRaterBreakdownLine(models.TransientModel):
+    _name = 'competency.rater.breakdown.line'
+    _description = '360° Rater Score Detail Line'
+
+    wizard_id = fields.Many2one('competency.rater.breakdown.wizard', string='Wizard', ondelete='cascade')
+    assessor_name = fields.Char(string='Assessor / Rater Name', readonly=True)
+    rater_type = fields.Selection([
+        ('self', 'Self Assessment'),
+        ('peer', 'Peer Assessment'),
+        ('subordinate', 'Subordinate Assessment'),
+        ('supervisor', 'Supervisor Assessment'),
+        ('team', 'Team Assessment'),
+    ], string='Rater Role / Source', readonly=True)
+    rating_level_str = fields.Char(string='Assessed Level', readonly=True)
+    rating_num = fields.Integer(string='Level (Numeric)', readonly=True)
+    assessment_name = fields.Char(string='Assessment Ref', readonly=True)
+    assessment_state = fields.Char(string='Status', readonly=True)
+    comments = fields.Text(string='Comments / Remarks', readonly=True)
+

@@ -45,7 +45,6 @@ class CompetencyRoleMappingCloneWizard(models.TransientModel):
             new_map = Mapping.create({
                 'job_position_id': job.id,
                 'version': self.target_version,
-                'record_type': 'production',
                 'change_description': _("Cloned & adapted from %s (Version %s).") % (self.source_mapping_id.mapping_name, self.source_mapping_id.version),
                 'cluster_ids': [(6, 0, self.source_mapping_id.cluster_ids.ids)],
             })

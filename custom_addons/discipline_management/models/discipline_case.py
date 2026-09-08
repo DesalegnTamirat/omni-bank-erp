@@ -241,9 +241,9 @@ class DisciplineCase(models.Model):
     def _check_initiator_employee_scope(self):
         """Strictly enforce that case initiator can only select employees beside them (e.g. manager only his team)."""
         for rec in self:
-            if rec.is_system_generated or self.env.su:
-                continue
             user = self.env.user
+            if rec.is_system_generated or user._is_superuser() or user.id == 1:
+                continue
             is_admin_or_audit = (
                 user.has_group('discipline_management.group_discipline_admin') or
                 user.has_group('discipline_management.group_discipline_auditor') or
@@ -251,7 +251,7 @@ class DisciplineCase(models.Model):
             )
             if is_admin_or_audit:
                 continue
-            user_emp = user.employee_id
+            user_emp = user.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)
             if not user_emp:
                 continue
 
@@ -650,7 +650,7 @@ class DisciplineCase(models.Model):
             # Dismissal / Disciplinary-Committee route. It must never block a Manager,
             # Director, or Chief from directly deciding and enforcing a non-dismissal case,
             # even where the affected employee happens to hold a managerial job title.
-            if rec.is_dismissal_action:
+            if rec.is_dismissal_action and not self.env.context.get('from_committee'):
                 if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
                     raise ValidationError(_(
                         'Approval Restriction: Dismissal decisions require CEO / Senior Executive Authority and are '

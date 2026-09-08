@@ -125,3 +125,36 @@
     }
 }
 
+/* Distinct light green row background for rated competencies once level is given */
+.o_form_view {
+    .o_field_one2many {
+        /* Filled / rated competency lines */
+        tr.decoration-success,
+        tr.text-success,
+        tr.decoration-success > td,
+        tr.text-success > td,
+        .table tr.decoration-success,
+        .table tr.text-success,
+        .table tr.decoration-success > td,
+        .table tr.text-success > td {
+            background-color: #d1e7dd !important; /* Soft, distinct light green */
+            color: #0f5132 !important; /* Dark green text for optimal contrast */
+        }
+
+        /* Unfilled / unrated competency lines */
+        tr.decoration-warning,
+        tr.text-warning,
+        tr.decoration-warning > td,
+        tr.text-warning > td,
+        .table tr.decoration-warning,
+        .table tr.text-warning,
+        .table tr.decoration-warning > td,
+        .table tr.text-warning > td {
+            background-color: #fff3cd !important; /* Soft light yellow/cream */
+            color: #664d03 !important;
+        }
+    }
+}
+
+
+

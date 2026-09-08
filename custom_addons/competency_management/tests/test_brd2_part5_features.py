@@ -89,6 +89,7 @@ class TestBRD2Part5Features(TransactionCase):
             'parent_assessment_id': parent_asm.id,
             'cycle_id': cycle.id,
             'employee_id': emp.id,
+            'assessment_type': 'multi_rater',
             'is_rater_assessment': True,
             'rater_type': 'peer',
             'is_anonymous': True,
