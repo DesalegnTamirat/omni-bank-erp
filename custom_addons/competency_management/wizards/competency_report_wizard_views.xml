@@ -31,6 +31,7 @@
                                 <field name="achievement_status" string="Proficiency Filter" readonly="is_status_readonly"/>
                                 <field name="stage_filter" string="Assessment Stage"/>
                                 <field name="required_level" string="Required Proficiency Levels"/>
+                                <field name="current_level" string="Current Rating Level"/>
                                 <field name="pillar" string="Competency Pillars / Categories"/>
                                 <field name="competency_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select Competencies..."/>
                             </group>

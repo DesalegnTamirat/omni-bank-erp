@@ -132,9 +132,33 @@ class CompetencyAssessmentCycle(models.Model):
         """Draft -> Open: Automatically generate 360-degree assessments (Self, Supervisor, Team, Peer, Subordinate) with random sampling caps."""
         self.with_context(force_write=True).write({'state': 'open'})
         for rec in self:
-            rec._generate_cycle_assessments_batch()
+            created_asms = rec._generate_cycle_assessments_batch()
+            rec._send_cycle_start_notifications(created_asms)
             rec.message_post(body=_('Assessment cycle %s opened and 360-degree evaluations generated. Deadline: %s.') % (rec.name, rec.assessment_deadline or 'Not set'))
         return True
+
+    def _send_cycle_start_notifications(self, assessments):
+        """Send notifications to all assigned raters/assessors when a cycle starts."""
+        self.ensure_one()
+        deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
+        assessor_map = {}
+        for asm in assessments:
+            if asm.assessor_id and asm.assessor_id.partner_id:
+                assessor_map.setdefault(asm.assessor_id, []).append(asm)
+
+        for assessor, asms in assessor_map.items():
+            partner = assessor.partner_id
+            msg_body = _(
+                "📋 <strong>Competency Assessment Cycle Started:</strong><br/>"
+                "The assessment cycle '<strong>%s</strong>' has started. You have <strong>%d</strong> assigned competency assessment(s) to fill.<br/>"
+                "Submission Deadline: <strong>%s</strong>.<br/>"
+                "Please log in and submit your evaluations before the deadline."
+            ) % (self.name, len(asms), deadline_str)
+            self.message_post(
+                body=msg_body,
+                partner_ids=[partner.id],
+                subtype_xmlid='mail.mt_comment'
+            )
 
     def _generate_cycle_assessments_batch(self):
         """Generate pre-populated 360-degree assessments for all active employees for this cycle in lightning-fast O(N) bulk."""
@@ -799,7 +823,7 @@ class CompetencyAssessment(models.Model):
         return super(CompetencyAssessment, self).write(vals)
 
     def action_submit(self):
-        """Draft -> Submitted with deadline checks, unrated checks, and employee confirmation notification (FR-COM-047)."""
+        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
         for rec in self:
             rec._check_submission_deadline()
             if not rec.line_ids:
@@ -814,13 +838,133 @@ class CompetencyAssessment(models.Model):
             rec.line_ids._trigger_sibling_360_recompute()
             rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
-            if rec.employee_id and rec.employee_id.user_id:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Assessment Submitted: %s') % rec.name,
-                    note=_('Your competency assessment %s has been submitted successfully.') % rec.name,
-                    user_id=rec.employee_id.user_id.id,
+    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
+        """Ensure notification appears in ALL Odoo notification channels:
+        1. Top Header Clock Icon (mail.activity)
+        2. Top Header Speech Bubble Notifications tab (mail.notification with inbox type)
+        3. Direct Discuss Chat Channel popover / popup window (discuss.channel)
+        """
+        if not target_user:
+            return
+        rec_to_notify = target_rec or self
+        
+        # 1. Top Header Clock Icon (Activity Badge)
+        rec_to_notify.activity_schedule(
+            'mail.mail_activity_data_todo',
+            summary=summary,
+            note=note,
+            user_id=target_user.id,
+        )
+
+        # 2. Document Chatter Message & In-App Notification
+        if target_user.partner_id:
+            msg = rec_to_notify.message_post(
+                body=msg_text,
+                partner_ids=[target_user.partner_id.id],
+                subtype_xmlid='mail.mt_comment',
+            )
+            # Guarantee an unread in-app inbox notification entry
+            notif = self.env['mail.notification'].sudo().search([
+                ('mail_message_id', '=', msg.id),
+                ('res_partner_id', '=', target_user.partner_id.id),
+            ], limit=1)
+            if notif:
+                notif.write({'notification_type': 'inbox', 'is_read': False})
+            else:
+                self.env['mail.notification'].sudo().create({
+                    'mail_message_id': msg.id,
+                    'res_partner_id': target_user.partner_id.id,
+                    'notification_type': 'inbox',
+                    'notification_status': 'sent',
+                    'is_read': False,
+                })
+
+            # 3. Direct Discuss Chat Channel Popup / Window (OdooBot Direct Message)
+            try:
+                chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[target_user.partner_id.id])
+                if chat_channel:
+                    chat_channel.message_post(
+                        body=msg_text,
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment',
+                    )
+            except Exception:
+                pass
+
+    def action_submit(self):
+        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
+        for rec in self:
+            rec._check_submission_deadline()
+            if not rec.line_ids:
+                raise UserError(_('Add at least one competency rating line before submitting.'))
+            unrated = rec.line_ids.filtered(lambda l: not l.current_level or l.current_level == '0')
+            if unrated:
+                unrated_names = ", ".join(unrated.mapped('competency_id.name')[:5])
+                raise ValidationError(_('Validation Error: Please rate all competencies before submitting! %d competency(ies) remaining unrated: %s%s') % (
+                    len(unrated), unrated_names, "..." if len(unrated) > 5 else ""
+                ))
+            rec.with_context(force_write=True).write({'state': 'submitted'})
+            rec.line_ids._trigger_sibling_360_recompute()
+            rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
+
+            # Targeted Notifications & Systray Activities on Submission
+            if rec.assessment_type == 'self':
+                # Confirmation activity for employee
+                if rec.employee_id and rec.employee_id.user_id:
+                    rec.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Self-Assessment Submitted: %s') % rec.name,
+                        note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
+                        user_id=rec.employee_id.user_id.id,
+                    )
+
+                coach_emp = rec.employee_id.coach_id or rec.employee_id.parent_id
+                coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
+
+                sup_asm = False
+                if rec.cycle_id and rec.employee_id:
+                    sup_asm = self.env['competency.assessment'].search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('assessment_type', 'in', ('supervisor', 'team')),
+                    ], limit=1)
+                    if not coach_user and sup_asm and sup_asm.assessor_id:
+                        coach_user = sup_asm.assessor_id
+
+                if coach_user:
+                    msg_text = _("📥 Subordinate Employee <strong>%s</strong> has completed and submitted their Self-Assessment for cycle '<strong>%s</strong>'.") % (
+                        rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    summary_str = _('Subordinate Self-Assessment Submitted: %s') % rec.employee_id.name
+                    note_str = _('Employee %s has submitted their self-assessment for cycle %s. You may now evaluate.') % (
+                        rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    target_rec = sup_asm or rec
+                    rec._notify_user_inbox_and_activity(coach_user, summary_str, note_str, msg_text, target_rec=target_rec)
+
+            elif rec.assessment_type in ('supervisor', 'team'):
+                emp_user = rec.employee_id.user_id if (rec.employee_id and rec.employee_id.user_id) else False
+
+                self_asm = False
+                if rec.cycle_id and rec.employee_id:
+                    self_asm = self.env['competency.assessment'].search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('assessment_type', '=', 'self'),
+                    ], limit=1)
+
+                coach_name = rec.assessor_id.name if rec.assessor_id else _("Supervisor/Coach")
+                msg_text = _("✅ Your supervisor/coach (<strong>%s</strong>) has completed and submitted your competency assessment for cycle '<strong>%s</strong>'.") % (
+                    coach_name, rec.cycle_id.name if rec.cycle_id else ''
                 )
+                summary_str = _('Supervisor Assessment Completed: %s') % coach_name
+                note_str = _('Your supervisor/coach (%s) has completed and submitted your competency assessment for cycle \'%s\'.') % (
+                    coach_name, rec.cycle_id.name if rec.cycle_id else ''
+                )
+
+                if emp_user:
+                    target_rec = self_asm or rec
+                    rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
@@ -1434,6 +1578,8 @@ class CompetencyAssessmentLine(models.Model):
     def action_view_360_breakdown(self):
         """Action button to open the 360° Rater Score Breakdown pop-up modal wizard."""
         self.ensure_one()
+        if self.employee_id.user_id == self.env.user and not self.env.user.has_group('competency_management.group_competency_supervisor') and not self.env.su:
+            raise UserError(_("Individual multi-rater score breakdowns are restricted to Supervisors and HR Officers to maintain 360-degree feedback anonymity."))
         emp = self.employee_id
         cycle = self.cycle_id
         comp = self.competency_id

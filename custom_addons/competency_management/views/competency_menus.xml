@@ -118,12 +118,6 @@
             action="action_competency_rating_model"
             sequence="20"
             groups="competency_management.group_competency_officer" />
-        <menuitem id="menu_trigger_matrix_seeding"
-            name="Re-Seed Matrix &amp; Clusters"
-            parent="menu_competency_config_categ"
-            action="action_trigger_matrix_seeding"
-            sequence="30"
-            groups="competency_management.group_competency_admin" />
 
     </data>
 </odoo>

@@ -192,7 +192,22 @@ class Competency(models.Model):
     ], string='Pillar', required=True, tracking=True)
     functional_domain = fields.Char(string='Functional Domain')
     definition = fields.Text(string='Definition', tracking=True)
-    rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model')
+
+    @api.model
+    def _default_rating_model_id(self):
+        models_rec = self.env['competency.rating.model'].search([])
+        if len(models_rec) == 1:
+            return models_rec.id
+        return False
+
+    rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model', default=_default_rating_model_id)
+    is_rating_model_readonly = fields.Boolean(compute='_compute_is_rating_model_readonly')
+
+    def _compute_is_rating_model_readonly(self):
+        count = self.env['competency.rating.model'].search_count([])
+        is_ro = (count == 1)
+        for rec in self:
+            rec.is_rating_model_readonly = is_ro
     proficiency_level_ids = fields.One2many(
         'competency.proficiency.level', 'competency_id', string='Proficiency Levels')
     applicable_job_ids = fields.Many2many(

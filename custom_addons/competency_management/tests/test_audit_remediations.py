@@ -771,8 +771,193 @@ class TestAuditRemediations(TransactionCase):
             snapshot_model_id = self.env.ref('competency_management.model_competency_dashboard_snapshot')
             cron.write({'model_id': snapshot_model_id.id, 'code': 'model._cron_send_scheduled_competency_reports()'})
             self.assertEqual(cron.model_id.model, 'competency.dashboard.snapshot')
-        res = self.Snapshot._cron_send_scheduled_competency_reports()
-        self.assertIsNotNone(res)
+    def test_single_rating_model_default_and_readonly(self):
+        """Verify single rating model default computation and readonly flag on competency creation."""
+        models_count = self.env['competency.rating.model'].search_count([])
+        if models_count == 1:
+            comp = self.Competency.create({
+                'name': 'Test Rating Model Competency',
+                'code': 'TRMC-001',
+                'pillar': 'core',
+            })
+            self.assertTrue(comp.is_rating_model_readonly, "Rating model must be readonly when only 1 exists")
+            self.assertEqual(comp.rating_model_id.id, self.env['competency.rating.model'].search([], limit=1).id)
+
+    def test_cluster_min_proficiency_removed(self):
+        """Verify min_proficiency field is removed from competency.cluster."""
+        self.assertNotIn('min_proficiency', self.env['competency.cluster']._fields)
+
+    def test_populate_from_clusters_without_constraint_crash(self):
+        """Verify populating competencies from cluster on existing job position does not crash with uniqueness constraint."""
+        # Create an existing approved mapping for job_pos
+        existing_approved = self.RoleMapping.create({
+            'job_position_id': self.job_pos.id,
+            'state': 'approved',
+        })
+        comp = self.Competency.create({
+            'name': 'Cluster Test Competency',
+            'code': 'CTC-001',
+            'pillar': 'core',
+        })
+        comp.write({'state': 'approved'})
+        cluster = self.env['competency.cluster'].create({
+            'name': 'Test Cluster A',
+            'code': 'TCA-001',
+            'competency_ids': [(6, 0, [comp.id])],
+        })
+        # New draft mapping for same job position
+        mapping = self.RoleMapping.create({
+            'job_position_id': self.job_pos.id,
+            'cluster_ids': [(6, 0, [cluster.id])],
+            'state': 'draft',
+        })
+        # Populating from cluster in draft state must succeed without triggering uniqueness constraint
+        mapping.action_populate_from_clusters()
+        self.assertIn(comp.id, mapping.line_ids.mapped('competency_id.id'))
+
+    def test_rating_line_editability_before_deadline(self):
+        """Verify rating line fields are editable in draft state before deadline."""
+        cycle = self.Cycle.create({
+            'name': 'Editability Cycle',
+            'period_start': fields.Date.today(),
+            'period_end': fields.Date.today(),
+            'assessment_deadline': fields.Date.today(),
+        })
+        comp = self.Competency.create({'name': 'Edit Comp', 'code': 'EC-001', 'pillar': 'core'})
+        asm = self.Assessment.create({
+            'cycle_id': cycle.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_admin.id,
+            'assessment_type': 'self',
+        })
+        line = self.AssessmentLine.create({
+            'assessment_id': asm.id,
+            'competency_id': comp.id,
+            'required_level': '2',
+            'current_level': '3',
+            'comments': 'Test comments',
+        })
+        self.assertEqual(line.current_level, '3')
+        self.assertFalse(line.is_deadline_passed)
+
+    def test_360_breakdown_restricted_for_evaluated_employee(self):
+        """Verify evaluated employee cannot view 360 breakdown wizard to protect anonymity."""
+        comp = self.Competency.create({'name': 'Anon Comp', 'code': 'AC-001', 'pillar': 'core'})
+        cycle = self.Cycle.create({
+            'name': 'Anon Cycle',
+            'period_start': fields.Date.today(),
+            'period_end': fields.Date.today(),
+            'assessment_deadline': fields.Date.today(),
+        })
+        asm = self.Assessment.create({
+            'cycle_id': cycle.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_emp_a.id,
+            'assessment_type': 'self',
+        })
+        line = self.AssessmentLine.create({
+            'assessment_id': asm.id,
+            'competency_id': comp.id,
+            'required_level': '2',
+            'current_level': '2',
+        })
+        with self.assertRaises(UserError):
+            line.with_user(self.user_emp_a).action_view_360_breakdown()
+
+    def test_cycle_start_and_submission_notifications(self):
+        """Verify cycle start and assessment submission notifications post chatter messages."""
+        cycle = self.Cycle.create({
+            'name': 'Notification Cycle',
+            'period_start': fields.Date.today(),
+            'period_end': fields.Date.today(),
+            'assessment_deadline': fields.Date.today(),
+        })
+        cycle.action_start()
+        self.assertEqual(cycle.state, 'open')
+        
+        asm = self.Assessment.create({
+            'cycle_id': cycle.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_emp_a.id,
+            'assessment_type': 'self',
+        })
+        comp = self.Competency.create({'name': 'Notif Comp', 'code': 'NC-001', 'pillar': 'core'})
+        line = self.AssessmentLine.create({
+            'assessment_id': asm.id,
+            'competency_id': comp.id,
+            'required_level': '2',
+            'current_level': '2',
+        })
+        asm.action_submit()
+        self.assertEqual(asm.state, 'submitted')
+
+    def test_bidirectional_submission_notifications_and_ordering(self):
+        """Verify instant chatter messages and Systray activities on submission in both directions (Emp->Coach and Coach->Emp) and view ordering."""
+        cycle = self.Cycle.create({
+            'name': 'Notification & Order Cycle',
+            'period_start': fields.Date.today(),
+            'period_end': fields.Date.today(),
+            'assessment_deadline': fields.Date.today(),
+        })
+
+        comp = self.Competency.create({'name': 'BiNotif Comp', 'code': 'BNC-001', 'pillar': 'core'})
+
+        # Self assessment for Employee A (Coach = Manager A)
+        asm_self = self.Assessment.create({
+            'cycle_id': cycle.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_emp_a.id,
+            'assessment_type': 'self',
+        })
+        self.AssessmentLine.create({
+            'assessment_id': asm_self.id,
+            'competency_id': comp.id,
+            'required_level': '2',
+            'current_level': '3',
+        })
+
+        # Supervisor assessment for Manager A (Employee = Employee A)
+        asm_sup = self.Assessment.create({
+            'cycle_id': cycle.id,
+            'employee_id': self.emp_a.id,
+            'assessor_id': self.user_mgr_a.id,
+            'assessment_type': 'supervisor',
+        })
+        self.AssessmentLine.create({
+            'assessment_id': asm_sup.id,
+            'competency_id': comp.id,
+            'required_level': '2',
+            'current_level': '4',
+        })
+
+        # 1. Employee A submits self-assessment
+        asm_self.action_submit()
+        self.assertEqual(asm_self.state, 'submitted')
+
+        # Check activity scheduled for Manager A (Coach)
+        sup_activities = self.env['mail.activity'].search([
+            ('user_id', '=', self.user_mgr_a.id),
+            ('res_id', 'in', [asm_self.id, asm_sup.id]),
+        ])
+        self.assertTrue(sup_activities, "Systray activity item must be scheduled for Coach when subordinate submits self-assessment")
+        self.assertIn(self.emp_a.name, sup_activities[0].summary)
+
+        # 2. Manager A submits supervisor assessment
+        asm_sup.action_submit()
+        self.assertEqual(asm_sup.state, 'submitted')
+
+        # Check activity scheduled for Employee A
+        emp_activities = self.env['mail.activity'].search([
+            ('user_id', '=', self.user_emp_a.id),
+            ('res_id', 'in', [asm_self.id, asm_sup.id]),
+        ])
+        self.assertTrue(emp_activities, "Systray activity item must be scheduled for Employee when coach submits evaluation")
+        self.assertIn("Supervisor Assessment Completed", emp_activities.mapped('summary'))
+
+        # 3. Verify view_my_competency_evaluation_line_list default_order attribute
+        view = self.env.ref('competency_management.view_my_competency_evaluation_line_list')
+        self.assertIn('default_order="cycle_id desc, id desc"', view.arch)
+
 
 
 

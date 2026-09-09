@@ -100,6 +100,7 @@ _ORIGINAL_UNLINK = models.BaseModel.unlink
 _PATCHED = False  # guard against double-patching
 
 
+@api.model_create_multi
 def _patched_create(self, vals_list):
     records = _ORIGINAL_CREATE(self, vals_list)
     # Skip if we are already inside an audit log call (re-entrancy guard)

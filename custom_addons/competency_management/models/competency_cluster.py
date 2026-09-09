@@ -20,12 +20,6 @@ class CompetencyCluster(models.Model):
         'competency.competency', 'competency_cluster_rel', 'cluster_id', 'competency_id',
         string='Competencies in Cluster', required=True,
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
-    min_proficiency = fields.Selection([
-        ('1', 'Level 1 - Basic'),
-        ('2', 'Level 2 - Intermediate'),
-        ('3', 'Level 3 - Advanced'),
-        ('4', 'Level 4 - Expert'),
-    ], string='Minimum Required Proficiency', required=True, default='2')
     active = fields.Boolean(default=True)
 
     _sql_constraints = [

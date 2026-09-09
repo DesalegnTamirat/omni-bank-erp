@@ -135,7 +135,7 @@
                         </group>
                         <group string="Required Competencies">
                             <field name="line_ids" readonly="state != 'draft'">
-                                <list>
+                                <list editable="bottom">
                                     <field name="is_matrix_configured" column_invisible="True"/>
                                     <field name="default_proficiency" column_invisible="True"/>
                                     <field name="competency_definition" column_invisible="True"/>

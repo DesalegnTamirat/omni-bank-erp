@@ -59,7 +59,8 @@
                                 <field name="code" readonly="state in ('approved', 'retired')"/>
                                 <field name="pillar" readonly="state in ('approved', 'retired')"/>
                                 <field name="functional_domain" readonly="state in ('approved', 'retired')"/>
-                                <field name="rating_model_id" readonly="state in ('approved', 'retired')"/>
+                                <field name="is_rating_model_readonly" invisible="1"/>
+                                <field name="rating_model_id" readonly="is_rating_model_readonly or state in ('approved', 'retired')"/>
                             </group>
                             <group string="Status &amp; Approval">
                                 <field name="status" widget="badge" readonly="1"/>
