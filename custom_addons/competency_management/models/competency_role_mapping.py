@@ -4,7 +4,11 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRoleMapping(models.Model):
-    """Role-Competency mapping: master reference for assessment & gap analysis (FR-COM-006, FR-MAP-001..006)."""
+    """Role-Competency mapping: master reference for assessment & gap analysis (FR-COM-006, FR-MAP-001..006).
+    
+    NOTE: Shared globally across all companies (intentionally not company-scoped
+    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    """
     _name = 'competency.role.mapping'
     _description = 'Role-Competency Mapping'
     _inherit = ['mail.thread']

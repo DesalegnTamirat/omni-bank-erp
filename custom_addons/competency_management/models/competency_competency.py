@@ -173,7 +173,11 @@ class CompetencyProficiencyLevel(models.Model):
 
 
 class Competency(models.Model):
-    """Competency dictionary entry (FR-COM-002, FR-COM-003)."""
+    """Competency dictionary entry (FR-COM-002, FR-COM-003).
+    
+    NOTE: Shared globally across all companies (intentionally not company-scoped
+    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    """
     _name = 'competency.competency'
     _description = 'Competency'
     _inherit = ['mail.thread']

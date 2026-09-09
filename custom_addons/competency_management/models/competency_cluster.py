@@ -4,7 +4,11 @@ from odoo.exceptions import ValidationError
 
 
 class CompetencyCluster(models.Model):
-    """Bundling related competencies with minimum proficiency requirement (FR-CFD-0176)."""
+    """Bundling related competencies with minimum proficiency requirement (FR-CFD-0176).
+    
+    NOTE: Shared globally across all companies (intentionally not company-scoped
+    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    """
     _name = 'competency.cluster'
     _description = 'Competency Cluster'
     _order = 'code, name'

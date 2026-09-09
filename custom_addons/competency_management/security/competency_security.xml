@@ -112,8 +112,8 @@
             <field name="name">360 Competency Evaluation HR Employee Read Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
             <field name="domain_force">['|', ('user_id', '=', user.id), '|', ('parent_id.user_id', '=', user.id), '|', ('default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
-            <field name="global" eval="True"/>
-            <field name="groups" eval="[(5, 0, 0)]"/>
+            <field name="global" eval="False"/>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee')), (4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

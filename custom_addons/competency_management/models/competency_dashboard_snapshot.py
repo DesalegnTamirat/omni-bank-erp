@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 from odoo import api, fields, models, _
 
 
@@ -113,3 +114,90 @@ class CompetencyDashboardSnapshot(models.Model):
                     snapshot_count += 1
 
         return snapshot_count
+
+    @api.model
+    def _cron_send_scheduled_competency_reports(self):
+        """Scheduled distribution cron method with supervisor group support and error handling (FR-RPT-008)."""
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        admin_group = self.env.ref('competency_management.group_competency_admin', raise_if_not_found=False)
+        supervisor_group = self.env.ref('competency_management.group_competency_supervisor', raise_if_not_found=False)
+
+        recipients = self.env['res.users']
+        if admin_group:
+            recipients |= getattr(admin_group, 'users_ids', getattr(admin_group, 'users', self.env['res.users']))
+        if supervisor_group:
+            recipients |= getattr(supervisor_group, 'users_ids', getattr(supervisor_group, 'users', self.env['res.users']))
+
+        if not recipients:
+            return False
+
+        active_cycle = self.env['competency.assessment.cycle'].sudo().search([('state', '=', 'open')], limit=1)
+        cycle_name = active_cycle.name if active_cycle else 'Current Framework Status'
+        total_comps = self.env['competency.competency'].search_count([('status', '=', 'active')])
+        total_asms = self.env['competency.assessment'].search_count([('cycle_id', '=', active_cycle.id)]) if active_cycle else 0
+
+        lines = self.env['competency.assessment.line'].search([('cycle_id', '=', active_cycle.id)]) if active_cycle else self.env['competency.assessment.line']
+        below_cnt = len(lines.filtered(lambda l: l.tna_measure == 'below'))
+        meets_cnt = len(lines.filtered(lambda l: l.tna_measure == 'meets'))
+        exceeds_cnt = len(lines.filtered(lambda l: l.tna_measure == 'exceeds'))
+
+        # Generate PDF report document attachment per FR-RPT-008
+        pdf_attachment = False
+        if active_cycle:
+            try:
+                report_wiz = self.env['competency.report.wizard'].create({
+                    'cycle_id': active_cycle.id,
+                    'report_type': 'org_capability',
+                    'pillar': 'all',
+                })
+                pdf_content, _ = self.env['ir.actions.report']._render_qweb_pdf('competency_management.action_report_competency_org_capability', [report_wiz.id])
+                if pdf_content:
+                    pdf_attachment = self.env['ir.attachment'].create({
+                        'name': 'Organizational_Capability_Report_%s.pdf' % active_cycle.name,
+                        'type': 'binary',
+                        'datas': base64.b64encode(pdf_content),
+                        'res_model': 'competency.dashboard.snapshot',
+                        'mimetype': 'application/pdf',
+                    })
+            except Exception as e:
+                _logger.warning("Failed to render QWeb PDF report attachment for cron: %s", str(e))
+
+        sent_count = 0
+        for user in recipients:
+            if not user.email:
+                continue
+            try:
+                body = _("""
+                <div style="font-family: Arial, sans-serif; color: #1d2b32; line-height: 1.5;">
+                    <div style="background-color: #541718; color: #FFFFFF; padding: 16px 20px; border-radius: 6px; margin-bottom: 16px;">
+                        <h2 style="margin: 0; font-size: 20px;">Bunna Bank S.C. — Scheduled Talent Capability &amp; TNA Report</h2>
+                        <div style="font-size: 12px; color: #c17540; margin-top: 4px;">Cycle: %s</div>
+                    </div>
+                    <p>Hello <b>%s</b>,</p>
+                    <p>Here is your scheduled competency capability and TNA assessment summary:</p>
+                    <table style="width: 100%%; border-collapse: collapse; border: 1px solid #ddd; font-size: 13px; margin-bottom: 16px;">
+                        <tr style="background-color: #f4f6f7;"><th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Metric</th><th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Value</th></tr>
+                        <tr><td style="padding: 8px; border: 1px solid #ddd;">Framework Active Competencies</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;"><b>%s</b></td></tr>
+                        <tr><td style="padding: 8px; border: 1px solid #ddd;">Assessed Employees in Cycle</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd;"><b>%s</b></td></tr>
+                        <tr><td style="padding: 8px; border: 1px solid #ddd;">Underqualified (Training Needed) Lines</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd; color: #541718;"><b>%s</b></td></tr>
+                        <tr><td style="padding: 8px; border: 1px solid #ddd;">Fit / Qualified Lines</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd; color: #726732;"><b>%s</b></td></tr>
+                        <tr><td style="padding: 8px; border: 1px solid #ddd;">Overqualified Lines</td><td style="padding: 8px; text-align: right; border: 1px solid #ddd; color: #1d2b32;"><b>%s</b></td></tr>
+                    </table>
+                    <p>The full <b>Organizational Capability &amp; TNA PDF Report</b> is attached to this email. Log in to the Bunna Bank ERP Portal to view interactive gap analytics.</p>
+                </div>
+                """) % (cycle_name, user.name, total_comps, total_asms, below_cnt, meets_cnt, exceeds_cnt)
+
+                mail_values = {
+                    'subject': _('Scheduled Competency & TNA Report — %s') % cycle_name,
+                    'body_html': body,
+                    'email_to': user.email,
+                    'attachment_ids': [(4, pdf_attachment.id)] if pdf_attachment else [],
+                }
+                self.env['mail.mail'].sudo().create(mail_values).send()
+                sent_count += 1
+            except Exception as e:
+                _logger.warning("Failed to send scheduled competency email report to %s (%s): %s", user.name, user.email, str(e))
+
+        return sent_count
