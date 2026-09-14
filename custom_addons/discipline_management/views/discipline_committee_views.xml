@@ -25,18 +25,24 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight"
+                                invisible="state != 'draft'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
                         <!-- Sequential sign-off flow -->
                         <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
                                 invisible="state != 'in_progress'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
                                 help="Submit agenda to Department Director for sign-off before voting."/>
                         <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
                                 invisible="state != 'director_review'"
+                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_admin"
                                 help="Director confirms review and opens voting for committee members."/>
                         <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
-                                invisible="state not in ('voting', 'in_progress')"/>
+                                invisible="state not in ('voting', 'in_progress')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
                         <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
-                                invisible="state != 'minutes_recorded'"/>
+                                invisible="state != 'minutes_recorded'"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,minutes_recorded,completed"/>
                     </header>
                     <sheet>

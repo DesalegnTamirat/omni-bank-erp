@@ -351,9 +351,64 @@ class DisciplineCase(models.Model):
     is_hr_admin = fields.Boolean(compute='_compute_is_hr_admin', string='Is HR Admin User')
 
     def _compute_is_hr_admin(self):
-        is_admin = self.env.user.has_group('discipline_management.group_discipline_manager') or self.env.user.has_group('base.group_system')
+        is_admin = self.env.user.has_group('discipline_management.group_discipline_admin') or self.env.user.has_group('base.group_system')
         for rec in self:
             rec.is_hr_admin = is_admin
+
+    is_current_user_employee = fields.Boolean(
+        string='Is Current User Subject Employee',
+        compute='_compute_current_user_roles'
+    )
+    can_submit_appeal = fields.Boolean(
+        string='Can Submit Appeal',
+        compute='_compute_current_user_roles'
+    )
+    can_lodge_appeal_on_behalf = fields.Boolean(
+        string='Can Lodge Appeal On Behalf',
+        compute='_compute_current_user_roles'
+    )
+    is_pomd_user = fields.Boolean(
+        string='Is POMD User',
+        compute='_compute_current_user_roles'
+    )
+
+    def _compute_current_user_roles(self):
+        current_user = self.env.user
+        is_pomd = current_user.has_group('discipline_management.group_discipline_pomd') or current_user.has_group('discipline_management.group_discipline_admin')
+        for rec in self:
+            rec.is_pomd_user = is_pomd
+
+            # Check if current user is the employee under this case
+            is_emp = bool(
+                rec.employee_id and (
+                    (rec.employee_id.user_id and rec.employee_id.user_id.id == current_user.id) or
+                    (current_user.employee_id and current_user.employee_id.id == rec.employee_id.id) or
+                    (hasattr(current_user, 'employee_ids') and rec.employee_id.id in current_user.employee_ids.ids)
+                )
+            )
+            rec.is_current_user_employee = is_emp
+
+            has_pending_appeal = bool(rec.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review']))
+
+            # Direct Appeal: ONLY visible for the subject employee, when appeal window is open, in enforced state, and no pending appeal
+            rec.can_submit_appeal = is_emp and rec.is_appeal_window_open and not has_pending_appeal and rec.state == 'enforced'
+
+            # On-Behalf Appeal: ONLY visible for POMD Director / Admin, when enforcement is dismissal AND employee is inactive
+            is_dismissal = rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal'
+            is_emp_inactive = bool(
+                rec.employee_id and (
+                    not rec.employee_id.active or
+                    (rec.employee_id.user_id and not rec.employee_id.user_id.active)
+                )
+            )
+            rec.can_lodge_appeal_on_behalf = (
+                is_pomd and
+                is_dismissal and
+                is_emp_inactive and
+                rec.state in ('enforced', 'closed') and
+                rec.is_appeal_window_open and
+                not has_pending_appeal
+            )
 
     @api.onchange('reported_by_id', 'employee_id', 'initiator_type')
     def _onchange_employee_id(self):
@@ -767,11 +822,22 @@ class DisciplineCase(models.Model):
 
     def action_create_appeal(self):
         self.ensure_one()
+        current_user = self.env.user
+        is_emp = bool(
+            (self.employee_id.user_id and self.employee_id.user_id.id == current_user.id) or
+            (current_user.employee_id and current_user.employee_id.id == self.employee_id.id) or
+            (hasattr(current_user, 'employee_ids') and self.employee_id.id in current_user.employee_ids.ids)
+        )
+        if not is_emp:
+            raise UserError(_('Appeal Access Restriction: Direct appeals can only be submitted by the employee (%s) subject to this disciplinary case.') % self.employee_id.name)
         if not self.is_appeal_window_open:
             raise UserError(_(
                 'Appeal Window Closed: The 10-calendar-day appeal submission window has expired. '
                 'Appeal deadline was %s.'
             ) % (self.appeal_deadline or 'N/A'))
+        existing_pending = self.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review'])
+        if existing_pending:
+            raise UserError(_('An appeal (%s) is already pending review for this case.') % existing_pending[0].name)
         return {
             'name': _('Submit Appeal for Case %s') % self.name,
             'type': 'ir.actions.act_window',
@@ -780,15 +846,29 @@ class DisciplineCase(models.Model):
             'target': 'new',
             'context': {
                 'default_case_id': self.id,
-                'default_employee_id': self.employee_id.id,
+                'default_is_submitted_on_behalf': False,
                 'default_submission_date': fields.Date.context_today(self),
             }
         }
 
     def action_create_appeal_on_behalf(self):
         self.ensure_one()
-        if not self.env.user.has_group('discipline_management.group_discipline_admin') and not self.env.user.has_group('discipline_management.group_discipline_manager'):
-            raise UserError(_('Only HR Administrators or Managers can lodge an appeal on behalf of an employee.'))
+        current_user = self.env.user
+        if not current_user.has_group('discipline_management.group_discipline_pomd') and not current_user.has_group('discipline_management.group_discipline_admin'):
+            raise UserError(_('Authority Restriction: Only the People Operations Management Directorate (POMD) or HR Administrator can lodge an appeal on behalf of an employee.'))
+        if not (self.severity_level == 'level_1' or self.punishment_type == 'dismissal'):
+            raise UserError(_('On-behalf appeals can only be lodged for Level 1 Dismissal cases.'))
+        is_emp_inactive = bool(
+            not self.employee_id.active or
+            (self.employee_id.user_id and not self.employee_id.user_id.active)
+        )
+        if not is_emp_inactive:
+            raise UserError(_('On-behalf appeals can only be lodged when the employee has been deactivated following a dismissal.'))
+        if not self.is_appeal_window_open:
+            raise UserError(_('Appeal Window Closed: The 10-calendar-day appeal submission window has expired.'))
+        existing_pending = self.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review'])
+        if existing_pending:
+            raise UserError(_('An appeal (%s) is already pending review for this case.') % existing_pending[0].name)
         return {
             'name': _('Lodge Appeal on Behalf of %s') % self.employee_id.name,
             'type': 'ir.actions.act_window',
@@ -797,7 +877,9 @@ class DisciplineCase(models.Model):
             'target': 'new',
             'context': {
                 'default_case_id': self.id,
-                'default_appellant_id': self.employee_id.id,
+                'default_is_submitted_on_behalf': True,
+                'default_submitted_by_id': current_user.id,
+                'default_submission_date': fields.Date.context_today(self),
             }
         }
 

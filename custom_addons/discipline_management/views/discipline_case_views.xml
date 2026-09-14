@@ -53,38 +53,68 @@
                     <header>
                         <button name="action_initiate" string="Initiate Case" type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <!-- Coach / Line Manager Direct Enforcement (Levels 2-5) -->
-                        <button name="action_approve_and_enforce" string="Enforce Decision (Coach / Manager)" type="object" class="btn-success" invisible="state not in ('draft', 'initiated') or initiator_type != 'manager' or severity_level == 'level_1'"/>
+                        <button name="action_approve_and_enforce" string="Enforce Decision (Coach / Manager)" type="object" class="btn-success"
+                                invisible="state not in ('draft', 'initiated') or initiator_type != 'manager' or severity_level == 'level_1' or not is_coach_or_manager"/>
                         
                         <!-- Director -> Chief Flow -->
-                        <button name="action_submit_to_chief" string="Submit to Respective Chief" type="object" class="btn-primary" invisible="state not in ('draft', 'initiated') or initiator_type != 'director'"/>
+                        <button name="action_submit_to_chief" string="Submit to Respective Chief" type="object" class="btn-primary"
+                                invisible="state not in ('draft', 'initiated') or initiator_type != 'director'"
+                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_admin"/>
                         
                         <!-- Chief Actions -->
-                        <button name="action_chief_escalate_to_audit" string="Escalate to Audit (Notify CEO)" type="object" class="btn-warning" invisible="state != 'submitted_chief'"/>
-                        <button name="action_chief_escalate_to_ceo" string="Escalate to CEO" type="object" class="btn-danger" invisible="state != 'submitted_chief'"/>
+                        <button name="action_chief_escalate_to_audit" string="Escalate to Audit (Notify CEO)" type="object" class="btn-warning"
+                                invisible="state != 'submitted_chief'"
+                                groups="discipline_management.group_discipline_chief,discipline_management.group_discipline_admin"/>
+                        <button name="action_chief_escalate_to_ceo" string="Escalate to CEO" type="object" class="btn-danger"
+                                invisible="state != 'submitted_chief'"
+                                groups="discipline_management.group_discipline_chief,discipline_management.group_discipline_admin"/>
                         
                         <!-- CEO Action -->
-                        <button name="action_ceo_assign_to_audit" string="Assign to Audit Directorate" type="object" class="btn-primary" invisible="state != 'ceo_review'"/>
+                        <button name="action_ceo_assign_to_audit" string="Assign to Audit Directorate" type="object" class="btn-primary"
+                                invisible="state != 'ceo_review'"
+                                groups="discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
                         
                         <!-- Audit Directorate -> Committee Flow -->
-                        <button name="action_send_to_committee" string="Submit Investigation to Committee" type="object" class="btn-warning" invisible="state != 'investigating'"/>
+                        <button name="action_send_to_committee" string="Submit Investigation to Committee" type="object" class="btn-warning"
+                                invisible="state != 'investigating'"
+                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
                         
                         <!-- Committee / Executive Enforce -->
-                        <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success" invisible="state != 'pending_approval'"/>
-                        <button name="action_return_revision" string="Return for Revision" type="object" class="btn-warning" invisible="state not in ('pending_approval', 'submitted_chief', 'ceo_review')"/>
-                        <button name="action_reject" string="Reject Case" type="object" class="btn-secondary" invisible="state not in ('pending_approval', 'submitted_chief', 'ceo_review')"/>
+                        <button name="action_approve_and_enforce" string="Approve &amp; Enforce Decision" type="object" class="btn-success"
+                                invisible="state != 'pending_approval'"
+                                groups="discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                        <button name="action_return_revision" string="Return for Revision" type="object" class="btn-warning"
+                                invisible="state not in ('pending_approval', 'submitted_chief', 'ceo_review')"
+                                groups="discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                        <button name="action_reject" string="Reject Case" type="object" class="btn-secondary"
+                                invisible="state not in ('pending_approval', 'submitted_chief', 'ceo_review')"
+                                groups="discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
                         
                         <!-- Delivery Receipt & Appeal -->
-                        <button name="action_acknowledge_receipt" string="Acknowledge Delivery / Receipt" type="object" class="btn-info" invisible="state != 'enforced' or delivery_receipt_date"/>
+                        <button name="action_acknowledge_receipt" string="Acknowledge Delivery / Receipt" type="object" class="btn-info"
+                                invisible="state != 'enforced' or delivery_receipt_date"/>
+                        <!-- Direct Appeal: Subject Employee ONLY -->
                         <button name="action_create_appeal" string="Submit Appeal" type="object" class="btn-warning"
-                                invisible="not is_appeal_window_open"
-                                help="Submit an appeal within the 10-day window."/>
+                                invisible="not can_submit_appeal"
+                                help="Submit an appeal against this decision within the 10-calendar-day window."/>
+                        <!-- On Behalf Appeal: POMD Director ONLY for Dismissal / Deactivated cases -->
                         <button name="action_create_appeal_on_behalf" string="Lodge Appeal (On Behalf)" type="object" class="btn-info"
-                                invisible="state not in ('enforced', 'closed') or not is_hr_admin"
-                                help="POMD or Secretary can lodge an appeal on behalf of a suspended or dismissed employee."/>
-                        <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger" invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"/>
+                                invisible="not can_lodge_appeal_on_behalf"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
+                                help="POMD Director or Committee Secretary can lodge an appeal on behalf of a dismissed or deactivated employee."/>
+                        <!-- Revocation: HR Administrator ONLY -->
+                        <button name="action_open_revocation_wizard" string="Revoke Case" type="object" class="btn-danger"
+                                invisible="state not in ('enforced', 'closed', 'appealed') or is_revoked"
+                                groups="discipline_management.group_discipline_admin"
+                                help="Revoke this disciplinary case with formal justification."/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,initiated,investigating,committee_review,pending_approval,enforced"/>
                     </header>
                     <sheet>
+                        <field name="can_submit_appeal" invisible="1"/>
+                        <field name="can_lodge_appeal_on_behalf" invisible="1"/>
+                        <field name="is_coach_or_manager" invisible="1"/>
+                        <field name="is_hr_admin" invisible="1"/>
+                        <field name="is_current_user_employee" invisible="1"/>
                         <widget name="web_ribbon" title="Revoked" bg_color="text-bg-danger" invisible="not is_revoked"/>
                         <widget name="web_ribbon" title="Enforced" bg_color="text-bg-success" invisible="state != 'enforced'"/>
                         <widget name="web_ribbon" title="Appeal Window Open" bg_color="text-bg-warning" invisible="not is_appeal_window_open"/>

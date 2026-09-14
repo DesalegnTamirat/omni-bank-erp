@@ -23,9 +23,15 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_request_suspension" string="Request Suspension" type="object" class="btn-warning" invisible="suspension_request_state != 'none'"/>
-                        <button name="action_submit_findings" string="Submit Findings" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <button name="action_accept_findings" string="Accept &amp; Sign-off Findings" type="object" class="btn-success" invisible="state != 'submitted'"/>
+                        <button name="action_request_suspension" string="Request Suspension" type="object" class="btn-warning"
+                                invisible="suspension_request_state != 'none'"
+                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_officer,discipline_management.group_discipline_admin"/>
+                        <button name="action_submit_findings" string="Submit Findings" type="object" class="oe_highlight"
+                                invisible="state != 'draft'"
+                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_officer,discipline_management.group_discipline_admin"/>
+                        <button name="action_accept_findings" string="Accept &amp; Sign-off Findings" type="object" class="btn-success"
+                                invisible="state != 'submitted'"
+                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_admin"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved"/>
                     </header>
                     <sheet>

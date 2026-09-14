@@ -146,5 +146,26 @@
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
         </record>
 
+        <!-- Appeal Record Rules -->
+        <!-- Employee: view & submit own appeals -->
+        <record id="rule_discipline_appeal_employee" model="ir.rule">
+            <field name="name">Employee Own Disciplinary Appeals</field>
+            <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
+            <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Officer & Above: view all appeals -->
+        <record id="rule_discipline_appeal_officer_all" model="ir.rule">
+            <field name="name">Officer and Above All Appeals</field>
+            <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
+        </record>
+
     </data>
 </odoo>

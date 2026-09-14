@@ -26,8 +26,12 @@
                 <form>
                     <header>
                         <button name="action_submit_for_approval" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
-                        <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning" invisible="state not in ('draft', 'pending_approval', 'referred_bod')"/>
-                        <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success" invisible="state not in ('active', 'extended')"/>
+                        <button name="action_activate_suspension" string="Activate Suspension" type="object" class="btn-warning"
+                                invisible="state not in ('draft', 'pending_approval', 'referred_bod')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
+                        <button name="action_reinstate_employee" string="Reinstate Employee" type="object" class="btn-success"
+                                invisible="state not in ('active', 'extended')"
+                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
                         <!-- Convert active/extended suspension to dismissal (Admin only) -->
                         <button name="action_convert_to_dismissal" string="Convert to Dismissal" type="object" class="btn-danger"
                                 invisible="state not in ('active', 'extended')"
