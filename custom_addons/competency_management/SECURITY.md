@@ -61,3 +61,11 @@ This document outlines the technical security controls implemented across the in
 - **Snapshot Data Security (`competency.dashboard.snapshot`)**: Stored trend snapshots maintain strict read permissions restricted to HR Supervisors (`group_competency_supervisor`) and HR Administrators (`group_competency_admin`).
 - **Scheduled Email Distribution**: Automated cron email dispatches utilize internal system email gateways over encrypted SMTP TLS channels (`Port 587/465`) targeting authenticated HR admin accounts only.
 
+---
+
+## 6. Global Core Framework Sharing Architecture (Fix 11)
+
+- **Enterprise Master Dictionary & Role Mappings**: Core reference models (`competency.competency`, `competency.cluster`, `competency.role.mapping`) are intentionally shared globally across all companies (without `company_id` isolation) to enforce a unified, bank-wide competency taxonomy for Bunna Bank S.C.
+- **Operational Data Isolation**: Assessment instances (`competency.assessment`) remain strictly company-scoped and Operating Unit-isolated via row-level security rules.
+
+

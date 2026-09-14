@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-inherit="hr_holidays.TimeOffDashboard" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('o_timeoff_dashboard')]" position="attributes">
+            <attribute name="class" add="flex-column" separator=" "/>
+        </xpath>
+
+        <!-- Replace standard allocation cards loop with our interactive custom dashboard banner -->
+        <xpath expr="//t[@t-foreach='state.holidays']" position="replace">
+            <div class="o_custom_leave_dashboard_banner w-100 px-3 py-2 border-bottom bg-white" style="width: 100%; background: #ffffff; border-bottom: 1px solid #e5e7eb; padding: 10px 16px;">
+                <!-- Top Header Row -->
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="o_dashboard_icon_badge rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: #fdf5f5; color: #541718; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #ebd0d0;">
+                            <i class="fa fa-tachometer fs-6"/>
+                        </span>
+                        <div>
+                            <h5 class="mb-0 fw-bold" style="font-weight: 700; color: #541718;">Time Off Dashboard</h5>
+                            <span class="small text-muted" style="font-size: 0.72rem;">Bunna Bank Leave &amp; Accrual Overview</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1.5 fw-semibold"
+                                style="background-color: #541718; border-color: #541718; color: #ffffff;"
+                                t-on-click="() => this.actionNewRequest()">
+                            <i class="fa fa-plus-circle"/> <span>New Request</span>
+                        </button>
+                        <button type="button" class="btn btn-sm rounded-pill px-3 d-flex align-items-center gap-1.5 fw-semibold"
+                                style="background-color: #ffffff; border: 1.5px solid #c17540; color: #c17540;"
+                                t-on-click="() => this.actionOpenMyRequests()">
+                            <i class="fa fa-list-ul"/> <span>My Requests</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light border rounded-pill px-2.5 d-flex align-items-center"
+                                style="color: #541718;"
+                                t-on-click="() => this.actionRefreshDashboard()" title="Refresh Dashboard">
+                            <i class="fa fa-refresh" t-att-class="{ 'fa-spin': state.isRefreshing }"/>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI Metric Cards Row (Bunna Bank Brand Colors - Interactive Clickable) -->
+                <div class="row g-2">
+                    <!-- Accrued Leave Balance (Wine Red #541718 Theme - Clickable) -->
+                    <div class="col-md-6 col-12">
+                        <div class="o_leave_kpi_card o_accrued_card d-flex align-items-center justify-content-between px-3 py-2 rounded-3 shadow-xs"
+                             role="button"
+                             title="Click to view your Leave Requests"
+                             t-on-click="() => this.actionOpenMyRequests()"
+                             style="background: linear-gradient(135deg, #fdf5f5 0%, #f7e6e6 100%); border: 1px solid #ebd0d0; border-left: 5px solid #541718; border-radius: 10px; padding: 10px 16px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                            <div class="d-flex align-items-center gap-2.5" style="display: flex; align-items: center; gap: 10px;">
+                                <div class="o_kpi_icon_wrapper rounded-3 d-flex align-items-center justify-content-center shadow-xs"
+                                     style="width: 38px; height: 38px; min-width: 38px; background: #541718; color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa fa-calendar-check-o fs-5" style="font-size: 1.15rem; color: #ffffff;"/>
+                                </div>
+                                <div>
+                                    <div class="o_kpi_label text-uppercase fw-bold" style="font-size: 0.74rem; font-weight: 700; color: #541718; letter-spacing: 0.5px; line-height: 1.2;">Accrued Leave Balance</div>
+                                    <div class="o_kpi_subtext small" style="font-size: 0.72rem; color: #726732; line-height: 1.1;">Total earned &amp; available leave &#8226; <span class="text-decoration-underline">View Details &#8594;</span></div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-1" style="display: flex; align-items: baseline; gap: 4px;">
+                                <span class="o_kpi_value fw-bolder" style="font-size: 1.65rem; font-weight: 800; color: #541718; line-height: 1;">
+                                    <t t-esc="accruedLeaveBalanceFormatted"/>
+                                </span>
+                                <span class="o_kpi_unit fw-semibold" style="font-size: 0.85rem; font-weight: 600; color: #541718;">days</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduled Leave Balance (Amber Orange #c17540 Theme - Clickable) -->
+                    <div class="col-md-6 col-12">
+                        <div class="o_leave_kpi_card o_scheduled_card d-flex align-items-center justify-content-between px-3 py-2 rounded-3 shadow-xs"
+                             role="button"
+                             title="Click to view your Scheduled Leaves"
+                             t-on-click="() => this.actionOpenScheduledRequests()"
+                             style="background: linear-gradient(135deg, #fefaf6 0%, #faede2 100%); border: 1px solid #f3dccb; border-left: 5px solid #c17540; border-radius: 10px; padding: 10px 16px; min-height: 60px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                            <div class="d-flex align-items-center gap-2.5" style="display: flex; align-items: center; gap: 10px;">
+                                <div class="o_kpi_icon_wrapper rounded-3 d-flex align-items-center justify-content-center shadow-xs"
+                                     style="width: 38px; height: 38px; min-width: 38px; background: #c17540; color: #ffffff; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa fa-calendar-plus-o fs-5" style="font-size: 1.15rem; color: #ffffff;"/>
+                                </div>
+                                <div>
+                                    <div class="o_kpi_label text-uppercase fw-bold" style="font-size: 0.74rem; font-weight: 700; color: #8f4a1c; letter-spacing: 0.5px; line-height: 1.2;">Scheduled Leave Balance</div>
+                                    <div class="o_kpi_subtext small" style="font-size: 0.72rem; color: #726732; line-height: 1.1;">Planned future leave &#8226; <span class="text-decoration-underline">View Schedule &#8594;</span></div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-baseline gap-1" style="display: flex; align-items: baseline; gap: 4px;">
+                                <span class="o_kpi_value fw-bolder" style="font-size: 1.65rem; font-weight: 800; color: #c17540; line-height: 1;">
+                                    <t t-esc="scheduledLeaveBalanceFormatted"/>
+                                </span>
+                                <span class="o_kpi_unit fw-semibold" style="font-size: 0.85rem; font-weight: 600; color: #c17540;">days</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accrual Rate & Maximum Carryover Cap Status Bar -->
+                <div class="o_accrual_cap_bar mt-2 p-2.5 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-3 shadow-xs"
+                     style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 16px;">
+                    
+                    <!-- Left: Daily Accrual Metric -->
+                    <div class="d-flex align-items-center gap-2.5">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center"
+                             style="width: 32px; height: 32px; min-width: 32px; background: #fdf5f5; color: #541718; border: 1px solid #ebd0d0; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                            <i class="fa fa-line-chart"/>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <span class="fw-bold text-dark" style="font-size: 0.85rem; color: #1d2b32;">Daily Accrual:</span>
+                                <span class="badge text-white px-2 py-0.5 rounded-pill fw-bold" style="background-color: #541718; font-size: 0.78rem;">
+                                    +<t t-esc="dailyAccrualRateFormatted"/> days/day
+                                </span>
+                            </div>
+                            <div class="small text-muted" style="font-size: 0.72rem; color: #6b7280;">
+                                Annual: <span class="fw-semibold text-dark"><t t-esc="state.annualEntitlement || 0"/> days/yr</span>
+                                <t t-if="state.employeeCategory">
+                                    &#8226; <span class="text-secondary"><t t-esc="state.employeeCategory"/></span>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Center: Maximum Carryover Cap & Progress Bar -->
+                    <div class="flex-grow-1 mx-md-3" style="min-width: 200px; max-width: 380px;">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="small fw-semibold text-dark" style="font-size: 0.75rem;">
+                                Cap Progress: <span class="fw-bold"><t t-esc="totalEarnedBalanceFormatted"/></span> / <span class="text-muted"><t t-esc="maxCarryoverCapFormatted"/> days</span>
+                            </span>
+                            <span class="small fw-bold" style="font-size: 0.75rem;" t-att-style="capPercentageStyle">
+                                <t t-esc="capPercentageFormatted"/>%
+                            </span>
+                        </div>
+                        <div class="progress" style="height: 6px; border-radius: 3px; background-color: #e5e7eb; overflow: hidden;">
+                            <div class="progress-bar" role="progressbar" t-att-style="capProgressStyle"/>
+                        </div>
+                        <div class="small mt-1 text-truncate" style="font-size: 0.70rem;">
+                            <t t-if="state.accrualStatus == 'capped'">
+                                <span class="text-danger fw-semibold"><i class="fa fa-exclamation-circle me-1"/>Max cap reached. Take leave to resume accrual.</span>
+                            </t>
+                            <t t-elif="state.accrualStatus == 'near_cap'">
+                                <span class="fw-semibold" style="color: #c17540;"><i class="fa fa-exclamation-triangle me-1"/>Approaching cap: <t t-esc="remainingToCapFormatted"/> days left</span>
+                            </t>
+                            <t t-else="">
+                                <span class="text-muted"><t t-esc="remainingToCapFormatted"/> days remaining before maximum cap</span>
+                            </t>
+                        </div>
+                    </div>
+
+                    <!-- Right: Live Accrual Status Badge -->
+                    <div>
+                        <t t-if="state.accrualStatus == 'capped'">
+                            <span class="badge text-white px-3 py-2 rounded-pill shadow-xs d-inline-flex align-items-center gap-1.5"
+                                  style="background-color: #dc3545; font-size: 0.78rem; font-weight: 600;">
+                                <i class="fa fa-pause-circle"/> <span>Accrual Paused (Cap Reached)</span>
+                            </span>
+                        </t>
+                        <t t-elif="state.accrualStatus == 'near_cap'">
+                            <span class="badge text-white px-3 py-2 rounded-pill shadow-xs d-inline-flex align-items-center gap-1.5"
+                                  style="background-color: #c17540; font-size: 0.78rem; font-weight: 600;">
+                                <i class="fa fa-clock-o"/> <span>Approaching Cap</span>
+                            </span>
+                        </t>
+                        <t t-else="">
+                            <span class="badge text-white px-3 py-2 rounded-pill shadow-xs d-inline-flex align-items-center gap-1.5"
+                                  style="background-color: #28a745; font-size: 0.78rem; font-weight: 600;">
+                                <i class="fa fa-check-circle"/> <span>Actively Accruing</span>
+                            </span>
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <!-- Remove the pending requests / new allocation request card -->
+        <xpath expr="//div[hasclass('o_timeoff_card') and hasclass('p-0')]" position="replace"/>
+    </t>
+</templates>

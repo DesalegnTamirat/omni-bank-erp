@@ -43,9 +43,6 @@ Key Features:
         'views/competency_role_mapping_views.xml',
         'views/competency_coverage_report_views.xml',
         'views/competency_assessment_views.xml',
-        'views/competency_skills_test_views.xml',
-        'views/competency_team_dashboard_views.xml',
-        'views/competency_dashboard_snapshot_views.xml',
         'views/competency_dashboard_views.xml',
         'views/competency_matrix_config_views.xml',
         'views/competency_report_templates.xml',
@@ -64,4 +61,5 @@ Key Features:
     'installable': True,
     'application': True,
     'auto_install': False,
+    'post_init_hook': 'post_init_hook',
 }

@@ -36,3 +36,4 @@ class HrLeaveReasonConfig(models.Model):
         'unique(leave_reason)',
         'Each leave reason can only be configured once.',
     )
+    

@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-052: Plan Submission Notification (All Categories) -->
+    <!-- ======================================================= -->
+    <record id="mail_template_workforce_plan_submitted" model="mail.template">
+        <field name="name">PBMS: Plan Submitted</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">{{ object.plan_category_title or 'Plan' }} Submitted: {{ object.request_number or 'Plan' }} - {{ object.org_unit_id.display_name }} ({{ object.cycle_id.name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Bunna Bank - Plan &amp; Budget Management System</h2>
+                                        <p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;"><t t-out="object.plan_category_title or 'Planning Request'"/> Submission Notification</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Reviewer / Colleague,</p>
+                                        <p>A new <b><t t-out="object.plan_category_title or 'Planning Request'"/></b> has been successfully submitted and is now pending your review and endorsement.</p>
+                                        
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FAFAFA; border-radius: 6px;">
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; width: 35%; color: #555555;">Request Number:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #541718;"><t t-out="object.request_number or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Plan Category / Scope:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #425727;"><t t-out="object.plan_category_title or 'Planning Request'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Work Unit:</td>
+                                                <td style="padding: 10px;"><t t-out="object.org_unit_id.display_name or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 10px;"><t t-out="object.cycle_id.name or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Submitted By:</td>
+                                                <td style="padding: 10px;"><t t-out="object.submitted_by.name or 'N/A'"/></td>
+                                            </tr>
+                                            <t t-out="object.plan_summary_metrics_html or ''"/>
+                                        </table>
+
+                                        <p style="margin-top: 20px;">Please log in to the PBMS portal to review the proposed targets, justifications, and quarterly distributions.</p>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #541718; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                Review <t t-out="object.plan_category_title or 'Plan'"/>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)<br/>
+                                        This is an automated system notification from Bunna PBMS.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-053: Pending Approval Notification               -->
+    <!-- ======================================================= -->
+    <record id="mail_template_plan_pending_approval" model="mail.template">
+        <field name="name">PBMS: Plan Pending Approval / Review</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">Action Required: {{ object.plan_category_title or 'Plan' }} Pending Approval - {{ object.request_number or 'Plan' }} ({{ object.org_unit_id.display_name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #425727;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Pending Approval Notification</h2>
+                                        <p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Plan &amp; Budget Management System</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Reviewer,</p>
+                                        <p>The following <b><t t-out="object.plan_category_title or 'plan'"/></b> is currently <b>pending your approval / endorsement</b>:</p>
+                                        
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #F0F4ED; border: 1px solid #C8DCB8; border-radius: 6px;">
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; width: 35%; color: #555555;">Request Number:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #541718;"><t t-out="object.request_number or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Plan Category / Scope:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #425727;"><t t-out="object.plan_category_title or 'Planning Request'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Work Unit:</td>
+                                                <td style="padding: 10px;"><t t-out="object.org_unit_id.display_name or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Current Stage:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #B45309;"><t t-out="dict(object._fields['state'].selection).get(object.state, object.state)"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 10px;"><t t-out="object.cycle_id.name or 'N/A'"/></td>
+                                            </tr>
+                                            <t t-out="object.plan_summary_metrics_html or ''"/>
+                                        </table>
+
+                                        <p>Please review the submitted figures and take the appropriate workflow action (Approve, Return for Revision, or Request Additional Info).</p>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #425727; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                Open <t t-out="object.plan_category_title or 'Plan'"/> for Review
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-054: Revision Request Notification               -->
+    <!-- ======================================================= -->
+    <record id="mail_template_plan_returned" model="mail.template">
+        <field name="name">PBMS: Plan Returned for Revision</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">Revision Required: {{ object.plan_category_title or 'Plan' }} Returned - {{ object.request_number or 'Plan' }} ({{ object.org_unit_id.display_name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #C17540;">
+                                        <h2 style="color: #C17540; margin: 0; font-weight: 700;">Plan Returned for Revision</h2>
+                                        <p style="color: #666666; margin: 4px 0 0 0; font-size: 13px;">Plan &amp; Budget Management System</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Requestor / Unit Manager,</p>
+                                        <p>Your <b><t t-out="object.plan_category_title or 'plan'"/></b> for <b><t t-out="object.org_unit_id.display_name"/></b> has been <b>returned for revision</b> by the reviewing authority.</p>
+                                        
+                                        <div style="background-color: #FAF1EB; border-left: 4px solid #C17540; padding: 14px; margin: 16px 0; border-radius: 4px;">
+                                            <h4 style="margin: 0 0 8px 0; color: #C17540;">Reviewer's Feedback / Return Reason:</h4>
+                                            <p style="margin: 0; font-style: italic; color: #333333;"><t t-out="object.return_reason or 'Please review the requested adjustments and resubmit.'"/></p>
+                                        </div>
+
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 8px 0; font-weight: bold; width: 35%; color: #555555;">Request Number:</td>
+                                                <td style="padding: 8px 0;"><t t-out="object.request_number or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 8px 0; font-weight: bold; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 8px 0;"><t t-out="object.cycle_id.name or 'N/A'"/></td>
+                                            </tr>
+                                        </table>
+
+                                        <p>Please make the required adjustments in the PBMS portal and click <b>Submit</b> to send the revised plan back for review.</p>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #C17540; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                Edit &amp; Resubmit Plan
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-055: Request Approval Notification               -->
+    <!-- ======================================================= -->
+    <record id="mail_template_plan_approved" model="mail.template">
+        <field name="name">PBMS: Plan Approval Notification</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">{{ object.plan_category_title or 'Plan' }} Approved: {{ object.request_number or 'Plan' }} - {{ object.org_unit_id.display_name }} ({{ object.cycle_id.name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #425727;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Plan Approval Notification</h2>
+                                        <p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Plan &amp; Budget Management System</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Requestor / Unit Manager,</p>
+                                        <p>We are pleased to inform you that your <b><t t-out="object.plan_category_title or 'plan'"/></b> for <b><t t-out="object.org_unit_id.display_name"/></b> has been <b>approved</b>.</p>
+                                        
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #EDF3E8; border: 1px solid #C8DCB8; border-radius: 6px;">
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; width: 35%; color: #555555;">Request Number:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #541718;"><t t-out="object.request_number or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Plan Category / Scope:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #425727;"><t t-out="object.plan_category_title or 'Planning Request'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Work Unit:</td>
+                                                <td style="padding: 10px;"><t t-out="object.org_unit_id.display_name or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 10px;"><t t-out="object.cycle_id.name or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #C8DCB8;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Status:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #425727;">Approved</td>
+                                            </tr>
+                                            <t t-out="object.plan_summary_metrics_html or ''"/>
+                                        </table>
+
+                                        <p>The approved figures are now incorporated into the Bank's official Annual Business Plan.</p>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #425727; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                View Approved Plan
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-056: Request Rejection Notification              -->
+    <!-- ======================================================= -->
+    <record id="mail_template_plan_rejected" model="mail.template">
+        <field name="name">PBMS: Plan Rejection Notification</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">{{ object.plan_category_title or 'Plan' }} Rejected: {{ object.request_number or 'Plan' }} - {{ object.org_unit_id.display_name }} ({{ object.cycle_id.name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Plan Rejection Notice</h2>
+                                        <p style="color: #666666; margin: 4px 0 0 0; font-size: 13px;">Plan &amp; Budget Management System</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Requestor / Unit Manager,</p>
+                                        <p>Your <b><t t-out="object.plan_category_title or 'plan'"/></b> for <b><t t-out="object.org_unit_id.display_name"/></b> has been <b>rejected</b>.</p>
+                                        
+                                        <div style="background-color: #F6EBEB; border-left: 4px solid #541718; padding: 14px; margin: 16px 0; border-radius: 4px;">
+                                            <h4 style="margin: 0 0 8px 0; color: #541718;">Reason for Rejection:</h4>
+                                            <p style="margin: 0; color: #333333;"><t t-out="object.return_reason or 'Plan rejected by reviewing authority.'"/></p>
+                                        </div>
+
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 8px 0; font-weight: bold; width: 35%; color: #555555;">Request Number:</td>
+                                                <td style="padding: 8px 0; color: #541718; font-weight: bold;"><t t-out="object.request_number or 'N/A'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 8px 0; font-weight: bold; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 8px 0;"><t t-out="object.cycle_id.name or 'N/A'"/></td>
+                                            </tr>
+                                        </table>
+
+                                        <p>If you have questions regarding this decision, please consult with your District Reviewer or the Strategic Planning Directorate.</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-057: Budget Year Status Notification             -->
+    <!-- ======================================================= -->
+    <record id="mail_template_cycle_status_changed" model="mail.template">
+        <field name="name">PBMS: Budget Year / Planning Cycle Status</field>
+        <field name="model_id" ref="model_pbms_planning_cycle"/>
+        <field name="subject">Planning Cycle Announcement: {{ object.name }} is now {{ dict(object._fields['state'].selection).get(object.state, object.state) }}</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Planning Cycle Status Update</h2>
+                                        <p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Plan &amp; Budget Management System</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Work Unit Managers &amp; Planning Teams,</p>
+                                        <p>The annual planning cycle <b><t t-out="object.name"/></b> (Period: <t t-out="object.date_start"/> to <t t-out="object.date_end"/>) has transitioned to status: <b><t t-out="dict(object._fields['state'].selection).get(object.state, object.state)"/></b>.</p>
+                                        
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FAFAFA; border-radius: 6px;">
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; width: 45%; color: #555555;">Planning Cycle:</td>
+                                                <td style="padding: 10px; font-weight: bold; color: #541718;"><t t-out="object.name"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Branch Submission Deadline:</td>
+                                                <td style="padding: 10px;"><t t-out="object.branch_deadline or 'To be announced'"/></td>
+                                            </tr>
+                                            <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">District Endorsement Deadline:</td>
+                                                <td style="padding: 10px;"><t t-out="object.district_deadline or 'To be announced'"/></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 10px; font-weight: bold; color: #555555;">Head Office Review Deadline:</td>
+                                                <td style="padding: 10px;"><t t-out="object.head_office_deadline or 'To be announced'"/></td>
+                                            </tr>
+                                        </table>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#action=bunna_pbms.action_pbms_planning_request_form"
+                                               style="background-color: #541718; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                Go to Planning Workspace
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- FR-WP-058: Recruitment Commencement Notification       -->
+    <!-- ======================================================= -->
+    <record id="mail_template_recruitment_commencement" model="mail.template">
+        <field name="name">PBMS: Recruitment Commencement Authorization</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">Recruitment Authorization: Approved Workforce for {{ object.org_unit_id.display_name }} ({{ object.cycle_id.name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 650px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Recruitment Commencement Authorization</h2>
+                                        <p style="color: #425727; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">Human Resources &amp; Talent Acquisition | Bunna PBMS</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear HR Recruitment Team &amp; Work Unit Manager,</p>
+                                        <p>Following final executive approval of the <b>Workforce Plan</b> for <b><t t-out="object.org_unit_id.display_name"/></b> in planning cycle <b><t t-out="object.cycle_id.name"/></b>, <b>recruitment and onboarding can now officially commence</b> for the approved positions detailed below.</p>
+                                        
+                                        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
+                                            <thead>
+                                                <tr style="background-color: #EDF3E8; color: #541718; border-bottom: 2px solid #C8DCB8;">
+                                                    <th style="padding: 8px; text-align: left;">Position / Title</th>
+                                                    <th style="padding: 8px; text-align: left;">Request Type</th>
+                                                    <th style="padding: 8px; text-align: center;">Q1</th>
+                                                    <th style="padding: 8px; text-align: center;">Q2</th>
+                                                    <th style="padding: 8px; text-align: center;">Q3</th>
+                                                    <th style="padding: 8px; text-align: center;">Q4</th>
+                                                    <th style="padding: 8px; text-align: center;">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <t t-foreach="object.manpower_line_ids" t-as="line">
+                                                    <tr style="border-bottom: 1px solid #EEEEEE;">
+                                                        <td style="padding: 8px; font-weight: bold;">
+                                                            <t t-out="line.job_id.name or line.new_job_title or 'N/A'"/>
+                                                        </td>
+                                                        <td style="padding: 8px; color: #555555;">
+                                                            <t t-out="line.position_type_id.name or line.position_type or 'N/A'"/>
+                                                        </td>
+                                                        <td style="padding: 8px; text-align: center;"><t t-out="line.q1 or 0"/></td>
+                                                        <td style="padding: 8px; text-align: center;"><t t-out="line.q2 or 0"/></td>
+                                                        <td style="padding: 8px; text-align: center;"><t t-out="line.q3 or 0"/></td>
+                                                        <td style="padding: 8px; text-align: center;"><t t-out="line.q4 or 0"/></td>
+                                                        <td style="padding: 8px; text-align: center; font-weight: bold; color: #425727;"><t t-out="line.quantity or 0"/></td>
+                                                    </tr>
+                                                </t>
+                                            </tbody>
+                                        </table>
+
+                                        <p style="margin-top: 15px;">Total Approved Headcount: <b><t t-out="object.manpower_total_headcount or 0"/> Position(s)</b>.</p>
+                                        <p>Human Resources may initiate job postings, sourcing, internal transfers, and candidate assessments according to the quarterly schedule.</p>
+
+                                        <div style="text-align: center; margin: 25px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #425727; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                View Approved Workforce Plan
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD) &amp; HR
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+    <!-- ======================================================= -->
+    <!-- Target Cascading Notification                            -->
+    <!-- ======================================================= -->
+    <record id="mail_template_target_cascaded" model="mail.template">
+        <field name="name">PBMS: Official Target Cascaded</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="subject">🎯 Official Business Target Cascaded: {{ object.plan_category_title or 'Plan' }} - {{ object.org_unit_id.display_name }} ({{ object.cycle_id.name }})</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #333333;">
+                <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 16px; background-color: #F1F1F1; width: 100%;">
+                    <tr>
+                        <td align="center">
+                            <table border="0" cellpadding="0" cellspacing="0" style="padding: 24px; background-color: #FFFFFF; width: 600px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                                <tr>
+                                    <td style="padding-bottom: 20px; border-bottom: 2.5px solid #541718;">
+                                        <h2 style="color: #541718; margin: 0; font-weight: 700;">Bunna Bank - Plan &amp; Budget Management System</h2>
+                                        <p style="color: #C17540; margin: 4px 0 0 0; font-size: 13px; font-weight: bold;">🎯 Official Business Target Cascaded Notification</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 0;">
+                                        <p>Dear Colleague / Unit Manager,</p>
+                                        <p>Official business targets have been allocated and cascaded to <b><t t-out="object.org_unit_id.display_name"/></b> for the <b><t t-out="object.cycle_id.name"/></b> planning cycle.</p>
+                                        
+                                        <t t-out="ctx.get('cascade_card_html', '')"/>
+
+                                        <p style="margin-top: 16px;">The approved annual and monthly targets have been populated and updated in your planning matrix.</p>
+
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a t-attf-href="/web#id={{ object.id }}&amp;model=pbms.planning.category&amp;view_type=form"
+                                               style="background-color: #541718; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                                                View Planning Matrix
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="border-top: 1px solid #EEEEEE; padding-top: 15px; font-size: 12px; color: #888888; text-align: center;">
+                                        Bunna Bank S.C. | Strategic Planning &amp; Performance Management Directorate (SPPMD)<br/>
+                                        This is an automated system notification from Bunna PBMS.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </field>
+    </record>
+
+</odoo>

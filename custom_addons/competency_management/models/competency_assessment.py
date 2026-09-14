@@ -22,16 +22,26 @@ class CompetencyAssessmentCycle(models.Model):
         ('closed', 'Closed'),
     ], string='Status', default='draft', tracking=True)
     assessment_ids = fields.One2many('competency.assessment', 'cycle_id', string='Assessments')
-    assessment_count = fields.Integer(string='Assessments', compute='_compute_assessment_count')
+    assessment_count = fields.Integer(string='Total Assessments', compute='_compute_assessment_counts')
+    pending_assessment_count = fields.Integer(string='Pending Assessments', compute='_compute_assessment_counts')
+    submitted_assessment_count = fields.Integer(string='Submitted Assessments', compute='_compute_assessment_counts')
     sampling_audit_log = fields.Text(string='360 Rater Sampling Audit Trail', readonly=True)
     eligible_rater_count = fields.Integer(string='Eligible Raters Pool Size', default=0, readonly=True)
     selected_rater_count = fields.Integer(string='Sampled Raters Size', default=0, readonly=True)
     notes = fields.Text(string='Notes')
 
-    @api.depends('assessment_ids')
-    def _compute_assessment_count(self):
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
+            raise UserError(_("Only Competency Administrators can create new Assessment Cycles."))
+        return super().create(vals_list)
+
+    @api.depends('assessment_ids', 'assessment_ids.state')
+    def _compute_assessment_counts(self):
         for rec in self:
             rec.assessment_count = len(rec.assessment_ids)
+            rec.pending_assessment_count = len(rec.assessment_ids.filtered(lambda a: a.state == 'draft'))
+            rec.submitted_assessment_count = len(rec.assessment_ids.filtered(lambda a: a.state != 'draft'))
 
     def action_view_assessments(self):
         """Smart button action to view all paginated assessments for this cycle."""
@@ -43,6 +53,73 @@ class CompetencyAssessmentCycle(models.Model):
             'view_mode': 'list,form',
             'domain': [('cycle_id', '=', self.id)],
             'context': {'default_cycle_id': self.id},
+        }
+
+    def action_view_pending_assessments(self):
+        """Smart button action for HR to view all unsubmitted/pending draft assessments for this cycle."""
+        self.ensure_one()
+        return {
+            'name': _('Pending Assessments (Drafts): %s') % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'competency.assessment',
+            'view_mode': 'list,form',
+            'domain': [('cycle_id', '=', self.id), ('state', '=', 'draft')],
+            'context': {'default_cycle_id': self.id, 'search_default_state_draft': 1},
+        }
+
+    def action_send_deadline_reminders(self):
+        """Send warning/reminder notifications to all assessors with pending draft assessments for this cycle."""
+        self.ensure_one()
+        pending_asms = self.assessment_ids.filtered(lambda a: a.state == 'draft')
+        if not pending_asms:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('No Pending Assessments'),
+                    'message': _('All assessments for this cycle have already been submitted!'),
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
+
+        assessors = pending_asms.mapped('assessor_id')
+        sent_count = 0
+        deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
+
+        for assessor in assessors:
+            assessor_pending = pending_asms.filtered(lambda a: a.assessor_id == assessor)
+            partner = assessor.partner_id
+            if not partner:
+                continue
+
+            emp_names = ", ".join(assessor_pending.mapped('employee_id.name')[:5])
+            extra = _(" and %d more") % (len(assessor_pending) - 5) if len(assessor_pending) > 5 else ""
+
+            msg_body = _(
+                "⚠️ <strong>Competency Assessment Deadline Warning:</strong><br/>"
+                "You have %d pending competency assessment(s) assigned to you for cycle '<strong>%s</strong>' "
+                "(Assessments for: %s%s).<br/>"
+                "The submission deadline is <strong>%s</strong>. Please complete and submit your assessments before the deadline."
+            ) % (len(assessor_pending), self.name, emp_names, extra, deadline_str)
+
+            self.message_post(
+                body=msg_body,
+                partner_ids=[partner.id],
+                subtype_xmlid='mail.mt_comment'
+            )
+            sent_count += 1
+
+        self.message_post(body=_("Sent deadline warning notifications to %d assessor(s) with pending draft assessments.") % sent_count)
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Notifications Sent'),
+                'message': _('Successfully sent deadline warning reminders to %d assessor(s) with pending assessments.') % sent_count,
+                'type': 'success',
+                'sticky': False,
+            }
         }
 
     @api.constrains('period_start', 'period_end')
@@ -333,8 +410,19 @@ class CompetencyAssessment(models.Model):
     technical_line_ids = fields.One2many('competency.assessment.line', 'assessment_id', string='Technical Competencies', domain=[('pillar', '=', 'technical')])
     average_gap = fields.Float(string='Average Gap', compute='_compute_average_gap', store=True)
     is_locked = fields.Boolean(string='Locked', compute='_compute_is_locked')
+    cycle_deadline = fields.Date(related='cycle_id.assessment_deadline', string='Cycle Deadline', readonly=True)
+    is_deadline_passed = fields.Boolean(
+        string='Submission Deadline Passed', compute='_compute_is_deadline_passed', store=True,
+        help='True if current date exceeds the assessment cycle submission deadline.')
     notes = fields.Text(string='Notes')
     company_id = fields.Many2one('res.company', string='Company', default=lambda self: self.env.company)
+
+    @api.depends('cycle_id', 'cycle_id.assessment_deadline')
+    def _compute_is_deadline_passed(self):
+        today = fields.Date.today()
+        for rec in self:
+            dl = fields.Date.to_date(rec.cycle_id.assessment_deadline) if (rec.cycle_id and rec.cycle_id.assessment_deadline) else False
+            rec.is_deadline_passed = bool(dl and today > dl)
 
     # 360 Multi-Rater extension fields (FR-COM-012, FR-ASM-002, FR-ASM-005)
     parent_assessment_id = fields.Many2one('competency.assessment', string='Parent 360 Assessment', ondelete='cascade', tracking=True)
@@ -428,10 +516,11 @@ class CompetencyAssessment(models.Model):
                     })
             parent.message_post(body=_("Multi-source assessment scores (360 feedback + Skills Tests) consolidated into final achievement levels using configured rater weights."))
 
-    @api.depends('line_ids', 'line_ids.gap')
+    @api.depends('line_ids', 'line_ids.gap', 'line_ids.current_level', 'line_ids.current_level_num')
     def _compute_average_gap(self):
         for rec in self:
-            gaps = [line.gap for line in rec.line_ids if line.gap is not None]
+            rated_lines = rec.line_ids.filtered(lambda l: l.current_level_num > 0 or (l.current_level and str(l.current_level).isdigit() and int(l.current_level) > 0))
+            gaps = [line.gap for line in rated_lines if line.gap is not False and line.gap is not None]
             rec.average_gap = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
 
     @api.depends('state')
@@ -662,7 +751,7 @@ class CompetencyAssessment(models.Model):
         if not self.cycle_id or not self.assessment_type or not self.employee_id:
             raise UserError(_("Assessment Cycle, Assessment Type, and Employee are required before populating competencies."))
         
-        cnt, mapping_name_str = self._do_populate_lines()
+        cnt, mapping_name_str = self.with_context(force_write=True)._do_populate_lines()
         self.message_post(body=_('Competency rating lines populated from %s (%d competencies).') % (mapping_name_str, cnt))
         return {
             'type': 'ir.actions.act_window',
@@ -676,18 +765,53 @@ class CompetencyAssessment(models.Model):
     def action_auto_fill_lines(self):
         return self.action_populate_competencies()
 
-    def action_submit(self):
-        """Draft -> Submitted with unrated checks and employee confirmation notification (FR-COM-047)."""
+    def _check_submission_deadline(self):
+        """Guard method: Enforce cycle submission deadline (FR-ASM-005)."""
+        today = fields.Date.today()
         for rec in self:
+            dl = fields.Date.to_date(rec.cycle_id.assessment_deadline) if (rec.cycle_id and rec.cycle_id.assessment_deadline) else False
+            if dl and today > dl:
+                deadline_str = dl.strftime('%b %d, %Y')
+                raise UserError(_(
+                    "The submission deadline (%s) for assessment cycle '%s' has passed. "
+                    "Submissions are no longer accepted unless HR extends the deadline."
+                ) % (deadline_str, rec.cycle_id.name))
+
+    def write(self, vals):
+        force_write = self.env.context.get('force_write')
+        for rec in self:
+            if rec.state == 'locked' and not force_write and not self.env.su:
+                locked_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids', 'notes'}
+                if set(vals.keys()) & locked_fields:
+                    raise ValidationError(_("Assessment %s is locked. Only Competency Administrators can unlock finalized assessments using the Unlock action.") % rec.name)
+            today = fields.Date.today()
+            cycle = rec.cycle_id.sudo() if rec.cycle_id else False
+            dl = fields.Date.to_date(cycle.assessment_deadline) if (cycle and cycle.assessment_deadline) else False
+            is_expired = rec.is_deadline_passed or bool(dl and today > dl)
+            if is_expired and rec.state == 'draft' and not force_write:
+                protected_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids', 'core_line_ids', 'leadership_line_ids', 'technical_line_ids', 'notes'}
+                if set(vals.keys()) & protected_fields:
+                    deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
+                    raise UserError(_(
+                        "The submission deadline (%s) for assessment cycle '%s' has passed. "
+                        "This assessment is locked for editing and submissions are closed unless HR extends the deadline."
+                    ) % (deadline_str, rec.cycle_id.name))
+        return super(CompetencyAssessment, self).write(vals)
+
+    def action_submit(self):
+        """Draft -> Submitted with deadline checks, unrated checks, and employee confirmation notification (FR-COM-047)."""
+        for rec in self:
+            rec._check_submission_deadline()
             if not rec.line_ids:
                 raise UserError(_('Add at least one competency rating line before submitting.'))
-            unrated = rec.line_ids.filtered(lambda l: not l.current_level)
+            unrated = rec.line_ids.filtered(lambda l: not l.current_level or l.current_level == '0')
             if unrated:
                 unrated_names = ", ".join(unrated.mapped('competency_id.name')[:5])
-                raise UserError(_('Please rate your current proficiency level for all competencies before submitting. %d competency(ies) remaining unrated: %s%s') % (
+                raise ValidationError(_('Validation Error: Please rate all competencies before submitting! %d competency(ies) remaining unrated: %s%s') % (
                     len(unrated), unrated_names, "..." if len(unrated) > 5 else ""
                 ))
             rec.with_context(force_write=True).write({'state': 'submitted'})
+            rec.line_ids._trigger_sibling_360_recompute()
             rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
             if rec.employee_id and rec.employee_id.user_id:
@@ -713,7 +837,7 @@ class CompetencyAssessment(models.Model):
                 if (subject_user and current_user == subject_user) or \
                    (assessor_user and current_user == assessor_user) or \
                    (creator_user and current_user == creator_user):
-                    raise ValidationError(_("You cannot approve your own assessment/IDP. This action must be performed by a different authorized user (FR-COM-055)."))
+                    raise ValidationError(_("You cannot approve your own assessment/IDP. This action must be performed by a different authorized user."))
 
     def action_supervisor_review(self):
         """Submitted -> Supervisor Review with supervisor activity notification (FR-COM-048)."""
@@ -777,14 +901,7 @@ class CompetencyAssessment(models.Model):
         self.with_context(force_write=True).write({'state': 'approved'})
         self.message_post(body=_('Assessment %s unlocked by %s.') % (self.name, self.env.user.name))
 
-    def write(self, vals):
-        force_write = self.env.context.get('force_write')
-        for rec in self:
-            if rec.state == 'locked' and not force_write and not self.env.su:
-                locked_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids', 'notes'}
-                if set(vals.keys()) & locked_fields:
-                    raise ValidationError(_("Assessment %s is locked. Only Competency Administrators can unlock finalized assessments using the Unlock action.") % rec.name)
-        return super().write(vals)
+
 
     @api.model
     def _cron_pending_assessment_reminders(self):
@@ -892,6 +1009,7 @@ class CompetencyAssessmentLine(models.Model):
     job_id = fields.Many2one(related='assessment_id.job_id', string='Job Position', store=True, readonly=True, index=True)
     grade_id = fields.Many2one(related='assessment_id.employee_id.grade_id', string='Job Grade', store=True, readonly=True, index=True)
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
+    is_deadline_passed = fields.Boolean(related='assessment_id.is_deadline_passed', string='Deadline Passed', readonly=True)
 
     tna_measure = fields.Selection([
         ('below', 'Underqualified'),
@@ -1013,10 +1131,10 @@ class CompetencyAssessmentLine(models.Model):
 
             if not (emp and cycle and comp):
                 s_init = int(line.current_level) if line.current_level and str(line.current_level).isdigit() else 0.0
-                line.self_rating = s_init
+                line.self_rating = s_init if line.assessment_id.assessment_type == 'self' else 0.0
                 line.peer_avg = 0.0
                 line.subordinate_avg = 0.0
-                line.supervisor_avg = 0.0
+                line.supervisor_avg = s_init if line.assessment_id.assessment_type in ('supervisor', 'team') else 0.0
                 line.team_avg = 0.0
                 line.weighted_current_level = s_init
                 continue
@@ -1031,10 +1149,10 @@ class CompetencyAssessmentLine(models.Model):
             self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self']
             peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer']
             sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate']
-            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'supervisor']
-            team_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'team']
+            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type in ('supervisor', 'team')]
+            team_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'team_member_eval']
 
-            s_val = int(self_lines[0].current_level) if self_lines and str(self_lines[0].current_level).isdigit() else (int(line.current_level) if line.current_level and str(line.current_level).isdigit() else 0.0)
+            s_val = int(self_lines[0].current_level) if (self_lines and str(self_lines[0].current_level).isdigit()) else (int(line.current_level) if (line.assessment_id.assessment_type == 'self' and line.current_level and str(line.current_level).isdigit()) else 0.0)
             p_val = round(sum(int(l.current_level) for l in peer_lines if str(l.current_level).isdigit()) / len(peer_lines), 2) if peer_lines else 0.0
             sub_val = round(sum(int(l.current_level) for l in sub_lines if str(l.current_level).isdigit()) / len(sub_lines), 2) if sub_lines else 0.0
             sup_val = round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0
@@ -1060,11 +1178,115 @@ class CompetencyAssessmentLine(models.Model):
             if sup_val:
                 num += sup_val * w_sup
                 den += w_sup
-            if t_val:
+            elif t_val and w_team > 0:
                 num += t_val * w_team
                 den += w_team
 
-            line.weighted_current_level = round(num / den, 2) if den > 0 else float(s_val or 0.0)
+            line.weighted_current_level = round(num / den, 2) if den > 0 else float(s_val or sup_val or sub_val or t_val or 0.0)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        force_write = self.env.context.get('force_write')
+        for vals in vals_list:
+            if not force_write and vals.get('assessment_id'):
+                asm = self.env['competency.assessment'].browse(vals['assessment_id'])
+                today = fields.Date.today()
+                dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
+                if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
+                    deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
+                    raise UserError(_(
+                        "The submission deadline (%s) for assessment cycle '%s' has passed. "
+                        "Rating lines cannot be added or edited after the deadline."
+                    ) % (deadline_str, asm.cycle_id.name))
+        lines = super().create(vals_list)
+        if not self.env.context.get('skip_360_recompute'):
+            lines._trigger_sibling_360_recompute()
+        return lines
+
+    def write(self, vals):
+        force_write = self.env.context.get('force_write')
+        for line in self:
+            if not force_write and line.assessment_id:
+                asm = line.assessment_id
+                today = fields.Date.today()
+                dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
+                if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
+                    deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
+                    raise UserError(_(
+                        "The submission deadline (%s) for assessment cycle '%s' has passed. "
+                        "Rating lines cannot be added or edited after the deadline."
+                    ) % (deadline_str, asm.cycle_id.name))
+        res = super().write(vals)
+        if ('current_level' in vals or 'state' in vals) and not self.env.context.get('skip_360_recompute'):
+            self._trigger_sibling_360_recompute()
+        return res
+
+    def _trigger_sibling_360_recompute(self):
+        config = self.env['competency.matrix.config'].sudo().get_active_config()
+        w_self = float(config.weight_self or 2.0)
+        w_peer = float(config.weight_peer or 1.0)
+        w_sub = float(config.weight_subordinate or 1.0)
+        w_sup = float(config.weight_supervisor or 3.0)
+        w_team = float(config.weight_team or 0.0)
+
+        emp_cycle_comps = set()
+        for line in self:
+            if line.employee_id and line.cycle_id and line.competency_id:
+                emp_cycle_comps.add((line.employee_id.id, line.cycle_id.id, line.competency_id.id))
+
+        for (emp_id, cycle_id, comp_id) in emp_cycle_comps:
+            comp_lines = self.env['competency.assessment.line'].sudo().search([
+                ('employee_id', '=', emp_id),
+                ('cycle_id', '=', cycle_id),
+                ('competency_id', '=', comp_id),
+                ('current_level', '!=', False)
+            ])
+
+            self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self']
+            peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer']
+            sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate']
+            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type in ('supervisor', 'team')]
+            team_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'team_member_eval']
+
+            s_val = int(self_lines[0].current_level) if (self_lines and str(self_lines[0].current_level).isdigit()) else 0.0
+            p_val = round(sum(int(l.current_level) for l in peer_lines if str(l.current_level).isdigit()) / len(peer_lines), 2) if peer_lines else 0.0
+            sub_val = round(sum(int(l.current_level) for l in sub_lines if str(l.current_level).isdigit()) / len(sub_lines), 2) if sub_lines else 0.0
+            sup_val = round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0
+            t_val = round(sum(int(l.current_level) for l in team_lines if str(l.current_level).isdigit()) / len(team_lines), 2) if team_lines else 0.0
+
+            num = 0.0
+            den = 0.0
+            if s_val:
+                num += s_val * w_self
+                den += w_self
+            if p_val:
+                num += p_val * w_peer
+                den += w_peer
+            if sub_val:
+                num += sub_val * w_sub
+                den += w_sub
+            if sup_val:
+                num += sup_val * w_sup
+                den += w_sup
+            elif t_val and w_team > 0:
+                num += t_val * w_team
+                den += w_team
+
+            calc_weighted = round(num / den, 2) if den > 0 else float(s_val or sup_val or sub_val or t_val or 0.0)
+
+            all_lines = self.env['competency.assessment.line'].sudo().search([
+                ('employee_id', '=', emp_id),
+                ('cycle_id', '=', cycle_id),
+                ('competency_id', '=', comp_id),
+            ])
+            all_lines.with_context(skip_360_recompute=True).write({
+                'self_rating': float(s_val),
+                'peer_avg': float(p_val),
+                'subordinate_avg': float(sub_val),
+                'supervisor_avg': float(sup_val),
+                'team_avg': float(t_val),
+                'weighted_current_level': calc_weighted,
+            })
 
     achievement_status = fields.Selection([
         ('exceeds', 'Exceeds Required Level'),
@@ -1079,30 +1301,67 @@ class CompetencyAssessmentLine(models.Model):
     comments = fields.Text(string='Comments')
     evidence_attachment_ids = fields.Many2many('ir.attachment', string='Supporting Evidence')
 
+    is_primary_reporting_line = fields.Boolean(
+        string='Is Primary Reporting Line', compute='_compute_is_primary_reporting_line', store=True, index=True,
+        help='Designates the single consolidated line per (employee, cycle, competency) used for reporting views.')
+
+    @api.depends('assessment_id.assessment_type', 'assessment_id.employee_id', 'assessment_id.cycle_id', 'competency_id')
+    def _compute_is_primary_reporting_line(self):
+        emp_cycle_comps = set()
+        for line in self:
+            if line.employee_id and line.cycle_id and line.competency_id:
+                emp_cycle_comps.add((line.employee_id.id, line.cycle_id.id, line.competency_id.id))
+
+        for (emp_id, cycle_id, comp_id) in emp_cycle_comps:
+            comp_lines = self.env['competency.assessment.line'].sudo().search([
+                ('employee_id', '=', emp_id),
+                ('cycle_id', '=', cycle_id),
+                ('competency_id', '=', comp_id),
+            ], order='id asc')
+
+            self_line = comp_lines.filtered(lambda l: l.assessment_id.assessment_type == 'self')
+            if self_line:
+                primary_id = self_line[0].id
+            else:
+                sup_line = comp_lines.filtered(lambda l: l.assessment_id.assessment_type in ('supervisor', 'team'))
+                primary_id = sup_line[0].id if sup_line else (comp_lines[0].id if comp_lines else False)
+
+            for l in comp_lines:
+                l.is_primary_reporting_line = (l.id == primary_id)
+
+        for line in self:
+            if not (line.employee_id and line.cycle_id and line.competency_id):
+                line.is_primary_reporting_line = True
+
     @api.constrains('competency_id')
     def _check_competency_status(self):
         for line in self:
             if line.competency_id and line.competency_id.state == 'retired':
                 raise ValidationError(_("The competency '%s' is retired and cannot be assessed.") % line.competency_id.name)
 
-    @api.depends('current_level', 'required_level')
+    @api.depends('current_level', 'required_level', 'weighted_current_level')
     def _compute_level_nums(self):
         for rec in self:
-            rec.current_level_num = int(rec.current_level) if rec.current_level and str(rec.current_level).isdigit() else 0
+            c_num = 0
+            if rec.current_level and str(rec.current_level).isdigit():
+                c_num = int(rec.current_level)
+            elif rec.weighted_current_level:
+                c_num = int(round(rec.weighted_current_level))
+            rec.current_level_num = c_num
             rec.required_level_num = int(rec.required_level) if rec.required_level and str(rec.required_level).isdigit() else 0
 
-    @api.depends('current_level', 'required_level')
+    @api.depends('current_level_num', 'required_level_num')
     def _compute_gap(self):
         for rec in self:
-            if rec.current_level and rec.required_level:
-                rec.gap = int(rec.required_level) - int(rec.current_level)
+            if rec.current_level_num:
+                rec.gap = rec.required_level_num - rec.current_level_num
             else:
-                rec.gap = 0
+                rec.gap = False
 
-    @api.depends('gap', 'current_level', 'required_level')
+    @api.depends('gap', 'current_level_num')
     def _compute_tna_measure(self):
         for rec in self:
-            if not rec.current_level:
+            if not rec.current_level_num:
                 rec.tna_measure = False
                 continue
             gap_val = rec.gap or 0
@@ -1113,10 +1372,10 @@ class CompetencyAssessmentLine(models.Model):
             else:
                 rec.tna_measure = 'exceeds'
 
-    @api.depends('gap', 'current_level', 'required_level')
+    @api.depends('gap', 'current_level_num')
     def _compute_achievement_status_and_priority(self):
         for rec in self:
-            if not rec.current_level:
+            if not rec.current_level_num:
                 rec.achievement_status = False
                 rec.gap_priority = False
                 continue
@@ -1143,22 +1402,107 @@ class CompetencyAssessmentLine(models.Model):
     def create(self, vals_list):
         lines = super().create(vals_list)
         for line in lines:
-            if line.assessment_id and line.assessment_id.state == 'locked' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % line.assessment_id.name)
+            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
+                if line.assessment_id.state == 'locked':
+                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % line.assessment_id.name)
+                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
+                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
+                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
         return lines
 
     def write(self, vals):
         res = super().write(vals)
         for line in self:
-            if line.assessment_id and line.assessment_id.state == 'locked' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % line.assessment_id.name)
+            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
+                if line.assessment_id.state == 'locked':
+                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % line.assessment_id.name)
+                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
+                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
+                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
         return res
 
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_locked(self):
         for line in self:
-            if line.assessment_id and line.assessment_id.state == 'locked' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_("Cannot delete rating lines from locked assessment %s.") % line.assessment_id.name)
+            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
+                if line.assessment_id.state == 'locked':
+                    raise ValidationError(_("Cannot delete rating lines from locked assessment %s.") % line.assessment_id.name)
+                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
+                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
+                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines cannot be deleted.") % (deadline_str, line.assessment_id.cycle_id.name))
+
+    def action_view_360_breakdown(self):
+        """Action button to open the 360° Rater Score Breakdown pop-up modal wizard."""
+        self.ensure_one()
+        emp = self.employee_id
+        cycle = self.cycle_id
+        comp = self.competency_id
+
+        # Search for all rated lines for this (employee, cycle, competency)
+        rated_lines = self.env['competency.assessment.line'].sudo().search([
+            ('employee_id', '=', emp.id),
+            ('cycle_id', '=', cycle.id),
+            ('competency_id', '=', comp.id),
+            ('current_level', '!=', False)
+        ], order='id asc')
+
+        breakdown_lines_vals = []
+        for r_line in rated_lines:
+            asm = r_line.assessment_id
+            assessor = asm.assessor_id
+            assessor_emp = assessor.employee_id if (assessor and getattr(assessor, 'employee_id', False)) else False
+            
+            # Anonymize peer/subordinate names if anonymized 360 settings are active
+            if asm.is_anonymous and asm.assessment_type in ('peer', 'subordinate'):
+                r_name = _("Anonymous 360 Rater (%s)") % asm.assessment_type.capitalize()
+            elif assessor_emp:
+                r_name = assessor_emp.name
+            elif assessor:
+                r_name = assessor.name
+            else:
+                r_name = _("System / Unassigned")
+
+            lvl_map = {'1': 'Level 1 - Basic', '2': 'Level 2 - Intermediate', '3': 'Level 3 - Advanced', '4': 'Level 4 - Expert'}
+            lvl_str = lvl_map.get(str(r_line.current_level), f"Level {r_line.current_level}")
+            
+            state_map = dict(asm._fields['state'].selection or [])
+            st_label = state_map.get(asm.state, asm.state.capitalize())
+
+            breakdown_lines_vals.append((0, 0, {
+                'assessor_name': r_name,
+                'rater_type': asm.assessment_type or 'self',
+                'rating_level_str': lvl_str,
+                'rating_num': int(r_line.current_level) if str(r_line.current_level).isdigit() else 0,
+                'assessment_name': asm.name or '',
+                'assessment_state': st_label,
+                'comments': r_line.comments or '',
+            }))
+
+        wizard = self.env['competency.rater.breakdown.wizard'].create({
+            'line_id': self.id,
+            'employee_id': emp.id if emp else False,
+            'department_id': self.department_id.id if self.department_id else False,
+            'job_id': self.job_id.id if self.job_id else False,
+            'cycle_id': cycle.id if cycle else False,
+            'competency_id': comp.id if comp else False,
+            'self_rating': self.self_rating,
+            'peer_avg': self.peer_avg,
+            'subordinate_avg': self.subordinate_avg,
+            'supervisor_avg': self.supervisor_avg,
+            'team_avg': self.team_avg,
+            'weighted_current_level': self.weighted_current_level,
+            'rater_line_ids': breakdown_lines_vals,
+        })
+
+        return {
+            'name': _('360° Rater Score Breakdown: %s — %s') % (comp.name if comp else '', emp.name if emp else ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'competency.rater.breakdown.wizard',
+            'res_id': wizard.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }
+
 
 
 

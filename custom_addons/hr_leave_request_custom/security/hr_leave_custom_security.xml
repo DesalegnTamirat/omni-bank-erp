@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 1. Employee Group (Level 1 under Time Off Privilege) -->
+    <record id="group_hr_holidays_employee" model="res.groups">
+        <field name="name">Employee</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="hr_holidays.res_groups_privilege_time_off"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Access Time Off dashboard, request leaves for self, view team overview.</field>
+    </record>
+
+    <!-- 2. Manager Group (Level 2 under Time Off Privilege) -->
+    <record id="group_hr_holidays_manager_approver" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="sequence">20</field>
+        <field name="privilege_id" ref="hr_holidays.res_groups_privilege_time_off"/>
+        <field name="implied_ids" eval="[(4, ref('hr_leave_request_custom.group_hr_holidays_employee')), (4, ref('hr_holidays.group_hr_holidays_responsible'))]"/>
+        <field name="comment">All Employee privileges + approve leaves of coachees/team members. Cannot approve own leave.</field>
+    </record>
+
+    <!-- 3. HR Officer Group (Level 3 under Time Off Privilege) - Update standard group_hr_holidays_user -->
+    <record id="hr_holidays.group_hr_holidays_user" model="res.groups">
+        <field name="name">HR</field>
+        <field name="sequence">30</field>
+        <field name="privilege_id" ref="hr_holidays.res_groups_privilege_time_off"/>
+        <field name="implied_ids" eval="[(4, ref('hr_leave_request_custom.group_hr_holidays_manager_approver'))]"/>
+        <field name="comment">All Employee/Manager privileges + request Suspense Leave on behalf of other employees, define leave types, accrual configuration, manage allocations, access reports. Cannot approve own leave.</field>
+    </record>
+
+    <!-- 4. Administrator Group (Level 4 under Time Off Privilege) - Update standard group_hr_holidays_manager -->
+    <record id="hr_holidays.group_hr_holidays_manager" model="res.groups">
+        <field name="name">Admin</field>
+        <field name="sequence">40</field>
+        <field name="privilege_id" ref="hr_holidays.res_groups_privilege_time_off"/>
+        <field name="implied_ids" eval="[(4, ref('hr_holidays.group_hr_holidays_user'))]"/>
+        <field name="comment">Full Time Off administrative access, configurations, allocations, reports. Cannot request Suspense Leave on behalf of employees (HR only).</field>
+    </record>
+
+    <!-- Backward compatibility alias for group_hr_leave_suspense_hr -->
+    <record id="group_hr_leave_suspense_hr" model="res.groups">
+        <field name="name">HR (Suspense Leave)</field>
+        <field name="implied_ids" eval="[(4, ref('hr_holidays.group_hr_holidays_user'))]"/>
+    </record>
+
+    <!-- ============================================================
+         RECORD RULES FOR TIME OFF (hr.leave)
+         ============================================================ -->
+
+    <!-- Manager Record Rule: sees own leaves, coachees (coach_id), direct reports (parent_id), and department leaves -->
+    <record id="rule_hr_leave_manager_approver" model="ir.rule">
+        <field name="name">Time Off: Manager sees own leaves, coachees, and subordinates</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+        <field name="domain_force">[
+            '|', '|', '|', '|', '|', '|', '|', '|',
+                ('employee_id.user_id', '=', user.id),
+                ('employee_id.coach_id.user_id', '=', user.id),
+                ('employee_id.coach_id', 'in', user.employee_ids.ids),
+                ('employee_id.parent_id.user_id', '=', user.id),
+                ('employee_id.parent_id', 'in', user.employee_ids.ids),
+                ('employee_id.leave_manager_id', '=', user.id),
+                ('employee_id.leave_manager_id', 'in', user.employee_ids.ids),
+                ('employee_id.department_id.manager_id.user_id', '=', user.id),
+                ('employee_id.department_id.manager_id', 'in', user.employee_ids.ids)
+        ]</field>
+        <field name="groups" eval="[(4, ref('group_hr_holidays_manager_approver'))]"/>
+        <field eval="1" name="perm_read"/>
+        <field eval="1" name="perm_write"/>
+        <field eval="1" name="perm_create"/>
+        <field eval="0" name="perm_unlink"/>
+    </record>
+
+    <!-- HR Officer Record Rule: sees all leaves -->
+    <record id="rule_hr_leave_officer_all" model="ir.rule">
+        <field name="name">Time Off: HR sees all leaves</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr_holidays.group_hr_holidays_user'))]"/>
+        <field eval="1" name="perm_read"/>
+        <field eval="1" name="perm_write"/>
+        <field eval="1" name="perm_create"/>
+        <field eval="1" name="perm_unlink"/>
+    </record>
+
+    <!-- Administrator Record Rule: sees all leaves -->
+    <record id="rule_hr_leave_admin_all" model="ir.rule">
+        <field name="name">Time Off: Admin sees all leaves</field>
+        <field name="model_id" ref="hr_holidays.model_hr_leave"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hr_holidays.group_hr_holidays_manager'))]"/>
+        <field eval="1" name="perm_read"/>
+        <field eval="1" name="perm_write"/>
+        <field eval="1" name="perm_create"/>
+        <field eval="1" name="perm_unlink"/>
+    </record>
+
+    <!-- ============================================================
+         MENU RESTRICTIONS: Strict separation by role
+         - Management Menu: Manager, HR, Admin (NOT Employee)
+         - Reporting Menu: HR, Admin (NOT Employee or Manager)
+         - Configuration Menu: HR, Admin (NOT Employee or Manager)
+         ============================================================ -->
+
+    <record id="hr_holidays.menu_hr_holidays_management" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_leave_request_custom.group_hr_holidays_manager_approver'),
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <record id="hr_holidays.menu_hr_holidays_report" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <record id="hr_holidays.menu_hr_holidays_configuration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <!-- Grant HR access to all Configuration submenus (standard restricts to Admin only) -->
+    <record id="hr_holidays.hr_holidays_status_menu_configuration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <record id="hr_holidays.hr_holidays_accrual_menu_configuration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <record id="hr_holidays.hr_holidays_public_time_off_menu_configuration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+    <record id="hr_holidays.hr_holidays_mandatory_day_menu_configuration" model="ir.ui.menu">
+        <field name="group_ids" eval="[(6, 0, [
+            ref('hr_holidays.group_hr_holidays_user'),
+            ref('hr_holidays.group_hr_holidays_manager')
+        ])]"/>
+    </record>
+
+</odoo>

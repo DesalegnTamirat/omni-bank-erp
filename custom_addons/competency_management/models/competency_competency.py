@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRatingModel(models.Model):
@@ -141,7 +141,7 @@ class CompetencyProficiencyLevel(models.Model):
                     if approved_fw and not self.env.context.get('eds_allow_definition_edit') and not self.env.context.get('force_write'):
                         raise ValidationError(_(
                             "Definition text cannot be freely re-edited for a competency on an approved framework "
-                            "without going through the Competency Framework change/version-control workflow (FR-COM-006). "
+                            "without going through the Competency Framework change/version-control workflow. "
                             "Create a new framework version or submit an approved change request."
                         ))
                     
@@ -173,7 +173,11 @@ class CompetencyProficiencyLevel(models.Model):
 
 
 class Competency(models.Model):
-    """Competency dictionary entry (FR-COM-002, FR-COM-003)."""
+    """Competency dictionary entry (FR-COM-002, FR-COM-003).
+    
+    NOTE: Shared globally across all companies (intentionally not company-scoped
+    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    """
     _name = 'competency.competency'
     _description = 'Competency'
     _inherit = ['mail.thread']
@@ -235,6 +239,8 @@ class Competency(models.Model):
             rec.write({'state': 'submitted'})
 
     def action_approve(self):
+        if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
+            raise UserError(_("Only Competency Administrators can approve competency dictionary entries."))
         for rec in self:
             rec.write({'state': 'approved', 'active': True})
 
@@ -339,7 +345,7 @@ class Competency(models.Model):
                     if approved_fw:
                         raise ValidationError(_(
                             "Competency name or pillar cannot be re-edited for a competency on an approved framework (%s) "
-                            "without going through the Competency Framework change/version-control workflow (FR-COM-006). "
+                            "without going through the Competency Framework change/version-control workflow. "
                             "Create a new framework version or submit an approved change request."
                         ) % approved_fw.framework_id.name)
                         

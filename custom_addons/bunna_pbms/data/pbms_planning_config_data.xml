@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Default Planning Configurations for each Work Unit Type -->
+    <record id="planning_config_branch" model="pbms.planning.config">
+        <field name="work_unit_type">branch</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">True</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+            ref('bunna_pbms.deposit_type_ifb'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+            ref('bunna_pbms.digital_channel_active_merchant'),
+            ref('bunna_pbms.digital_channel_quality_merchant'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_building'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+            ref('bunna_pbms.fa_category_it'),
+            ref('bunna_pbms.fa_category_renovation'),
+            ref('bunna_pbms.fa_category_initiative'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_branch_expansion'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_digital_transformation'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_bpr'),
+            ref('bunna_pbms.justification_operational_risk'),
+            ref('bunna_pbms.justification_compliance'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_new_product'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_restructuring'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_sub_branch" model="pbms.planning.config">
+        <field name="work_unit_type">sub_branch</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">False</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_head_office" model="pbms.planning.config">
+        <field name="work_unit_type">head_office</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">True</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+            ref('bunna_pbms.deposit_type_ifb'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+            ref('bunna_pbms.digital_channel_active_merchant'),
+            ref('bunna_pbms.digital_channel_quality_merchant'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_building'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+            ref('bunna_pbms.fa_category_it'),
+            ref('bunna_pbms.fa_category_renovation'),
+            ref('bunna_pbms.fa_category_initiative'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_branch_expansion'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_digital_transformation'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_bpr'),
+            ref('bunna_pbms.justification_operational_risk'),
+            ref('bunna_pbms.justification_compliance'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_new_product'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_restructuring'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_regional_office" model="pbms.planning.config">
+        <field name="work_unit_type">regional_office</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">True</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+            ref('bunna_pbms.deposit_type_ifb'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+            ref('bunna_pbms.digital_channel_active_merchant'),
+            ref('bunna_pbms.digital_channel_quality_merchant'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_building'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+            ref('bunna_pbms.fa_category_it'),
+            ref('bunna_pbms.fa_category_renovation'),
+            ref('bunna_pbms.fa_category_initiative'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_branch_expansion'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_digital_transformation'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_bpr'),
+            ref('bunna_pbms.justification_operational_risk'),
+            ref('bunna_pbms.justification_compliance'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_new_product'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_restructuring'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_district_office" model="pbms.planning.config">
+        <field name="work_unit_type">district_office</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">True</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+            ref('bunna_pbms.deposit_type_ifb'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+            ref('bunna_pbms.digital_channel_active_merchant'),
+            ref('bunna_pbms.digital_channel_quality_merchant'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_building'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+            ref('bunna_pbms.fa_category_it'),
+            ref('bunna_pbms.fa_category_renovation'),
+            ref('bunna_pbms.fa_category_initiative'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_branch_expansion'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_digital_transformation'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_bpr'),
+            ref('bunna_pbms.justification_operational_risk'),
+            ref('bunna_pbms.justification_compliance'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_new_product'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_restructuring'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_service_center" model="pbms.planning.config">
+        <field name="work_unit_type">service_center</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">False</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+
+    <record id="planning_config_other" model="pbms.planning.config">
+        <field name="work_unit_type">other</field>
+        <field name="enable_deposit">True</field>
+        <field name="enable_customer_base">True</field>
+        <field name="enable_fx">False</field>
+        <field name="enable_digital_banking">True</field>
+        <field name="enable_expense">True</field>
+        <field name="enable_manpower">True</field>
+        <field name="enable_fixed_asset">True</field>
+        <field name="deposit_measurement_type">monetary</field>
+        <field name="customer_base_measurement_type">integer</field>
+        <field name="fx_measurement_type">monetary</field>
+        <field name="digital_banking_measurement_type">integer</field>
+        <field name="expense_measurement_type">monetary</field>
+        <field name="manpower_measurement_type">integer</field>
+        <field name="fixed_asset_measurement_type">integer</field>
+        <field name="deposit_type_ids" eval="[(6, 0, [
+            ref('bunna_pbms.deposit_type_savings'),
+            ref('bunna_pbms.deposit_type_demand'),
+            ref('bunna_pbms.deposit_type_time'),
+        ])]"/>
+        <field name="digital_channel_ids" eval="[(6, 0, [
+            ref('bunna_pbms.digital_channel_mobile_activation'),
+            ref('bunna_pbms.digital_channel_atm_activation'),
+        ])]"/>
+        <field name="expense_account_ids" eval="[(6, 0, [])]"/>
+        <field name="fixed_asset_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.fa_category_computer'),
+            ref('bunna_pbms.fa_category_furniture'),
+            ref('bunna_pbms.fa_category_equipment'),
+        ])]"/>
+        <field name="justification_category_ids" eval="[(6, 0, [
+            ref('bunna_pbms.justification_business_growth'),
+            ref('bunna_pbms.justification_regulatory'),
+            ref('bunna_pbms.justification_increased_workload'),
+            ref('bunna_pbms.justification_customer_service'),
+            ref('bunna_pbms.justification_replacement'),
+            ref('bunna_pbms.justification_other'),
+        ])]"/>
+    </record>
+</odoo>

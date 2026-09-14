@@ -1,0 +1,549 @@
+/* Bunna Bank S.C. Official 6 Brand Colors */
+/* Primary Colors (Image 4 & 6) */
+$bunna-primary-slate: #1D2B32;       /* Swatch 4: C:83 M:67 Y:58 K:62 | R:29 G:43 B:50 */
+$bunna-primary-maroon: #541718;      /* Swatch 6: C:39 M:89 Y:79 K:60 | R:84 G:24 B:24 */
+
+/* Secondary Colors (Image 1, 2, 3, 5) */
+$bunna-secondary-forest: #425727;    /* Swatch 1: C:70 M:44 Y:100 K:39 | R:66 G:87 B:39 */
+$bunna-secondary-bronze: #726732;    /* Swatch 2: C:50 M:47 Y:92 K:26 | R:114 G:103 B:50 */
+$bunna-secondary-terracotta: #C17540;/* Swatch 3: C:20 M:60 Y:84 K:5 | R:193 G:117 B:64 */
+$bunna-secondary-pine: #1E2917;      /* Swatch 5: C:73 M:56 Y:81 K:73 | R:30 G:41 B:23 */
+
+/* Standard Theme Bindings */
+$bunna-primary: $bunna-primary-maroon;
+$bunna-secondary: $bunna-secondary-pine;
+$bunna-accent: $bunna-primary-slate;
+$bunna-success: $bunna-secondary-forest;
+$bunna-warning: $bunna-secondary-terracotta;
+$bunna-info: $bunna-secondary-bronze;
+$bunna-danger: $bunna-primary-maroon;
+$bunna-dark: $bunna-secondary-pine;
+$bunna-light: #F4F6F7;
+
+.o_pbms_dashboard {
+    height: 100%;
+    overflow-y: auto;
+    padding: 1.5rem;
+    padding-bottom: 3rem;
+    background: $bunna-light;
+
+    .clickable {
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+            transform: scale(1.02);
+            filter: brightness(0.95);
+        }
+    }
+
+    .dashboard-header {
+        padding: 0.85rem 1.25rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 2.5px solid rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: linear-gradient(135deg, #541718 0%, #6E2021 100%) !important;
+        box-shadow: 0 4px 12px rgba(84, 24, 24, 0.25);
+
+        h2 {
+            color: #FFFFFF !important;
+            font-weight: 700;
+
+            .fa {
+                color: #FFFFFF !important;
+            }
+        }
+
+        .text-muted,
+        .text-white,
+        .opacity-75 {
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        label {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 0.88rem;
+        }
+
+        // Custom Styled Select Trigger Button on Maroon Header
+        .pbms-custom-select {
+            background-color: rgba(255, 255, 255, 0.16) !important;
+            background: rgba(255, 255, 255, 0.16) !important;
+            border: 1.5px solid rgba(255, 255, 255, 0.4) !important;
+            border-radius: 6px !important;
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            font-size: 0.875rem !important;
+            padding: 0.45rem 0.95rem !important;
+            min-width: 175px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+
+            span {
+                color: #FFFFFF !important;
+            }
+
+            .fa-chevron-down,
+            .fa {
+                color: #FFFFFF !important;
+            }
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.26) !important;
+                border-color: #FFFFFF !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+                color: #FFFFFF !important;
+                transform: translateY(-1px);
+            }
+
+            &:focus {
+                background: rgba(255, 255, 255, 0.26) !important;
+                border-color: #FFFFFF !important;
+                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.35) !important;
+                outline: none !important;
+            }
+        }
+
+        // Custom Dropdown Menu Panel
+        .pbms-dropdown-menu {
+            background-color: #FFFFFF !important;
+            border: 1.5px solid #CBD5E1 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 8px 24px rgba(84, 24, 24, 0.15) !important;
+            padding: 0.35rem 0 !important;
+            animation: pbmsDropdownFadeIn 0.15s ease-out;
+
+            .dropdown-item {
+                color: #1D2B32 !important;
+                font-weight: 500;
+                font-size: 0.875rem;
+                padding: 0.55rem 1rem;
+                background: transparent;
+                border: none;
+                width: 100%;
+                text-align: left;
+                cursor: pointer;
+                transition: all 0.15s ease;
+
+                // On Hover: BUNNA Primary Maroon (#541718) with Crisp White Text
+                &:hover,
+                &:focus {
+                    background-color: $bunna-primary-maroon !important;
+                    background: $bunna-primary-maroon !important;
+                    color: #FFFFFF !important;
+
+                    .text-muted,
+                    .text-success,
+                    .text-primary,
+                    .fa {
+                        color: #FFFFFF !important;
+                    }
+                }
+
+                // Active / Currently Selected Item
+                &.active-item {
+                    background-color: #FAF1EB !important;
+                    color: $bunna-primary-maroon !important;
+                    font-weight: 700 !important;
+
+                    .text-primary,
+                    .text-success,
+                    .fa {
+                        color: $bunna-primary-maroon !important;
+                    }
+
+                    &:hover {
+                        background-color: $bunna-primary-maroon !important;
+                        color: #FFFFFF !important;
+
+                        .text-primary,
+                        .text-success,
+                        .fa {
+                            color: #FFFFFF !important;
+                        }
+                    }
+                }
+            }
+        }
+
+        .form-select {
+            border: 1px solid #3E1011 !important;
+            border-radius: 6px !important;
+            color: #FFFFFF !important;
+            background-color: $bunna-primary-maroon !important;
+            background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+            font-weight: 600 !important;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            option {
+                background-color: #FFFFFF !important;
+                color: #1D2B32 !important;
+            }
+
+            &:hover {
+                background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35) !important;
+            }
+
+            &:focus {
+                border-color: #3E1011 !important;
+                box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.35) !important;
+                outline: none !important;
+            }
+        }
+    }
+
+    @keyframes pbmsDropdownFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    // KPI Cards with Bunna Bank 6 Official Colors
+    .kpi-card {
+        border-radius: 12px;
+        transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        overflow: hidden;
+        cursor: pointer;
+        border: none !important;
+
+        &:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.15) !important;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+    }
+
+    // Total Submissions - Primary Maroon (#541718)
+    .kpi-total {
+        background: linear-gradient(135deg, #541718 0%, #742526 100%);
+        .text-muted { color: rgba(255,255,255,0.85) !important; }
+        .fw-bold { color: white; }
+        .total-icon {
+            background: rgba(255,255,255,0.15);
+            color: #FAF1EB;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #541718 0%, #C17540 100%) !important;
+        }
+    }
+
+    // Draft - Secondary Pine Night (#1E2917)
+    .kpi-draft {
+        background: linear-gradient(135deg, #1E2917 0%, #304123 100%);
+        .text-muted { color: rgba(255,255,255,0.85) !important; }
+        .fw-bold { color: white; }
+        .draft-icon {
+            background: rgba(255,255,255,0.15);
+            color: #C8DCB8;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #726732 0%, #C17540 100%) !important;
+        }
+    }
+
+    // Submitted / In Review - Secondary Terracotta (#C17540)
+    .kpi-submitted {
+        background: linear-gradient(135deg, #C17540 0%, #A35E2F 100%);
+        .text-muted { color: rgba(255,255,255,0.85) !important; }
+        .fw-bold { color: white; }
+        .submitted-icon {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #726732 0%, #425727 100%) !important;
+        }
+    }
+
+    // Approved - Secondary Forest Olive (#425727)
+    .kpi-approved {
+        background: linear-gradient(135deg, #425727 0%, #597435 100%);
+        .text-muted { color: rgba(255,255,255,0.85) !important; }
+        .fw-bold { color: white; }
+        .approved-icon {
+            background: rgba(255,255,255,0.15);
+            color: #A3CF7C;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #425727 0%, #726732 100%) !important;
+        }
+    }
+
+    .kpi-icon {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+    }
+
+    // Plan Cards
+    .hover-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        border-radius: 12px;
+        border: 1px solid #e9ecef !important;
+
+        &:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0.75rem 1.5rem rgba(29, 43, 50, 0.12) !important;
+            border-color: $bunna-secondary !important;
+        }
+
+        .card-header {
+            border-bottom: 1px solid #e9ecef;
+        }
+    }
+
+    .plan-icon {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 16px;
+    }
+
+    // Status Items with Bunna Bank Colors
+    .status-item {
+        padding: 8px 12px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+
+        &.clickable:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+    }
+
+    .total-item {
+        background: #EAEFF2;
+        border-left-color: $bunna-primary-slate;
+        .fw-bold { color: $bunna-primary-slate; }
+    }
+
+    .draft-item {
+        background: #EAECE8;
+        border-left-color: $bunna-secondary-pine;
+        .fw-bold { color: $bunna-secondary-pine; }
+    }
+
+    .submitted-item {
+        background: #FAF1EB;
+        border-left-color: $bunna-secondary-terracotta;
+        .fw-bold { color: $bunna-secondary-terracotta; }
+    }
+
+    .endorsed-item {
+        background: #F6F4EB;
+        border-left-color: $bunna-secondary-bronze;
+        .fw-bold { color: $bunna-secondary-bronze; }
+    }
+
+    .ho-item {
+        background: #EDF3E8;
+        border-left-color: $bunna-secondary-forest;
+        .fw-bold { color: $bunna-secondary-forest; }
+    }
+
+    .approved-item {
+        background: #EDF3E8;
+        border-left-color: $bunna-secondary-forest;
+        .fw-bold { color: $bunna-secondary-forest; }
+    }
+
+    .returned-item {
+        background: #F6EBEB;
+        border-left-color: $bunna-primary-maroon;
+        .fw-bold { color: $bunna-primary-maroon; }
+    }
+
+    // Progress Bar - Bunna Brand Colors
+    .progress {
+        border-radius: 6px;
+        background-color: #e9ecef;
+        cursor: pointer;
+
+        .progress-approved {
+            border-radius: 6px;
+            background: linear-gradient(90deg, $bunna-primary 0%, $bunna-secondary 100%) !important;
+            transition: width 0.6s ease;
+        }
+
+        &:hover {
+            box-shadow: 0 2px 8px rgba(29, 43, 50, 0.2);
+        }
+    }
+
+    // Chart Colors - Bunna Bank Palette
+    .chart-container {
+        .card-header {
+            background: white;
+            border-bottom: 2px solid $bunna-secondary;
+        }
+    }
+
+    // Canvas cursor
+    canvas {
+        width: 100% !important;
+        height: 100% !important;
+        cursor: pointer;
+    }
+
+    // Form Select - Bunna Brand
+    .form-select {
+        min-width: 150px;
+        border-radius: 8px;
+        border: 2px solid #dee2e6;
+
+        &:focus {
+            border-color: $bunna-primary;
+            box-shadow: 0 0 0 0.2rem rgba(29, 43, 50, 0.25);
+        }
+    }
+
+    // Pagination - Bunna Brand
+    .pagination {
+        .page-item {
+            .page-link {
+                color: $bunna-primary;
+                cursor: pointer;
+                border-radius: 6px;
+                margin: 0 2px;
+                border: none;
+                background: transparent;
+
+                &:hover {
+                    background: rgba(29, 43, 50, 0.08);
+                    color: $bunna-primary;
+                }
+            }
+            &.active .page-link {
+                background: $bunna-primary;
+                color: white;
+                border: none;
+            }
+            &.disabled .page-link {
+                cursor: not-allowed;
+                opacity: 0.5;
+                background: transparent;
+            }
+        }
+    }
+
+    // Cards
+    .card {
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-header {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        padding: 1rem 1.25rem;
+        background: white;
+    }
+
+    // Button styles - Bunna Bank
+    .btn-secondary {
+        background: #EAECE8 !important;
+        border: 1px solid #CCD3C5 !important;
+        color: $bunna-secondary !important;
+        font-weight: 600;
+
+        &:hover {
+            background: $bunna-secondary !important;
+            border-color: $bunna-secondary !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+        }
+    }
+
+    .btn-outline-secondary {
+        color: $bunna-secondary;
+        border-color: $bunna-secondary;
+
+        &:hover {
+            background: $bunna-secondary;
+            color: white;
+            border-color: $bunna-secondary;
+        }
+    }
+
+    // Badge colors
+    .badge {
+        &.bg-primary { background: $bunna-primary !important; }
+        &.bg-secondary { background: $bunna-secondary !important; }
+        &.bg-success { background: $bunna-success !important; }
+        &.bg-info { background: $bunna-info !important; }
+        &.bg-warning { background: $bunna-warning !important; }
+        &.bg-danger { background: $bunna-danger !important; }
+    }
+
+    // Text colors
+    .text-primary { color: $bunna-primary !important; }
+    .text-secondary { color: $bunna-secondary !important; }
+    .text-success { color: $bunna-success !important; }
+    .text-info { color: $bunna-info !important; }
+    .text-warning { color: $bunna-warning !important; }
+    .text-danger { color: $bunna-danger !important; }
+
+    // Responsive
+    @media (max-width: 768px) {
+        padding: 1rem;
+
+        .dashboard-header {
+            flex-direction: column;
+            align-items: stretch;
+
+            .d-flex {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+
+                .form-select {
+                    width: 100% !important;
+                }
+            }
+        }
+
+        .kpi-card {
+            .fs-2 {
+                font-size: 1.5rem;
+            }
+        }
+
+        .col-xl-4, .col-xl-8 {
+            .card-body {
+                height: 250px !important;
+            }
+        }
+    }
+
+    @media (max-width: 576px) {
+        .status-item {
+            padding: 4px 8px;
+            font-size: 0.875rem;
+        }
+    }
+}

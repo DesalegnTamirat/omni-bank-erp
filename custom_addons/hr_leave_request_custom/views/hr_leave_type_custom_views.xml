@@ -2,7 +2,7 @@
 <odoo>
 
     <!-- ============================================================
-         Custom Time Off Type Form View - Streamlined to only needed fields
+         Custom Time Off Type Form View
          ============================================================ -->
     <record id="view_hr_leave_type_form_inherit_custom" model="ir.ui.view">
         <field name="name">hr.leave.type.form.inherit.custom</field>
@@ -18,6 +18,7 @@
             <xpath expr="//field[@name='responsible_ids']" position="attributes">
                 <attribute name="invisible">True</attribute>
             </xpath>
+            <!-- Keep leave_validation group hidden but expose just the approval field in our section below -->
             <xpath expr="//group[@name='leave_validation']" position="attributes">
                 <attribute name="invisible">True</attribute>
             </xpath>
@@ -31,19 +32,24 @@
                 <attribute name="invisible">True</attribute>
             </xpath>
 
-            <!-- Add custom clean Rules & Configuration section -->
+            <!-- Custom Configuration & Rules Section -->
             <xpath expr="//group[hasclass('mw-100')]" position="before">
                 <group string="Configuration &amp; Rules">
                     <group>
                         <field name="check_accrual_balance" widget="boolean_toggle"/>
+                        <field name="is_scheduled_leave" widget="boolean_toggle"/>
+                        <field name="is_lwp" widget="boolean_toggle"/>
                         <field name="is_exact_days" widget="boolean_toggle"/>
                         <field name="exact_days" invisible="not is_exact_days" placeholder="e.g. 30.0"/>
                         <field name="max_allowed_days" placeholder="0.0 = no maximum limit"/>
                     </group>
                     <group>
+                        <field name="gender_rule" widget="radio"/>
+                        <field name="allowed_group"/>
                         <field name="include_public_holidays_in_duration"/>
                         <field name="support_document" string="Require Supporting Document" widget="boolean_toggle"/>
                         <field name="hide_on_dashboard"/>
+                        <field name="leave_validation_type" string="Approval"/>
                     </group>
                 </group>
             </xpath>

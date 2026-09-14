@@ -96,30 +96,39 @@ class CompetencyMatrixConfig(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        self.env.registry.clear_cache()
+        self.clear_caches()
         return records
 
     def write(self, vals):
         res = super().write(vals)
-        self.env.registry.clear_cache()
+        self.clear_caches()
+        weight_fields = {'weight_self', 'weight_peer', 'weight_subordinate', 'weight_supervisor', 'weight_team'}
+        if set(vals.keys()) & weight_fields:
+            all_lines = self.env['competency.assessment.line'].sudo().search([])
+            all_lines.with_context(skip_360_recompute=True)._compute_360_ratings()
         return res
-
-    @api.model
-    def get_active_config(self):
-        """Helper to return singleton active matrix configuration record."""
-        config_id = self._get_active_config_id()
-        return self.browse(config_id)
 
     @api.model
     @tools.ormcache()
     def _get_active_config_id(self):
-        """Helper to get/cache the ID of the active matrix configuration."""
+        """Return cached ID of singleton active matrix configuration record."""
         config = self.search([], limit=1)
         if not config:
             config = self.create({'name': 'Bunna Bank Competency Matrix Configuration'})
+        return config.id
+
+    @api.model
+    def get_active_config(self):
+        """Helper to return singleton active matrix configuration record bound to current environment."""
+        config_id = self._get_active_config_id()
+        config = self.browse(config_id)
+        if not config.exists():
+            self.clear_caches()
+            config_id = self._get_active_config_id()
+            config = self.browse(config_id)
         if not config.grade_matrix_line_ids or not config.job_matrix_line_ids:
             config._seed_matrix_guidelines()
-        return config.id
+        return config
 
     def _seed_matrix_guidelines(self):
         """Pre-populate Job Grade Matrix Guidelines and Job Position Matrix Guidelines."""

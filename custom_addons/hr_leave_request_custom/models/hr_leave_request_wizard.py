@@ -19,6 +19,7 @@ class HrLeaveRequestWizard(models.TransientModel):
     workflow, and is auto-vacuumed by Odoo.
 
     The REAL hr.leave record is only ever created inside
+    The REAL hr.leave record is only ever created inside
     action_wizard_save / action_wizard_notify — i.e. only when the user
     explicitly clicks "Save" or "Notify Request".
     """
@@ -54,9 +55,10 @@ class HrLeaveRequestWizard(models.TransientModel):
     computed_leave = fields.Float(string='Computed Leave', digits=(16, 2), readonly=True)
     number_of_days = fields.Float(string='Duration (Days)', default=0.0)
     half_day_type = fields.Selection([
-        ('start', 'Starting Half Day'),
-        ('end', 'Ending Half Day'),
-    ], string='Select Half Day', default='end')
+        ('start', 'Starting Half Day (Starts in Afternoon)'),
+        ('end', 'Ending Half Day (Ends in Morning)'),
+        ('both', 'Both (Starts Afternoon & Ends Morning)'),
+    ], string='Select Half Day', default='start')
 
     holiday_status_id = fields.Many2one('hr.leave.type', string='Leave Reason')
     attachment = fields.Binary(string='Attachment')

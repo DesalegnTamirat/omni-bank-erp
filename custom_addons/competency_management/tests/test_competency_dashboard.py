@@ -15,32 +15,29 @@ class TestCompetencyDashboard(TransactionCase):
             })
 
     def test_01_dashboard_metrics_and_persona(self):
-        """Test competency dashboard singleton instantiation, metric computations, and persona switching."""
-        dashboard = self.env['competency.dashboard'].create({
-            'cycle_id': self.cycle.id,
-            'persona_role': 'executive',
-        })
-        self.assertTrue(dashboard.cycle_name)
-        self.assertGreaterEqual(dashboard.total_active_competencies, 0)
-        self.assertEqual(dashboard.persona_role, 'executive')
+        """Fix 3: Test competency dashboard get_dashboard_data RPC method and persona switching."""
+        dashboard_model = self.env['competency.dashboard']
+        data = dashboard_model.get_dashboard_data(cycle_id=self.cycle.id, persona='executive')
+        self.assertTrue(data.get('stats'))
+        self.assertIn('total_assessments', data['stats'])
+        self.assertGreaterEqual(data['stats']['total_assessments'], 0)
 
-        # Test persona switching
-        dashboard.persona_role = 'hrbp'
-        self.assertEqual(dashboard.persona_role, 'hrbp')
+        # Test persona switching via RPC get_dashboard_data
+        data_hrbp = dashboard_model.get_dashboard_data(cycle_id=self.cycle.id, persona='hrbp')
+        self.assertEqual(data_hrbp['persona'], 'hrbp')
 
-        dashboard.persona_role = 'manager'
-        self.assertEqual(dashboard.persona_role, 'manager')
+        data_manager = dashboard_model.get_dashboard_data(cycle_id=self.cycle.id, persona='manager')
+        self.assertEqual(data_manager['persona'], 'manager')
 
-        dashboard.persona_role = 'employee'
-        self.assertEqual(dashboard.persona_role, 'employee')
+        data_emp = dashboard_model.get_dashboard_data(cycle_id=self.cycle.id, persona='employee')
+        self.assertEqual(data_emp['persona'], 'employee')
 
-    def test_02_heatmap_html_generation(self):
-        """Test Department x Pillar gap heat map HTML rendering."""
-        dashboard = self.env['competency.dashboard'].create({
-            'cycle_id': self.cycle.id,
-        })
-        self.assertTrue(dashboard.heatmap_html)
-        self.assertIn('Department × Pillar Competency Gap Heat Map', str(dashboard.heatmap_html))
+    def test_02_heatmap_rows_generation(self):
+        """Fix 3 & Fix 5: Test Department x Pillar gap heatmap data returned by get_dashboard_data."""
+        dashboard_model = self.env['competency.dashboard']
+        data = dashboard_model.get_dashboard_data(cycle_id=self.cycle.id)
+        self.assertIn('heatmap_rows', data)
+        self.assertIsInstance(data['heatmap_rows'], list)
 
     def test_03_dashboard_snapshot_cron_deduplication(self):
         """Test automated snapshot generation cron with active cycle guards & deduplication (FR-RPT-010)."""
@@ -59,6 +56,6 @@ class TestCompetencyDashboard(TransactionCase):
 
     def test_04_scheduled_report_distribution_cron(self):
         """Test scheduled email report distribution cron with supervisor group support (FR-RPT-008)."""
-        dashboard_model = self.env['competency.dashboard']
-        res = dashboard_model._cron_send_scheduled_competency_reports()
+        snapshot_model = self.env['competency.dashboard.snapshot']
+        res = snapshot_model._cron_send_scheduled_competency_reports()
         self.assertIsNotNone(res)

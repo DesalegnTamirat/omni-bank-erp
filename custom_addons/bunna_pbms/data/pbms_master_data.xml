@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Deposit product types (BRD 8.1 Deposit Mobilization Plan) -->
+    <record id="deposit_type_savings" model="pbms.deposit.type">
+        <field name="name">Savings Deposit</field>
+        <field name="code">SAV</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="deposit_type_demand" model="pbms.deposit.type">
+        <field name="name">Demand Deposit</field>
+        <field name="code">DEM</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="deposit_type_time" model="pbms.deposit.type">
+        <field name="name">Time Deposit</field>
+        <field name="code">TIME</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="deposit_type_ifb" model="pbms.deposit.type">
+        <field name="name">IFB Deposit</field>
+        <field name="code">IFB</field>
+        <field name="sequence">40</field>
+        <field name="is_ifb">True</field>
+    </record>
+
+    <!-- Fixed asset categories (BRD 8.1 Fixed Asset Requirement Plan) -->
+    <record id="fa_category_computer" model="pbms.fixed.asset.category">
+        <field name="name">Computer and Accessories</field>
+        <field name="code">FA-COMP</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="fa_category_building" model="pbms.fixed.asset.category">
+        <field name="name">Buildings</field>
+        <field name="code">FA-BLDG</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="fa_category_furniture" model="pbms.fixed.asset.category">
+        <field name="name">Office Furniture and Fittings</field>
+        <field name="code">FA-FURN</field>
+        <field name="sequence">30</field>
+    </record>
+    <record id="fa_category_equipment" model="pbms.fixed.asset.category">
+        <field name="name">Office Equipment</field>
+        <field name="code">FA-EQUIP</field>
+        <field name="sequence">40</field>
+    </record>
+    <record id="fa_category_it" model="pbms.fixed.asset.category">
+        <field name="name">Digital and IT Equipment</field>
+        <field name="code">FA-IT</field>
+        <field name="sequence">50</field>
+    </record>
+    <record id="fa_category_renovation" model="pbms.fixed.asset.category">
+        <field name="name">Office Renovation</field>
+        <field name="code">FA-RENOV</field>
+        <field name="sequence">60</field>
+    </record>
+    <record id="fa_category_initiative" model="pbms.fixed.asset.category">
+        <field name="name">Initiatives</field>
+        <field name="code">FA-INIT</field>
+        <field name="sequence">70</field>
+    </record>
+    <!-- Digital banking channels (BRD 8.1 Digital Banking Plan) -->
+    <record id="digital_channel_mobile_activation" model="pbms.digital.channel">
+        <field name="name">Mobile Banking Activation</field>
+        <field name="code">DIG-MOB</field>
+        <field name="sequence">10</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_atm_activation" model="pbms.digital.channel">
+        <field name="name">ATM Card Activation</field>
+        <field name="code">DIG-ATM</field>
+        <field name="sequence">20</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_active_merchant" model="pbms.digital.channel">
+        <field name="name">Active Merchant</field>
+        <field name="code">DIG-MERCH-ACT</field>
+        <field name="sequence">30</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+    <record id="digital_channel_quality_merchant" model="pbms.digital.channel">
+        <field name="name">Quality Merchant</field>
+        <field name="code">DIG-MERCH-QLY</field>
+        <field name="sequence">40</field>
+        <field name="unit_of_measure">count</field>
+    </record>
+
+    <!-- FX Source Types (Configurable Master Data) -->
+    <record id="fx_source_remittance_swift" model="pbms.fx.source.type">
+        <field name="name">Remittance - SWIFT</field>
+        <field name="code">remittance_swift</field>
+        <field name="sequence">10</field>
+    </record>
+    <record id="fx_source_cash_export" model="pbms.fx.source.type">
+        <field name="name">Cash Purchase - Export</field>
+        <field name="code">cash_export</field>
+        <field name="sequence">20</field>
+    </record>
+    <record id="fx_source_purchase_nbe_other" model="pbms.fx.source.type">
+        <field name="name">Purchase from NBE / Other Bank</field>
+        <field name="code">purchase_nbe_other</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <!-- Request Number Sequences -->
+    <record id="seq_pbms_workforce_request" model="ir.sequence">
+        <field name="name">Workforce / Manpower Plan Request</field>
+        <field name="code">pbms.workforce.request</field>
+        <field name="prefix">WFP/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_pbms_planning_request" model="ir.sequence">
+        <field name="name">PBMS Planning Request</field>
+        <field name="code">pbms.planning.request</field>
+        <field name="prefix">REQ/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <record id="seq_pbms_planning_category" model="ir.sequence">
+        <field name="name">PBMS Plan &amp; Budget Category Request</field>
+        <field name="code">pbms.planning.category</field>
+        <field name="prefix">REQ/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Business Justification Categories (Configurable Master Data) -->
+    <record id="justification_business_growth" model="pbms.justification.category">
+        <field name="name">Business Growth</field>
+        <field name="code">BUS_GROWTH</field>
+        <field name="sequence">10</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Workforce expansion directly supporting business volume and customer growth.</field>
+    </record>
+
+    <record id="justification_branch_expansion" model="pbms.justification.category">
+        <field name="name">New Branch Expansion</field>
+        <field name="code">BRANCH_EXP</field>
+        <field name="sequence">20</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Staffing required for opening new branch outlets or service centers.</field>
+    </record>
+
+    <record id="justification_regulatory" model="pbms.justification.category">
+        <field name="name">Regulatory Requirement</field>
+        <field name="code">REGULATORY</field>
+        <field name="sequence">30</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Positions mandated by National Bank of Ethiopia (NBE) or financial regulators.</field>
+    </record>
+
+    <record id="justification_digital_transformation" model="pbms.justification.category">
+        <field name="name">Digital Transformation</field>
+        <field name="code">DIGITAL_TRANS</field>
+        <field name="sequence">40</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Capabilities and roles needed to support digital channels and IT modernization.</field>
+    </record>
+
+    <record id="justification_increased_workload" model="pbms.justification.category">
+        <field name="name">Increased Workload</field>
+        <field name="code">WORKLOAD</field>
+        <field name="sequence">50</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Additional manpower to handle substantial growth in operational volume.</field>
+    </record>
+
+    <record id="justification_bpr" model="pbms.justification.category">
+        <field name="name">Business Process Reengineering</field>
+        <field name="code">BPR</field>
+        <field name="sequence">60</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Staffing adjustments arising from redesigned workflows and operating models.</field>
+    </record>
+
+    <record id="justification_operational_risk" model="pbms.justification.category">
+        <field name="name">Operational Risk</field>
+        <field name="code">OP_RISK</field>
+        <field name="sequence">70</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Positions required to mitigate operational risks, controls, and segregation of duties.</field>
+    </record>
+
+    <record id="justification_compliance" model="pbms.justification.category">
+        <field name="name">Compliance Requirement</field>
+        <field name="code">COMPLIANCE</field>
+        <field name="sequence">80</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Roles supporting legal, regulatory, and AML/CFT compliance standards.</field>
+    </record>
+
+    <record id="justification_customer_service" model="pbms.justification.category">
+        <field name="name">Customer Service Improvement</field>
+        <field name="code">CUST_SERVICE</field>
+        <field name="sequence">90</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Enhancing frontline service quality, customer satisfaction, and queue management.</field>
+    </record>
+
+    <record id="justification_new_product" model="pbms.justification.category">
+        <field name="name">New Product</field>
+        <field name="code">NEW_PRODUCT</field>
+        <field name="sequence">100</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Dedicated skills and manpower for launching and managing new banking products.</field>
+    </record>
+
+    <record id="justification_replacement" model="pbms.justification.category">
+        <field name="name">Replacement of Separated Employee</field>
+        <field name="code">REPLACEMENT</field>
+        <field name="sequence">110</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Filling an authorized vacant position following employee turnover or retirement.</field>
+    </record>
+
+    <record id="justification_restructuring" model="pbms.justification.category">
+        <field name="name">Organizational Restructuring</field>
+        <field name="code">RESTRUCTURING</field>
+        <field name="sequence">120</field>
+        <field name="requires_remarks">False</field>
+        <field name="description">Roles created or realigned as part of bank-wide or departmental reorganizations.</field>
+    </record>
+
+    <record id="justification_other" model="pbms.justification.category">
+        <field name="name">Other (Specify)</field>
+        <field name="code">OTHER</field>
+        <field name="sequence">130</field>
+        <field name="requires_remarks">True</field>
+        <field name="description">Other specific business needs (mandatory remarks must be provided).</field>
+    </record>
+
+    <!-- Manpower Position / Request Types (Configurable Master Data) -->
+    <record id="pos_type_new" model="pbms.position.type">
+        <field name="name">New Position</field>
+        <field name="code">new</field>
+        <field name="sequence">10</field>
+        <field name="is_new_position">True</field>
+    </record>
+    <record id="pos_type_additional" model="pbms.position.type">
+        <field name="name">Additional Position</field>
+        <field name="code">additional</field>
+        <field name="sequence">20</field>
+        <field name="is_new_position">False</field>
+    </record>
+
+    <!-- Sequence for Exceptional Workforce Request -->
+    <record id="seq_pbms_exceptional_workforce" model="ir.sequence">
+        <field name="name">Exceptional Workforce Request</field>
+        <field name="code">pbms.exceptional.workforce.request</field>
+        <field name="prefix">EWR/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+</odoo>

@@ -1,0 +1,76 @@
+.o_custom_leave_dashboard_banner {
+    width: 100% !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+
+    .o_dashboard_icon_badge {
+        width: 30px;
+        height: 30px;
+        background: #fdf5f5;
+        color: #541718;
+    }
+
+    .o_leave_kpi_card {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        &.o_accrued_card {
+            background: linear-gradient(135deg, #fdf5f5 0%, #f7e6e6 100%) !important;
+            border: 1px solid #ebd0d0 !important;
+            border-left: 5px solid #541718 !important;
+
+            .o_kpi_icon_wrapper {
+                background: #541718 !important;
+                color: #ffffff !important;
+            }
+            .o_kpi_label {
+                color: #541718 !important;
+            }
+            .o_kpi_subtext {
+                color: #726732 !important;
+            }
+            .o_kpi_value {
+                color: #541718 !important;
+            }
+            .o_kpi_unit {
+                color: #541718 !important;
+            }
+        }
+
+        &.o_scheduled_card {
+            background: linear-gradient(135deg, #fefaf6 0%, #faede2 100%) !important;
+            border: 1px solid #f3dccb !important;
+            border-left: 5px solid #c17540 !important;
+
+            .o_kpi_icon_wrapper {
+                background: #c17540 !important;
+                color: #ffffff !important;
+            }
+            .o_kpi_label {
+                color: #8f4a1c !important;
+            }
+            .o_kpi_subtext {
+                color: #726732 !important;
+            }
+            .o_kpi_value {
+                color: #c17540 !important;
+            }
+            .o_kpi_unit {
+                color: #c17540 !important;
+            }
+        }
+    }
+}
+
+.o_timeoff_dashboard {
+    flex-wrap: wrap !important;
+
+    .o_timeoff_card {
+        flex: 1 1 auto;
+        min-width: 180px;
+    }
+}

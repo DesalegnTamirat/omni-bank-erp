@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Exceptional Workforce Request: Card / Kanban View -->
+    <record id="view_pbms_exceptional_workforce_kanban" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.kanban</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_mobile" sample="1" quick_create="false">
+                <field name="id"/>
+                <field name="name"/>
+                <field name="state"/>
+                <field name="request_date"/>
+                <field name="initiator_id"/>
+                <field name="initiator_role"/>
+                <field name="operating_unit_id"/>
+                <field name="department_id"/>
+                <field name="job_id"/>
+                <field name="job_grade_id"/>
+                <field name="headcount"/>
+                <field name="employment_type"/>
+                <field name="sourcing_type" groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
+                <field name="can_view_sourcing_type"/>
+                <field name="color"/>
+                <field name="activity_state"/>
+                <progressbar field="state" colors='{"approved": "success", "ceo_review": "warning", "rejected": "danger", "returned": "muted", "people_solutions": "info", "cpco_review": "info"}'/>
+                <templates>
+                    <t t-name="card">
+                        <div class="card-body">
+                            <!-- Card Header: Request Number & State Badge -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold fs-6 text-primary">
+                                    <field name="name"/>
+                                </span>
+                                <field name="state" widget="badge"
+                                       decoration-info="state in ('people_solutions', 'cpco_review')"
+                                       decoration-warning="state == 'ceo_review'"
+                                       decoration-success="state == 'approved'"
+                                       decoration-danger="state == 'rejected'"
+                                       decoration-muted="state == 'returned'"/>
+                            </div>
+
+                            <!-- Position / Job Title -->
+                            <div class="fw-bold fs-5 text-dark mb-1">
+                                <i class="fa fa-briefcase text-muted me-1"/>
+                                <field name="job_id"/>
+                            </div>
+
+                            <!-- Operating Unit & Department -->
+                            <div class="text-muted small mb-2">
+                                <i class="fa fa-building-o me-1"/>
+                                <field name="operating_unit_id"/>
+                                <t t-if="record.department_id.raw_value">
+                                    <span> &amp;bull; </span>
+                                    <field name="department_id"/>
+                                </t>
+                            </div>
+
+                            <!-- Chips: Headcount, Grade, Type, Sourcing -->
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                                    <i class="fa fa-users me-1"/>
+                                    <field name="headcount"/> Position<t t-if="record.headcount.raw_value &gt; 1">s</t>
+                                </span>
+                                <t t-if="record.job_grade_id.raw_value">
+                                    <span class="badge bg-light text-secondary border px-2 py-1">
+                                        <i class="fa fa-id-badge me-1"/>
+                                        <field name="job_grade_id"/>
+                                    </span>
+                                </t>
+                                <span class="badge bg-light text-secondary border px-2 py-1 text-capitalize">
+                                    <field name="employment_type"/>
+                                </span>
+                                <t t-if="record.can_view_sourcing_type.raw_value and record.sourcing_type.raw_value">
+                                    <span class="badge bg-light text-secondary border px-2 py-1 text-capitalize">
+                                        <field name="sourcing_type"/>
+                                    </span>
+                                </t>
+                            </div>
+
+                            <!-- Card Footer: Initiator Avatar, Date, Activity -->
+                            <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                                <div class="d-flex align-items-center gap-1 small text-muted">
+                                    <field name="initiator_id" widget="many2one_avatar_user"/>
+                                    <span class="text-truncate" style="max-width: 110px;">
+                                        <field name="initiator_id"/>
+                                    </span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted small">
+                                        <field name="request_date"/>
+                                    </span>
+                                    <field name="activity_ids" widget="kanban_activity"/>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Tree / List View -->
+    <record id="view_pbms_exceptional_workforce_tree" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.list</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <list string="Exceptional Workforce Requests"
+                  sample="1"
+                  multi_edit="1"
+                  decoration-info="state in ('people_solutions', 'cpco_review')"
+                  decoration-warning="state == 'ceo_review'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-muted="state == 'returned'">
+                <field name="name" string="Request #" decoration-bf="1"/>
+                <field name="request_date"/>
+                <field name="initiator_id" widget="many2one_avatar_user"/>
+                <field name="initiator_role" optional="show"/>
+                <field name="operating_unit_id"/>
+                <field name="department_id" optional="show"/>
+                <field name="job_id"/>
+                <field name="job_grade_id" optional="show"/>
+                <field name="headcount" sum="Total Headcount"/>
+                <field name="employment_type"/>
+                <field name="sourcing_type" optional="show"
+                       groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
+                <field name="recruitment_request_reference" optional="hide"/>
+                <field name="company_id" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-info="state in ('people_solutions', 'cpco_review')"
+                       decoration-warning="state == 'ceo_review'"
+                       decoration-success="state == 'approved'"
+                       decoration-danger="state == 'rejected'"
+                       decoration-muted="state == 'returned'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Form View -->
+    <record id="view_pbms_exceptional_workforce_form" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.form</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <form string="Exceptional Workforce Request">
+                <header>
+                    <!-- Export to Excel Action Button -->
+                    <button name="action_export_excel"
+                            string="Export to Excel"
+                            type="object"
+                            icon="fa-file-excel-o"
+                            class="btn btn-outline-secondary"/>
+
+                    <!-- District Reviewer Action: Submit to People Solutions -->
+                    <button name="action_submit"
+                            string="Submit to People Solutions"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_district_submit"
+                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
+
+                    <!-- People Solutions Directorate Actions -->
+                    <button name="action_people_solutions_escalate"
+                            string="Assess &amp; Escalate to CPCO"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_people_solutions_action"
+                            groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_return_wizard)d"
+                            string="Return for Revision"
+                            type="action"
+                            class="btn-warning text-white"
+                            invisible="not can_people_solutions_action"
+                            groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d"
+                            string="Reject Request"
+                            type="action"
+                            class="btn-danger"
+                            invisible="not can_people_solutions_action"
+                            groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_manager"/>
+
+                    <!-- CPCO Actions -->
+                    <button name="action_cpco_submit_memo"
+                            string="Submit Memo to CEO"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="not can_cpco_action"
+                            groups="bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_return_wizard)d"
+                            string="Return for Revision"
+                            type="action"
+                            class="btn-warning text-white"
+                            invisible="not can_cpco_action"
+                            groups="bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d"
+                            string="Reject Request"
+                            type="action"
+                            class="btn-danger"
+                            invisible="not can_cpco_action"
+                            groups="bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_manager"/>
+
+                    <!-- CEO Decision Actions -->
+                    <button name="action_ceo_approve"
+                            string="Approve Request"
+                            type="object"
+                            class="btn-success"
+                            confirm="Are you sure you want to approve this Exceptional Workforce Request?"
+                            invisible="not can_ceo_action"
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="%(bunna_pbms.action_pbms_exceptional_reject_wizard)d"
+                            string="Reject Request"
+                            type="action"
+                            class="btn-danger"
+                            invisible="not can_ceo_action"
+                            groups="bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager"/>
+
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,people_solutions,cpco_review,ceo_review,approved"/>
+                </header>
+                <sheet>
+                    <!-- Client-side permission evaluation flags -->
+                    <field name="eligible_job_ids" invisible="1"/>
+                    <field name="can_district_edit" invisible="1"/>
+                    <field name="can_district_submit" invisible="1"/>
+                    <field name="can_people_solutions_edit" invisible="1"/>
+                    <field name="can_people_solutions_action" invisible="1"/>
+                    <field name="can_cpco_edit" invisible="1"/>
+                    <field name="can_cpco_action" invisible="1"/>
+                    <field name="can_ceo_edit" invisible="1"/>
+                    <field name="can_ceo_action" invisible="1"/>
+                    <field name="can_view_sourcing_type" invisible="1"/>
+                    <field name="can_edit_sourcing_type" invisible="1"/>
+                    <field name="can_edit" invisible="1"/>
+
+                    <!-- Alert Banner for Returned Requests -->
+                    <div class="alert alert-warning mb-3" role="alert" invisible="state != 'returned'">
+                        <strong><i class="fa fa-exclamation-triangle"/> Returned for Revision: </strong>
+                        <field name="return_reason" readonly="1" class="d-inline ms-1"/>
+                    </div>
+
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_recruitment_request"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-briefcase"
+                                invisible="not recruitment_request_reference">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Recruitment</span>
+                                <span class="o_stat_value"><field name="recruitment_request_reference"/></span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <span class="o_form_label">Exceptional Workforce Request</span>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Initiator &amp; Work Unit">
+                            <field name="initiator_id" widget="many2one_avatar_user" readonly="not can_district_edit"/>
+                            <field name="initiator_role" readonly="not can_district_edit"/>
+                            <field name="request_date" readonly="not can_district_edit"/>
+                            <field name="operating_unit_id" readonly="not can_district_edit"/>
+                            <field name="department_id" readonly="not can_district_edit"/>
+                            <field name="company_id" invisible="1"/>
+                        </group>
+                        <group string="Position &amp; Requirement Details">
+                            <field name="job_id" domain="[('id', 'in', eligible_job_ids)]" options="{'no_create': True, 'no_open': True}" readonly="not can_edit"/>
+                            <field name="job_grade_id" readonly="not can_edit" force_save="1"/>
+                            <field name="headcount" readonly="not can_edit"/>
+                            <field name="employment_type" readonly="not can_edit"/>
+                            <field name="sourcing_type"
+                                   groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"
+                                   invisible="not can_view_sourcing_type"
+                                   readonly="not can_edit_sourcing_type"
+                                   required="state in ('people_solutions', 'cpco_review', 'ceo_review') and can_edit_sourcing_type"/>
+                        </group>
+                    </group>
+
+                    <group string="Business Justification &amp; Supporting Documents">
+                        <field name="justification" readonly="not can_edit" placeholder="Explain the mid-year operational need, critical gap, or business justification..."/>
+                        <field name="supporting_doc_ids" widget="many2many_binary" readonly="not can_edit"/>
+                    </group>
+
+                    <notebook>
+                        <page string="People Solutions Assessment" name="page_people_solutions" invisible="state == 'draft'">
+                            <group>
+                                <group>
+                                    <field name="people_solutions_reviewer_id" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="people_solutions_review_date" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Assessment &amp; Remarks">
+                                <field name="people_solutions_assessment" readonly="not can_people_solutions_edit" placeholder="Reviewer assessment, justification verification, headcount impact analysis..."/>
+                            </group>
+                        </page>
+
+                        <page string="CPCO Memo to CEO" name="page_cpco_memo" invisible="state in ('draft', 'people_solutions')">
+                            <group>
+                                <group>
+                                    <field name="cpco_reviewer_id" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="cpco_submission_date" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Recommendation Memo">
+                                <field name="cpco_memo" readonly="not can_cpco_edit" placeholder="Formal recommendation and justification memo to the CEO..."/>
+                            </group>
+                        </page>
+
+                        <page string="CEO Decision" name="page_ceo_decision" invisible="state in ('draft', 'people_solutions', 'cpco_review')">
+                            <group>
+                                <group>
+                                    <field name="ceo_decision" readonly="1"/>
+                                    <field name="ceo_decision_recorded_by" readonly="1"/>
+                                    <field name="ceo_decision_date" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="ceo_approver_id" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Remarks &amp; Feedback">
+                                <field name="ceo_decision_remarks" readonly="not can_ceo_edit"/>
+                                <field name="rejection_reason" invisible="state != 'rejected'" readonly="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Recruitment Action" name="page_recruitment_action" invisible="state != 'approved'">
+                            <group>
+                                <group string="People Operations &amp; Management Directorate">
+                                    <field name="recruitment_request_reference" readonly="1"/>
+                                    <field name="vacancy_reference" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter reload_on_attachment="True"/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Pivot View -->
+    <record id="view_pbms_exceptional_workforce_pivot" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.pivot</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <pivot string="Exceptional Workforce Analysis" sample="1">
+                <field name="operating_unit_id" type="row"/>
+                <field name="job_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="headcount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Graph View -->
+    <record id="view_pbms_exceptional_workforce_graph" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.graph</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <graph string="Exceptional Workforce Demand" type="bar" sample="1">
+                <field name="operating_unit_id"/>
+                <field name="headcount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Activity View -->
+    <record id="view_pbms_exceptional_workforce_activity" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.activity</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <activity string="Exceptional Workforce Requests">
+                <field name="job_id"/>
+                <field name="operating_unit_id"/>
+                <field name="headcount"/>
+                <templates>
+                    <div t-name="activity-box">
+                        <div>
+                            <field name="name" display="full" class="fw-bold"/>
+                            <div class="text-muted small">
+                                <field name="job_id"/> (<field name="headcount"/> pos) - <field name="operating_unit_id"/>
+                            </div>
+                        </div>
+                    </div>
+                </templates>
+            </activity>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Calendar View -->
+    <record id="view_pbms_exceptional_workforce_calendar" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.calendar</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <calendar string="Exceptional Workforce Schedule"
+                      date_start="request_date"
+                      color="state"
+                      mode="month"
+                      hide_time="true"
+                      event_limit="5">
+                <field name="name"/>
+                <field name="job_id"/>
+                <field name="operating_unit_id"/>
+                <field name="headcount"/>
+                <field name="state" filters="1"/>
+            </calendar>
+        </field>
+    </record>
+
+    <!-- Exceptional Workforce Request: Search View -->
+    <record id="view_pbms_exceptional_workforce_search" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.request.search</field>
+        <field name="model">pbms.exceptional.workforce.request</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name" string="Request Number"/>
+                <field name="job_id" string="Position"/>
+                <field name="operating_unit_id" string="Work Unit"/>
+                <field name="department_id" string="Department"/>
+                <field name="initiator_id" string="Initiator"/>
+                <field name="recruitment_request_reference" string="Recruitment Reference"/>
+
+                <!-- Stage Filters -->
+                <filter name="my_requests" string="My Requests" domain="[('initiator_id', '=', uid)]"/>
+                <separator/>
+                <filter name="pending" string="Pending Action"
+                        domain="[('state', 'in', ('draft', 'returned', 'people_solutions', 'cpco_review', 'ceo_review'))]"/>
+                <filter name="draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="returned" string="Returned for Revision" domain="[('state', '=', 'returned')]"/>
+                <filter name="people_solutions" string="People Solutions Review" domain="[('state', '=', 'people_solutions')]"/>
+                <filter name="cpco_review" string="CPCO Review" domain="[('state', '=', 'cpco_review')]"/>
+                <filter name="ceo_review" string="Pending CEO Approval" domain="[('state', '=', 'ceo_review')]"/>
+                <filter name="approved" string="Approved" domain="[('state', '=', 'approved')]"/>
+                <filter name="rejected" string="Rejected" domain="[('state', '=', 'rejected')]"/>
+
+                <!-- Employment & Sourcing Filters -->
+                <separator/>
+                <filter name="permanent" string="Permanent" domain="[('employment_type', '=', 'permanent')]"/>
+                <filter name="contractual" string="Contractual" domain="[('employment_type', '=', 'contractual')]"/>
+                <filter name="internal_sourcing" string="Internal Sourcing" domain="[('sourcing_type', '=', 'internal')]"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
+                <filter name="external_sourcing" string="External Sourcing" domain="[('sourcing_type', '=', 'external')]"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
+
+                <!-- Activity Filters -->
+                <separator/>
+                <filter name="activities_overdue" string="Late Activities"
+                        domain="[('my_activity_date_deadline', '&lt;', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="activities_today" string="Today's Activities"
+                        domain="[('my_activity_date_deadline', '=', context_today().strftime('%Y-%m-%d'))]"/>
+                <filter name="activities_upcoming_all" string="Future Activities"
+                        domain="[('my_activity_date_deadline', '&gt;', context_today().strftime('%Y-%m-%d'))]"/>
+
+                <!-- Group By Filters -->
+                <separator/>
+                <filter name="group_state" string="Status" domain="[]" context="{'group_by': 'state'}"/>
+                <filter name="group_operating_unit" string="Work Unit" domain="[]" context="{'group_by': 'operating_unit_id'}"/>
+                <filter name="group_department" string="Department" domain="[]" context="{'group_by': 'department_id'}"/>
+                <filter name="group_job" string="Position" domain="[]" context="{'group_by': 'job_id'}"/>
+                <filter name="group_job_grade" string="Job Grade" domain="[]" context="{'group_by': 'job_grade_id'}"/>
+                <filter name="group_employment_type" string="Employment Type" domain="[]" context="{'group_by': 'employment_type'}"/>
+                <filter name="group_sourcing_type" string="Sourcing Type" domain="[]" context="{'group_by': 'sourcing_type'}"
+                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
+                <filter name="group_initiator" string="Initiator" domain="[]" context="{'group_by': 'initiator_id'}"/>
+                <filter name="group_request_date" string="Request Date" domain="[]" context="{'group_by': 'request_date:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Window Action: Exceptional Workforce Requests -->
+    <record id="action_pbms_exceptional_workforce" model="ir.actions.act_window">
+        <field name="name">Exceptional Workforce Requests</field>
+        <field name="res_model">pbms.exceptional.workforce.request</field>
+        <field name="view_mode">kanban,list,form,pivot,graph,activity,calendar</field>
+        <field name="search_view_id" ref="view_pbms_exceptional_workforce_search"/>
+        <field name="context">{'search_default_pending': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create an Exceptional Workforce Request
+            </p>
+            <p>
+                Use this to request mid-year workforce needs that were not included in the approved annual workforce plan.
+            </p>
+        </field>
+    </record>
+
+    <!-- Server Action: Export to Excel from Exceptional Workforce Requests (appears in Action ⚙ menu) -->
+    <record id="action_server_export_exceptional_workforce_excel" model="ir.actions.server">
+        <field name="name">Export to Excel</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="binding_model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="binding_view_types">form,list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = (records or model.browse(env.context.get('active_ids', [])) or model.browse(env.context.get('active_id', []))).action_export_excel()
+        </field>
+    </record>
+
+</odoo>

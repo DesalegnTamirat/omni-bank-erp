@@ -4,7 +4,11 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRoleMapping(models.Model):
-    """Role-Competency mapping: master reference for assessment & gap analysis (FR-COM-006, FR-MAP-001..006)."""
+    """Role-Competency mapping: master reference for assessment & gap analysis (FR-COM-006, FR-MAP-001..006).
+    
+    NOTE: Shared globally across all companies (intentionally not company-scoped
+    to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
+    """
     _name = 'competency.role.mapping'
     _description = 'Role-Competency Mapping'
     _inherit = ['mail.thread']
@@ -153,6 +157,8 @@ class CompetencyRoleMapping(models.Model):
 
     def action_approve(self):
         """Under Approval -> Approved with version supersession."""
+        if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
+            raise UserError(_("Only Competency Administrators can approve role-competency mappings."))
         for rec in self:
             prior_approved = self.search([
                 ('job_position_id', '=', rec.job_position_id.id),
@@ -428,3 +434,26 @@ class CompetencyRoleMappingLine(models.Model):
         for line in self:
             if line.mapping_id and line.mapping_id.state != 'draft' and not self.env.context.get('force_write') and not self.env.su:
                 raise ValidationError(_('Cannot delete lines from a role-competency mapping (%s) that is not in Draft state. Please create a new version.') % line.mapping_id.mapping_name)
+
+
+class HrJob(models.Model):
+    _inherit = 'hr.job'
+
+    competency_mapping_ids = fields.One2many('competency.role.mapping', 'job_position_id', string='Competency Mappings')
+    competency_mapping_count = fields.Integer(string='Competency Mapping Count', compute='_compute_competency_mapping_count')
+
+    @api.depends('competency_mapping_ids')
+    def _compute_competency_mapping_count(self):
+        for job in self:
+            job.competency_mapping_count = len(job.competency_mapping_ids)
+
+    def action_view_competency_mappings(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Role-Competency Mapping for %s') % self.display_name,
+            'res_model': 'competency.role.mapping',
+            'view_mode': 'list,form',
+            'domain': [('job_position_id', '=', self.id)],
+            'context': {'default_job_position_id': self.id},
+        }

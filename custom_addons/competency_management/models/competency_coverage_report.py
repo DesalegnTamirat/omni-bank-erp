@@ -30,11 +30,11 @@ class CompetencyCoverageReport(models.Model):
                     COALESCE(j.name->>'en_US', j.name::text) AS job_name,
                     j.department_id AS department_id,
                     CASE
-                        WHEN (SELECT m.state FROM competency_role_mapping m WHERE m.job_position_id = j.id AND m.state = 'approved' ORDER BY m.id DESC LIMIT 1) = 'approved' THEN 'mapped'
+                        WHEN approved_map.state = 'approved' THEN 'mapped'
                         WHEN EXISTS (SELECT 1 FROM competency_role_mapping m WHERE m.job_position_id = j.id AND m.state IN ('draft', 'under_approval')) THEN 'draft'
                         ELSE 'unmapped'
                     END AS mapping_status,
-                    (SELECT m.version FROM competency_role_mapping m WHERE m.job_position_id = j.id AND m.state = 'approved' ORDER BY m.id DESC LIMIT 1) AS active_version,
+                    approved_map.version AS active_version,
                     COALESCE((
                         SELECT COUNT(l.id)
                         FROM competency_role_mapping_line l
@@ -42,6 +42,13 @@ class CompetencyCoverageReport(models.Model):
                         WHERE m.job_position_id = j.id AND m.state = 'approved'
                     ), 0) AS mapped_competencies_count
                 FROM hr_job j
+                LEFT JOIN LATERAL (
+                    SELECT m.state, m.version
+                    FROM competency_role_mapping m
+                    WHERE m.job_position_id = j.id AND m.state = 'approved'
+                    ORDER BY m.id DESC
+                    LIMIT 1
+                ) approved_map ON TRUE
                 WHERE j.active = TRUE
             )
         """)

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Target Cascade Wizard Form View -->
+    <record id="view_pbms_target_cascade_wizard_form" model="ir.ui.view">
+        <field name="name">pbms.target.cascade.wizard.form</field>
+        <field name="model">pbms.target.cascade.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Target Cascading &amp; Allocation">
+                <sheet>
+                    <div class="alert alert-info py-2 mb-3" role="status">
+                        <i class="fa fa-sitemap me-2"/>
+                        <span invisible="cascade_level != 'ho_to_district'">
+                            <b>Tier 1 Cascade (Corporate &#8594; Districts):</b> Divide and allocate the approved corporate target across District Offices.
+                        </span>
+                        <span invisible="cascade_level != 'district_to_branch'">
+                            <b>Tier 2 Cascade (District &#8594; Branches):</b> Divide and cascade your District target quota across all Child Branches.
+                        </span>
+                    </div>
+
+                    <group>
+                        <group string="Source &amp; Category">
+                            <field name="plan_id" readonly="1" options="{'no_open': True}"/>
+                            <field name="cycle_id" readonly="1"/>
+                            <field name="source_org_unit_id" readonly="1"/>
+                            <field name="cascade_level" widget="radio"/>
+                            <field name="category"/>
+                            <field name="cascade_scope" widget="radio"/>
+                        </group>
+                        <group string="Target Quota &amp; Distribution">
+                            <field name="deposit_type_id" invisible="category != 'deposit' or cascade_scope != 'single_product'" required="category == 'deposit' and cascade_scope == 'single_product'" options="{'no_create': True}"/>
+                            <field name="deposit_type_id" string="Account Type" invisible="category != 'customer_base' or cascade_scope != 'single_product'" options="{'no_create': True}"/>
+                            <field name="base_type" invisible="category != 'customer_base' or cascade_scope != 'single_product'"/>
+                            <field name="fx_source_type" invisible="category != 'fx' or cascade_scope != 'single_product'" required="category == 'fx' and cascade_scope == 'single_product'" options="{'no_create': True}"/>
+                            <field name="channel_id" invisible="category != 'digital_banking' or cascade_scope != 'single_product'" required="category == 'digital_banking' and cascade_scope == 'single_product'" options="{'no_create': True}"/>
+                            <field name="expense_account_id" invisible="category != 'general_expense' or cascade_scope != 'single_product'" required="category == 'general_expense' and cascade_scope == 'single_product'" options="{'no_create': True}"/>
+
+                            <field name="source_annual_target" readonly="1"/>
+                            <field name="total_target_amount" class="fw-bold fs-5 text-primary"/>
+                            <field name="distribution_method" widget="radio"/>
+                        </group>
+                    </group>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                        <h4 class="m-0 text-dark fw-bold">
+                            <i class="fa fa-list me-1"/> Recipient Work Unit Allocation Matrix
+                        </h4>
+                        <button name="action_recalculate_proportions" type="object" string="Recalculate Proportions" icon="fa-refresh" class="btn-sm btn-outline-secondary"/>
+                    </div>
+
+                    <field name="line_ids" nolabel="1">
+                        <list editable="bottom" create="0" delete="0">
+                            <field name="org_unit_id" readonly="1" force_save="1" style="font-weight:bold;"/>
+                            <field name="baseline_amount" readonly="1" force_save="1" sum="Total Baseline"/>
+                            <field name="allocation_percentage" widget="float" digits="[16, 2]" sum="Total Share (%)"/>
+                            <field name="allocated_amount" widget="float" digits="[16, 2]" sum="Total Allocated"/>
+                        </list>
+                    </field>
+
+                    <div class="row mt-3 p-2 bg-light border rounded">
+                        <div class="col-4">
+                            <b>Total Allocated:</b> <field name="total_allocated_amount" readonly="1" class="fw-bold"/>
+                        </div>
+                        <div class="col-4">
+                            <b>Total Share:</b> <field name="total_allocated_percentage" readonly="1" class="fw-bold"/>%
+                        </div>
+                        <div class="col-4">
+                            <b>Difference:</b> <field name="allocation_difference" readonly="1" class="fw-bold text-danger"/>
+                        </div>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_apply_cascade" type="object" string="Apply Target Cascade" class="btn-primary" icon="fa-check-circle"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Window Action: Head Office to Districts (Tier 1) -->
+    <record id="action_pbms_target_cascade_ho_wizard" model="ir.actions.act_window">
+        <field name="name">Cascade Targets to Districts</field>
+        <field name="res_model">pbms.target.cascade.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_cascade_level': 'ho_to_district'}</field>
+    </record>
+
+    <!-- Window Action: District to Branches (Tier 2) -->
+    <record id="action_pbms_target_cascade_district_wizard" model="ir.actions.act_window">
+        <field name="name">Cascade Targets to Branches</field>
+        <field name="res_model">pbms.target.cascade.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_cascade_level': 'district_to_branch'}</field>
+    </record>
+</odoo>

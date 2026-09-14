@@ -43,11 +43,9 @@ class RecruitmentRequest(models.Model):
         unit_id = self._default_operating_unit_id()
         if not unit_id:
             return False
-        plans = self.env["pbms.planning.category"].search([
-            ("category", "=", "manpower"),
-            ("org_unit_id", "=", unit_id),
+        plans = self.env["planning.work.unit.manpower"].search([
+            ("work_unit_id", "=", unit_id),
             ("state", "=", "approved"),
-            ("active", "=", True),
         ], order="id desc")
         return plans[0].id if plans else False
 
@@ -84,11 +82,11 @@ class RecruitmentRequest(models.Model):
     )
 
     workforce_plan_id = fields.Many2one(
-        "pbms.planning.category", string="Approved Workforce Plan",
+        "planning.work.unit.manpower", string="Approved Workforce Plan",
         tracking=True,
         default=lambda self: self._default_workforce_plan_id(),
-        domain="[('category', '=', 'manpower'), ('org_unit_id', '=', operating_unit_id), ('state', '=', 'approved'), ('active', '=', True)]",
-        help="Required for Planned requests. Only approved PBMS Manpower plans "
+        domain="[('work_unit_id', '=', operating_unit_id), ('state', '=', 'approved')]",
+        help="Required for Planned requests. Only approved Manpower plans "
              "belonging to the selected Work Unit are selectable. "
              "Auto-filled when an Approved plan exists for your Work Unit."
     )
@@ -210,16 +208,14 @@ class RecruitmentRequest(models.Model):
             if rec.request_type == "unplanned":
                 jobs = self.env["hr.job"].search([])
             elif rec.workforce_plan_id:
-                lines = rec.workforce_plan_id.line_ids.filtered(lambda l: l.line_type == "manpower" and l.job_id)
+                lines = rec.workforce_plan_id.manpower_line_ids.filtered(lambda l: l.job_id)
                 jobs = lines.mapped("job_id")
             elif rec.operating_unit_id:
-                plans = self.env["pbms.planning.category"].search([
-                    ("category", "=", "manpower"),
-                    ("org_unit_id", "=", rec.operating_unit_id.id),
+                plans = self.env["planning.work.unit.manpower"].search([
+                    ("work_unit_id", "=", rec.operating_unit_id.id),
                     ("state", "=", "approved"),
-                    ("active", "=", True),
                 ])
-                lines = plans.mapped("line_ids").filtered(lambda l: l.line_type == "manpower" and l.job_id)
+                lines = plans.mapped("manpower_line_ids").filtered(lambda l: l.job_id)
                 jobs = lines.mapped("job_id")
             rec.allowed_job_ids = jobs
 
@@ -229,22 +225,20 @@ class RecruitmentRequest(models.Model):
             if not rec.job_position_id:
                 rec.allowed_grade_ids = self.env["employee.grade"].search([])
                 continue
-            lines = self.env["pbms.plan.category.line"]
+            lines = self.env["planning.manpower.line"]
             if rec.workforce_plan_id:
-                lines = rec.workforce_plan_id.line_ids.filtered(
-                    lambda l: l.line_type == "manpower" and l.job_id == rec.job_position_id
+                lines = rec.workforce_plan_id.manpower_line_ids.filtered(
+                    lambda l: l.job_id == rec.job_position_id
                 )
             elif rec.operating_unit_id:
-                plans = self.env["pbms.planning.category"].search([
-                    ("category", "=", "manpower"),
-                    ("org_unit_id", "=", rec.operating_unit_id.id),
+                plans = self.env["planning.work.unit.manpower"].search([
+                    ("work_unit_id", "=", rec.operating_unit_id.id),
                     ("state", "=", "approved"),
-                    ("active", "=", True),
                 ])
-                lines = plans.mapped("line_ids").filtered(
-                    lambda l: l.line_type == "manpower" and l.job_id == rec.job_position_id
+                lines = plans.mapped("manpower_line_ids").filtered(
+                    lambda l: l.job_id == rec.job_position_id
                 )
-            grades = lines.mapped("job_grade_id")
+            grades = lines.mapped("grade_id")
             if not grades and getattr(rec.job_position_id, 'grade', False):
                 grades = rec.job_position_id.grade
             if not grades:
@@ -333,14 +327,14 @@ class RecruitmentRequest(models.Model):
         (and `grade`, if one is set on the request). If no grade is set on
         the request, all grades/categories for that job are summed."""
         if not plan or not job:
-            return self.env["pbms.plan.category.line"]
-        lines = plan.line_ids.filtered(lambda l: l.line_type == "manpower" and l.job_id == job)
+            return self.env["planning.manpower.line"]
+        lines = plan.manpower_line_ids.filtered(lambda l: l.job_id == job)
         if grade:
-            lines = lines.filtered(lambda l: l.job_grade_id == grade)
+            lines = lines.filtered(lambda l: l.grade_id == grade)
         return lines
 
     def _get_plan_total_headcount(self, plan, job, grade):
-        return sum(self._get_matching_plan_lines(plan, job, grade).mapped("quantity"))
+        return sum(self._get_matching_plan_lines(plan, job, grade).mapped("total_headcount"))
 
     def _get_plan_consumed_headcount(self, plan, job, grade, exclude=None):
         """Sum of required_headcount from other active (submitted / under
@@ -562,11 +556,9 @@ class RecruitmentRequest(models.Model):
         """If the Work Unit changes, auto-sync the approved workforce plan for that unit
         and clear selected job position if no longer valid under the new unit."""
         if self.operating_unit_id:
-            plans = self.env["pbms.planning.category"].search([
-                ("category", "=", "manpower"),
-                ("org_unit_id", "=", self.operating_unit_id.id),
+            plans = self.env["planning.work.unit.manpower"].search([
+                ("work_unit_id", "=", self.operating_unit_id.id),
                 ("state", "=", "approved"),
-                ("active", "=", True),
             ])
             if len(plans) == 1:
                 self.workforce_plan_id = plans.id
@@ -578,7 +570,7 @@ class RecruitmentRequest(models.Model):
             if hasattr(self.operating_unit_id, "department") and self.operating_unit_id.department:
                 self.department_id = self.operating_unit_id.department
 
-        if self.workforce_plan_id and self.workforce_plan_id.org_unit_id != self.operating_unit_id:
+        if self.workforce_plan_id and self.workforce_plan_id.work_unit_id != self.operating_unit_id:
             self.workforce_plan_id = False
 
         if self.job_position_id and self.allowed_job_ids and self.job_position_id not in self.allowed_job_ids:
@@ -622,23 +614,21 @@ class RecruitmentRequest(models.Model):
             self.required_qualifications = self.job_position_id.requirements
 
         # Auto-sync grade if exactly one grade planned
-        lines = self.env["pbms.plan.category.line"]
+        lines = self.env["planning.manpower.line"]
         if self.workforce_plan_id:
-            lines = self.workforce_plan_id.line_ids.filtered(
-                lambda l: l.line_type == "manpower" and l.job_id == self.job_position_id
+            lines = self.workforce_plan_id.manpower_line_ids.filtered(
+                lambda l: l.job_id == self.job_position_id
             )
         elif self.operating_unit_id:
-            plans = self.env["pbms.planning.category"].search([
-                ("category", "=", "manpower"),
-                ("org_unit_id", "=", self.operating_unit_id.id),
+            plans = self.env["planning.work.unit.manpower"].search([
+                ("work_unit_id", "=", self.operating_unit_id.id),
                 ("state", "=", "approved"),
-                ("active", "=", True),
             ])
-            lines = plans.mapped("line_ids").filtered(
-                lambda l: l.line_type == "manpower" and l.job_id == self.job_position_id
+            lines = plans.mapped("manpower_line_ids").filtered(
+                lambda l: l.job_id == self.job_position_id
             )
 
-        grades = lines.mapped("job_grade_id")
+        grades = lines.mapped("grade_id")
         if len(grades) == 1:
             self.job_grade_id = grades.id
         elif getattr(self.job_position_id, 'grade', False):

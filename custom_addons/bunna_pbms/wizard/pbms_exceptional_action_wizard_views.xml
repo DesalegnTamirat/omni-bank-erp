@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Exceptional Workforce Action Wizard Form -->
+    <record id="view_pbms_exceptional_workforce_wizard_form" model="ir.ui.view">
+        <field name="name">pbms.exceptional.workforce.wizard.form</field>
+        <field name="model">pbms.exceptional.workforce.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reviewer Decision &amp; Feedback">
+                <sheet>
+                    <group>
+                        <field name="request_id" readonly="1" options="{'no_open': True}"/>
+                        <field name="action_type" widget="radio"/>
+                    </group>
+                    <group string="Reason &amp; Feedback">
+                        <field name="reason" nolabel="1" placeholder="Enter detailed revision feedback, justification, or reason for rejection..." required="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Confirm Decision" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Return Action Window -->
+    <record id="action_pbms_exceptional_return_wizard" model="ir.actions.act_window">
+        <field name="name">Return for Revision</field>
+        <field name="res_model">pbms.exceptional.workforce.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'return'}</field>
+    </record>
+
+    <!-- Reject Action Window -->
+    <record id="action_pbms_exceptional_reject_wizard" model="ir.actions.act_window">
+        <field name="name">Reject Request</field>
+        <field name="res_model">pbms.exceptional.workforce.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'reject'}</field>
+    </record>
+</odoo>
