@@ -53,18 +53,21 @@
                                 <field name="meeting_date"/>
                                 <field name="meeting_end_time"/>
                                 <field name="location"/>
+                                <field name="meeting_link"/>
                             </group>
                         <group>
-                            <group string="Committee &amp; Quorum">
+                            <group string="Designated Committee Roles">
                                 <field name="committee_chair_id"/>
+                                <field name="respective_director_id"/>
+                                <field name="legal_director_id"/>
+                                <field name="pomd_secretary_id"/>
                                 <field name="member_ids" widget="many2many_tags"/>
+                            </group>
+                            <group string="Quorum &amp; Sequential Sign-off">
                                 <field name="total_expected_members"/>
                                 <field name="present_members_count"/>
                                 <field name="required_quorum_percentage"/>
                                 <field name="is_quorum_met" widget="boolean"/>
-                            </group>
-                            <!-- Director sign-off tracking -->
-                            <group string="Director Sign-off ">
                                 <field name="director_signed_off" widget="boolean"/>
                                 <field name="director_signoff_by_id" readonly="1"/>
                                 <field name="director_signoff_date" readonly="1"/>

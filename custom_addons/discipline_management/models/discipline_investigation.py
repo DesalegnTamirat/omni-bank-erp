@@ -52,28 +52,44 @@ class DisciplineInvestigation(models.Model):
             if not self.summary_findings and self.case_id.description:
                 self.summary_findings = self.case_id.description
 
-    # Part 2: Date of Examination
-    examination_date = fields.Date(string='Date of Examination', required=True, default=fields.Date.context_today, tracking=True)
+    # Standardized 8-Part Investigation Structure
+    # 1. Title / Subject
+    title = fields.Char(string='Investigation Subject / Title', required=True, default=lambda self: _('Investigation of Misconduct'), tracking=True)
+    
+    # 2. Introduction
+    introduction = fields.Text(string='1. Introduction', tracking=True)
+    
+    # 3. Scope & Limitations of Investigation
+    scope_limitations = fields.Text(string='2. Scope & Limitations of Investigation', tracking=True)
 
-    # Part 3: Summary of Findings
-    summary_findings = fields.Text(string='Summary of Findings (Facts Established)', required=True, tracking=True)
+    # 4. Investigation Findings
+    summary_findings = fields.Text(string='3. Investigation Findings (Facts Established)', required=True, tracking=True)
 
-    # Part 4: Liable Employees (child model)
+    # 5. Financial Shortage / Loss Amount (If applicable)
+    financial_loss_amount = fields.Float(string='4. Financial Shortage / Loss Amount (ETB)', default=0.0, tracking=True)
+
+    # 6. Resolution Status of Financial / Property Loss (Resolved / Unresolved)
+    loss_resolution_status = fields.Selection([
+        ('not_applicable', 'Not Applicable'),
+        ('resolved', 'Resolved / Fully Recovered'),
+        ('unresolved', 'Unresolved / Pending Recovery'),
+    ], string='5. Loss Resolution Status', default='not_applicable', tracking=True)
+
+    # 7. Liable Employees & Policy Violations
     liable_employee_ids = fields.One2many('discipline.investigation.liable', 'investigation_id', string='Liable Employees')
-
-    # Part 5: Applicable Policy / Rule Violated
     applicable_policy = fields.Char(string='Applicable Policy / Rule Violated', required=True,
                                     help='Reference the specific bank HR policy clause or regulation violated.')
     policy_clause = fields.Char(string='Policy Clause / Section Number')
+    policy_violation_references = fields.Text(string='6. Detailed References to Relevant Policy Articles')
 
-    # Part 6: Witness Statements & Evidence
+    # Supporting Evidence & Witness Statements
     witness_statements = fields.Text(string='Witness Statements & Interviews')
     evidence_description = fields.Text(string='Evidence Description & Chain of Custody')
 
-    # Part 7: Investigator Conclusion & Recommendation
-    investigator_recommendation = fields.Text(string='Investigator Conclusion & Recommendation', required=True)
+    # 8. Recommendations
+    investigator_recommendation = fields.Text(string='7. Recommendations & Proposed Actions', required=True)
 
-    # Part 8: Management Review Sign-off
+    # Management Review Sign-off
     reviewed_by_id = fields.Many2one('res.users', string='Reviewed & Approved By (Management)', tracking=True)
     management_review_date = fields.Date(string='Management Review Date', tracking=True)
     management_review_notes = fields.Text(string='Management Review Notes / Approval Remarks')

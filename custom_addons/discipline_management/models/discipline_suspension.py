@@ -25,9 +25,47 @@ class DisciplineSuspension(models.Model):
     end_date = fields.Date(string='Suspension End Date', required=True, tracking=True, index=True)
     working_days_count = fields.Integer(string='Working Days Duration', compute='_compute_working_days_count', store=True, tracking=True)
     
+    # Initiation & Authority Matrix Mapping
+    initiating_unit = fields.Selection([
+        ('directorate', 'Respective Directorate'),
+        ('audit', 'Audit Directorate'),
+        ('pomd', 'People Operations Management Directorate (POMD)'),
+    ], string='Initiating Unit', default='directorate', required=True, tracking=True)
+
+    is_rmcd_or_iad = fields.Boolean(string='Is RMCD or IAD Staff', compute='_compute_is_rmcd_or_iad', store=True)
+    
+    suspending_authority = fields.Selection([
+        ('pomd', 'People Operations Management Directorate (POMD)'),
+        ('cpco', 'Chief People & Culture Officer (CPCO)'),
+        ('bod', 'Board of Directors (BOD via CEO Referral)'),
+    ], string='Designated Suspending Authority', compute='_compute_suspending_authority', store=True, tracking=True)
+
+    bod_resolution_number = fields.Char(string='BOD Resolution Reference', tracking=True)
+    bod_meeting_date = fields.Date(string='BOD Referral / Meeting Date', tracking=True)
+    bod_resolution_file = fields.Binary(string='BOD Resolution Attachment', attachment=True)
+    bod_resolution_filename = fields.Char(string='BOD Resolution Filename')
+
+    @api.depends('employee_id', 'employee_id.department_id', 'employee_id.department_id.name')
+    def _compute_is_rmcd_or_iad(self):
+        for rec in self:
+            dept_name = (rec.employee_id.department_id.name or '').lower() if rec.employee_id and rec.employee_id.department_id else ''
+            rec.is_rmcd_or_iad = any(kw in dept_name for kw in ['risk', 'compliance', 'audit', 'rmcd', 'iad'])
+
+    @api.depends('employee_id', 'employee_id.is_managerial', 'is_rmcd_or_iad')
+    def _compute_suspending_authority(self):
+        for rec in self:
+            if rec.is_rmcd_or_iad:
+                rec.suspending_authority = 'bod'
+            elif rec.employee_id and rec.employee_id.is_managerial:
+                rec.suspending_authority = 'cpco'
+            else:
+                rec.suspending_authority = 'pomd'
+
     reason = fields.Text(string='Reason for Suspension', required=True)
     state = fields.Selection([
-        ('draft', 'Draft'),
+        ('draft', 'Draft Request'),
+        ('pending_approval', 'Pending Authority Approval'),
+        ('referred_bod', 'Referred to BOD'),
         ('active', 'Active Suspension'),
         ('extended', 'Extended'),
         ('completed', 'Completed / Reinstated'),
@@ -78,21 +116,57 @@ class DisciplineSuspension(models.Model):
         return super().create(vals_list)
 
     # Workflow Actions
-    def action_activate_suspension(self):
-        """Support employee suspension from work/salary pending investigation."""
+    def action_submit_for_approval(self):
         for rec in self:
+            if rec.suspending_authority == 'bod':
+                rec.write({'state': 'referred_bod'})
+                rec.case_id.message_post(body=_('Suspension case for RMCD/IAD staff referred to Board of Directors (BOD) for review.'))
+            else:
+                rec.write({'state': 'pending_approval'})
+                rec.case_id.message_post(body=_('Suspension submitted for approval to %s.') % rec.suspending_authority)
+
+    def action_activate_suspension(self):
+        """Activate suspension, validate approval authority, and deactivate ERP user account."""
+        for rec in self:
+            current_user = self.env.user
+            # Authority validation
+            if rec.suspending_authority == 'bod':
+                if not rec.bod_resolution_number:
+                    raise UserError(_('BOD Resolution Reference must be recorded prior to activating suspension for RMCD/IAD staff.'))
+            elif rec.suspending_authority == 'cpco':
+                if not (current_user.has_group('discipline_management.group_discipline_cpco') or current_user.has_group('discipline_management.group_discipline_admin')):
+                    raise UserError(_('Authority Restriction: Suspensions for managerial employees require Chief People & Culture Officer (CPCO) approval.'))
+            elif rec.suspending_authority == 'pomd':
+                if not (current_user.has_group('discipline_management.group_discipline_pomd') or current_user.has_group('discipline_management.group_discipline_admin') or current_user.has_group('discipline_management.group_discipline_manager')):
+                    raise UserError(_('Authority Restriction: Non-managerial suspensions must be approved by People Operations Directorate (POMD).'))
+
             rec.write({'state': 'active'})
             rec.employee_id.is_suspended = True
             rec.employee_id.suspension_type = rec.suspension_type
+
+            # Deactivate employee ERP user account during active suspension
+            if rec.employee_id.user_id:
+                rec.employee_id.user_id.sudo().write({'active': False})
+                rec.message_post(body=_('Employee ERP user account (%s) deactivated for the duration of the suspension.') % rec.employee_id.user_id.name)
+
             rec.case_id.message_post(
-                body=_('Suspension %s activated for employee %s (%s) from %s to %s.') % (rec.name, rec.employee_id.name, rec.suspension_type, rec.start_date, rec.end_date)
+                body=_('Suspension %s activated for employee %s (%s) from %s to %s by %s.') % (
+                    rec.name, rec.employee_id.name, rec.suspension_type, rec.start_date, rec.end_date, current_user.name
+                )
             )
 
     def action_reinstate_employee(self):
+        """Reinstate employee and restore ERP user account."""
         for rec in self:
             rec.write({'state': 'completed'})
             rec.employee_id.is_suspended = False
             rec.employee_id.suspension_type = False
+            
+            # Reactivate ERP user account
+            if rec.employee_id.user_id:
+                rec.employee_id.user_id.sudo().write({'active': True})
+                rec.message_post(body=_('Employee ERP user account (%s) reactivated upon reinstatement.') % rec.employee_id.user_id.name)
+
             rec.case_id.message_post(body=_('Suspension completed. Employee %s reinstated to duty.') % rec.employee_id.name)
 
     def action_convert_to_dismissal(self):

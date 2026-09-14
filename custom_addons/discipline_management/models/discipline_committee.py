@@ -16,12 +16,16 @@ class DisciplineCommitteeMeeting(models.Model):
     meeting_end_time = fields.Datetime(string='Scheduled Meeting End Time', tracking=True)
     location = fields.Char(string='Meeting Room / Location', default='Main HR Conference Room')
 
-    committee_chair_id = fields.Many2one('res.users', string='Committee Chair', required=True, tracking=True)
+    committee_chair_id = fields.Many2one('res.users', string='Committee Chair (CPCO)', required=True, tracking=True)
+    respective_director_id = fields.Many2one('res.users', string='Director of Respective Office', tracking=True)
+    legal_director_id = fields.Many2one('res.users', string='Legal Director', tracking=True)
+    pomd_secretary_id = fields.Many2one('res.users', string='People Operation Director (Secretary)', tracking=True)
+    meeting_link = fields.Char(string='Virtual Meeting Link / Room')
     member_ids = fields.Many2many('res.users', 'discipline_committee_members_rel', 'meeting_id', 'user_id', string='Committee Members', required=True)
 
     # Quorum Requirements
     total_expected_members = fields.Integer(string='Total Expected Members', compute='_compute_quorum', store=True)
-    present_members_count = fields.Integer(string='Members Present Count', required=True, default=0, tracking=True)
+    present_members_count = fields.Integer(string='Members Present Count', required=True, default=4, tracking=True)
     required_quorum_percentage = fields.Float(string='Required Quorum (%)', default=50.0, required=True, help='Minimum percentage of members present required for valid decision')
     is_quorum_met = fields.Boolean(string='Quorum Validated', compute='_compute_quorum', store=True, tracking=True)
 
@@ -34,6 +38,7 @@ class DisciplineCommitteeMeeting(models.Model):
         ('second_warning', 'Recommend Second Written Warning'),
         ('first_warning', 'Recommend First Written Warning'),
         ('verbal_warning', 'Recommend Verbal Warning'),
+        ('demotion', 'Recommend Demotion'),
         ('exonerate', 'Exonerate Employee / Case Dismissed'),
         ('further_investigation', 'Require Further Investigation'),
     ], string='Committee Recommendation', tracking=True)
@@ -54,12 +59,12 @@ class DisciplineCommitteeMeeting(models.Model):
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', required=True, tracking=True)
 
-    # — Sequential sign-off tracking
+    # Sequential sign-off tracking
     director_signed_off = fields.Boolean(
-        string='Director Sign-off Completed',
+        string='Immediate Director Sign-off Completed',
         default=False,
         tracking=True,
-        help='Department Director must review and sign off before votes are opened.'
+        help='Immediate Director of employee under investigation must sign first to initiate final review.'
     )
     director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
     director_signoff_by_id = fields.Many2one('res.users', string='Signed Off By (Director)', tracking=True)
@@ -83,43 +88,42 @@ class DisciplineCommitteeMeeting(models.Model):
 
     @api.onchange('case_id')
     def _onchange_case_id_populate_committee(self):
-        """Auto-populate Chairman, Required Members, and Optional Members based on Managerial status & Labor Union membership (Requirement 6 & 9)."""
+        """Auto-populate mandatory committee roles (Chair, Director, Legal, Secretary)."""
         if self.case_id and self.case_id.employee_id:
             emp = self.case_id.employee_id
-            is_mgr = emp.is_managerial
             
-            # Find Chairman: CEO if Managerial, CPCO / HR Director if Non-Managerial
-            if is_mgr:
-                ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
-                ceo_user = ceo_group.users[0] if ceo_group and ceo_group.users else False
-                if not ceo_user:
-                    ceo_user = self.env['res.users'].search([('name', 'ilike', 'CEO')], limit=1)
-                self.committee_chair_id = ceo_user or self.env.user
-            else:
-                cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-                cpco_user = cpco_group.users[0] if cpco_group and cpco_group.users else False
-                if not cpco_user:
-                    cpco_user = self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
-                self.committee_chair_id = cpco_user or self.env.user
+            # 1. Chairperson: Chief People and Culture Officer (CPCO)
+            cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+            cpco_user = cpco_group.users[0] if cpco_group and cpco_group.users else self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
+            self.committee_chair_id = cpco_user or self.env.user
 
-            # Build member list: Chairman, Secretary, Immediate Dept Director, Union President (if union member)
+            # 2. Member: Director of Respective Office
+            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
+                self.respective_director_id = emp.department_id.manager_id.user_id
+            else:
+                self.respective_director_id = False
+
+            # 3. Member: Legal Director
+            legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
+            legal_user = legal_group.users[0] if legal_group and legal_group.users else self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
+            self.legal_director_id = legal_user or False
+
+            # 4. Member & Secretary: People Operation Director
+            pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
+            pomd_user = pomd_group.users[0] if pomd_group and pomd_group.users else self.env['res.users'].search([('name', 'ilike', 'Operation')], limit=1)
+            self.pomd_secretary_id = pomd_user or self.env.user
+
+            # Assemble full member set
             members = set()
             if self.committee_chair_id:
                 members.add(self.committee_chair_id.id)
+            if self.respective_director_id:
+                members.add(self.respective_director_id.id)
+            if self.legal_director_id:
+                members.add(self.legal_director_id.id)
+            if self.pomd_secretary_id:
+                members.add(self.pomd_secretary_id.id)
             
-            # Immediate Director / Department Manager
-            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
-                members.add(emp.department_id.manager_id.user_id.id)
-            
-            # Labor Union President if employee is union member
-            is_union = getattr(emp, 'member_of_labour_union', False) or getattr(emp, 'union_member', False)
-            if is_union:
-                union_pres = self.env['res.users'].search([('name', 'ilike', 'Union')], limit=1)
-                if union_pres:
-                    members.add(union_pres.id)
-            
-            # Current user / HR Officer
-            members.add(self.env.user.id)
             self.member_ids = [(6, 0, list(members))]
             self.present_members_count = len(members)
 

@@ -8,8 +8,8 @@ class DisciplineSeverityLevel(models.Model):
     _description = 'Disciplinary Severity Level'
     _order = 'sequence, id'
 
-    name = fields.Char(string='Severity Level Name', required=True, tracking=True)
-    code = fields.Char(string='Level Code', required=True, tracking=True, help="Unique identifier, e.g. level_1, level_2")
+    name = fields.Char(string='Severity Level Name', required=True)
+    code = fields.Char(string='Level Code', required=True, help="Unique identifier, e.g. level_1, level_2")
     sequence = fields.Integer(string='Sequence / Rank', default=10, help="Lower number indicates higher severity")
     
     is_dismissal = fields.Boolean(string='Triggers Dismissal / Termination', default=False, help="Check if this severity level mandates dismissal")
@@ -22,7 +22,7 @@ class DisciplineSeverityLevel(models.Model):
         ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
-    ], string='Default Punishment Type', default='first_warning_penalty', tracking=True)
+    ], string='Default Punishment Type', default='first_warning_penalty')
 
     default_penalty_percentage = fields.Float(string='Default Penalty Percentage (%)', default=0.0)
     default_fine_days = fields.Float(string='Default Salary Fine (Days)', default=0.0)
@@ -34,17 +34,18 @@ class DisciplineSeverityLevel(models.Model):
     default_managerial_fine_days = fields.Float(string='Default Managerial Fine (Days)', default=0.0)
 
     default_reset_window_months = fields.Integer(string='Default Reset Window (Months)', default=3, help="Validity period in months before warning count resets")
+    active_duration_days = fields.Integer(string='Active Duration (Days)', default=365, help="Number of days the penalty remains active for promotion/transfer ineligibility")
 
     default_approval_authority = fields.Selection([
-        ('direct_manager', 'Direct Manager'),
-        ('hr_manager', 'HR Manager'),
+        ('direct_manager', 'Direct Manager / Coach'),
+        ('hr_manager', 'HR Manager / Directorate'),
         ('executive', 'Executive HR / Disciplinary Committee'),
         ('cpco', 'Chief People Officer (CPCO)'),
         ('ceo', 'Chief Executive Officer (CEO)'),
-    ], string='Default Approval Authority', default='hr_manager', tracking=True)
+    ], string='Default Approval Authority', default='direct_manager')
 
     description = fields.Text(string='Description & Guidelines')
-    active = fields.Boolean(default=True, tracking=True)
+    active = fields.Boolean(default=True)
 
     _sql_constraints = [
         ('code_uniq', 'unique(code)', 'The Severity Level Code must be unique!')

@@ -64,36 +64,51 @@ class HrEmployee(models.Model):
         for emp in self:
             emp.discipline_case_count = len(emp.discipline_case_ids)
 
-    def check_discipline_eligibility(self):
-        """Check if employee is eligible for promotion, transfer, or internal recruitment."""
+    def check_discipline_eligibility(self, action_type='promotion', is_forced=False):
+        """
+        Check if employee is eligible for promotion, transfer, or internal recruitment.
+        :param action_type: 'promotion', 'transfer', or 'recruitment'
+        :param is_forced: Boolean - True if HR/Management is executing an administrative/forced transfer
+        :return: (is_eligible: bool, reason: str)
+        """
         self.ensure_one()
         if self.is_suspended:
-            return (False, _('Employee is currently under active disciplinary suspension (%s).') % self.suspension_type)
-        if self.is_ineligible_for_promotion_transfer:
-            return (False, _('Employee is currently flagged as ineligible for promotion/transfer due to active disciplinary action.'))
+            return (False, _('Employee is currently under active disciplinary suspension (%s).') % (self.suspension_type or 'Standard'))
         
-        cutoff_date = fields.Date.context_today(self) - timedelta(days=365)
+        # Administrative / forced transfer initiated by HR/Management is always permitted
+        if action_type == 'transfer' and is_forced:
+            return (True, _('Administrative transfer permitted for operational or disciplinary reassignment.'))
+
+        if self.is_ineligible_for_promotion_transfer:
+            return (False, _('Candidate is currently ineligible for promotion/transfer due to an active disciplinary penalty.'))
+        
+        today = fields.Date.context_today(self)
         active_cases = self.discipline_case_ids.filtered(
-            lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
+            lambda c: c.state == 'enforced' and (
+                (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
+                (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
+            ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
         )
         if active_cases:
             case_names = ", ".join(active_cases.mapped('name'))
-            return (False, _('Ineligible for promotion/recruitment due to active disciplinary record within 12 months (Cases: %s).') % case_names)
+            return (False, _('Candidate is currently ineligible for promotion due to an active disciplinary penalty (Cases: %s).') % case_names)
         
         return (True, _('Employee is eligible.'))
 
     @api.model
     def _cron_revert_ineligibility(self):
-        """Cron job: automatically revert ineligibility flag once legal active penalty period (365 days) expires."""
+        """Cron job: automatically revert ineligibility flag once legal active penalty period expires."""
         today = fields.Date.context_today(self)
-        cutoff_date = today - timedelta(days=365)
         ineligible_employees = self.search([
             ('is_ineligible_for_promotion_transfer', '=', True),
             ('is_suspended', '=', False),
         ])
         for emp in ineligible_employees:
             active_recent_cases = emp.discipline_case_ids.filtered(
-                lambda c: c.state == 'enforced' and c.final_decision_date and c.final_decision_date >= cutoff_date
+                lambda c: c.state == 'enforced' and (
+                    (c.active_penalty_end_date and c.active_penalty_end_date >= today) or
+                    (not c.active_penalty_end_date and c.final_decision_date and c.final_decision_date >= (today - timedelta(days=365)))
+                ) and (c.severity_level in ['level_1', 'level_2'] or c.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty'])
             )
             if not active_recent_cases:
                 emp.with_context(no_leave_resource_calendar_update=True).write({

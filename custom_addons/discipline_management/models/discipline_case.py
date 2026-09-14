@@ -122,15 +122,50 @@ class DisciplineCase(models.Model):
 
     def _default_initiator_type(self):
         user = self.env.user
-        audit_group = self.env.ref('discipline_management.group_discipline_auditor', raise_if_not_found=False)
+        has_audit_group = user.has_group('discipline_management.group_discipline_auditor')
         user_dept_name = (user.employee_id.department_id.name or '').lower() if user.employee_id and user.employee_id.department_id else ''
-        is_audit = (audit_group and audit_group in user.groups_id) or ('audit' in user_dept_name or 'compliance' in user_dept_name)
+        is_audit = has_audit_group or ('audit' in user_dept_name or 'compliance' in user_dept_name)
         return 'audit' if is_audit else 'manager'
 
     initiator_type = fields.Selection([
-        ('manager', 'Line Manager / Supervisor'),
+        ('manager', 'Coach / Line Manager'),
+        ('director', 'Directorate Director'),
         ('audit', 'Internal Audit / Compliance'),
     ], string='Case Initiator Source', default=_default_initiator_type, store=True, readonly=False, tracking=True)
+
+    chief_id = fields.Many2one('res.users', string='Respective Chief Officer', tracking=True)
+    escalation_target = fields.Selection([
+        ('audit', 'Audit Directorate'),
+        ('ceo', 'Chief Executive Officer (CEO)'),
+    ], string='Chief Escalation Target', tracking=True)
+    ceo_assignment_notes = fields.Text(string='CEO Assignment Remarks', tracking=True)
+    delivery_receipt_date = fields.Date(string='Decision Letter Delivery / Receipt Date', tracking=True)
+
+    active_duration_days = fields.Integer(string='Penalty Active Duration (Days)', related='severity_level_id.active_duration_days', store=True, readonly=True)
+    active_penalty_end_date = fields.Date(string='Penalty Active Expiration Date', compute='_compute_active_penalty_end_date', store=True, tracking=True)
+
+    @api.depends('final_decision_date', 'active_duration_days', 'state')
+    def _compute_active_penalty_end_date(self):
+        for rec in self:
+            if rec.final_decision_date and rec.state == 'enforced':
+                rec.active_penalty_end_date = rec.final_decision_date + timedelta(days=rec.active_duration_days or 365)
+            else:
+                rec.active_penalty_end_date = False
+
+    is_coach_or_manager = fields.Boolean(string='Is Coach or Line Manager', compute='_compute_is_coach_or_manager')
+
+    def _compute_is_coach_or_manager(self):
+        current_emp = self.env.user.employee_id
+        for rec in self:
+            if not current_emp or not rec.employee_id:
+                rec.is_coach_or_manager = False
+                continue
+            is_sub = (
+                rec.employee_id.parent_id.id == current_emp.id or
+                rec.employee_id.coach_id.id == current_emp.id or
+                rec.employee_id.id in self.env['hr.employee'].search([('id', 'child_of', current_emp.id)]).ids
+            )
+            rec.is_coach_or_manager = is_sub or self.env.user.has_group('discipline_management.group_discipline_manager') or self.env.user.has_group('discipline_management.group_discipline_admin')
 
     allowed_severity_level_ids = fields.Many2many(
         'discipline.severity.level',
@@ -149,7 +184,11 @@ class DisciplineCase(models.Model):
         for rec in self:
             reporter = rec.reported_by_id or self.env.user.employee_id
             if reporter:
-                subs = self.env['hr.employee'].search([('id', 'child_of', reporter.id)])
+                subs = self.env['hr.employee'].search([
+                    '|',
+                    ('id', 'child_of', reporter.id),
+                    ('coach_id', '=', reporter.id)
+                ])
                 rec.subordinate_employee_ids = subs
             else:
                 rec.subordinate_employee_ids = self.env['hr.employee'].search([])
@@ -177,6 +216,7 @@ class DisciplineCase(models.Model):
 
     # Automatic routing & authority
     required_final_authority = fields.Selection([
+        ('direct_manager', 'Coach / Line Manager'),
         ('cpco', 'Chief People Officer (CPCO)'),
         ('ceo', 'Chief Executive Officer (CEO)'),
     ], string='Required Final Approval Authority', compute='_compute_required_final_authority', store=True, tracking=True)
@@ -205,8 +245,10 @@ class DisciplineCase(models.Model):
     # State Machine
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('initiated', 'Initiated / Under Review'),
-        ('investigating', 'Under Investigation'),
+        ('initiated', 'Initiated'),
+        ('submitted_chief', 'Submitted to Respective Chief'),
+        ('ceo_review', 'Under CEO Review'),
+        ('investigating', 'Under Audit Investigation'),
         ('committee_review', 'Committee Review'),
         ('pending_approval', 'Pending Final Approval'),
         ('enforced', 'Enforced / Finalized'),
@@ -371,30 +413,28 @@ class DisciplineCase(models.Model):
     def _validate_segregation_of_duties(self):
         for rec in self:
             current_user = self.env.user
-            if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Reviewer must be different individuals.'))
-            if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Approver must be different individuals.'))
-            if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
-                raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
+            # Coach / Line Manager direct enforcement on subordinates for Levels 2-5 is permitted
+            is_direct_mgr_enforcement = (
+                rec.initiator_type == 'manager' and
+                rec.severity_level != 'level_1' and
+                rec.punishment_type != 'dismissal'
+            )
+            if not is_direct_mgr_enforcement:
+                if rec.initiator_id and rec.reviewer_id and rec.initiator_id == rec.reviewer_id:
+                    raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Reviewer must be different individuals.'))
+                if rec.initiator_id and rec.approver_id and rec.initiator_id == rec.approver_id and rec.initiator_type != 'manager':
+                    raise ValidationError(_('Segregation of Duties Violation: Case Initiator and Approver must be different individuals for escalated cases.'))
+                if rec.reviewer_id and rec.approver_id and rec.reviewer_id == rec.approver_id:
+                    raise ValidationError(_('Segregation of Duties Violation: Case Reviewer and Approver must be different individuals.'))
 
-            if rec.severity_level == 'level_1' or rec.required_final_authority == 'ceo':
+            if rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal':
                 if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
                     raise ValidationError(_(
-                        'Approval Restriction: Decisions requiring CEO / Senior Executive Authority are restricted '
-                        'exclusively to authorized executive approvers.'
+                        'Approval Restriction: Decisions requiring Dismissal / Separation are restricted '
+                        'exclusively to authorized executive approvers (CEO / Disciplinary Committee).'
                     ))
                 if not rec.dismissal_authority_id:
-                    raise ValidationError(_(
-                        'Authority Record Required: For executive or dismissal cases, you must record the designated '
-                        'CEO or CPCO approver in the "Dismissal Authority" field.'
-                    ))
-                if rec.required_final_authority == 'ceo' and rec.dismissal_authority_id:
-                    if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_ceo') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
-                        raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CEO / Executive approval authority.'))
-            elif rec.required_final_authority == 'cpco' and rec.dismissal_authority_id:
-                if not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_cpco') and not rec.dismissal_authority_id.has_group('discipline_management.group_discipline_admin'):
-                    raise ValidationError(_('Authority Mismatch: Dismissal authority assigned must hold CPCO approval authority.'))
+                    rec.dismissal_authority_id = current_user
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -407,7 +447,7 @@ class DisciplineCase(models.Model):
     def write(self, vals):
         force_write = self.env.context.get('force_write')
         if not force_write:
-            whitelisted_fields = {'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked', 'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee', 'approver_id', 'final_decision_date'}
+            whitelisted_fields = {'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked', 'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee', 'approver_id', 'final_decision_date', 'delivery_receipt_date', 'chief_id', 'escalation_target', 'ceo_assignment_notes'}
             for rec in self:
                 if rec.state in ('enforced', 'closed', 'appealed'):
                     if set(vals.keys()) - whitelisted_fields:
@@ -429,6 +469,58 @@ class DisciplineCase(models.Model):
                 raise UserError(_('Detailed Description is mandatory before initiating a case.'))
             rec.with_context(force_write=True).write({'state': 'initiated'})
             rec.message_post(body=_('Disciplinary case initiated for employee %s.') % rec.employee_id.name)
+
+    def action_submit_to_chief(self):
+        """Submit the initiated disciplinary case to the respective Chief Officer for review and escalation routing."""
+        for rec in self:
+            if not rec.chief_id:
+                # Resolve chief user from group if not explicitly set
+                chief_group = self.env.ref('discipline_management.group_discipline_chief', raise_if_not_found=False)
+                if chief_group and chief_group.users:
+                    rec.chief_id = chief_group.users[0]
+            rec.with_context(force_write=True).write({'state': 'submitted_chief'})
+            rec.message_post(body=_('Case submitted to Respective Chief (%s) for review.') % (rec.chief_id.name if rec.chief_id else 'Chief Officer'))
+
+    def action_chief_escalate_to_audit(self):
+        """Escalate the case to the Audit Directorate for investigation, notifying the CEO simultaneously."""
+        for rec in self:
+            rec.escalation_target = 'audit'
+            rec.with_context(force_write=True).write({'state': 'investigating'})
+            rec.message_post(body=_('Chief reviewed case and escalated to Audit Directorate for investigation.'))
+            
+            # Send informational activity notification to executive management
+            ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+            ceo_users = ceo_group.users if ceo_group else self.env['res.users']
+            for ceo in ceo_users:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('CEO Notification: Chief Escalated Disciplinary Case %s') % rec.name,
+                    note=_('Disciplinary Case %s for employee %s was escalated by Chief to Audit Directorate for investigation.') % (rec.name, rec.employee_id.name),
+                    user_id=ceo.id
+                )
+
+    def action_chief_escalate_to_ceo(self):
+        """Escalate the case directly to the Chief Executive Officer for review."""
+        for rec in self:
+            rec.escalation_target = 'ceo'
+            rec.with_context(force_write=True).write({'state': 'ceo_review'})
+            rec.message_post(body=_('Chief escalated case directly to CEO for executive review.'))
+            
+            ceo_group = self.env.ref('discipline_management.group_discipline_ceo', raise_if_not_found=False)
+            ceo_users = ceo_group.users if ceo_group else self.env['res.users']
+            for ceo in ceo_users:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('Executive Review Required: Disciplinary Case %s') % rec.name,
+                    note=_('Disciplinary Case %s has been submitted by Chief for CEO review and assignment.') % rec.name,
+                    user_id=ceo.id
+                )
+
+    def action_ceo_assign_to_audit(self):
+        """Assign the case to the Audit Directorate for formal investigation with CEO directives."""
+        for rec in self:
+            rec.with_context(force_write=True).write({'state': 'investigating'})
+            rec.message_post(body=_('CEO reviewed case and assigned to Audit Directorate for investigation. Remarks: %s') % (rec.ceo_assignment_notes or 'None'))
 
     def action_start_investigation(self):
         for rec in self:
@@ -458,42 +550,64 @@ class DisciplineCase(models.Model):
     def action_submit_for_approval(self):
         for rec in self:
             rec.with_context(force_write=True).write({'state': 'pending_approval'})
-            rec.message_post(body=_('Case submitted for final approval to Director.'))
+            rec.message_post(body=_('Case submitted for final approval.'))
 
     def action_return_revision(self):
         """Return case to Initiator / Line Manager for revision."""
         for rec in self:
-            if rec.state != 'pending_approval':
-                raise UserError(_('Only cases pending approval can be returned for revision.'))
+            if rec.state not in ['pending_approval', 'submitted_chief', 'ceo_review']:
+                raise UserError(_('Only cases under review/pending approval can be returned for revision.'))
             rec.with_context(force_write=True).write({'state': 'draft'})
             rec.message_post(body=_('Case returned to Initiator for revision by %s.') % self.env.user.name)
 
     def action_reject(self):
         """Reject disciplinary case."""
         for rec in self:
-            if rec.state not in ['pending_approval', 'initiated', 'investigating']:
+            if rec.state not in ['pending_approval', 'initiated', 'investigating', 'submitted_chief', 'ceo_review']:
                 raise UserError(_('Case cannot be rejected in its current state.'))
             rec.with_context(force_write=True).write({'state': 'closed'})
             rec.message_post(body=_('Disciplinary case rejected and closed by %s.') % self.env.user.name)
 
-    def action_approve_and_enforce(self):
+    def action_acknowledge_receipt(self):
+        """Record official delivery and acknowledgment of the disciplinary notice, starting the appeal window."""
         for rec in self:
-            rec.approver_id = self.env.user
+            rec.delivery_receipt_date = fields.Date.context_today(self)
+            rec.message_post(body=_('Disciplinary decision letter delivery acknowledged on %s. 10-day appeal countdown is active.') % rec.delivery_receipt_date)
+
+    def action_approve_and_enforce(self):
+        """Enforces the disciplinary penalty (Coach/Manager direct enforcement for Levels 2-5, or Committee/Executive enforcement)."""
+        for rec in self:
+            current_user = self.env.user
+            # Coach / Manager direct enforcement validation
+            if rec.initiator_type == 'manager' and (rec.severity_level == 'level_1' or rec.punishment_type == 'dismissal'):
+                if not current_user.has_group('discipline_management.group_discipline_admin') and not current_user.has_group('discipline_management.group_discipline_ceo'):
+                    raise UserError(_(
+                        'Dismissal Authority Restriction: Level 1 Dismissal cannot be directly enforced by a Coach or Line Manager. '
+                        'Please escalate through the Chief / Executive Committee route.'
+                    ))
+
+            rec.approver_id = current_user
             rec._validate_segregation_of_duties()
 
             # Verify linked committee meetings are completed with quorum and signoff (only if committee route)
-            if rec.initiator_type != 'manager' and rec.committee_meeting_ids:
+            if rec.initiator_type == 'audit' and rec.committee_meeting_ids:
                 for meeting in rec.committee_meeting_ids:
                     if meeting.state != 'completed' or not meeting.director_signed_off or not meeting.is_quorum_met:
                         raise UserError(_('Cannot enforce case decision. Linked committee meeting (%s) must be in Completed state with director sign-off and valid quorum.') % meeting.name)
 
             rec.final_decision_date = fields.Date.context_today(self)
+            if not rec.delivery_receipt_date:
+                rec.delivery_receipt_date = rec.final_decision_date
             rec.with_context(force_write=True).write({'state': 'enforced'})
 
-            # Update Employee Master Disciplinary Info & Internal Mobility Ineligibility
+            # Update employee disciplinary record and set internal mobility restrictions
+            is_ineligible = (
+                rec.severity_level in ['level_1', 'level_2'] or
+                rec.punishment_type in ['dismissal', 'demotion', 'final_warning_penalty']
+            )
             rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({
                 'active_disciplinary_action': True,
-                'is_ineligible_for_promotion_transfer': True,
+                'is_ineligible_for_promotion_transfer': is_ineligible,
                 'disciplinary_warning_count': rec.employee_id.disciplinary_warning_count + 1,
                 'last_disciplinary_date': rec.final_decision_date,
             })
@@ -502,8 +616,9 @@ class DisciplineCase(models.Model):
             if rec.punishment_type == 'demotion':
                 rec.action_apply_demotion()
 
-            # Trigger Payroll Penalty Deduction if applicable
-            if rec.penalty_percentage > 0.0:
+            # Enqueue pending deduction records for downstream payroll processing
+            # 1. Percentage deduction for non-managerial employees
+            if not rec.is_managerial and rec.penalty_percentage > 0.0:
                 self.env['discipline.payroll.penalty'].create({
                     'case_id': rec.id,
                     'employee_id': rec.employee_id.id,
@@ -512,6 +627,17 @@ class DisciplineCase(models.Model):
                     'effective_date': rec.final_decision_date,
                     'state': 'pending',
                     'notes': _('Automatic percentage penalty of %s%% from Case %s.') % (rec.penalty_percentage, rec.name)
+                })
+            # 2. Daily wage unit deduction for managerial staff
+            elif rec.is_managerial and rec.fine_days > 0.0:
+                self.env['discipline.payroll.penalty'].create({
+                    'case_id': rec.id,
+                    'employee_id': rec.employee_id.id,
+                    'penalty_type': 'managerial',
+                    'managerial_days': int(rec.fine_days),
+                    'effective_date': rec.final_decision_date,
+                    'state': 'pending',
+                    'notes': _('Automatic managerial penalty of %d day(s) from Case %s.') % (int(rec.fine_days), rec.name)
                 })
 
             # Suspension without-pay deduction for active suspensions
@@ -585,14 +711,14 @@ class DisciplineCase(models.Model):
             })
 
     def action_apply_demotion(self):
-        """Gap 1: Demotion execution preserving basic salary while downgrading position scale/allowances."""
+        """Execute demotion by reassigning job position while preserving basic salary scale."""
         for rec in self:
             if rec.new_job_id:
                 rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({'job_id': rec.new_job_id.id})
                 rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved.') % rec.new_job_id.name)
 
     def action_approve_dismissal(self):
-        """Gap 3: Final approval of Level 1 Dismissal creating separation record and revoking system access."""
+        """Execute final approval of Level 1 Dismissal, triggering separation and revoking system access."""
         for rec in self:
             rec._process_employee_dismissal()
 

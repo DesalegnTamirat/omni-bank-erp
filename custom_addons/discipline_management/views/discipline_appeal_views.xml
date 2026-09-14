@@ -24,19 +24,24 @@
                     <header>
                         <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info" invisible="state != 'submitted'"/>
                         <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success" invisible="state != 'under_review'"/>
+                        <button name="action_create_second_appeal" string="Submit 2nd Level Appeal" type="object" class="btn-warning" invisible="state != 'decided' or decision_outcome != 'upheld' or appeal_level == 'second'"/>
                         <field name="state" widget="statusbar" statusbar_visible="submitted,under_review,decided"/>
                     </header>
                     <sheet>
                         <group>
-                            <group string="Original Case Information">
+                            <group string="Appeal Information &amp; Stage">
                                 <field name="name"/>
                                 <field name="case_id"/>
                                 <field name="employee_id"/>
-                                <field name="original_offense_id"/>
-                                <field name="original_decision_date"/>
+                                <field name="appeal_level"/>
+                                <field name="parent_appeal_id" invisible="appeal_level == 'first'"/>
+                                <field name="case_origin_type"/>
+                                <field name="appeal_target_authority"/>
                             </group>
-                            <group string="Appeal Submission">
+                            <group string="Appeal Submission &amp; Authority">
                                 <field name="submission_date"/>
+                                <field name="is_submitted_on_behalf"/>
+                                <field name="submitted_by_id" invisible="not is_submitted_on_behalf"/>
                                 <field name="reviewer_id"/>
                                 <field name="review_date"/>
                                 <field name="supporting_document" filename="document_filename"/>
@@ -52,7 +57,8 @@
                                     <field name="decision_outcome"/>
                                     <field name="revised_punishment_type"/>
                                     <field name="revised_penalty_percentage"/>
-                                    <field name="appeal_decision_notes" placeholder="Board justification for upholding, overturning, or reducing penalty..."/>
+                                    <field name="revised_fine_days"/>
+                                    <field name="appeal_decision_notes" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..."/>
                                 </group>
                             </page>
                         </notebook>

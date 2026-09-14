@@ -11,7 +11,6 @@
                     <field name="employee_id"/>
                     <field name="investigator_id"/>
                     <field name="misconduct_type"/>
-                    <field name="examination_date"/>
                     <field name="investigation_date"/>
                     <field name="state"/>
                 </list>
@@ -34,13 +33,15 @@
                         <group>
                             <group string="Case Reference">
                                 <field name="name" readonly="1"/>
+                                <field name="title"/>
                                 <field name="case_id" readonly="1"/>
                                 <field name="employee_id" readonly="1"/>
                             </group>
-                            <group string="Investigator &amp; Dates">
+                            <group string="Investigator &amp; Financial Loss Details">
                                 <field name="investigator_id" readonly="1"/>
                                 <field name="investigation_date"/>
-                                <field name="examination_date"/>
+                                <field name="financial_loss_amount"/>
+                                <field name="loss_resolution_status"/>
                                 <field name="offense_id" readonly="1"/>
                             </group>
                         </group>
@@ -57,35 +58,41 @@
                             </group>
                         </group>
                         <notebook>
-                            <!-- Part 3: Findings -->
-                            <page string="Findings &amp; Summary">
-                                <field name="summary_findings" placeholder="Detail all facts established during the investigation..."/>
+                            <page string="1. Introduction &amp; Background">
+                                <field name="introduction" placeholder="Describe the background, mandate, initiation circumstances, and commencement of investigation..."/>
                             </page>
-                            <!-- Part 4: Liable Employees -->
-                            <page string="Liable Employees">
-                                <field name="liable_employee_ids">
-                                    <list editable="bottom">
-                                        <field name="employee_id"/>
-                                        <field name="role_in_incident"/>
-                                        <field name="degree_of_liability"/>
-                                        <field name="recommended_action"/>
-                                    </list>
-                                </field>
+                            <page string="2. Scope &amp; Limitations">
+                                <field name="scope_limitations" placeholder="Specify boundaries, timeframes, systems/branches audited, constraints faced during investigation..."/>
                             </page>
-                            <!-- Part 5 & 6: Policy &amp; Evidence -->
-                            <page string="Policy &amp; Evidence">
-                                <group>
+                            <page string="3. Investigation Findings">
+                                <field name="summary_findings" placeholder="Detail all facts established during the investigation, timelines, and audit evidence..."/>
+                            </page>
+                            <page string="4. Liable Employees &amp; Policy Articles">
+                                <group string="Specific Policy Articles Violated">
                                     <field name="applicable_policy" placeholder="e.g. HR Policy Section 4.2 – Attendance Violations"/>
                                     <field name="policy_clause"/>
+                                    <field name="policy_violation_references" placeholder="Detail specific policy articles, procedural codes, and circular clauses violated..."/>
+                                </group>
+                                <group string="Liable Personnel List">
+                                    <field name="liable_employee_ids">
+                                        <list editable="bottom">
+                                            <field name="employee_id"/>
+                                            <field name="role_in_incident"/>
+                                            <field name="degree_of_liability"/>
+                                            <field name="recommended_action"/>
+                                        </list>
+                                    </field>
+                                </group>
+                            </page>
+                            <page string="5. Recommendations">
+                                <field name="investigator_recommendation" placeholder="Investigator recommended action, disciplinary sanction, and system control improvements..."/>
+                            </page>
+                            <page string="Witness Statements &amp; Evidence">
+                                <group>
                                     <field name="witness_statements" placeholder="Enter witness statements and interview notes..."/>
                                     <field name="evidence_description" placeholder="Evidence collected, chain of custody, CCTV references..."/>
                                 </group>
                             </page>
-                            <!-- Part 7: Recommendation -->
-                            <page string="Conclusion &amp; Recommendation">
-                                <field name="investigator_recommendation" placeholder="Investigator recommended action based on evidence..."/>
-                            </page>
-                            <!-- Part 8: Management Review -->
                             <page string="Management Review Sign-off">
                                 <group>
                                     <field name="reviewed_by_id"/>

@@ -181,3 +181,18 @@ class DisciplinePayrollPenalty(models.Model):
             'suspension_days': self.suspension_days,
             'managerial_days': self.managerial_days,
         }
+
+    @api.model
+    def get_pending_penalties(self, employee_id, date_from=None, date_to=None):
+        """Public API returning list of pending penalty records for an employee during payroll execution."""
+        domain = [
+            ('employee_id', '=', employee_id),
+            ('state', 'in', ['pending', 'transferred']),
+        ]
+        if date_from:
+            domain.append(('effective_date', '>=', date_from))
+        if date_to:
+            domain.append(('effective_date', '<=', date_to))
+        penalties = self.search(domain)
+        return [p.get_payroll_transmission_payload() for p in penalties]
+

@@ -75,25 +75,33 @@
                                     <thead style="background-color: #f2f2f2;">
                                         <tr>
                                             <th>Punishment Type</th>
-                                            <th>Salary Penalty (%)</th>
+                                            <th>Penalty Rate / Days</th>
                                             <th>Initiator</th>
-                                            <th>Reviewer</th>
-                                            <th>Final Approver</th>
+                                            <th>Enforced By</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
                                             <td><span t-field="doc.punishment_type"/></td>
-                                            <td><span t-field="doc.penalty_percentage"/> %</td>
+                                            <td>
+                                                <t t-if="doc.fine_days &gt; 0">
+                                                    <span t-field="doc.fine_days"/> Day(s) Wage Deduction
+                                                </t>
+                                                <t t-elif="doc.penalty_percentage &gt; 0">
+                                                    <span t-field="doc.penalty_percentage"/> % Salary Deduction
+                                                </t>
+                                                <t t-else="">
+                                                    Recorded Warning (0% Penalty)
+                                                </t>
+                                            </td>
                                             <td><span t-field="doc.initiator_id.name"/></td>
-                                            <td><span t-field="doc.reviewer_id.name"/></td>
                                             <td><span t-field="doc.approver_id.name"/></td>
                                         </tr>
                                     </tbody>
                                 </table>
-                                <t t-if="doc.penalty_percentage &gt; 0">
+                                <t t-if="doc.penalty_percentage &gt; 0 or doc.fine_days &gt; 0">
                                     <p class="text-danger" style="font-weight: bold;">
-                                        Note: A salary deduction penalty of <span t-field="doc.penalty_percentage"/>% will be automatically applied via Payroll starting from effective date.
+                                        Note: The financial deduction penalty will be automatically scheduled and applied via the Payroll module starting from the effective pay period.
                                     </p>
                                 </t>
                             </div>
