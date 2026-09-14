@@ -28,14 +28,6 @@
             <field name="company_id" eval="False"/>
         </record>
 
-        <record id="sequence_hr_onboarding_plan" model="ir.sequence">
-            <field name="name">Onboarding Plan sequence</field>
-            <field name="code">hr.onboarding.plan</field>
-            <field name="prefix">BB/ONB/</field>
-            <field name="padding">5</field>
-            <field name="company_id" eval="False"/>
-        </record>
-
         <!-- ================================================================ -->
         <!-- Bunna Bank S.C. Official Probation Evaluation Criteria Seed Data  -->
         <!-- ================================================================ -->
@@ -103,17 +95,5 @@
             <field name="active">True</field>
         </record>
 
-        <!-- ================================================================ -->
-        <!-- Cron: Onboarding Delayed Milestones Escalation Check             -->
-        <!-- ================================================================ -->
-        <record id="ir_cron_onboarding_check_escalations" model="ir.cron">
-            <field name="name">Recruitment: Check Onboarding Delayed Milestones Escalations</field>
-            <field name="model_id" ref="model_hr_onboarding_plan"/>
-            <field name="state">code</field>
-            <field name="code">model._cron_check_onboarding_escalations</field>
-            <field name="interval_number">1</field>
-            <field name="interval_type">days</field>
-            <field name="active">True</field>
-        </record>
     </data>
 </odoo>

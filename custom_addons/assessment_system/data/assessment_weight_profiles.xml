@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- 1. External - Managerial & Junior: 50% Exam + 50% Interview -->
+    <record id="weight_profile_external_managerial" model="assessment.weight.profile">
+        <field name="name">External Applicant - Managerial Weight Profile</field>
+        <field name="candidate_type">external</field>
+        <field name="role_level">managerial</field>
+        <field name="notes">External Managerial &amp; Junior Candidates (50% Exam + 50% Interview)</field>
+    </record>
+    <record id="weight_line_ext_mgr_exam" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_external_managerial"/>
+        <field name="sequence">10</field>
+        <field name="component">exam</field>
+        <field name="weight_percentage">50.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_ext_mgr_interview" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_external_managerial"/>
+        <field name="sequence">20</field>
+        <field name="component">interview</field>
+        <field name="weight_percentage">50.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+
+    <!-- 2. External - Non-Managerial: 60% Exam + 40% Interview -->
+    <record id="weight_profile_external_non_managerial" model="assessment.weight.profile">
+        <field name="name">External Applicant - Non-Managerial Weight Profile</field>
+        <field name="candidate_type">external</field>
+        <field name="role_level">non_managerial</field>
+        <field name="notes">External Non-Managerial Candidates (60% Exam + 40% Interview)</field>
+    </record>
+    <record id="weight_line_ext_nonmgr_exam" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_external_non_managerial"/>
+        <field name="sequence">10</field>
+        <field name="component">exam</field>
+        <field name="weight_percentage">60.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_ext_nonmgr_interview" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_external_non_managerial"/>
+        <field name="sequence">20</field>
+        <field name="component">interview</field>
+        <field name="weight_percentage">40.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+
+    <!-- 3. Internal - Managerial: 60% PMS + 40% Interview -->
+    <record id="weight_profile_internal_managerial" model="assessment.weight.profile">
+        <field name="name">Internal Applicant - Managerial Weight Profile</field>
+        <field name="candidate_type">internal</field>
+        <field name="role_level">managerial</field>
+        <field name="notes">Internal Managerial Candidates (60% PMS + 40% Interview)</field>
+    </record>
+    <record id="weight_line_int_mgr_pms" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_managerial"/>
+        <field name="sequence">10</field>
+        <field name="component">pms</field>
+        <field name="weight_percentage">60.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_int_mgr_interview" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_managerial"/>
+        <field name="sequence">20</field>
+        <field name="component">interview</field>
+        <field name="weight_percentage">40.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+
+    <!-- 4. Internal - Non-Managerial: 40% PMS + 30% Exam + 30% Interview -->
+    <record id="weight_profile_internal_non_managerial" model="assessment.weight.profile">
+        <field name="name">Internal Applicant - Non-Managerial Weight Profile</field>
+        <field name="candidate_type">internal</field>
+        <field name="role_level">non_managerial</field>
+        <field name="notes">Internal Non-Managerial Candidates (40% PMS + 30% Exam + 30% Interview)</field>
+    </record>
+    <record id="weight_line_int_nonmgr_pms" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_non_managerial"/>
+        <field name="sequence">10</field>
+        <field name="component">pms</field>
+        <field name="weight_percentage">40.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_int_nonmgr_exam" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_non_managerial"/>
+        <field name="sequence">20</field>
+        <field name="component">exam</field>
+        <field name="weight_percentage">30.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_int_nonmgr_interview" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_non_managerial"/>
+        <field name="sequence">30</field>
+        <field name="component">interview</field>
+        <field name="weight_percentage">30.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+
+    <!-- 5. Internal - Junior: 50% PMS + 25% Exam + 25% Interview -->
+    <record id="weight_profile_internal_junior" model="assessment.weight.profile">
+        <field name="name">Internal Applicant - Junior Weight Profile</field>
+        <field name="candidate_type">internal</field>
+        <field name="role_level">junior</field>
+        <field name="notes">Internal Junior Candidates (50% PMS + 25% Exam + 25% Interview)</field>
+    </record>
+    <record id="weight_line_int_jun_pms" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_junior"/>
+        <field name="sequence">10</field>
+        <field name="component">pms</field>
+        <field name="weight_percentage">50.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_int_jun_exam" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_junior"/>
+        <field name="sequence">20</field>
+        <field name="component">exam</field>
+        <field name="weight_percentage">25.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+    <record id="weight_line_int_jun_interview" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_internal_junior"/>
+        <field name="sequence">30</field>
+        <field name="component">interview</field>
+        <field name="weight_percentage">25.0</field>
+        <field name="minimum_pass_score">50.0</field>
+    </record>
+
+    <!-- 6. Transfer - All Levels: PMS 30% + App Date 20% + Experience 20% + Location Service 20% + Recommendation 10% -->
+    <record id="weight_profile_transfer_all" model="assessment.weight.profile">
+        <field name="name">Transfer Applicant - All Levels Weight Profile</field>
+        <field name="candidate_type">transfer</field>
+        <field name="role_level">all</field>
+        <field name="notes">Transfer Applicants All Levels</field>
+    </record>
+    <record id="weight_line_trf_pms" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_transfer_all"/>
+        <field name="sequence">10</field>
+        <field name="component">pms</field>
+        <field name="weight_percentage">30.0</field>
+    </record>
+    <record id="weight_line_trf_app_date" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_transfer_all"/>
+        <field name="sequence">20</field>
+        <field name="component">app_date</field>
+        <field name="weight_percentage">20.0</field>
+    </record>
+    <record id="weight_line_trf_exp" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_transfer_all"/>
+        <field name="sequence">30</field>
+        <field name="component">experience</field>
+        <field name="weight_percentage">20.0</field>
+    </record>
+    <record id="weight_line_trf_loc" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_transfer_all"/>
+        <field name="sequence">40</field>
+        <field name="component">service_location</field>
+        <field name="weight_percentage">20.0</field>
+    </record>
+    <record id="weight_line_trf_rec" model="assessment.weight.profile.line">
+        <field name="profile_id" ref="weight_profile_transfer_all"/>
+        <field name="sequence">50</field>
+        <field name="component">recommendation</field>
+        <field name="weight_percentage">10.0</field>
+    </record>
+
+</odoo>

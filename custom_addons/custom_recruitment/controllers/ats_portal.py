@@ -1,4 +1,35 @@
+import urllib.parse
 from datetime import datetime
+
+def _validate_uploaded_file(file_obj, max_mb=5, allowed_exts=None, label="File"):
+    """
+    Validates uploaded file size and extension based on Bunna Bank ATS standards.
+    Returns (bytes_data_base64, filename, error_msg).
+    """
+    if not file_obj or not hasattr(file_obj, 'read'):
+        return False, False, None
+    filename = getattr(file_obj, 'filename', '') or ''
+    if not filename:
+        return False, False, None
+    
+    content = file_obj.read()
+    if not content:
+        return False, False, None
+    
+    # 1. Size check
+    max_bytes = max_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        size_mb = len(content) / (1024 * 1024)
+        return False, False, _("%s size (%.2f MB) exceeds the maximum allowed limit of %d MB. Please upload a smaller or compressed file.") % (label, size_mb, max_mb)
+    
+    # 2. Extension check
+    if allowed_exts:
+        ext = filename.split('.')[-1].lower() if '.' in filename else ''
+        clean_exts = [e.lower().lstrip('.') for e in allowed_exts]
+        if ext not in clean_exts:
+            return False, False, _("%s format (.%s) is not supported. Allowed formats: %s.") % (label, ext, ', '.join(allowed_exts))
+            
+    return base64.b64encode(content), filename, None
 
 def _clean_date(d_str):
     if not d_str:
@@ -59,6 +90,91 @@ class ATSPortalController(http.Controller):
             user.has_group('base.group_system') or
             user.has_group('base.group_erp_manager')
         )
+
+    def _is_hired_or_employee_applicant(self, app):
+        """Returns True if the applicant is hired, contract signed/proposal, or already exists as an employee in hr.employee / hr.version."""
+        if not app:
+            return False
+        if app.employee_id or app.contract_created_new or app.bunna_app_status == 'hired':
+            return True
+        stage_name = (app.stage_id.name or '').strip().lower() if app.stage_id else ''
+        if any(keyword in stage_name for keyword in ['contract signed', 'contract proposal', 'hired', 'signed']):
+            return True
+
+        emp_model = request.env['hr.employee'].sudo()
+        # Check if applicant's email exists in hr.employee
+        email = (app.email_from or '').strip().lower()
+        if email:
+            email_domain = []
+            if 'work_email' in emp_model._fields:
+                email_domain.append(('work_email', '=ilike', email))
+            if 'private_email' in emp_model._fields:
+                email_domain.append(('private_email', '=ilike', email))
+            if email_domain:
+                if len(email_domain) > 1:
+                    email_domain = ['|'] * (len(email_domain) - 1) + email_domain
+                if emp_model.search(email_domain, limit=1):
+                    return True
+
+        # Check if applicant's partner exists in hr.employee
+        if app.partner_id:
+            partner_domain = []
+            if 'work_contact_id' in emp_model._fields:
+                partner_domain.append(('work_contact_id', '=', app.partner_id.id))
+            if 'user_partner_id' in emp_model._fields:
+                partner_domain.append(('user_partner_id', '=', app.partner_id.id))
+            if 'user_id' in emp_model._fields:
+                partner_domain.append(('user_id.partner_id', '=', app.partner_id.id))
+            if partner_domain:
+                if len(partner_domain) > 1:
+                    partner_domain = ['|'] * (len(partner_domain) - 1) + partner_domain
+                if emp_model.search(partner_domain, limit=1):
+                    return True
+        return False
+
+    def _is_hired_or_employee_candidate(self, candidate):
+        """Returns True if candidate profile belongs to an employee registered in hr.employee / hr.version or has signed contract."""
+        if not candidate:
+            return False
+        # Check if candidate user has an employee record
+        if candidate.user_id and hasattr(candidate.user_id, 'employee_ids') and candidate.user_id.employee_ids:
+            return True
+
+        emp_model = request.env['hr.employee'].sudo()
+        # Check partner link to employee
+        if candidate.partner_id:
+            partner_domain = []
+            if 'work_contact_id' in emp_model._fields:
+                partner_domain.append(('work_contact_id', '=', candidate.partner_id.id))
+            if 'user_partner_id' in emp_model._fields:
+                partner_domain.append(('user_partner_id', '=', candidate.partner_id.id))
+            if 'user_id' in emp_model._fields:
+                partner_domain.append(('user_id.partner_id', '=', candidate.partner_id.id))
+            if partner_domain:
+                if len(partner_domain) > 1:
+                    partner_domain = ['|'] * (len(partner_domain) - 1) + partner_domain
+                if emp_model.search(partner_domain, limit=1):
+                    return True
+
+        # Check candidate email in hr.employee
+        email = (candidate.email or '').strip().lower()
+        if email:
+            email_domain = []
+            if 'work_email' in emp_model._fields:
+                email_domain.append(('work_email', '=ilike', email))
+            if 'private_email' in emp_model._fields:
+                email_domain.append(('private_email', '=ilike', email))
+            if email_domain:
+                if len(email_domain) > 1:
+                    email_domain = ['|'] * (len(email_domain) - 1) + email_domain
+                if emp_model.search(email_domain, limit=1):
+                    return True
+
+        # Check if candidate has any application with Contract Signed / Hired / employee_id
+        for app in candidate.application_ids:
+            if self._is_hired_or_employee_applicant(app):
+                return True
+        return False
 
     # ---------------------------------------------------------------
     # 1. External Vacancies List & Search (/jobs)
@@ -216,11 +332,15 @@ class ATSPortalController(http.Controller):
         if not self._is_profile_complete(candidate):
             return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
-        applications = request.env['hr.applicant'].sudo().search([
+        domain = [
             '|',
             ('candidate_profile_id', '=', candidate.id),
             ('email_from', '=ilike', candidate.email or 'never_match_placeholder'),
-        ], order='create_date desc')
+            ('bunna_app_status', '!=', 'hired'),
+            ('contract_created_new', '!=', True),
+        ]
+        raw_applications = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
+        applications = raw_applications.filtered(lambda a: not self._is_hired_or_employee_applicant(a))
 
         # Auto-link candidate_profile_id on any apps matched by email but missing the link
         for app in applications:
@@ -401,6 +521,8 @@ class ATSPortalController(http.Controller):
             ])
 
         applicants = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
+        # Exclude candidates whose contract is signed, are hired, or registered in Core HR (hr.employee / hr.version)
+        applicants = applicants.filtered(lambda a: not self._is_hired_or_employee_applicant(a))
 
         selected_vacancy = request.env['job.vacancy'].sudo().browse(target_vacancy_id) if target_vacancy_id else False
 
@@ -457,6 +579,8 @@ class ATSPortalController(http.Controller):
             domain.append(('gender', '=', gender))
 
         candidates = request.env['candidate.profile'].sudo().search(domain, order='create_date desc')
+        # Exclude candidates who have become employees or whose contracts are signed
+        candidates = candidates.filtered(lambda c: not self._is_hired_or_employee_candidate(c))
 
         values = {
             'candidates': candidates,
@@ -549,11 +673,15 @@ class ATSPortalController(http.Controller):
         if not self._is_profile_complete(candidate):
             return request.redirect('/my/candidate/profile?step=1&profile_required=1')
 
-        applications = request.env['hr.applicant'].sudo().search([
+        domain = [
             '|',
             ('candidate_profile_id', '=', candidate.id),
             ('email_from', '=ilike', candidate.email or 'never_match_placeholder'),
-        ], order='create_date desc')
+            ('bunna_app_status', '!=', 'hired'),
+            ('contract_created_new', '!=', True),
+        ]
+        raw_applications = request.env['hr.applicant'].sudo().search(domain, order='create_date desc')
+        applications = raw_applications.filtered(lambda a: not self._is_hired_or_employee_applicant(a))
 
         # Auto-link candidate_profile_id on any apps matched by email but missing the link
         for app in applications:
@@ -592,6 +720,162 @@ class ATSPortalController(http.Controller):
         return request.render('custom_recruitment.ats_candidate_applications_template', values)
 
     # ---------------------------------------------------------------
+    # Candidate Job Offers Management (/my/candidate/offers)
+    # ---------------------------------------------------------------
+    @http.route(['/my/candidate/offers'], type='http', auth='user', website=True)
+    def candidate_offers(self, offer_id=None, success=None, error=None, **kwargs):
+        """Displays job offers extended to the selected candidate, with a 3-day acceptance window."""
+        candidate = self._get_candidate_profile()
+        if not candidate:
+            return request.redirect('/jobs/login')
+        if not self._is_profile_complete(candidate):
+            return request.redirect('/my/candidate/profile?step=1&profile_required=1')
+
+        cand_email = candidate.email or request.env.user.email or ''
+        user_partner_id = request.env.user.partner_id.id
+
+        # Trigger cron to ensure any offers past 3 days are auto-expired
+        request.env['recruitment.offer.letter'].sudo()._cron_expire_pending_offers()
+
+        cand_email = (candidate.email or request.env.user.email or '').strip().lower()
+        user_partner_id = request.env.user.partner_id.id
+
+        # Trigger cron to ensure any offers past deadline are auto-expired
+        request.env['recruitment.offer.letter'].sudo()._cron_expire_pending_offers()
+
+        domain = [
+            '|', '|', '|', '|',
+            ('candidate_email', '=ilike', cand_email),
+            ('applicant_id.partner_id', '=', user_partner_id),
+            ('applicant_id.email_from', '=ilike', cand_email),
+            ('ext_candidate_id.applicant_name.partner_id', '=', user_partner_id),
+            ('ext_candidate_id.applicant_name.email_from', '=ilike', cand_email),
+        ]
+        all_offers = request.env['recruitment.offer.letter'].sudo().search(domain, order='create_date desc')
+
+        today = fields.Date.today()
+        offers_data = []
+        for off in all_offers:
+            app = off.applicant_id or (off.ext_candidate_id.applicant_name if off.ext_candidate_id else False)
+            # Remove / hide from candidate portal once Employee and Contract are created (hired)
+            if app and (app.bunna_app_status == 'hired' or app.contract_created_new or (app.employee_id and app.contract_created_new)):
+                continue
+
+            # Remove from ATS candidate portal once the offer letter is accepted or rejected (declined)
+            if off.state in ('accepted', 'declined'):
+                continue
+
+            days_left = None
+            is_urgent = False
+            deadline_val = off.deadline_date or off.expiry_date
+            if off.state == 'sent' and deadline_val:
+                delta = (deadline_val - today).days
+                days_left = max(0, delta)
+                is_urgent = days_left <= 1
+
+            offers_data.append({
+                'offer': off,
+                'days_left': days_left,
+                'is_urgent': is_urgent,
+                'applicant': app,
+                'deadline': deadline_val,
+            })
+
+        values = {
+            'candidate': candidate,
+            'offers_data': offers_data,
+            'total_offers': len(offers_data),
+            'success': success,
+            'error': error,
+            'today': today,
+        }
+        return request.render('custom_recruitment.ats_candidate_offers_template', values)
+
+    @http.route(['/my/candidate/offers/download/<int:offer_id>', '/my/candidate/offers/preview/<int:offer_id>'], type='http', auth='user', website=True)
+    def candidate_offer_download(self, offer_id, preview=False, **kwargs):
+        """Allows candidate to preview or download their official Bunna Bank Employment Offer Letter PDF."""
+        candidate = self._get_candidate_profile()
+        if not candidate:
+            return request.redirect('/jobs/login')
+
+        offer = request.env['recruitment.offer.letter'].sudo().browse(int(offer_id))
+        if not offer.exists():
+            return request.redirect('/my/candidate/offers?error=Offer+not+found')
+
+        cand_email = (candidate.email or request.env.user.email or '').strip().lower()
+        off_email = (offer.candidate_email or '').strip().lower()
+        app_partner = offer.applicant_id.partner_id.id if (offer.applicant_id and offer.applicant_id.partner_id) else (
+            offer.ext_candidate_id.applicant_name.partner_id.id if (offer.ext_candidate_id and offer.ext_candidate_id.applicant_name) else False
+        )
+        app_email = (offer.applicant_id.email_from or '').strip().lower() if offer.applicant_id else (
+            (offer.ext_candidate_id.applicant_name.email_from or '').strip().lower() if (offer.ext_candidate_id and offer.ext_candidate_id.applicant_name) else ''
+        )
+
+        has_access = (
+            off_email == cand_email
+            or app_email == cand_email
+            or app_partner == request.env.user.partner_id.id
+            or request.env.user.has_group('custom_recruitment.group_recruitment_user')
+            or request.env.user.has_group('base.group_system')
+        )
+        if not has_access:
+            return request.redirect('/my/candidate/offers?error=Unauthorized+access+to+offer')
+
+        pdf_content, _dummy = request.env['ir.actions.report']._render_qweb_pdf('custom_recruitment.action_report_recruitment_offer_letter', [offer.id])
+        filename = f"Bunna_Bank_Offer_Letter_{(offer.candidate_name or 'Candidate').replace(' ', '_')}.pdf"
+        is_preview = preview or kwargs.get('preview') or request.httprequest.path.startswith('/my/candidate/offers/preview')
+        disposition = 'inline' if is_preview else 'attachment'
+        pdfhttpheaders = [
+            ('Content-Type', 'application/pdf'),
+            ('Content-Length', len(pdf_content)),
+            ('Content-Disposition', f'{disposition}; filename="{filename}"')
+        ]
+        return request.make_response(pdf_content, headers=pdfhttpheaders)
+
+    @http.route(['/my/candidate/offers/respond'], type='http', auth='user', methods=['POST'], website=True)
+    def candidate_offer_respond(self, offer_id, decision, reason='', **kwargs):
+        """Candidate accepts or declines the job offer via the ATS Portal."""
+        candidate = self._get_candidate_profile()
+        if not candidate:
+            return request.redirect('/jobs/login')
+
+        offer = request.env['recruitment.offer.letter'].sudo().browse(int(offer_id))
+        if not offer.exists():
+            return request.redirect('/my/candidate/offers?error=Offer+not+found')
+
+        cand_email = (candidate.email or request.env.user.email or '').strip().lower()
+        off_email = (offer.candidate_email or '').strip().lower()
+        app_partner = offer.applicant_id.partner_id.id if (offer.applicant_id and offer.applicant_id.partner_id) else (
+            offer.ext_candidate_id.applicant_name.partner_id.id if (offer.ext_candidate_id and offer.ext_candidate_id.applicant_name) else False
+        )
+        app_email = (offer.applicant_id.email_from or '').strip().lower() if offer.applicant_id else (
+            (offer.ext_candidate_id.applicant_name.email_from or '').strip().lower() if (offer.ext_candidate_id and offer.ext_candidate_id.applicant_name) else ''
+        )
+
+        has_access = (
+            off_email == cand_email
+            or app_email == cand_email
+            or app_partner == request.env.user.partner_id.id
+            or request.env.user.has_group('custom_recruitment.group_recruitment_user')
+            or request.env.user.has_group('base.group_system')
+        )
+        if not has_access:
+            return request.redirect('/my/candidate/offers?error=Unauthorized+access+to+offer')
+
+        if offer.state != 'sent':
+            return request.redirect(f'/my/candidate/offers?error=Offer+is+already+{offer.state}')
+
+        if decision == 'accept':
+            offer.action_accept()
+            return request.redirect('/my/candidate/offers?success=accepted')
+        elif decision == 'decline':
+            offer.rejection_reason = reason or _("Declined by candidate via ATS Job Portal")
+            offer.action_decline()
+            return request.redirect('/my/candidate/offers?success=declined')
+
+        return request.redirect('/my/candidate/offers')
+
+    # ---------------------------------------------------------------
     # Master Electronic CV Profile Builder (7 Tabs)
     # ---------------------------------------------------------------
     @http.route('/my/candidate/profile', type='http', auth='user', website=True, methods=['GET', 'POST'])
@@ -626,166 +910,286 @@ class ATSPortalController(http.Controller):
                 return request.redirect('/my/candidate/profile?step=3')
 
             elif step == 3:
-                # Add/Update Education
+                # Handle single edit or multiple new education entries
                 edit_id = kwargs.get('edit_id')
-                edu_level = kwargs.get('education_level', 'bsc')
-                field_study = kwargs.get('field_of_study')
-                if field_study == 'Other':
-                    field_study = kwargs.get('other_field_of_study') or 'Other'
-                
-                inst = kwargs.get('institution')
-                if inst == 'Other':
-                    inst = kwargs.get('other_institution') or 'Other'
-
-                has_cs = kwargs.get('has_cost_sharing') == '1'
-                cs_file = kwargs.get('cost_sharing_file')
-                cs_data, cs_filename = False, False
-                if cs_file and hasattr(cs_file, 'read'):
-                    c = cs_file.read()
-                    if c:
-                        cs_data = base64.b64encode(c)
-                        cs_filename = cs_file.filename
-
-                edu_doc_file = kwargs.get('education_doc_file')
-                ed_data, ed_filename = False, False
-                if edu_doc_file and hasattr(edu_doc_file, 'read'):
-                    c = edu_doc_file.read()
-                    if c:
-                        ed_data = base64.b64encode(c)
-                        ed_filename = edu_doc_file.filename
-
-                grad_year_input = kwargs.get('graduation_year')
-                grad_date = False
-                if grad_year_input and str(grad_year_input).strip():
-                    s_val = str(grad_year_input).strip()
-                    if len(s_val) == 4 and s_val.isdigit():
-                        grad_date = f"{s_val}-01-01"
-                    else:
-                        grad_date = s_val
-
-                vals = {
-                    'candidate_id': candidate.id,
-                    'education_level': edu_level,
-                    'qualification_name': kwargs.get('qualification_name') or edu_level,
-                    'field_of_study': field_study or '',
-                    'other_field_of_study': kwargs.get('other_field_of_study', ''),
-                    'institution': inst or '',
-                    'other_institution': kwargs.get('other_institution', ''),
-                    'program_type': kwargs.get('program_type', 'regular'),
-                    'has_cost_sharing': has_cs,
-                    'graduation_year': grad_date,
-                    'cgpa': float(kwargs.get('cgpa', 0.0) or 0.0),
-                }
-                if cs_data:
-                    vals['cost_sharing_file'] = cs_data
-                    vals['cost_sharing_filename'] = cs_filename
-                if ed_data:
-                    vals['education_doc_file'] = ed_data
-                    vals['education_doc_filename'] = ed_filename
-
                 if edit_id:
+                    # Single edit mode
+                    edu_level = kwargs.get('education_level', 'bsc')
+                    field_study = kwargs.get('field_of_study')
+                    if field_study == 'Other':
+                        field_study = kwargs.get('other_field_of_study') or 'Other'
+                    inst = kwargs.get('institution')
+                    if inst == 'Other':
+                        inst = kwargs.get('other_institution') or 'Other'
+
+                    has_cs = kwargs.get('has_cost_sharing') == '1'
+                    cs_file = kwargs.get('cost_sharing_file')
+                    cs_data, cs_filename, cs_err = _validate_uploaded_file(cs_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Cost Sharing Agreement / Document')
+                    if cs_err:
+                        return request.redirect('/my/candidate/profile?step=3&upload_error=' + urllib.parse.quote(cs_err))
+
+                    edu_doc_file = kwargs.get('education_doc_file')
+                    ed_data, ed_filename, ed_err = _validate_uploaded_file(edu_doc_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Degree / Diploma / Transcript Document')
+                    if ed_err:
+                        return request.redirect('/my/candidate/profile?step=3&upload_error=' + urllib.parse.quote(ed_err))
+
+                    grad_year_input = kwargs.get('graduation_year')
+                    grad_date = False
+                    if grad_year_input and str(grad_year_input).strip():
+                        s_val = str(grad_year_input).strip()
+                        grad_date = f"{s_val}-01-01" if len(s_val) == 4 and s_val.isdigit() else s_val
+
+                    vals = {
+                        'education_level': edu_level,
+                        'qualification_name': kwargs.get('qualification_name') or edu_level,
+                        'field_of_study': field_study or '',
+                        'other_field_of_study': kwargs.get('other_field_of_study', ''),
+                        'institution': inst or '',
+                        'other_institution': kwargs.get('other_institution', ''),
+                        'program_type': kwargs.get('program_type', 'regular'),
+                        'has_cost_sharing': has_cs,
+                        'graduation_year': grad_date,
+                        'cgpa': float(kwargs.get('cgpa', 0.0) or 0.0),
+                    }
+                    if cs_data:
+                        vals['cost_sharing_file'] = cs_data
+                        vals['cost_sharing_filename'] = cs_filename
+                    if ed_data:
+                        vals['education_doc_file'] = ed_data
+                        vals['education_doc_filename'] = ed_filename
+
                     request.env['candidate.education'].sudo().browse(int(edit_id)).write(vals)
-                elif field_study and inst:
-                    request.env['candidate.education'].sudo().create(vals)
+                else:
+                    # Multi-entry creation mode
+                    fields_list = request.httprequest.form.getlist('field_of_study')
+                    inst_list = request.httprequest.form.getlist('institution')
+                    level_list = request.httprequest.form.getlist('education_level')
+                    prog_list = request.httprequest.form.getlist('program_type')
+                    grad_list = request.httprequest.form.getlist('graduation_year')
+                    cgpa_list = request.httprequest.form.getlist('cgpa')
+                    other_f_list = request.httprequest.form.getlist('other_field_of_study')
+                    other_i_list = request.httprequest.form.getlist('other_institution')
+                    cs_files = request.httprequest.files.getlist('cost_sharing_file')
+                    ed_files = request.httprequest.files.getlist('education_doc_file')
+
+                    num_entries = max(len(fields_list), len(inst_list), 1)
+                    for i in range(num_entries):
+                        f_study = fields_list[i].strip() if i < len(fields_list) else (kwargs.get('field_of_study', '').strip() if i == 0 else '')
+                        inst = inst_list[i].strip() if i < len(inst_list) else (kwargs.get('institution', '').strip() if i == 0 else '')
+                        if not f_study and not inst:
+                            continue
+
+                        lvl = level_list[i] if i < len(level_list) else kwargs.get('education_level', 'bsc')
+                        prog = prog_list[i] if i < len(prog_list) else kwargs.get('program_type', 'regular')
+                        g_val = grad_list[i].strip() if i < len(grad_list) else str(kwargs.get('graduation_year', '')).strip()
+                        grad_date = f"{g_val}-01-01" if len(g_val) == 4 and g_val.isdigit() else (g_val or False)
+                        cgpa_val = cgpa_list[i] if i < len(cgpa_list) else kwargs.get('cgpa', '0.0')
+                        other_f = other_f_list[i] if i < len(other_f_list) else kwargs.get('other_field_of_study', '')
+                        other_i = other_i_list[i] if i < len(other_i_list) else kwargs.get('other_institution', '')
+
+                        if f_study == 'Other' and other_f:
+                            f_study = other_f
+                        if inst == 'Other' and other_i:
+                            inst = other_i
+
+                        cs_file = cs_files[i] if i < len(cs_files) else (kwargs.get('cost_sharing_file') if i == 0 else None)
+                        cs_data, cs_filename, _ = _validate_uploaded_file(cs_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'])
+
+                        ed_file = ed_files[i] if i < len(ed_files) else (kwargs.get('education_doc_file') if i == 0 else None)
+                        ed_data, ed_filename, _ = _validate_uploaded_file(ed_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'])
+
+                        vals = {
+                            'candidate_id': candidate.id,
+                            'education_level': lvl,
+                            'qualification_name': lvl,
+                            'field_of_study': f_study,
+                            'other_field_of_study': other_f,
+                            'institution': inst,
+                            'other_institution': other_i,
+                            'program_type': prog,
+                            'graduation_year': grad_date,
+                            'cgpa': float(cgpa_val or 0.0),
+                        }
+                        if cs_data:
+                            vals['cost_sharing_file'] = cs_data
+                            vals['cost_sharing_filename'] = cs_filename
+                            vals['has_cost_sharing'] = True
+                        if ed_data:
+                            vals['education_doc_file'] = ed_data
+                            vals['education_doc_filename'] = ed_filename
+
+                        request.env['candidate.education'].sudo().create(vals)
 
                 return request.redirect('/my/candidate/profile?step=4')
 
             elif step == 4:
-                # Add/Update Experience
+                # Handle single edit or multiple new experience entries
                 edit_id = kwargs.get('edit_id')
-                pos = kwargs.get('position')
-                org = kwargs.get('organization')
-                is_curr = kwargs.get('is_current') == '1'
-
-                exp_file = kwargs.get('exp_file')
-                exp_data, exp_filename = False, False
-                if exp_file and hasattr(exp_file, 'read'):
-                    c = exp_file.read()
-                    if c:
-                        exp_data = base64.b64encode(c)
-                        exp_filename = exp_file.filename
-
-                candidate.sudo().write({
-                    'worked_in_bunna_earlier': kwargs.get('worked_in_bunna_earlier', candidate.worked_in_bunna_earlier),
-                    'last_position_held': kwargs.get('last_position_held', candidate.last_position_held),
-                    'last_department': kwargs.get('last_department', candidate.last_department),
-                    'reporting_manager': kwargs.get('reporting_manager', candidate.reporting_manager),
-                    'length_of_service': float(kwargs.get('length_of_service', 0.0) or 0.0),
-                    'termination_reason': kwargs.get('termination_reason', candidate.termination_reason),
-                    'supervisory_experience': float(kwargs.get('supervisory_experience', 0.0) or 0.0),
-                })
-
-                vals = {
-                    'candidate_id': candidate.id,
-                    'position': pos or '',
-                    'organization': org or '',
-                    'employment_type': kwargs.get('employment_type', 'full_time'),
-                    'sector_type': kwargs.get('sector_type', 'banking'),
-                    'start_date': _clean_date(kwargs.get('start_date')),
-                    'end_date': False if is_curr else _clean_date(kwargs.get('end_date')),
-                    'is_current': is_curr,
-                    'responsibilities': kwargs.get('responsibilities', ''),
-                }
-                if exp_data:
-                    vals['exp_file'] = exp_data
-                    vals['exp_filename'] = exp_filename
-
                 if edit_id:
+                    pos = kwargs.get('position')
+                    org = kwargs.get('organization')
+                    is_curr = kwargs.get('is_current') == '1'
+
+                    exp_file = kwargs.get('exp_file')
+                    exp_data, exp_filename, exp_err = _validate_uploaded_file(exp_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'], label='Experience / Service Certificate')
+                    if exp_err:
+                        return request.redirect('/my/candidate/profile?step=4&upload_error=' + urllib.parse.quote(exp_err))
+
+                    vals = {
+                        'position': pos or '',
+                        'organization': org or '',
+                        'employment_type': kwargs.get('employment_type', 'full_time'),
+                        'sector_type': kwargs.get('sector_type', 'banking'),
+                        'start_date': _clean_date(kwargs.get('start_date')),
+                        'end_date': False if is_curr else _clean_date(kwargs.get('end_date')),
+                        'is_current': is_curr,
+                        'responsibilities': kwargs.get('responsibilities', ''),
+                    }
+                    if exp_data:
+                        vals['exp_file'] = exp_data
+                        vals['exp_filename'] = exp_filename
+
                     request.env['candidate.experience'].sudo().browse(int(edit_id)).write(vals)
-                elif pos and org:
-                    request.env['candidate.experience'].sudo().create(vals)
+                else:
+                    # Multi-entry creation mode
+                    pos_list = request.httprequest.form.getlist('position')
+                    org_list = request.httprequest.form.getlist('organization')
+                    sector_list = request.httprequest.form.getlist('sector_type')
+                    emp_type_list = request.httprequest.form.getlist('employment_type')
+                    start_list = request.httprequest.form.getlist('start_date')
+                    end_list = request.httprequest.form.getlist('end_date')
+                    curr_list = request.httprequest.form.getlist('is_current')
+                    resp_list = request.httprequest.form.getlist('responsibilities')
+                    exp_files = request.httprequest.files.getlist('exp_file')
+
+                    num_entries = max(len(pos_list), len(org_list), 1)
+                    for i in range(num_entries):
+                        pos = pos_list[i].strip() if i < len(pos_list) else (kwargs.get('position', '').strip() if i == 0 else '')
+                        org = org_list[i].strip() if i < len(org_list) else (kwargs.get('organization', '').strip() if i == 0 else '')
+                        if not pos and not org:
+                            continue
+
+                        sec = sector_list[i] if i < len(sector_list) else kwargs.get('sector_type', 'banking')
+                        emp_t = emp_type_list[i] if i < len(emp_type_list) else kwargs.get('employment_type', 'full_time')
+                        s_date = _clean_date(start_list[i]) if i < len(start_list) else _clean_date(kwargs.get('start_date'))
+                        e_date_raw = end_list[i] if i < len(end_list) else kwargs.get('end_date')
+                        is_c = (curr_list[i] == '1' if i < len(curr_list) else kwargs.get('is_current') == '1')
+                        e_date = False if is_c else _clean_date(e_date_raw)
+                        resp = resp_list[i] if i < len(resp_list) else kwargs.get('responsibilities', '')
+
+                        exp_file = exp_files[i] if i < len(exp_files) else (kwargs.get('exp_file') if i == 0 else None)
+                        exp_data, exp_filename, _ = _validate_uploaded_file(exp_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png'])
+
+                        vals = {
+                            'candidate_id': candidate.id,
+                            'position': pos,
+                            'organization': org,
+                            'employment_type': emp_t,
+                            'sector_type': sec,
+                            'start_date': s_date,
+                            'end_date': e_date,
+                            'is_current': is_c,
+                            'responsibilities': resp,
+                        }
+                        if exp_data:
+                            vals['exp_file'] = exp_data
+                            vals['exp_filename'] = exp_filename
+
+                        request.env['candidate.experience'].sudo().create(vals)
 
                 return request.redirect('/my/candidate/profile?step=5')
 
             elif step == 5:
-                # Add/Update Certification
+                # Handle single edit or multiple new certification entries
                 edit_id = kwargs.get('edit_id')
-                name = kwargs.get('cert_name')
-                has_exp = kwargs.get('has_expiry') == '1'
-
-                cert_file = kwargs.get('cert_file')
-                cert_data, cert_filename = False, False
-                if cert_file and hasattr(cert_file, 'read'):
-                    c = cert_file.read()
-                    if c:
-                        cert_data = base64.b64encode(c)
-                        cert_filename = cert_file.filename
-
-                vals = {
-                    'candidate_id': candidate.id,
-                    'name': name or '',
-                    'issuing_organization': kwargs.get('issuing_organization', ''),
-                    'issue_date': _clean_date(kwargs.get('issue_date')),
-                    'has_expiry': has_exp,
-                    'expiry_date': _clean_date(kwargs.get('expiry_date')) if has_exp else False,
-                    'cert_url': kwargs.get('cert_url', ''),
-                }
-                if cert_data:
-                    vals['cert_file'] = cert_data
-                    vals['cert_filename'] = cert_filename
-
                 if edit_id:
+                    name = kwargs.get('cert_name')
+                    has_exp = kwargs.get('has_expiry') == '1'
+                    cert_file = kwargs.get('cert_file')
+                    cert_data, cert_filename, cert_err = _validate_uploaded_file(cert_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Certification Document')
+                    if cert_err:
+                        return request.redirect('/my/candidate/profile?step=5&upload_error=' + urllib.parse.quote(cert_err))
+
+                    vals = {
+                        'name': name or '',
+                        'issuing_organization': kwargs.get('issuing_organization', ''),
+                        'issue_date': _clean_date(kwargs.get('issue_date')),
+                        'has_expiry': has_exp,
+                        'expiry_date': _clean_date(kwargs.get('expiry_date')) if has_exp else False,
+                        'cert_url': kwargs.get('cert_url', ''),
+                    }
+                    if cert_data:
+                        vals['cert_file'] = cert_data
+                        vals['cert_filename'] = cert_filename
+
                     request.env['candidate.certification'].sudo().browse(int(edit_id)).write(vals)
-                elif name:
-                    request.env['candidate.certification'].sudo().create(vals)
+                else:
+                    # Multi-entry creation mode
+                    name_list = request.httprequest.form.getlist('cert_name')
+                    org_list = request.httprequest.form.getlist('issuing_organization')
+                    issue_list = request.httprequest.form.getlist('issue_date')
+                    has_exp_list = request.httprequest.form.getlist('has_expiry')
+                    exp_date_list = request.httprequest.form.getlist('expiry_date')
+                    url_list = request.httprequest.form.getlist('cert_url')
+                    cert_files = request.httprequest.files.getlist('cert_file')
+
+                    num_entries = max(len(name_list), 1)
+                    for i in range(num_entries):
+                        name = name_list[i].strip() if i < len(name_list) else (kwargs.get('cert_name', '').strip() if i == 0 else '')
+                        if not name:
+                            continue
+
+                        org = org_list[i].strip() if i < len(org_list) else kwargs.get('issuing_organization', '')
+                        i_date = _clean_date(issue_list[i]) if i < len(issue_list) else _clean_date(kwargs.get('issue_date'))
+                        has_e = (has_exp_list[i] == '1' if i < len(has_exp_list) else kwargs.get('has_expiry') == '1')
+                        e_date = _clean_date(exp_date_list[i]) if (has_e and i < len(exp_date_list)) else (_clean_date(kwargs.get('expiry_date')) if has_e else False)
+                        c_url = url_list[i].strip() if i < len(url_list) else kwargs.get('cert_url', '')
+
+                        cert_file = cert_files[i] if i < len(cert_files) else (kwargs.get('cert_file') if i == 0 else None)
+                        cert_data, cert_filename, _ = _validate_uploaded_file(cert_file, max_mb=5, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'])
+
+                        vals = {
+                            'candidate_id': candidate.id,
+                            'name': name,
+                            'issuing_organization': org,
+                            'issue_date': i_date,
+                            'has_expiry': has_e,
+                            'expiry_date': e_date,
+                            'cert_url': c_url,
+                        }
+                        if cert_data:
+                            vals['cert_file'] = cert_data
+                            vals['cert_filename'] = cert_filename
+
+                        request.env['candidate.certification'].sudo().create(vals)
 
                 return request.redirect('/my/candidate/profile?step=6')
 
             elif step == 6:
-                # Add/Update Language
+                # Handle single edit or multiple new language entries
                 edit_id = kwargs.get('edit_id')
-                lang_name = kwargs.get('lang_name')
                 if edit_id:
+                    lang_name = kwargs.get('lang_name')
                     request.env['candidate.language'].sudo().browse(int(edit_id)).write({
                         'name': lang_name,
                         'proficiency': kwargs.get('proficiency', 'fluent'),
                     })
-                elif lang_name:
-                    request.env['candidate.language'].sudo().create({
-                        'candidate_id': candidate.id,
-                        'name': lang_name,
-                        'proficiency': kwargs.get('proficiency', 'fluent'),
-                    })
+                else:
+                    # Multi-entry creation mode
+                    lang_list = request.httprequest.form.getlist('lang_name')
+                    prof_list = request.httprequest.form.getlist('proficiency')
+
+                    num_entries = max(len(lang_list), 1)
+                    for i in range(num_entries):
+                        l_name = lang_list[i].strip() if i < len(lang_list) else (kwargs.get('lang_name', '').strip() if i == 0 else '')
+                        if not l_name:
+                            continue
+                        prof = prof_list[i] if i < len(prof_list) else kwargs.get('proficiency', 'fluent')
+                        request.env['candidate.language'].sudo().create({
+                            'candidate_id': candidate.id,
+                            'name': l_name,
+                            'proficiency': prof,
+                        })
 
                 return request.redirect('/my/candidate/profile?step=7')
 
@@ -798,30 +1202,29 @@ class ATSPortalController(http.Controller):
                 }
 
                 cv_file = kwargs.get('cv_file')
-                if cv_file and hasattr(cv_file, 'read'):
-                    c = cv_file.read()
-                    if c:
-                        write_vals['cv_file'] = base64.b64encode(c)
-                        write_vals['cv_filename'] = cv_file.filename
+                cv_data, cv_filename, cv_err = _validate_uploaded_file(cv_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc'], label='Curriculum Vitae (CV / Resume)')
+                if cv_err:
+                    return request.redirect('/my/candidate/profile?step=7&upload_error=' + urllib.parse.quote(cv_err))
+                if cv_data:
+                    write_vals['cv_file'] = cv_data
+                    write_vals['cv_filename'] = cv_filename
 
                 cl_file = kwargs.get('cover_letter_file')
-                if cl_file and hasattr(cl_file, 'read'):
-                    c = cl_file.read()
-                    if c:
-                        write_vals['cover_letter_file'] = base64.b64encode(c)
-                        write_vals['cover_letter_filename'] = cl_file.filename
+                cl_data, cl_filename, cl_err = _validate_uploaded_file(cl_file, max_mb=5, allowed_exts=['pdf', 'docx', 'doc'], label='Cover Letter Document')
+                if cl_err:
+                    return request.redirect('/my/candidate/profile?step=7&upload_error=' + urllib.parse.quote(cl_err))
+                if cl_data:
+                    write_vals['cover_letter_file'] = cl_data
+                    write_vals['cover_letter_filename'] = cl_filename
 
                 candidate.sudo().write(write_vals)
 
-                # Supporting Document entry
+                # Supporting Document entry (Tempo / Permits / IDs / Transcripts)
                 doc_title = kwargs.get('doc_title')
                 doc_file = kwargs.get('doc_file')
-                doc_data, doc_filename = False, False
-                if doc_file and hasattr(doc_file, 'read'):
-                    c = doc_file.read()
-                    if c:
-                        doc_data = base64.b64encode(c)
-                        doc_filename = doc_file.filename
+                doc_data, doc_filename, doc_err = _validate_uploaded_file(doc_file, max_mb=2, allowed_exts=['pdf', 'jpg', 'jpeg', 'png'], label='Tempo / Work ID / Supporting Document')
+                if doc_err:
+                    return request.redirect('/my/candidate/profile?step=7&upload_error=' + urllib.parse.quote(doc_err))
 
                 if doc_title:
                     request.env['candidate.document'].sudo().create({
@@ -859,6 +1262,7 @@ class ATSPortalController(http.Controller):
             'edit_exp': request.env['candidate.experience'].sudo().browse(int(kwargs.get('edit_exp_id'))) if kwargs.get('edit_exp_id') else False,
             'edit_cert': request.env['candidate.certification'].sudo().browse(int(kwargs.get('edit_cert_id'))) if kwargs.get('edit_cert_id') else False,
             'edit_lang': request.env['candidate.language'].sudo().browse(int(kwargs.get('edit_lang_id'))) if kwargs.get('edit_lang_id') else False,
+            'error_msg': kwargs.get('error') or kwargs.get('error_msg') or False,
         }
         return request.render('custom_recruitment.ats_candidate_profile_template', values)
 
@@ -1024,25 +1428,40 @@ class ATSPortalController(http.Controller):
         }
         return request.render('custom_recruitment.ats_change_password_template', values)
 
-    @http.route('/my/candidate/applications/withdraw/<int:app_id>', type='http', auth='user', website=True, methods=['POST'], csrf=True)
-    def withdraw_application(self, app_id, **kw):
-        """Allows candidates to withdraw their job application before closing date (BRD FR-ATS-026)."""
-        candidate = self._get_candidate_profile()
-        if not candidate:
-            return request.redirect('/jobs/login')
+    @http.route(['/my/candidate/applications/withdraw/<int:app_id>', '/my/candidate/applications/withdraw'], type='http', auth='user', website=True, methods=['GET', 'POST'], csrf=False)
+    def withdraw_application(self, app_id=None, **kw):
+        """Allows candidates to withdraw their job application via the ATS portal (BRD FR-ATS-026)."""
+        target_id = app_id or kw.get('app_id')
+        if not target_id:
+            return request.redirect('/my/candidate/applications')
+        try:
+            target_id = int(target_id)
+        except (ValueError, TypeError):
+            return request.redirect('/my/candidate/applications')
 
-        applicant = request.env['hr.applicant'].sudo().browse(app_id)
-        if applicant.exists() and applicant.candidate_profile_id.id == candidate.id:
-            vacancy = applicant.app_reference
-            today = fields.Date.today()
-            if not vacancy or not vacancy.last_date_to_apply or vacancy.last_date_to_apply >= today:
+        candidate = self._get_candidate_profile()
+        user = request.env.user
+        applicant = request.env['hr.applicant'].sudo().browse(target_id)
+
+        if applicant.exists():
+            cand_email = (candidate.email if candidate else user.email or '').strip().lower()
+            app_email = (applicant.email_from or '').strip().lower()
+            is_owner = (
+                (candidate and applicant.candidate_profile_id and applicant.candidate_profile_id.id == candidate.id) or
+                (applicant.partner_id and applicant.partner_id.id == user.partner_id.id) or
+                (cand_email and app_email and cand_email == app_email)
+            )
+            if is_owner:
                 applicant.sudo().write({
                     'bunna_app_status': 'rejected',
-                    'rejection_reason': 'Withdrawn by Candidate prior to vacancy closing date.',
+                    'rejection_reason': 'Withdrawn by Candidate via ATS Portal.',
                 })
-                applicant.message_post(body=_("Application withdrawn by candidate."))
+                try:
+                    applicant.message_post(body=_("Application withdrawn by candidate via ATS Portal."))
+                except Exception:
+                    pass
 
-        return request.redirect('/my/candidate/applications')
+        return request.redirect('/my/candidate/applications?withdrawn=1')
 
     @http.route('/my/candidate/profile/delete', type='http', auth='user', website=True, methods=['POST'], csrf=True)
     def request_profile_deletion(self, **kw):

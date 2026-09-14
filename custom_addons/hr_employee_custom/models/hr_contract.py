@@ -332,6 +332,17 @@ class HrContract(models.Model):
                 vals['name'] = (
                     self.env['ir.sequence'].next_by_code('hr.contract') or 'New'
                 )
+            if 'job_grade' in self._fields and not vals.get('job_grade'):
+                grade = False
+                if vals.get('employee_id'):
+                    emp = self.env['hr.employee'].browse(vals['employee_id'])
+                    grade = emp.job_grade or getattr(emp, 'grade_id', False) or getattr(emp, 'grade', False)
+                if not grade and self.env.context.get('default_job_grade'):
+                    grade = self.env['employee.grade'].browse(self.env.context['default_job_grade'])
+                if not grade:
+                    grade = self.env['employee.grade'].search([], order='id asc', limit=1)
+                if grade:
+                    vals['job_grade'] = grade.id if hasattr(grade, 'id') else grade
         records = super().create(vals_list)
         for rec in records:
             if rec.state == 'open':
@@ -773,3 +784,20 @@ class HrContract(models.Model):
                 'hr_employee_custom.ir_cron_generate_missing_work_entries',
                 raise_if_not_found=False,
             )
+
+    @api.model
+    def _has_field_access(self, field, operation):
+        """Allow read access to contract fields for internal users / Employees User group.
+        Record-level rules still strictly restrict which contracts the user can see."""
+        if not field.groups or self.env.su:
+            return True
+        if operation == 'read':
+            user = self.env.user
+            if user and len(user) == 1 and (
+                user._has_group('base.group_user')
+                or user._has_group('hr_employee_custom.group_hr_employee_user')
+            ):
+                return True
+        return super()._has_field_access(field, operation)
+
+

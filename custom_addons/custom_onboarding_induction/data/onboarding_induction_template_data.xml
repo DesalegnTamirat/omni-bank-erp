@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ── Default Corporate Induction Task Templates ── -->
+        <record id="template_induction_task_1" model="hr.induction.task.template">
+            <field name="name">Bunna Bank Culture, Vision &amp; Core Values Orientation</field>
+            <field name="sequence">10</field>
+            <field name="training_type">classroom</field>
+            <field name="is_mandatory">1</field>
+            <field name="days_offset">1</field>
+        </record>
+        <record id="template_induction_task_2" model="hr.induction.task.template">
+            <field name="name">PPDD HR Policies, Benefits &amp; Code of Ethics</field>
+            <field name="sequence">20</field>
+            <field name="training_type">document</field>
+            <field name="is_mandatory">1</field>
+            <field name="days_offset">3</field>
+        </record>
+        <record id="template_induction_task_3" model="hr.induction.task.template">
+            <field name="name">Information Security &amp; Fraud Prevention Awareness</field>
+            <field name="sequence">30</field>
+            <field name="training_type">lms_video</field>
+            <field name="is_mandatory">1</field>
+            <field name="days_offset">5</field>
+        </record>
+        <record id="template_induction_task_4" model="hr.induction.task.template">
+            <field name="name">Finacle Core Banking System Overview &amp; Basics</field>
+            <field name="sequence">40</field>
+            <field name="training_type">system_demo</field>
+            <field name="is_mandatory">1</field>
+            <field name="days_offset">7</field>
+        </record>
+        <record id="template_induction_task_5" model="hr.induction.task.template">
+            <field name="name">ERP Employee Self-Service (ESS) Training</field>
+            <field name="sequence">50</field>
+            <field name="training_type">system_demo</field>
+            <field name="is_mandatory">1</field>
+            <field name="days_offset">10</field>
+        </record>
+
+        <!-- ── Default Workplace Onboarding Task Templates ── -->
+        <record id="template_onboarding_task_1" model="hr.onboarding.task.template">
+            <field name="name">Day 1: Workstation Setup, Email &amp; ERP Access Check</field>
+            <field name="sequence">10</field>
+            <field name="period">day_1</field>
+            <field name="assigned_to_role">supervisor</field>
+            <field name="days_offset">1</field>
+        </record>
+        <record id="template_onboarding_task_2" model="hr.onboarding.task.template">
+            <field name="name">Day 1: Team &amp; Department Introduction Walkthrough</field>
+            <field name="sequence">20</field>
+            <field name="period">day_1</field>
+            <field name="assigned_to_role">buddy</field>
+            <field name="days_offset">1</field>
+        </record>
+        <record id="template_onboarding_task_3" model="hr.onboarding.task.template">
+            <field name="name">Week 1: Review Department Operational SOPs &amp; Systems</field>
+            <field name="sequence">30</field>
+            <field name="period">week_1</field>
+            <field name="assigned_to_role">employee</field>
+            <field name="days_offset">7</field>
+        </record>
+        <record id="template_onboarding_task_4" model="hr.onboarding.task.template">
+            <field name="name">Week 1: Assigned Buddy Mentorship Check-in Session 1</field>
+            <field name="sequence">40</field>
+            <field name="period">week_1</field>
+            <field name="assigned_to_role">buddy</field>
+            <field name="days_offset">7</field>
+        </record>
+        <record id="template_onboarding_task_5" model="hr.onboarding.task.template">
+            <field name="name">Week 2: Initial Job Assignment &amp; Supervisory Review</field>
+            <field name="sequence">50</field>
+            <field name="period">week_2</field>
+            <field name="assigned_to_role">supervisor</field>
+            <field name="days_offset">14</field>
+        </record>
+        <record id="template_onboarding_task_6" model="hr.onboarding.task.template">
+            <field name="name">Week 3: Key Process Execution &amp; Practical Walkthrough</field>
+            <field name="sequence">60</field>
+            <field name="period">week_3</field>
+            <field name="assigned_to_role">employee</field>
+            <field name="days_offset">21</field>
+        </record>
+        <record id="template_onboarding_task_7" model="hr.onboarding.task.template">
+            <field name="name">Month 1: 4-Week Mid-Term Onboarding Evaluation</field>
+            <field name="sequence">70</field>
+            <field name="period">month_1</field>
+            <field name="assigned_to_role">supervisor</field>
+            <field name="days_offset">30</field>
+        </record>
+        <record id="template_onboarding_task_8" model="hr.onboarding.task.template">
+            <field name="name">Month 2: Final 2-Month Performance Sign-off &amp; File Closure</field>
+            <field name="sequence">80</field>
+            <field name="period">month_2</field>
+            <field name="assigned_to_role">hr_officer</field>
+            <field name="days_offset">60</field>
+        </record>
+    </data>
+</odoo>

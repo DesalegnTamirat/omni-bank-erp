@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View for Workplace Onboarding Plans -->
+    <record id="hr_onboarding_plan_view_tree" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.list</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <list string="Workplace Onboarding Plans"
+                  decoration-info="state=='pre_boarding'"
+                  decoration-warning="state=='induction_gate' or state=='work_unit_onboarding' or state=='midterm_review'"
+                  decoration-success="state=='completed'"
+                  decoration-danger="state=='escalated'">
+                <field name="name"/>
+                <field name="employee_id" string="New Hire"/>
+                <field name="job_position_id"/>
+                <field name="supervisor_id"/>
+                <field name="buddy_id"/>
+                <field name="start_date"/>
+                <field name="pre_boarding_verified" widget="boolean_toggle" string="Pre-Boarding Gate"/>
+                <field name="induction_completed" widget="boolean_toggle" string="Induction Gate"/>
+                <field name="progress_percentage" widget="progressbar"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View for Workplace Onboarding Plans -->
+    <record id="hr_onboarding_plan_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.form</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <form string="Workplace Onboarding Management Plan">
+                <header>
+                    <button name="action_start_pre_boarding" string="Start Pre-Boarding" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_verify_pre_boarding" string="Verify &amp; Pass Pre-Boarding Gate" type="object" class="btn-success" invisible="state != 'pre_boarding'"/>
+                    <button name="action_trigger_provisioning_alert" string="Send 7-Day Pre-Arrival IT Alert" type="object" class="btn-secondary" invisible="state not in ('pre_boarding', 'induction_gate') or provisioning_status != 'pending'"/>
+                    <button name="action_start_work_unit_onboarding" string="Initiate Work Unit Onboarding" type="object" class="oe_highlight" invisible="state != 'induction_gate'"/>
+                    <button name="action_dispatch_midterm_eval" string="Dispatch 4-Week Mid-Term Form" type="object" invisible="state != 'work_unit_onboarding'"/>
+                    <button name="action_close_onboarding" string="Digital Sign-off &amp; Close File" type="object" class="oe_highlight" invisible="state not in ('midterm_review', 'work_unit_onboarding')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,pre_boarding,induction_gate,work_unit_onboarding,midterm_review,completed"/>
+                </header>
+                <sheet>
+                    <div class="text-center mb-4 p-3 rounded" style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); color: #FFFFFF;">
+                        <h2 class="fw-bold" style="letter-spacing: 1px; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase" style="color: #FFFFFF;">Workplace Onboarding Management System</h3>
+                        <h5 style="color: #E2C095;">POMD &amp; Work Unit Integrated Integration Framework</h5>
+                    </div>
+
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Onboarding Plan Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Header Employee Card -->
+                    <div class="card p-3 mb-4 bg-light">
+                        <group>
+                            <group>
+                                <field name="employee_id" string="NEW HIRE EMPLOYEE" readonly="state != 'draft'"/>
+                                <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
+                                <field name="department_id" string="DEPARTMENT" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="supervisor_id" string="IMMEDIATE SUPERVISOR" readonly="state in ('completed',)"/>
+                                <field name="start_date" string="EXPECTED START DATE" readonly="state != 'draft'"/>
+                                <field name="employee_category" string="JOB CATEGORY" readonly="state != 'draft'"/>
+                                <field name="progress_percentage" widget="progressbar" string="WORK UNIT PROGRESS"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <notebook>
+                        <!-- Tab 1: Pre-Boarding Gate & Provisioning -->
+                        <page string="Pre-Boarding &amp; IT Provisioning">
+                            <div class="alert alert-info" role="alert">
+                                <strong>Pre-Boarding Gatekeeper Rule (POMD):</strong> Formal onboarding cannot initiate until POMD verifies all critical pre-employment documentation.
+                            </div>
+                            <group>
+                                <group string="Mandatory Document Checklists">
+                                    <field name="doc_offer_letter" string="Signed Offer / Acceptance Letter" readonly="state == 'completed'"/>
+                                    <field name="doc_medical_certificate" string="Medical Certificate Verified" readonly="state == 'completed'"/>
+                                    <field name="doc_police_clearance" string="Police Clearance / Forensic Cert." readonly="state == 'completed'"/>
+                                    <field name="doc_guarantor_contract" string="Guarantor Contract &amp; Letter" readonly="state == 'completed'"/>
+                                    <field name="doc_code_of_conduct" string="Signed Code of Conduct" readonly="state == 'completed'"/>
+                                    <field name="doc_job_description" string="Signed Job Description (JD)" readonly="state == 'completed'"/>
+                                    <field name="doc_asset_registration" string="Asset Requisition / Handover Form" readonly="state == 'completed'"/>
+                                </group>
+                                <group string="Formalities Verification &amp; Gate">
+                                    <field name="doc_tin_number" string="TIN Number" placeholder="e.g. 0045981234" readonly="state == 'completed'"/>
+                                    <field name="doc_pension_number" string="Pension Reference No." placeholder="e.g. PEN-88741" readonly="state == 'completed'"/>
+                                    <field name="pre_boarding_verified" string="Pre-Boarding Gate Passed" widget="boolean_toggle" readonly="1"/>
+                                    <field name="pre_boarding_verified_by_user_id" string="Verified By POMD User" readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="7-Day Pre-Arrival IT &amp; Workstation Provisioning Alert">
+                                <group>
+                                    <field name="provisioning_status" string="IT Setup Status" widget="badge"/>
+                                    <field name="provisioning_alert_date" string="Alert Sent On" readonly="1"/>
+                                    <button name="action_trigger_provisioning_alert" string="Send 7-Day Pre-Arrival IT Alert Now" type="object" class="btn btn-primary" invisible="provisioning_status != 'pending'"/>
+                                </group>
+                                <group>
+                                    <field name="it_notes" string="IT Configuration Notes" placeholder="Enter PC serial number, Finacle user ID, email details..." readonly="state == 'completed'"/>
+                                </group>
+                            </group>
+                            <group string="Corporate Induction Link Status">
+                                <group>
+                                    <field name="induction_plan_id" string="Linked Corporate Induction Plan" readonly="state == 'completed'"/>
+                                    <field name="induction_status" string="Induction Plan Status" widget="badge"/>
+                                    <field name="induction_completed" string="Induction Gate Passed?" widget="boolean_toggle" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- Tab 2: Buddy Support & Work Unit Tasks -->
+                        <page string="Buddy &amp; Work Unit Tasks">
+                            <group string="Onboarding Buddy Mentorship Handoff">
+                                <group>
+                                    <field name="buddy_id" string="Assigned Onboarding Buddy" readonly="state == 'completed'"/>
+                                    <field name="buddy_user_id" string="Buddy User Account" readonly="1"/>
+                                    <field name="buddy_assigned_date" string="Assigned On" readonly="1"/>
+                                    <field name="buddy_assigned_by_user_id" string="Assigned By" readonly="1"/>
+                                    <button name="action_assign_buddy" string="Confirm Buddy Assignment" type="object" class="btn btn-secondary"/>
+                                </group>
+                                <group>
+                                    <field name="buddy_notes" string="Buddy Guidance Notes &amp; Check-ins" placeholder="Log mentorship advice, weekly check-in notes..." readonly="state == 'completed'"/>
+                                </group>
+                            </group>
+                            <separator string="Work Unit Daily &amp; Weekly Task Progress Tracker"/>
+                            <field name="task_ids" readonly="state == 'completed'">
+                                <list editable="bottom"
+                                      decoration-danger="is_overdue"
+                                      decoration-success="state == 'done'">
+                                    <field name="period" string="Period" widget="badge"/>
+                                    <field name="name" string="Task Description"/>
+                                    <field name="assigned_to_role" string="Assigned Role" widget="badge"/>
+                                    <field name="due_date" string="Due Date"/>
+                                    <field name="is_overdue" column_invisible="1"/>
+                                    <field name="state" string="Status" widget="badge"
+                                           decoration-success="state == 'done'"
+                                           decoration-warning="state == 'todo'"/>
+                                    <field name="comments" string="Progress Notes" optional="hide"/>
+                                    <field name="completed_date" string="Completed On" readonly="1" optional="show"/>
+                                    <field name="completed_by_user_id" string="Completed By" readonly="1" optional="show"/>
+                                    <button name="action_mark_done" string="Mark Done" type="object"
+                                            icon="fa-check-circle" class="btn-success"
+                                            invisible="state == 'done'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 3: Mid-Term Review & Final Program Closure -->
+                        <page string="Evaluations &amp; Sign-off">
+                            <group string="4-Week Mid-Term Review">
+                                <group>
+                                    <field name="midterm_eval_sent" string="Form Dispatched" readonly="1"/>
+                                    <field name="midterm_eval_date" string="Dispatched Date" readonly="1"/>
+                                    <field name="midterm_score" string="Mid-Term Rating (/100)" readonly="state == 'completed'"/>
+                                </group>
+                                <group>
+                                    <field name="midterm_employee_feedback" string="New Hire Mid-Term Feedback" placeholder="New hire comments on integration..." readonly="state == 'completed'"/>
+                                    <field name="midterm_supervisor_feedback" string="Supervisor Mid-Term Feedback" placeholder="Supervisor performance feedback..." readonly="state == 'completed'"/>
+                                </group>
+                            </group>
+                            <group string="2-Month Program Closure &amp; Digital Sign-off">
+                                <group>
+                                    <field name="final_eval_sent" string="Final Form Sent" readonly="1"/>
+                                    <field name="final_eval_date" string="Closure Date" readonly="1"/>
+                                    <field name="final_onboarding_score" string="Overall Onboarding Score (/100)" readonly="state == 'completed'"/>
+                                </group>
+                                <group string="Probation Counter Linkage">
+                                    <field name="probation_id" string="Linked Probation Record" readonly="1"/>
+                                    <field name="is_escalated" string="Milestone Escalated" readonly="1"/>
+                                    <field name="escalation_reason" string="Escalation Reason" readonly="1"/>
+                                </group>
+                            </group>
+
+                            <!-- Digital Sign-off Action Panels -->
+                            <div class="row mt-3">
+                                <!-- Employee Sign-off Panel -->
+                                <div class="col-6">
+                                    <div class="card p-3 h-100" style="border: 2px solid #4A261A; border-radius: 8px;">
+                                        <h6 class="fw-bold mb-3" style="color: #4A261A;">✍️ New Hire Digital Sign-off</h6>
+                                        <field name="final_employee_signoff" widget="boolean_toggle" readonly="1" nolabel="1"/>
+                                        <span class="ms-2 fw-bold" style="color: #4A261A;" invisible="not final_employee_signoff">
+                                            ✅ Signed Off
+                                        </span>
+                                        <div class="mt-2 small" style="color: #6E382A;">
+                                            <field name="final_employee_signoff_user_id" readonly="1" nolabel="1"
+                                                   placeholder="Not yet signed"/>
+                                            <field name="final_employee_signoff_date" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <button name="action_employee_signoff" string="I Confirm &amp; Sign Off"
+                                                type="object" class="btn mt-2 w-100 fw-bold"
+                                                style="background-color: #4A261A; color: #F0C27B; border: none;"
+                                                invisible="final_employee_signoff or state == 'completed'"/>
+                                    </div>
+                                </div>
+                                <!-- Supervisor Sign-off Panel -->
+                                <div class="col-6">
+                                    <div class="card p-3 h-100" style="border: 2px solid #4A261A; border-radius: 8px;">
+                                        <h6 class="fw-bold mb-3" style="color: #4A261A;">✍️ Supervisor Digital Sign-off</h6>
+                                        <field name="final_supervisor_signoff" widget="boolean_toggle" readonly="1" nolabel="1"/>
+                                        <span class="ms-2 fw-bold" style="color: #4A261A;" invisible="not final_supervisor_signoff">
+                                            ✅ Signed Off
+                                        </span>
+                                        <div class="mt-2 small" style="color: #6E382A;">
+                                            <field name="final_supervisor_signoff_user_id" readonly="1" nolabel="1"
+                                                   placeholder="Not yet signed"/>
+                                            <field name="final_supervisor_signoff_date" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <button name="action_supervisor_signoff" string="Supervisor Sign-off &amp; Approve"
+                                                type="object" class="btn mt-2 w-100 fw-bold"
+                                                style="background-color: #4A261A; color: #F0C27B; border: none;"
+                                                invisible="final_supervisor_signoff or state == 'completed'"/>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                        </page>
+
+                        <!-- Tab 4: Audit & Segregation of Duties Log -->
+                        <page string="Audit Log &amp; SoD Controls">
+                            <group string="Segregation of Duties Audit Log">
+                                <group>
+                                    <field name="submitted_by_user_id" string="Initiated By User" readonly="1"/>
+                                    <field name="pre_boarding_verified_by_user_id" string="Pre-Boarding Gate Verified By" readonly="1"/>
+                                    <field name="closed_by_user_id" string="Program Closed &amp; Signed Off By" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View for Workplace Onboarding Plans -->
+    <record id="hr_onboarding_plan_view_search" model="ir.ui.view">
+        <field name="name">hr.onboarding.plan.search</field>
+        <field name="model">hr.onboarding.plan</field>
+        <field name="arch" type="xml">
+            <search string="Search Workplace Onboarding Plans">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="job_position_id"/>
+                <field name="supervisor_id"/>
+                <field name="buddy_id"/>
+                <separator/>
+                <filter name="filter_pre_boarding" string="Pre-Boarding" domain="[('state', '=', 'pre_boarding')]"/>
+                <filter name="filter_induction_gate" string="Induction Gate" domain="[('state', '=', 'induction_gate')]"/>
+                <filter name="filter_work_unit" string="Work Unit Onboarding" domain="[('state', '=', 'work_unit_onboarding')]"/>
+                <filter name="filter_completed" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_category" string="Category" context="{'group_by': 'employee_category'}"/>
+                    <filter name="group_supervisor" string="Supervisor" context="{'group_by': 'supervisor_id'}"/>
+                    <filter name="group_buddy" string="Buddy" context="{'group_by': 'buddy_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Workplace Onboarding Plans -->
+    <record id="hr_onboarding_plan_action" model="ir.actions.act_window">
+        <field name="name">Workplace Onboarding Plans</field>
+        <field name="res_model">hr.onboarding.plan</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="hr_onboarding_plan_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Workplace Onboarding Management Plan!
+            </p>
+            <p>
+                Manage pre-boarding formalities, workstation setup alerts, buddy mentorship, work unit tasks, and 2-month evaluations.
+            </p>
+        </field>
+    </record>
+</odoo>

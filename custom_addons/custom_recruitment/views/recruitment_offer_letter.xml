@@ -8,10 +8,14 @@
             <list string="Offer Letters">
                 <field name="reference"/>
                 <field name="vacancy_id"/>
-                <field name="ext_candidate_id"/>
-                <field name="applicant_id"/>
+                <field name="candidate_name"/>
+                <field name="job_position_id" string="Job Position" optional="show"/>
+                <field name="job_grade" string="Job Grade" optional="show"/>
+                <field name="operating_unit_id" string="Work Unit" optional="show"/>
+                <field name="salary_figure" string="Base Salary" widget="monetary"/>
+                <field name="is_managerial" widget="boolean_toggle" string="Managerial"/>
                 <field name="offer_date"/>
-                <field name="expiry_date"/>
+                <field name="deadline_date" string="Deadline"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'accepted'"
                        decoration-warning="state == 'sent'"
@@ -29,8 +33,11 @@
         <field name="arch" type="xml">
             <form string="Offer Letter">
                 <header>
-                    <button name="action_send" string="Send Offer" type="object"
+                    <button name="action_send" string="Send Offer Letter" type="object"
                             class="oe_highlight" icon="fa-paper-plane" invisible="state != 'draft'"/>
+                    <button name="%(custom_recruitment.action_report_recruitment_offer_letter)d"
+                            string="Print Official PDF" type="action"
+                            class="btn-outline-primary" icon="fa-print"/>
                     <button name="action_accept" string="Accept Offer" type="object"
                             class="btn-success" icon="fa-check" invisible="state != 'sent'"/>
                     <button name="action_decline" string="Decline Offer" type="object"
@@ -44,28 +51,96 @@
                         <h1>
                             <field name="reference" readonly="1"/>
                         </h1>
+                        <h3>
+                            <field name="candidate_name" placeholder="Candidate Full Name" readonly="state != 'draft'"/>
+                        </h3>
                     </div>
+
                     <group>
-                        <group string="External Vacancy &amp; Candidate Selection">
+                        <!-- Group 1: Candidate & Vacancy -->
+                        <group string="Candidate &amp; Vacancy Selection">
                             <field name="vacancy_id"
                                    domain="[('reference', 'ilike', 'EXT')]"
                                    options="{'no_create': True}"
                                    readonly="state != 'draft'"/>
                             <field name="vacancy_reference" invisible="1"/>
                             <field name="ext_candidate_id"
-                                   string="Candidate Name"
+                                   string="Candidate Selector"
                                    domain="[('selection_type', 'in', ['selected', 'Selected']), '|', ('ext_rec_sel_cand.vacancy_reference', '=', vacancy_reference), ('ext_rec_sel_cand.vacancy_id', '=', vacancy_id)]"
                                    options="{'no_create': True}"
                                    readonly="state != 'draft'"/>
-                            <field name="applicant_id" readonly="1" options="{'no_create': True}"/>
+                            <field name="candidate_title" readonly="state != 'draft'"/>
                             <field name="candidate_email" readonly="state != 'draft'"/>
+                            <field name="candidate_address" readonly="state != 'draft'"/>
+                            <field name="applicant_id" readonly="1" options="{'no_create': True}"/>
                         </group>
-                        <group string="Offer Timeline (3-Day Window)">
+
+                        <!-- Group 2: Position & Classification -->
+                        <group string="Position &amp; Work Unit Classification">
+                            <field name="job_position_id"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="1"
+                                   string="Job Position"/>
+                            <field name="job_grade"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="1"
+                                   string="Job Grade"/>
+                            <field name="operating_unit_id"
+                                   options="{'no_create': True, 'no_open': True}"
+                                   readonly="1"
+                                   string="Work Unit"/>
+                            <field name="job_category" readonly="1" string="Job Category"/>
+                            <field name="is_managerial" widget="boolean_toggle" readonly="1"/>
+                            <field name="ref_no" placeholder="e.g. BB/HRM/EXT/2026/001" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+
+                    <!-- Group 3: Compensation & Allowances -->
+                    <group string="Compensation &amp; Allowances Breakdown">
+                        <group>
+                            <field name="salary_figure" placeholder="e.g. 28500.00" required="1" readonly="state != 'draft'"/>
+                            <field name="salary_words" readonly="state != 'draft'"/>
+                            <field name="housing_allowance" placeholder="e.g. 5000.00" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="fuel_allowance_liters" placeholder="e.g. 120" readonly="state != 'draft'"/>
+                            <field name="representation_allowance" readonly="not is_managerial or state != 'draft'"/>
+                            <div colspan="2" class="text-muted small" invisible="not is_managerial">
+                                <i class="fa fa-info-circle text-info"/> Managerial role: 10% Representation Allowance is automatically calculated.
+                            </div>
+                            <div colspan="2" class="text-muted small" invisible="is_managerial">
+                                <i class="fa fa-info-circle text-muted"/> Non-Managerial role: Representation allowance is set to 0 and excluded from the official letter.
+                            </div>
+                        </group>
+                    </group>
+
+                    <group string="Other Benefits &amp; Terms">
+                        <field name="other_benefits" placeholder="Optional: list other benefits associated with this post..." readonly="state != 'draft'"/>
+                    </group>
+
+                    <!-- Group 4: Offer Timeline & Configurable Deadline -->
+                    <group string="Offer Timeline &amp; Configurable Response Deadline">
+                        <group>
                             <field name="offer_date" readonly="state != 'draft'"/>
-                            <field name="expiry_date" readonly="1"/>
+                            <field name="deadline_date" required="1" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="expiry_date" invisible="1"/>
                             <field name="response_date" invisible="state not in ('accepted', 'declined', 'expired')"/>
                         </group>
                     </group>
+
+                    <!-- Group 5: Letter Signatory & CC Details -->
+                    <group string="Official Letter Signatory &amp; CC Details">
+                        <group>
+                            <field name="signatory_name" readonly="state != 'draft'"/>
+                        </group>
+                        <group>
+                            <field name="cc_chief_office" readonly="state != 'draft'"/>
+                            <field name="cc_work_unit" readonly="state != 'draft'"/>
+                        </group>
+                    </group>
+
                     <group string="Decline / Rejection Reason" invisible="state not in ('sent', 'declined', 'expired')">
                         <field name="rejection_reason" placeholder="State optional reason for candidate decline or offer expiry..." readonly="state in ('accepted', 'cascaded')"/>
                     </group>
@@ -87,6 +162,9 @@
             <p class="o_view_nocontent_smiling_face">
                 No offer letters created yet. Select an External Vacancy to generate offer letters for selected candidates!
             </p>
+        </field>
+    </record>
+
     <!-- Decline Offer Wizard View -->
     <record id="view_recruitment_offer_decline_wizard_form" model="ir.ui.view">
         <field name="name">recruitment.offer.decline.wizard.form</field>

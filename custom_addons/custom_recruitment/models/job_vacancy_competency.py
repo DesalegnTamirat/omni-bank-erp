@@ -18,17 +18,21 @@ class JobVacancyCompetency(models.Model):
     sequence = fields.Integer(default=10)
 
     def _auto_init(self):
-        self.env.cr.execute("""
-            DO $$ 
-            BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'job_vacancy_competency' AND column_name = 'competency_id')
-                   AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'competency_competency') THEN
-                    EXECUTE 'DELETE FROM job_vacancy_competency 
-                             WHERE competency_id IS NOT NULL 
-                               AND competency_id NOT IN (SELECT id FROM competency_competency)';
-                END IF;
-            END $$;
-        """)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    DO $$ 
+                    BEGIN 
+                        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'job_vacancy_competency') 
+                           AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'competency_competency') THEN
+                            DELETE FROM job_vacancy_competency 
+                            WHERE competency_id IS NOT NULL 
+                              AND competency_id NOT IN (SELECT id FROM competency_competency);
+                        END IF;
+                    END $$;
+                """)
+        except Exception as e:
+            _logger.warning("Safe cleanup on job_vacancy_competency: %s", e)
         return super()._auto_init()
 
     vacancy_id = fields.Many2one(

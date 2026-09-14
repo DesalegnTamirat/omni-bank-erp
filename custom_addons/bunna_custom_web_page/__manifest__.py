@@ -5,7 +5,7 @@
     'summary': 'Adds a dynamic frontend page and custom website menu.',
     'category': 'Website',
     'author': 'EAD Team',
-    'depends': ['base', 'web', 'website'],
+    'depends': ['base', 'web', 'website', 'custom_recruitment'],
     'data': [
         'views/templates.xml',
     ],

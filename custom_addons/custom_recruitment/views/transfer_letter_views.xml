@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_transfer_letter_tree" model="ir.ui.view">
+        <field name="name">transfer.letter.list</field>
+        <field name="model">transfer.letter</field>
+        <field name="arch" type="xml">
+            <list string="Lateral Transfer Letters" sample="1" decoration-info="state == 'draft'" decoration-success="state == 'sent'" decoration-danger="state == 'cancelled'">
+                <field name="name"/>
+                <field name="letter_date"/>
+                <field name="employee_name"/>
+                <field name="employee_email"/>
+                <field name="current_work_unit_name"/>
+                <field name="current_position_name"/>
+                <field name="new_work_unit_name"/>
+                <field name="new_position_name"/>
+                <field name="job_grade_name"/>
+                <field name="effective_date"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state == 'sent'"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_transfer_letter_form" model="ir.ui.view">
+        <field name="name">transfer.letter.form</field>
+        <field name="model">transfer.letter</field>
+        <field name="arch" type="xml">
+            <form string="Lateral Transfer Letter">
+                <header>
+                    <button name="action_send_transfer_letter"
+                            string="Send Transfer Letter"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-envelope"
+                            invisible="state == 'cancelled'"/>
+                    <button name="action_print_transfer_letter"
+                            string="Print Transfer Letter"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-print"
+                            invisible="state == 'cancelled'"/>
+                    <button name="action_draft"
+                            string="Set to Draft"
+                            type="object"
+                            invisible="state != 'cancelled'"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,sent"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Letter Reference"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <label for="employee_name" string="Transferred Employee"/>
+                        <h2>
+                            <field name="employee_name" placeholder="Full Employee Name" readonly="state == 'sent'"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group string="Transferred Employee Details">
+                            <field name="employee_id" readonly="state == 'sent'"/>
+                            <field name="employee_title" readonly="state == 'sent'"/>
+                            <field name="employee_email" readonly="state == 'sent'"/>
+                            <field name="employee_id_number" readonly="state == 'sent'"/>
+                            <field name="employee_address" readonly="state == 'sent'"/>
+                        </group>
+                        <group string="Transfer Schedule &amp; Signatory">
+                            <field name="letter_date" readonly="state == 'sent'"/>
+                            <field name="effective_date" readonly="state == 'sent'"/>
+                            <field name="signatory_config_id" readonly="state == 'sent'"/>
+                            <field name="signatory_name" readonly="state == 'sent'"/>
+                            <field name="signatory_title" readonly="state == 'sent'"/>
+                            <field name="signatory_company" readonly="state == 'sent'"/>
+                            <field name="cc_extra_work_units" readonly="state == 'sent'"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Current Placement">
+                            <field name="current_work_unit_name" readonly="state == 'sent'"/>
+                            <field name="current_position_name" readonly="state == 'sent'"/>
+                        </group>
+                        <group string="Target Placement (Maintained Terms)">
+                            <field name="new_work_unit_name" readonly="state == 'sent'"/>
+                            <field name="new_position_name" readonly="state == 'sent'"/>
+                            <field name="job_grade_name" readonly="state == 'sent'"/>
+                            <field name="monthly_salary" readonly="state == 'sent'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Linked Requests &amp; Minutes" name="links_page">
+                            <group>
+                                <field name="transfer_request_id" readonly="state == 'sent'"/>
+                                <field name="minutes_id" readonly="state == 'sent'"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_transfer_letter_search" model="ir.ui.view">
+        <field name="name">transfer.letter.search</field>
+        <field name="model">transfer.letter</field>
+        <field name="arch" type="xml">
+            <search string="Search Lateral Transfer Letters">
+                <field name="name"/>
+                <field name="employee_name"/>
+                <field name="employee_email"/>
+                <field name="current_work_unit_name"/>
+                <field name="new_work_unit_name"/>
+                <field name="transfer_request_id"/>
+                <field name="minutes_id"/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_sent" string="Sent" domain="[('state', '=', 'sent')]"/>
+                <group>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_current_unit" string="Current Work Unit" context="{'group_by': 'current_work_unit_name'}"/>
+                    <filter name="group_by_new_unit" string="New Work Unit" context="{'group_by': 'new_work_unit_name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_transfer_letter" model="ir.actions.act_window">
+        <field name="name">Lateral Transfer Letters</field>
+        <field name="res_model">transfer.letter</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_transfer_letter_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No lateral transfer letters found!
+            </p>
+            <p>
+                Lateral transfer letters are generated for transferred staff to formally communicate new placement, reporting date, and handover instructions.
+            </p>
+        </field>
+    </record>
+</odoo>

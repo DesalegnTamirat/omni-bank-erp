@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================ -->
+    <!-- ROOT APP MENU: ASSESSMENT SYSTEM             -->
+    <!-- ============================================ -->
+    <menuitem id="menu_assessment_root"
+              name="Assessment System Management"
+              web_icon="assessment_system,static/description/icon.png"
+              groups="group_assessment_user,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_user,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,base.group_user"
+              sequence="100"/>
+
+    <!-- ============================================ -->
+    <!-- 0. ASSESSMENT DASHBOARD                      -->
+    <!-- ============================================ -->
+    <menuitem id="menu_assessment_dashboard"
+              name="Dashboard"
+              parent="menu_assessment_root"
+              action="action_assessment_dashboard"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="1"/>
+
+    <!-- ============================================ -->
+    <!-- 1. EXAM SYSTEM (EXM) SUB-MODULE              -->
+    <!-- ============================================ -->
+    <menuitem id="menu_exm_root"
+              name="Written Exam System"
+              parent="menu_assessment_root"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="2"/>
+
+    <menuitem id="menu_exam_sessions"
+              name="Exam Sessions"
+              parent="menu_exm_root"
+              action="action_exam_sessions"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="6"/>
+
+    <menuitem id="menu_exam_candidate_attempts"
+              name="Candidate Exam Sittings"
+              parent="menu_exm_root"
+              action="action_exam_candidate_attempts"
+              groups="group_assessment_user"
+              sequence="7"/>
+
+    <menuitem id="menu_exam_grading_tasks"
+              name="Manual Grading Queue"
+              parent="menu_exm_root"
+              action="action_exam_grading_tasks"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="8"/>
+
+    <menuitem id="menu_exam_definitions"
+              name="Exam Definitions / Templates"
+              parent="menu_exm_root"
+              action="action_exam_definitions"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="4"/>
+
+    <menuitem id="menu_exam_question_bank"
+              name="Question Bank"
+              parent="menu_exm_root"
+              action="action_exam_question_bank"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="3"/>
+
+    <menuitem id="menu_exam_question_approval_queue"
+              name="Question Review Queue"
+              parent="menu_exm_root"
+              action="action_exam_question_approval_queue"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="2"/>
+
+    <menuitem id="menu_exam_pdf_import"
+              name="Import Questions (Word / PDF)"
+              parent="menu_exm_root"
+              action="action_exam_pdf_import_wizard"
+              groups="group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="1"/>
+
+    <menuitem id="menu_exam_disqualifications"
+              name="Disqualification Logs &amp; Appeals"
+              parent="menu_exm_root"
+              action="action_exam_disqualification_logs"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="9"/>
+
+    <menuitem id="menu_exam_appeals"
+              name="Candidate Appeals"
+              parent="menu_exm_root"
+              action="action_exam_disqualification_appeals"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="10"/>
+
+    <!-- ============================================ -->
+    <!-- 2. CBIS INTERVIEW SYSTEM SUB-MODULE          -->
+    <!-- ============================================ -->
+    <menuitem id="menu_cbis_root"
+              name="Competency Interviews (CBIS)"
+              parent="menu_assessment_root"
+              groups="group_assessment_panel_member,group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="20"/>
+
+    <!-- Panel Member Accept / Reject / Reschedule / Delegate Invitations -->
+    <menuitem id="menu_cbis_my_panel_assignments"
+              name="Panel Interview Invitations"
+              parent="menu_cbis_root"
+              action="action_my_panel_assignments"
+              groups="group_assessment_panel_member,group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator"
+              sequence="1"/>
+
+    <!-- Interviewer Dashboard Tab -->
+    <menuitem id="menu_cbis_my_interviews"
+              name="My Assigned Evaluations"
+              parent="menu_cbis_root"
+              action="action_cbis_my_interviews"
+              groups="group_assessment_panel_member,group_assessment_workunit_manager,group_assessment_officer,group_assessment_manager,group_assessment_administrator"
+              sequence="3"/>
+
+    <menuitem id="menu_cbis_interview_sessions"
+              name="Interview Sessions"
+              parent="menu_cbis_root"
+              action="action_cbis_interview_sessions"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="2"/>
+
+    <menuitem id="menu_cbis_candidate_results"
+              name="Candidate Final Results (Aggregated)"
+              parent="menu_cbis_root"
+              action="action_cbis_candidate_results"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="4"/>
+
+    <menuitem id="menu_cbis_all_evaluations"
+              name="All Panelist Evaluation Sheets"
+              parent="menu_cbis_root"
+              action="action_cbis_all_evaluations"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="5"/>
+
+
+    <!-- ============================================ -->
+    <!-- 3. TRANSFER ASSESSMENTS                      -->
+    <!-- ============================================ -->
+    <menuitem id="menu_transfer_assessment_root"
+              name="Transfer Assessments"
+              parent="menu_assessment_root"
+              action="action_transfer_assessment_records"
+              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="30"/>
+
+    <!-- ============================================ -->
+    <!-- 4. RESULT PUBLICATIONS                       -->
+    <!-- ============================================ -->
+    <menuitem id="menu_assessment_publications"
+              name="Result Publications (Portal)"
+              parent="menu_assessment_root"
+              action="action_assessment_result_publications"
+              groups="base.group_user"
+              sequence="40"/>
+
+    <!-- ============================================ -->
+    <!-- 5. CONFIGURATION & RULES ENGINE              -->
+    <!-- ============================================ -->
+    <menuitem id="menu_assessment_configuration_root"
+              name="Configuration"
+              parent="menu_assessment_root"
+              groups="group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              sequence="100"/>
+
+    <menuitem id="menu_assessment_weight_profiles"
+              name="Weight Distribution Profiles"
+              parent="menu_assessment_configuration_root"
+              action="action_assessment_weight_profiles"
+              sequence="10"/>
+
+    <menuitem id="menu_assessment_competencies"
+              name="Competency Library"
+              parent="menu_assessment_configuration_root"
+              action="action_assessment_competencies"
+              sequence="20"/>
+
+    <menuitem id="menu_assessment_job_competency_profiles"
+              name="Job Competency Profiles"
+              parent="menu_assessment_configuration_root"
+              action="action_assessment_job_competency_profiles"
+              sequence="30"/>
+
+    <menuitem id="menu_transfer_config_settings"
+              name="Transfer Request Settings"
+              parent="menu_assessment_configuration_root"
+              action="transfer_config_settings_action"
+              groups="group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,base.group_system"
+              sequence="40"/>
+
+<!--    <menuitem id="menu_exam_manual_overrides"-->
+<!--              name="Score Manual Overrides"-->
+<!--              parent="menu_assessment_configuration_root"-->
+<!--              action="action_exam_manual_overrides"-->
+<!--              sequence="40"/>-->
+
+</odoo>

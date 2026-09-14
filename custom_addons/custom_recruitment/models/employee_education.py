@@ -57,3 +57,9 @@ class HrEmployeeEducationInherit(models.Model):
         'employee.education', 'employee_id',
         string='Education Records',
     )
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'coach_id' in vals:
+            self.env.registry.clear_cache()
+        return res

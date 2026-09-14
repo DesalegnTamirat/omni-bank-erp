@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!-- Module Category for Onboarding and Induction (using 'and' to prevent Owl parseXML unescaped ampersand error on res.users form) -->
+        <record id="module_category_onboarding_induction" model="ir.module.category">
+            <field name="name">Onboarding and Induction Management</field>
+            <field name="description">Access rights for Module 14: Onboarding and Induction Management System</field>
+            <field name="sequence">25</field>
+        </record>
+
+        <!-- Privilege Record for Odoo 19 Security Groups -->
+        <record id="onboarding_induction_privilege" model="res.groups.privilege">
+            <field name="name">Onboarding and Induction</field>
+            <field name="placeholder"></field>
+            <field name="sequence">25</field>
+            <field name="category_id" ref="module_category_onboarding_induction"/>
+        </record>
+
+        <!-- User Privilege Group -->
+        <record id="group_onboarding_induction_user" model="res.groups">
+            <field name="name">User (Employee)</field>
+            <field name="privilege_id" ref="onboarding_induction_privilege"/>
+            <field name="sequence">10</field>
+            <field name="comment">Employees can view their own onboarding and induction tasks.</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- Officer Group -->
+        <record id="group_onboarding_induction_officer" model="res.groups">
+            <field name="name">HR Officer / PPDD Coordinator</field>
+            <field name="privilege_id" ref="onboarding_induction_privilege"/>
+            <field name="sequence">20</field>
+            <field name="comment">HR Officers and PPDD Coordinators can manage induction and onboarding plans.</field>
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
+        </record>
+
+        <!-- IT Provisioning Group -->
+        <record id="group_onboarding_induction_it" model="res.groups">
+            <field name="name">IT Provisioning Officer</field>
+            <field name="privilege_id" ref="onboarding_induction_privilege"/>
+            <field name="sequence">22</field>
+            <field name="comment">IT operations and administrators responsible for hardware, email, and Finacle core banking provisioning alerts.</field>
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
+        </record>
+
+        <!-- Facility & Logistics Group -->
+        <record id="group_onboarding_induction_facility" model="res.groups">
+            <field name="name">Facility &amp; Logistics Officer</field>
+            <field name="privilege_id" ref="onboarding_induction_privilege"/>
+            <field name="sequence">24</field>
+            <field name="comment">Facilities and logistics officers responsible for physical workstation setup, desk allocation, and access cards.</field>
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
+        </record>
+
+        <!-- Manager Group -->
+        <record id="group_onboarding_induction_manager" model="res.groups">
+            <field name="name">Manager / Directorate Head</field>
+            <field name="privilege_id" ref="onboarding_induction_privilege"/>
+            <field name="sequence">30</field>
+            <field name="comment">Full management and sign-off privileges for onboarding and corporate induction.</field>
+            <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_officer'))]"/>
+        </record>
+    </data>
+</odoo>

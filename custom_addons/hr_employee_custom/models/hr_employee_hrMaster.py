@@ -187,12 +187,12 @@ class hr_job_updated(models.Model):
     probation_period = fields.Integer(string="Probation Period")
     job_code = fields.Many2one("hr.job", string="Job Code")
     grade = fields.Many2one("employee.grade", "Grade")
-    minimum_number_years_in_company = fields.Integer(string="Minimum Number of Years in the Company")
-    current_location_exp = fields.Float(string="Current Location Experience",
+    minimum_number_years_in_company = fields.Integer(string="Minimum Number of Years in the Company", default=1)
+    current_location_exp = fields.Float(string="Current Location Experience", default=1.0,
                                         help="Minimum experience in current location required (from bunna_hr_addons).")
-    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice")
-    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion")
-    minimum_pms_score = fields.Float(string="Minimum PMS Score")
+    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice", default=12)
+    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion", default=12)
+    minimum_pms_score = fields.Float(string="Minimum PMS Score", default=75.0)
     demoted_employee = fields.Boolean(string="Demoted Employee")
     promotion_revoked = fields.Boolean(string="Promotion Revoked")
     weightage_written_exam = fields.Float(string="Weightage Written Exam")
@@ -428,6 +428,53 @@ class Job(models.Model):
     # hr_policy_id = fields.One2many("hr.job.policies", "hr_job_id", string="Hr Policies")
     user_id = fields.Many2one('res.users', "Responsible", tracking=True, default=lambda self: self.env.uid)
 
+    @api.onchange('position_id')
+    def _onchange_position_id_sync_grades(self):
+        """Automatically populate Eligible Grades when Eligible Positions are added or selected."""
+        for job in self:
+            existing_grade_ids = set()
+            for g in job.grade_recruitment_id:
+                if g.job_grade:
+                    existing_grade_ids.add(g.job_grade.id)
+
+            for pos_line in job.position_id:
+                if pos_line.position and pos_line.position.grade:
+                    grade_id = pos_line.position.grade.id
+                    if grade_id not in existing_grade_ids:
+                        existing_grade_ids.add(grade_id)
+                        job.grade_recruitment_id += self.env['employee.recruitment.grade'].new({
+                            'job_grade': grade_id,
+                            'status': True,
+                        })
+
+    def _sync_eligible_grades_from_positions(self):
+        """Ensure all grades of eligible positions exist in grade_recruitment_id."""
+        GradeRecruitment = self.env['employee.recruitment.grade']
+        for job in self:
+            existing_grade_ids = set(job.grade_recruitment_id.mapped('job_grade.id'))
+            for pos_line in job.position_id:
+                if pos_line.position and pos_line.position.grade:
+                    grade_id = pos_line.position.grade.id
+                    if grade_id not in existing_grade_ids:
+                        existing_grade_ids.add(grade_id)
+                        GradeRecruitment.create({
+                            'employee_id': job.id,
+                            'job_grade': grade_id,
+                            'status': True,
+                        })
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        records._sync_eligible_grades_from_positions()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'position_id' in vals:
+            self._sync_eligible_grades_from_positions()
+        return res
+
 
 class res_users_hr_applicant_responsible(models.Model):
     _inherit = 'res.users'
@@ -446,12 +493,6 @@ class res_partner_hr_applicant_responsible(models.Model):
 
 class attachment_file(models.Model):
     _inherit = 'ir.attachment'
-    # _description = "Job Position"
-    # qualification_id = fields.One2many('hr_qualification_info', 'applicant_id', 'Education Qualification')
-    # experiance_id = fields.One2many('hr_experience_info', 'applicant_id', 'Experiance')
-    # competencies_id = fields.One2many('hr_competencies_info', 'applicant_id', 'Competencies')
-    # hr_new_department_ids = fields.One2many('hr_new_department_info', 'applicant_id', 'Department Info')
-    # user_id2 = fields.Many2one('res.users', "Responsible", tracking=True, default=lambda self: self.env.uid)
 
 
 class qualification_multi_record_job(models.Model):
@@ -462,7 +503,6 @@ class qualification_multi_record_job(models.Model):
     employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
 
-    # qualification = fields.Char(string="Qualification")
     qualification = fields.Many2one('recruitment.qualification', string="Recruitment Qualification")
     requirement = fields.Float(string="Requirement(CGPA)")
     response = fields.Float(string="Response")
@@ -487,6 +527,35 @@ class EligiblePositions(models.Model):
 
     position = fields.Many2one("hr.job", string="Position")
     status = fields.Boolean(string="Status", default=True)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            rec._sync_grade_to_job()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'position' in vals or 'employee_id' in vals:
+            for rec in self:
+                rec._sync_grade_to_job()
+        return res
+
+    def _sync_grade_to_job(self):
+        self.ensure_one()
+        if self.employee_id and self.position and self.position.grade:
+            grade_id = self.position.grade.id
+            existing = self.env['employee.recruitment.grade'].search([
+                ('employee_id', '=', self.employee_id.id),
+                ('job_grade', '=', grade_id),
+            ], limit=1)
+            if not existing:
+                self.env['employee.recruitment.grade'].create({
+                    'employee_id': self.employee_id.id,
+                    'job_grade': grade_id,
+                    'status': True,
+                })
 
 
 class hr_recruitment_stage2(models.Model):
@@ -539,10 +608,26 @@ class competencies_multi_record_job(models.Model):
     _name = "hr_competencies_info_job"
     _description = "Competencies Profile"
     _rec_name = "competencies"
+
+    def _auto_init(self):
+        self.env.cr.execute("""
+            DO $$ 
+            BEGIN 
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'hr_competencies_info_job') 
+                   AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'recruitment_competency') THEN
+                    UPDATE hr_competencies_info_job 
+                    SET competencies = NULL 
+                    WHERE competencies IS NOT NULL 
+                      AND competencies NOT IN (SELECT id FROM recruitment_competency);
+                END IF;
+            END $$;
+        """)
+        return super()._auto_init()
+
     job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
     employee_id = fields.Many2one('hr.employee', string="Employee", help='Select corresponding Employee')
-    competencies = fields.Many2one('recruitment.competency', string="Competency")
+    competencies = fields.Many2one('recruitment.competency', string="Competency", ondelete='set null')
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
     smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')

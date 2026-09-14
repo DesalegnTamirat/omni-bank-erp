@@ -39,38 +39,57 @@
                   name="Dashboard"
                   parent="hr_recruitment.menu_hr_recruitment_root"
                   action="action_recruitment_dashboard"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
                   sequence="1"/>
+
+        <menuitem id="menu_recruitment_manpower_dashboard"
+                  name="Manpower &amp; Recruitment Dashboard"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  action="action_recruitment_manpower_dashboard"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  sequence="2"/>
 
         <!-- ============================================ -->
         <!-- RECRUITMENT REQUEST MANAGEMENT - Officer, Manager, Administrator -->
         <!-- ============================================ -->
+          <menuitem id="menu_recruitment_request_management_others"
+                  name="Others"
+                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  groups="group_recruitment_administrator"
+                  sequence="3"/>
         <menuitem id="menu_recruitment_request_management"
                   name="Recruitment Request Management"
-                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  parent="menu_recruitment_request_management_others"
+                  groups="group_recruitment_manager,group_recruitment_administrator"
+                  sequence="3"/>
+
+        <menuitem id="menu_create_recruitment_request"
+                  name="New Request"
+                  parent="menu_recruitment_request_management"
+                  action="action_recruitment_request_new"
                   groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
-                  sequence="2"/>
+                  sequence="1"/>
 
         <menuitem id="menu_all_recruitment_requests"
                   name="All Requests"
                   parent="menu_recruitment_request_management"
-                  action="action_recruitment_request"
+                  action="action_recruitment_request_work_units"
                   groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
-                  sequence="1"/>
+                  sequence="2"/>
 
         <menuitem id="menu_my_recruitment_requests"
                   name="My Requests"
                   parent="menu_recruitment_request_management"
-                  action="action_recruitment_request"
+                  action="action_my_recruitment_request_work_units"
                   groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
-                  sequence="2"/>
+                  sequence="3"/>
 
         <!-- ============================================ -->
         <!-- TALENT ROSTER - Manager & Administrator only -->
         <!-- ============================================ -->
         <menuitem id="menu_talent_roster"
                   name="Talent Roster"
-                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  parent="menu_recruitment_request_management_others"
                   action="action_talent_roster"
                   groups="group_recruitment_manager,group_recruitment_administrator"
                   sequence="3"/>
@@ -78,9 +97,9 @@
         <!-- Candidate Release Form Top Menu - Accessible for Managers, Officers & Administrators -->
         <menuitem id="menu_top_candidate_release_form"
                   name="Release Form"
-                  parent="hr_recruitment.menu_hr_recruitment_root"
+                  parent="menu_recruitment_request_management_others"
                   action="action_candidate_release_forms"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="4"/>
 
         <!-- ============================================ -->
@@ -92,7 +111,7 @@
                   name="Internal Job Position"
                   parent="hr.menu_hr_employee_payroll"
                   action="internal_job_position_tree_form"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="17"/>
 
         <!-- Candidate Release Form under Employee Master / Employees App -->
@@ -100,15 +119,50 @@
                   name="Release Form"
                   parent="hr.menu_hr_employee_payroll"
                   action="action_candidate_release_forms"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="18"/>
+
+        <!-- Digital Selection Minutes under Employee Master (Visible only to Recruitment Approval Committee Members & HR) -->
+        <menuitem id="menu_hr_employee_digital_selection_minute"
+                  name="Digital Selection Minutes"
+                  parent="hr.menu_hr_employee_payroll"
+                  action="action_recruitment_selection_minute"
+                  groups="group_recruitment_approval_committee,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  sequence="19"/>
+
+        <!-- Recruitment Request Management under Employee Master (Visible only to Coaches/Supervisors & HR) -->
+        <menuitem id="menu_hr_employee_recruitment_request_management"
+                  name="Recruitment Request Management"
+                  parent="hr.menu_hr_employee_payroll"
+                  sequence="20"/>
+
+        <menuitem id="menu_hr_employee_create_recruitment_request"
+                  name="New Request"
+                  parent="menu_hr_employee_recruitment_request_management"
+                  action="action_recruitment_request_new"
+                  sequence="1"/>
+
+        <menuitem id="menu_hr_employee_my_recruitment_requests"
+                  name="My Requests"
+                  parent="menu_hr_employee_recruitment_request_management"
+                  action="action_my_recruitment_request_work_units"
+                  sequence="2"/>
+
+        <!-- Restrict Employee Demotion under Employee Master to users with recruitment module access -->
+        <record id="hr_employee_custom.menu_hr_employee_custom_demotion" model="ir.ui.menu">
+            <field name="group_ids" eval="[(6, 0, [
+                ref('custom_recruitment.group_recruitment_officer'),
+                ref('custom_recruitment.group_recruitment_manager'),
+                ref('custom_recruitment.group_recruitment_administrator')
+            ])]"/>
+        </record>
 
         <!-- Internal Recruitment Process - Manager & Administrator only -->
         <menuitem id="new_recruitment_process_internal"
                   name="Internal Recruitment Process"
                   action="action_employee_recruitment_internal"
                   parent="menu_internal_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
 
                   sequence="7"/>
 
@@ -117,7 +171,7 @@
                   name="Internal Recruitment Process Selected Candidates"
                   action="action_new_internal_recruitment_selected"
                   parent="menu_internal_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="8"/>
 
         <!-- Application Windows - Manager & Administrator only -->
@@ -125,23 +179,23 @@
                   name="Application Windows"
                   parent="menu_internal_recruitment"
                   action="action_recruitment_application_window"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="9"/>
 
         <!-- Candidate Release Form (Different Work Unit Placement) -->
-        <menuitem id="menu_candidate_release_form"
-                  name="Release Form"
-                  action="action_candidate_release_forms"
-                  parent="menu_internal_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
-                  sequence="10"/>
+<!--        <menuitem id="menu_candidate_release_form"-->
+<!--                  name="Release Form"-->
+<!--                  action="action_candidate_release_forms"-->
+<!--                  parent="menu_internal_recruitment"-->
+<!--                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"-->
+<!--                  sequence="10"/>-->
 
         <!-- Digital Selection Minutes (Under Applications Menu) -->
         <menuitem id="menu_recruitment_selection_minute"
                   name="Digital Selection Minutes"
                   action="action_recruitment_selection_minute"
                   parent="hr_recruitment.menu_crm_case_categ0_act_job"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_approval_committee,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
                   sequence="25"/>
 
         <!-- ============================================ -->
@@ -153,7 +207,7 @@
                   name="External Recruitment Process"
                   action="action_employee_recruitment_external"
                   parent="menu_external_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="2"/>
 
         <!-- Application Windows - Manager & Administrator only -->
@@ -161,7 +215,7 @@
                   name="Application Windows"
                   action="action_recruitment_application_window"
                   parent="menu_external_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="3"/>
 
         <!-- Eligible Candidates - Manager & Administrator only -->
@@ -177,8 +231,16 @@
                   name="External Recruitment Process Selected"
                   action="action_external_recruitment_selected"
                   parent="menu_external_recruitment"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="8"/>
+
+        <!-- Offer Letters (Selected Candidates) - 3-Day Response Window & Tracking -->
+        <menuitem id="menu_recruitment_offer_letter_external"
+                  name="Offer Letters (Selected Candidates)"
+                  action="action_recruitment_offer_letter"
+                  parent="menu_external_recruitment"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  sequence="9"/>
 
         <!-- Blacklist Pool - Manager & Administrator only -->
         <menuitem id="menu_blacklist_pool_form"
@@ -186,7 +248,7 @@
                   sequence="12"
                   parent="menu_external_recruitment"
                   action="blacklist_pool_form_tree"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
 
@@ -198,7 +260,7 @@
                   name="Probation Management"
                   parent="new_recruitment_menu"
                   action="action_hr_employee_probation"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="10"/>
 
         <!-- ============================================ -->
@@ -207,39 +269,33 @@
         <menuitem id="menu_employee_transfer"
                   name="Employee Transfers"
                   parent="new_recruitment_menu"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
                   sequence="11"/>
 
         <menuitem id="menu_employee_transfer_request"
                   name="Transfer Requests"
                   parent="menu_employee_transfer"
                   action="action_employee_transfer_request"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"
                   sequence="1"/>
 
         <menuitem id="menu_transfer_committee_minutes"
                   name="Transfer Committee Minutes"
                   parent="menu_employee_transfer"
                   action="action_transfer_committee_minutes"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="2"/>
 
         <menuitem id="menu_transfer_history_tracking"
                   name="Transfer History"
                   parent="menu_employee_transfer"
                   action="hr_employee_custom.action_hr_employee_transfer_history"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="3"/>
 
         <!-- ============================================ -->
-        <!-- TRANSFER SETTINGS (CONFIGURATION) - Manager & Administrator only -->
+        <!-- CONFIGURATION MENUS - Manager & Administrator only -->
         <!-- ============================================ -->
-        <menuitem id="menu_transfer_config_settings"
-                  name="Transfer Settings"
-                  parent="hr_recruitment.menu_hr_recruitment_configuration"
-                  action="transfer_config_settings_action"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
-                  sequence="100"/>
 
         <!-- ============================================ -->
         <!-- CONFIGURATION MENUS - Manager & Administrator only -->
@@ -250,35 +306,35 @@
                   name="Job Vacancy Form"
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="job_vacancy_form_tree"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <menuitem id="menu_bb_internal_list"
                   name="BB Internal Form"
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="bb_internal_form_tree"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <menuitem id="menu_bb_external_list"
                   name="BB external Form"
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="bb_external_form_tree"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <menuitem id="menu_hr_recruitment_skill"
                   name="Skills"
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="action_recruitment_skill"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <menuitem id="menu_hr_recruitment_certification"
                   name="Certifications"
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="action_recruitment_certification"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <menuitem id="menu_employee_education"
@@ -286,7 +342,7 @@
                   parent="hr_recruitment.menu_hr_recruitment_configuration"
                   action="action_employee_education"
                   sequence="50"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
         <!-- ============================================ -->
@@ -296,7 +352,7 @@
                   name="Shortlist Internal Candidates Wizard"
                   parent="menu_internal_recruitment"
                   action="action_internal_candidates_wizard"
-                  groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="1"/>
 
         <!-- Offer Letters for External Recruitment -->
@@ -304,7 +360,7 @@
                   name="Offer Letters"
                   parent="menu_external_recruitment"
                   action="action_recruitment_offer_letter"
-                 groups="group_recruitment_user,group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                 groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                   sequence="10"/>
 
     </data>

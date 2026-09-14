@@ -246,12 +246,12 @@ class InternalJobPosition(models.Model):
                         INSERT INTO new_internal_recruitment_selected_candidates (
                             id, new_int_sel_cand, emp_name, emp_position, current_work_unit, pms_score,
                             create_uid, create_date, write_uid, write_date, current_department, select_flag,
-                            preferred_location, active
+                            preferred_location, active, selection_type
                         ) VALUES (
                             NEXTVAL('new_internal_recruitment_selected_candidates_id_seq'), v_nirs_id,
                             rec_h.emp_id, rec_h.employee_position, rec_h.employee_work_unit, rec_h.pms_score,
                             rec_h.create_uid, (NOW()::TIMESTAMP(0)), rec_h.write_uid, (NOW()::TIMESTAMP(0)),
-                            rec_h.current_department, FALSE, combined_pref_location, TRUE
+                            rec_h.current_department, FALSE, combined_pref_location, TRUE, 'pending'
                         );
                     END IF;
 

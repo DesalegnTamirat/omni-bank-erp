@@ -46,37 +46,43 @@
                 <!-- ── SECTION 1: Vacancy Stat Cards ── -->
                 <div class="o_dashboard_section_title mb-2">Job Vacancies</div>
                 <div class="row g-3 mb-4">
-                    <div class="col-6 col-sm-4 col-md-2">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
                         <div class="o_stat_card o_stat_total" t-on-click="openVacancies" data-status="">
                             <div class="o_stat_label">Total</div>
                             <div class="o_stat_value v-total"><t t-esc="state.stats.total"/></div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-2">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
                         <div class="o_stat_card" t-on-click="openVacancies" data-status="draft">
                             <div class="o_stat_label">Draft</div>
                             <div class="o_stat_value v-draft"><t t-esc="state.stats.draft"/></div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-2">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
                         <div class="o_stat_card" t-on-click="openVacancies" data-status="published">
                             <div class="o_stat_label">Published</div>
                             <div class="o_stat_value v-published"><t t-esc="state.stats.published"/></div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-2">
-                        <div class="o_stat_card o_stat_positive" t-on-click="openVacancies" data-status="closed">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_positive" t-on-click="openProcessCompletedVacancies">
+                            <div class="o_stat_label">Process Vacancy (Completed)</div>
+                            <div class="o_stat_value v-completed"><t t-esc="state.stats.process_completed"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openVacancies" data-status="closed">
                             <div class="o_stat_label">Closed</div>
                             <div class="o_stat_value v-closed"><t t-esc="state.stats.closed"/></div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-2">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
                         <div class="o_stat_card" t-on-click="openVacancies" data-status="">
                             <div class="o_stat_label">Internal</div>
                             <div class="o_stat_value v-internal"><t t-esc="state.stats.internal"/></div>
                         </div>
                     </div>
-                    <div class="col-6 col-sm-4 col-md-2">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
                         <div class="o_stat_card" t-on-click="openVacancies" data-status="">
                             <div class="o_stat_label">External</div>
                             <div class="o_stat_value v-external"><t t-esc="state.stats.external"/></div>

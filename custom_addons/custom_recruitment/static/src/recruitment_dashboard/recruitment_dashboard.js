@@ -18,7 +18,7 @@ export class RecruitmentDashboard extends Component {
             dateFrom: "",
             dateTo: "",
             stats: {
-                total: 0, draft: 0, published: 0, closed: 0,
+                total: 0, draft: 0, published: 0, process_completed: 0, closed: 0,
                 internal: 0, external: 0,
                 probation_total: 0, probation_completed: 0, probation_pending: 0,
                 transfer_total: 0, transfer_approved: 0, transfer_pending: 0,
@@ -99,7 +99,8 @@ export class RecruitmentDashboard extends Component {
         const [vacancies, probations, transfers] = await Promise.all([
             this.orm.searchRead("job.vacancy", vacDomain,
                 ["vacancy_status", "recruitment_type", "sourcing_type",
-                 "internal_movement_type", "source_channel"]),
+                 "internal_movement_type", "source_channel", "recruitment_step",
+                 "employees_promoted", "minute_signed"]),
             this.orm.searchRead("hr.employee.probation", cleanProbDomain, ["state"]),
             this.orm.searchRead("employee.transfer.request", cleanTranDomain, ["state"]),
         ]);
@@ -107,6 +108,9 @@ export class RecruitmentDashboard extends Component {
         const total     = vacancies.length;
         const draft     = vacancies.filter(v => v.vacancy_status === "draft").length;
         const published = vacancies.filter(v => v.vacancy_status === "published").length;
+        const process_completed = vacancies.filter(v =>
+            v.recruitment_step === "done" || v.employees_promoted || (v.vacancy_status === "closed" && v.minute_signed)
+        ).length;
         const closed    = vacancies.filter(v => v.vacancy_status === "closed").length;
         const internal  = vacancies.filter(v =>
             (v.recruitment_type||"").toLowerCase()==="internal" ||
@@ -127,12 +131,12 @@ export class RecruitmentDashboard extends Component {
         const other     = vacancies.filter(v => v.source_channel === "other" || !v.source_channel).length;
 
         // Store for chart rendering
-        this._chartData = { draft, published, closed, internal, external,
+        this._chartData = { draft, published, process_completed, closed, internal, external,
                             promotion, lateral,
                             linkedin, telegram, website, newspaper, other };
 
         Object.assign(this.state.stats, {
-            total, draft, published, closed, internal, external,
+            total, draft, published, process_completed, closed, internal, external,
             probation_total:     probations.length,
             probation_completed: probations.filter(p => p.state === "completed").length,
             probation_pending:   probations.filter(p => p.state !== "completed").length,
@@ -323,6 +327,25 @@ export class RecruitmentDashboard extends Component {
             type: "ir.actions.act_window", name: "Job Vacancies",
             res_model: "job.vacancy", view_mode: "list,form",
             views: [[false,"list"],[false,"form"]], domain,
+        });
+    }
+
+    openProcessCompletedVacancies(ev) {
+        const domain = ["|", ["recruitment_step", "=", "done"], ["employees_promoted", "=", true]];
+        if (this.state.recruitmentType === "internal") {
+            domain.push("|");
+            domain.push(["recruitment_type", "=", "Internal"]);
+            domain.push(["sourcing_type", "in", ["internal", "both"]]);
+        }
+        if (this.state.recruitmentType === "external") {
+            domain.push("|");
+            domain.push(["recruitment_type", "=", "External"]);
+            domain.push(["sourcing_type", "in", ["external", "both"]]);
+        }
+        this.actionService.doAction({
+            type: "ir.actions.act_window", name: "Process Vacancies (Completed)",
+            res_model: "job.vacancy", view_mode: "list,form",
+            views: [[false, "list"], [false, "form"]], domain,
         });
     }
 

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: Result Publication -->
+    <record id="view_assessment_result_publication_form" model="ir.ui.view">
+        <field name="name">assessment.result.publication.form</field>
+        <field name="model">assessment.result.publication</field>
+        <field name="arch" type="xml">
+            <form string="Assessment Result Publication">
+                <header>
+                    <button name="action_publish" string="Publish Live to HR Portal" type="object" invisible="state != 'draft'" class="btn-primary" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,published,expired,withdrawn"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Publication Title"/>
+                        <h1><field name="name" placeholder="e.g. 2026 Management Trainee Final Selection Results"/></h1>
+                        <h3><field name="code" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="publication_category"/>
+                            <field name="job_id"/>
+                            <field name="vacancy_id"/>
+                        </group>
+                        <group>
+                            <field name="publication_date"/>
+                            <field name="expiry_date"/>
+                            <field name="total_candidates"/>
+                            <field name="view_count"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info py-2" role="alert">
+                        <b>Privacy Enforcement :</b> Results on the HR Portal are displayed with Candidate ID / Employee ID only. Candidate names are strictly hidden from public endpoints.
+                    </div>
+                    <notebook>
+                        <page string="Candidate Results (Anonymized Lines)">
+                            <div class="alert alert-secondary py-2 mb-3" role="alert" invisible="line_ids">
+                                <i class="fa fa-info-circle me-1"/> No assessment records found for your account in this published batch.
+                            </div>
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="rank"/>
+                                    <field name="candidate_code"/>
+                                    <field name="candidate_name_private" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                                    <field name="exam_score"/>
+                                    <field name="interview_score"/>
+                                    <field name="pms_score"/>
+                                    <field name="total_score"/>
+                                    <field name="status" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Candidate Portal View Tracking" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator">
+                            <field name="view_log_ids">
+                                <list create="0" delete="0">
+                                    <field name="view_datetime"/>
+                                    <field name="candidate_code"/>
+                                    <field name="ip_address"/>
+                                    <field name="verification_success"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Withdrawal Audit" invisible="not is_withdrawn">
+                            <group>
+                                <field name="is_withdrawn"/>
+                                <field name="withdrawn_by_user_id"/>
+                                <field name="withdrawn_date"/>
+                                <field name="withdrawal_reason"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Result Publication -->
+    <record id="view_assessment_result_publication_tree" model="ir.ui.view">
+        <field name="name">assessment.result.publication.list</field>
+        <field name="model">assessment.result.publication</field>
+        <field name="arch" type="xml">
+            <list string="Result Publications" decoration-info="state == 'draft'" decoration-success="state == 'published'" decoration-muted="state in ['expired', 'withdrawn']">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="publication_category"/>
+                <field name="job_id"/>
+                <field name="publication_date"/>
+                <field name="total_candidates"/>
+                <field name="view_count"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Result Publications -->
+    <record id="action_assessment_result_publications" model="ir.actions.act_window">
+        <field name="name">Result Publications</field>
+        <field name="res_model">assessment.result.publication</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -9,11 +9,45 @@
             <field name="inherit_id" ref="hr_recruitment.hr_applicant_view_form"/>
             <field name="arch" type="xml">
                 <button name="archive_applicant" position="before">
-                    <button name="create_contract" invisible="((application_type == 'Internal' or contract_created_new == True) or bunna_app_status == 'rejected')" string="Create Contract" type="object" class="oe_highlight"/>
-                    <button name="promote_employee" string="Promote Employee" invisible="((application_type in 'External' or bunna_app_status == 'rejected') or prmt_emp in 'Yes')" type="object" class="oe_highlight"/>
-                    <button name="action_applicant_send" invisible="application_type == 'Internal' or offer_letter_sent == True" string="Send Offer Letter" type="object" class="oe_highlight"/>
+                    <button name="action_print_employment_letter"
+                            invisible="application_type == 'Internal' or not pre_employment_cleared or bunna_app_status == 'rejected'"
+                            string="Print Employment Letter"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-print"/>
+                    <button name="action_send_employment_letter"
+                            invisible="application_type == 'Internal' or not pre_employment_cleared or bunna_app_status == 'rejected'"
+                            string="Send Employment Letter"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-envelope"/>
+                    <button name="action_view_employment_letter"
+                            invisible="application_type == 'Internal' or not employment_letter_id"
+                            string="View Employment Letter"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-file-text-o"/>
+                    <button name="create_contract"
+                            invisible="application_type == 'Internal' or not employee_id or contract_created_new == True or bunna_app_status == 'rejected'"
+                            string="Create Contract"
+                            type="object"
+                            class="oe_highlight"/>
+                    <button name="action_preview_cv" string="Preview CV" type="object" class="btn-primary" icon="fa-eye"/>
                     <button name="action_download_cv" string="Download CV" type="object" class="btn-secondary" icon="fa-download"/>
                 </button>
+                <xpath expr="//button[@name='create_employee_from_applicant']" position="attributes">
+                    <attribute name="invisible">application_type == 'Internal' or employee_id or not active or bunna_app_status == 'rejected'</attribute>
+                    <attribute name="class">oe_highlight</attribute>
+                </xpath>
+                <xpath expr="//button[@name='archive_applicant']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_talent_pool_add_applicants']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//header/field[@name='stage_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
                 <xpath expr="//field[@name='email_from']" position="before">
                     <field name="candidate_score_id"/>
                     <field name="cv_attachment_id" readonly="1"/>
@@ -23,92 +57,125 @@
                          independently editable fields. -->
                     <field name="application_type" readonly="app_reference != False"/>
                 </xpath>
-                <xpath expr="//form/sheet/group[1]" position="inside">
-                    <group>
-                        <field name="functions" invisible="1"/>
-                        <field name="date_of_birth"/>
-                        <field name="age"/>
-                        <field name="place_of_birth"/>
-                        <field name="gender"/>
-                        <field name="worked_in_bunna_earlier"/>
-                        <field name="current_company"/>
-                        <field name="current_working_location"/>
-                        <field name="working_status"/>
-                        <field name="willing_to_join_immediately"/>
-                        <field name="contract_created_new" invisible="1"/>
-                        <field name="date_of_availability"/>
-                        <field name="bunna_app_status"/>
-                        <field name="prmt_emp" invisible="1"/>
+                <xpath expr="//form/sheet/group[1]" position="after">
+                    <!-- SECTION 1: EXTERNAL CANDIDATE PROFILE & EMPLOYMENT (Hidden for Internal) -->
+                    <group string="External Candidate Profile &amp; Employment Details" invisible="application_type == 'Internal'">
+                        <group string="Personal Demographics">
+                            <field name="date_of_birth"/>
+                            <field name="age"/>
+                            <field name="place_of_birth"/>
+                            <field name="gender"/>
+                        </group>
+                        <group string="Current Employment &amp; Availability">
+                            <field name="worked_in_bunna_earlier"/>
+                            <field name="current_company"/>
+                            <field name="current_working_location"/>
+                            <field name="working_status"/>
+                            <field name="willing_to_join_immediately"/>
+                            <field name="date_of_availability"/>
+                        </group>
+                        <group string="Recruitment &amp; Offer Status">
+                            <field name="bunna_app_status"/>
+                            <field name="job_offer_status" widget="badge"
+                                   decoration-success="job_offer_status == 'accepted'"
+                                   decoration-danger="job_offer_status == 'declined'"
+                                   decoration-warning="job_offer_status == 'sent'"/>
+                            <field name="rejection_reason" invisible="job_offer_status != 'declined' and bunna_app_status != 'rejected'"/>
+                            <field name="contract_created_new" invisible="1"/>
+                            <field name="prmt_emp" invisible="1"/>
+                            <field name="functions" invisible="1"/>
+                        </group>
+                        <group string="Target Location">
+                            <field name="preferred_location" readonly="app_reference != False"/>
+                            <field name="vacancy_reference" readonly="app_reference != False"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="internal_employee_id"/>
-                        <field name="employee_work_unit"/>
-                        <field name="employee_number"/>
-                        <!-- job_grade_id removed — duplicated employee_grade below -->
-                        <field name="employee_grade"/>
-                        <field name="employee_position"/>
-                        <field name="manager"/>
-                        <field name="active_leave_status" string="Leave Status" readonly="1"
-                               invisible="application_type != 'Internal'"/>
-                        <field name="active_disciplinary_status" string="Discipline Warning Level" readonly="1"
-                               invisible="application_type != 'Internal'"/>
-                        <field name="promotion_date"/>
-                        <field name="employment_start_date"/>
-                        <field name="final_work_unit"/>
-                        <!-- Both cascaded from app_reference — readonly once set -->
-                        <field name="preferred_location" readonly="app_reference != False"/>
-                        <field name="vacancy_reference" readonly="app_reference != False"/>
-                        <field name="cc_workunits" widget="many2many_tags"/>
+
+                    <!-- SECTION 2: INTERNAL EMPLOYEE PLACEMENT & RECORDS (Hidden for External) -->
+                    <group string="Internal Employee Placement &amp; Service Records" invisible="application_type != 'Internal'">
+                        <group string="Current Employee Placement">
+                            <field name="internal_employee_id"/>
+                            <field name="employee_number"/>
+                            <field name="employee_work_unit"/>
+                            <field name="employee_grade"/>
+                            <field name="employee_position"/>
+                            <field name="manager"/>
+                        </group>
+                        <group string="Promotion &amp; Service History">
+                            <field name="employment_start_date"/>
+                            <field name="promotion_date"/>
+                            <field name="final_work_unit"/>
+                            <field name="active_leave_status" string="Leave Status" readonly="1"/>
+                            <field name="active_disciplinary_status" string="Discipline Warning Level" readonly="1"/>
+                            <field name="preferred_location" readonly="app_reference != False"/>
+                            <field name="vacancy_reference" readonly="app_reference != False"/>
+                            <field name="cc_workunits" widget="many2many_tags"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="job_offer_status"/>
-                        <field name="rejection_reason"/>
-                    </group>
+                </xpath>
+
+                <!-- Hide default base tabs (Note, Details) while preserving internal DOM elements for Odoo inheritance -->
+                <xpath expr="//notebook/page[1]" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//notebook/page[2]" position="attributes">
+                    <attribute name="invisible">1</attribute>
                 </xpath>
 
                 <xpath expr="//notebook" position="inside">
-                    <page string="Education Qualification">
-                        <field name="qualification_id">
-                            <list editable="bottom">
-                                <field name="qualification" options="{'no_open': True}"/>
-                                <field name="requirement"/>
-                                <field name="response"/>
-                            </list>
-                        </field>
+                    <page string="CV Document Preview" name="cv_preview_page" invisible="application_type == 'Internal'">
+                        <field name="cv_preview_html" nolabel="1" widget="html"/>
                     </page>
-                    <page string="Experience">
-                        <field name="experiance_id">
-                            <list editable="bottom">
-                                <field name="experience" options="{'no_open': True}"/>
-                                <field name="requirement"/>
-                                <field name="response"/>
-                            </list>
-                        </field>
-                    </page>
-                    <page string="Competencies ">
-                        <field name="competencies_id">
-                            <list editable="bottom">
-                                <field name="competencies" options="{'no_open': True}"/>
-                                <field name="requirement"/>
-                                <field name="response"/>
-                            </list>
-                        </field>
-                    </page>
-                    <page string="Vacancies">
-                        <field name="hr_new_department_ids">
-                            <list editable="bottom">
-                                <field name="work_unit"/>
-                                <field name="number_of_vacancies"/>
-                                <field name="response"/>
-                            </list>
-                        </field>
+                    <page string="Pre-Employment Verification &amp; Clearance" invisible="application_type == 'Internal'">
+                        <group>
+                            <group string="Verification Status">
+                                <field name="job_offer_status" widget="badge"
+                                       decoration-success="job_offer_status == 'accepted'"
+                                       decoration-danger="job_offer_status == 'declined'"
+                                       decoration-warning="job_offer_status == 'pending'"/>
+                                <field name="forensic_cleared"/>
+                                <field name="medical_cleared"/>
+                                <field name="educational_docs_verified"/>
+                                <field name="pre_employment_cleared" widget="boolean_toggle" readonly="1" string="All Prerequisites Cleared"/>
+                            </group>
+                            <group string="Mandatory Document Attachments">
+                                <field name="forensic_certificate" filename="forensic_certificate_filename"/>
+                                <field name="forensic_certificate_filename" invisible="1"/>
+                                <field name="medical_certificate" filename="medical_certificate_filename"/>
+                                <field name="medical_certificate_filename" invisible="1"/>
+                                <field name="guarantor_form" filename="guarantor_form_filename"/>
+                                <field name="guarantor_form_filename" invisible="1"/>
+                            </group>
+                        </group>
+                        <group string="Official Employment Letter">
+                            <group>
+                                <field name="employment_letter_id" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="employment_letter_state" widget="badge"
+                                       decoration-info="employment_letter_state == 'draft'"
+                                       decoration-success="employment_letter_state in ['sent', 'issued']"
+                                       decoration-danger="employment_letter_state == 'cancelled'"/>
+                            </group>
+                        </group>
                     </page>
                 </xpath>
-                <xpath expr="//form//sheet//field[@name='user_id']" position="replace">
-                    <field name="user_id"/>
-                    <field name="functions" invisible="1"/>
+                <xpath expr="//field[@name='user_id']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//field[@name='interviewer_ids']" position="attributes">
+                    <attribute name="invisible">1</attribute>
                 </xpath>
 
+            </field>
+        </record>
+
+        <record id="hr_applicant_hide_skills_view_form" model="ir.ui.view">
+            <field name="name">hr.applicant.hide.skills.form</field>
+            <field name="model">hr.applicant</field>
+            <field name="inherit_id" ref="hr_recruitment_skills.hr_applicant_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//page[.//field[@name='current_applicant_skill_ids']]" position="replace"/>
             </field>
         </record>
 

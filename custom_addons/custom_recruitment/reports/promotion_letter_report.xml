@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Promotion Letter Report Action -->
+    <record id="action_report_internal_promotion_letter" model="ir.actions.report">
+        <field name="name">Internal Promotion Letter</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_internal_promotion_letter_document</field>
+        <field name="report_file">custom_recruitment.report_internal_promotion_letter_document</field>
+        <field name="print_report_name">'Promotion_Letter_' + (object.emp_name.name or 'Employee').replace(' ', '_')</field>
+        <field name="binding_model_id" ref="model_new_internal_recruitment_selected_candidates"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Promotion Letter Template -->
+    <template id="report_internal_promotion_letter_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 14px; line-height: 1.6; padding: 15px 35px; position: relative;">
+
+                    <!-- Official Header: Logo + Accent Bar -->
+                    <div class="row align-items-center mb-4" style="padding-top: 10px;">
+                        <div class="col-4">
+                            <img src="/custom_recruitment/static/src/img/bunna_logo.jpg" style="max-height: 85px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
+                        </div>
+                        <div class="col-8">
+                            <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Date & Reference Numbers -->
+                    <div class="row mb-3">
+                        <div class="col-6"></div>
+                        <div class="col-6 text-start" style="padding-left: 120px; font-size: 13.5px; line-height: 1.5;">
+                            <div>
+                                <strong>Date: </strong>
+                                <span t-esc="o.promotion_date.strftime('%d/%m/%Y') if o.promotion_date else (context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y'))"/>
+                            </div>
+                            <div>
+                                <strong>Ref. No: </strong>
+                                <span t-esc="o.promotion_ref_no or 'BB/TAOD/0000/' + str(context_timestamp(datetime.datetime.now()).year)"/>
+                            </div>
+                            <div>
+                                <strong>ID No: </strong>
+                                <span t-esc="o.emp_name.identification_id or o.emp_name.barcode or (o.emp_name.id if o.emp_name else '')"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recipient Block -->
+                    <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                        <div>
+                            <strong><span t-esc="o.get_salutation_label()"/> </strong>
+                            <span style="text-decoration: underline; font-weight: bold;" t-esc="o.emp_name.name if o.emp_name else '____________________'"/>
+                        </div>
+                        <div><strong>Bunna Bank S.C</strong></div>
+                        <div><u><strong>Addis Ababa</strong></u></div>
+                    </div>
+
+                    <!-- Salutation -->
+                    <div class="mb-3" style="font-size: 14px;">
+                        Dear <strong><span t-esc="o.get_salutation_label()"/> <span t-esc="o.emp_name.name if o.emp_name else ''"/></strong>,
+                    </div>
+
+                    <!-- Subject -->
+                    <div class="text-center my-3">
+                        <span style="font-size: 15px; font-weight: bold;">
+                            Subject: – <u>Promotion</u>
+                        </span>
+                    </div>
+
+                    <!-- Body Content -->
+                    <div style="text-align: justify; font-size: 13.5px; line-height: 1.7;">
+                        
+                        <!-- Paragraph 1: Position, Grade, Work Unit & Phrasing -->
+                        <p style="margin-bottom: 14px;">
+                            I am pleased to inform you that you are promoted to the post of 
+                            <strong><span t-esc="o.get_new_job_position_name() or '________________'"/></strong> 
+                            Job Grade <strong><span t-esc="o.get_new_job_grade_name() or '________'"/></strong> 
+                            and assigned at <strong><span t-esc="o.get_target_work_unit_name() or '________________'"/></strong> 
+                            <t t-if="o.promotion_type == 'diff_unit'">
+                                effective the date you assume your new position.
+                            </t>
+                            <t t-else="">
+                                effective <strong t-esc="o.promotion_date.strftime('%d/%m/%Y') if o.promotion_date else '________________'"/>.
+                            </t>
+                        </p>
+
+                        <!-- Paragraph 2: Salary Figures & In Words -->
+                        <p style="margin-bottom: 14px;">
+                            Commencing the same date, your monthly salary is raised to Birr 
+                            <strong><span t-esc="'{:,.2f}'.format(o.get_promoted_salary_figure()) if o.get_promoted_salary_figure() else '________'"/></strong> 
+                            (<em><span t-esc="o.get_promoted_salary_in_words() or '________________'"/></em>) 
+                            and you are entitled to other benefits attached to the position as per the benefit Package.
+                        </p>
+
+                        <!-- Paragraph 3: RELEASE CLAUSE (Rendered ONLY for Different Work Unit - Image 1) -->
+                        <t t-if="o.promotion_type == 'diff_unit'">
+                            <p style="margin-bottom: 14px;">
+                                By copy of this letter, <strong><span t-esc="o.get_current_work_unit_name() or '________________'"/></strong> 
+                                is advised to release <strong><span t-esc="o.emp_name.name if o.emp_name else '________________'"/></strong> 
+                                and forward the necessary information to <strong><span t-esc="o.get_target_work_unit_name() or '________________'"/></strong> 
+                                and <strong><span t-esc="o.get_signatory_title()"/></strong>.
+                            </p>
+                        </t>
+
+                        <!-- Paragraph 4: Closing Encouragement -->
+                        <p style="margin-bottom: 20px;">
+                            I hope you will continue to exert maximum effort to discharge the duties and responsibilities bestowed upon you.
+                        </p>
+                    </div>
+
+                    <!-- Sign-off Block with Authorized Signature & Official Stamp -->
+                    <div class="mt-2 mb-4" style="font-size: 13.5px; line-height: 1.5;">
+                        <div style="margin-bottom: 5px;">Sincerely yours,</div>
+                        <t t-set="prom_sig" t-value="o.signatory_config_id or o.get_signatory_config()"/>
+                        <t t-set="prom_sig_b64" t-value="o.get_signature_stamp_base64()"/>
+                        <t t-if="prom_sig_b64">
+                            <div style="margin-bottom: 2px;">
+                                <img t-att-src="prom_sig_b64" alt="Authorized Signature &amp; Stamp" style="max-height: 85px; max-width: 220px; object-fit: contain;"/>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div style="height: 50px;"></div>
+                        </t>
+                        <t t-set="disp_prom_name" t-value="(prom_sig.signatory_name if prom_sig and prom_sig.signatory_name else False) or o.get_signatory_name()"/>
+                        <t t-if="disp_prom_name">
+                            <div style="margin-bottom: 2px;"><strong><span t-esc="disp_prom_name"/></strong></div>
+                        </t>
+                        <div><strong><span t-esc="o.get_signatory_title()"/></strong></div>
+                        <div><strong><span t-esc="o.get_signatory_company()"/></strong></div>
+                    </div>
+
+                    <!-- CC Block -->
+                    <div class="mt-4" style="font-size: 12.5px; line-height: 1.5;">
+                        <div><strong>CC:</strong></div>
+                        <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
+                            <li>IT Security Management Directorate</li>
+                            <li>All respective work units</li>
+                            <li><u><strong>Bunna Bank S.C</strong></u></li>
+                        </ul>
+                    </div>
+
+                    <!-- Official Footer -->
+                    <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 35px; font-size: 10px; color: #555555;">
+                        <div class="row align-items-center">
+                            <div class="col-1 text-center" style="background-color: #8C948D; height: 18px; border-radius: 2px;"></div>
+                            <div class="col-4 text-center">
+                                <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                            </div>
+                            <div class="col-3 text-center">
+                                <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                <div><strong>Website</strong> www.bunnabanksc.com</div>
+                            </div>
+                            <div class="col-3 text-center">
+                                <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                <div>Addis Ababa | Ethiopia</div>
+                            </div>
+                            <div class="col-1 text-center" style="background-color: #8C948D; height: 18px; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

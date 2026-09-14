@@ -5,7 +5,6 @@ from . import applicant_shortlist
 from . import blacklist_pool
 from . import candidate_shortlist
 from . import internal_job_position
-from . import internal_recruitment
 from . import job_vacancy_competency
 from . import job_vacancy
 from . import recruitment_process_external
@@ -26,9 +25,6 @@ from . import res_config_settings
 from . import acting_role
 from . import hr_attendance
 from . import hr_job
-from . import recruitment_application_window
-from . import recruitment_available_vacancy
-from . import recruitment_competency
 from . import recruitment_experience
 from . import recruitment_experience_weight_config
 from . import recruitment_master_data_probation
@@ -36,7 +32,12 @@ from . import recruitment_offer_letter
 from . import recruitment_penalty_deduction
 from . import recruitment_qualifications
 from . import transfer_assessment
-from . import hr_onboarding
 from . import ats_news
 from . import recruitment_selection_minute
+from . import recruitment_manpower_dashboard_service
+from . import recruitment_employment_letter
+from . import recruitment_signatory_config
+from . import transfer_letter
+from . import ir_ui_menu
+from . import ir_model_fields
 

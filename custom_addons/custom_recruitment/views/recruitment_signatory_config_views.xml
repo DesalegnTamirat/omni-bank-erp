@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_recruitment_signatory_config_tree" model="ir.ui.view">
+        <field name="name">recruitment.signatory.config.list</field>
+        <field name="model">recruitment.signatory.config</field>
+        <field name="arch" type="xml">
+            <list string="Authorized Signatories &amp; Stamps" decoration-success="is_default and active" decoration-muted="not active">
+                <field name="name"/>
+                <field name="org_level"/>
+                <field name="operating_unit_id" string="District / Unit"/>
+                <field name="signatory_name"/>
+                <field name="signatory_title"/>
+                <field name="document_scope"/>
+                <field name="is_default" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_recruitment_signatory_config_form" model="ir.ui.view">
+        <field name="name">recruitment.signatory.config.form</field>
+        <field name="model">recruitment.signatory.config</field>
+        <field name="arch" type="xml">
+            <form string="Authorized Signatory &amp; Stamp Configuration">
+                <sheet>
+                    <div class="oe_button_box" name="button_box"/>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <widget name="web_ribbon" title="Default Active" bg_color="text-bg-success" invisible="not is_default or not active"/>
+                    <field name="signature_stamp_image" widget="image" class="oe_avatar" options="{'preview_image': 'signature_stamp_image', 'size': [180, 100]}"/>
+                    <div class="oe_title">
+                        <label for="name" string="Configuration Title"/>
+                        <h1>
+                            <field name="name" placeholder="e.g Debremarkos District"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Signatory &amp; Executive Info">
+                            <field name="signatory_name"/>
+                            <field name="signatory_title"/>
+                            <field name="signatory_company"/>
+                        </group>
+                        <group string="Document Scope &amp; Behavior">
+                            <field name="document_scope"/>
+                            <field name="is_default"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Organizational Assignment (Head Office vs District)">
+                        <group>
+                            <field name="org_level" widget="radio"/>
+                        </group>
+                        <group>
+                            <field name="operating_unit_id" string="Assigned District Office" invisible="org_level != 'district'" required="org_level == 'district'"/>
+                            <field name="department_id" string="Head Office Department" invisible="org_level != 'head_office'"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info mt-3" role="alert">
+                        <strong>ℹ️ Dynamic Application:</strong>
+                        This signature and official stamp will be automatically applied to matching Bank letters (Lateral Transfers, Promotions, Permanent Confirmation Letters) based on the hiring work unit and department. If no district-specific configuration is set, the system seamlessly falls back to Head Office default.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_recruitment_signatory_config_search" model="ir.ui.view">
+        <field name="name">recruitment.signatory.config.search</field>
+        <field name="model">recruitment.signatory.config</field>
+        <field name="arch" type="xml">
+            <search string="Search Signatories &amp; Stamps">
+                <field name="name"/>
+                <field name="signatory_name"/>
+                <field name="signatory_title"/>
+                <field name="operating_unit_id"/>
+                <filter name="filter_head_office" string="Head Office" domain="[('org_level', '=', 'head_office')]"/>
+                <filter name="filter_district" string="Districts" domain="[('org_level', '=', 'district')]"/>
+                <separator/>
+                <filter name="filter_default" string="Default Active" domain="[('is_default', '=', True), ('active', '=', True)]"/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+                <group>
+                    <filter name="group_by_org_level" string="Organizational Level" context="{'group_by': 'org_level'}"/>
+                    <filter name="group_by_scope" string="Document Scope" context="{'group_by': 'document_scope'}"/>
+                    <filter name="group_by_unit" string="District / Unit" context="{'group_by': 'operating_unit_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_recruitment_signatory_config" model="ir.actions.act_window">
+        <field name="name">Authorized Signatories &amp; Stamps</field>
+        <field name="res_model">recruitment.signatory.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_recruitment_signatory_config_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your first Authorized Signatory and Stamp!
+            </p>
+            <p>
+                Upload the official executive signature and purple Bunna Bank rubber stamp to automatically sign all official Letters (Lateral Transfer, Promotion, Employment) and Minutes.
+            </p>
+        </field>
+    </record>
+</odoo>

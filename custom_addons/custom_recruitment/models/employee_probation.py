@@ -102,7 +102,6 @@ class HrEmployeeProbation(models.Model):
         [
             ("pending", "Pending"),
             ("satisfactory", "Satisfactory (Permanency Confirmation)"),
-            ("extended", "Probation Extended"),
             ("unsatisfactory", "Unsatisfactory (Contract Termination)"),
             ("discipline", "Discipline Issue (Route to Legal/Discipline)"),
         ],
@@ -118,11 +117,48 @@ class HrEmployeeProbation(models.Model):
             ("notified", "Supervisor Notified"),
             ("evaluated", "Evaluated"),
             ("completed", "Completed / Permanency Confirmed"),
-            ("extended", "Extended"),
             ("terminated", "Contract Terminated"),
         ],
         string="Status", default="draft", tracking=True, copy=False,
     )
+
+    signatory_config_id = fields.Many2one(
+        'recruitment.signatory.config',
+        string='Signatory & Stamp Configuration',
+        help='Configuration providing the official signature and stamp for Permanent Confirmation'
+    )
+
+    def get_signatory_config(self):
+        self.ensure_one()
+        if self.signatory_config_id:
+            return self.signatory_config_id
+        return self.env['recruitment.signatory.config'].get_signatory_for_unit(
+            work_unit=self.operating_unit_id,
+            department=self.department_id,
+            doc_type='permanent_letter'
+        )
+
+    def get_signatory_name(self):
+        self.ensure_one()
+        sig = self.get_signatory_config()
+        return sig.signatory_name if sig and sig.signatory_name else ""
+
+    def get_signatory_title(self):
+        self.ensure_one()
+        sig = self.get_signatory_config()
+        return sig.signatory_title if sig and sig.signatory_title else "People Operation Management Directorate"
+
+    def get_signatory_company(self):
+        self.ensure_one()
+        sig = self.get_signatory_config()
+        return sig.signatory_company if sig and sig.signatory_company else "Bunna Bank S.C."
+
+    def get_signature_stamp_base64(self):
+        self.ensure_one()
+        sig = self.get_signatory_config()
+        if sig:
+            return sig.get_signature_stamp_base64()
+        return ""
 
     # -------------------------------------------------------------------------
     # Sequence & Reference Generation
@@ -196,14 +232,58 @@ class HrEmployeeProbation(models.Model):
                 MANAGERIAL_DURATION if rec.employee_category == "Managerial" else NON_MANAGERIAL_DURATION
             )
 
-    @api.depends("probation_start_date", "duration_days", "extension_days")
+    @api.depends("probation_start_date", "duration_days", "extension_days", "employee_id")
     def _compute_probation_end_date(self):
         for rec in self:
-            if rec.probation_start_date and rec.duration_days:
-                total_days = rec.duration_days + (rec.extension_days or 0)
-                rec.probation_end_date = rec.probation_start_date + timedelta(days=total_days)
-            else:
+            if not (rec.probation_start_date and rec.duration_days):
                 rec.probation_end_date = False
+                continue
+
+            target_working_days = rec.duration_days + (rec.extension_days or 0)
+            if target_working_days <= 0:
+                rec.probation_end_date = rec.probation_start_date
+                continue
+
+            calendar = (
+                rec.employee_id.resource_calendar_id
+                or rec.env.company.resource_calendar_id
+                or False
+            )
+
+            # Public holidays / Global leaves domain (excluding leaves where resource_id is set for specific employees)
+            leave_domain = [('resource_id', '=', False)]
+            if calendar:
+                leave_domain.append(('calendar_id', 'in', [False, calendar.id]))
+
+            holiday_leaves = self.env['resource.calendar.leaves'].search(leave_domain)
+            holiday_ranges = []
+            for h in holiday_leaves:
+                if h.date_from and h.date_to:
+                    holiday_ranges.append((h.date_from.date(), h.date_to.date()))
+
+            # Working days of week (0=Mon ... 6=Sun). Default: Monday to Friday
+            if calendar and calendar.attendance_ids:
+                work_weekdays = set(int(att.dayofweek) for att in calendar.attendance_ids)
+            else:
+                work_weekdays = {0, 1, 2, 3, 4}
+
+            curr_date = rec.probation_start_date
+            counted_days = 0
+            max_days_limit = 500  # Safeguard against infinite loops
+            iterations = 0
+
+            while counted_days < target_working_days and iterations < max_days_limit:
+                iterations += 1
+                is_workday = curr_date.weekday() in work_weekdays
+                is_holiday = any(start_d <= curr_date <= end_d for start_d, end_d in holiday_ranges)
+
+                if is_workday and not is_holiday:
+                    counted_days += 1
+
+                if counted_days < target_working_days:
+                    curr_date += timedelta(days=1)
+
+            rec.probation_end_date = curr_date
 
     @api.depends("criteria_line_ids.score", "criteria_line_ids.coefficient")
     def _compute_scores(self):
@@ -387,10 +467,10 @@ class HrEmployeeProbation(models.Model):
         }
 
     def action_record_outcome(self):
-        """Record final probation outcome and execute HR contract updates."""
+        """Record final probation outcome and execute HR contract updates (Confirmation or Termination)."""
         for rec in self:
             if rec.outcome == "pending":
-                raise UserError(_("Please select an Outcome (Satisfactory, Unsatisfactory, Extended, or Discipline Issue)."))
+                raise UserError(_("Please select an Outcome (Satisfactory or Unsatisfactory)."))
 
             today = fields.Date.context_today(self)
             rec.write({
@@ -419,9 +499,6 @@ class HrEmployeeProbation(models.Model):
                     if contracts:
                         contracts.write({"state": "cancel"})
                 rec.message_post(body=_("Probation completed: Unsatisfactory outcome. Contract terminated."))
-
-            elif rec.outcome == "extended":
-                rec.action_extend_probation()
 
             elif rec.outcome == "discipline":
                 rec.state = "completed"

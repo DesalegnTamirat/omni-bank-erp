@@ -67,4 +67,9 @@ from . import hr_employee_previous_occupation
 from . import hr_employee_delegation
 from . import hr_delegated_approval
 
-
+from . import res_company
+from . import res_company_ldap
+from . import res_users
+from . import res_config_settings
+from . import ir_http
+from . import ir_ui_menu

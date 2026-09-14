@@ -45,6 +45,16 @@ class CandidateProfile(models.Model):
     cv_filename = fields.Char(
         string='CV Filename',
     )
+    cv_preview_html = fields.Html(
+        string='CV Document In-Browser Preview',
+        compute='_compute_cv_preview_html',
+        sanitize=False,
+    )
+    profile_summary_html = fields.Html(
+        string='Electronic CV Summary Sheet',
+        compute='_compute_profile_summary_html',
+        sanitize=False,
+    )
     cover_letter_file = fields.Binary(string='Cover Letter Document', attachment=True)
     cover_letter_filename = fields.Char(string='Cover Letter Filename')
     linkedin_url = fields.Char(string='LinkedIn Profile URL')
@@ -94,6 +104,16 @@ class CandidateProfile(models.Model):
     dob = fields.Date(string='Date of Birth')
     age = fields.Integer(string='Age', compute='_compute_age', store=True)
     place_of_birth = fields.Char(string='Place of Birth')
+    father_name = fields.Char(string='Father Name')
+    grand_father_name = fields.Char(string='Grand Father Name')
+    mother_name = fields.Char(string='Mother Name')
+    blood_group = fields.Char(string='Blood Group')
+    house_number = fields.Char(string='House Number')
+    sub_city = fields.Char(string='Sub City')
+    region = fields.Char(string='Region')
+    woreda = fields.Char(string='Woreda')
+    kebele = fields.Char(string='Kebele')
+    alternative_mobile = fields.Char(string='Alternate Mobile')
 
     # ── User Requested Bunna Bank Experience Fields ─────────────────────────
     worked_in_bunna_earlier = fields.Selection([('yes', 'Yes'), ('no', 'No')], string='Previously Worked in Bunna Bank?', default='no')
@@ -247,6 +267,123 @@ class CandidateProfile(models.Model):
         for rec in self:
             rec.application_count = len(rec.application_ids)
 
+    @api.depends('cv_file', 'cv_filename')
+    def _compute_cv_preview_html(self):
+        import html
+        for rec in self:
+            if rec.cv_file:
+                fn = rec.cv_filename or 'CV_Document.pdf'
+                url = f"/web/content?model=candidate.profile&id={rec.id}&field=cv_file&filename={html.escape(fn)}"
+                rec.cv_preview_html = f"""
+                <div style="width: 100%; min-height: 750px; height: 80vh; background: #2c3e50; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
+                    <div style="background: #1a252f; color: #ffffff; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600;">
+                        <span><i class="fa fa-file-pdf-o" style="margin-right: 8px; color: #e74c3c;"></i> {html.escape(fn)}</span>
+                        <div>
+                            <a href="{url}" target="_blank" class="btn btn-sm btn-outline-light" style="font-size: 12px; margin-right: 8px;"><i class="fa fa-external-link"></i> Full Screen</a>
+                            <a href="{url}&download=true" class="btn btn-sm btn-primary" style="font-size: 12px;"><i class="fa fa-download"></i> Download</a>
+                        </div>
+                    </div>
+                    <iframe src="{url}#toolbar=1&navpanes=1" style="width: 100%; height: 100%; flex-grow: 1; border: none;" allowfullscreen="true"></iframe>
+                </div>
+                """
+            else:
+                rec.cv_preview_html = """
+                <div style="padding: 40px; text-align: center; background: #f8f9fa; border: 2px dashed #ced4da; border-radius: 10px; margin: 20px 0;">
+                    <i class="fa fa-file-text-o" style="font-size: 48px; color: #6c757d; margin-bottom: 15px; display: block;"></i>
+                    <h5 style="color: #495057; font-weight: 600;">No Uploaded CV File Attached</h5>
+                    <p style="color: #6c757d; font-size: 13px; max-width: 450px; margin: 0 auto 15px auto;">The candidate profile was entered electronically or without an uploaded PDF attachment. You can review their full structured resume under the <strong>Electronic CV Summary</strong> tab.</p>
+                </div>
+                """
+
+    @api.depends('education_ids', 'experience_ids', 'skill_ids', 'language_ids', 'name', 'email', 'phone', 'city', 'region')
+    def _compute_profile_summary_html(self):
+        import html
+        for rec in self:
+            edu_rows = ""
+            for edu in rec.education_ids:
+                edu_rows += f"""
+                <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;">
+                    <strong style="color: #2c3e50; font-size: 14px;">{html.escape(edu.qualification_name or '')}</strong>
+                    <span style="color: #7f8c8d; font-size: 12px; float: right;">{edu.start_date or ''} - {edu.end_date or 'Present'}</span>
+                    <div style="color: #34495e; font-size: 13px;">{html.escape(edu.institution or '')} {f'— {html.escape(edu.field_of_study)}' if edu.field_of_study else ''}</div>
+                    {f'<div style="color: #8e44ad; font-size: 12px; font-weight: bold; margin-top:2px;">CGPA: {edu.cgpa}</div>' if edu.cgpa else ''}
+                </div>
+                """
+            if not edu_rows:
+                edu_rows = "<p style='color:#95a5a6; font-style:italic;'>No education history recorded.</p>"
+
+            exp_rows = ""
+            for exp in rec.experience_ids:
+                exp_rows += f"""
+                <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;">
+                    <strong style="color: #2c3e50; font-size: 14px;">{html.escape(exp.position or '')}</strong>
+                    <span style="color: #7f8c8d; font-size: 12px; float: right;">{exp.start_date or ''} - {exp.end_date or ('Present' if exp.is_current else '')} ({exp.duration_years} yrs)</span>
+                    <div style="color: #34495e; font-size: 13px; font-weight: 500;">{html.escape(exp.organization or '')}</div>
+                    {f'<span class="badge bg-info text-white" style="font-size:10px; margin-top:3px;">{html.escape(exp.experience_type or "General")}</span>' if exp.experience_type else ''}
+                </div>
+                """
+            if not exp_rows:
+                exp_rows = "<p style='color:#95a5a6; font-style:italic;'>No work experience history recorded.</p>"
+
+            skills_badges = "".join([f"<span class='badge' style='background:#4a1515; color:#fff; font-size:12px; padding:6px 12px; margin:3px 4px; border-radius:12px;'>{html.escape(s.name or '')} ({html.escape(s.level or '')})</span>" for s in rec.skill_ids])
+            if not skills_badges:
+                skills_badges = "<span style='color:#95a5a6; font-style:italic;'>None</span>"
+
+            lang_badges = "".join([f"<span class='badge' style='background:#b38b59; color:#fff; font-size:12px; padding:6px 12px; margin:3px 4px; border-radius:12px;'>{html.escape(l.name or '')} ({html.escape(l.proficiency or '')})</span>" for l in rec.language_ids])
+            if not lang_badges:
+                lang_badges = "<span style='color:#95a5a6; font-style:italic;'>None</span>"
+
+            rec.profile_summary_html = f"""
+            <div style="background:#ffffff; border:1px solid #e0e0e0; border-radius:12px; padding:30px; box-shadow:0 2px 10px rgba(0,0,0,0.05); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <div style="border-bottom: 2px solid #4a1515; padding-bottom: 18px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h2 style="color: #4a1515; margin:0 0 6px 0; font-weight:700;">{html.escape(rec.name or '')}</h2>
+                        <div style="color: #555; font-size: 13px;">
+                            <span><i class="fa fa-envelope" style="color:#b38b59;"></i> {html.escape(rec.email or '')}</span> &nbsp;|&nbsp; 
+                            <span><i class="fa fa-phone" style="color:#b38b59;"></i> {html.escape(rec.phone or '')}</span> &nbsp;|&nbsp; 
+                            <span><i class="fa fa-map-marker" style="color:#b38b59;"></i> {html.escape(rec.city or '')}, {html.escape(rec.region or '')}</span>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span class="badge" style="background:#4a1515; color:#fff; font-size:12px; padding:6px 14px; border-radius:20px;">Total Exp: {rec.total_experience} Yrs</span>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px;">
+                    <div>
+                        <h4 style="color:#4a1515; border-bottom:1px solid #ddd; padding-bottom:6px; font-weight:600;"><i class="fa fa-graduation-cap"></i> Education &amp; Qualifications</h4>
+                        {edu_rows}
+                    </div>
+                    <div>
+                        <h4 style="color:#4a1515; border-bottom:1px solid #ddd; padding-bottom:6px; font-weight:600;"><i class="fa fa-briefcase"></i> Work Experience</h4>
+                        {exp_rows}
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <div>
+                        <h5 style="color:#4a1515; font-weight:600;"><i class="fa fa-cogs"></i> Skills &amp; Competencies</h5>
+                        <div style="margin-top:8px;">{skills_badges}</div>
+                    </div>
+                    <div>
+                        <h5 style="color:#4a1515; font-weight:600;"><i class="fa fa-language"></i> Languages</h5>
+                        <div style="margin-top:8px;">{lang_badges}</div>
+                    </div>
+                </div>
+            </div>
+            """
+
+    def action_preview_cv(self):
+        self.ensure_one()
+        if not self.cv_file:
+            raise UserError(_("No CV document file uploaded for candidate %s.") % self.name)
+        fn = self.cv_filename or 'CV_Document.pdf'
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f"/web/content?model=candidate.profile&id={self.id}&field=cv_file&filename={fn}",
+            'target': 'new',
+        }
+
     # ---------------------------------------------------------------
     # Soft Delete
     # ---------------------------------------------------------------
@@ -267,38 +404,7 @@ class CandidateProfile(models.Model):
             'email_from': self.email,
             'partner_phone': self.phone,
         })
-
-        # 1. Sync Education Qualifications -> hr_qualification_info_job
-        for edu in self.education_ids:
-            rec_qual = self.env['recruitment.qualification'].search([('qualification', '=ilike', edu.qualification_name)], limit=1)
-            if not rec_qual and edu.qualification_name:
-                rec_qual = self.env['recruitment.qualification'].create({'qualification': edu.qualification_name})
-            
-            if rec_qual:
-                existing_q = applicant.qualification_id.filtered(lambda q: q.qualification.id == rec_qual.id)
-                if not existing_q:
-                    self.env['hr_qualification_info_job'].create({
-                        'applicant_id': applicant.id,
-                        'qualification': rec_qual.id,
-                        'requirement': 0.0,
-                        'response': float(edu.cgpa or 0.0),
-                    })
-
-        # 2. Sync Experience -> hr_experience_info_job
-        for exp in self.experience_ids:
-            rec_exp = self.env['recruitment.experience'].search([('experience', '=ilike', exp.position)], limit=1)
-            if not rec_exp and exp.position:
-                rec_exp = self.env['recruitment.experience'].create({'experience': exp.position})
-            
-            if rec_exp:
-                existing_e = applicant.experiance_id.filtered(lambda e: e.experience.id == rec_exp.id)
-                if not existing_e:
-                    self.env['hr_experience_info_job'].create({
-                        'applicant_id': applicant.id,
-                        'experience': rec_exp.id,
-                        'requirement': 0.0,
-                        'response': float(exp.duration_years or 0.0),
-                    })
+        applicant._sync_from_candidate_profile()
 
     def sync_from_application(self, applicant):
         """Populates master profile fields, education, and experience from hr.applicant if missing."""
@@ -342,8 +448,12 @@ class CandidateProfile(models.Model):
                         'start_date': fields.Date.today(),
                     })
 
-    def _auto_init(self):
-        super()._auto_init()
+    # def _auto_init(self):
+    #     super()._auto_init()
+    #     try:
+    #         self.env['candidate.profile'].sudo().action_sync_all_unlinked_applicants()
+    #     except Exception as e:
+    #         _logger.warning("Auto sync candidate profiles on init/startup failed: %s", str(e))
 
     def action_sync_all_unlinked_applicants(self, *args, **kwargs):
         """Retroactively finds or creates Master Candidate Profiles for all unlinked hr.applicant records."""
@@ -382,6 +492,16 @@ class CandidateProfile(models.Model):
             app.sudo().write({'candidate_profile_id': candidate.id})
             candidate.sync_from_application(app)
             count += 1
+
+        # Also populate and compute all demographics, work status, and notebook tabs from CV profile for all applicants
+        all_apps = self.env['hr.applicant'].sudo().search([])
+        for app in all_apps:
+            try:
+                app._sync_from_candidate_profile()
+                if app.employee_id:
+                    app._populate_employee_from_applicant_and_profile(app.employee_id)
+            except Exception as e:
+                _logger.warning("Error syncing applicant %s from profile: %s", app.id, str(e))
 
         _logger.info("Master Candidate Profiles auto-synced %s unlinked applicant records.", count)
         return True
@@ -422,23 +542,28 @@ class CandidateEducation(models.Model):
     graduation_year = fields.Date(string='Graduation Year')
 
     def _auto_init(self):
-        self.env.cr.execute("""
-            SELECT data_type FROM information_schema.columns 
-            WHERE table_name = %s AND column_name = 'graduation_year'
-        """, (self._table,))
-        res = self.env.cr.fetchone()
-        if res and res[0] in ('integer', 'bigint', 'numeric', 'double precision'):
-            self.env.cr.execute(f"""
-                ALTER TABLE {self._table} 
-                ALTER COLUMN graduation_year TYPE date 
-                USING (
-                    CASE 
-                        WHEN graduation_year IS NULL OR graduation_year::text = '0' OR length(graduation_year::text) < 4 
-                        THEN NULL 
-                        ELSE (left(graduation_year::text, 4) || '-01-01')::date 
-                    END
-                );
-            """)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    SELECT data_type FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = 'graduation_year'
+                """, (self._table,))
+                res = self.env.cr.fetchone()
+                if res and res[0].lower() != 'date':
+                    self.env.cr.execute(f"""
+                        ALTER TABLE {self._table} 
+                        ALTER COLUMN graduation_year TYPE date 
+                        USING (
+                            CASE 
+                                WHEN graduation_year IS NULL THEN NULL 
+                                WHEN graduation_year::text ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}' THEN substring(graduation_year::text from 1 for 10)::date 
+                                WHEN graduation_year::text ~ '^\\d{{4}}' THEN (substring(graduation_year::text from 1 for 4) || '-01-01')::date 
+                                ELSE NULL 
+                            END
+                        );
+                    """)
+        except Exception as e:
+            _logger.warning("Safe migration on %s.graduation_year: %s", self._table, e)
         super()._auto_init()
 
     candidate_id = fields.Many2one(

@@ -4,6 +4,34 @@
     <data>
 
 
+        <!-- ================================================================
+             FIX: current_leave_id Access Error for User-group employees
+             hr_holidays adds leave fields to the kanban view WITHOUT a
+             view-level groups restriction — so Odoo tries to _read() them
+             for ALL users, but the Python field has groups='hr.group_hr_user'.
+             Adding groups="hr.group_hr_user" here tells Odoo's view processor
+             to strip these fields for non-Officers BEFORE calling _read().
+        ================================================================ -->
+        <record id="hr_kanban_leave_fields_officer_only" model="ir.ui.view">
+            <field name="name">hr.employee.kanban.leave.fields.officer.groups</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr_holidays.hr_kanban_view_employees_kanban"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='current_leave_id']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
+                <xpath expr="//field[@name='current_leave_state']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
+                <xpath expr="//field[@name='leave_date_from']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
+                <xpath expr="//field[@name='leave_date_to']" position="attributes">
+                    <attribute name="groups">hr.group_hr_user</attribute>
+                </xpath>
+            </field>
+        </record>
+
         <record id="hr_employee_inherit_form_view" model="ir.ui.view">
             <field name="name">hr.employee.form.view</field>
             <field name="model">hr.employee</field>

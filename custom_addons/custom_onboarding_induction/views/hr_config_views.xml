@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <!-- 1. Corporate Induction Task Template Views                           -->
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <record id="hr_induction_task_template_view_tree" model="ir.ui.view">
+        <field name="name">hr.induction.task.template.list</field>
+        <field name="model">hr.induction.task.template</field>
+        <field name="arch" type="xml">
+            <list string="Corporate Induction Task Templates" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name" string="Task / Training Title"/>
+                <field name="training_type" string="Training Type"/>
+                <field name="is_mandatory" string="Mandatory?" widget="boolean_toggle"/>
+                <field name="days_offset" string="Due Date Offset (Days from Start)"/>
+                <field name="active" string="Active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_induction_task_template_view_form" model="ir.ui.view">
+        <field name="name">hr.induction.task.template.form</field>
+        <field name="model">hr.induction.task.template</field>
+        <field name="arch" type="xml">
+            <form string="Corporate Induction Task Template">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Task / Training Title"/>
+                        <h1><field name="name" placeholder="e.g. Bunna Bank Culture, Vision &amp; Core Values"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="training_type" string="Training Type"/>
+                            <field name="is_mandatory" string="Mandatory?" widget="boolean_toggle"/>
+                        </group>
+                        <group>
+                            <field name="days_offset" string="Due Date Offset (Days from Start Date)"/>
+                            <field name="sequence" string="Display Sequence"/>
+                            <field name="active" string="Active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_induction_task_template_action" model="ir.actions.act_window">
+        <field name="name">Induction Task Templates</field>
+        <field name="res_model">hr.induction.task.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Corporate Induction task template!
+            </p>
+            <p>
+                Tasks configured here will be automatically instantiated with target due dates whenever a new Corporate Induction Plan is created.
+            </p>
+        </field>
+    </record>
+
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <!-- 2. Workplace Onboarding Task Template Views                          -->
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <record id="hr_onboarding_task_template_view_tree" model="ir.ui.view">
+        <field name="name">hr.onboarding.task.template.list</field>
+        <field name="model">hr.onboarding.task.template</field>
+        <field name="arch" type="xml">
+            <list string="Workplace Onboarding Task Templates" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name" string="Task Description"/>
+                <field name="period" string="Period"/>
+                <field name="assigned_to_role" string="Assigned Role"/>
+                <field name="days_offset" string="Due Date Offset (Days from Start)"/>
+                <field name="active" string="Active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_task_template_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.task.template.form</field>
+        <field name="model">hr.onboarding.task.template</field>
+        <field name="arch" type="xml">
+            <form string="Workplace Onboarding Task Template">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Task Description"/>
+                        <h1><field name="name" placeholder="e.g. Day 1: Workstation Setup, Email &amp; ERP Access"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="period" string="Onboarding Period"/>
+                            <field name="assigned_to_role" string="Assigned Role"/>
+                        </group>
+                        <group>
+                            <field name="days_offset" string="Due Date Offset (Days from Start Date)"/>
+                            <field name="sequence" string="Display Sequence"/>
+                            <field name="active" string="Active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_task_template_action" model="ir.actions.act_window">
+        <field name="name">Onboarding Task Templates</field>
+        <field name="res_model">hr.onboarding.task.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Workplace Onboarding task template!
+            </p>
+            <p>
+                Tasks configured here will be automatically generated with target due dates whenever a new Workplace Onboarding Plan is created.
+            </p>
+        </field>
+    </record>
+
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <!-- 3. Dedicated Score Weighting Configuration Views                     -->
+    <!-- ═════════════════════════════════════════════════════════════════════ -->
+    <record id="hr_onboarding_score_config_view_tree" model="ir.ui.view">
+        <field name="name">hr.onboarding.score.config.list</field>
+        <field name="model">hr.onboarding.score.config</field>
+        <field name="arch" type="xml">
+            <list string="Performance Scoring Weights" editable="bottom">
+                <field name="name" string="Configuration Name"/>
+                <field name="weight_induction" string="Corporate Induction LMS (%)"/>
+                <field name="weight_tasks" string="Work Unit Tasks (%)"/>
+                <field name="weight_midterm" string="Supervisor Mid-Term (%)"/>
+                <field name="total_weight" string="Total Weight (%)" decoration-success="total_weight == 100" decoration-danger="total_weight != 100"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_score_config_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.score.config.form</field>
+        <field name="model">hr.onboarding.score.config</field>
+        <field name="arch" type="xml">
+            <form string="Performance Scoring Weight Configuration">
+                <sheet>
+                    <div class="text-center mb-4 p-3 rounded" style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); color: #FFFFFF;">
+                        <h2 class="fw-bold" style="letter-spacing: 1px; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase" style="color: #FFFFFF;">Performance Scoring Configuration</h3>
+                        <h5 style="color: #E2C095;">Onboarding &amp; Induction Weight Settings</h5>
+                    </div>
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Configuration Name"/>
+                        <h1><field name="name" placeholder="e.g. Bunna Bank Standard Scoring Weights"/></h1>
+                    </div>
+                    <group string="Component Percentage Weights (Must Total 100%)">
+                        <group>
+                            <field name="weight_induction" string="Corporate Induction LMS Weight (%)"/>
+                            <field name="weight_tasks" string="Work Unit Tasks Weight (%)"/>
+                            <field name="weight_midterm" string="Supervisor Mid-Term Rating Weight (%)"/>
+                        </group>
+                        <group string="Weight Validation">
+                            <field name="total_weight" string="Total Weight (%)" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="hr_onboarding_score_config_action" model="ir.actions.act_window">
+        <field name="name">Scoring Weights Configuration</field>
+        <field name="res_model">hr.onboarding.score.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure Performance Scoring Weights
+            </p>
+            <p>
+                Configure the percentage weights for Induction LMS, Work Unit Tasks, and Supervisor Mid-Term ratings.
+            </p>
+        </field>
+    </record>
+
+</odoo>

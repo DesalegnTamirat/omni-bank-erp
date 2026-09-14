@@ -59,6 +59,29 @@
                                 <p t-field="o.selection_decision"/>
                             </div>
                         </div>
+
+                        <!-- Executive Approval & Stamp -->
+                        <div class="row mt-4" style="page-break-inside: avoid;">
+                            <div class="col-7"></div>
+                            <div class="col-5 text-start" style="font-size: 13px;">
+                                <div><strong>Approved by:</strong></div>
+                                <t t-set="min_sig" t-value="env['recruitment.signatory.config'].get_active_signatory('committee_minute')"/>
+                                <t t-set="min_b64" t-value="min_sig.get_signature_stamp_base64() if min_sig else env['recruitment.signatory.config'].get_active_signature_stamp_base64('committee_minute')"/>
+                                <t t-if="min_b64">
+                                    <div style="margin-top: 4px; margin-bottom: 2px;">
+                                        <img t-att-src="min_b64" alt="Authorized Signature &amp; Stamp" style="max-height: 80px; max-width: 200px; object-fit: contain;"/>
+                                    </div>
+                                </t>
+                                <t t-else="">
+                                    <div style="height: 45px;"></div>
+                                </t>
+                                <t t-if="min_sig and min_sig.signatory_name">
+                                    <div><strong><span t-esc="min_sig.signatory_name"/></strong></div>
+                                </t>
+                                <div><strong><span t-esc="min_sig.signatory_title if min_sig and min_sig.signatory_title else 'Talent Management Directorate'"/></strong></div>
+                                <div><strong><span t-esc="min_sig.signatory_company if min_sig and min_sig.signatory_company else 'Bunna Bank S.C.'"/></strong></div>
+                            </div>
+                        </div>
                     </div>
                 </t>
             </t>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Sequence for Corporate Induction Plan -->
+        <record id="sequence_hr_induction_plan" model="ir.sequence">
+            <field name="name">Corporate Induction Plan Sequence</field>
+            <field name="code">hr.induction.plan</field>
+            <field name="prefix">BB/IND/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Sequence for Workplace Onboarding Plan -->
+        <record id="sequence_hr_onboarding_plan" model="ir.sequence">
+            <field name="name">Workplace Onboarding Plan Sequence</field>
+            <field name="code">hr.onboarding.plan</field>
+            <field name="prefix">BB/ONB/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

@@ -22,11 +22,15 @@
         'website',
         'website_hr_recruitment',
     ],
+    'external_dependencies': {
+        'python': ['python-ldap'],
+    },
     'data': [
         'security/security.xml',
         'security/operating_unit_security.xml',
         'security/security_hr_contract.xml',
         'security/ir.model.access.csv',
+        'security/security_hr_employee_custom_rules.xml',
         'data/hr_contract_data.xml',
         'views/hr_contract_views.xml',
         'views/hr_contract_history_views.xml',
@@ -49,26 +53,21 @@
         'views/recruitment_experience.xml',
         'data/hr_job_data.xml',
 
-        # -- Service Request & Delegation --
+        # -- Service Request --
         'security/security_service_request.xml',
         'security/security_delegation.xml',
         'data/employee_service_request_sequence.xml',
         'data/emp_service_req.xml',
         'data/employee_self_service_sequence.xml',
-        'data/delegation_sequence.xml',
         'views/service_request_type_views.xml',
-
-
         'views/service_request_views.xml',
         'views/service_request.xml',
+        'views/employee_ser_request.xml',
+        'wizards/completion_wizard_views.xml',
+        'wizards/rejection_wizard_views.xml',
         'views/hr_employee_delegation_views.xml',
         'views/hr_delegated_approval_views.xml',
         'wizards/hr_employee_delegation_cancel_wizard_views.xml',
-
-        'wizards/completion_wizard_views.xml',
-        'wizards/rejection_wizard_views.xml',
-
-
 
         # -- Guarantees / Supplementary Role --
         'views/guarentees_details_views.xml',
@@ -87,6 +86,9 @@
         'views/employee_demotion.xml',
         'views/part_time_employment_views.xml',
         'views/part_time_employement.xml',
+
+        # -- Experience Letter --
+        'data/employee_experience_letter_sequence.xml',
 
         # -- Probation --
         'data/prob_sequence.xml',
@@ -135,6 +137,9 @@
         'views/hr_employee_relative_views.xml',
         'views/hr_employee_education_detail_views.xml',
         'views/hr_employee_previous_occupation_views.xml',
+        'views/ldap_installer_views.xml',
+        'views/res_config_settings_views.xml',
+        'views/unregistered_employee_notice.xml',
         'views/menu.xml',
     ],
     'assets': {

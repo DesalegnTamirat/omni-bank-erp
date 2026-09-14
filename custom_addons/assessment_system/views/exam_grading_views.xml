@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: Grading Task -->
+    <record id="view_exam_grading_task_form" model="ir.ui.view">
+        <field name="name">exam.grading.task.form</field>
+        <field name="model">exam.grading.task</field>
+        <field name="arch" type="xml">
+            <form string="Manual Question Grading Task">
+                <header>
+                    <button name="action_submit_candidate_evaluation" string="Submit Candidate Evaluation &amp; Compute Final Score" type="object" invisible="state == 'verified'" class="btn-primary"/>
+                    <button name="action_verify_grade" string="Supervisor Verify &amp; Finalize" type="object" invisible="state != 'graded'" class="btn-success" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,graded,verified"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Grading Task Reference"/>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="candidate_name"/>
+                            <field name="attempt_id"/>
+                            <field name="job_id"/>
+                            <field name="operating_unit_id"/>
+                        </group>
+                        <group>
+                            <field name="assigned_grader_id"/>
+                            <field name="sla_deadline"/>
+                            <field name="is_overdue" decoration-danger="is_overdue"/>
+                            <field name="days_pending"/>
+                        </group>
+                    </group>
+                    <group string="Question &amp; Expected Answer / Rubric">
+                        <field name="question_type" readonly="1"/>
+                        <field name="question_text" readonly="1"/>
+                        <field name="correct_text_answer" readonly="1" invisible="question_type != 'fill_blank'"/>
+                        <field name="rubric_guidelines" readonly="1" invisible="question_type not in ['short_answer', 'essay']"/>
+                    </group>
+                    <group string="Candidate Response">
+                        <field name="candidate_response" readonly="1"/>
+                    </group>
+                    <group string="Grading Evaluation">
+                        <group>
+                            <field name="marks_available"/>
+                            <field name="marks_awarded"/>
+                        </group>
+                        <group>
+                            <field name="grader_comments" placeholder="Provide scoring justification..."/>
+                        </group>
+                    </group>
+                    <group string="Verification Sign-Off">
+                        <group>
+                            <field name="graded_by_user_id"/>
+                            <field name="graded_date"/>
+                        </group>
+                        <group>
+                            <field name="verified_by_user_id"/>
+                            <field name="verified_date"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Grading Tasks (Editable row by row for fast bulk scoring) -->
+    <record id="view_exam_grading_task_tree" model="ir.ui.view">
+        <field name="name">exam.grading.task.list</field>
+        <field name="model">exam.grading.task</field>
+        <field name="arch" type="xml">
+            <list string="Manual Grading Queue" editable="bottom" decoration-danger="is_overdue and state != 'verified'" decoration-info="state == 'pending'" decoration-success="state == 'verified'">
+                <field name="name" readonly="1"/>
+                <field name="candidate_name" readonly="1"/>
+                <field name="job_id" readonly="1" optional="show"/>
+                <field name="operating_unit_id" optional="show" readonly="1"/>
+                <field name="question_text" readonly="1" widget="char" class="text-truncate"/>
+                <field name="candidate_response" readonly="1" widget="char" class="text-truncate"/>
+                <field name="marks_available" readonly="1"/>
+                <field name="marks_awarded"/>
+                <field name="grader_comments" optional="show" widget="char" class="text-truncate"/>
+                <field name="assigned_grader_id" optional="show"/>
+                <field name="sla_deadline" readonly="1" optional="show"/>
+                <field name="state" widget="badge" readonly="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Server Action: Submit Candidate Essay Evaluations & Compute Final Scores -->
+    <record id="action_server_submit_candidate_evaluations" model="ir.actions.server">
+        <field name="name">Submit Evaluations &amp; Compute Final Scores</field>
+        <field name="model_id" ref="model_exam_grading_task"/>
+        <field name="binding_model_id" ref="model_exam_grading_task"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_submit_candidate_evaluation()
+        </field>
+    </record>
+
+    <!-- Search View: Grading Tasks -->
+    <record id="view_exam_grading_task_search" model="ir.ui.view">
+        <field name="name">exam.grading.task.search</field>
+        <field name="model">exam.grading.task</field>
+        <field name="arch" type="xml">
+            <search string="Search Grading Tasks">
+                <field name="name" string="Task / Ref"/>
+                <field name="candidate_name"/>
+                <field name="job_id"/>
+                <field name="operating_unit_id" string="Submitting Work Unit"/>
+                <field name="assigned_grader_id"/>
+                <field name="question_text"/>
+
+                <filter string="My Assigned Tasks" name="my_tasks" domain="[('assigned_grader_id', '=', uid)]"/>
+                <separator/>
+                <filter string="Pending Grading" name="filter_pending" domain="[('state', '=', 'pending')]"/>
+                <filter string="Graded / Awaiting Verification" name="filter_graded" domain="[('state', '=', 'graded')]"/>
+                <filter string="Verified &amp; Finalized" name="filter_verified" domain="[('state', '=', 'verified')]"/>
+                <separator/>
+                <filter string="Overdue SLA (>3 Days)" name="filter_overdue" domain="[('is_overdue', '=', True), ('state', '!=', 'verified')]"/>
+
+                <group>
+                    <filter string="Submitting Work Unit" name="group_work_unit" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
+                    <filter string="Candidate Attempt" name="group_attempt" context="{'group_by': 'attempt_id'}"/>
+                    <filter string="Assigned Grader" name="group_grader" context="{'group_by': 'assigned_grader_id'}"/>
+                    <filter string="Grading Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+
+<!--                <searchpanel>-->
+<!--                    <field name="operating_unit_id" icon="fa-building" enable_counters="1" string="Submitting Work Unit"/>-->
+<!--                    <field name="job_id" icon="fa-briefcase" enable_counters="1" string="Job Position"/>-->
+<!--                    <field name="state" icon="fa-tasks" enable_counters="1" select="multi" string="Grading Status"/>-->
+<!--                </searchpanel>-->
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: Grading Task Queue -->
+    <record id="action_exam_grading_tasks" model="ir.actions.act_window">
+        <field name="name">Manual Grading Queue</field>
+        <field name="res_model">exam.grading.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_exam_grading_task_search"/>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+        <field name="domain">[("state", "in", ["pending", "graded"])]</field>
+    </record>
+
+    <!-- Action: Overdue Grading Tasks (>3 Days SLA) -->
+    <record id="action_exam_overdue_grading_tasks" model="ir.actions.act_window">
+        <field name="name">Overdue Grading Tasks (>3 Days SLA)</field>
+        <field name="res_model">exam.grading.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[("is_overdue", "=", True), ("state", "!=", "verified")]</field>
+    </record>
+
+    <!-- Form View: Manual Score Override -->
+    <record id="view_exam_manual_override_form" model="ir.ui.view">
+        <field name="name">exam.manual.override.form</field>
+        <field name="model">exam.manual.override</field>
+        <field name="arch" type="xml">
+            <form string="Manual Score Override Request">
+                <header>
+                    <button name="action_verify_override" string="Approve &amp; Apply Override" type="object" invisible="state != 'draft'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_reject" string="Reject" type="object" invisible="state != 'draft'" class="btn-danger" groups="custom_recruitment.group_recruitment_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,verified,rejected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Override Reference"/>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="attempt_id"/>
+                            <field name="candidate_name"/>
+                        </group>
+                        <group>
+                            <field name="original_total_score"/>
+                            <field name="new_total_score"/>
+                        </group>
+                    </group>
+                    <group string="Mandatory Justification">
+                        <field name="reason" placeholder="Explain why the score is being overridden (e.g. Graded question dispute, technical glitched question)..."/>
+                    </group>
+                    <group string="Audit Sign-Off">
+                        <group>
+                            <field name="entered_by_user_id"/>
+                        </group>
+                        <group>
+                            <field name="verified_by_user_id"/>
+                            <field name="verification_date"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: Manual Overrides -->
+    <record id="action_exam_manual_overrides" model="ir.actions.act_window">
+        <field name="name">Score Manual Overrides</field>
+        <field name="res_model">exam.manual.override</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!--
-    Merged from the standalone 'operating_unit' module (OCA/operating-unit)
-    so that hr_employee_custom no longer depends on a separate addon.
-    NOTE: In Odoo 19, res.groups no longer has category_id (ir.module.category).
-    Groups are now organised under res.groups.privilege via privilege_id.
-
-    ACCESS POLICY:
-    - HR Administrator (hr.group_hr_manager) → sees ALL operating units (no restriction)
-    - Other users with group_multi_operating_unit → sees only their assigned units
--->
 <odoo>
     <record model="res.groups.privilege" id="privilege_operating_units">
         <field name="name">Operating Units</field>
@@ -62,21 +52,18 @@
         <field eval="1" name="perm_unlink" />
     </record>
 
-    <!-- ── HR Employee: Non-admin sees only employees in own operating unit or via delegation ── -->
+    <!-- ── HR Employee: Operating unit rule deactivated in favor of strict self, coach, and subordinate hierarchy ── -->
     <record id="ir_rule_hr_employee_own_ou" model="ir.rule">
-        <field name="name">HR Employee: Own Operating Unit Only</field>
+        <field name="name">HR Employee: Own Operating Unit Only (Deactivated)</field>
         <field name="model_id" ref="hr.model_hr_employee" />
-        <field name="domain_force">['|', ('default_operating_unit_id', 'in', user.operating_unit_ids.ids), ('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
+        <field name="active" eval="False"/>
+        <field name="domain_force">[('default_operating_unit_id', 'in', user.operating_unit_ids.ids)]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
         <field eval="1" name="perm_read" />
         <field eval="0" name="perm_write" />
         <field eval="0" name="perm_create" />
         <field eval="0" name="perm_unlink" />
     </record>
-
-
-
-
 
     <!-- ── HR Employee: Administrator sees ALL employees ── -->
     <record id="ir_rule_hr_employee_manager_all" model="ir.rule">

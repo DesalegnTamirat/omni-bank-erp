@@ -27,6 +27,26 @@ class ExternalRecruitmentSelected(models.Model):
                 return vac.job_position.name
         return _("N/A")
 
+    def _get_hiring_work_units(self):
+        self.ensure_one()
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        if vac and vac.exists():
+            if vac.hiring_details:
+                units = [hd.work_unit.name for hd in vac.hiring_details if hd.work_unit and hd.work_unit.name]
+                if units:
+                    return ", ".join(dict.fromkeys(units))
+            if vac.operating_unit_id and vac.operating_unit_id.name:
+                return vac.operating_unit_id.name
+
+        if self.job_location:
+            return self.job_location
+        return _("Head Office")
+
     def unlink(self):
         """ Prohibit hard deletion of recruitment selection records for compliance """
         raise UserError(_("Deletion of recruitment selection records is strictly prohibited for audit integrity. You may archive records instead."))
@@ -88,32 +108,33 @@ class ExternalRecruitmentSelected(models.Model):
                     for line in rec.ext_rec_panel
                 )
     no_of_vacancies = fields.Integer(string="Number of Vacancies")
-    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice")
-    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion")
-    minimum_pms_score = fields.Float(string="Minimum PMS Score")
+    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice", default=12)
+    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion", default=12)
+    minimum_pms_score = fields.Float(string="Minimum PMS Score", default=75.0)
     status = fields.Selection([('draft', 'Draft'), ('notify', 'Notified'), ('evaluate', 'Evaluate'), ('approved', 'Approved')], string="Status", default='draft')
     state = fields.Selection([('draft', 'Draft'), ("notify_approver", "Notify Approvers"), ("evaluate", "Evaluate"), ("approved", "Approved")], string="State", default='draft')
+    exam_candidate_summary = fields.Text(
+        string="Exam & Selected Candidates Summary",
+        help="Summary regarding exams (written & interview) and selected candidates for the Approval Committee review."
+    )
 
     def _auto_init(self):
         res = super()._auto_init()
-        self.env.cr.execute("""
-            DO $$ 
-            BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'external_recruitment_selected' AND column_name = 'state') THEN
-                    EXECUTE 'UPDATE external_recruitment_selected 
-                             SET state = ''notify_approver'',
-                                 status = ''notify''
-                             WHERE state IS NULL OR state IN ('''', ''draft'')
-                                OR status IS NULL OR status IN ('''', ''draft'')';
-                END IF;
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE external_recruitment_selected 
+                    SET state = 'notify_approver',
+                        status = 'notify'
+                    WHERE state IS NULL OR state IN ('', 'draft')
+                       OR status IS NULL OR status IN ('', 'draft');
 
-                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'external_recruitment_selected_candidates' AND column_name = 'selection_type') THEN
-                    EXECUTE 'UPDATE external_recruitment_selected_candidates 
-                             SET selection_type = COALESCE(NULLIF(selection_type, ''''), ''selected'')
-                             WHERE selection_type IS NULL OR selection_type = ''''';
-                END IF;
-            END $$;
-        """)
+                    UPDATE external_recruitment_selected_candidates 
+                    SET selection_type = COALESCE(NULLIF(selection_type, ''), 'selected')
+                    WHERE selection_type IS NULL OR selection_type = '';
+                """)
+        except Exception as e:
+            _logger.warning("Safe update on external_recruitment_selected: %s", e)
         return res
     panel_notified = fields.Boolean(string="Panel Notified", default=False)
     exam_scores_fetched = fields.Boolean(string="Exam Scores Fetched", default=False)
@@ -230,7 +251,13 @@ class ExternalRecruitmentSelected(models.Model):
 
     def mail_channel_msgs(self, rec_id, ref, arg1):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-        message = _("Dear Committee<br>Candidates have been shortlisted for the position: <b>%s</b> (Ref: <b>%s</b>).<br><br>Kindly approve.") % (arg1, ref)
+        message = (
+            f"Dear Committee,\n\n"
+            f"Candidates have been shortlisted for external selection:\n\n"
+            f"• Position: {arg1}\n"
+            f"• Reference: {ref}\n\n"
+            f"Kindly review and approve."
+        )
         channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def evaluate(self):
@@ -288,21 +315,95 @@ class ExternalRecruitmentSelected(models.Model):
         if not app or not app.applicant_name:
             return 'Candidate'
         applicant = app.applicant_name
-        return getattr(applicant, 'partner_name', False) or getattr(applicant, 'display_name', False) or 'Candidate'
+    def _format_date_time_parts(self, dt):
+        if not dt:
+            return ('TBD', 'TBD')
+        try:
+            if isinstance(dt, str):
+                dt = fields.Datetime.to_datetime(dt)
+            return (dt.strftime('%b %d, %Y'), dt.strftime('%I:%M %p'))
+        except Exception:
+            return (str(dt), '')
 
     def notify_written_exam(self):
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        # Pull exam schedule from linked vacancy if missing on this record
+        if not self.written_exam_date and vac and vac.exists():
+            if getattr(vac, 'written_exam_date', False):
+                self.written_exam_date = vac.written_exam_date
+            elif vac.selected_recruitment_id and vac.selected_recruitment_id.written_exam_date:
+                self.written_exam_date = vac.selected_recruitment_id.written_exam_date
+            if getattr(vac, 'exam_location', False) and not self.exam_location:
+                self.exam_location = vac.exam_location
+            elif vac.selected_recruitment_id and vac.selected_recruitment_id.exam_location and not self.exam_location:
+                self.exam_location = vac.selected_recruitment_id.exam_location
+
         if not self.written_exam_date:
             raise UserError(_('Please specify the Written Exam Date before notifying candidates.'))
+
+        # Sync exam schedule to vacancy record
+        if vac and vac.exists():
+            vac.sudo().write({
+                'written_exam_date': self.written_exam_date,
+                'exam_location': self.exam_location or 'Head Office',
+                'exam_notified': True,
+            })
+
+        pos_title = self._get_position_title()
+        unit_str = self._get_hiring_work_units()
+        date_part, time_part = self._format_date_time_parts(self.written_exam_date)
+        loc_str = self.exam_location or 'Head Office'
+
         for app in self.ext_rec_sel:
             if app.select_flag and app.applicant_email:
-                message = _("Greetings %s,\n\nJob Position: %s\nWe invite you for the Written Exam on %s at %s.\n\nBest Regards,\nBunna Bank S.C.") % (
-                    self._get_applicant_display_name(app),
-                    self.job_position.name if self.job_position else '',
-                    str(self.written_exam_date),
-                    self.exam_location or 'Main Branch'
+                cand_name = self._get_applicant_display_name(app)
+                message = (
+                    f"Dear {cand_name},\n\n"
+                    f"You have been selected for written exam assessment for the position of {pos_title} for {unit_str} work unit. "
+                    f"Your exam is scheduled for {date_part} at {time_part} at {loc_str}.\n\n"
+                    f"Best of luck!"
                 )
-                subject = _("Written Exam Notification - %s") % (self.job_position.name if self.job_position else '')
+                subject = _("Written Exam Notification - %s") % pos_title
                 self.send_mail(app.applicant_email, subject, message)
+
+                # Log on applicant and update bunna status
+                if app.applicant_name:
+                    app.applicant_name.sudo().write({'bunna_app_status': 'shortlisted'})
+                    try:
+                        app.applicant_name.message_post(
+                            body=Markup(
+                                f"<p>Dear <b>{cand_name}</b>,</p>"
+                                f"<p>You have been selected for written exam assessment for the position of <b>{pos_title}</b> for <b>{unit_str}</b> work unit.</p>"
+                                f"<p>Your exam is scheduled for <b>{date_part}</b> at <b>{time_part}</b> at <b>{loc_str}</b>.</p>"
+                                f"<p><b>Best of luck!</b></p>"
+                            ),
+                            subject=subject
+                        )
+                    except Exception:
+                        pass
+                    # Discuss chat notification if user exists
+                    partner = app.applicant_name.partner_id or (app.applicant_name.candidate_profile_id.partner_id if app.applicant_name.candidate_profile_id else False)
+                    if partner:
+                        try:
+                            channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[partner.id])
+                            channel.message_post(
+                                body=Markup(
+                                    f"<p>Dear <b>{cand_name}</b>,</p>"
+                                    f"<p>You have been selected for written exam assessment for the position of <b>{pos_title}</b> for <b>{unit_str}</b> work unit.</p>"
+                                    f"<p>Your exam is scheduled for <b>{date_part}</b> at <b>{time_part}</b> at <b>{loc_str}</b>.</p>"
+                                    f"<p><b>Best of luck!</b></p>"
+                                ),
+                                message_type='comment',
+                                subtype_xmlid='mail.mt_comment'
+                            )
+                        except Exception:
+                            pass
+
         try:
             with self.env.cr.savepoint():
                 self.env.cr.execute('SELECT populate_external_exam_evaluation_sheet(%s)', (self.id,))
@@ -391,12 +492,13 @@ class ExternalRecruitmentSelected(models.Model):
         if not self.interview_date:
             raise UserError(_('Please specify the Interview Date before notifying the panel.'))
         pos_title = self._get_position_title()
+        work_unit_str = self._get_hiring_work_units()
         for val in self.ext_rec_panel:
             if val.emp_name:
                 val.write({'response_status': 'pending'})
                 usr = val.emp_name.user_id.partner_id if (val.emp_name and val.emp_name.user_id) else False
                 if usr:
-                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, pos_title, str(self.interview_date), self.interview_location or 'Head Office')
+                    self.mail_channel_msgs_panel(usr.id, val.emp_name.name, pos_title, str(self.interview_date), self.interview_location or 'Head Office', work_unit=work_unit_str)
         try:
             with self.env.cr.savepoint():
                 self.env.cr.execute('SELECT notify_panel_external_interview(%s)', (self.id,))
@@ -415,11 +517,33 @@ class ExternalRecruitmentSelected(models.Model):
             }
         }
 
-    def mail_channel_msgs_panel(self, rec_id, emp, position, date, loc):
+    def _format_datetime_friendly(self, dt):
+        if not dt:
+            return 'TBD'
+        try:
+            if isinstance(dt, str):
+                dt = fields.Datetime.to_datetime(dt)
+            return dt.strftime("%b %d, %Y %I:%M %p")
+        except Exception:
+            return str(dt)
+
+    def mail_channel_msgs_panel(self, rec_id, emp, position, date, loc, work_unit=None):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
         pos_title = position or self._get_position_title()
-        message = Markup(_("Dear %s,<br/>You are selected as an Interview Panel Member for position <b>%s</b>.<br/>Date: %s<br/>Location: %s")) % (emp, pos_title, str(date) if date else _("TBD"), loc or _("Head Office"))
-        channel.message_post(body=message, message_type='comment', subtype_xmlid='mail.mt_comment')
+        unit_str = work_unit or self._get_hiring_work_units()
+        date_str = self._format_datetime_friendly(date)
+        loc_str = loc or 'Head Office'
+        message = (
+            f"<p>Dear <b>{emp}</b>,</p>"
+            f"<p>You are selected as an <b>Interview Panel Member</b> for:</p>"
+            f"<ul style='margin: 0; padding-left: 20px; line-height: 1.6;'>"
+            f"<li><b>Position:</b> {pos_title}</li>"
+            f"<li><b>Work Unit:</b> {unit_str}</li>"
+            f"<li><b>Date:</b> {date_str}</li>"
+            f"<li><b>Location:</b> {loc_str}</li>"
+            f"</ul>"
+        )
+        channel.message_post(body=Markup(message), message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def action_open_reschedule_wizard(self):
         self.ensure_one()
@@ -441,8 +565,39 @@ class ExternalRecruitmentSelected(models.Model):
             raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
         if not self.panel_notified:
             raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        # Pull interview schedule from linked vacancy if missing on this record
+        if not self.interview_date and vac and vac.exists():
+            if getattr(vac, 'interview_date', False):
+                self.interview_date = vac.interview_date
+            elif vac.selected_recruitment_id and vac.selected_recruitment_id.interview_date:
+                self.interview_date = vac.selected_recruitment_id.interview_date
+            if getattr(vac, 'interview_location', False) and not self.interview_location:
+                self.interview_location = vac.interview_location
+            elif vac.selected_recruitment_id and vac.selected_recruitment_id.interview_location and not self.interview_location:
+                self.interview_location = vac.selected_recruitment_id.interview_location
+
         if not self.interview_date:
             raise UserError(_('Please specify the Interview Date before notifying candidates.'))
+
+        # Sync interview schedule to vacancy record
+        if vac and vac.exists():
+            vac.sudo().write({
+                'interview_date': self.interview_date,
+                'interview_location': self.interview_location or 'Head Office',
+                'interview_notified': True,
+            })
+
+        pos_title = self._get_position_title()
+        unit_str = self._get_hiring_work_units()
+        date_part, time_part = self._format_date_time_parts(self.interview_date)
+        loc_str = self.interview_location or 'Head Office'
+
         for app in self.ext_rec_sel:
             score = app.written_exam_score or 0.0
             if score < 50.0:
@@ -450,14 +605,49 @@ class ExternalRecruitmentSelected(models.Model):
                 app.remarks = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % score
             else:
                 if app.select_flag and app.applicant_email:
-                    message = _("Greetings %s,\n\nJob Position: %s\nYou are invited for an Interview on %s at %s.\n\nBest Regards,\nBunna Bank S.C.") % (
-                        self._get_applicant_display_name(app),
-                        self.job_position.name if self.job_position else '',
-                        str(self.interview_date),
-                        self.interview_location or 'Head Office'
+                    cand_name = self._get_applicant_display_name(app)
+                    message = (
+                        f"Dear {cand_name},\n\n"
+                        f"You have been selected for an interview assessment for the position of {pos_title} for {unit_str} work unit. "
+                        f"Your interview is scheduled for {date_part} at {time_part} at {loc_str}.\n\n"
+                        f"Best of luck!"
                     )
-                    subject = _("Call for Interview - %s") % (self.job_position.name if self.job_position else '')
+                    subject = _("Call for Interview - %s") % pos_title
                     self.send_mail(app.applicant_email, subject, message)
+
+                    # Log on applicant and update bunna status
+                    if app.applicant_name:
+                        app.applicant_name.sudo().write({'bunna_app_status': 'interview'})
+                        try:
+                            app.applicant_name.message_post(
+                                body=Markup(
+                                    f"<p>Dear <b>{cand_name}</b>,</p>"
+                                    f"<p>You have been selected for an interview assessment for the position of <b>{pos_title}</b> for <b>{unit_str}</b> work unit.</p>"
+                                    f"<p>Your interview is scheduled for <b>{date_part}</b> at <b>{time_part}</b> at <b>{loc_str}</b>.</p>"
+                                    f"<p><b>Best of luck!</b></p>"
+                                ),
+                                subject=subject
+                            )
+                        except Exception:
+                            pass
+                        # Discuss chat notification if user exists
+                        partner = app.applicant_name.partner_id or (app.applicant_name.candidate_profile_id.partner_id if app.applicant_name.candidate_profile_id else False)
+                        if partner:
+                            try:
+                                channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[partner.id])
+                                channel.message_post(
+                                    body=Markup(
+                                        f"<p>Dear <b>{cand_name}</b>,</p>"
+                                        f"<p>You have been selected for an interview assessment for the position of <b>{pos_title}</b> for <b>{unit_str}</b> work unit.</p>"
+                                        f"<p>Your interview is scheduled for <b>{date_part}</b> at <b>{time_part}</b> at <b>{loc_str}</b>.</p>"
+                                        f"<p><b>Best of luck!</b></p>"
+                                    ),
+                                    message_type='comment',
+                                    subtype_xmlid='mail.mt_comment'
+                                )
+                            except Exception:
+                                pass
+
         try:
             with self.env.cr.savepoint():
                 self.env.cr.execute('SELECT populate_external_interview_evaluation_sheet(%s)', (self.id,))
@@ -820,6 +1010,12 @@ class ExternalRecruitmentSelected(models.Model):
             if not line_vals:
                 minute_rec.action_load_candidates_from_vacancy()
 
+        if minute_rec and minute_rec.state == 'draft':
+            try:
+                minute_rec.action_submit_to_committee()
+            except Exception as e:
+                _logger.warning("Could not auto-submit minute in action_open_digital_minute: %s", e)
+
         return {
             'name': _('Digital Selection Minute'),
             'type': 'ir.actions.act_window',
@@ -942,13 +1138,13 @@ class ExternalRecruitmentSelectedCandidates(models.Model):
     emp_gender = fields.Char(string="Gender")
     current_work_unit = fields.Char(string="Current Location")
     service_in_company = fields.Float(string="Service in Company")
-    educational_qualification = fields.Char(string="Educational Qualification")
-    cgpa = fields.Float(string="CGPA")
+    educational_qualification = fields.Char(string="Educational Qualification", compute="_compute_applicant_details", store=True, readonly=False)
+    cgpa = fields.Float(string="CGPA", compute="_compute_applicant_details", store=True, readonly=False)
     relevant_experience = fields.Float(string="Relevant Experience")
     supervisory_experience = fields.Float(string="Supervisory Experience")
     last_promotion = fields.Float(string="Months since last Promotion")
     pms_score = fields.Float(string="PMS Score")
-    preferred_location = fields.Char(string="Preferred Location")
+    preferred_location = fields.Char(string="Preferred Location", compute="_compute_applicant_details", store=True, readonly=False)
     written_warning = fields.Float(string="Months since Written Warning")
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     written_exam_score = fields.Float(string="Written Exam Score")
@@ -966,6 +1162,103 @@ class ExternalRecruitmentSelectedCandidates(models.Model):
     select_flag = fields.Boolean(string="Select")
     ext_rec_sel_cand = fields.Many2one("external.recruitment.selected",
                                            string="Selected candidates for External Recruitment")
+
+    @api.depends('applicant_name', 'applicant_name.email_from', 'applicant_name.preferred_location',
+                 'applicant_name.latest_cgpa', 'applicant_name.highest_education',
+                 'applicant_name.candidate_profile_id', 'applicant_name.candidate_profile_id.latest_cgpa',
+                 'applicant_name.candidate_profile_id.highest_education',
+                 'applicant_name.candidate_profile_id.city',
+                 'applicant_name.candidate_profile_id.region',
+                 'applicant_name.candidate_profile_id.education_ids',
+                 'applicant_name.candidate_profile_id.education_ids.cgpa')
+    def _compute_applicant_details(self):
+        for rec in self:
+            app = rec.applicant_name
+            if app:
+                # 1. Email
+                if not rec.applicant_email or rec.applicant_email != app.email_from:
+                    rec.applicant_email = app.email_from or ''
+
+                # 2. Preferred Location
+                loc = app.preferred_location or (app.candidate_profile_id.city if app.candidate_profile_id else False) or (app.candidate_profile_id.region if app.candidate_profile_id else False)
+                if loc:
+                    rec.preferred_location = loc
+                elif not rec.preferred_location:
+                    rec.preferred_location = _("Head Office")
+
+                # 3. CGPA
+                cand_cgpa = getattr(app, 'latest_cgpa', 0.0)
+                if not cand_cgpa and app.candidate_profile_id:
+                    cand_cgpa = getattr(app.candidate_profile_id, 'latest_cgpa', 0.0)
+                    if not cand_cgpa and app.candidate_profile_id.education_ids:
+                        edus = app.candidate_profile_id.education_ids.filtered(lambda e: e.cgpa > 0)
+                        if edus:
+                            cand_cgpa = edus[0].cgpa
+                if not cand_cgpa and hasattr(app, 'qualification_id'):
+                    for q in app.qualification_id:
+                        if hasattr(q, 'response') and q.response:
+                            try:
+                                val = float(str(q.response).strip())
+                                if 0.0 < val <= 4.0:
+                                    cand_cgpa = val
+                                    break
+                            except Exception:
+                                pass
+                if cand_cgpa:
+                    rec.cgpa = cand_cgpa
+
+                # 4. Educational Qualification
+                edu_name = getattr(app, 'highest_education', False)
+                if not edu_name and app.candidate_profile_id:
+                    edu_name = getattr(app.candidate_profile_id, 'highest_education', False)
+                    if not edu_name and app.candidate_profile_id.education_ids:
+                        edu_name = app.candidate_profile_id.education_ids[0].qualification_name or app.candidate_profile_id.education_ids[0].field_of_study
+                if not edu_name and hasattr(app, 'qualification_id'):
+                    for q in app.qualification_id:
+                        if q.qualification and q.qualification.qualification:
+                            edu_name = q.qualification.qualification
+                            break
+                if not edu_name and getattr(app, 'type_id', False) and app.type_id.name:
+                    edu_name = app.type_id.name
+                if edu_name:
+                    rec.educational_qualification = edu_name
+
+                # 5. Gender
+                gender = getattr(app, 'gender', False)
+                if not gender and app.candidate_profile_id:
+                    gender = getattr(app.candidate_profile_id, 'gender', False)
+                if gender:
+                    rec.emp_gender = gender
+
+    def _auto_init(self):
+        res = super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE external_recruitment_selected_candidates cand
+                    SET 
+                        applicant_email = COALESCE(NULLIF(cand.applicant_email, ''), app.email_from, cp.email),
+                        preferred_location = COALESCE(NULLIF(cand.preferred_location, ''), NULLIF(app.preferred_location, ''), NULLIF(cp.city, ''), NULLIF(cp.region, ''), 'Head Office'),
+                        cgpa = CASE 
+                            WHEN cand.cgpa > 0 THEN cand.cgpa 
+                            WHEN cp.latest_cgpa > 0 THEN cp.latest_cgpa 
+                            ELSE COALESCE((SELECT edu.cgpa FROM candidate_education edu WHERE edu.candidate_id = cp.id AND edu.cgpa > 0 ORDER BY edu.end_date DESC LIMIT 1), 0.0)
+                        END,
+                        educational_qualification = COALESCE(
+                            NULLIF(cand.educational_qualification, ''), 
+                            NULLIF(cp.highest_education, ''), 
+                            (SELECT edu.qualification_name FROM candidate_education edu WHERE edu.candidate_id = cp.id ORDER BY edu.end_date DESC LIMIT 1),
+                            (SELECT rt.name->>'en_US' FROM hr_recruitment_degree rt WHERE rt.id = app.type_id),
+                            (SELECT rt.name::text FROM hr_recruitment_degree rt WHERE rt.id = app.type_id)
+                        ),
+                        emp_gender = COALESCE(NULLIF(cand.emp_gender, ''), NULLIF(cp.gender, ''), NULLIF(app.gender, ''))
+                    FROM hr_applicant app
+                    LEFT JOIN candidate_profile cp ON cp.id = app.candidate_profile_id
+                    WHERE cand.applicant_name = app.id;
+                """)
+        except Exception as e:
+            _logger.warning("Error in external_recruitment_selected_candidates _auto_init backfill: %s", e)
+        return res
 
 
 class InternalRecruitmentPanel(models.Model):
@@ -995,6 +1288,94 @@ class InternalRecruitmentPanel(models.Model):
     interview_date = fields.Datetime(string="Scheduled Date & Time", related='ext_panel.interview_date', readonly=True)
     interview_location = fields.Text(string="Interview Location", readonly=True)
     vacancy_reference = fields.Char(string="Vacancy Reference", related='ext_panel.vacancy_reference', readonly=True)
+
+    eligible_employee_ids = fields.Many2many(
+        'hr.employee',
+        compute='_compute_eligible_employee_ids',
+        string='Eligible Panel Employees'
+    )
+
+    @api.depends('ext_panel', 'ext_panel.vacancy_id', 'ext_panel.workunit_id')
+    def _compute_eligible_employee_ids(self):
+        for rec in self:
+            sel = rec.ext_panel
+            vac = False
+            if sel:
+                vac_id = getattr(sel, 'vacancy_id', False)
+                if isinstance(vac_id, int) and vac_id > 0:
+                    vac = self.env['job.vacancy'].browse(vac_id)
+                elif hasattr(vac_id, 'operating_unit_id') and vac_id:
+                    vac = vac_id
+                if not vac and getattr(sel, 'vacancy_reference', False):
+                    vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
+
+            hiring_ou = False
+            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                hiring_ou = vac.operating_unit_id.id
+            elif sel and getattr(sel, 'workunit_id', False):
+                w_id = sel.workunit_id
+                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            elif sel and getattr(sel, 'job_location', False):
+                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
+                if ou:
+                    hiring_ou = ou.id
+
+            elif self.env.context.get('parent_operating_unit_id'):
+                p_ou = self.env.context.get('parent_operating_unit_id')
+                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            elif self.env.context.get('parent_workunit_id'):
+                p_wu = self.env.context.get('parent_workunit_id')
+                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+
+            if hiring_ou:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('active', '=', True)
+                ])
+            else:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
+
+    @api.onchange('ext_panel', 'selection_criteria')
+    def _onchange_ext_panel_domain(self):
+        """Filter panel members strictly to the Hiring Work Unit."""
+        sel = self.ext_panel
+        vac = False
+        if sel:
+            vac_id = getattr(sel, 'vacancy_id', False)
+            if isinstance(vac_id, int) and vac_id > 0:
+                vac = self.env['job.vacancy'].browse(vac_id)
+            elif hasattr(vac_id, 'operating_unit_id') and vac_id:
+                vac = vac_id
+            if not vac and getattr(sel, 'vacancy_reference', False):
+                vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
+
+        hiring_ou = False
+        if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+            hiring_ou = vac.operating_unit_id.id
+        elif sel and getattr(sel, 'workunit_id', False):
+            w_id = sel.workunit_id
+            hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+        elif sel and getattr(sel, 'job_location', False):
+            ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
+            if ou:
+                hiring_ou = ou.id
+        elif self.env.context.get('parent_operating_unit_id'):
+            p_ou = self.env.context.get('parent_operating_unit_id')
+            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+        elif self.env.context.get('parent_workunit_id'):
+            p_wu = self.env.context.get('parent_workunit_id')
+            hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+
+        if hiring_ou:
+            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
+            self.eligible_employee_ids = self.env['hr.employee'].search(domain)
+            if self.emp_name and self.emp_name.id not in self.eligible_employee_ids.ids:
+                self.emp_name = False
+            return {'domain': {'emp_name': domain}}
+
+        domain = [('active', '=', True)]
+        self.eligible_employee_ids = self.env['hr.employee'].search(domain)
+        return {'domain': {'emp_name': domain}}
 
     # Rescheduling & Delegation fields
     response_status = fields.Selection([
@@ -1064,20 +1445,149 @@ class ExternalRecruitmentSelectedDelegation(models.Model):
     _name = "external.recrt.delegation.team"
     _description = "External Recrt Delegation Team"
 
-    role = fields.Selection([("chair_person", "Chair Person"), ("member", "Member"), ("secretary", "Secretary"),
-                             ("member_secretary", "Member & Secretary")], string="Role")
+    def _auto_init(self):
+        super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE external_recrt_delegation_team SET role = 'chairperson' WHERE role = 'chair_person';
+                    UPDATE external_recrt_delegation_team SET role = 'secretary' WHERE role IN ('secretary', 'member_secretary');
+                    UPDATE external_recrt_delegation_team SET role = 'panel_member' WHERE role IN ('member', 'approver') OR role IS NULL;
+                    UPDATE external_recrt_delegation_team SET status = 'active' WHERE status IS NULL OR status = '';
+                """)
+        except Exception as e:
+            _logger.warning("Migration query on external_recrt_delegation_team failed: %s", e)
+
+    role = fields.Selection([
+        ("chairperson", "Chairperson"),
+        ("panel_member", "Panel Member"),
+        ("secretary", "Panel Member & Secretary"),
+        ("observer", "Labor Representative (Observer)"),
+    ], string="Role", default="panel_member")
     employee_name = fields.Many2one("res.users", string="Employee Name")
     active = fields.Boolean(default=True)
+    eligible_user_ids = fields.Many2many(
+        'res.users',
+        compute='_compute_eligible_user_ids',
+        string='Eligible Approvers'
+    )
+
+    @api.depends('role', 'exter_rec_del_id', 'exter_rec_del_id.vacancy_id', 'exter_rec_del_id.workunit_id')
+    def _compute_eligible_user_ids(self):
+        for rec in self:
+            domain = rec._get_role_user_domain(rec.role)
+            rec.eligible_user_ids = self.env['res.users'].search(domain)
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
         for rec in self:
             rec.write({'active': False})
         return True
+
+    @api.onchange('role', 'exter_rec_del_id')
+    def _onchange_role_get_user_domain(self):
+        """
+        Dynamically filters employee_name and alternate_committee_member based on the role:
+        - 'panel_member': Strictly from Vacancy's Hiring Work Unit.
+        - 'secretary': Strictly from Vacancy Responsible Officer's Work Unit (HR / Recruitment).
+        - 'chairperson' / 'observer': Across company.
+        """
+        domain = self._get_role_user_domain(self.role)
+        self.eligible_user_ids = self.env['res.users'].search(domain)
+        if self.employee_name and self.employee_name.id not in self.eligible_user_ids.ids:
+            self.employee_name = False
+        if self.alternate_committee_member and self.alternate_committee_member.id not in self.eligible_user_ids.ids:
+            self.alternate_committee_member = False
+        return {
+            'domain': {
+                'employee_name': domain,
+                'alternate_committee_member': domain,
+            }
+        }
+
+    def _get_role_user_domain(self, role=None):
+        role_val = role or self.role or 'panel_member'
+        sel = self.exter_rec_del_id
+        vac = False
+        if sel:
+            vac_id = getattr(sel, 'vacancy_id', False)
+            if isinstance(vac_id, int) and vac_id > 0:
+                vac = self.env['job.vacancy'].browse(vac_id)
+            elif hasattr(vac_id, 'operating_unit_id') and vac_id:
+                vac = vac_id
+            if not vac and getattr(sel, 'vacancy_reference', False):
+                vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
+
+        # 1. Panel Member: Strictly from Vacancy's Hiring Work Unit
+        if role_val == 'panel_member':
+            hiring_ou = False
+            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                hiring_ou = vac.operating_unit_id.id
+            elif sel and getattr(sel, 'workunit_id', False):
+                w_id = sel.workunit_id
+                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            elif sel and getattr(sel, 'job_location', False):
+                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
+                if ou:
+                    hiring_ou = ou.id
+            elif self.env.context.get('parent_operating_unit_id'):
+                p_ou = self.env.context.get('parent_operating_unit_id')
+                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            elif self.env.context.get('parent_workunit_id'):
+                p_wu = self.env.context.get('parent_workunit_id')
+                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+
+            if hiring_ou:
+                employees = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('active', '=', True),
+                    ('user_id', '!=', False)
+                ])
+                user_ids = employees.mapped('user_id').ids
+                if user_ids:
+                    return [('id', 'in', user_ids)]
+
+        # 2. Panel Member & Secretary: Strictly from Vacancy Responsible Officer's Work Unit (HR / Recruitment)
+        elif role_val == 'secretary':
+            resp_ou = False
+            if vac and hasattr(vac, 'responsible') and vac.responsible and vac.responsible.default_operating_unit_id:
+                resp_ou = vac.responsible.default_operating_unit_id.id
+            elif self.env.context.get('parent_responsible_id'):
+                r_id = self.env.context.get('parent_responsible_id')
+                emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+                if emp and hasattr(emp, 'default_operating_unit_id') and emp.default_operating_unit_id:
+                    resp_ou = emp.default_operating_unit_id.id
+            if not resp_ou:
+                ou = self.env['operating.unit'].search([('name', 'ilike', 'Onboarding and Recruitment')], limit=1)
+                if not ou:
+                    ou = self.env['operating.unit'].search([('name', 'ilike', 'Recruitment')], limit=1)
+                if ou:
+                    resp_ou = ou.id
+            if resp_ou:
+                employees = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', '=', resp_ou),
+                    ('active', '=', True),
+                    ('user_id', '!=', False)
+                ])
+                user_ids = employees.mapped('user_id').ids
+                if user_ids:
+                    return [('id', 'in', user_ids)]
+
+        # 3. Chairperson / Observer / Default: All active employees linked to users
+        all_emps = self.env['hr.employee'].search([
+            ('active', '=', True),
+            ('user_id', '!=', False)
+        ])
+        user_ids = all_emps.mapped('user_id').ids
+        return [('id', 'in', user_ids)] if user_ids else []
+
     operating_unit = fields.Char(string="Operating Unit", related="employee_name.employee_id.default_operating_unit_id.name")
-    status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="status")
+    status = fields.Selection([("active", "Active"), ("unavailable", "Un Available")], string="Status", default="active")
     alternate_committee_member = fields.Many2one("res.users", string="Alternate Approver")
     alter_operating_unit = fields.Char(string="Operating Unit",
                                        related="alternate_committee_member.employee_id.default_operating_unit_id.name")
+    is_mandatory = fields.Boolean(string="Mandatory?", default=True)
+    digital_signature = fields.Binary(string="Digital Signature", copy=False)
+    signed_on = fields.Datetime(string="Signed Date & Time", readonly=True, copy=False)
     approve = fields.Boolean(string="Approve", readonly=True)
     exter_rec_del_id = fields.Many2one("external.recruitment.selected", string="External Recruitment Selected Delegation Team")

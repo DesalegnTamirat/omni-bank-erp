@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: CBIS Interview Session -->
+    <record id="view_cbis_interview_session_form" model="ir.ui.view">
+        <field name="name">cbis.interview.session.form</field>
+        <field name="model">cbis.interview.session</field>
+        <field name="arch" type="xml">
+            <form string="Competency Interview Session">
+                <header>
+                    <button name="action_confirm_session" string="Confirm &amp; Dispatch to Panel" type="object" invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_load_panel_and_candidates" string="Auto-Load Panel &amp; Candidates" type="object" invisible="state != 'draft'" class="btn-secondary" icon="fa-refresh"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Session Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="vacancy_id"/>
+                            <field name="vacancy_reference"/>
+                            <field name="job_id"/>
+                            <field name="interview_type"/>
+                        </group>
+                        <group>
+                            <field name="interview_date"/>
+                            <field name="venue"/>
+                            <field name="hr_observer_id"/>
+                        </group>
+                    </group>
+                    <group string="Assigned Panel Members">
+                        <field name="panel_member_ids" widget="many2many_tags"/>
+                    </group>
+                    <notebook>
+                        <page string="Competency Configuration &amp; Weighting (Max 100%)">
+                            <div class="alert alert-warning py-2 mb-2" role="alert" invisible="total_competency_weight &lt;= 100">
+                                <b>Warning:</b> Total percentage weight of selected competencies exceeds 100%! Current total: <b><field name="total_competency_weight" readonly="1"/>%</b>. Please adjust weights.
+                            </div>
+                            <div class="alert alert-info py-2 mb-2" role="alert" invisible="total_competency_weight &gt; 100">
+                                Total Selected Competency Weight: <b><field name="total_competency_weight" readonly="1"/>%</b> / 100%
+                            </div>
+                            <field name="competency_line_ids" readonly="state in ('confirmed', 'completed')">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="competency_id"/>
+                                    <field name="evaluation_method"/>
+                                    <field name="weight_percentage" string="Weight (%)"/>
+                                    <field name="suggested_question"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Scheduled Candidates">
+                            <field name="candidate_line_ids">
+                                <list editable="bottom" decoration-danger="state == 'absent'" decoration-success="state == 'locked'" decoration-info="state == 'pending'">
+                                    <field name="candidate_type"/>
+                                    <field name="employee_id" string="Internal Employee" invisible="candidate_type != 'internal'" required="candidate_type == 'internal'"/>
+                                    <field name="applicant_id" string="Recruitment Applicant" invisible="candidate_type != 'external'" required="candidate_type == 'external'"/>
+                                    <field name="candidate_code" string="Employee ID / Candidate Code" readonly="1" force_save="1"/>
+                                    <field name="candidate_name" string="Candidate Name" readonly="1" force_save="1"/>
+                                    <field name="scheduled_time"/>
+                                    <field name="documents_verified" widget="boolean_toggle"/>
+                                    <field name="submitted_eval_count" string="Panel Submitted"/>
+                                    <field name="panel_count" string="Total Panelists"/>
+                                    <field name="average_interview_score"/>
+                                    <field name="is_passed" widget="boolean_toggle"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: CBIS Interview Session -->
+    <record id="view_cbis_interview_session_tree" model="ir.ui.view">
+        <field name="name">cbis.interview.session.list</field>
+        <field name="model">cbis.interview.session</field>
+        <field name="arch" type="xml">
+            <list string="Interview Sessions" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-success="state == 'completed'">
+                <field name="name"/>
+                <field name="vacancy_reference"/>
+                <field name="job_id"/>
+                <field name="interview_type"/>
+                <field name="interview_date"/>
+                <field name="total_competency_weight" string="Comp Weight (%)"/>
+                <field name="candidate_count"/>
+                <field name="completed_count"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: CBIS Interview Sessions -->
+    <record id="action_cbis_interview_sessions" model="ir.actions.act_window">
+        <field name="name">Interview Sessions</field>
+        <field name="res_model">cbis.interview.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Form View: Individual Interviewer Evaluation Sheet  -->
+    <record id="view_cbis_interviewer_evaluation_form" model="ir.ui.view">
+        <field name="name">cbis.interviewer.evaluation.form</field>
+        <field name="model">cbis.interviewer.evaluation</field>
+        <field name="arch" type="xml">
+            <form string="Interviewer Evaluation Sheet">
+                <header>
+                    <button name="action_save_draft" string="Save as Draft" type="object" invisible="state == 'submitted'" class="btn-secondary"/>
+                    <button name="action_submit_evaluation" string="Submit Final Evaluation" type="object" invisible="state == 'submitted'" class="btn-primary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="candidate_name" string="Candidate Evaluation"/>
+                        <h1><field name="candidate_name" readonly="1"/></h1>
+                        <h4>Candidate ID: <field name="candidate_code" readonly="1"/></h4>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="session_id" readonly="1"/>
+                            <field name="job_id" readonly="1"/>
+                            <field name="vacancy_id" readonly="1"/>
+                            <field name="total_score" string="Total Evaluation Score (%)" readonly="1" class="fw-bold"/>
+                        </group>
+                        <group>
+                            <field name="interviewer_user_id" readonly="1"/>
+                            <field name="candidate_status" widget="radio" options="{'horizontal': true}"/>
+                            <field name="conflict_of_interest_declared"/>
+                            <field name="conflict_notes" invisible="not conflict_of_interest_declared"/>
+                            <field name="has_starr_method" invisible="1"/>
+                            <field name="has_likert_method" invisible="1"/>
+                            <field name="has_star_or_starr_method" invisible="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-warning py-2 mb-2" role="alert" invisible="candidate_status != 'absent'">
+                        <b>Candidate Marked Absent:</b> Ratings and competency scores for this candidate are automatically set to 0.0% (0 Marks).
+                    </div>
+                    <div class="alert alert-info py-2" role="alert" invisible="state != 'submitted'">
+                        <b>Evaluation Locked:</b> This evaluation has been submitted and is locked against further edits in accordance with compliance policy.
+                    </div>
+                    
+                    <h3 class="mt-4 mb-2">Competency Evaluation Matrix</h3>
+                    <field name="line_ids" readonly="state == 'submitted' or candidate_status == 'absent'" nolabel="1">
+                        <list editable="bottom" create="false" delete="false">
+                            <field name="sequence" widget="handle"/>
+                            <field name="competency_id" string="Competency"/>
+                            <field name="evaluation_method" string="Method"/>
+                            <field name="star_situation" string="S" column_invisible="not parent.has_star_or_starr_method" invisible="evaluation_method == 'likert' or parent.candidate_status == 'absent'"/>
+                            <field name="star_task" string="T" column_invisible="not parent.has_star_or_starr_method" invisible="evaluation_method == 'likert' or parent.candidate_status == 'absent'"/>
+                            <field name="star_action" string="A" column_invisible="not parent.has_star_or_starr_method" invisible="evaluation_method == 'likert' or parent.candidate_status == 'absent'"/>
+                            <field name="star_result" string="R" column_invisible="not parent.has_star_or_starr_method" invisible="evaluation_method == 'likert' or parent.candidate_status == 'absent'"/>
+                            <field name="starr_reflection" string="Refl" column_invisible="not parent.has_starr_method" invisible="evaluation_method != 'starr' or parent.candidate_status == 'absent'"/>
+                            <field name="likert_score" string="Likert (1-5)" column_invisible="not parent.has_likert_method" invisible="evaluation_method != 'likert' or parent.candidate_status == 'absent'"/>
+                            <field name="weight_percentage" string="Weight (%)"/>
+                            <field name="weighted_score" string="Result / Score (%)"/>
+                        </list>
+                    </field>
+
+
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Interviewer Evaluations -->
+    <record id="view_cbis_interviewer_evaluation_tree" model="ir.ui.view">
+        <field name="name">cbis.interviewer.evaluation.list</field>
+        <field name="model">cbis.interviewer.evaluation</field>
+        <field name="arch" type="xml">
+            <list string="My Assigned Evaluations" decoration-info="state == 'draft'" decoration-success="state == 'submitted'">
+                <field name="candidate_code"/>
+                <field name="candidate_name"/>
+                <field name="job_id"/>
+                <field name="vacancy_id"/>
+                <field name="interviewer_user_id"/>
+                <field name="candidate_status" widget="badge" decoration-success="candidate_status == 'present'" decoration-danger="candidate_status == 'absent'"/>
+                <field name="total_score"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+
+    <!-- Tree View: Candidate Final Results (Aggregated Scores) -->
+    <record id="view_cbis_interview_candidate_tree" model="ir.ui.view">
+        <field name="name">cbis.interview.candidate.list</field>
+        <field name="model">cbis.interview.candidate</field>
+        <field name="arch" type="xml">
+            <list string="Candidate Final Results &amp; Aggregated Scores" decoration-success="state in ('evaluated', 'locked')" decoration-info="state == 'in_progress'" decoration-danger="state == 'absent'">
+                <field name="candidate_code" string="Candidate ID"/>
+                <field name="candidate_name" string="Candidate Name"/>
+                <field name="job_id" string="Job Position"/>
+                <field name="vacancy_id" string="Vacancy"/>
+                <field name="session_id" string="Session"/>
+                <field name="submitted_eval_count" string="Submitted"/>
+                <field name="panel_count" string="Total Panelists"/>
+                <field name="average_interview_score" string="Aggregated Interview Score (%)"/>
+                <field name="state" string="Evaluation Status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Candidate Final Results (Aggregated Scores & Panel Breakdown) -->
+    <record id="view_cbis_interview_candidate_form" model="ir.ui.view">
+        <field name="name">cbis.interview.candidate.form</field>
+        <field name="model">cbis.interview.candidate</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Aggregated Interview Result">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="candidate_name" readonly="1"/></h1>
+                        <h4>Candidate ID: <field name="candidate_code" readonly="1"/></h4>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="session_id" readonly="1"/>
+                            <field name="job_id" readonly="1"/>
+                            <field name="vacancy_id" readonly="1"/>
+                            <field name="candidate_type" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="average_interview_score" string="Aggregated Interview Score (%)" readonly="1" class="fw-bold fs-4 text-primary"/>
+                            <field name="submitted_eval_count" string="Evaluations Submitted" readonly="1"/>
+                            <field name="panel_count" string="Total Assigned Panelists" readonly="1"/>
+                            <field name="state" widget="badge"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: Candidate Final Results (Aggregated Scores) -->
+    <record id="action_cbis_candidate_results" model="ir.actions.act_window">
+        <field name="name">Candidate Final Results (Aggregated)</field>
+        <field name="res_model">cbis.interview.candidate</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[("|"), ("submitted_eval_count", "&gt;", 0), ("state", "=", "absent")]</field>
+    </record>
+
+    <!-- Search View: Interviewer Evaluations -->
+    <record id="view_cbis_interviewer_evaluation_search" model="ir.ui.view">
+        <field name="name">cbis.interviewer.evaluation.search</field>
+        <field name="model">cbis.interviewer.evaluation</field>
+        <field name="arch" type="xml">
+            <search string="Search Evaluation Sheets">
+                <field name="candidate_name" string="Candidate Name"/>
+                <field name="candidate_code" string="Candidate ID"/>
+                <field name="vacancy_id" string="Vacancy"/>
+                <field name="job_id" string="Job Position"/>
+                <field name="interviewer_user_id" string="Interviewer"/>
+                <group>
+                    <filter name="group_by_vacancy" string="Vacancy" context="{'group_by': 'vacancy_id'}"/>
+                    <filter name="group_by_candidate" string="Candidate" context="{'group_by': 'candidate_interview_id'}"/>
+                    <filter name="group_by_interviewer" string="Interviewer" context="{'group_by': 'interviewer_user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: My Assigned Interview Evaluations  -->
+    <record id="action_cbis_my_interviews" model="ir.actions.act_window">
+        <field name="name">My Assigned Interview Evaluations</field>
+        <field name="res_model">cbis.interviewer.evaluation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[("interviewer_user_id", "=", uid)]</field>
+    </record>
+
+    <!-- Action: All Panelist Evaluation Sheets (Grouped by Vacancy) -->
+    <record id="action_cbis_all_evaluations" model="ir.actions.act_window">
+        <field name="name">All Panelist Evaluation Sheets</field>
+        <field name="res_model">cbis.interviewer.evaluation</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_cbis_interviewer_evaluation_search"/>
+        <field name="context">{'search_default_group_by_vacancy': 1}</field>
+    </record>
+
+
+    <!-- Form View: Individual Competency Evaluation Line (Strictly Isolated by Method) -->
+    <record id="view_cbis_interviewer_evaluation_line_form" model="ir.ui.view">
+        <field name="name">cbis.interviewer.evaluation.line.form</field>
+        <field name="model">cbis.interviewer.evaluation.line</field>
+        <field name="arch" type="xml">
+            <form string="Competency Evaluation">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="competency_id" readonly="1"/>
+                            <field name="evaluation_method" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="weight_percentage" string="Competency Weight (%)" readonly="1"/>
+                            <field name="component_weight" string="Per Component Weight (%)" readonly="1"/>
+                            <field name="weighted_score" string="Result / Score (%)" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info py-2 mb-2" role="alert" invisible="not suggested_question">
+                        <b>Suggested Question Prompt:</b> <field name="suggested_question" readonly="1"/>
+                    </div>
+
+                    <!-- STAR Method Section (ONLY displayed when method is STAR: Rates S, T, A, R) -->
+                    <group string="STAR Evaluation Method (Rates: S, T, A, R)" invisible="evaluation_method != 'star'">
+                        <group>
+                            <field name="star_situation" string="S - Situation (1-5)"/>
+                            <field name="star_task" string="T - Task (1-5)"/>
+                        </group>
+                        <group>
+                            <field name="star_action" string="A - Action (1-5)"/>
+                            <field name="star_result" string="R - Result (1-5)"/>
+                        </group>
+                    </group>
+
+                    <!-- STARR Method Section (ONLY displayed when method is STARR: Rates S, T, A, R, Refl) -->
+                    <group string="STARR Evaluation Method (Rates: S, T, A, R, Refl)" invisible="evaluation_method != 'starr'">
+                        <group>
+                            <field name="star_situation" string="S - Situation (1-5)"/>
+                            <field name="star_task" string="T - Task (1-5)"/>
+                            <field name="star_action" string="A - Action (1-5)"/>
+                        </group>
+                        <group>
+                            <field name="star_result" string="R - Result (1-5)"/>
+                            <field name="starr_reflection" string="Refl - Reflection (1-5)"/>
+                        </group>
+                    </group>
+
+                    <!-- Likert Scale Section (ONLY displayed when method is Likert Scale) -->
+                    <group string="Likert Scale Evaluation Method" invisible="evaluation_method != 'likert'">
+                        <group>
+                            <field name="likert_score" string="Likert Rating (1 to 5)"/>
+                        </group>
+                    </group>
+
+                    <group string="Notes &amp; Behavioral Evidence">
+                        <field name="interviewer_remarks" placeholder="Enter observation notes and behavioral evidence for this competency..."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+</odoo>
+
+

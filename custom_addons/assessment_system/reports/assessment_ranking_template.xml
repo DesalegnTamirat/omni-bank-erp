@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- PDF Ranking Report Template with Signature Blocks (FR-CBIS-028) -->
+    <template id="report_cbis_ranking_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" style="font-family: sans-serif; font-size: 12px;">
+                        <div class="text-center mb-4 border-bottom pb-3">
+                            <h2 style="color: #3E2010; margin-bottom: 4px;">BUNNA BANK S.C.</h2>
+                            <h4 style="margin: 0; color: #555;">Human Resources Department - Assessment &amp; Selection</h4>
+                            <h5 style="margin-top: 6px; color: #6F4E37;">CANDIDATE FINAL RANKING &amp; ASSESSMENT REPORT</h5>
+                        </div>
+
+                        <!-- Session Metadata -->
+                        <table class="table table-sm table-bordered mb-4" style="width: 100%;">
+                            <tr>
+                                <td style="width: 25%; background: #f8f9fa;"><b>Vacancy Reference:</b></td>
+                                <td style="width: 25%;"><t t-esc="doc.vacancy_reference"/></td>
+                                <td style="width: 25%; background: #f8f9fa;"><b>Target Position:</b></td>
+                                <td style="width: 25%;"><t t-esc="doc.job_id.name"/></td>
+                            </tr>
+                            <tr>
+                                <td style="background: #f8f9fa;"><b>Interview Date:</b></td>
+                                <td><t t-esc="doc.interview_date"/></td>
+                                <td style="background: #f8f9fa;"><b>Interview Type:</b></td>
+                                <td><t t-esc="doc.interview_type.capitalize()"/></td>
+                            </tr>
+                        </table>
+
+                        <!-- Candidate Ranking Table (FR-CBIS-025, FR-CBIS-026) -->
+                        <h6 style="color: #3E2010; font-weight: bold; margin-bottom: 8px;">ASSESSMENT COMPONENT SCORES &amp; COMPOSITE RANKING</h6>
+                        <table class="table table-sm table-bordered text-center" style="width: 100%; border-collapse: collapse;">
+                            <thead style="background-color: #3E2010; color: #ffffff;">
+                                <tr>
+                                    <th style="width: 5%;">Rank</th>
+                                    <th style="width: 20%; text-align: left;">Candidate Name</th>
+                                    <th style="width: 12%;">Candidate ID</th>
+                                    <th style="width: 10%;">Written Exam</th>
+                                    <th style="width: 10%;">PMS Rating</th>
+                                    <th style="width: 12%;">Avg Interview</th>
+                                    <th style="width: 13%;">Composite Score</th>
+                                    <th style="width: 18%;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="sorted_candidates" t-value="doc.candidate_line_ids.sorted(key=lambda c: c.composite_total_score, reverse=True)"/>
+                                <t t-set="rank_idx" t-value="1"/>
+                                <t t-foreach="sorted_candidates" t-as="cand">
+                                    <tr>
+                                        <td><b>#<t t-esc="rank_idx"/></b></td>
+                                        <td style="text-align: left;"><t t-esc="cand.candidate_name"/></td>
+                                        <td><t t-esc="cand.candidate_code"/></td>
+                                        <td><t t-esc="cand.exam_score_percentage"/>%</td>
+                                        <td><t t-esc="cand.pms_rating_score"/>%</td>
+                                        <td><t t-esc="cand.average_interview_score"/>%</td>
+                                        <td style="font-weight: bold; color: #3E2010;"><t t-esc="cand.composite_total_score"/>%</td>
+                                        <td>
+                                            <t t-if="cand.is_absent">
+                                                <span style="color: red; font-weight: bold;">ABSENT</span>
+                                            </t>
+                                            <t t-elif="cand.is_passed">
+                                                <span style="color: green; font-weight: bold;">PASSED</span>
+                                            </t>
+                                            <t t-else="">
+                                                <span style="color: #666;">BELOW FLOOR (&lt;50%)</span>
+                                            </t>
+                                        </td>
+                                    </tr>
+                                    <t t-set="rank_idx" t-value="rank_idx + 1"/>
+                                </t>
+                            </tbody>
+                        </table>
+
+                        <!-- Official Signatures Block (FR-CBIS-028) -->
+                        <div style="margin-top: 40px; page-break-inside: avoid;">
+                            <h6 style="color: #3E2010; font-weight: bold; border-bottom: 1px solid #3E2010; padding-bottom: 4px;">
+                                OFFICIAL EVALUATION PANEL SIGNATURES
+                            </h6>
+                            <table style="width: 100%; margin-top: 20px;">
+                                <tr>
+                                    <t t-set="col_count" t-value="0"/>
+                                    <t t-foreach="doc.panel_member_ids" t-as="member">
+                                        <td style="width: 33%; padding: 15px; vertical-align: top;">
+                                            <div style="border-top: 1px solid #000; padding-top: 5px; text-align: center;">
+                                                <b><t t-esc="member.name"/></b><br/>
+                                                <small class="text-muted">Panel Interviewer</small><br/>
+                                                <small>Date: _______________</small>
+                                            </div>
+                                        </td>
+                                        <t t-set="col_count" t-value="col_count + 1"/>
+                                    </t>
+                                    <td style="width: 33%; padding: 15px; vertical-align: top;">
+                                        <div style="border-top: 1px solid #000; padding-top: 5px; text-align: center;">
+                                            <b><t t-esc="doc.hr_observer_id.name or 'HR Facilitator'"/></b><br/>
+                                            <small class="text-muted">HR Facilitator / Observer</small><br/>
+                                            <small>Date: _______________</small>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

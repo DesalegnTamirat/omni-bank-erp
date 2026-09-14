@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+        <!-- Manager: Full Access to Assessment Criteria -->
+        <record id="rule_assessment_system_manager_assessment_criteria" model="ir.rule">
+            <field name="name">Assessment System: Manager - Assessment Criteria</field>
+            <field name="model_id" ref="model_assessment_criteria"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Applicant Assessment -->
+        <record id="rule_assessment_system_manager_applicant_assessment" model="ir.rule">
+            <field name="name">Assessment System: Manager - Applicant Assessment</field>
+            <field name="model_id" ref="model_applicant_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Assessment -->
+        <record id="rule_assessment_system_manager_interview_assessment" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Assessment</field>
+            <field name="model_id" ref="model_interview_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Rate Sheet -->
+        <record id="rule_assessment_system_manager_interview_rate_sheet" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Rate Sheet</field>
+            <field name="model_id" ref="model_interview_rate_sheet"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Rate Sheet Line -->
+        <record id="rule_assessment_system_manager_interview_rate_sheet_line" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Rate Sheet Line</field>
+            <field name="model_id" ref="model_interview_rate_sheet_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Session -->
+        <record id="rule_assessment_system_manager_interview_session" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Session</field>
+            <field name="model_id" ref="model_interview_session"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Candidate Assessment -->
+        <record id="rule_assessment_system_manager_interview_candidate_assessment" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Candidate Assessment</field>
+            <field name="model_id" ref="model_interview_candidate_assessment"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Criteria Score -->
+        <record id="rule_assessment_system_manager_interview_criteria_score" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Criteria Score</field>
+            <field name="model_id" ref="model_interview_criteria_score"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Final Result -->
+        <record id="rule_assessment_system_manager_interview_final_result" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Final Result</field>
+            <field name="model_id" ref="model_interview_final_result"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Manager: Full Access to Interview Final Result Line -->
+        <record id="rule_assessment_system_manager_interview_final_result_line" model="ir.rule">
+            <field name="name">Assessment System: Manager - Interview Final Result Line</field>
+            <field name="model_id" ref="model_interview_final_result_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+        </record>
+
+        <!-- Assessment System: Officers & Managers Full Access to Panel Invitations -->
+        <record id="rule_assessment_panel_member_officer_all" model="ir.rule">
+            <field name="name">Assessment: Officers &amp; Managers - All Panel Invitations</field>
+            <field name="model_id" ref="custom_recruitment.model_new_internal_recruitment_panel"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(6, 0, [ref('group_assessment_officer'), ref('group_assessment_manager'), ref('group_assessment_administrator')])]"/>
+        </record>
+
+        <!-- ==================================================== -->
+        <!-- WORK UNIT ISOLATION: QUESTION BANK (EXAM.QUESTION)   -->
+        <!-- ==================================================== -->
+
+        <!-- Work Unit Officer / Grader: Can view and manage questions for their own Work Unit (operating.unit) -->
+        <record id="rule_exam_question_work_unit_officer" model="ir.rule">
+            <field name="name">Question Bank: Work Unit Officer - Own Work Unit Questions</field>
+            <field name="model_id" ref="model_exam_question"/>
+            <field name="domain_force">['|', '|', ('operating_unit_id', '=', False), ('operating_unit_id', '=', user.employee_id.operating_unit_id.id), ('create_uid', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_workunit_manager')), (4, ref('group_assessment_officer')), (4, ref('custom_recruitment.group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- HR Manager & Administrator: Full Access to all Questions across all Work Units -->
+        <record id="rule_exam_question_manager_admin_all" model="ir.rule">
+            <field name="name">Question Bank: Manager &amp; Admin - All Work Unit Questions</field>
+            <field name="model_id" ref="model_exam_question"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator')), (4, ref('custom_recruitment.group_recruitment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+        </record>
+
+        <!-- ==================================================== -->
+        <!-- WORK UNIT ISOLATION: MANUAL GRADING (EXAM.GRADING.TASK) -->
+        <!-- ==================================================== -->
+
+        <!-- Work Unit Grader / Officer: Can only see grading tasks assigned to them or in their Work Unit (operating.unit) -->
+        <record id="rule_exam_grading_task_work_unit_officer" model="ir.rule">
+            <field name="name">Manual Grading: Work Unit Grader - Own Assigned / Work Unit Tasks</field>
+            <field name="model_id" ref="model_exam_grading_task"/>
+            <field name="domain_force">['|', '|', ('assigned_grader_id', '=', user.id), ('operating_unit_id', '=', user.employee_id.operating_unit_id.id), ('question_id.operating_unit_id', '=', user.employee_id.operating_unit_id.id)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_workunit_manager')), (4, ref('group_assessment_officer')), (4, ref('custom_recruitment.group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- HR Manager & Administrator: Full Access to all Grading Tasks across all Work Units -->
+        <record id="rule_exam_grading_task_manager_admin_all" model="ir.rule">
+            <field name="name">Manual Grading: Manager &amp; Admin - All Work Unit Tasks</field>
+            <field name="model_id" ref="model_exam_grading_task"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator')), (4, ref('custom_recruitment.group_recruitment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+        </record>
+
+        <!-- ==================================================== -->
+        <!-- CANDIDATE ISOLATION: CANDIDATE EXAM SITTINGS        -->
+        <!-- ==================================================== -->
+
+        <!-- Candidate: Can ONLY see their own exam sitting records -->
+        <record id="rule_exam_candidate_attempt_candidate_own" model="ir.rule">
+            <field name="name">Candidate Exam Attempt: Candidate - Own Sittings Only</field>
+            <field name="model_id" ref="model_exam_candidate_attempt"/>
+            <field name="domain_force">['|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=', user.login)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_user')), (4, ref('base.group_user'))]"/>
+        </record>
+
+        <!-- Officers, Managers & Administrators: Full Access to all Candidate Sittings -->
+        <record id="rule_exam_candidate_attempt_officer_manager_all" model="ir.rule">
+            <field name="name">Candidate Exam Attempt: Officers &amp; Managers - All Sittings</field>
+            <field name="model_id" ref="model_exam_candidate_attempt"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+        </record>
+
+        <!-- Transfer Request Config: Manager Access -->
+        <record id="rule_assessment_manager_transfer_request_config" model="ir.rule">
+            <field name="name">Assessment System: Manager - Transfer Request Config</field>
+            <field name="model_id" ref="model_transfer_request_config"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[(4, ref('group_assessment_manager')), (4, ref('group_assessment_administrator')), (4, ref('custom_recruitment.group_recruitment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+        </record>
+
+        <!-- ==================================================== -->
+        <!-- RESULT PUBLICATIONS ISOLATION (FR-EXM-071)           -->
+        <!-- ==================================================== -->
+
+        <!-- Employee: Can ONLY see their own published result line -->
+        <record id="rule_assessment_result_publication_line_user_own" model="ir.rule">
+            <field name="name">Assessment Result Publication Line: Employee - Own Results Only</field>
+            <field name="model_id" ref="model_assessment_result_publication_line"/>
+            <field name="domain_force">['|', '|', '|', ('user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('candidate_email', '=ilike', user.login), ('candidate_code', 'in', [user.employee_id.identification_id or '___none___', user.employee_id.barcode or '___none___', user.login or '___none___'])]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Officers, Managers & Administrators: Full Access to all Publication Lines -->
+        <record id="rule_assessment_result_publication_line_officer_all" model="ir.rule">
+            <field name="name">Assessment Result Publication Line: Officers &amp; Managers - All Lines</field>
+            <field name="model_id" ref="model_assessment_result_publication_line"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+        </record>
+
+        <!-- Employee: Can view published result batches -->
+        <record id="rule_assessment_result_publication_user" model="ir.rule">
+            <field name="name">Assessment Result Publication: Employee - Published Batches Only</field>
+            <field name="model_id" ref="model_assessment_result_publication"/>
+            <field name="domain_force">[('state', '=', 'published')]</field>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Officers, Managers & Administrators: Full Access to all Publication Batches -->
+        <record id="rule_assessment_result_publication_officer_all" model="ir.rule">
+            <field name="name">Assessment Result Publication: Officers &amp; Managers - All Batches</field>
+            <field name="model_id" ref="model_assessment_result_publication"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="groups" eval="[
+                (4, ref('group_assessment_officer')),
+                (4, ref('group_assessment_manager')),
+                (4, ref('group_assessment_administrator')),
+                (4, ref('custom_recruitment.group_recruitment_officer')),
+                (4, ref('custom_recruitment.group_recruitment_manager')),
+                (4, ref('custom_recruitment.group_recruitment_administrator'))
+            ]"/>
+        </record>
+
+</odoo>

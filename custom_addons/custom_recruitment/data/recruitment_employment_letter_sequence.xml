@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="sequence_recruitment_employment_letter" model="ir.sequence">
+            <field name="name">External Recruitment Employment Letter Reference</field>
+            <field name="code">bunna.recruitment.employment.letter</field>
+            <field name="prefix">-BB/PROM/</field>
+            <field name="padding">2</field>
+            <field name="suffix">/%(year)s</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

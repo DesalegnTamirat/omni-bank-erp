@@ -105,6 +105,9 @@ class EmployeeTransferRequest(models.Model):
     )
     reason_for_transfer = fields.Text(string="Reason for Transfer")
     additional_remarks = fields.Text(string="Additional Remarks (Optional)")
+    transfer_letter_id = fields.Many2one(
+        "transfer.letter", string="Lateral Transfer Letter", readonly=True, copy=False,
+    )
 
     employee_name = fields.Char(related="employee_id.name", string="Employee Name", store=True, readonly=True)
     department_id = fields.Many2one(
@@ -115,6 +118,7 @@ class EmployeeTransferRequest(models.Model):
         string="Job Category",
         compute="_compute_current_info",
         store=True,
+        readonly=True,
     )
     employment_type = fields.Selection(
         related="employee_id.employee_type", string="Employment Type", store=True, readonly=True,
@@ -151,7 +155,7 @@ class EmployeeTransferRequest(models.Model):
 
     disciplinary_status = fields.Selection(
         DISCIPLINE_SELECTION, string="Disciplinary Status", compute="_compute_disciplinary_status",
-        store=True, readonly=False, tracking=True,
+        store=True, readonly=True, tracking=True,
     )
     discipline_deduction_percent = fields.Float(
         string="Discipline Deduction (%)", compute="_compute_discipline_deduction", store=True
@@ -164,7 +168,7 @@ class EmployeeTransferRequest(models.Model):
     )
     exchange_partner_disciplinary_status = fields.Selection(
         DISCIPLINE_SELECTION, string="Exchange Partner Disciplinary Status",
-        compute="_compute_exchange_partner_disciplinary_status", store=True, readonly=False,
+        compute="_compute_exchange_partner_disciplinary_status", store=True, readonly=True,
     )
     exchange_transfer_ok = fields.Boolean(
         string="Exchange Transfer OK", compute="_compute_eligibility", store=True
@@ -192,6 +196,7 @@ class EmployeeTransferRequest(models.Model):
     )
     supervisor_recommendation_score = fields.Float(
         string="Supervisor Recommendation Score (0-100)",
+        default=100.0,
     )
     transfer_suitability_score = fields.Float(
         string="Transfer Suitability Score", readonly=True, copy=False,
@@ -226,11 +231,120 @@ class EmployeeTransferRequest(models.Model):
     refusal_reason = fields.Text(string="Refusal Reason")
     hr_notified_on_refusal = fields.Datetime(string="HR Notified On", readonly=True, copy=False)
 
+    submitted_by_user_id = fields.Many2one("res.users", string="Submitted By User", readonly=True, copy=False)
+    reviewed_by_user_id = fields.Many2one("res.users", string="Reviewer User (Started Review)", readonly=True, copy=False, tracking=True)
+    approved_by_user_id = fields.Many2one("res.users", string="Approved By User", readonly=True, copy=False, tracking=True)
+
+    is_requesting_employee = fields.Boolean(
+        string="Is Requesting Employee",
+        compute="_compute_user_roles",
+    )
+    is_hr_user = fields.Boolean(
+        string="Is HR User",
+        compute="_compute_user_roles",
+    )
+
+    @api.depends_context("uid")
+    @api.depends("employee_id")
+    def _compute_user_roles(self):
+        user = self.env.user
+        is_hr = (
+            user.has_group("custom_recruitment.group_recruitment_officer")
+            or user.has_group("custom_recruitment.group_recruitment_manager")
+            or user.has_group("custom_recruitment.group_recruitment_administrator")
+            or user.has_group("hr.group_hr_user")
+            or user.has_group("hr.group_hr_manager")
+        )
+        for rec in self:
+            rec.is_hr_user = is_hr
+            rec.is_requesting_employee = bool(rec.employee_id and rec.employee_id.user_id and rec.employee_id.user_id.id == user.id)
+
+    def _get_employee_active_discipline_cases(self, employee):
+        case_names = []
+        if not employee:
+            return case_names
+
+        # 1. Search discipline.case model (discipline_management module)
+        if 'discipline.case' in self.env:
+            cases = self.env['discipline.case'].search([
+                ('employee_id', '=', employee.id),
+                ('state', 'not in', ['revoked', 'closed']),
+            ])
+            for c in cases:
+                sel = c._fields['punishment_type'].selection if 'punishment_type' in c._fields else False
+                if callable(sel):
+                    try:
+                        sel = sel(c.env[c._name])
+                    except Exception:
+                        sel = False
+                p_label = dict(sel).get(c.punishment_type, c.punishment_type or 'Active Offense') if sel and isinstance(sel, (list, tuple)) else (c.punishment_type or 'Active Offense')
+                case_names.append("%s (%s - state: %s)" % (c.name or 'Case', p_label, c.state))
+
+        # 2. Search discipline.action model (hr_employee_custom module)
+        if 'discipline.action' in self.env:
+            actions = self.env['discipline.action'].search([
+                ('employee_name', '=', employee.id),
+            ])
+            for a in actions:
+                a_name = getattr(a, 'ref_no', False) or getattr(a, 'name', False) or 'Disciplinary Action'
+                case_names.append("Action: %s" % a_name)
+
+        # 3. Search disciplinary.action model (hr_employee_custom module)
+        if 'disciplinary.action' in self.env:
+            d_actions = self.env['disciplinary.action'].search([
+                ('employee_name', '=', employee.id),
+            ])
+            for da in d_actions:
+                da_name = getattr(da, 'name', False) or 'Disciplinary Action'
+                case_names.append("Disciplinary Action: %s" % da_name)
+
+        return case_names
+
+    @api.constrains("employee_id")
+    def _check_employee_discipline_constraints(self):
+        for rec in self:
+            if rec.employee_id:
+                active_cases = rec._get_employee_active_discipline_cases(rec.employee_id)
+                if active_cases:
+                    case_names = ", ".join(active_cases)
+                    raise ValidationError(_(
+                        "Cannot create or process transfer request for employee '%s'. "
+                        "The employee has active disciplinary record(s): %s. "
+                        "Employees with active disciplinary cases are strictly prohibited from requesting transfers."
+                    ) % (rec.employee_id.name, case_names))
+
+    @api.onchange("employee_id")
+    def _onchange_employee_id_discipline_warning(self):
+        if self.employee_id:
+            active_cases = self._get_employee_active_discipline_cases(self.employee_id)
+            if active_cases:
+                case_names = ", ".join(active_cases)
+                return {
+                    "warning": {
+                        "title": _("Active Disciplinary Record Detected"),
+                        "message": _(
+                            "Employee '%s' has active disciplinary case(s): %s. "
+                            "Transfer requests are strictly prohibited for employees with active disciplinary records."
+                        ) % (self.employee_id.name, case_names)
+                    }
+                }
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if not vals.get("name") or vals.get("name") == _("New"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("employee.transfer.request") or _("New")
+            emp_id = vals.get("employee_id")
+            if emp_id:
+                emp = self.env["hr.employee"].browse(emp_id)
+                active_cases = self._get_employee_active_discipline_cases(emp)
+                if active_cases:
+                    case_names = ", ".join(active_cases)
+                    raise ValidationError(_(
+                        " You Cannot create transfer request for employee '%s'. "
+                        "The employee has active disciplinary record(s): %s. "
+                        "Employees with active disciplinary cases are strictly prohibited from applying for transfers."
+                    ) % (emp.name, case_names))
         records = super().create(vals_list)
         records._compute_current_info()
         return records
@@ -244,7 +358,8 @@ class EmployeeTransferRequest(models.Model):
             "target_vacancy_id", "target_job_grade_id", "target_job_position_id",
             "target_job_level", "target_operating_unit_id",
             "supervisor_recommendation_score",
-            "reporting_manager_id", "effective_transfer_date",  # ✅ NEW
+            "reporting_manager_id", "effective_transfer_date",
+            "submitted_by_user_id", "reviewed_by_user_id", "approved_by_user_id",
         }
         computed_fields = {
             fname for fname, field in self._fields.items() if field.compute
@@ -258,6 +373,9 @@ class EmployeeTransferRequest(models.Model):
     @api.depends(
         "employee_id",
         "employee_id.job_position",
+        "employee_id.job_position.employee_category",
+        "employee_id.job_id",
+        "employee_id.job_id.employee_category",
         "employee_id.job_grade",
         "employee_id.default_operating_unit_id",
         "employee_id.contract_id",
@@ -270,10 +388,20 @@ class EmployeeTransferRequest(models.Model):
             rec.current_job_grade_id = emp.job_grade if emp else False
             rec.current_operating_unit_id = emp.default_operating_unit_id if emp else False
 
-            if emp and emp.job_grade and hasattr(emp.job_grade, 'job_category'):
-                rec.current_job_category = emp.job_grade.job_category or False
-            else:
-                rec.current_job_category = False
+            job = getattr(emp, "job_position", False) or getattr(emp, "job_id", False) if emp else False
+            cat = False
+            if job and hasattr(job, "employee_category") and job.employee_category:
+                raw_cat = str(job.employee_category).strip()
+                if "non" in raw_cat.lower():
+                    cat = "Non Managerial"
+                elif "manag" in raw_cat.lower():
+                    cat = "Managerial"
+                else:
+                    cat = raw_cat
+            elif emp and emp.job_grade and hasattr(emp.job_grade, "job_category") and emp.job_grade.job_category:
+                cat = emp.job_grade.job_category
+
+            rec.current_job_category = cat or False
 
             if emp and not rec.date_in_current_position:
                 joining = (
@@ -312,10 +440,16 @@ class EmployeeTransferRequest(models.Model):
     @api.depends("employee_id")
     def _compute_pms_score(self):
         for rec in self:
-            try:
-                rec.pms_score = rec.employee_id.contract_id.pms_score or 0.0
-            except Exception:
-                rec.pms_score = rec.pms_score or 0.0
+            if rec.employee_id:
+                ver = self.env["hr.version"].search([("employee_id", "=", rec.employee_id.id)], order="id desc", limit=1)
+                if ver and ver.pms_score:
+                    rec.pms_score = ver.pms_score
+                elif rec.employee_id.contract_id and getattr(rec.employee_id.contract_id, "pms_score", False):
+                    rec.pms_score = rec.employee_id.contract_id.pms_score
+                else:
+                    rec.pms_score = rec.pms_score or 0.0
+            else:
+                rec.pms_score = 0.0
 
     @api.depends("date_in_current_position", "date_in_current_location")
     def _compute_service_years(self):
@@ -430,22 +564,22 @@ class EmployeeTransferRequest(models.Model):
             if rec.employee_id and 'discipline.case' in self.env:
                 active_cases = self.env['discipline.case'].search([
                     ('employee_id', '=', rec.employee_id.id),
-                    ('state', '=', 'enforced'),
+                    ('state', 'not in', ['revoked', 'closed']),
                 ])
                 if active_cases:
                     severities = set(active_cases.mapped('severity_level'))
                     punishments = set(active_cases.mapped('punishment_type'))
-                    if {'level_1', 'level_2'} & severities or 'final_warning_penalty' in punishments:
+                    if {'level_1', 'level_2'} & severities or {'dismissal', 'final_warning_penalty'} & punishments:
                         rec.disciplinary_status = 'last_written_warning'
                     elif 'level_3' in severities or 'second_warning_penalty' in punishments:
                         rec.disciplinary_status = 'second_warning'
                     elif 'level_4' in severities or 'first_warning_penalty' in punishments:
                         rec.disciplinary_status = 'first_warning'
                     else:
-                        rec.disciplinary_status = 'none'
+                        rec.disciplinary_status = 'last_written_warning'
                 else:
                     rec.disciplinary_status = 'none'
-            elif not rec.disciplinary_status:
+            else:
                 rec.disciplinary_status = 'none'
 
     @api.depends('exchange_partner_employee_id')
@@ -454,22 +588,22 @@ class EmployeeTransferRequest(models.Model):
             if rec.exchange_partner_employee_id and 'discipline.case' in self.env:
                 active_cases = self.env['discipline.case'].search([
                     ('employee_id', '=', rec.exchange_partner_employee_id.id),
-                    ('state', '=', 'enforced'),
+                    ('state', 'not in', ['revoked', 'closed']),
                 ])
                 if active_cases:
                     severities = set(active_cases.mapped('severity_level'))
                     punishments = set(active_cases.mapped('punishment_type'))
-                    if {'level_1', 'level_2'} & severities or 'final_warning_penalty' in punishments:
+                    if {'level_1', 'level_2'} & severities or {'dismissal', 'final_warning_penalty'} & punishments:
                         rec.exchange_partner_disciplinary_status = 'last_written_warning'
                     elif 'level_3' in severities or 'second_warning_penalty' in punishments:
                         rec.exchange_partner_disciplinary_status = 'second_warning'
                     elif 'level_4' in severities or 'first_warning_penalty' in punishments:
                         rec.exchange_partner_disciplinary_status = 'first_warning'
                     else:
-                        rec.exchange_partner_disciplinary_status = 'none'
+                        rec.exchange_partner_disciplinary_status = 'last_written_warning'
                 else:
                     rec.exchange_partner_disciplinary_status = 'none'
-            elif not rec.exchange_partner_disciplinary_status:
+            else:
                 rec.exchange_partner_disciplinary_status = 'none'
 
     @api.depends("disciplinary_status")
@@ -552,7 +686,7 @@ class EmployeeTransferRequest(models.Model):
                     if max_location_years else 0.0
                 )
                 pms_score = req.pms_score or 0.0
-                recommendation_score = req.supervisor_recommendation_score or 0.0
+                recommendation_score = req.supervisor_recommendation_score if req.supervisor_recommendation_score is not False and req.supervisor_recommendation_score > 0 else 100.0
                 deduction = req.discipline_deduction_percent or 0.0
                 weighted_total = (
                         application_score * w_app
@@ -569,10 +703,12 @@ class EmployeeTransferRequest(models.Model):
             for idx, (req, score) in enumerate(scored, start=1):
                 if req in batch:
                     req.final_assessment_score = round(score, 2)
+                    req.transfer_suitability_score = round(score, 2)
                     req.current_ranking = idx
             for rec in batch:
                 if rec.eligibility_status != "eligible":
                     rec.final_assessment_score = 0.0
+                    rec.transfer_suitability_score = 0.0
                     rec.current_ranking = 0
 
     @api.onchange("employee_id")
@@ -625,8 +761,11 @@ class EmployeeTransferRequest(models.Model):
                 raise ValidationError(
                     _("You already have an active transfer request (%s).") % duplicate.name
                 )
-            rec.state = "submitted"
-            rec.message_post(body=_("Transfer request submitted."))
+            rec.write({
+                "state": "submitted",
+                "submitted_by_user_id": self.env.user.id,
+            })
+            rec.message_post(body=_("Transfer request submitted by %s.") % self.env.user.name)
             self._notify_hr_of_submission(rec)
 
         return {
@@ -655,17 +794,98 @@ class EmployeeTransferRequest(models.Model):
                }
         rec.message_post(body=body)
 
+    def _notify_manager_of_under_review(self, rec):
+        # Identify manager: coach_id under hr.employee table (fallback parent_id)
+        manager = rec.employee_id.coach_id or rec.employee_id.parent_id
+        if not manager:
+            return
+
+        body = _(
+            "Transfer request %(name)s for employee %(employee)s is now Under Review. "
+            "As the direct manager/supervisor (coach), please open the request and provide the "
+            "Supervisor Recommendation Score (0-100%%)."
+        ) % {
+            "name": rec.name,
+            "employee": rec.employee_id.name,
+        }
+
+        # 1. Post to Chatter & In-App Discuss / Inbox Notification
+        if manager.user_id and manager.user_id.partner_id:
+            partner = manager.user_id.partner_id
+            rec.message_post(
+                body=body,
+                partner_ids=[partner.id],
+                message_type="notification",
+                subtype_xmlid="mail.mt_comment",
+            )
+            try:
+                channel = self.env["discuss.channel"]._get_or_create_chat(partners_to=[partner.id])
+                channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
+            except Exception:
+                pass
+            try:
+                self.env['bus.bus']._sendone(
+                    partner,
+                    'notification',
+                    {
+                        'type': 'warning',
+                        'title': _('Action Required: Provide Supervisor Recommendation Score'),
+                        'message': body,
+                        'sticky': True,
+                    }
+                )
+            except Exception:
+                pass
+        else:
+            rec.message_post(body=body)
+
+        # 2. Direct Email to Manager
+        manager_email = manager.work_email or (manager.user_id.email if manager.user_id else False)
+        if manager_email:
+            email_from = self.env.company.email or self.env.user.email_formatted or "noreply@bunnabank.com"
+            try:
+                mail_values = {
+                    "subject": _("Action Required: Provide Supervisor Recommendation Score - %s (%s)") % (rec.name, rec.employee_id.name),
+                    "body_html": Markup("<div><p>%s</p></div>") % body,
+                    "email_to": manager_email,
+                    "email_from": email_from,
+                }
+                mail = self.env["mail.mail"].sudo().create(mail_values)
+                try:
+                    mail.send()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        # 3. Create Activity Task for Manager
+        if manager.user_id:
+            try:
+                rec.activity_schedule(
+                    'mail.mail_activity_data_todo',
+                    summary=_('Provide Supervisor Recommendation Score for Transfer Request'),
+                    note=body,
+                    user_id=manager.user_id.id,
+                    date_deadline=date.today() + timedelta(days=3),
+                )
+            except Exception:
+                pass
+
     def action_start_review(self):
         records = self.filtered(lambda r: r.state == "submitted")
-        records.write({"state": "under_review"})
+        records.write({
+            "state": "under_review",
+            "reviewed_by_user_id": self.env.user.id,
+        })
         for rec in records:
-            rec.message_post(body=_("Transfer request is now under review."))
+            rec.message_post(body=_("Transfer request is now under review by %s.") % self.env.user.name)
+            self._notify_manager_of_under_review(rec)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Under Review'),
-                'message': _('Transfer request is now under review.'),
+                'message': _('Transfer request is now under review and notification sent to manager/coach.'),
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -792,6 +1012,92 @@ class EmployeeTransferRequest(models.Model):
             'target': 'current',
         }
 
+    # ── Lateral Transfer Letter Actions ──────────────────────────────
+    def _ensure_transfer_letter(self):
+        """Ensures a lateral transfer letter exists for this transfer request, creating it if needed."""
+        self.ensure_one()
+        if self.transfer_letter_id:
+            return self.transfer_letter_id
+
+        emp = self.employee_id
+        title = 'Ato'
+        gender = (emp.gender or '').lower() if emp else ''
+        if gender in ['female', 'f']:
+            title = 'W/ro'
+
+        cur_unit = self.current_operating_unit_id.name if self.current_operating_unit_id else (emp.operating_unit.name if emp and emp.operating_unit else _('Current Branch'))
+        cur_pos = self.current_job_position_id.name if self.current_job_position_id else (emp.job_title or (emp.job_id.name if emp and emp.job_id else _('Current Position')))
+        new_unit = self.target_operating_unit_id.name if self.target_operating_unit_id else (self.requested_operating_unit_id.name if self.requested_operating_unit_id else _('Target Branch'))
+        new_pos = self.target_job_position_id.name if self.target_job_position_id else cur_pos
+        grade_name = self.current_job_grade_id.grade_name if self.current_job_grade_id else (getattr(emp, 'emp_grade', False) and emp.emp_grade.grade_name or 'Grade')
+        salary = emp.contract_id.wage if (emp and emp.contract_id and emp.contract_id.wage) else (getattr(emp, 'monthly_salary', 0.0) or 0.0)
+
+        eff_date = getattr(self, 'effective_transfer_date', False) or getattr(self, 'reporting_date', False) or fields.Date.today()
+        id_num = getattr(emp, 'identification_id', False) or getattr(emp, 'employee_id_number', False) or getattr(emp, 'barcode', '') or ''
+
+        letter_vals = {
+            'transfer_request_id': self.id,
+            'employee_id': emp.id,
+            'employee_name': emp.name,
+            'employee_title': title,
+            'employee_email': (emp.work_email or emp.private_email or '').strip(),
+            'employee_id_number': id_num,
+            'employee_address': cur_unit or _('Addis Ababa'),
+            'letter_date': fields.Date.today(),
+            'effective_date': eff_date,
+            'current_work_unit_name': cur_unit,
+            'current_position_name': cur_pos,
+            'new_work_unit_name': new_unit,
+            'new_position_name': new_pos,
+            'job_grade_name': grade_name,
+            'monthly_salary': salary,
+            'signatory_title': 'Talent Management Directorate',
+            'signatory_company': 'Bunna Bank S.C.',
+            'state': 'draft',
+        }
+        letter = self.env['transfer.letter'].create(letter_vals)
+        self.transfer_letter_id = letter.id
+        return letter
+
+    def action_generate_transfer_letter(self):
+        """Generates or opens the Lateral Transfer Letter."""
+        self.ensure_one()
+        letter = self._ensure_transfer_letter()
+        return {
+            'name': _('Lateral Transfer Letter'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'transfer.letter',
+            'res_id': letter.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
+    def action_print_transfer_letter(self):
+        """Prints the Lateral Transfer Letter directly from the transfer request."""
+        self.ensure_one()
+        letter = self._ensure_transfer_letter()
+        return letter.action_print_transfer_letter()
+
+    def action_send_transfer_letter(self):
+        """Sends the Lateral Transfer Letter by email with PDF attached directly from the transfer request."""
+        self.ensure_one()
+        letter = self._ensure_transfer_letter()
+        return letter.action_send_transfer_letter()
+
+    def action_view_transfer_letter(self):
+        """Opens the linked Lateral Transfer Letter."""
+        self.ensure_one()
+        if not self.transfer_letter_id:
+            raise UserError(_("No Lateral Transfer Letter has been generated yet."))
+        return {
+            'name': _('Lateral Transfer Letter'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'transfer.letter',
+            'res_id': self.transfer_letter_id.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
     def _get_selection_notification_html(self):
         self.ensure_one()
         emp = self.employee_id
@@ -855,16 +1161,49 @@ class EmployeeTransferRequest(models.Model):
         unit — that only happens when this employee is selected via
         Transfer Committee Minutes (see action_complete_transfer)."""
         for rec in self:
+            current_user = self.env.user
+
+            if rec.state in ("draft", "submitted"):
+                raise ValidationError(_(
+                    "Cannot approve transfer request '%s'! The initial reviewer/manager has not reviewed and approved this request yet (Current Status: %s). "
+                    "The request must be under review before HR approval."
+                ) % (rec.name, rec.state))
+
+            # STRICT Segregation of Duties Check 1: The user who clicked 'Start Review' CANNOT approve the request
+            if rec.reviewed_by_user_id and rec.reviewed_by_user_id.id == current_user.id:
+                raise ValidationError(_(
+                    "Segregation of Duties Violation: You ('%s') clicked 'Start Review' for transfer request '%s'. "
+                    "You are strictly prohibited from approving a request you reviewed. "
+                    "To ensure segregation of duties in the approval hierarchy, the request MUST be approved by a DIFFERENT user."
+                ) % (current_user.name, rec.name))
+
+            # STRICT Segregation of Duties Check 2: The requesting employee cannot approve their own request
+            if rec.employee_id.user_id and rec.employee_id.user_id.id == current_user.id:
+                raise ValidationError(_(
+                    "Segregation of Duties Violation: You ('%s') are the requesting employee for '%s'. "
+                    "You are strictly prohibited from approving your own transfer request."
+                ) % (current_user.name, rec.name))
+
+            # STRICT Segregation of Duties Check 3: The user who submitted the request cannot approve it
+            if rec.submitted_by_user_id and rec.submitted_by_user_id.id == current_user.id:
+                raise ValidationError(_(
+                    "Segregation of Duties Violation: You ('%s') submitted transfer request '%s'. "
+                    "You are strictly prohibited from approving a request you submitted."
+                ) % (current_user.name, rec.name))
+
             if rec.eligibility_status != "eligible":
                 raise ValidationError(
                     _("This transfer request is not eligible:\n%s")
                     % (rec.ineligibility_reason or _("Unknown reason."))
                 )
-            rec.state = "approved"
+            rec.write({
+                "state": "approved",
+                "approved_by_user_id": current_user.id,
+            })
             rec.message_post(
-                body=_("Transfer request approved by HR. The transfer will "
+                body=_("Transfer request approved by HR (%s). The transfer will "
                        "take effect once this employee is selected through "
-                       "the Transfer Committee Minutes ranking process.")
+                       "the Transfer Committee Minutes ranking process.") % current_user.name
             )
 
         return {
@@ -980,6 +1319,25 @@ class EmployeeTransferRequest(models.Model):
                 'title': _('Request Withdrawn'),
                 'message': _('Transfer request withdrawn.'),
                 'type': 'warning',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    def action_reconfirm_interest(self):
+        for rec in self:
+            rec.write({
+                'pending_expiry_notified': False,
+                'request_date': date.today(),
+            })
+            rec.message_post(body=_("Employee re-confirmed interest in transfer request. Expiry timer reset."))
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Interest Re-confirmed'),
+                'message': _('Your interest in this transfer request has been re-confirmed and active cycle reset.'),
+                'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             },
@@ -1113,28 +1471,114 @@ class EmployeeTransferRequest(models.Model):
         one_year_ago = today - timedelta(days=expiry_days)
 
         pending_not_notified = self.search([
-            ("state", "in", ("submitted", "under_review")),
+            ("state", "in", ("draft", "submitted", "under_review")),
             ("request_date", "<=", one_year_ago),
             ("pending_expiry_notified", "=", False),
         ])
 
         for req in pending_not_notified:
             req.pending_expiry_notified = True
-            req.message_post(
-                body=_(
-                    "Your transfer request has been pending for more than %(days)d days."
-                ) % {"days": expiry_days},
-            )
+            body = _(
+                "Your transfer request (%(name)s) has been pending for more than %(days)d days. "
+                "Please open your transfer request and click 'Re-confirm Interest' within 7 days, "
+                "otherwise the request will be automatically withdrawn."
+            ) % {"name": req.name, "days": expiry_days}
+            
+            # 1. Post to Chatter & In-App Discuss / Inbox Notification
+            partner = req.employee_id.user_id.partner_id if req.employee_id and req.employee_id.user_id else False
+            if partner:
+                req.message_post(
+                    body=body,
+                    partner_ids=[partner.id],
+                    message_type="notification",
+                    subtype_xmlid="mail.mt_comment",
+                )
+                # In-App Discuss Chat Notification
+                try:
+                    channel = self.env["discuss.channel"]._get_or_create_chat(partners_to=[partner.id])
+                    channel.message_post(body=body, message_type="comment", subtype_xmlid="mail.mt_comment")
+                except Exception:
+                    pass
+                # In-App Bus Toast Alert (Pop-up alert in Odoo UI)
+                try:
+                    self.env['bus.bus']._sendone(
+                        partner,
+                        'notification',
+                        {
+                            'type': 'warning',
+                            'title': _('Transfer Request Pending Confirmation'),
+                            'message': body,
+                            'sticky': True,
+                        }
+                    )
+                except Exception:
+                    pass
+            else:
+                req.message_post(body=body)
+
+            # 2. Send Direct Email to Applicant Address
+            if req.active_email_address:
+                email_from = self.env.company.email or self.env.user.email_formatted or "noreply@bunnabank.com"
+                try:
+                    mail_values = {
+                        "subject": _("Action Required: Transfer Request Pending Confirmation - %s") % req.name,
+                        "body_html": Markup("<div><p>%s</p></div>") % body,
+                        "email_to": req.active_email_address,
+                        "email_from": email_from,
+                    }
+                    mail = self.env["mail.mail"].sudo().create(mail_values)
+                    try:
+                        mail.send()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            # 3. Create Systray Activity Task
+            if req.employee_id and req.employee_id.user_id:
+                try:
+                    req.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Transfer Request Pending Confirmation'),
+                        note=body,
+                        user_id=req.employee_id.user_id.id,
+                        date_deadline=today + timedelta(days=auto_withdraw_days),
+                    )
+                except Exception:
+                    pass
 
         seven_days_buffer = today - timedelta(days=expiry_days + auto_withdraw_days)
         pending_auto_withdraw = self.search([
-            ("state", "in", ("submitted", "under_review")),
+            ("state", "in", ("draft", "submitted", "under_review")),
             ("request_date", "<=", seven_days_buffer),
             ("pending_expiry_notified", "=", True),
         ])
 
         for req in pending_auto_withdraw:
             req.write({"state": "withdrawn"})
-            req.message_post(
-                body=_("Transfer request automatically withdrawn after being pending for too long.")
-            )
+            body = _("Transfer request automatically withdrawn after being pending for too long.")
+            req.message_post(body=body)
+            if req.active_email_address:
+                email_from = self.env.company.email or self.env.user.email_formatted or "noreply@bunnabank.com"
+                try:
+                    mail_values = {
+                        "subject": _("Transfer Request Automatically Withdrawn - %s") % req.name,
+                        "body_html": Markup("<div><p>%s</p></div>") % body,
+                        "email_to": req.active_email_address,
+                        "email_from": email_from,
+                    }
+                    mail = self.env["mail.mail"].sudo().create(mail_values)
+                    try:
+                        mail.send()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            if req.employee_id and req.employee_id.user_id:
+                try:
+                    req.activity_feedback(
+                        ['mail.mail_activity_data_todo'],
+                        feedback=_("Request automatically withdrawn due to non-response.")
+                    )
+                except Exception:
+                    pass

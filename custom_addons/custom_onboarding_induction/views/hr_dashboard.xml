@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════
+         BUNNA BANK S.C. — ONBOARDING & INDUCTION DASHBOARD
+         Brand Palette (from official brand guide):
+           Coffee Brown : #4A261A   Dark Teal  : #1d2b32
+           Gold Accent  : #D4A359  Forest Green: #425707
+           Olive        : #726732   Amber      : #C17540
+           Very Dark    : #1e2917   Berry      : #7A1F3D
+           Cream        : #FDF6EC
+    ═══════════════════════════════════════════════════════ -->
+
+    <record id="hr_onboarding_dashboard_view_form" model="ir.ui.view">
+        <field name="name">hr.onboarding.dashboard.form</field>
+        <field name="model">hr.onboarding.dashboard</field>
+        <field name="arch" type="xml">
+            <form string="Onboarding &amp; Induction Dashboard"
+                  create="false" edit="false" delete="false">
+                <sheet>
+
+                    <!-- ══ HEADER BANNER ══ -->
+                    <div style="background: linear-gradient(135deg, #4A261A 0%, #1d2b32 100%);
+                                color:#FFF; padding:20px 24px; border-radius:10px; margin-bottom:20px;">
+                        <h2 style="color:#D4A359; font-weight:800; margin:0; letter-spacing:1px;">
+                            Bunna Bank S.C.
+                        </h2>
+                        <h4 style="color:#FFF; margin:4px 0 0 0; font-weight:600;">
+                            Onboarding &amp; Induction Management — Live Dashboard
+                        </h4>
+                        <small style="color:#C9B49A;">
+                            People Operations &amp; PPDD Intelligence Hub
+                        </small>
+                    </div>
+
+                    <!-- ══ ROW 1: ONBOARDING KPI TILES ══ -->
+                    <h5 style="color:#4A261A; font-weight:700;
+                               border-left:4px solid #D4A359; padding-left:10px; margin-bottom:12px;">
+                        Workplace Onboarding Plans
+                    </h5>
+                    <div class="row mb-3">
+                        <div class="col-2">
+                            <div style="background:#1d2b32; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800; color:#D4A359;">
+                                    <field name="ob_total" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; color:#C9B49A; margin-top:4px;">TOTAL PLANS</div>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div style="background:#726732; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800;">
+                                    <field name="ob_draft" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; margin-top:4px;">DRAFT</div>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div style="background:#C17540; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800;">
+                                    <field name="ob_pre_boarding" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; margin-top:4px;">PRE-BOARDING</div>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div style="background:#1e6b7a; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800;">
+                                    <field name="ob_work_unit" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; margin-top:4px;">WORK UNIT</div>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div style="background:#425707; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800;">
+                                    <field name="ob_completed" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; margin-top:4px;">COMPLETED</div>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div style="background:#7A1F3D; border-radius:10px;
+                                        padding:16px 12px; text-align:center; color:#FFF; min-height:90px;">
+                                <div style="font-size:32px; font-weight:800;">
+                                    <field name="ob_escalated" readonly="1" nolabel="1"/>
+                                </div>
+                                <div style="font-size:10px; margin-top:4px;">ESCALATED</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Completion Rate Progress Bar -->
+                    <div style="background:#FDF6EC; border-radius:8px; padding:12px 16px;
+                                border-left:4px solid #425707; margin-bottom:20px;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                            <span style="color:#4A261A; font-weight:700; font-size:12px;">
+                                Onboarding Completion Rate
+                            </span>
+                            <span style="color:#425707; font-weight:800; font-size:13px;">
+                                <field name="ob_completion_rate" readonly="1" nolabel="1" widget="float"/> %
+                            </span>
+                        </div>
+                        <field name="ob_completion_rate" readonly="1" nolabel="1" widget="progressbar"
+                               options="{'current_value': 'ob_completion_rate', 'max_value': 100}"/>
+                    </div>
+
+                    <!-- ══ ROW 2: INDUCTION + TASK KPIS ══ -->
+                    <div class="row mb-3">
+
+                        <!-- Induction Plans -->
+                        <div class="col-6">
+                            <h5 style="color:#1e2917; font-weight:700;
+                                       border-left:4px solid #C17540; padding-left:10px; margin-bottom:12px;">
+                                Corporate Induction Plans
+                            </h5>
+                            <div class="row mb-2">
+                                <div class="col-4">
+                                    <div style="background:#1e2917; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800; color:#D4A359;">
+                                            <field name="ind_total" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px; color:#C9B49A;">TOTAL</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div style="background:#C17540; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800;">
+                                            <field name="ind_in_progress" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px;">IN PROGRESS</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div style="background:#425707; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800;">
+                                            <field name="ind_completed" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px;">COMPLETED</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background:#FDF6EC; border-radius:8px; padding:10px 14px;
+                                        border-left:4px solid #C17540;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span style="color:#4A261A; font-weight:700; font-size:11px;">
+                                        Induction Completion Rate
+                                    </span>
+                                    <span style="color:#C17540; font-weight:800; font-size:12px;">
+                                        <field name="ind_completion_rate" readonly="1" nolabel="1" widget="float"/> %
+                                    </span>
+                                </div>
+                                <field name="ind_completion_rate" readonly="1" nolabel="1" widget="progressbar"
+                                       options="{'current_value': 'ind_completion_rate', 'max_value': 100}"/>
+                            </div>
+                        </div>
+
+                        <!-- Onboarding Tasks -->
+                        <div class="col-6">
+                            <h5 style="color:#4A261A; font-weight:700;
+                                       border-left:4px solid #726732; padding-left:10px; margin-bottom:12px;">
+                                Onboarding Task Tracker
+                            </h5>
+                            <div class="row mb-2">
+                                <div class="col-3">
+                                    <div style="background:#1d2b32; border-radius:10px;
+                                                padding:14px 6px; text-align:center; color:#FFF;">
+                                        <div style="font-size:22px; font-weight:800; color:#D4A359;">
+                                            <field name="task_total" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:9px; color:#C9B49A;">TOTAL</div>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div style="background:#425707; border-radius:10px;
+                                                padding:14px 6px; text-align:center; color:#FFF;">
+                                        <div style="font-size:22px; font-weight:800;">
+                                            <field name="task_done" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:9px;">DONE</div>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div style="background:#726732; border-radius:10px;
+                                                padding:14px 6px; text-align:center; color:#FFF;">
+                                        <div style="font-size:22px; font-weight:800;">
+                                            <field name="task_todo" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:9px;">PENDING</div>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div style="background:#7A1F3D; border-radius:10px;
+                                                padding:14px 6px; text-align:center; color:#FFF;">
+                                        <div style="font-size:22px; font-weight:800;">
+                                            <field name="task_overdue" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:9px;">OVERDUE</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background:#FDF6EC; border-radius:8px; padding:10px 14px;
+                                        border-left:4px solid #726732;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span style="color:#4A261A; font-weight:700; font-size:11px;">
+                                        Task Completion Rate
+                                    </span>
+                                    <span style="color:#425707; font-weight:800; font-size:12px;">
+                                        <field name="task_completion_rate" readonly="1" nolabel="1" widget="float"/> %
+                                    </span>
+                                </div>
+                                <field name="task_completion_rate" readonly="1" nolabel="1" widget="progressbar"
+                                       options="{'current_value': 'task_completion_rate', 'max_value': 100}"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══ ROW 3: LMS + PIPELINE BREAKDOWN ══ -->
+                    <div class="row mb-3">
+
+                        <!-- LMS Tasks -->
+                        <div class="col-6">
+                            <h5 style="color:#4A261A; font-weight:700;
+                                       border-left:4px solid #1e2917; padding-left:10px; margin-bottom:12px;">
+                                LMS / Induction Tasks
+                            </h5>
+                            <div class="row mb-2">
+                                <div class="col-4">
+                                    <div style="background:#1e2917; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800; color:#D4A359;">
+                                            <field name="lms_total" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px; color:#C9B49A;">TOTAL LMS</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div style="background:#425707; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800;">
+                                            <field name="lms_done" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px;">COMPLETED</div>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div style="background:#7A1F3D; border-radius:10px;
+                                                padding:14px 8px; text-align:center; color:#FFF;">
+                                        <div style="font-size:26px; font-weight:800;">
+                                            <field name="lms_overdue" readonly="1" nolabel="1"/>
+                                        </div>
+                                        <div style="font-size:10px;">OVERDUE</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="background:#FDF6EC; border-radius:8px; padding:10px 14px;
+                                        border-left:4px solid #1e2917;">
+                                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                    <span style="color:#4A261A; font-weight:700; font-size:11px;">
+                                        LMS Completion Rate
+                                    </span>
+                                    <span style="color:#1e2917; font-weight:800; font-size:12px;">
+                                        <field name="lms_completion_rate" readonly="1" nolabel="1" widget="float"/> %
+                                    </span>
+                                </div>
+                                <field name="lms_completion_rate" readonly="1" nolabel="1" widget="progressbar"
+                                       options="{'current_value': 'lms_completion_rate', 'max_value': 100}"/>
+                            </div>
+                        </div>
+
+                        <!-- Pipeline Stage Breakdown -->
+                        <div class="col-6">
+                            <h5 style="color:#4A261A; font-weight:700;
+                                       border-left:4px solid #D4A359; padding-left:10px; margin-bottom:12px;">
+                                Pipeline Stage Breakdown
+                            </h5>
+                            <div style="background:#FDF6EC; border-radius:10px; padding:14px;">
+                                <div style="display:flex; align-items:center; margin-bottom:9px;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#726732;">DRAFT</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_draft" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_draft', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#726732; font-size:12px;">
+                                        <field name="ob_draft" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-bottom:9px;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#C17540;">PRE-BOARDING</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_pre_boarding" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_pre_boarding', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#C17540; font-size:12px;">
+                                        <field name="ob_pre_boarding" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-bottom:9px;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#1d2b32;">INDUCTION GATE</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_induction_gate" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_induction_gate', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#1d2b32; font-size:12px;">
+                                        <field name="ob_induction_gate" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-bottom:9px;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#1e6b7a;">WORK UNIT</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_work_unit" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_work_unit', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#1e6b7a; font-size:12px;">
+                                        <field name="ob_work_unit" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; margin-bottom:9px;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#C17540;">MID-TERM</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_midterm" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_midterm', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#C17540; font-size:12px;">
+                                        <field name="ob_midterm" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center;">
+                                    <div style="width:115px; font-size:10px; font-weight:700; color:#425707;">COMPLETED</div>
+                                    <div style="flex:1;">
+                                        <field name="ob_completed" readonly="1" nolabel="1" widget="progressbar"
+                                               options="{'current_value': 'ob_completed', 'max_value': 'ob_total', 'editable': false}"/>
+                                    </div>
+                                    <div style="width:22px; text-align:right; font-weight:800; color:#425707; font-size:12px;">
+                                        <field name="ob_completed" readonly="1" nolabel="1"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══ ROW 4: RECENT ONBOARDING PLANS TABLE ══ -->
+                    <h5 style="color:#4A261A; font-weight:700;
+                               border-left:4px solid #D4A359; padding-left:10px;
+                               margin-bottom:12px; margin-top:8px;">
+                        Recent Onboarding Plans
+                    </h5>
+                    <field name="recent_onboarding_ids" readonly="1" nolabel="1">
+                        <list string="Recent Onboarding Plans" create="false" delete="false"
+                              decoration-success="state == 'completed'"
+                              decoration-danger="state == 'escalated'"
+                              decoration-warning="state in ('pre_boarding', 'midterm_review')">
+                            <field name="name"                string="Reference"/>
+                            <field name="employee_id"         string="New Hire"/>
+                            <field name="department_id"       string="Department"/>
+                            <field name="start_date"          string="Start Date"/>
+                            <field name="progress_percentage" string="Progress" widget="progressbar"/>
+                            <field name="state" string="Status" widget="badge"
+                                   decoration-success="state == 'completed'"
+                                   decoration-warning="state in ('pre_boarding','midterm_review','work_unit_onboarding')"
+                                   decoration-danger="state == 'escalated'"
+                                   decoration-info="state == 'induction_gate'"/>
+                            <field name="supervisor_id" string="Supervisor"/>
+                        </list>
+                    </field>
+
+                    <!-- ══ ROW 5: RECENT INDUCTION PLANS TABLE ══ -->
+                    <h5 style="color:#4A261A; font-weight:700;
+                               border-left:4px solid #C17540; padding-left:10px;
+                               margin-bottom:12px; margin-top:16px;">
+                        Recent Corporate Induction Plans
+                    </h5>
+                    <field name="recent_induction_ids" readonly="1" nolabel="1">
+                        <list string="Recent Induction Plans" create="false" delete="false"
+                              decoration-success="state == 'completed'"
+                              decoration-warning="state == 'in_progress'">
+                            <field name="name"                   string="Reference"/>
+                            <field name="employee_id"            string="New Hire"/>
+                            <field name="start_date"             string="Start Date"/>
+                            <field name="lms_progress_percentage" string="LMS Progress" widget="progressbar"/>
+                            <field name="state" string="Status" widget="badge"
+                                   decoration-success="state == 'completed'"
+                                   decoration-warning="state == 'in_progress'"/>
+                            <field name="ppdd_coordinator_id" string="PPDD Coordinator"/>
+                        </list>
+                    </field>
+
+                    <!-- ══ FOOTER ══ -->
+                    <div style="background:linear-gradient(90deg,#4A261A,#1d2b32);
+                                color:#C9B49A; padding:10px 20px; border-radius:8px;
+                                text-align:center; margin-top:16px; font-size:11px;">
+                        Bunna Bank S.C. — People Operations Management Directorate (POMD) &amp; PPDD |
+                        Module 14: Onboarding &amp; Induction Intelligence Dashboard
+                    </div>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══ ACTION ═══ -->
+    <record id="hr_onboarding_dashboard_action" model="ir.actions.act_window">
+        <field name="name">Onboarding &amp; Induction Dashboard</field>
+        <field name="res_model">hr.onboarding.dashboard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="hr_onboarding_dashboard_view_form"/>
+        <field name="target">current</field>
+        <field name="context">{'form_view_initial_mode': 'readonly'}</field>
+    </record>
+
+</odoo>

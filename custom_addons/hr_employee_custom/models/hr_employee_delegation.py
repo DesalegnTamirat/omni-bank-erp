@@ -15,6 +15,26 @@ class HrEmployee(models.Model):
     """
     _inherit = 'hr.employee'
 
+    def _get_delegated_subordinate_ids(self):
+        if not self:
+            return []
+        today = fields.Date.today()
+        active_delegations = self.env['hr.employee.delegation'].sudo().search([
+            ('delegate_id', 'in', self.ids),
+            ('state', '=', 'submitted'),
+            ('start_date', '<=', today),
+            ('end_date', '>=', today),
+        ])
+        if not active_delegations:
+            return []
+        delegators = active_delegations.mapped('employee_id')
+        subs = self.env['hr.employee'].sudo().search([
+            '|',
+            ('coach_id', 'in', delegators.ids),
+            ('parent_id', 'in', delegators.ids)
+        ])
+        return subs.ids
+
     def _get_delegation_visible_employee_ids(self):
         emp = self.env.user.employee_id
         Delegation = self.env['hr.employee.delegation'].sudo()

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+        <record id="seq_interview_session" model="ir.sequence">
+            <field name="name">Interview Assessment Session Sequence</field>
+            <field name="code">interview.session</field>
+            <field name="prefix">INT/</field>
+            <field name="padding">5</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+</odoo>

@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Search View: Question Bank (Search by Job Position, Competency, Question Type, Difficulty Level, Submitting Work Unit) -->
+    <record id="view_exam_question_search" model="ir.ui.view">
+        <field name="name">exam.question.search</field>
+        <field name="model">exam.question</field>
+        <field name="arch" type="xml">
+            <search string="Search Question Bank">
+                <field name="name" string="Question Stem / Content" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                <field name="code" string="Question Code"/>
+                <field name="job_id" string="Job Position"/>
+                <field name="operating_unit_id" string="Submitting Work Unit"/>
+                <field name="competency_id" string="Competency"/>
+                <field name="question_type" string="Question Type"/>
+                <field name="difficulty" string="Difficulty Level"/>
+
+                <!-- Status Filters -->
+                <filter string="Approved" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Under HR Review" name="filter_review" domain="[('state', '=', 'review')]"/>
+                <filter string="Draft / Submitted" name="filter_draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Rejected" name="filter_rejected" domain="[('state', '=', 'rejected')]"/>
+                <separator/>
+
+                <!-- Question Type Filters -->
+                <filter string="Essay Questions" name="type_essay" domain="[('question_type', '=', 'essay')]"/>
+                <filter string="MCQ (Single Choice)" name="type_mcq_single" domain="[('question_type', '=', 'mcq_single')]"/>
+                <filter string="MCQ (Multiple Choice)" name="type_mcq_multiple" domain="[('question_type', '=', 'mcq_multiple')]"/>
+                <filter string="True / False" name="type_true_false" domain="[('question_type', '=', 'true_false')]"/>
+                <filter string="Fill in the Blank" name="type_fill_blank" domain="[('question_type', '=', 'fill_blank')]"/>
+                <separator/>
+
+                <!-- Difficulty Level Filters -->
+                <filter string="Difficulty: Basic" name="level_basic" domain="[('difficulty', '=', 'basic')]"/>
+                <filter string="Difficulty: Easy" name="level_easy" domain="[('difficulty', '=', 'easy')]"/>
+                <filter string="Difficulty: Hard" name="level_hard" domain="[('difficulty', '=', 'hard')]"/>
+
+                <!-- Group By Options -->
+                <group>
+                    <filter string="Submitting Work Unit" name="group_work_unit" context="{'group_by': 'operating_unit_id'}"/>
+                    <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
+                    <filter string="Competency" name="group_competency" context="{'group_by': 'competency_id'}"/>
+                    <filter string="Question Type" name="group_type" context="{'group_by': 'question_type'}"/>
+                    <filter string="Difficulty Level" name="group_difficulty" context="{'group_by': 'difficulty'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Form View: Question Bank -->
+    <record id="view_exam_question_form" model="ir.ui.view">
+        <field name="name">exam.question.form</field>
+        <field name="model">exam.question</field>
+        <field name="arch" type="xml">
+            <form string="Question Bank Item">
+                <header>
+                    <button name="action_submit_review" string="Submit for Review" type="object" invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_approve" string="Approve Question" type="object" invisible="state != 'review'" class="btn-success" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_reject" string="Reject Question" type="object" invisible="state not in ['draft', 'review']" class="btn-danger" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ['review', 'approved', 'rejected']" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_deactivate" string="Deactivate" type="object" invisible="state == 'deactivated'" class="btn-secondary" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,rejected,deactivated"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="code" string="Question Reference"/>
+                        <h3><field name="code" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <field name="name" placeholder="Enter question stem / problem statement here..."/>
+                    </group>
+                    <group>
+                        <group string="Categorization">
+                            <field name="eligible_job_ids" invisible="1"/>
+                            <field name="eligible_competency_ids" invisible="1"/>
+                            <field name="operating_unit_id"/>
+                            <field name="job_id" domain="[('id', 'in', eligible_job_ids)]"/>
+                            <field name="question_type"/>
+                            <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                        </group>
+                        <group string="Level &amp; Allocation">
+                            <field name="difficulty"/>
+                            <field name="marks"/>
+                            <field name="version"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Answer Options" invisible="question_type not in ['mcq_single', 'mcq_multiple', 'true_false']">
+                            <field name="option_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="option_text"/>
+                                    <field name="is_correct"/>
+                                    <field name="score_fraction"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Fill in the Blank Setup" invisible="question_type != 'fill_blank'">
+                            <group>
+                                <field name="correct_text_answer" placeholder="e.g. 16.6ms or accepted keyword"/>
+                            </group>
+                            <div class="alert alert-info" role="status">
+                                <b>Tip for Fill-in-the-Blank:</b> In the question prompt above, write the full sentence with brackets e.g. <i>"...within less than [ e.g. 16.6ms ] to maximize..."</i>. The candidate portal will dynamically render an interactive input box in place of the slot.
+                            </div>
+                        </page>
+                        <page string="Essay Grading Rubric" invisible="question_type not in ['short_answer', 'essay']">
+                            <group>
+                                <field name="rubric_guidelines" placeholder="Enter key points, expected concepts, and scoring criteria for manual graders..."/>
+                            </group>
+                        </page>
+                        <page string="Work Unit Submission Attachment">
+                            <group>
+                                <group>
+                                    <field name="submission_file" filename="submission_filename"/>
+                                    <field name="submission_filename" invisible="1"/>
+                                </group>
+                                <group>
+                                    <field name="submission_notes" placeholder="Notes or instructions from submitting work unit..."/>
+                                </group>
+                            </group>
+                            <group invisible="not rejection_reason">
+                                <field name="rejection_reason" placeholder="Reason for rejection / revision guidance..."/>
+                            </group>
+                        </page>
+                        <page string="Explanation &amp; Metadata">
+                            <group>
+                                <field name="explanation"/>
+                                <field name="created_by_user_id"/>
+                                <field name="reviewed_by_user_id"/>
+                                <field name="approved_by_user_id"/>
+                                <field name="approval_date"/>
+                                <field name="usage_count"/>
+                                <field name="last_used_date"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Question Bank -->
+    <record id="view_exam_question_tree" model="ir.ui.view">
+        <field name="name">exam.question.list</field>
+        <field name="model">exam.question</field>
+        <field name="arch" type="xml">
+            <list string="Question Bank" decoration-muted="state == 'deactivated'" decoration-info="state == 'draft'" decoration-warning="state == 'review'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'">
+                <field name="code"/>
+                <field name="name" string="Question Prompt" widget="char" class="text-truncate"/>
+                <field name="operating_unit_id" optional="show"/>
+                <field name="job_id"/>
+                <field name="competency_id" optional="show"/>
+                <field name="question_type" widget="badge" decoration-primary="question_type == 'essay'" decoration-info="question_type in ['mcq_single', 'mcq_multiple']" decoration-warning="question_type == 'fill_blank'"/>
+                <field name="difficulty" widget="badge" decoration-info="difficulty == 'basic'" decoration-success="difficulty == 'easy'" decoration-danger="difficulty == 'hard'"/>
+                <field name="marks"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Question Bank -->
+    <record id="action_exam_question_bank" model="ir.actions.act_window">
+        <field name="name">Question Bank</field>
+        <field name="res_model">exam.question</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_exam_question_search"/>
+        <field name="context">{"search_default_filter_approved": 1}</field>
+    </record>
+
+    <!-- Action: Question Approval Queue -->
+    <record id="action_exam_question_approval_queue" model="ir.actions.act_window">
+        <field name="name">Question Review Queue</field>
+        <field name="res_model">exam.question</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_exam_question_search"/>
+        <field name="domain">[("state", "in", ["draft", "review"])]</field>
+    </record>
+
+    <!-- Wizard Form: Document / Word / PDF Import -->
+    <record id="view_exam_pdf_import_wizard_form" model="ir.ui.view">
+        <field name="name">exam.pdf.import.wizard.form</field>
+        <field name="model">exam.pdf.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Exam Questions from Word (.docx), PDF, or Text">
+                <group>
+                    <group string="Categorization &amp; Attribution">
+                        <field name="eligible_job_ids" invisible="1"/>
+                        <field name="eligible_competency_ids" invisible="1"/>
+                        <field name="operating_unit_id"/>
+                        <field name="job_id" domain="[('id', 'in', eligible_job_ids)]"/>
+                        <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                        <field name="difficulty"/>
+                        <field name="default_marks"/>
+                    </group>
+                    <group string="Upload Exam Document">
+                        <field name="file_data" string="Exam Document (.docx / .pdf / .txt)" filename="file_name"/>
+                        <field name="file_name" invisible="1"/>
+                    </group>
+                </group>
+                <div class="alert alert-info py-2" role="status">
+                    <p class="mb-1"><b>Single Document Structure (Questions on Top + Answers at Bottom):</b></p>
+                    <ul class="mb-0 ps-3">
+                        <li><b>Top Part:</b> List all questions numbered <code>1., 2., 3. ... 20.</code> (MCQs, True/False, Fill-in-the-Blank, Short Answer, Essays).</li>
+                        <li><b>Bottom Part:</b> Under a header like <code>ANSWER KEY:</code> or <code>SOLUTIONS:</code>, list the matching answers <code>1. B, 2. True, 3. 16.6ms, 4. Rubric ...</code>.</li>
+                        <li><b>1-to-1 Mapping:</b> The system automatically matches Question #1 with Answer #1, Question #2 with Answer #2, etc. with 100% accuracy.</li>
+                    </ul>
+                </div>
+                <footer>
+                    <button name="action_parse_and_approve" string="Extract &amp; Approve All Questions (1-Click)" type="object" class="btn-success"/>
+                    <button name="action_parse_and_import" string="Extract to Review Queue" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_exam_pdf_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import Questions (Word / PDF / Text)</field>
+        <field name="res_model">exam.pdf.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Multi-Record Server Actions: Bulk Approve, Reject, Submit Review -->
+    <record id="action_server_approve_exam_questions" model="ir.actions.server">
+        <field name="name">Approve Selected Questions</field>
+        <field name="model_id" ref="model_exam_question"/>
+        <field name="binding_model_id" ref="model_exam_question"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_approve()
+        </field>
+    </record>
+
+    <record id="action_server_submit_review_exam_questions" model="ir.actions.server">
+        <field name="name">Submit Selected for Review</field>
+        <field name="model_id" ref="model_exam_question"/>
+        <field name="binding_model_id" ref="model_exam_question"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_submit_review()
+        </field>
+    </record>
+
+    <record id="action_server_reject_exam_questions" model="ir.actions.server">
+        <field name="name">Reject Selected Questions</field>
+        <field name="model_id" ref="model_exam_question"/>
+        <field name="binding_model_id" ref="model_exam_question"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_reject()
+        </field>
+    </record>
+
+    <record id="action_server_reset_draft_exam_questions" model="ir.actions.server">
+        <field name="name">Reset Selected to Draft</field>
+        <field name="model_id" ref="model_exam_question"/>
+        <field name="binding_model_id" ref="model_exam_question"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+records.action_reset_draft()
+        </field>
+    </record>
+
+</odoo>

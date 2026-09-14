@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Lateral Transfer Letter Report Action -->
+    <record id="action_report_lateral_transfer_letter" model="ir.actions.report">
+        <field name="name">Lateral Transfer Letter</field>
+        <field name="model">transfer.letter</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_lateral_transfer_letter_document</field>
+        <field name="report_file">custom_recruitment.report_lateral_transfer_letter_document</field>
+        <field name="print_report_name">'Lateral_Transfer_Letter_' + (object.employee_name or object.name or 'Employee').replace(' ', '_')</field>
+        <field name="binding_model_id" ref="model_transfer_letter"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Lateral Transfer Letter QWeb Template -->
+    <template id="report_lateral_transfer_letter_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 15px 35px; position: relative;">
+
+                    <!-- Official Header: Full Bunna Logo (Emblem + Text) + Brown Accent Bar -->
+                    <table style="width: 100%; margin-bottom: 22px; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 32%; vertical-align: middle;">
+                                <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 95px; max-width: 180px; height: auto;" alt="Bunna Bank S.C."/>
+                            </td>
+                            <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Date & Reference Numbers -->
+                    <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 58%;"></td>
+                            <td style="width: 42%; font-size: 13.5px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                                <div>
+                                    <strong>Date: - </strong>
+                                    <span t-esc="o.letter_date.strftime('%B %d, %Y') if o.letter_date else ''"/>
+                                </div>
+                                <div>
+                                    <strong>Ref.No: - </strong>
+                                    <span t-esc="o.name or ''"/>
+                                </div>
+                                <div>
+                                    <strong>ID.No.: - </strong>
+                                    <span t-esc="o.employee_id_number or ''"/>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Recipient Block -->
+                    <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                        <div>
+                            <strong><span t-esc="o.get_formatted_employee_name()"/></strong>
+                        </div>
+                        <div>
+                            <strong>Bunna Bank S.C</strong>
+                        </div>
+                        <div>
+                            <u><strong><span t-esc="o.employee_address or 'Addis Ababa'"/></strong></u>
+                        </div>
+                    </div>
+
+                    <!-- Salutation -->
+                    <div class="mb-3" style="font-size: 14px;">
+                        Dear <span t-esc="o.get_salutation_title_and_first_name()"/>,
+                    </div>
+
+                    <!-- Subject -->
+                    <div class="mb-3 text-center" style="font-size: 14.5px;">
+                        <strong>Subject: - <u>Lateral Transfer</u></strong>
+                    </div>
+
+                    <!-- Body Paragraphs -->
+                    <div style="text-align: justify; font-size: 13.5px; line-height: 1.65;">
+                        <p>
+                            It&apos;s to be recalled that you have been working at <strong><span t-esc="o.current_work_unit_name"/></strong> in the position of <strong><span t-esc="o.current_position_name"/></strong>.
+                        </p>
+
+                        <p>
+                            However, this is to inform you that you are transferred to <strong><span t-esc="o.new_work_unit_name"/></strong> effective <strong><span t-esc="o.effective_date.strftime('%B %d, %Y') if o.effective_date else ''"/></strong>, in the position of <strong><span t-esc="o.new_position_name"/></strong>, maintaining your Job grade <strong><span t-esc="o.job_grade_name"/></strong>, monthly salary and other benefits attached to the post.
+                        </p>
+
+                        <p>
+                            Therefore, you are advised to handover all properties and documents of the Bank at your hand to <strong><span t-esc="o.current_work_unit_name"/></strong> and report to <strong><span t-esc="o.new_work_unit_name"/></strong> on the date of transfer.
+                        </p>
+
+                        <p>
+                            By copy of this letter, <strong><span t-esc="o.current_work_unit_name"/></strong> is advised to release <strong><span t-esc="o.get_formatted_employee_name()"/></strong> and forward the necessary information to <strong><span t-esc="o.new_work_unit_name"/></strong><t t-if="o.cc_extra_work_units">, <strong><span t-esc="o.cc_extra_work_units"/></strong></t> and <strong>Talent Management Directorate</strong>.
+                        </p>
+
+                        <p class="mt-4" style="margin-bottom: 5px;">
+                            Sincerely yours,
+                        </p>
+                    </div>
+
+                    <!-- Sign-off Block with Authorized Signature & Official Stamp -->
+                    <div class="mt-2 mb-3" style="font-size: 13px;">
+                        <t t-set="trans_sig" t-value="o.signatory_config_id or env['recruitment.signatory.config'].get_active_signatory('transfer_letter')"/>
+                        <t t-set="sig_b64" t-value="o.get_signature_stamp_base64()"/>
+                        <t t-if="sig_b64">
+                            <div style="margin-bottom: 2px;">
+                                <img t-att-src="sig_b64" alt="Authorized Signature &amp; Stamp" style="max-height: 85px; max-width: 220px; object-fit: contain;"/>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div style="height: 45px;"></div>
+                        </t>
+                        <t t-set="disp_trans_name" t-value="(trans_sig.signatory_name if trans_sig and trans_sig.signatory_name else False) or o.signatory_name"/>
+                        <t t-if="disp_trans_name">
+                            <div style="margin-bottom: 2px;"><strong><span t-esc="disp_trans_name"/></strong></div>
+                        </t>
+                        <t t-set="disp_trans_title" t-value="(trans_sig.signatory_title if trans_sig and trans_sig.signatory_title else False) or o.signatory_title or 'People Operation Directorate'"/>
+                        <div><strong><span t-esc="disp_trans_title"/></strong></div>
+                        <div><strong><span t-esc="o.signatory_company or (trans_sig.signatory_company if trans_sig else 'Bunna Bank S.C.')"/></strong></div>
+                    </div>
+
+                    <!-- CC Block -->
+                    <div class="mt-4" style="font-size: 12.5px; line-height: 1.5;">
+                        <div><strong>CC:</strong></div>
+                        <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
+                            <li>IT Security Management Directorate</li>
+                            <li>All respective work units</li>
+                            <li><u><strong>Bunna Bank S.C</strong></u></li>
+                        </ul>
+                    </div>
+
+                    <!-- Official Footer -->
+                    <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 25px; font-size: 10px; color: #555555;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                            <tr>
+                                <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                <td style="width: 32%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                    <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                                </td>
+                                <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                    <div><strong>Website</strong> www.bunnabanksc.com</div>
+                                </td>
+                                <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                    <div>Addis Ababa | Ethiopia</div>
+                                </td>
+                                <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

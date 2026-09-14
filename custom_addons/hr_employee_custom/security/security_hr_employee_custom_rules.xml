@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ===============================================================
+             ACCESS RULES SUMMARY
+             ─────────────────────────────────────────────────────────────
+             TIER 1 – User (group_hr_employee_user):
+               domain = self | coached | subordinates
+               perm   = read only (or limited write for own requests)
+
+             TIER 2 – Officer (hr.group_hr_user):
+               domain = [(1,'=',1)]  →  ALL records bank-wide
+               perm   = read + write + create  (NO delete)
+
+             TIER 3 – Administrator (hr.group_hr_manager):
+               domain = [(1,'=',1)]  →  ALL records bank-wide
+               perm   = read + write + create + DELETE (full)
+        ================================================================ -->
+
+        <!-- ===============================================================
+             1. HR EMPLOYEE (Core Directory & Profile)
+        ================================================================ -->
+        <record id="rule_hr_employee_user" model="ir.rule">
+            <field name="name">Hr Employee: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('id', '=', user.employee_id.id), ('coach_id', '=', user.employee_id.id), ('parent_id', '=', user.employee_id.id), ('parent_id', 'child_of', [user.employee_id.id])]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_officer_all" model="ir.rule">
+            <field name="name">Hr Employee: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_admin_all" model="ir.rule">
+            <field name="name">Hr Employee: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             2. EMPLOYEE SERVICE REQUEST
+        ================================================================ -->
+        <record id="rule_employee_service_request_user" model="ir.rule">
+            <field name="name">Employee Service Request: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_employee_service_request"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_employee_service_request_officer_all" model="ir.rule">
+            <field name="name">Employee Service Request: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_employee_service_request"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_employee_service_request_admin_all" model="ir.rule">
+            <field name="name">Employee Service Request: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_employee_service_request"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             3. GUARANTEES DETAILS
+        ================================================================ -->
+        <record id="rule_guarentees_details_user" model="ir.rule">
+            <field name="name">Guarantees Details: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_guarentees_details"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_guarentees_details_officer_all" model="ir.rule">
+            <field name="name">Guarantees Details: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_guarentees_details"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_guarentees_details_admin_all" model="ir.rule">
+            <field name="name">Guarantees Details: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_guarentees_details"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             4. SUPPLEMENTARY ROLE
+        ================================================================ -->
+        <record id="rule_supplementary_role_user" model="ir.rule">
+            <field name="name">Supplementary Role: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_supplementary_role"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_name.user_id', '=', user.id), ('employee_name.coach_id', '=', user.employee_id.id), ('employee_name.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_supplementary_role_officer_all" model="ir.rule">
+            <field name="name">Supplementary Role: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_supplementary_role"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_supplementary_role_admin_all" model="ir.rule">
+            <field name="name">Supplementary Role: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_supplementary_role"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             5. RE-INSTATING
+        ================================================================ -->
+        <record id="rule_re_instating_user" model="ir.rule">
+            <field name="name">Re-Instating: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_re_instating"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', '|', ('create_uid', '=', user.id), ('employee_name.user_id', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_name.coach_id', '=', user.employee_id.id), ('employee_name.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_re_instating_officer_all" model="ir.rule">
+            <field name="name">Re-Instating: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_re_instating"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_re_instating_admin_all" model="ir.rule">
+            <field name="name">Re-Instating: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_re_instating"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             6. TRANSFER FORM
+        ================================================================ -->
+        <record id="rule_transfer_form_user" model="ir.rule">
+            <field name="name">Transfer Form: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_transfer_form"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_name.user_id', '=', user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_transfer_form_officer_all" model="ir.rule">
+            <field name="name">Transfer Form: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_transfer_form"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_transfer_form_admin_all" model="ir.rule">
+            <field name="name">Transfer Form: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_transfer_form"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             7. EMPLOYEE DOCUMENTS
+        ================================================================ -->
+        <record id="rule_hr_employee_document_user" model="ir.rule">
+            <field name="name">Employee Documents: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_hr_employee_document"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_ref.user_id', '=', user.id), ('employee_ref.coach_id', '=', user.employee_id.id), ('employee_ref.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_document_officer_all" model="ir.rule">
+            <field name="name">Employee Documents: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_hr_employee_document"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_document_admin_all" model="ir.rule">
+            <field name="name">Employee Documents: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_hr_employee_document"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             8. HR CONTRACT / VERSION
+        ================================================================ -->
+        <record id="rule_hr_version_user" model="ir.rule">
+            <field name="name">Hr Contract / Version: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="hr.model_hr_version"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user')), (4, ref('base.group_user'))]"/>
+            <field name="domain_force">['|', '|', '|', '|', '|', ('employee_id.user_id', '=', user.id), ('employee_id', '=', user.employee_id.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id), ('employee_id', 'child_of', [user.employee_id.id]), ('employee_id', 'in', user.employee_id._get_delegated_subordinate_ids())]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_version_officer_all" model="ir.rule">
+            <field name="name">Hr Contract / Version: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="hr.model_hr_version"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_version_admin_all" model="ir.rule">
+            <field name="name">Hr Contract / Version: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="hr.model_hr_version"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             9. EMPLOYEE DEMOTION
+        ================================================================ -->
+        <record id="rule_employee_demotion_user" model="ir.rule">
+            <field name="name">Employee Demotion: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_employee_demotion"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_name.user_id', '=', user.id), ('employee_name.coach_id', '=', user.employee_id.id), ('employee_name.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_employee_demotion_officer_all" model="ir.rule">
+            <field name="name">Employee Demotion: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_employee_demotion"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_employee_demotion_admin_all" model="ir.rule">
+            <field name="name">Employee Demotion: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_employee_demotion"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             10. JOB HISTORY
+        ================================================================ -->
+        <record id="rule_hr_job_history_user" model="ir.rule">
+            <field name="name">Job History: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_hr_job_history"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_job_history_officer_all" model="ir.rule">
+            <field name="name">Job History: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_hr_job_history"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_job_history_admin_all" model="ir.rule">
+            <field name="name">Job History: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_hr_job_history"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- ===============================================================
+             11. DEPARTMENT HISTORY
+        ================================================================ -->
+        <record id="rule_department_history_user" model="ir.rule">
+            <field name="name">Department History: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="model_department_history"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">['|', '|', '|', ('create_uid', '=', user.id), ('employee_id.user_id', '=', user.id), ('employee_id.coach_id', '=', user.employee_id.id), ('employee_id.parent_id', '=', user.employee_id.id)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_department_history_officer_all" model="ir.rule">
+            <field name="name">Department History: Officer - Bank-wide (No Delete)</field>
+            <field name="model_id" ref="model_department_history"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_department_history_admin_all" model="ir.rule">
+            <field name="name">Department History: Administrator - Bank-wide (Full Access)</field>
+            <field name="model_id" ref="model_department_history"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+    </data>
+</odoo>

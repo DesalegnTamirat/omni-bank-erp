@@ -114,6 +114,9 @@
                             <field name="vacancy_announced_on" readonly="scores_computed == True"/>
                             <field name="written_exam_weight" widget="float" readonly="scores_computed == True"/>
                             <field name="interview_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="exam_candidate_summary"
+                                   placeholder="Write summary about exams &amp; selected candidates for Approval Committee..."
+                                   invisible="state != 'notify_approver'"/>
                         </group>
                         <group string="Exam &amp; Interview Schedules">
                             <field name="written_exam_date" readonly="scores_computed == True"/>
@@ -146,9 +149,10 @@
                             </field>
                         </page>
                         <page string="Panel Members">
-                            <field name="ext_rec_panel">
+                            <field name="ext_rec_panel" context="{'parent_workunit_id': workunit_id, 'default_vacancy_id': vacancy_id}">
                                 <list string="Panel Members" editable="bottom" delete="0">
-                                    <field name="emp_name"/>
+                                    <field name="eligible_employee_ids" column_invisible="1"/>
+                                    <field name="emp_name" domain="[('id', 'in', eligible_employee_ids)]"/>
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
                                     <field name="response_status"
@@ -169,15 +173,18 @@
                             </field>
                         </page>
                         <page string="Approval Committee Members">
-                            <field name="recr_exter_selected_team_id">
-                                <list string="Approval Members" editable="bottom" delete="0">
-                                    <field name="role" width="20%"/>
-                                    <field name="employee_name" width="20%"/>
-                                    <field name="operating_unit" width="20%"/>
-                                    <field name="status" width="20%"/>
-                                    <field name="alternate_committee_member" width="20%"/>
-                                    <field name="alter_operating_unit" width="20%"/>
-                                    <field name="approve" width="20%"/>
+                            <field name="recr_exter_selected_team_id" context="{'parent_workunit_id': workunit_id, 'default_exter_rec_del_id': id}">
+                                <list string="Approval Members" editable="bottom" delete="0" decoration-success="approve == True">
+                                    <field name="eligible_user_ids" column_invisible="1"/>
+                                    <field name="role"/>
+                                    <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>
+                                    <field name="operating_unit"/>
+                                    <field name="status"/>
+                                    <field name="alternate_committee_member" domain="[('id', 'in', eligible_user_ids)]"/>
+                                    <field name="alter_operating_unit"/>
+                                    <field name="digital_signature" widget="signature" readonly="1"/>
+                                    <field name="signed_on" readonly="1"/>
+                                    <field name="approve"/>
                                 </list>
                             </field>
                         </page>

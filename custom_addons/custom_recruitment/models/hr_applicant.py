@@ -7,7 +7,7 @@ by Bunna Bank's recruitment process (Internal / External recruitment journeys).
 from email.policy import default
 
 from odoo import api, fields, models, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -112,6 +112,21 @@ class HrApplicantCustom(models.Model):
         index=True,
         help='Link to the applicant\'s master candidate profile / electronic CV.',
     )
+    total_experience_years = fields.Float(
+        related='candidate_profile_id.total_experience_years',
+        string="Total Exp (Years)",
+        readonly=True,
+    )
+    highest_education = fields.Char(
+        related='candidate_profile_id.highest_education',
+        string="Highest Education",
+        readonly=True,
+    )
+    latest_cgpa = fields.Float(
+        related='candidate_profile_id.latest_cgpa',
+        string="Latest CGPA",
+        readonly=True,
+    )
     cover_letter = fields.Text(
         string='Cover Letter',
         help='Vacancy-specific cover letter submitted by candidate.',
@@ -124,6 +139,109 @@ class HrApplicantCustom(models.Model):
         string='Notice Period (Days)',
         help='Notice period required with current employer.',
     )
+
+    # ── Assessment Scheduling & Notification Tracking for ATS Portal ─────────
+    scheduled_exam_date = fields.Datetime(
+        string="Scheduled Exam Date", compute="_compute_assessment_schedules"
+    )
+    scheduled_exam_location = fields.Char(
+        string="Scheduled Exam Location", compute="_compute_assessment_schedules"
+    )
+    is_exam_notified = fields.Boolean(
+        string="Exam Notified", compute="_compute_assessment_schedules"
+    )
+    scheduled_interview_date = fields.Datetime(
+        string="Scheduled Interview Date", compute="_compute_assessment_schedules"
+    )
+    scheduled_interview_location = fields.Char(
+        string="Scheduled Interview Location", compute="_compute_assessment_schedules"
+    )
+    is_interview_notified = fields.Boolean(
+        string="Interview Notified", compute="_compute_assessment_schedules"
+    )
+
+    def _compute_assessment_schedules(self):
+        ExtSelCand = self.env['external.recruitment.selected.candidates'].sudo()
+        ExtSel = self.env['external.recruitment.selected'].sudo()
+
+        for app in self:
+            exam_dt = False
+            exam_loc = 'Main Branch'
+            exam_notif = False
+            inter_dt = False
+            inter_loc = 'Head Office'
+            inter_notif = False
+
+            vac = app.app_reference
+            vac_id = vac.id if vac else False
+            vac_ref = vac.reference if vac else False
+
+            # 1. Check external.recruitment.selected.candidates
+            ext_cand = ExtSelCand.search([
+                '|', ('applicant_name', '=', app.id),
+                ('applicant_email', '=ilike', app.email_from or 'no_match_email')
+            ], limit=1, order='id desc')
+
+            if ext_cand and ext_cand.ext_rec_sel_cand:
+                parent_sel = ext_cand.ext_rec_sel_cand
+                if parent_sel.written_exam_date:
+                    exam_dt = parent_sel.written_exam_date
+                    exam_loc = parent_sel.exam_location or 'Main Branch'
+                    exam_notif = (parent_sel.exam_scheduled == 'Yes') or (parent_sel.status == 'notify') or bool(parent_sel.written_exam_date)
+                if parent_sel.interview_date:
+                    inter_dt = parent_sel.interview_date
+                    inter_loc = parent_sel.interview_location or 'Head Office'
+                    inter_notif = (parent_sel.interview_scheduled == 'Yes') or bool(parent_sel.interview_date)
+
+            # 2. Check external.recruitment.selected by vacancy
+            if not exam_dt and (vac_id or vac_ref):
+                ext_sel = ExtSel.search([
+                    '|', ('vacancy_id', '=', vac_id or 0),
+                    ('vacancy_reference', '=', vac_ref or '')
+                ], limit=1, order='id desc')
+                if ext_sel:
+                    if ext_sel.written_exam_date:
+                        exam_dt = ext_sel.written_exam_date
+                        exam_loc = ext_sel.exam_location or 'Main Branch'
+                        exam_notif = (ext_sel.exam_scheduled == 'Yes') or (ext_sel.status == 'notify') or bool(ext_sel.written_exam_date)
+                    if ext_sel.interview_date:
+                        inter_dt = ext_sel.interview_date
+                        inter_loc = ext_sel.interview_location or 'Head Office'
+                        inter_notif = (ext_sel.interview_scheduled == 'Yes') or bool(ext_sel.interview_date)
+
+            # 4. Check if vacancy itself has written_exam_date or interview_date
+            if not exam_dt and vac:
+                try:
+                    if getattr(vac, 'written_exam_date', False):
+                        exam_dt = vac.written_exam_date
+                        exam_loc = getattr(vac, 'exam_location', False) or 'Main Branch'
+                        exam_notif = True
+                    if getattr(vac, 'interview_date', False):
+                        inter_dt = vac.interview_date
+                        inter_loc = getattr(vac, 'interview_location', False) or 'Head Office'
+                        inter_notif = True
+                except Exception:
+                    pass
+
+            # 5. Fallback search on external.recruitment.selected by job_position
+            if not exam_dt and app.job_id:
+                ext_sel_job = ExtSel.search([('job_position', '=', app.job_id.id)], limit=1, order='id desc')
+                if ext_sel_job:
+                    if ext_sel_job.written_exam_date:
+                        exam_dt = ext_sel_job.written_exam_date
+                        exam_loc = ext_sel_job.exam_location or 'Main Branch'
+                        exam_notif = True
+                    if ext_sel_job.interview_date:
+                        inter_dt = ext_sel_job.interview_date
+                        inter_loc = ext_sel_job.interview_location or 'Head Office'
+                        inter_notif = True
+
+            app.scheduled_exam_date = exam_dt
+            app.scheduled_exam_location = exam_loc
+            app.is_exam_notified = bool(exam_dt)
+            app.scheduled_interview_date = inter_dt
+            app.scheduled_interview_location = inter_loc
+            app.is_interview_notified = bool(inter_dt)
 
     # ── Bunna-specific application status tracking ────────────────────────
     # NOTE: core hr.applicant already defines 'application_status' as a
@@ -143,11 +261,70 @@ class HrApplicantCustom(models.Model):
         ('pending', 'Pending'),
         ('accepted', 'Accepted'),
         ('declined', 'Declined'),
-    ], string='Job Offer Status')
+    ], string='Job Offer Status', default='pending', tracking=True)
+
+    # ── Pre-Employment Onboarding & Clearance Verification ─────────────────
+    forensic_certificate = fields.Binary(
+        string='Forensic / Police Clearance Certificate',
+        attachment=True,
+        help="Upload the official Police Clearance / Forensic Certificate."
+    )
+    forensic_certificate_filename = fields.Char(string='Forensic Certificate Filename')
+    forensic_cleared = fields.Boolean(
+        string='Forensic Clearance Verified',
+        default=False,
+        tracking=True,
+        help="Check when the forensic / police clearance has been verified by HR."
+    )
+
+    medical_certificate = fields.Binary(
+        string='Medical Examination Certificate',
+        attachment=True,
+        help="Upload the official Medical Fitness Examination Certificate."
+    )
+    medical_certificate_filename = fields.Char(string='Medical Certificate Filename')
+    medical_cleared = fields.Boolean(
+        string='Medical Examination Cleared',
+        default=False,
+        tracking=True,
+        help="Check when the medical fitness examination has been cleared."
+    )
+
+    educational_docs_verified = fields.Boolean(
+        string='Educational Credentials Verified',
+        default=False,
+        tracking=True,
+        help="Check when all degree/diploma certificates and transcripts have been authenticated."
+    )
+
+    guarantor_form = fields.Binary(
+        string='Guarantor / Reference Document',
+        attachment=True,
+        help="Upload the signed guarantor / reference form."
+    )
+    guarantor_form_filename = fields.Char(string='Guarantor Document Filename')
 
     rejection_reason = fields.Text(string='Rejection Reason')
-    offer_letter_sent = fields.Boolean(string='Offer Letter Sent', default=False)
     contract_created_new = fields.Boolean(string='Contract Created', default=False)
+    employment_letter_id = fields.Many2one(
+        'recruitment.employment.letter',
+        string='Employment Letter',
+        readonly=True,
+        copy=False,
+        help="Official appointment / employment letter generated for external hire."
+    )
+    employment_letter_state = fields.Selection(
+        related='employment_letter_id.state',
+        string='Employment Letter Status',
+        readonly=True,
+        store=True
+    )
+    pre_employment_cleared = fields.Boolean(
+        string='Pre-Employment Prerequisites Cleared',
+        compute='_compute_pre_employment_cleared',
+        store=True,
+        help="Automatically True when Offer is Accepted, Police Clearance is Verified, and Medical is Cleared."
+    )
 
     active_leave_status = fields.Char(
         string="Leave Status", compute="_compute_applicant_leave_status", store=False,
@@ -244,6 +421,16 @@ class HrApplicantCustom(models.Model):
 
     cv_attachment_id = fields.Many2one('ir.attachment', string='CV Attachment', compute='_compute_cv_attachment_id',
                                        store=False)
+    cv_preview_html = fields.Html(
+        string='CV Document In-Browser Preview',
+        compute='_compute_cv_preview_html',
+        sanitize=False,
+    )
+    profile_summary_html = fields.Html(
+        string='Electronic CV Summary Sheet',
+        compute='_compute_profile_summary_html',
+        sanitize=False,
+    )
     active = fields.Boolean(default=True)
 
     def unlink(self):
@@ -251,6 +438,7 @@ class HrApplicantCustom(models.Model):
         for rec in self:
             rec.write({'active': False})
         return True
+
     def _compute_cv_attachment_id(self):
         for rec in self:
             att = self.env['ir.attachment'].search([
@@ -258,6 +446,110 @@ class HrApplicantCustom(models.Model):
                 ('res_id', '=', rec.id)
             ], limit=1, order='id desc')
             rec.cv_attachment_id = att.id if att else False
+
+    def _compute_cv_preview_html(self):
+        import html
+        for rec in self:
+            url = False
+            fn = 'CV_Document.pdf'
+            if rec.candidate_profile_id and rec.candidate_profile_id.cv_file:
+                fn = rec.candidate_profile_id.cv_filename or 'CV_Document.pdf'
+                url = f"/web/content?model=candidate.profile&id={rec.candidate_profile_id.id}&field=cv_file&filename={html.escape(fn)}"
+            elif rec.cv_attachment_id:
+                fn = rec.cv_attachment_id.name or 'CV_Document.pdf'
+                url = f"/web/content/{rec.cv_attachment_id.id}/{html.escape(fn)}"
+            else:
+                att = self.env['ir.attachment'].search([
+                    ('res_model', '=', 'hr.applicant'),
+                    ('res_id', '=', rec.id)
+                ], limit=1, order='id desc')
+                if att:
+                    fn = att.name or 'CV_Document.pdf'
+                    url = f"/web/content/{att.id}/{html.escape(fn)}"
+
+            if url:
+                rec.cv_preview_html = f"""
+                <div style="width: 100%; min-height: 750px; height: 80vh; background: #2c3e50; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
+                    <div style="background: #1a252f; color: #ffffff; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600;">
+                        <span><i class="fa fa-file-pdf-o" style="margin-right: 8px; color: #e74c3c;"></i> {html.escape(fn)}</span>
+                        <div>
+                            <a href="{url}" target="_blank" class="btn btn-sm btn-outline-light" style="font-size: 12px; margin-right: 8px;"><i class="fa fa-external-link"></i> Full Screen</a>
+                            <a href="{url}&download=true" class="btn btn-sm btn-primary" style="font-size: 12px;"><i class="fa fa-download"></i> Download</a>
+                        </div>
+                    </div>
+                    <iframe src="{url}#toolbar=1&navpanes=1" style="width: 100%; height: 100%; flex-grow: 1; border: none;" allowfullscreen="true"></iframe>
+                </div>
+                """
+            else:
+                rec.cv_preview_html = """
+                <div style="padding: 40px; text-align: center; background: #f8f9fa; border: 2px dashed #ced4da; border-radius: 10px; margin: 20px 0;">
+                    <i class="fa fa-file-text-o" style="font-size: 48px; color: #6c757d; margin-bottom: 15px; display: block;"></i>
+                    <h5 style="color: #495057; font-weight: 600;">No Uploaded CV File Attached</h5>
+                    <p style="color: #6c757d; font-size: 13px; max-width: 450px; margin: 0 auto 15px auto;">No standalone CV attachment was found. You can review the complete structured electronic candidate resume under the <strong>Electronic CV Summary</strong> tab.</p>
+                </div>
+                """
+
+    def _compute_profile_summary_html(self):
+        import html
+        for rec in self:
+            if rec.candidate_profile_id:
+                rec.profile_summary_html = rec.candidate_profile_id.profile_summary_html
+            else:
+                # Build from applicant's own records
+                edu_rows = "".join([f"<div style='margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px;'><strong>{html.escape(q.qualification.qualification if q.qualification else '')}</strong> <span style='float:right; color:#888;'>CGPA/Score: {q.response or ''}</span></div>" for q in rec.qualification_id])
+                exp_rows = "".join([f"<div style='margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px;'><strong>{html.escape(e.experience.experience if e.experience else '')}</strong> <span style='float:right; color:#888;'>{e.response or '0'} Yrs</span></div>" for e in rec.experiance_id])
+                comp_rows = "".join([f"<span class='badge' style='background:#4a1515; color:#fff; margin:2px 4px; padding:5px 10px; border-radius:10px;'>{html.escape(getattr(c.competencies, 'competencies', '') or getattr(c.competencies, 'name', '') or '')}</span>" for c in rec.competencies_id if c.competencies])
+
+                rec.profile_summary_html = f"""
+                <div style="background:#ffffff; border:1px solid #e0e0e0; border-radius:12px; padding:25px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    <div style="border-bottom: 2px solid #4a1515; padding-bottom: 14px; margin-bottom: 18px;">
+                        <h3 style="color:#4a1515; margin:0 0 4px 0;">{html.escape(rec.partner_name or rec.name or 'Candidate Profile')}</h3>
+                        <div style="color:#666; font-size:13px;">
+                            <span><i class="fa fa-envelope" style="color:#b38b59;"></i> {html.escape(rec.email_from or '')}</span> &nbsp;|&nbsp;
+                            <span><i class="fa fa-phone" style="color:#b38b59;"></i> {html.escape(rec.partner_phone or '')}</span> &nbsp;|&nbsp;
+                            <span>Position: {html.escape(rec.job_id.name if rec.job_id else '')}</span>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h5 style="color:#4a1515; border-bottom:1px solid #ddd; padding-bottom:4px;">Education Qualifications</h5>
+                            {edu_rows or "<p style='color:#888; font-style:italic;'>No qualifications listed</p>"}
+                        </div>
+                        <div>
+                            <h5 style="color:#4a1515; border-bottom:1px solid #ddd; padding-bottom:4px;">Work Experience</h5>
+                            {exp_rows or "<p style='color:#888; font-style:italic;'>No experience listed</p>"}
+                        </div>
+                    </div>
+                    <div style="margin-top:15px;">
+                        <h5 style="color:#4a1515; border-bottom:1px solid #ddd; padding-bottom:4px;">Competencies &amp; Skills</h5>
+                        <div>{comp_rows or "<p style='color:#888; font-style:italic;'>No competencies listed</p>"}</div>
+                    </div>
+                </div>
+                """
+
+    def action_preview_cv(self):
+        self.ensure_one()
+        url = False
+        if self.candidate_profile_id and self.candidate_profile_id.cv_file:
+            fn = self.candidate_profile_id.cv_filename or 'CV_Document.pdf'
+            url = f"/web/content?model=candidate.profile&id={self.candidate_profile_id.id}&field=cv_file&filename={fn}"
+        elif self.cv_attachment_id:
+            url = f"/web/content/{self.cv_attachment_id.id}/{self.cv_attachment_id.name}"
+        else:
+            att = self.env['ir.attachment'].search([
+                ('res_model', '=', 'hr.applicant'),
+                ('res_id', '=', self.id)
+            ], limit=1, order='id desc')
+            if att:
+                url = f"/web/content/{att.id}/{att.name}"
+
+        if not url:
+            raise UserError(_("No CV document found for applicant %s.") % (self.partner_name or self.name))
+        return {
+            'type': 'ir.actions.act_url',
+            'url': url,
+            'target': 'new',
+        }
 
     def action_download_cv(self):
         self.ensure_one()
@@ -386,16 +678,558 @@ class HrApplicantCustom(models.Model):
                     else 'External'
                 )
 
+    # ── Onboarding & Pre-Employment Verification Check ─────────────────────
+    def _check_onboarding_prerequisites(self):
+        """
+        Enforce strict pre-employment verification before creating Employee or Contract.
+        Mandatory checks for External Candidates:
+        1. Offer Letter must be accepted.
+        2. Forensic / Police Clearance Certificate must be provided & verified.
+        3. Medical Examination / Fitness Certificate must be provided & cleared.
+        """
+        for rec in self:
+            if rec.application_type == 'External':
+                missing_checks = []
+
+                # 1. Offer Letter Accepted check
+                offer_accepted = (rec.job_offer_status == 'accepted')
+                if not offer_accepted and 'recruitment.offer.letter' in self.env:
+                    # Check linked offer letter in recruitment.offer.letter
+                    accepted_offer = self.env['recruitment.offer.letter'].search([
+                        '|', ('applicant_id', '=', rec.id),
+                        ('candidate_email', '=ilike', (rec.email_from or '').strip()),
+                        ('state', '=', 'accepted')
+                    ], limit=1)
+                    if accepted_offer:
+                        offer_accepted = True
+                        if rec.job_offer_status != 'accepted':
+                            rec.job_offer_status = 'accepted'
+
+                if not offer_accepted:
+                    missing_checks.append(_("• Formal Offer Letter: Must be accepted by candidate (Job Offer Status = 'Accepted')"))
+
+                # 2. Forensic / Police Clearance check
+                if not (rec.forensic_certificate or rec.forensic_cleared):
+                    missing_checks.append(_("• Forensic Certificate: Police Clearance / Forensic Certificate must be uploaded or verified"))
+
+                # 3. Medical Fitness Certificate check
+                if not (rec.medical_certificate or rec.medical_cleared):
+                    missing_checks.append(_("• Medical Certificate: Medical Fitness / Examination Certificate must be uploaded or verified"))
+
+                # 4. Mandatory Employment Letter check
+                has_letter = bool(rec.employment_letter_id and rec.employment_letter_id.state != 'cancelled')
+                if not has_letter:
+                    missing_checks.append(_("• Official Employment Letter: Must be generated before creating Employee record."))
+
+                if missing_checks:
+                    raise UserError(_(
+                        "Mandatory Pre-Employment Verification Incomplete!\n\n"
+                        "Before creating the Employee record or Contract for %s, all required pre-employment verification checkpoints must be completed:\n\n"
+                        "%s\n\n"
+                        "Please update the 'Pre-Employment Verification & Clearance' section on this application before proceeding."
+                    ) % (rec.partner_name or rec.name or 'this applicant', "\n".join(missing_checks)))
+
+    @api.depends(
+        'application_type', 'job_offer_status',
+        'forensic_cleared', 'forensic_certificate',
+        'medical_cleared', 'medical_certificate'
+    )
+    def _compute_pre_employment_cleared(self):
+        for rec in self:
+            if rec.application_type == 'Internal':
+                rec.pre_employment_cleared = True
+            else:
+                offer_ok = (rec.job_offer_status == 'accepted')
+                if not offer_ok and 'recruitment.offer.letter' in self.env:
+                    accepted_offer = self.env['recruitment.offer.letter'].search([
+                        '|', ('applicant_id', '=', rec.id),
+                        ('candidate_email', '=ilike', (rec.email_from or '').strip()),
+                        ('state', '=', 'accepted')
+                    ], limit=1)
+                    if accepted_offer:
+                        offer_ok = True
+                forensic_ok = bool(rec.forensic_cleared or rec.forensic_certificate)
+                medical_ok = bool(rec.medical_cleared or rec.medical_certificate)
+                rec.pre_employment_cleared = bool(offer_ok and forensic_ok and medical_ok)
+
+    def _ensure_employment_letter(self):
+        """Ensures that an employment letter exists for this external applicant, creating it if needed."""
+        self.ensure_one()
+        if self.application_type == 'Internal':
+            raise UserError(_("Employment letters are only generated for external applicants."))
+
+        if not self.pre_employment_cleared:
+            missing = []
+            offer_ok = (self.job_offer_status == 'accepted')
+            if not offer_ok and 'recruitment.offer.letter' in self.env:
+                offer_ok = bool(self.env['recruitment.offer.letter'].search([
+                    '|', ('applicant_id', '=', self.id),
+                    ('candidate_email', '=ilike', (self.email_from or '').strip()),
+                    ('state', '=', 'accepted')
+                ], limit=1))
+            if not offer_ok:
+                missing.append(_("• Formal Offer Letter accepted by candidate"))
+            if not (self.forensic_cleared or self.forensic_certificate):
+                missing.append(_("• Police / Forensic Clearance certificate verified"))
+            if not (self.medical_cleared or self.medical_certificate):
+                missing.append(_("• Medical Fitness Examination certificate cleared"))
+
+            raise UserError(_(
+                "Cannot generate Employment Letter!\n\n"
+                "All pre-employment verification checkpoints must be cleared first:\n\n%s"
+            ) % ("\n".join(missing) if missing else _("Pre-employment verification incomplete.")))
+
+        if self.employment_letter_id:
+            return self.employment_letter_id
+
+        # Resolve candidate title (Ato/W/ro/W/t)
+        title = 'Ato'
+        gender = (self.gender or '').lower()
+        if gender in ['female', 'f']:
+            title = 'W/t'
+
+        # Resolve vacancy & candidate
+        vac = False
+        if self.app_reference:
+            vac = self.app_reference
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        cand_rec = self.env['external.recruitment.selected.candidates'].search([
+            ('applicant_name', '=', self.id)
+        ], limit=1)
+
+        # Resolve Grade
+        grade_rec = self._resolve_applicant_job_grade()
+        grade_name = grade_rec.grade_name if grade_rec else (getattr(self, 'emp_grade', False) or '')
+
+        # Resolve Job Title
+        job_title = self.job_id.name if self.job_id else (self.name or _('Officer'))
+
+        # Resolve Work Unit
+        work_unit = self.preferred_location or ''
+        if not work_unit and vac:
+            if hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
+                work_unit = vac.operating_unit_id.name
+            elif hasattr(vac, 'hiring_details') and vac.hiring_details:
+                for hd in vac.hiring_details:
+                    if hd.work_unit and hd.work_unit.name:
+                        work_unit = hd.work_unit.name
+                        break
+        if not work_unit:
+            work_unit = _('Head Office')
+
+        # Resolve Salary
+        salary = self.salary_proposed or self.expected_salary or 0.0
+        if 'recruitment.offer.letter' in self.env:
+            offer = self.env['recruitment.offer.letter'].search([
+                '|', ('applicant_id', '=', self.id),
+                ('candidate_email', '=ilike', (self.email_from or '').strip())
+            ], order='id desc', limit=1)
+            if offer and offer.salary_figure > 0:
+                salary = offer.salary_figure
+
+        # Resolve Managerial vs Non-Managerial: 70 days for managerial, 60 days for non-managerial
+        is_mgr = bool(vac and vac.employee_category == 'Managerial')
+        prob_days = 70 if is_mgr else 60
+
+        letter_vals = {
+            'applicant_id': self.id,
+            'vacancy_id': vac.id if vac else False,
+            'candidate_id': cand_rec.id if cand_rec else False,
+            'candidate_title': title,
+            'candidate_name': self.partner_name or self.name or '',
+            'candidate_email': (self.email_from or '').strip(),
+            'candidate_address': self.current_working_location or _('Addis Ababa'),
+            'letter_date': fields.Date.today(),
+            'effective_date': self.date_of_availability or fields.Date.today(),
+            'job_id': self.job_id.id if self.job_id else False,
+            'job_position_name': job_title,
+            'job_grade_name': grade_name,
+            'work_unit_name': work_unit,
+            'monthly_salary': salary,
+            'is_managerial': is_mgr,
+            'probation_days': prob_days,
+            'state': 'draft',
+        }
+        new_letter = self.env['recruitment.employment.letter'].create(letter_vals)
+        self.employment_letter_id = new_letter.id
+        return new_letter
+
+    def action_generate_employment_letter(self):
+        """Generates or opens the official Employment Letter for an external candidate."""
+        self.ensure_one()
+        letter = self._ensure_employment_letter()
+        return {
+            'name': _('Employment Letter'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'recruitment.employment.letter',
+            'res_id': letter.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
+    def action_print_employment_letter(self):
+        """Prints the Employment Letter PDF directly from the applicant record."""
+        self.ensure_one()
+        letter = self._ensure_employment_letter()
+        return letter.action_print_employment_letter()
+
+    def action_send_employment_letter(self):
+        """Dispatches the Employment Letter with PDF attachment to candidate email registered during ATS."""
+        self.ensure_one()
+        letter = self._ensure_employment_letter()
+        return letter.action_send_letter()
+
+    def action_view_employment_letter(self):
+        """Opens the linked employment letter."""
+        self.ensure_one()
+        if not self.employment_letter_id:
+            raise UserError(_("No Employment Letter has been generated yet."))
+        return {
+            'name': _('Employment Letter'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'recruitment.employment.letter',
+            'res_id': self.employment_letter_id.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
+    # ── Resolve Job Grade & Operating Unit for New Employee ────────────────
+    def _resolve_applicant_job_grade(self):
+        """Finds or resolves the employee.grade record for this applicant."""
+        self.ensure_one()
+        grade_rec = False
+        if self.app_reference:
+            grade_rec = getattr(self.app_reference, 'grade', False) or getattr(self.app_reference, 'job_grade', False)
+        if not grade_rec and self.job_id:
+            grade_rec = getattr(self.job_id, 'job_grade', False) or getattr(self.job_id, 'grade_id', False)
+        if not grade_rec and self.employee_grade:
+            grade_rec = self.env['employee.grade'].search([
+                '|', ('grade_name', '=ilike', str(self.employee_grade).strip()),
+                ('grade_code', '=ilike', str(self.employee_grade).strip())
+            ], limit=1)
+        if not grade_rec:
+            # Safe fallback: pick the lowest/first active grade
+            grade_rec = self.env['employee.grade'].search([], order='id asc', limit=1)
+        return grade_rec
+
+    def _get_employee_create_vals(self):
+        vals = super()._get_employee_create_vals()
+        grade_rec = self._resolve_applicant_job_grade()
+        if grade_rec:
+            vals['job_grade'] = grade_rec.id
+            if hasattr(self.env['hr.employee'], 'grade'):
+                vals['grade'] = grade_rec.id
+            if hasattr(self.env['hr.employee'], 'grade_id'):
+                vals['grade_id'] = grade_rec.id
+            if hasattr(self.env['hr.employee'], 'emp_grade'):
+                vals['emp_grade'] = grade_rec.grade_name
+
+        # Resolve destination operating unit
+        ou = False
+        if self.app_reference and getattr(self.app_reference, 'operating_unit_id', False):
+            ou = self.app_reference.operating_unit_id
+        elif self.preferred_location:
+            ou = self.env['operating.unit'].search([('name', '=ilike', self.preferred_location.strip())], limit=1)
+
+        if ou and hasattr(self.env['hr.employee'], 'default_operating_unit_id'):
+            vals['default_operating_unit_id'] = ou.id
+
+        return vals
+
     # ── Button actions ─────────────────────────────────────────────────────
+    def _populate_employee_from_applicant_and_profile(self, employee):
+        """Populates employee personal info, demographics, address, and all Qualification & Criteria
+        sub-tabs (Education Qualification, Experience, Competencies) from Candidate Profile (CV)."""
+        self.ensure_one()
+        if not employee:
+            return
+
+        cand = self.candidate_profile_id
+        emp_write = {}
+
+        # 1. Personal Information & Demographics (Image 2)
+        if cand:
+            if hasattr(employee, 'father_name') and not employee.father_name:
+                emp_write['father_name'] = getattr(cand, 'father_name', False) or getattr(self, 'father_name', False)
+            if hasattr(employee, 'grand_father_name') and not employee.grand_father_name:
+                emp_write['grand_father_name'] = getattr(cand, 'grand_father_name', False) or getattr(self, 'grand_father_name', False)
+            if hasattr(employee, 'mother_name') and not employee.mother_name:
+                emp_write['mother_name'] = getattr(cand, 'mother_name', False)
+            if hasattr(employee, 'birthday') and not employee.birthday:
+                emp_write['birthday'] = cand.dob or cand.birth_date or getattr(self, 'date_of_birth', False)
+            if hasattr(employee, 'date_of_birth') and not employee.date_of_birth:
+                emp_write['date_of_birth'] = cand.dob or cand.birth_date or getattr(self, 'date_of_birth', False)
+            if hasattr(employee, 'age') and not employee.age:
+                emp_write['age'] = str(cand.age or getattr(self, 'age', '') or '')
+            if hasattr(employee, 'gender') and not employee.gender:
+                emp_write['gender'] = cand.gender or getattr(self, 'gender', False)
+            if hasattr(employee, 'place_of_birth') and not employee.place_of_birth:
+                emp_write['place_of_birth'] = cand.place_of_birth or getattr(self, 'place_of_birth', False)
+            if hasattr(employee, 'blood_group') and not employee.blood_group:
+                emp_write['blood_group'] = getattr(cand, 'blood_group', False)
+            if hasattr(employee, 'house_number') and not employee.house_number:
+                emp_write['house_number'] = getattr(cand, 'house_number', False)
+            if hasattr(employee, 'city') and not employee.city:
+                emp_write['city'] = cand.city or getattr(cand, 'city', False)
+            if hasattr(employee, 'sub_city') and not employee.sub_city:
+                emp_write['sub_city'] = getattr(cand, 'sub_city', False)
+            if hasattr(employee, 'region') and not employee.region:
+                emp_write['region'] = getattr(cand, 'region', False) or (cand.state_id.name if cand.state_id else False)
+            if hasattr(employee, 'woreda') and not employee.woreda:
+                emp_write['woreda'] = getattr(cand, 'woreda', False)
+            if hasattr(employee, 'kebele') and not employee.kebele:
+                emp_write['kebele'] = getattr(cand, 'kebele', False)
+            if hasattr(employee, 'mobile_phone') and not employee.mobile_phone:
+                emp_write['mobile_phone'] = self.partner_phone or cand.phone
+            if hasattr(employee, 'work_phone') and not employee.work_phone:
+                emp_write['work_phone'] = self.partner_phone or cand.phone
+            if hasattr(employee, 'phone_num') and not employee.phone_num:
+                emp_write['phone_num'] = cand.phone or self.partner_phone
+            if hasattr(employee, 'personal_phone') and not employee.personal_phone:
+                emp_write['personal_phone'] = cand.phone or self.partner_phone
+            if hasattr(employee, 'private_phone') and not employee.private_phone:
+                emp_write['private_phone'] = cand.phone or self.partner_phone
+            if hasattr(employee, 'alternative_mobile') and not employee.alternative_mobile:
+                emp_write['alternative_mobile'] = getattr(cand, 'alternative_mobile', False) or cand.phone
+            if hasattr(employee, 'personal_email') and not employee.personal_email:
+                emp_write['personal_email'] = cand.email or self.email_from
+            if hasattr(employee, 'private_email') and not employee.private_email:
+                emp_write['private_email'] = cand.email or self.email_from
+            if hasattr(employee, 'work_email') and not employee.work_email:
+                emp_write['work_email'] = self.email_from or cand.email
+            if hasattr(employee, 'current_company') and not employee.current_company:
+                emp_write['current_company'] = cand.current_company or getattr(self, 'current_company', False)
+            if hasattr(employee, 'working_status') and not employee.working_status:
+                emp_write['working_status'] = cand.working_status or getattr(self, 'working_status', False)
+            if hasattr(employee, 'willing_to_join_immediately') and not employee.willing_to_join_immediately:
+                emp_write['willing_to_join_immediately'] = getattr(self, 'willing_to_join_immediately', False) or ('yes' if cand.join_immediately else 'no')
+            if hasattr(employee, 'date_of_availability') and not employee.date_of_availability:
+                emp_write['date_of_availability'] = getattr(self, 'date_of_availability', False)
+            if hasattr(employee, 'marital') and not employee.marital and hasattr(cand, 'marital_status'):
+                emp_write['marital'] = cand.marital_status
+
+        if emp_write:
+            employee.sudo().write(emp_write)
+
+        # 2. Education Qualifications Tab (Image 1 Sub-tab 1)
+        if cand and cand.education_ids:
+            # A. hr.employee.education (edu_ids)
+            if hasattr(employee, 'edu_ids') and not employee.edu_ids:
+                edu_vals = []
+                for edu in cand.education_ids:
+                    adm_y = edu.start_date.year if edu.start_date else 0
+                    grad_y = edu.end_date.year if edu.end_date else (edu.graduation_year.year if hasattr(edu, 'graduation_year') and edu.graduation_year else 0)
+                    prog_type = 'Full time'
+                    if hasattr(edu, 'program_type') and edu.program_type and 'program_type' in edu._fields:
+                        prog_type = dict(edu._fields['program_type'].selection).get(edu.program_type, 'Regular')
+                    edu_vals.append((0, 0, {
+                        'qualification': edu.qualification_name,
+                        'specialization': edu.field_of_study,
+                        'university': edu.institution,
+                        'college_or_school': edu.institution,
+                        'year_of_admission': adm_y,
+                        'year_of_outcome': grad_y,
+                        'cgpa_percentage': edu.cgpa or 0.0,
+                        'fulltime': prog_type,
+                    }))
+                if edu_vals:
+                    employee.sudo().write({'edu_ids': edu_vals})
+
+            # B. employee.education (education_detail_ids)
+            if 'employee.education' in self.env:
+                existing_emp_edu = self.env['employee.education'].sudo().search([('employee_id', '=', employee.id)])
+                if not existing_emp_edu:
+                    valid_types = dict(self.env['employee.education']._fields['edu_type'].selection).keys() if 'edu_type' in self.env['employee.education']._fields and self.env['employee.education']._fields['edu_type'].selection else []
+                    for edu in cand.education_ids:
+                        lvl = getattr(edu, 'education_level', '')
+                        etype = 'formal'
+                        if lvl in ('diploma', 'tvet') and 'vocational' in valid_types:
+                            etype = 'vocational'
+                        elif 'formal' in valid_types:
+                            etype = 'formal'
+                        elif 'bachelor' in valid_types:
+                            etype = 'bachelor'
+                        elif valid_types:
+                            etype = list(valid_types)[0]
+                        else:
+                            etype = False
+
+                        edu_vals_dict = {
+                            'employee_id': employee.id,
+                            'from_date': edu.start_date,
+                            'to_date': edu.end_date or (edu.graduation_year if hasattr(edu, 'graduation_year') else False),
+                            'field': edu.field_of_study,
+                            'school_name': edu.institution,
+                            'CGPA': edu.cgpa or 0.0,
+                            'qualification': edu.qualification_name,
+                        }
+                        if etype:
+                            edu_vals_dict['edu_type'] = etype
+                        self.env['employee.education'].sudo().create(edu_vals_dict)
+
+            # C. hr_qualification_info_job (qualification_id)
+            if hasattr(employee, 'qualification_id') and not employee.qualification_id and 'recruitment.qualification' in self.env:
+                q_vals = []
+                for edu in cand.education_ids:
+                    q_rec = self.env['recruitment.qualification'].sudo().search([('qualification', '=ilike', edu.qualification_name)], limit=1)
+                    if not q_rec and edu.qualification_name:
+                        q_rec = self.env['recruitment.qualification'].sudo().create({'qualification': edu.qualification_name})
+                    if q_rec:
+                        q_vals.append((0, 0, {
+                            'qualification': q_rec.id,
+                            'requirement': edu.cgpa or 0.0,
+                            'response': edu.cgpa or 0.0,
+                        }))
+                if q_vals:
+                    employee.sudo().write({'qualification_id': q_vals})
+
+        # 3. Experience Tab (Image 1 Sub-tab 2)
+        if cand and cand.experience_ids:
+            if hasattr(employee, 'experiance_id') and not employee.experiance_id and 'recruitment.experience' in self.env:
+                exp_vals = []
+                for exp in cand.experience_ids:
+                    exp_rec = self.env['recruitment.experience'].sudo().search([('experience', '=ilike', exp.position)], limit=1)
+                    if not exp_rec and exp.position:
+                        exp_rec = self.env['recruitment.experience'].sudo().create({'experience': exp.position})
+                    if exp_rec:
+                        exp_vals.append((0, 0, {
+                            'experience': exp_rec.id,
+                            'requirement': exp.duration_years or 0.0,
+                            'response': exp.duration_years or 0.0,
+                        }))
+                if exp_vals:
+                    employee.sudo().write({'experiance_id': exp_vals})
+
+            # hr.resume.line
+            if 'hr.resume.line' in self.env:
+                existing_res = self.env['hr.resume.line'].sudo().search([('employee_id', '=', employee.id)])
+                if not existing_res:
+                    for exp in cand.experience_ids:
+                        self.env['hr.resume.line'].sudo().create({
+                            'employee_id': employee.id,
+                            'name': exp.position,
+                            'date_start': exp.start_date,
+                            'date_end': exp.end_date,
+                            'description': exp.responsibilities or f"{exp.position} at {exp.organization}",
+                            'organization_name': exp.organization,
+                        })
+
+        # 4. Competencies Tab (Image 1 Sub-tab 3)
+        if cand and (cand.skill_ids or cand.certification_ids):
+            if hasattr(employee, 'competencies_id') and not employee.competencies_id and 'recruitment.competency' in self.env:
+                skills_list = []
+                for sk in cand.skill_ids:
+                    skills_list.append((sk.name, sk.level or 'intermediate'))
+                for cert in cand.certification_ids:
+                    skills_list.append((cert.name, 'expert'))
+
+                comp_vals = []
+                comp_fields = self.env['recruitment.competency']._fields
+                for s_name, s_lvl in skills_list:
+                    c_rec = False
+                    if 'competencies' in comp_fields:
+                        c_rec = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', s_name)], limit=1)
+                        if not c_rec and s_name:
+                            c_rec = self.env['recruitment.competency'].sudo().create({'competencies': s_name})
+                    elif 'name' in comp_fields:
+                        c_rec = self.env['recruitment.competency'].sudo().search([('name', '=ilike', s_name)], limit=1)
+                        if not c_rec and s_name:
+                            c_rec = self.env['recruitment.competency'].sudo().create({'name': s_name})
+
+                    if c_rec:
+                        comp_vals.append((0, 0, {
+                            'competencies': c_rec.id,
+                            'requirement': 100.0,
+                            'response': 100.0,
+                        }))
+                if comp_vals:
+                    employee.sudo().write({'competencies_id': comp_vals})
+
+    def create_employee_from_applicant(self):
+        """Override core employee creation to enforce mandatory pre-employment verification and pass job grade."""
+        self._check_onboarding_prerequisites()
+        grade_rec = self._resolve_applicant_job_grade()
+        grade_id = grade_rec.id if grade_rec else False
+
+        ctx = dict(self.env.context, default_job_grade=grade_id, job_history_reason='recruitment')
+        res = super(HrApplicantCustom, self.with_context(ctx)).create_employee_from_applicant()
+
+        # Guarantee job_grade on employee, auto-populate all profile/CV records, and handle versions
+        for applicant in self:
+            emp = applicant.employee_id
+            if emp:
+                applicant._populate_employee_from_applicant_and_profile(emp)
+                if applicant.employment_letter_id:
+                    applicant.employment_letter_id.sudo().write({
+                        'employee_id': emp.id,
+                        'id_no': emp.identification_id or emp.barcode or str(emp.id)
+                    })
+
+                if grade_rec:
+                    emp_write = {}
+                    if hasattr(emp, 'job_grade') and not emp.job_grade:
+                        emp_write['job_grade'] = grade_rec.id
+                    if hasattr(emp, 'emp_grade') and not emp.emp_grade:
+                        emp_write['emp_grade'] = grade_rec.grade_name
+                    if emp_write:
+                        emp.sudo().write(emp_write)
+
+                    if 'hr.version' in self.env:
+                        versions = self.env['hr.version'].sudo().search([
+                            ('employee_id', '=', emp.id),
+                            ('job_grade', '=', False)
+                        ])
+                        if versions:
+                            versions.write({'job_grade': grade_rec.id})
+
+        return res
+
     def create_contract(self):
-        """Placeholder: triggers contract creation workflow."""
-        self.write({'contract_created_new': True})
+        """Triggers contract creation workflow after verifying mandatory checks and employee existence."""
+        self._check_onboarding_prerequisites()
+        if not self.employee_id:
+            raise UserError(_("Please click 'Create Employee' first to create the employee record before creating a contract."))
+
+        self.write({
+            'contract_created_new': True,
+            'bunna_app_status': 'hired',
+        })
+
+        if 'hr.contract' in self.env:
+            existing_contract = self.env['hr.contract'].sudo().search([
+                ('employee_id', '=', self.employee_id.id),
+            ], limit=1)
+            if not existing_contract:
+                grade_rec = self._resolve_applicant_job_grade()
+                contract_vals = {
+                    'name': _("Employment Contract - %s") % self.employee_id.name,
+                    'employee_id': self.employee_id.id,
+                    'job_id': self.job_id.id if self.job_id else self.employee_id.job_id.id,
+                    'department_id': self.department_id.id if self.department_id else self.employee_id.department_id.id,
+                    'wage': self.salary_proposed or self.expected_salary or 0.0,
+                    'state': 'draft',
+                }
+                if grade_rec and 'job_grade' in self.env['hr.contract']._fields:
+                    contract_vals['job_grade'] = grade_rec.id
+                existing_contract = self.env['hr.contract'].sudo().create(contract_vals)
+
+            return {
+                'name': _('Employee Contract'),
+                'type': 'ir.actions.act_window',
+                'res_model': 'hr.contract',
+                'res_id': existing_contract.id,
+                'view_mode': 'form',
+                'target': 'current',
+            }
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Contract Created'),
-                'message': _('Contract has been created for %s.') % self.partner_name,
+                'message': _('Pre-employment verification passed. Contract has been initialized for %s.') % (self.partner_name or self.name),
                 'type': 'success',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'reload'},
@@ -580,40 +1414,240 @@ class HrApplicantCustom(models.Model):
                 app.sudo().write({'candidate_profile_id': candidate.id})
                 candidate.sync_from_application(app)
 
+            # Auto-populate and compute all demographics, work status, and notebook tabs from CV profile
+            app._sync_from_candidate_profile()
+
         return res
 
-    def write(self, vals):
-        if 'job_id' in vals and vals.get('job_id'):
-            job = self.env['hr.job'].browse(vals['job_id'])
-            
-            # Qualifications
-            qual_lines = [(5, 0, 0)]
-            for line in job.qualification_id:
-                qual_lines.append((0, 0, {
-                    'qualification': line.qualification.id,
-                    'requirement': str(line.requirement or ''),
-                    'response': str(line.response or ''),
-                }))
-            vals['qualification_id'] = qual_lines
-                
-            # Experiences
-            exp_lines = [(5, 0, 0)]
-            for line in job.experiance_id:
-                exp_lines.append((0, 0, {
-                    'experience': line.experience.id,
-                    'requirement': str(line.requirement or ''),
-                    'response': str(line.response or ''),
-                }))
-            vals['experiance_id'] = exp_lines
-                
-            # Competencies
-            comp_lines = [(5, 0, 0)]
-            for line in job.competencies_id:
-                comp_lines.append((0, 0, {
-                    'competencies': line.competencies.id,
-                    'requirement': str(line.requirement or ''),
-                    'response': str(line.response or ''),
-                }))
-            vals['competencies_id'] = comp_lines
+    @api.onchange('candidate_profile_id')
+    def _onchange_candidate_profile_id(self):
+        if self.candidate_profile_id:
+            self._sync_from_candidate_profile()
 
-        return super().write(vals)
+    def _sync_from_candidate_profile(self):
+        """Auto-computes and populates candidate demographics, employment details,
+        and all notebook tabs (Education, Experience, Competencies, Vacancies) from ATS Profile (Electronic CV)."""
+        for app in self:
+            cand = app.candidate_profile_id
+            if not cand:
+                if app.email_from:
+                    cand = self.env['candidate.profile'].sudo().search([
+                        ('email', '=ilike', app.email_from.strip())
+                    ], limit=1)
+                if not cand and app.partner_phone:
+                    cand = self.env['candidate.profile'].sudo().search([
+                        ('phone', '=', app.partner_phone.strip())
+                    ], limit=1)
+                if cand:
+                    app.sudo().write({'candidate_profile_id': cand.id})
+
+            if not cand:
+                continue
+
+            vals = {}
+            # 1. Demographics
+            dob = cand.dob or cand.birth_date
+            if dob and not app.date_of_birth:
+                vals['date_of_birth'] = dob
+            if cand.gender and not app.gender:
+                vals['gender'] = cand.gender
+            if (cand.place_of_birth or cand.city) and not app.place_of_birth:
+                vals['place_of_birth'] = cand.place_of_birth or cand.city
+            if cand.linkedin_url and hasattr(app, 'linkedin_profile') and not app.linkedin_profile:
+                vals['linkedin_profile'] = cand.linkedin_url
+
+            # 2. Employment & Availability
+            if cand.worked_in_bunna_earlier:
+                vals['worked_in_bunna_earlier'] = (cand.worked_in_bunna_earlier == 'yes')
+            if cand.current_company and not app.current_company:
+                vals['current_company'] = cand.current_company
+            if (cand.city or cand.address) and not app.current_working_location:
+                vals['current_working_location'] = cand.city or cand.address
+            if cand.working_status and (not app.working_status or app.working_status == 'unemployed'):
+                vals['working_status'] = 'employed' if cand.working_status == 'employed' else ('unemployed' if cand.working_status == 'unemployed' else 'self_employed')
+            if cand.join_immediately:
+                vals['willing_to_join_immediately'] = True
+
+            if vals:
+                app.sudo().write(vals)
+
+            # 3. Tab: Education Qualifications (qualification_id)
+            if cand.education_ids:
+                existing_qual_map = {
+                    (q.qualification.qualification or '').strip().lower(): q
+                    for q in app.qualification_id if q.qualification
+                }
+                new_qual_lines = []
+                for edu in cand.education_ids:
+                    name = (edu.qualification_name or edu.field_of_study or 'Degree').strip()
+                    cgpa_val = f"{edu.cgpa:.2f}" if edu.cgpa else "3.50"
+
+                    rec_qual = self.env['recruitment.qualification'].sudo().search([
+                        ('qualification', '=ilike', name)
+                    ], limit=1)
+                    if not rec_qual and name:
+                        rec_qual = self.env['recruitment.qualification'].sudo().create({'qualification': name})
+
+                    if rec_qual:
+                        key = rec_qual.qualification.strip().lower()
+                        if key in existing_qual_map:
+                            existing_q = existing_qual_map[key]
+                            if (not existing_q.response or existing_q.response in ('0.0', '0', '0.00')):
+                                existing_q.sudo().write({'response': cgpa_val})
+                        else:
+                            # Check if vacancy job has requirement
+                            req_val = '0.00'
+                            if app.job_id:
+                                job_q = app.job_id.qualification_id.filtered(lambda jq: jq.qualification.id == rec_qual.id)
+                                if job_q:
+                                    req_val = str(job_q[0].requirement or '0.00')
+                            new_qual_lines.append((0, 0, {
+                                'qualification': rec_qual.id,
+                                'requirement': req_val,
+                                'response': cgpa_val,
+                            }))
+                if new_qual_lines:
+                    app.sudo().write({'qualification_id': new_qual_lines})
+
+            # 4. Tab: Experience (experiance_id)
+            if cand.experience_ids:
+                existing_exp_map = {
+                    (e.experience.experience or '').strip().lower(): e
+                    for e in app.experiance_id if e.experience
+                }
+                new_exp_lines = []
+                for exp in cand.experience_ids:
+                    pos = (exp.position or 'Professional Experience').strip()
+                    dur_val = f"{exp.duration_years:.1f}" if exp.duration_years else "1.0"
+
+                    rec_exp = self.env['recruitment.experience'].sudo().search([
+                        ('experience', '=ilike', pos)
+                    ], limit=1)
+                    if not rec_exp and pos:
+                        rec_exp = self.env['recruitment.experience'].sudo().create({'experience': pos})
+
+                    if rec_exp:
+                        key = rec_exp.experience.strip().lower()
+                        if key in existing_exp_map:
+                            existing_e = existing_exp_map[key]
+                            if (not existing_e.response or existing_e.response in ('0.0', '0', '0.00')):
+                                existing_e.sudo().write({'response': dur_val})
+                        else:
+                            req_val = '0.00'
+                            if app.job_id:
+                                job_e = app.job_id.experiance_id.filtered(lambda je: je.experience.id == rec_exp.id)
+                                if job_e:
+                                    req_val = str(job_e[0].requirement or '0.00')
+                            new_exp_lines.append((0, 0, {
+                                'experience': rec_exp.id,
+                                'requirement': req_val,
+                                'response': dur_val,
+                            }))
+                if new_exp_lines:
+                    app.sudo().write({'experiance_id': new_exp_lines})
+
+            # 5. Tab: Competencies (competencies_id)
+            skills_certs = []
+            for sk in cand.skill_ids:
+                if sk.skill_name:
+                    skills_certs.append((sk.skill_name, sk.proficiency or 'Proficient'))
+            for crt in cand.certification_ids:
+                if crt.name:
+                    skills_certs.append((crt.name, 'Certified'))
+
+            if skills_certs and 'recruitment.competency' in self.env:
+                existing_comp_map = {}
+                for c in app.competencies_id:
+                    comp_name = (getattr(c.competencies, 'competencies', False) or getattr(c.competencies, 'name', '') or '').strip().lower()
+                    if comp_name:
+                        existing_comp_map[comp_name] = c
+
+                new_comp_lines = []
+                for name, resp in skills_certs:
+                    rec_comp = False
+                    comp_fields = self.env['recruitment.competency']._fields
+                    if 'competencies' in comp_fields:
+                        rec_comp = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', name)], limit=1)
+                        if not rec_comp and name:
+                            rec_comp = self.env['recruitment.competency'].sudo().create({'competencies': name})
+                    elif 'name' in comp_fields:
+                        rec_comp = self.env['recruitment.competency'].sudo().search([('name', '=ilike', name)], limit=1)
+                        if not rec_comp and name:
+                            rec_comp = self.env['recruitment.competency'].sudo().create({'name': name})
+
+                    if rec_comp:
+                        c_name = (getattr(rec_comp, 'competencies', False) or getattr(rec_comp, 'name', '') or '').strip().lower()
+                        if c_name in existing_comp_map:
+                            existing_c = existing_comp_map[c_name]
+                            if not existing_c.response:
+                                existing_c.sudo().write({'response': resp})
+                        else:
+                            new_comp_lines.append((0, 0, {
+                                'competencies': rec_comp.id,
+                                'requirement': 'Required',
+                                'response': resp,
+                            }))
+                if new_comp_lines:
+                    app.sudo().write({'competencies_id': new_comp_lines})
+
+            # 6. Tab: Vacancies (hr_new_department_ids)
+            if app.app_reference and not app.hr_new_department_ids and 'hr_new_department_info_job' in self.env:
+                vac = app.app_reference
+                ou_name = vac.operating_unit_id.name if vac.operating_unit_id else (vac.job_location or 'Main Branch')
+                
+                comodel = self.env['hr_new_department_info_job']._fields['work_unit'].comodel_name if 'work_unit' in self.env['hr_new_department_info_job']._fields else False
+                unit_id = False
+                if comodel and comodel in self.env:
+                    c_model = self.env[comodel].sudo()
+                    rec_field = c_model._rec_name if hasattr(c_model, '_rec_name') and c_model._rec_name in c_model._fields else False
+                    if not rec_field:
+                        if 'workunit_name' in c_model._fields:
+                            rec_field = 'workunit_name'
+                        elif 'name' in c_model._fields:
+                            rec_field = 'name'
+
+                    unit_match = False
+                    if rec_field:
+                        unit_match = c_model.search([(rec_field, '=ilike', ou_name)], limit=1)
+                    unit_id = unit_match.id if unit_match else False
+
+                vac_lines = []
+                if hasattr(vac, 'department_ids') and vac.department_ids:
+                    for d in vac.department_ids:
+                        d_unit_val = False
+                        if hasattr(d, 'work_unit') and d.work_unit:
+                            if hasattr(d.work_unit, 'id'):
+                                d_unit_val = d.work_unit.id
+                            elif isinstance(d.work_unit, int):
+                                d_unit_val = d.work_unit
+                        
+                        resp_val = 0
+                        raw_resp = getattr(d, 'response', 0)
+                        if isinstance(raw_resp, int):
+                            resp_val = raw_resp
+                        elif isinstance(raw_resp, str) and raw_resp.isdigit():
+                            resp_val = int(raw_resp)
+
+                        vac_lines.append((0, 0, {
+                            'work_unit': d_unit_val or unit_id,
+                            'number_of_vacancies': int(getattr(d, 'number_of_vacancies', 1) or 1),
+                            'response': resp_val,
+                        }))
+                if not vac_lines:
+                    vac_lines.append((0, 0, {
+                        'work_unit': unit_id,
+                        'number_of_vacancies': int(getattr(vac, 'number_of_vacancies', 1) or 1),
+                        'response': 1,
+                    }))
+                if vac_lines:
+                    app.sudo().write({'hr_new_department_ids': vac_lines})
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'candidate_profile_id' in vals or 'job_id' in vals:
+            self._sync_from_candidate_profile()
+        if 'employee_id' in vals and vals.get('employee_id'):
+            for app in self:
+                if app.employee_id:
+                    app._populate_employee_from_applicant_and_profile(app.employee_id)
+        return res

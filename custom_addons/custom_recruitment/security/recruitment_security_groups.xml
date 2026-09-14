@@ -2,83 +2,79 @@
 <odoo>
     <data noupdate="0">
 
-        <!-- Module category for Recruitment groups -->
-        <record id="module_category_recruitment" model="ir.module.category">
-            <field name="name">Recruitment</field>
-            <field name="description">Access rights for the Recruitment application</field>
-            <field name="sequence">20</field>
-        </record>
+        <!-- ========================================================= -->
+        <!-- RECRUITMENT ACCESS GROUPS (Merged into Human Resources)    -->
+        <!-- Privilege: hr_recruitment.res_groups_privilege_recruitment -->
+        <!-- Category:  base.module_category_human_resources           -->
+        <!-- ========================================================= -->
 
-        <record id="recruitment_privilege" model="res.groups.privilege">
-            <field name="name">Recruitment</field>
-            <field name="sequence">20</field>
-            <field name="category_id" ref="module_category_recruitment"/>
-        </record>
-
-        <!-- 1. No Access (base tier - no recruitment access) -->
-        <record id="group_recruitment_no_access" model="res.groups">
-            <field name="name">No Access</field>
-            <field name="privilege_id" ref="recruitment_privilege"/>
-            <field name="sequence">5</field>
-            <field name="comment">No access to recruitment module.</field>
-            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-        </record>
-
-        <!-- 2. User (basic tier) - Can only access Transfer Requests -->
+        <!-- 1. User: Internal Employee Access (Transfer Requests & Self-Service) -->
         <record id="group_recruitment_user" model="res.groups">
             <field name="name">User</field>
-            <field name="privilege_id" ref="recruitment_privilege"/>
+            <field name="privilege_id" eval="False"/>
             <field name="sequence">10</field>
             <field name="comment">Basic recruitment access: employees can view and manage their own transfer requests only.</field>
-            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         </record>
 
-        <!-- 3. Officer (mid-low tier) - Can access Recruitment Requests and Transfer Requests -->
+        <!-- Base Internal User automatically gets basic recruitment transfer access -->
+        <record id="base.group_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_user'))]"/>
+        </record>
+
+        <!-- 1b. Recruitment Approval Committee Member (Designated signers for Selection Minutes) -->
+        <record id="group_recruitment_approval_committee" model="res.groups">
+            <field name="name">Recruitment Approval Committee Member</field>
+            <field name="sequence">12</field>
+            <field name="comment">Employees appointed to a vacancy selection approval committee to review and digitally sign Selection Minutes.</field>
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_user'))]"/>
+        </record>
+
+        <!-- 2. Officer: Recruitment Officer (Screening, Shortlisting, Operations) -->
         <record id="group_recruitment_officer" model="res.groups">
             <field name="name">Officer</field>
-            <field name="privilege_id" ref="recruitment_privilege"/>
+            <field name="privilege_id" eval="False"/>
             <field name="sequence">15</field>
             <field name="comment">Officer-level access: can view and manage their own recruitment requests and transfer requests.</field>
-            <field name="implied_ids" eval="[(4, ref('group_recruitment_user'))]"/>
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_user')), (4, ref('custom_recruitment.group_recruitment_approval_committee'))]"/>
         </record>
 
-        <!-- 4. HR Manager (mid-high tier) - Full access except delete -->
+        <!-- Remove Interviewer from Recruitment privilege dropdown -->
+        <record id="hr_recruitment.group_hr_recruitment_interviewer" model="res.groups">
+            <field name="privilege_id" eval="False"/>
+        </record>
+
+        <!-- Clear "No" placeholder for Recruitment privilege -->
+        <record id="hr_recruitment.res_groups_privilege_recruitment" model="res.groups.privilege">
+            <field name="placeholder"></field>
+        </record>
+
+        <!-- Link standard Odoo Recruitment Officer to custom Recruitment Officer -->
+        <record id="hr_recruitment.group_hr_recruitment_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_officer'))]"/>
+        </record>
+
+        <!-- 3. HR Manager: Talent Acquisition Manager / Directorate Head -->
+        <!-- Appears in the single Recruitment dropdown under HUMAN RESOURCES -->
         <record id="group_recruitment_manager" model="res.groups">
             <field name="name">HR Manager</field>
-            <field name="privilege_id" ref="recruitment_privilege"/>
-            <field name="sequence">20</field>
+            <field name="privilege_id" ref="hr_recruitment.res_groups_privilege_recruitment"/>
+            <field name="sequence">25</field>
             <field name="comment">Full operational access to recruitment: can read, create and edit all recruitment records but cannot delete.</field>
-            <field name="implied_ids" eval="[(4, ref('group_recruitment_officer'))]"/>
+            <field name="implied_ids" eval="[(4, ref('hr_recruitment.group_hr_recruitment_user'))]"/>
         </record>
 
-        <!-- 5. Administrator (top tier) - Full access including delete -->
+        <!-- 4. Administrator: Full Control & Configuration -->
         <record id="group_recruitment_administrator" model="res.groups">
             <field name="name">Administrator</field>
-            <field name="privilege_id" ref="recruitment_privilege"/>
+            <field name="privilege_id" eval="False"/>
             <field name="sequence">30</field>
             <field name="comment">Full control of the recruitment module, including delete.</field>
-            <field name="implied_ids" eval="[(4, ref('group_recruitment_manager'))]"/>
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_manager'))]"/>
         </record>
 
-        <!-- ============================================ -->
-        <!-- DISABLE BASE HR_RECRUITMENT GROUPS            -->
-        <!-- ============================================ -->
-
-        <!-- Disable base hr_recruitment groups to avoid conflicts -->
-        <record id="hr_recruitment.group_hr_recruitment_interviewer" model="res.groups">
-<!--            <field name="active" eval="False"/>-->
-        </record>
-
-        <record id="hr_recruitment.group_hr_recruitment_user" model="res.groups">
-<!--            <field name="active" eval="False"/>-->
-        </record>
-
+        <!-- Link standard Odoo Recruitment Administrator to custom Administrator -->
         <record id="hr_recruitment.group_hr_recruitment_manager" model="res.groups">
-<!--            <field name="active" eval="False"/>-->
-        </record>
-
-        <record id="hr_recruitment.group_applicant_cv_display" model="res.groups">
-<!--            <field name="active" eval="False"/>-->
+            <field name="implied_ids" eval="[(4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
         </record>
 
     </data>

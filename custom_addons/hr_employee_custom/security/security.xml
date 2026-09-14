@@ -1,19 +1,66 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <odoo>
     <data noupdate="1">
-        <!-- =====================================
-             SECURITY GROUPS
-        ====================================== -->
-        <record id="group_hr_contract_manager" model="res.groups">
-            <field name="name">Contract Manager</field>
-            <field name="privilege_id" ref="hr.res_groups_privilege_employees"/>
-            <field name="sequence">30</field>
-            <field name="implied_ids" eval="[(4, ref('base.group_user')),                           (4, ref('hr.group_hr_user'))]"/>
-            <field name="user_ids" eval="[(4, ref('base.user_root')),                           (4, ref('base.user_admin'))]"/>
-        </record>
-    </data>
+        <!-- =====================================================
+             EMPLOYEES PRIVILEGE GROUPS (shown on User form)
+             Sequence controls order in dropdown:
+               5  → User        (self-only access)
+               10 → Officer     (bank-wide, no delete)
+               20 → Administrator (bank-wide, full access)
+        ====================================================== -->
 
-    <!-- Extend standard HR Manager (Administrator) to imply Contract Manager -->
+        <!-- User group — internal access, sees own records + coached employees.
+             privilege_id is False so it does NOT appear in the Employees dropdown on the User form. -->
+         <record id="group_hr_employee_user" model="res.groups">
+             <field name="name">User</field>
+             <field name="privilege_id" eval="False"/>
+             <field name="sequence">5</field>
+             <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+         </record>
+
+         <!-- Contract Manager: internal group, NOT shown in Employees dropdown -->
+         <record id="group_hr_contract_manager" model="res.groups">
+             <field name="name">Contract Manager</field>
+             <field name="privilege_id" eval="False"/>
+             <field name="sequence">30</field>
+             <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('hr.group_hr_user'))]"/>
+             <field name="user_ids" eval="[(4, ref('base.user_root')), (4, ref('base.user_admin'))]"/>
+         </record>
+     </data>
+
+     <!-- =====================================================
+          Applied on EVERY upgrade (outside noupdate)
+     ====================================================== -->
+
+     <!-- Restore "No" placeholder so standard employees show "No" / empty selection -->
+     <record id="hr.res_groups_privilege_employees" model="res.groups.privilege">
+         <field name="placeholder">No</field>
+     </record>
+
+     <!-- Ensure group_hr_employee_user has no privilege_id so it is removed from the Employees dropdown -->
+     <record id="group_hr_employee_user" model="res.groups">
+         <field name="privilege_id" eval="False"/>
+     </record>
+
+    <!-- Officer implies User → Officers automatically get User group too,
+         so they can access the Employees menu and all records. -->
+    <record id="hr.group_hr_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+    </record>
+
+    <!-- Internal Users automatically imply group_hr_employee_user so that ALL employees
+         get User access to their own records without needing manual configuration. -->
+    <record id="base.group_user" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+    </record>
+
+    <!-- Default User Group implies group_hr_employee_user so that newly created users
+         automatically get the User role under Employees by default. -->
+    <record id="base.default_user_group" model="res.groups">
+        <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+    </record>
+
+    <!-- Administrator implies Contract Manager (for contract access) -->
     <record id="hr.group_hr_manager" model="res.groups">
         <field name="implied_ids" eval="[(4, ref('hr_employee_custom.group_hr_contract_manager'))]"/>
     </record>

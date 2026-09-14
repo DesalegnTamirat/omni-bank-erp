@@ -248,15 +248,22 @@ class ExternalShortlistChoiceWizard(models.TransientModel):
             delegation_lines = []
             if recruitment.vacancy_id:
                 for member in recruitment.vacancy_id.vac_del_team_id:
-                    role_map = 'member'
+                    role_map = 'panel_member'
                     if member.role:
-                        role_clean = member.role.lower().replace(' ', '_')
-                        if role_clean in ['chair_person', 'member', 'secretary', 'member_secretary']:
-                            role_map = role_clean
+                        role_clean = str(member.role).lower().replace(' ', '_').replace('&', '').strip()
+                        if 'chair' in role_clean:
+                            role_map = 'chairperson'
+                        elif 'sec' in role_clean:
+                            role_map = 'secretary'
+                        elif 'obs' in role_clean or 'labor' in role_clean:
+                            role_map = 'observer'
+                        else:
+                            role_map = 'panel_member'
+
                     delegation_lines.append((0, 0, {
                         'role': role_map,
-                        'employee_name': member.employee_name.id,
-                        'alternate_committee_member': member.alternate_committee_member.id,
+                        'employee_name': member.employee_name.id if member.employee_name else False,
+                        'alternate_committee_member': member.alternate_committee_member.id if member.alternate_committee_member else False,
                         'status': 'active',
                     }))
 
@@ -299,6 +306,11 @@ class ExternalShortlistChoiceWizard(models.TransientModel):
 
         # Mark shortlisting as done — hides the Shortlist button on the form
         recruitment.write({'shortlisting_done': True})
+        if recruitment.vacancy_id:
+            recruitment.vacancy_id.write({
+                'shortlist_done': True,
+                'recruitment_step': 'notify_cand',
+            })
 
         return {
             'name': _('External Recruitment Selected Candidates'),

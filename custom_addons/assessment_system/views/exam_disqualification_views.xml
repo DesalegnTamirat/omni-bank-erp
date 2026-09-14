@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View: Disqualification Logs -->
+    <record id="view_exam_disqualification_log_tree" model="ir.ui.view">
+        <field name="name">exam.disqualification.log.list</field>
+        <field name="model">exam.disqualification.log</field>
+        <field name="arch" type="xml">
+            <list string="Disqualification Logs" create="0" delete="0">
+                <field name="name"/>
+                <field name="timestamp"/>
+                <field name="candidate_code"/>
+                <field name="candidate_name"/>
+                <field name="session_id"/>
+                <field name="violation_type"/>
+                <field name="is_reversed" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Disqualification Log -->
+    <record id="view_exam_disqualification_log_form" model="ir.ui.view">
+        <field name="name">exam.disqualification.log.form</field>
+        <field name="model">exam.disqualification.log</field>
+        <field name="arch" type="xml">
+            <form string="Assessment Disqualification Record" create="0" delete="0">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Log Reference"/>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="candidate_code"/>
+                            <field name="candidate_name"/>
+                            <field name="attempt_id"/>
+                            <field name="session_id"/>
+                        </group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="violation_type"/>
+                            <field name="is_reversed"/>
+                        </group>
+                    </group>
+                    <group string="Violation Evidence Details">
+                        <field name="reason" readonly="1"/>
+                    </group>
+                    <group string="Reversal History" invisible="not is_reversed">
+                        <group>
+                            <field name="reversed_by_user_id"/>
+                            <field name="reversal_date"/>
+                        </group>
+                        <group>
+                            <field name="reversal_reason"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: Disqualification Logs -->
+    <record id="action_exam_disqualification_logs" model="ir.actions.act_window">
+        <field name="name">Disqualification Logs</field>
+        <field name="res_model">exam.disqualification.log</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Form View: Disqualification Appeal -->
+    <record id="view_exam_disqualification_appeal_form" model="ir.ui.view">
+        <field name="name">exam.disqualification.appeal.form</field>
+        <field name="model">exam.disqualification.appeal</field>
+        <field name="arch" type="xml">
+            <form string="Disqualification Appeal Request">
+                <header>
+                    <button name="action_approve_appeal" string="Uphold Appeal &amp; Reverse Disqualification" type="object" invisible="state != 'submitted'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_reject_appeal" string="Reject Appeal" type="object" invisible="state != 'submitted'" class="btn-danger" groups="custom_recruitment.group_recruitment_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="submitted,approved,rejected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Appeal Reference"/>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="candidate_name"/>
+                            <field name="candidate_code"/>
+                            <field name="disqualification_log_id"/>
+                        </group>
+                        <group>
+                            <field name="create_date" string="Submission Date"/>
+                            <field name="reviewer_user_id"/>
+                            <field name="review_date"/>
+                        </group>
+                    </group>
+                    <group string="Candidate Statement">
+                        <field name="appeal_reason" readonly="state != 'submitted'"/>
+                    </group>
+                    <group string="Review Decision">
+                        <field name="review_comments" placeholder="Provide justification for upholding or rejecting this appeal..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Appeals -->
+    <record id="view_exam_disqualification_appeal_tree" model="ir.ui.view">
+        <field name="name">exam.disqualification.appeal.list</field>
+        <field name="model">exam.disqualification.appeal</field>
+        <field name="arch" type="xml">
+            <list string="Disqualification Appeals" decoration-info="state == 'submitted'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'">
+                <field name="name"/>
+                <field name="candidate_code"/>
+                <field name="candidate_name"/>
+                <field name="create_date" string="Date Submitted"/>
+                <field name="reviewer_user_id"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Disqualification Appeals -->
+    <record id="action_exam_disqualification_appeals" model="ir.actions.act_window">
+        <field name="name">Candidate Appeals</field>
+        <field name="res_model">exam.disqualification.appeal</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

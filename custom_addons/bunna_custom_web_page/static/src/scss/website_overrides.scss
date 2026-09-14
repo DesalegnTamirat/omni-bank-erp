@@ -1,41 +1,40 @@
-/* Public Banking Portal Header Styling */
+/* Corporate Brand Web Header Styling */
 header .navbar {
-    background-color: #1d2b32  !important; /* Forces Deep Espresso container layout */
-    border-bottom: 2px solid #A07855 !important; /* Fine accent line underneath the header */
+    background-color: #1d2b32 !important; /* Dark Slate Navy header */
+    border-bottom: 3px solid #425727 !important; /* Forest Green Accent border line */
 }
 
 /* Nav Link Treatments */
 header .navbar .nav-link {
-    color: #FDFBF7 !important; /* Soft milk froth readable text color */
+    color: #f7f9f5 !important;
     font-weight: 500 !important;
 
     &:hover {
-        color: #D4B996 !important; /* Creamy Foam highlights on focus hover */
+        color: #c17540 !important; /* Warm Orange highlight */
     }
 }
 
-/* Call-to-Action Primary Buttons (e.g., Online Banking Sign-In) */
+/* Call-to-Action Primary Buttons */
 header .navbar .btn-primary,
 .oe_structure .btn-primary {
-    background-color: #A07855 !important; /* Warm Latte buttons */
-    border-color: #A07855 !important;
-    color: #FFFFFF !important;
+    background-color: #425727 !important; /* Forest Green buttons */
+    border-color: #425727 !important;
+    color: #ffffff !important;
 
     &:hover {
-        background-color: #8C6646 !important; /* Rich darker shade during interaction */
-        border-color: #8C6646 !important;
+        background-color: #35471f !important;
+        border-color: #35471f !important;
     }
 }
 
-
-
 :root {
-    --o-brand-primary: #1d2b32 ;
-    --o-brand-secondary: #D4B996;
+    --o-brand-primary: #425727;
+    --o-brand-secondary: #726732;
+    --o-brand-accent: #c17540;
+    --o-brand-navy: #1d2b32;
 }
 
-
 .o_web_client {
-    --btn-primary-bg: #A07855;
-    --btn-primary-border: #A07855;
+    --btn-primary-bg: #425727;
+    --btn-primary-border: #425727;
 }

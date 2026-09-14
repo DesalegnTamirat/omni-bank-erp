@@ -10,6 +10,9 @@
             <field name="model">candidate.profile</field>
             <field name="arch" type="xml">
                 <form string="Candidate Master Profile / Electronic CV">
+                    <header>
+                        <button name="action_preview_cv" string="Preview CV Document" type="object" class="btn-primary" icon="fa-eye" invisible="not cv_file"/>
+                    </header>
                     <sheet>
                         <div class="oe_button_box" name="button_box">
                             <button class="oe_stat_button" icon="fa-briefcase" type="action"
@@ -57,6 +60,9 @@
                         </group>
 
                         <notebook>
+                            <page string="CV Document Preview" name="cv_preview_page">
+                                <field name="cv_preview_html" nolabel="1" widget="html"/>
+                            </page>
                             <page string="Education" name="education_page">
                                 <field name="education_ids">
                                     <list editable="bottom">
