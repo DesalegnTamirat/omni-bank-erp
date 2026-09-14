@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_onboarding_induction.OnboardingDashboard">
+        <div class="o_onboarding_dashboard">
+
+            <!-- Header -->
+            <div class="o_ob_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4">
+                <h2 class="o_ob_dashboard_title mb-0">Onboarding &amp; Induction Dashboard</h2>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select o_ob_period_select" style="width:150px;"
+                            t-on-change="onPeriodChange">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    <!-- Custom date range inputs — shown only when Custom Range is selected -->
+                    <div t-if="state.period === 'custom'" class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateFrom"
+                               t-on-change="onDateFromChange"/>
+                        <span class="text-muted fw-bold">–</span>
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateTo"
+                               t-on-change="onDateToChange"/>
+                        <button class="btn btn-primary btn-sm o_ob_apply_btn"
+                                t-on-click="applyCustomRange">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-2x" style="color:#4A261A;"/>
+            </div>
+
+            <div t-else="" class="px-4 pb-4">
+
+                <!-- SECTION 1: Onboarding Plans -->
+                <div class="o_ob_section_title mb-2">Onboarding Plans</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card o_ob_stat_total" t-on-click="openOnboardingPlans" data-state="">
+                            <div class="o_ob_stat_label">Total</div>
+                            <div class="o_ob_stat_value v-total"><t t-esc="state.stats.ob_total"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card" t-on-click="openOnboardingPlans" data-state="draft">
+                            <div class="o_ob_stat_label">Draft</div>
+                            <div class="o_ob_stat_value v-draft"><t t-esc="state.stats.ob_draft"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card o_ob_stat_warning" t-on-click="openOnboardingPlans" data-state="pre_boarding">
+                            <div class="o_ob_stat_label">Pre-Boarding</div>
+                            <div class="o_ob_stat_value v-preboard"><t t-esc="state.stats.ob_preboard"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card" t-on-click="openOnboardingPlans" data-state="work_unit_onboarding">
+                            <div class="o_ob_stat_label">Work Unit</div>
+                            <div class="o_ob_stat_value v-workunit"><t t-esc="state.stats.ob_workunit"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card o_ob_stat_positive" t-on-click="openOnboardingPlans" data-state="completed">
+                            <div class="o_ob_stat_label">Completed</div>
+                            <div class="o_ob_stat_value v-completed"><t t-esc="state.stats.ob_completed"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_ob_stat_card o_ob_stat_danger" t-on-click="openOnboardingPlans" data-state="escalated">
+                            <div class="o_ob_stat_label">Escalated</div>
+                            <div class="o_ob_stat_value v-escalated"><t t-esc="state.stats.ob_escalated"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Induction Plans + Task Tracker (side by side) -->
+                <div class="row g-3 mb-4">
+                    <!-- Induction Plans -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_ob_section_title mb-2">Corporate Induction Plans</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_total" t-on-click="openInductionPlans" data-state="">
+                                    <div class="o_ob_stat_label">Total</div>
+                                    <div class="o_ob_stat_value v-total"><t t-esc="state.stats.ind_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_warning" t-on-click="openInductionPlans" data-state="in_progress">
+                                    <div class="o_ob_stat_label">In Progress</div>
+                                    <div class="o_ob_stat_value v-progress"><t t-esc="state.stats.ind_progress"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_positive" t-on-click="openInductionPlans" data-state="completed">
+                                    <div class="o_ob_stat_label">Completed</div>
+                                    <div class="o_ob_stat_value v-completed"><t t-esc="state.stats.ind_completed"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Task Tracker -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_ob_section_title mb-2">Onboarding Tasks</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_total" t-on-click="openTasks" data-state="">
+                                    <div class="o_ob_stat_label">Total</div>
+                                    <div class="o_ob_stat_value v-total"><t t-esc="state.stats.task_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_positive" t-on-click="openTasks" data-state="done">
+                                    <div class="o_ob_stat_label">Completed</div>
+                                    <div class="o_ob_stat_value v-completed"><t t-esc="state.stats.task_done"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_ob_stat_card o_ob_stat_danger" t-on-click="openTasks" data-state="overdue">
+                                    <div class="o_ob_stat_label">Overdue</div>
+                                    <div class="o_ob_stat_value v-overdue"><t t-esc="state.stats.task_overdue"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: Charts -->
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <div class="o_ob_chart_card">
+                            <div class="o_ob_chart_title">Onboarding Stage Distribution</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="obPieChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_ob_chart_card">
+                            <div class="o_ob_chart_title">Induction Progress</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="obBarChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_ob_chart_card">
+                            <div class="o_ob_chart_title">Task Completion Overview</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="obTrendChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

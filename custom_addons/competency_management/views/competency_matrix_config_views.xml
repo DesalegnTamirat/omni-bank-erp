@@ -14,23 +14,13 @@
                                 Job Grade &amp; Position Proficiency Matrix Guidelines
                             </h1>
                             <div style="font-size: 13px; color: #1d2b32;">
-                                Configure whether required proficiency levels (1-4) are determined by Job Grade or Job Position, and manage framework guidelines.
-                            </div>
-                        </div>
-
-                        <!-- Determination Mode Banner -->
-                        <div style="background-color: #F4F6F7; border: 1px solid #1d2b32; border-left: 5px solid #541718; padding: 14px 18px; border-radius: 4px; margin-bottom: 20px;">
-                            <group>
-                                <field name="proficiency_determinant" widget="radio" class="oe_inline"/>
-                            </group>
-                            <div style="font-size: 12px; color: #566573; margin-top: 6px;">
-                                <strong>Note:</strong> Selecting <em>By Job Grade</em> applies proficiency levels based on employee/role grade. Selecting <em>By Job Position</em> applies proficiency levels based on job position title.
+                                Manage baseline proficiency guidelines by Job Grade and role-specific matrix overrides by Job Position.
                             </div>
                         </div>
 
                         <notebook>
                             <!-- Tab 1: Job Grade Matrix Guidelines -->
-                            <page string="Job Grade Matrix Guidelines" invisible="proficiency_determinant != 'job_grade'">
+                            <page string="Job Grade Matrix Guidelines">
                                 <field name="grade_matrix_line_ids">
                                     <list editable="bottom">
                                         <field name="grade_id"/>
@@ -41,8 +31,8 @@
                                 </field>
                             </page>
 
-                            <!-- Tab 2: Job Position Matrix Guidelines -->
-                            <page string="Job Position Matrix Guidelines" invisible="proficiency_determinant != 'job_position'">
+                            <!-- Tab 2: Job Position Matrix Guidelines (Exceptions) -->
+                            <page string="Job Position Matrix Guidelines (Exceptions)">
                                 <field name="job_matrix_line_ids">
                                     <list editable="bottom">
                                         <field name="job_id"/>

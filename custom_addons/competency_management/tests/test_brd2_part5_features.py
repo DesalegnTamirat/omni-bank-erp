@@ -38,7 +38,6 @@ class TestBRD2Part5Features(TransactionCase):
             'name': 'Risk Management Cluster',
             'code': 'RMC_001',
             'competency_ids': [(6, 0, [self.comp1.id, self.comp2.id])],
-            'min_proficiency': '3',
         })
         self.assertTrue(cluster.id)
         

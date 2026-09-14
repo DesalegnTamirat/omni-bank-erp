@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Top-Level Root Menu for Module 14: Onboarding & Induction System -->
+    <menuitem id="menu_onboarding_induction_root"
+              name="Onboarding &amp; Induction"
+              sequence="25"
+              web_icon="custom_onboarding_induction,static/description/icon.png"
+              groups="group_onboarding_induction_user"/>
+
+    <!-- Submenu 0: Dashboard (first item) -->
+    <menuitem id="menu_onboarding_induction_dashboard"
+              name="Dashboard"
+              parent="menu_onboarding_induction_root"
+              action="action_onboarding_induction_dashboard"
+              sequence="5"/>
+
+    <!-- Submenu Category: Operational Management -->
+    <menuitem id="menu_onboarding_induction_plans_cat"
+              name="Onboarding &amp; Induction"
+              parent="menu_onboarding_induction_root"
+              sequence="10"/>
+
+    <!-- Submenu 1: Workplace Onboarding Plans -->
+    <menuitem id="menu_workplace_onboarding_plan"
+              name="Workplace Onboarding Plans"
+              parent="menu_onboarding_induction_plans_cat"
+              action="hr_onboarding_plan_action"
+              sequence="10"/>
+
+    <!-- Submenu 2: Corporate Induction Plans -->
+    <menuitem id="menu_corporate_induction_plan"
+              name="Corporate Induction Plans"
+              parent="menu_onboarding_induction_plans_cat"
+              action="hr_induction_plan_action"
+              sequence="20"/>
+
+    <!-- Submenu Category: Configuration -->
+    <menuitem id="menu_onboarding_induction_config_cat"
+              name="Configuration"
+              parent="menu_onboarding_induction_root"
+              sequence="90"
+              groups="group_onboarding_induction_officer"/>
+
+    <!-- Configuration Item 1: Induction Task Templates -->
+    <menuitem id="menu_induction_task_template"
+              name="Induction Task Templates"
+              parent="menu_onboarding_induction_config_cat"
+              action="hr_induction_task_template_action"
+              sequence="10"/>
+
+    <!-- Configuration Item 2: Onboarding Task Templates -->
+    <menuitem id="menu_onboarding_task_template"
+              name="Onboarding Task Templates"
+              parent="menu_onboarding_induction_config_cat"
+              action="hr_onboarding_task_template_action"
+              sequence="20"/>
+
+    <!-- Configuration Item 3: Scoring Weights Configuration -->
+    <menuitem id="menu_onboarding_score_config"
+              name="Scoring Weights Configuration"
+              parent="menu_onboarding_induction_config_cat"
+              action="hr_onboarding_score_config_action"
+              sequence="30"/>
+</odoo>

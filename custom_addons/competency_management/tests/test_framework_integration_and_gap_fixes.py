@@ -33,14 +33,7 @@ class TestFrameworkIntegrationAndGapFixes(TransactionCase):
 
     def test_01_competency_approval_and_retirement(self):
         """Verify competency approval workflow and auto-disappearance upon retirement."""
-        # Setup proficiency levels for draft competency
-        for lvl in ['1', '2', '3', '4']:
-            self.env['competency.proficiency.level'].create({
-                'competency_id': self.comp_draft.id,
-                'level': lvl,
-                'definition': f'Level {lvl}',
-                'behavioral_indicators': f'Indicator {lvl}',
-            })
+        self.assertEqual(len(self.comp_draft.proficiency_level_ids), 4)
         
         self.comp_draft.action_submit()
         self.assertEqual(self.comp_draft.state, 'submitted')

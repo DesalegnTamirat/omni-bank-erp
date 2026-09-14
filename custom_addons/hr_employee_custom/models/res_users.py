@@ -4,7 +4,9 @@
 # Fields and logic are unchanged.
 
 from odoo import models, fields, api, _
-
+from odoo import api, models, SUPERUSER_ID
+from odoo.exceptions import AccessDenied
+from odoo.modules.registry import Registry
 
 class User(models.Model):
     _inherit = 'res.users'
@@ -111,3 +113,144 @@ class ResUsersOperatingUnit(models.Model):
         for user in self:
             user.assigned_operating_unit_ids = user.operating_unit_ids
         self.env.registry.clear_cache()
+
+
+
+class Users(models.Model):
+    _inherit = 'res.users'
+
+    def _has_valid_employee_and_contract(self):
+        """
+        Validates whether the user has both:
+        1. An active record in hr.employee (Master Data)
+        2. An active record in hr.version (Contract Data)
+        System Administrators (SUPERUSER_ID or base.group_system) are always valid.
+        """
+        self.ensure_one()
+        if self.id == SUPERUSER_ID or self.has_group('base.group_system'):
+            return True
+
+        employee = self.env['hr.employee'].sudo().search([
+            ('user_id', '=', self.id),
+            ('active', '=', True),
+        ], limit=1)
+        if not employee:
+            return False
+
+        has_contract = self.env['hr.version'].sudo().search_count([
+            ('employee_id', '=', employee.id),
+            ('active', '=', True),
+        ])
+        return bool(has_contract)
+
+    def _get_employee_validation_status(self):
+        """
+        Returns a dictionary indicating the status of master and contract data.
+        """
+        self.ensure_one()
+        if self.id == SUPERUSER_ID or self.has_group('base.group_system'):
+            return {'is_valid': True, 'missing_master': False, 'missing_contract': False}
+
+        employee = self.env['hr.employee'].sudo().search([
+            ('user_id', '=', self.id),
+            ('active', '=', True),
+        ], limit=1)
+        if not employee:
+            return {'is_valid': False, 'missing_master': True, 'missing_contract': True}
+
+        has_contract = self.env['hr.version'].sudo().search_count([
+            ('employee_id', '=', employee.id),
+            ('active', '=', True),
+        ])
+        return {
+            'is_valid': bool(has_contract),
+            'missing_master': False,
+            'missing_contract': not bool(has_contract),
+        }
+
+    def _login(self, credential, user_agent_env=None):
+        try:
+            return super()._login(credential, user_agent_env=user_agent_env)
+        except AccessDenied:
+            login = credential.get('login', '')
+            self.env.cr.execute("SELECT id FROM res_users WHERE lower(login)=%s", (login.lower().strip(),))
+            res = self.env.cr.fetchone()
+            if res:
+                raise
+
+            Ldap = self.env['res.company.ldap'].sudo()
+            for conf in Ldap._get_ldap_dicts():
+                entry = Ldap._authenticate(conf, login, credential.get('password'))
+                if entry:
+                    return {
+                        'uid': Ldap._get_or_create_user(conf, login, entry),
+                        'auth_method': 'ldap',
+                        'mfa': 'default',
+                    }
+            raise
+
+    def _check_credentials(self, credential, env):
+        try:
+            return super()._check_credentials(credential, env)
+        except AccessDenied:
+            if not (isinstance(credential, dict) and credential.get('type') == 'password' and credential.get('password')):
+                raise
+            env_interactive = env.get('interactive', False) if isinstance(env, dict) else False
+            has_rpc_api_keys_only = hasattr(self.env.user, '_rpc_api_keys_only') and self.env.user._rpc_api_keys_only()
+            passwd_allowed = env_interactive or not has_rpc_api_keys_only
+            if passwd_allowed and self.env.user.active:
+                Ldap = self.env['res.company.ldap'].sudo()
+                for conf in Ldap._get_ldap_dicts():
+                    if Ldap._authenticate(conf, self.env.user.login, credential['password']):
+                        return {
+                            'uid': self.env.user.id,
+                            'auth_method': 'ldap',
+                            'mfa': 'default',
+                        }
+            raise
+
+    @api.model
+    def change_password(self, old_passwd, new_passwd):
+        if new_passwd:
+            Ldap = self.env['res.company.ldap'].sudo()
+            for conf in Ldap._get_ldap_dicts():
+                changed = Ldap._change_password(conf, self.env.user.login, old_passwd, new_passwd)
+                if changed:
+                    self.env.user._set_empty_password()
+                    return True
+        return super().change_password(old_passwd, new_passwd)
+
+    def _set_empty_password(self):
+        self.flush_recordset(['password'])
+        self.env.cr.execute(
+            'UPDATE res_users SET password=NULL WHERE id=%s',
+            (self.id,)
+        )
+        self.invalidate_recordset(['password'])
+
+    @api.model
+    def _register_hook(self):
+        super()._register_hook()
+        base_group = self.env.ref('base.group_user', raise_if_not_found=False)
+        user_group = self.env.ref('hr_employee_custom.group_hr_employee_user', raise_if_not_found=False)
+        if base_group and user_group and user_group not in base_group.implied_ids:
+            base_group.sudo().write({'implied_ids': [(4, user_group.id)]})
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        users = super().create(vals_list)
+        user_group = self.env.ref('hr_employee_custom.group_hr_employee_user', raise_if_not_found=False)
+        if user_group:
+            for user in users:
+                if user.has_group('base.group_user') and not user.has_group('hr_employee_custom.group_hr_employee_user'):
+                    user.sudo().write({'group_ids': [(4, user_group.id)]})
+        return users
+
+    def write(self, vals):
+        res = super().write(vals)
+        user_group = self.env.ref('hr_employee_custom.group_hr_employee_user', raise_if_not_found=False)
+        if user_group and ('group_ids' in vals or 'groups_id' in vals):
+            for user in self:
+                if user.has_group('base.group_user') and not user.has_group('hr_employee_custom.group_hr_employee_user'):
+                    user.sudo().write({'group_ids': [(4, user_group.id)]})
+        return res

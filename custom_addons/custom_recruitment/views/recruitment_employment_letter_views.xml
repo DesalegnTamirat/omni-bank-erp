@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree View -->
+    <record id="view_recruitment_employment_letter_tree" model="ir.ui.view">
+        <field name="name">recruitment.employment.letter.tree</field>
+        <field name="model">recruitment.employment.letter</field>
+        <field name="arch" type="xml">
+            <list string="Employment Letters" sample="1" decoration-info="state == 'draft'" decoration-success="state in ['sent', 'issued']" decoration-danger="state == 'cancelled'">
+                <field name="name"/>
+                <field name="letter_date"/>
+                <field name="candidate_name"/>
+                <field name="candidate_email"/>
+                <field name="job_position_name"/>
+                <field name="job_grade_name"/>
+                <field name="work_unit_name"/>
+                <field name="monthly_salary" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                <field name="is_managerial" widget="boolean_toggle" string="Managerial"/>
+                <field name="probation_days" string="Probation (Days)"/>
+                <field name="effective_date"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-success="state in ['sent', 'issued']"
+                       decoration-danger="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_recruitment_employment_letter_form" model="ir.ui.view">
+        <field name="name">recruitment.employment.letter.form</field>
+        <field name="model">recruitment.employment.letter</field>
+        <field name="arch" type="xml">
+            <form string="Employment Letter">
+                <header>
+                    <button name="action_send_letter"
+                            string="Send Employment Letter"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-envelope"
+                            invisible="state == 'cancelled'"/>
+                    <button name="action_print_employment_letter"
+                            string="Print Employment Letter"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-print"
+                            invisible="state == 'cancelled'"/>
+                    <button name="action_draft"
+                            string="Set to Draft"
+                            type="object"
+                            invisible="state != 'cancelled'"/>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,sent"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Letter Reference"/>
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                        <label for="candidate_name" string="Candidate Name"/>
+                        <h2>
+                            <field name="candidate_name" placeholder="Full Candidate Name" readonly="state == 'issued'"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group string="Candidate &amp; Application">
+                            <field name="applicant_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="vacancy_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="candidate_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="candidate_title" readonly="state in ['sent', 'issued']"/>
+                            <field name="candidate_email" readonly="state in ['sent', 'issued']"/>
+                            <field name="candidate_address" readonly="state in ['sent', 'issued']"/>
+                            <field name="id_no" readonly="state in ['sent', 'issued']"/>
+                        </group>
+                        <group string="Placement &amp; Schedule">
+                            <field name="letter_date" readonly="state in ['sent', 'issued']"/>
+                            <field name="effective_date" readonly="state in ['sent', 'issued']"/>
+                            <field name="job_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="job_position_name" readonly="state in ['sent', 'issued']"/>
+                            <field name="job_grade_name" readonly="state in ['sent', 'issued']"/>
+                            <field name="work_unit_id" readonly="state in ['sent', 'issued']"/>
+                            <field name="work_unit_name" readonly="state in ['sent', 'issued']"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Compensation &amp; Probation" name="compensation_page">
+                            <group>
+                                <group string="Salary Details">
+                                    <field name="monthly_salary" readonly="state in ['sent', 'issued']"/>
+                                    <field name="salary_words" readonly="state in ['sent', 'issued']"/>
+                                </group>
+                                <group string="Probation Period">
+                                    <field name="is_managerial" widget="boolean_toggle" readonly="state in ['sent', 'issued']"/>
+                                    <field name="probation_days" readonly="state in ['sent', 'issued']"/>
+                                    <field name="probation_eval_days" readonly="state in ['sent', 'issued']"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Signatory &amp; Distribution" name="signatory_page">
+                            <group>
+                                <group string="Signatory">
+                                    <field name="signatory_title" readonly="state in ['sent', 'issued']"/>
+                                    <field name="signatory_company" readonly="state in ['sent', 'issued']"/>
+                                </group>
+                                <group string="Distribution (CC)">
+                                    <field name="cc_district_or_work_unit" readonly="state in ['sent', 'issued']"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Hired Employee Record" name="employee_page" invisible="not employee_id">
+                            <group>
+                                <field name="employee_id" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_recruitment_employment_letter_search" model="ir.ui.view">
+        <field name="name">recruitment.employment.letter.search</field>
+        <field name="model">recruitment.employment.letter</field>
+        <field name="arch" type="xml">
+            <search string="Search Employment Letters">
+                <field name="name"/>
+                <field name="candidate_name"/>
+                <field name="candidate_email"/>
+                <field name="job_position_name"/>
+                <field name="work_unit_name"/>
+                <field name="applicant_id"/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_sent" string="Sent" domain="[('state', '=', 'sent')]"/>
+                <filter name="filter_managerial" string="Managerial (70 Days)" domain="[('is_managerial', '=', True)]"/>
+                <filter name="filter_non_managerial" string="Non-Managerial (60 Days)" domain="[('is_managerial', '=', False)]"/>
+                <group>
+                    <filter name="group_by_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_by_work_unit" string="Work Unit" context="{'group_by': 'work_unit_name'}"/>
+                    <filter name="group_by_job" string="Job Position" context="{'group_by': 'job_position_name'}"/>
+                    <filter name="group_by_probation" string="Probation Period" context="{'group_by': 'probation_days'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Window -->
+    <record id="action_recruitment_employment_letter" model="ir.actions.act_window">
+        <field name="name">Employment Letters</field>
+        <field name="res_model">recruitment.employment.letter</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_recruitment_employment_letter_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No employment letters found!
+            </p>
+            <p>
+                Employment letters are generated for external candidates once all pre-employment verification prerequisites are cleared.
+            </p>
+        </field>
+    </record>
+</odoo>

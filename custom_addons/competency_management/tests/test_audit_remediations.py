@@ -951,12 +951,68 @@ class TestAuditRemediations(TransactionCase):
             ('user_id', '=', self.user_emp_a.id),
             ('res_id', 'in', [asm_self.id, asm_sup.id]),
         ])
-        self.assertTrue(emp_activities, "Systray activity item must be scheduled for Employee when coach submits evaluation")
-        self.assertIn("Supervisor Assessment Completed", emp_activities.mapped('summary'))
+        self.assertTrue(any("Supervisor Assessment Completed" in (s or '') for s in emp_activities.mapped('summary')), "Supervisor Assessment Completed summary expected in employee activities")
 
         # 3. Verify view_my_competency_evaluation_line_list default_order attribute
         view = self.env.ref('competency_management.view_my_competency_evaluation_line_list')
         self.assertIn('default_order="cycle_id desc, id desc"', view.arch)
+
+    def test_matrix_determinant_job_position_first_fallback(self):
+        """Verify proficiency level determination checks Job Position first, falling back to Job Grade if not set."""
+        config = self.env['competency.matrix.config'].get_active_config()
+
+        # Setup test grade
+        test_grade = self.env['employee.grade'].create({'grade_code': 'TEST_G1', 'grade_name': 'Test Grade 1', 'salary_factor': 1.5})
+        # Add grade matrix requirement
+        self.env['competency.grade.matrix'].create({
+            'config_id': config.id,
+            'grade_id': test_grade.id,
+            'required_core_level': '3',
+            'required_leadership_level': '2',
+            'required_technical_level': '3',
+        })
+
+        # Test job position without job matrix record -> Should fallback to grade matrix
+        req_core_fallback = self.Assessment._get_matrix_required_level('core', grade=test_grade, job=self.job_pos)
+        self.assertEqual(req_core_fallback, '3', "Should fallback to Job Grade matrix level when Job Position matrix is not configured")
+
+        # Now add job matrix requirement for job_pos
+        self.env['competency.job.matrix'].create({
+            'config_id': config.id,
+            'job_id': self.job_pos.id,
+            'required_core_level': '4',
+            'required_leadership_level': '4',
+            'required_technical_level': '4',
+        })
+
+        # Test job position with job matrix record -> Should evaluate job matrix first
+        req_core_job = self.Assessment._get_matrix_required_level('core', grade=test_grade, job=self.job_pos)
+        self.assertEqual(req_core_job, '4', "Should prioritize Job Position matrix over Job Grade matrix when configured")
+
+    def test_custom_rating_model_5_scale_generation(self):
+        """Verify creating a 5-point proficiency scale rating model generates 5 lines and populates competency levels accordingly."""
+        RatingModel = self.env['competency.rating.model']
+        rm5 = RatingModel.create({
+            'name': '5 Point Proficiency Scale Test',
+            'code': '5SCALE_TEST',
+            'max_rating': 5,
+        })
+        rm5._sync_level_lines()
+        self.assertEqual(len(rm5.line_ids), 5)
+        names = rm5.line_ids.mapped('name')
+        self.assertEqual(names, ['Very Bad', 'Bad', 'Good', 'Better', 'Best'])
+
+        comp = self.Competency.create({
+            'name': '5-Scale Test Competency',
+            'code': 'COMP-5S-01',
+            'pillar': 'technical',
+            'rating_model_id': rm5.id,
+        })
+        self.assertEqual(len(comp.proficiency_level_ids), 5)
+        comp_level_names = comp.proficiency_level_ids.mapped('name')
+        self.assertEqual(comp_level_names, ['Very Bad', 'Bad', 'Good', 'Better', 'Best'])
+
+
 
 
 

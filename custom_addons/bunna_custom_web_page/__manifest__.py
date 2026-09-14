@@ -4,8 +4,8 @@
     'version': '19.0.1.0.0',
     'summary': 'Adds a dynamic frontend page and custom website menu.',
     'category': 'Website',
-    'author': 'Desalegn & Abeza',
-    'depends': ['base', 'web', 'website'],
+    'author': 'EAD Team',
+    'depends': ['base', 'web', 'website', 'custom_recruitment'],
     'data': [
         'views/templates.xml',
     ],

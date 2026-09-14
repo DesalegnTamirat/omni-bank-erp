@@ -9,6 +9,7 @@
                 <field name="name"/>
                 <field name="vacancy_id"/>
                 <field name="recruitment_type"/>
+                <field name="approval_hierarchy_type" optional="show"/>
                 <field name="meeting_date"/>
                 <field name="is_fully_signed" widget="boolean_toggle"/>
                 <field name="state" decoration-info="state == 'draft'" decoration-warning="state == 'pending_approval'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'"/>
@@ -25,6 +26,7 @@
                 <header>
                     <button name="action_submit_to_committee" string="Submit &amp; Notify Panel for Digital Sign-Off" type="object" class="btn-primary" icon="fa-paper-plane" invisible="state != 'draft'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                     <button name="action_load_from_vacancy" string="Load Panel &amp; Candidates" type="object" class="btn-secondary" icon="fa-refresh" invisible="state == 'approved'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_generate_signature_lines" string="Re-generate Committee Roles" type="object" class="btn-secondary" icon="fa-users" invisible="state != 'draft'" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                     <button name="action_notify_panel_members" string="Notify Panel for Digital Sign-Off" type="object" class="btn-secondary" icon="fa-envelope" invisible="state in ('draft', 'approved') or panel_notified == True" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,pending_approval,approved"/>
                 </header>
@@ -45,6 +47,13 @@
                             <field name="meeting_date" readonly="state != 'draft'"/>
                             <field name="is_fully_signed" widget="boolean"/>
                         </group>
+                        <group string="Approval Hierarchy &amp; Committee Roles">
+                            <field name="approval_hierarchy_type" widget="radio" readonly="state != 'draft'"/>
+                            <field name="chairperson_id" readonly="state != 'draft'"/>
+                            <field name="panel_member_id" readonly="state != 'draft'"/>
+                            <field name="secretary_id" readonly="state != 'draft'"/>
+                            <field name="observer_id" readonly="state != 'draft'" invisible="approval_hierarchy_type == 'ho_district_grade2_plus'"/>
+                        </group>
                     </group>
                     <notebook>
                         <page string="Ranked Candidates" name="ranked_candidates">
@@ -62,16 +71,21 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Committee Signatures" name="committee_signatures">
-                            <field name="committee_signature_ids">
-                                <list string="Committee Signatures" editable="bottom">
-                                    <field name="user_id"/>
-                                    <field name="role"/>
-                                    <field name="signature_img" widget="signature"/>
-                                    <field name="state" readonly="1"/>
-                                    <field name="signed_date" readonly="1"/>
-                                    <field name="remarks"/>
-                                    <button name="action_sign_minute" string="Sign Minute" type="object" class="btn-sm btn-success" invisible="state == 'signed'"/>
+                        <page string="Committee Digital Signatures" name="committee_signatures">
+                            <field name="committee_signature_ids" readonly="state == 'approved'">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-success="state == 'signed'"
+                                      decoration-warning="state == 'pending' and is_mandatory"
+                                      decoration-muted="state == 'pending' and not is_mandatory">
+                                    <field name="role_label" readonly="1" string="Role Title"/>
+                                    <field name="user_id" readonly="1" string="Signatory User"/>
+                                    <field name="is_mandatory" readonly="1" widget="boolean_toggle" string="Mandatory?"/>
+                                    <field name="digital_signature" widget="signature"/>
+                                    <field name="signed_on" readonly="1" string="Signed Date &amp; Time"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'signed'"
+                                           decoration-warning="state == 'pending'"/>
+                                    <button name="action_sign_digitally" string="Confirm Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
                                 </list>
                             </field>
                         </page>

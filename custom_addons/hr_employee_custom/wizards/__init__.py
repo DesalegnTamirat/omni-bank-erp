@@ -14,3 +14,5 @@ from . import salary_details_wizard
 from . import service_request_completion_wizard
 from . import service_request_rejection_wizard
 from . import transaction_api
+from . import hr_employee_delegation_cancel_wizard
+

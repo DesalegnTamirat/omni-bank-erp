@@ -240,38 +240,38 @@ class CompetencyAssessmentCycle(models.Model):
                     existing_pairs.add(pair_team)
 
             # 4 & 5. Peer & Subordinate Assessments
-            if c_id:
-                siblings = [s for s in coach_to_reports.get(c_id, []) if s != emp_id]
-                peers = [s for s in siblings if emp_map[s]['job_id'] == info['job_id']]
-                subs = [s for s in siblings if emp_map[s]['job_id'] != info['job_id']]
+            evaluator_emp = self.env['hr.employee'].browse(emp_id)
+            eligible_peers = self.env['competency.assessment']._get_eligible_peers_for_emp(evaluator_emp).ids
+            eligible_subs = self.env['competency.assessment']._get_eligible_subordinates_for_emp(evaluator_emp).ids
 
-                sampled_peers = random.sample(peers, min(len(peers), max_peers)) if peers else []
-                sampled_subs = random.sample(subs, min(len(subs), max_subs)) if subs else []
+            sampled_peers = random.sample(eligible_peers, min(len(eligible_peers), max_peers)) if eligible_peers else []
+            sampled_subs = random.sample(eligible_subs, min(len(eligible_subs), max_subs)) if eligible_subs else []
 
-                total_eligible_raters += len(peers) + len(subs)
-                total_sampled_raters += len(sampled_peers) + len(sampled_subs)
+            total_eligible_raters += len(eligible_peers) + len(eligible_subs)
+            total_sampled_raters += len(sampled_peers) + len(sampled_subs)
 
-                for p_id in sampled_peers:
-                    pair_peer = (p_id, u_id, 'peer')
-                    if pair_peer not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': p_id,
-                            'assessor_id': u_id,
-                            'assessment_type': 'peer',
-                        })
-                        existing_pairs.add(pair_peer)
+            for p_id in sampled_peers:
+                pair_peer = (p_id, u_id, 'peer')
+                if pair_peer not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': p_id,
+                        'assessor_id': u_id,
+                        'assessment_type': 'peer',
+                    })
+                    existing_pairs.add(pair_peer)
 
-                for s_id in sampled_subs:
-                    pair_sub = (s_id, u_id, 'subordinate')
-                    if pair_sub not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': s_id,
-                            'assessor_id': u_id,
-                            'assessment_type': 'subordinate',
-                        })
-                        existing_pairs.add(pair_sub)
+            for s_id in sampled_subs:
+                pair_sub = (s_id, u_id, 'subordinate')
+                if pair_sub not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': s_id,
+                        'assessor_id': u_id,
+                        'assessment_type': 'subordinate',
+                    })
+                    existing_pairs.add(pair_sub)
+
 
         # Record auditable sampling log
         self.sudo().write({
@@ -354,12 +354,147 @@ class CompetencyAssessment(models.Model):
         selection='_get_assessment_type_selection', string='Assessment Type',
         required=True, tracking=True)
 
+    @api.model
+    def _get_employee_ou_id(self, emp):
+        if not emp:
+            return False
+        if getattr(emp, 'default_operating_unit_id', False):
+            return emp.default_operating_unit_id.id
+        if emp.department_id and getattr(emp.department_id, 'operating_unit_id', False):
+            return emp.department_id.operating_unit_id.id
+        return False
+
+    @api.model
+    def _get_employee_grade_id(self, emp):
+        if not emp:
+            return False
+        job = emp.job_id
+        if job:
+            g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+            if g:
+                return g.id
+        g = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade_id', False)
+        return g.id if g else False
+
+    @api.model
+    def _is_director_emp(self, emp):
+        if not emp or not emp.job_id:
+            return False
+        job_name = emp.job_id.name or ''
+        return 'director' in job_name.lower()
+
+    @api.model
+    def _is_district_manager_emp(self, emp):
+        if not emp or not emp.job_id:
+            return False
+        job_name = emp.job_id.name or ''
+        return 'district manager' in job_name.lower() or ('district' in job_name.lower() and 'manager' in job_name.lower())
+
+    @api.model
+    def _get_eligible_subordinates_for_emp(self, emp):
+        """Get eligible subordinate evaluatees for evaluator employee emp.
+        Criteria:
+        1. emp's coach/supervisor (assessing coach = subordinate assessment type from employee side)
+        2. Same coach + same Operating Unit + different Job Position
+        Note: Assessing direct reports is classified under assessment type 'team', not 'subordinate'.
+        """
+        if not emp:
+            return self.env['hr.employee']
+
+        subs = self.env['hr.employee']
+
+        # 1. Coach / supervisor (evaluating coach = subordinate type)
+        coach = getattr(emp, 'coach_id', False) or emp.parent_id
+        if coach and coach.id != emp.id:
+            subs |= coach
+
+        # 2. Same coach + same OU + different job position
+        if coach:
+            emp_ou_id = self._get_employee_ou_id(emp)
+            domain = [
+                ('id', '!=', emp.id),
+                '|', ('parent_id', '=', coach.id), ('coach_id', '=', coach.id),
+            ]
+            if emp.job_id:
+                domain.append(('job_id', '!=', emp.job_id.id))
+
+            siblings = self.env['hr.employee'].search(domain)
+            if emp_ou_id:
+                siblings = siblings.filtered(lambda s: self._get_employee_ou_id(s) == emp_ou_id)
+            subs |= siblings
+
+        return subs
+
+
+    @api.model
+    def _get_eligible_peers_for_emp(self, emp):
+        """Get eligible peer evaluatees for evaluator employee emp.
+        Scenario 3 (Director): resolved via competency.director.peer.config.
+        Scenario 2 (District Manager): same coach + same job position + same job grade (across OUs).
+        Scenario 1 (Non-Manager & HO Manager): same coach + same OU + same job position + same job grade.
+        """
+        if not emp:
+            return self.env['hr.employee']
+
+        peers = self.env['hr.employee']
+
+        # Scenario 3: Director
+        if self._is_director_emp(emp):
+            config = self.env['competency.director.peer.config'].search([('director_id', '=', emp.id)], limit=1)
+            if config and config.peer_ids:
+                peers |= config.peer_ids
+            other_configs = self.env['competency.director.peer.config'].search([('peer_ids', 'in', [emp.id])])
+            if other_configs:
+                peers |= other_configs.mapped('director_id')
+            if peers:
+                return peers.filtered(lambda p: p.id != emp.id)
+
+        coach = getattr(emp, 'coach_id', False) or emp.parent_id
+        if not coach:
+            if emp.department_id:
+                peers |= self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)], limit=20)
+            return peers
+
+        emp_grade_id = self._get_employee_grade_id(emp)
+        emp_ou_id = self._get_employee_ou_id(emp)
+
+        domain = [
+            ('id', '!=', emp.id),
+            '|', ('parent_id', '=', coach.id), ('coach_id', '=', coach.id),
+        ]
+        if emp.job_id:
+            domain.append(('job_id', '=', emp.job_id.id))
+
+        candidates = self.env['hr.employee'].search(domain)
+
+        # Scenario 2: District Manager (allows across OUs)
+        if self._is_district_manager_emp(emp):
+            if emp_grade_id:
+                candidates = candidates.filtered(lambda c: self._get_employee_grade_id(c) == emp_grade_id)
+            peers |= candidates
+        else:
+            # Scenario 1: Non-Manager & HO Manager (same OU + same grade)
+            if emp_ou_id:
+                candidates = candidates.filtered(lambda c: self._get_employee_ou_id(c) == emp_ou_id)
+            if emp_grade_id:
+                candidates = candidates.filtered(lambda c: self._get_employee_grade_id(c) == emp_grade_id)
+            peers |= candidates
+
+        if not peers and coach:
+            fallback = self.env['hr.employee'].search([
+                ('id', '!=', emp.id),
+                '|', ('parent_id', '=', coach.id), ('coach_id', '=', coach.id)
+            ], limit=20)
+            peers |= fallback
+
+        return peers
+
     @api.onchange('assessment_type')
     def _onchange_assessment_type_set_employee_domain(self):
         """Rule 2: Restrict employee selection domain strictly based on chosen assessment type and auto-assign valid default."""
         user = self.env.user
         emp = user.employee_id
-        
+
         if self.assessment_type == 'self':
             if emp:
                 self.employee_id = emp.id
@@ -370,20 +505,16 @@ class CompetencyAssessment(models.Model):
             return {'domain': {'employee_id': [('id', '=', False)]}}
 
         if self.assessment_type == 'peer':
-            # Peer selection: same manager or same department (excluding self)
-            peers = self.env['hr.employee']
-            if emp.parent_id:
-                peers |= self.env['hr.employee'].search([('parent_id', '=', emp.parent_id.id), ('id', '!=', emp.id)])
-            if emp.department_id:
-                peers |= self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
-            if not peers:
-                peers = self.env['hr.employee'].search([('id', '!=', emp.id)], limit=50)
-            
+            peers = self._get_eligible_peers_for_emp(emp)
             self.employee_id = peers[0].id if peers else False
             return {'domain': {'employee_id': [('id', 'in', peers.ids)]}}
-            
+
+        elif self.assessment_type == 'subordinate':
+            subs = self._get_eligible_subordinates_for_emp(emp)
+            self.employee_id = subs[0].id if subs else False
+            return {'domain': {'employee_id': [('id', 'in', subs.ids)]}}
+
         elif self.assessment_type == 'supervisor':
-            # Supervisor selection: parent_id, coach_id, or department manager
             supervisors = self.env['hr.employee']
             if emp.parent_id:
                 supervisors |= emp.parent_id
@@ -393,7 +524,6 @@ class CompetencyAssessment(models.Model):
                 supervisors |= emp.department_id.manager_id
 
             if not supervisors and emp.department_id:
-                # Fallback to parent department manager
                 dept = emp.department_id.parent_id
                 while dept and not supervisors:
                     if dept.manager_id and dept.manager_id.id != emp.id:
@@ -401,7 +531,6 @@ class CompetencyAssessment(models.Model):
                     dept = dept.parent_id
 
             if not supervisors:
-                # Fallback to employees with manager/director in job title
                 supervisors = self.env['hr.employee'].search([
                     ('id', '!=', emp.id),
                     '|', ('job_id.name', 'ilike', 'manager'), ('job_id.name', 'ilike', 'director')
@@ -409,17 +538,17 @@ class CompetencyAssessment(models.Model):
 
             self.employee_id = supervisors[0].id if supervisors else False
             return {'domain': {'employee_id': [('id', 'in', supervisors.ids)]}}
-            
+
         elif self.assessment_type == 'team':
-            # Team selection: direct reports or subordinates
             subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)])
             if not subordinates and emp.department_id and emp.department_id.manager_id.id == emp.id:
                 subordinates = self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
-            
+
             self.employee_id = subordinates[0].id if subordinates else False
             return {'domain': {'employee_id': [('id', 'in', subordinates.ids)]}}
 
         return {'domain': {'employee_id': []}}
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -562,21 +691,11 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _get_matrix_required_level(self, pillar, grade=False, job=False, job_name=''):
-        """Determine required proficiency level (1..4) based on configured Competency Matrix settings."""
+        """Determine required proficiency level (1..4) checking Job Position exception matrix first, then falling back to Job Grade matrix baseline."""
         config = self.env['competency.matrix.config'].get_active_config()
         
-        # 1. Configured Determinant Mode Check
-        if config.proficiency_determinant == 'job_grade' and grade:
-            g_line = self.env['competency.grade.matrix'].search([
-                ('config_id', '=', config.id),
-                ('grade_id', '=', grade.id)
-            ], limit=1)
-            if g_line:
-                if pillar == 'core': return g_line.required_core_level
-                elif pillar == 'leadership': return g_line.required_leadership_level if g_line.required_leadership_level != '0' else '1'
-                else: return g_line.required_technical_level
-                
-        elif config.proficiency_determinant == 'job_position' and job:
+        # 1. Job Position Matrix Check (Exceptions Override)
+        if job:
             j_line = self.env['competency.job.matrix'].search([
                 ('config_id', '=', config.id),
                 ('job_id', '=', job.id)
@@ -585,6 +704,17 @@ class CompetencyAssessment(models.Model):
                 if pillar == 'core': return j_line.required_core_level
                 elif pillar == 'leadership': return j_line.required_leadership_level if j_line.required_leadership_level != '0' else '1'
                 else: return j_line.required_technical_level
+
+        # 2. Job Grade Matrix Check (Baseline Standard)
+        if grade:
+            g_line = self.env['competency.grade.matrix'].search([
+                ('config_id', '=', config.id),
+                ('grade_id', '=', grade.id)
+            ], limit=1)
+            if g_line:
+                if pillar == 'core': return g_line.required_core_level
+                elif pillar == 'leadership': return g_line.required_leadership_level if g_line.required_leadership_level != '0' else '1'
+                else: return g_line.required_technical_level
 
         # Fallback to standard guidelines
         g_name = (grade.grade_name or '').lower() if grade else ''

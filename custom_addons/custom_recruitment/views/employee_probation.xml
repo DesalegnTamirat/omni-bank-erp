@@ -36,7 +36,6 @@
                     <button name="action_populate_criteria" string="Reload Evaluation Criteria" type="object" invisible="state in ('completed', 'terminated')"/>
                     <button name="action_notify_supervisor" string="Notify Evaluator" type="object" class="oe_highlight" invisible="state not in ('in_progress',) or notification_sent"/>
                     <button name="action_committee_evaluate" string="Committee Vote" type="object" class="oe_highlight" invisible="state not in ('notified', 'in_progress') or not delegation_team_ids"/>
-                    <button name="action_extend_probation" string="Extend Probation" type="object" invisible="state in ('completed', 'terminated')"/>
                     <button name="action_record_outcome" string="Record Outcome &amp; Confirm/Terminate" type="object" class="oe_highlight" invisible="state in ('completed', 'terminated')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,notified,evaluated,completed"/>
                 </header>
@@ -117,18 +116,6 @@
                             </field>
                         </page>
 
-                        <page string="Extension Details" invisible="not is_extended">
-                            <group>
-                                <group>
-                                    <field name="is_extended" readonly="1"/>
-                                    <field name="extension_days"/>
-                                </group>
-                                <group>
-                                    <field name="extension_reason"/>
-                                </group>
-                            </group>
-                        </page>
-
                         <page string="Recruitment &amp; System Metadata">
                             <group>
                                 <group>
@@ -139,6 +126,7 @@
                                     <field name="notification_sent" readonly="1"/>
                                     <field name="notification_date" readonly="1"/>
                                     <field name="in_charge_id"/>
+                                    <field name="signatory_config_id" string="Permanency Signatory Config"/>
                                 </group>
                             </group>
                         </page>
@@ -186,7 +174,6 @@
                 <filter name="filter_in_progress" string="In Progress" domain="[('state', '=', 'in_progress')]"/>
                 <filter name="filter_notified" string="Notified" domain="[('state', '=', 'notified')]"/>
                 <filter name="filter_completed" string="Completed (Confirmed)" domain="[('state', '=', 'completed')]"/>
-                <filter name="filter_extended" string="Extended" domain="[('state', '=', 'extended')]"/>
                 <filter name="filter_terminated" string="Terminated" domain="[('state', '=', 'terminated')]"/>
                 <separator/>
                 <group name="group_by">

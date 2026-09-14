@@ -7,7 +7,28 @@
             <field name="name">4-Point Proficiency Scale</field>
             <field name="code">4SCALE</field>
             <field name="max_rating">4</field>
-            <field name="description">Basic / Intermediate / Advanced / Expert rating scale with behavioral anchors.</field>
+            <field name="description">Standard 4-Level scale (Level 1 - Basic, Level 2 - Intermediate, Level 3 - Advanced, Level 4 - Expert)</field>
+            <field name="line_ids" eval="[
+                (0, 0, {'level': '1', 'name': 'Level 1 - Basic', 'sequence': 10}),
+                (0, 0, {'level': '2', 'name': 'Level 2 - Intermediate', 'sequence': 20}),
+                (0, 0, {'level': '3', 'name': 'Level 3 - Advanced', 'sequence': 30}),
+                (0, 0, {'level': '4', 'name': 'Level 4 - Expert', 'sequence': 40}),
+            ]"/>
+        </record>
+
+        <!-- 5-point rating model -->
+        <record id="rating_model_5_scale" model="competency.rating.model">
+            <field name="name">5-Point Proficiency Scale</field>
+            <field name="code">5SCALE</field>
+            <field name="max_rating">5</field>
+            <field name="description">5-Level proficiency scale (Very Bad, Bad, Good, Better, Best)</field>
+            <field name="line_ids" eval="[
+                (0, 0, {'level': '1', 'name': 'Very Bad', 'sequence': 10}),
+                (0, 0, {'level': '2', 'name': 'Bad', 'sequence': 20}),
+                (0, 0, {'level': '3', 'name': 'Good', 'sequence': 30}),
+                (0, 0, {'level': '4', 'name': 'Better', 'sequence': 40}),
+                (0, 0, {'level': '5', 'name': 'Best', 'sequence': 50}),
+            ]"/>
         </record>
 
         <!-- Core Competencies (5) — BRD Module 12 (execution mastery, professional authenticity,

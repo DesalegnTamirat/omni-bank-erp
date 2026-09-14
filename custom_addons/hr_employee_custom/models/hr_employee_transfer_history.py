@@ -1,10 +1,10 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class HrEmployeeTransferHistory(models.Model):
     _name = 'hr.employee.transfer.history'
     _description = 'Employee Transfer History'
-    _order = 'date desc'
+    _order = 'start_date desc, id desc'
 
     employee_id = fields.Many2one(
         'hr.employee',
@@ -17,6 +17,17 @@ class HrEmployeeTransferHistory(models.Model):
         string='Date',
         default=fields.Date.context_today,
         required=True,
+    )
+    start_date = fields.Date(
+        string='Start Date',
+        default=fields.Date.context_today,
+    )
+    end_date = fields.Date(
+        string='End Date',
+    )
+    is_current = fields.Boolean(
+        string='Current Transfer', compute='_compute_is_current', store=True,
+        help="True when this row has no end date.",
     )
     transfer_reason = fields.Char(string='Transfer Reason')
 
@@ -31,3 +42,8 @@ class HrEmployeeTransferHistory(models.Model):
     to_department_id = fields.Many2one('hr.department', string='To Department')
     to_job_id = fields.Many2one('hr.job', string='To Position')
     to_grade_id = fields.Many2one('employee.grade', string='To Grade')
+
+    @api.depends('end_date')
+    def _compute_is_current(self):
+        for rec in self:
+            rec.is_current = not rec.end_date

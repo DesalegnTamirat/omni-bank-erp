@@ -245,3 +245,13 @@ class HrEmployeeGradeAssignment(models.Model):
         store=True,
         readonly=False
     )
+
+
+class HrEmployeePublicGradeAssignment(models.Model):
+    _inherit = 'hr.employee.public'
+
+    grade_id = fields.Many2one(
+        'employee.grade',
+        string='Employee Grade',
+        readonly=True
+    )

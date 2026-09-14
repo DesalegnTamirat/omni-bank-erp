@@ -16,108 +16,128 @@
     <template id="report_employee_experience_letter">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="employee">
-                <t t-call="web.external_layout">
-                    <div class="page" style="font-family: Arial, sans-serif; font-size: 11pt; padding: 10mm 15mm;">
+                <!-- Helper variables directly called on hr.employee -->
+                <t t-set="salutation" t-value="employee.get_experience_letter_salutation()"/>
+                <t t-set="pronouns" t-value="employee.get_experience_letter_pronouns()"/>
+                <t t-set="ref_no" t-value="employee.get_experience_letter_ref_no()"/>
+                <t t-set="start_date" t-value="employee.get_experience_letter_start_date()"/>
+                <t t-set="histories" t-value="employee.get_sorted_job_history()"/>
+                <t t-set="salary_info" t-value="employee.get_experience_letter_salary_info()"/>
+                <t t-set="signatory" t-value="employee.get_experience_letter_signatory_name()"/>
 
-                        <!-- Date and Reference -->
-                        <div style="text-align: right; margin-bottom: 20px;">
-                            <div>Date: <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d')"/></div>
-                            <div>Ref.No: <t t-esc="employee.identification_id or ''"/></div>
-                        </div>
+                <div class="article page" t-att-data-oe-model="employee._name" t-att-data-oe-id="employee.id" style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 25px 35px 20px 35px; min-height: 1000px; position: relative;">
 
-                        <!-- Title -->
-                        <div style="text-align: center; margin-bottom: 24px;">
-                            <strong><u>To Whom It May Concern</u></strong>
-                        </div>
-
-                        <!-- Opening paragraph -->
-                        <p>
-                            Our staff member <strong><t t-esc="employee.name"/></strong> has requested us to write
-                            him/her a letter of confirmation concerning his/her work experience.
-                        </p>
-
-                        <!-- Certification paragraph -->
-                        <p>
-                            Pursuant to his/her request, we hereby certify that
-                            <strong><t t-esc="employee.name"/></strong>
-                            is a permanent employee of Bunna Bank S.C. since
-                            <strong>
-                                <t t-if="employee.first_contract_date">
-                                    <t t-esc="employee.first_contract_date"/>
+                    <!-- Official Bunna Bank Letterhead Header -->
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="width: 32%; vertical-align: middle; text-align: left;">
+                                <t t-if="employee.company_id and employee.company_id.logo">
+                                    <img t-att-src="image_data_uri(employee.company_id.logo)" style="max-height: 80px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
                                 </t>
-                                <t t-elif="employee.contract_id and employee.contract_id.date_start">
-                                    <t t-esc="employee.contract_id.date_start"/>
+                                <t t-else="">
+                                    <img src="/hr_employee_custom/static/src/img/bunna_logo.jpg" style="max-height: 80px; width: auto; object-fit: contain;" alt="Bunna Bank Logo"/>
                                 </t>
-                            </strong>
-                            in the following capacities:
-                        </p>
+                            </td>
+                            <td style="width: 68%; vertical-align: top; padding-top: 18px; padding-left: 15px;">
+                                <div style="background-color: #3b3b3b; height: 22px; width: 100%; border-radius: 1px;"></div>
+                            </td>
+                        </tr>
+                    </table>
 
-                        <!-- Job History Table -->
-                        <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-                            <thead>
-                                <tr style="background-color:#1d2632; color:white;">
-                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">Job Position</th>
-                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">Start Date</th>
-                                    <th style="padding:7px 10px; text-align:left; border:1px solid #ccc;">End Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <t t-foreach="employee.job_history_ids" t-as="jh">
+                    <!-- Date and Reference Number (Right Aligned) -->
+                    <div style="text-align: right; margin-top: 10px; margin-bottom: 25px; font-size: 13.5px; line-height: 1.5;">
+                        <div>Date: <t t-esc="context_timestamp(datetime.datetime.now()).strftime('%Y-%m-%d')"/></div>
+                        <div>Ref.No: <t t-esc="ref_no"/></div>
+                    </div>
+
+                    <!-- Title -->
+                    <div style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
+                        <span style="font-size: 15px; font-weight: bold; text-decoration: underline;">To Whom It May Concern</span>
+                    </div>
+
+                    <!-- Opening paragraph -->
+                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
+                        Our staff member <strong><t t-esc="salutation"/> <t t-esc="employee.name"/></strong> has requested us to write <t t-esc="pronouns['obj']"/> a letter of confirmation concerning <t t-esc="pronouns['poss']"/> work experience.
+                    </p>
+
+                    <!-- Certification paragraph -->
+                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
+                        Pursuant to <t t-esc="pronouns['poss']"/> request, we hereby certify that <strong><t t-esc="salutation"/> <t t-esc="employee.name"/></strong> is a permanent employee of Bunna Bank S.C. since <strong><t t-esc="start_date"/></strong> in the following capacities;
+                    </p>
+
+                    <!-- Job History Table (Chronological: Earliest to Latest, ending with To date.) -->
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 14px; margin-bottom: 22px; font-size: 13px;">
+                        <thead>
+                            <tr style="background-color: #1d2632; color: #ffffff;">
+                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 55%; font-weight: bold;">Job Position</th>
+                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 22%; font-weight: bold;">Start Date</th>
+                                <th style="padding: 7px 10px; text-align: left; border: 1px solid #777777; width: 23%; font-weight: bold;">End Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="histories">
+                                <t t-foreach="histories" t-as="jh">
                                     <tr>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
                                             <t t-esc="jh.job_id.name or jh.position or ''"/>
                                         </td>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">
-                                            <t t-esc="jh.job_history_start_date or ''"/>
+                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
+                                            <t t-if="jh.job_history_start_date">
+                                                <t t-esc="jh.job_history_start_date.strftime('%Y-%m-%d')"/>
+                                            </t>
                                         </td>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">
+                                        <td style="padding: 6px 10px; border: 1px solid #777777;">
                                             <t t-if="not jh.job_history_end_date">To date.</t>
-                                            <t t-else=""><t t-esc="jh.job_history_end_date"/></t>
+                                            <t t-else="">
+                                                <t t-esc="jh.job_history_end_date.strftime('%Y-%m-%d')"/>
+                                            </t>
                                         </td>
                                     </tr>
                                 </t>
-                                <!-- Fallback if no job history -->
-                                <t t-if="not employee.job_history_ids">
-                                    <tr>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">
-                                            <t t-esc="employee.job_id.name or ''"/>
-                                        </td>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">
-                                            <t t-esc="employee.contract_id.date_start or ''"/>
-                                        </td>
-                                        <td style="padding:6px 10px; border:1px solid #ccc;">To date.</td>
-                                    </tr>
-                                </t>
-                            </tbody>
-                        </table>
+                            </t>
+                            <t t-else="">
+                                <tr>
+                                    <td style="padding: 6px 10px; border: 1px solid #777777;">
+                                        <t t-esc="employee.job_id.name or employee.job_title or ''"/>
+                                    </td>
+                                    <td style="padding: 6px 10px; border: 1px solid #777777;">
+                                        <t t-esc="start_date"/>
+                                    </td>
+                                    <td style="padding: 6px 10px; border: 1px solid #777777;">To date.</td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
 
-                        <!-- Salary paragraph -->
-                        <t t-if="employee.contract_id">
-                            <p>
-                                He/She is drawing a monthly gross salary of Birr
-                                <strong>
-                                    <t t-esc="'{:,.2f}'.format(employee.contract_id.wage or 0)"/>
-                                </strong>
-                                along with other benefits allowed for the position.
-                            </p>
-                        </t>
+                    <!-- Salary Statement (Figure and Words) -->
+                    <p style="margin-bottom: 16px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
+                        <t t-esc="pronouns['subj']"/> is drawing a monthly gross salary of Birr
+                        <strong>
+                            <t t-esc="salary_info['figure']"/> (<t t-esc="salary_info['words']"/>)
+                        </strong>
+                        along with other benefits allowed for the position.
+                    </p>
 
-                        <!-- Closing paragraph -->
-                        <p>
-                            This certificate is issued upon his/her request and does not serve as a release.
-                        </p>
+                    <!-- Disclaimer -->
+                    <p style="margin-bottom: 35px; text-align: justify; font-size: 13.5px; line-height: 1.6;">
+                        This certificate is issued upon <t t-esc="pronouns['poss']"/> request and does not serve as a release.
+                    </p>
 
-                        <!-- Signature block -->
-                        <div style="margin-top: 50px;">
-                            <p>Sincerely yours,</p>
-                            <br/><br/><br/>
-                            <p style="margin-bottom:2px;"><strong>__________________________</strong></p>
-                            <p style="margin-bottom:2px;">Manager- People Service and Reward</p>
-                            <p>Division</p>
-                        </div>
-
+                    <!-- Sign-off Block -->
+                    <div style="margin-top: 35px; margin-bottom: 60px; font-size: 13.5px; line-height: 1.4;">
+                        <div style="margin-bottom: 10px;">Sincerely yours,</div>
+                        <div style="height: 55px;"></div>
+                        <div style="font-weight: bold;"><t t-esc="signatory"/></div>
+                        <div>Manager- People Service and Reward</div>
+                        <div>Division</div>
                     </div>
-                </t>
+
+                    <!-- Authentication Footer Notice -->
+                    <div style="margin-top: 45px; font-size: 11.5px; color: #222222; line-height: 1.4;">
+                        <strong>N.B.:</strong> This is a system-generated work experience letter. For further authentication, please contact <strong>bibtmdsec@bunnabanksc.com</strong>.
+                    </div>
+
+                </div>
             </t>
         </t>
     </template>

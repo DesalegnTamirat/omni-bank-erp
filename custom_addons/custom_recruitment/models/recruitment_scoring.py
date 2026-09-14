@@ -752,192 +752,7 @@ class JobVacancyOfferableCandidates(models.Model):
             return [("id", "not in", eligible_vacancy_ids)]
 
 
-# ── Section 11: Offer Management ────────────────────────────────────────────
-
-class RecruitmentOfferLetter(models.Model):
-    """
-    Section 11.2: Job Offer Letter with 3-day response window and cascade logic.
-    """
-    _name = "recruitment.offer.letter"
-    _inherit = ["mail.thread"]
-    _description = "Job Offer Letter"
-    _rec_name = "reference"
-    _order = "offer_date desc"
-
-    reference = fields.Char(string="Offer Reference", copy=False, readonly=True,
-                            default=lambda self: _("New"))
-    # ── CHANGED: only External vacancies that still have at least one Selected candidate are selectable.
-    vacancy_id = fields.Many2one(
-        "job.vacancy", string="Vacancy", required=True, tracking=True,
-        domain="[('reference', 'ilike', 'EXT')]"
-    )
-    ext_candidate_id = fields.Many2one(
-        "external.recruitment.selected.candidates", string="Candidate", required=True, tracking=True,
-        domain="[('selection_type', 'in', ['selected', 'Selected'])]",
-        help="Selected external candidate for offer letter."
-    )
-    candidate_score_id = fields.Many2one(
-        "recruitment.candidate.score", string="Candidate Score Record", required=False
-    )
-    candidate_name = fields.Char(related="ext_candidate_id.display_name", store=True)
-    active = fields.Boolean(default=True)
-
-    offer_date = fields.Date(string="Offer Issue Date", default=fields.Date.context_today, required=True)
-    response_deadline = fields.Date(string="Response Deadline", compute="_compute_deadline", store=True)
-
-    response = fields.Selection(
-        [("pending", "Awaiting Response"), ("accepted", "Accepted"), ("declined", "Declined"), ("expired", "Expired")],
-        string="Candidate Response", default="pending", tracking=True
-    )
-    response_date = fields.Date(string="Response Date", readonly=True, copy=False)
-
-    employment_letter_generated = fields.Boolean(string="Employment Letter Generated", default=False, readonly=True)
-
-    state = fields.Selection(
-        [("draft", "Draft"), ("sent", "Offer Sent"), ("accepted", "Accepted"),
-         ("declined", "Declined"), ("expired", "Expired"), ("cascaded", "Cascaded")],
-        string="Status", default="draft", tracking=True, copy=False
-    )
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        for vals in vals_list:
-            if not vals.get("reference") or vals["reference"] == _("New"):
-                vals["reference"] = (
-                        self.env["ir.sequence"].next_by_code("recruitment.offer.letter") or _("New")
-                )
-        records = super().create(vals_list)
-        return records
-
-    def unlink(self):
-        res = super().unlink()
-        return res
-
-    @api.constrains("ext_candidate_id")
-    def _check_candidate_not_already_offered(self):
-        for rec in self:
-            if rec.ext_candidate_id:
-                dupes = self.search([
-                    ("ext_candidate_id", "=", rec.ext_candidate_id.id),
-                    ("id", "!=", rec.id),
-                    ("state", "not in", ["declined", "expired"])
-                ])
-                if dupes:
-                    raise ValidationError(_(
-                        "Candidate %s already has an active offer letter (%s)."
-                    ) % (rec.ext_candidate_id.display_name or rec.candidate_name, dupes[0].reference))
-
-    @api.depends("offer_date")
-    def _compute_deadline(self):
-        for rec in self:
-            if rec.offer_date:
-                rec.response_deadline = rec.offer_date + timedelta(days=OFFER_RESPONSE_DAYS)
-            else:
-                rec.response_deadline = False
-
-    def action_send_offer(self):
-        """11.2.1: Send the offer letter. Selection now routes through the
-        validated _select_candidate so the vacancy slot cap is respected
-        even when this fires automatically from a cascade."""
-        for rec in self:
-            rec.write({"state": "sent"})
-            rec.candidate_score_id._select_candidate()
-            rec.message_post(body=_(
-                "Offer letter sent to <b>%s</b>. Response deadline: <b>%s</b>."
-            ) % (rec.candidate_name, rec.response_deadline))
-        return {
-            "type": "ir.actions.client",
-            "tag": "display_notification",
-            "params": {
-                "title": _("Offer Sent"),
-                "message": _("Offer letter sent. Candidate has %d days to respond.") % OFFER_RESPONSE_DAYS,
-                "type": "success",
-                "sticky": False,
-                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
-            },
-        }
-
-    def action_accept(self):
-        """Candidate accepts — generate employment letter."""
-        for rec in self:
-            rec.write({
-                "state": "accepted",
-                "response": "accepted",
-                "response_date": fields.Date.today(),
-            })
-            rec.message_post(body=_("Offer accepted by %s.") % rec.candidate_name)
-            rec._generate_employment_letter()
-
-    def _generate_employment_letter(self):
-        """11.3: Generate employment letter on acceptance."""
-        self.ensure_one()
-        self.write({"employment_letter_generated": True})
-        self.message_post(body=_(
-            "Employment letter generated for <b>%s</b>. Distributed to Payroll and HR."
-        ) % self.candidate_name)
-
-    def action_decline(self):
-        """11.2.3: Candidate declines — frees the slot, then cascades to the
-        next ranked candidate."""
-        for rec in self:
-            rec.write({
-                "state": "declined",
-                "response": "declined",
-                "response_date": fields.Date.today(),
-            })
-            rec.candidate_score_id.write({"selection_status": "rejected"})
-            rec.message_post(body=_("Offer declined by %s. Cascading to next candidate.") % rec.candidate_name)
-            rec._cascade_to_next_candidate()
-
-    def _cascade_to_next_candidate(self):
-
-        self.ensure_one()
-        current_rank = self.candidate_score_id.rank
-
-        Score = self.env["recruitment.candidate.score"]
-        next_candidate = Score.search([
-            ("vacancy_id", "=", self.vacancy_id.id),
-            ("disqualified", "=", False),
-            ("selection_status", "in", ("reserve")),
-            ("rank", ">", current_rank),
-        ], order="rank asc", limit=1)
-        offer_sent = self.env["recruitment.offer.letter"]
-        next_offer_sent = Score.search([
-            ("vacancy_id", "=", self.vacancy_id.id),
-            ("disqualified", "=", False),
-            ("selection_status", "not in", ("accepted","expired","cascaded","declined","pending")),
-            ("rank", ">", current_rank),
-        ], order="rank asc", limit=1)
-
-        if next_candidate:
-            new_offer = self.create({
-                "vacancy_id": self.vacancy_id.id,
-                "candidate_score_id": next_candidate.id,
-            })
-            new_offer.message_post(body=_(
-                "Offer cascaded from %s (rank %d) after decline/expiry."
-            ) % (self.candidate_name, current_rank))
-            self.write({"state": "cascaded"})
-            new_offer.action_send_offer()
-        else:
-            self.message_post(body=_(
-                "No more eligible candidates (pending or reserve) to cascade the offer to."
-            ))
-
-    @api.model
-    def _cron_expire_pending_offers(self):
-        """11.2.2: Auto-expire offers that exceeded the 3-day response window."""
-        today = fields.Date.today()
-        expired = self.search([
-            ("state", "=", "sent"),
-            ("response_deadline", "<", today),
-        ])
-        for rec in expired:
-            rec.write({"state": "expired", "response": "expired"})
-            rec.candidate_score_id.write({"selection_status": "rejected"})
-            rec.message_post(body=_("Offer expired. Response deadline %s passed.") % rec.response_deadline)
-            rec._cascade_to_next_candidate
-
+# ── Section 11: Offer Management (Defined in models/recruitment_offer_letter.py) ──
 
 # ── Section 5: Application Window Enforcement ────────────────────────────────
 
@@ -978,6 +793,21 @@ class RecruitmentApplicationWindow(models.Model):
             else:
                 rec.deadline = False
 
+    closing_date = fields.Date(
+        string='Closing Date',
+        help='BRD FR-REC-019: Vacancy auto-closes at this date. '
+             'Applications after this date are rejected unless '
+             'HR grants late inclusion with justification.'
+    )
+
+    @api.depends('closing_date')
+    def _compute_is_closed_from_date(self):
+        today = fields.Date.today()
+        for rec in self:
+            if rec.closing_date and rec.closing_date < today:
+                if not rec.is_closed:
+                    rec.is_closed = True
+
     def check_application_allowed(self, application_date=None):
         """BRD FR-REC-019: Reject applications after deadline unless HR granted late inclusion."""
         self.ensure_one()
@@ -986,7 +816,17 @@ class RecruitmentApplicationWindow(models.Model):
             return False
         if self.deadline and today > self.deadline and not self.late_inclusion_allowed:
             return False
+        if self.closing_date and today > self.closing_date and not self.late_inclusion_allowed:
+            return False
         return True
+
+    def check_application_allowed_ext(self, application_date=None):
+        self.ensure_one()
+        today = application_date or fields.Date.today()
+        if self.closing_date and today > self.closing_date:
+            if not self.late_inclusion_allowed:
+                return False, _("Application window closed on %s.") % self.closing_date
+        return True, _("Application accepted.")
 
     @api.model
     def _cron_close_expired_windows(self):

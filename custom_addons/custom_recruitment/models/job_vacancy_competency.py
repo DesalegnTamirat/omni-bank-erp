@@ -17,12 +17,30 @@ class JobVacancyCompetency(models.Model):
     active = fields.Boolean(default=True)
     sequence = fields.Integer(default=10)
 
+    def _auto_init(self):
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    DO $$ 
+                    BEGIN 
+                        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'job_vacancy_competency') 
+                           AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'competency_competency') THEN
+                            DELETE FROM job_vacancy_competency 
+                            WHERE competency_id IS NOT NULL 
+                              AND competency_id NOT IN (SELECT id FROM competency_competency);
+                        END IF;
+                    END $$;
+                """)
+        except Exception as e:
+            _logger.warning("Safe cleanup on job_vacancy_competency: %s", e)
+        return super()._auto_init()
+
     vacancy_id = fields.Many2one(
         'job.vacancy', string='Job Vacancy',
         required=True, ondelete='cascade', index=True,
     )
     competency_id = fields.Many2one(
-        'recruitment.competency', string='Competency',
+        'competency.competency', string='Competency',
         required=True,
     )
     required_level = fields.Selection([

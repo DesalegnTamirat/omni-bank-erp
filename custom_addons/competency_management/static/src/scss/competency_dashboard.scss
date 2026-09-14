@@ -153,7 +153,46 @@
             background-color: #fff3cd !important; /* Soft light yellow/cream */
             color: #664d03 !important;
         }
+
+        /* Underqualified / Below target competency lines */
+        tr.decoration-danger,
+        tr.text-danger,
+        tr.decoration-danger > td,
+        tr.text-danger > td,
+        .table tr.decoration-danger,
+        .table tr.text-danger,
+        .table tr.decoration-danger > td,
+        .table tr.text-danger > td {
+            background-color: #f8d7da !important; /* Distinct light red tint */
+            color: #541718 !important; /* Bunna dark red text */
+        }
     }
+}
+
+/* Custom Bunna Bank Brand Colors for Status Badges & Tabs */
+.badge.text-bg-danger,
+.badge.bg-danger,
+.badge[data-value="below"],
+.badge[data-value="underqualified"] {
+    background-color: #541718 !important;
+    color: #ffffff !important;
+}
+
+.badge.text-bg-success,
+.badge.bg-success,
+.badge[data-value="meets"],
+.badge[data-value="fit"],
+.badge[data-value="qualified"] {
+    background-color: #15803d !important;
+    color: #ffffff !important;
+}
+
+.badge.text-bg-warning,
+.badge.bg-warning,
+.badge[data-value="exceeds"],
+.badge[data-value="overqualified"] {
+    background-color: #c17540 !important;
+    color: #ffffff !important;
 }
 
 

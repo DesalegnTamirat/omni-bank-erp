@@ -1,34 +1,36 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hr_employee_grade,employee.grade,model_employee_grade,hr.group_hr_user,1,1,1,1
-access_hr_operating_unit,operating.unit,model_operating_unit,hr.group_hr_user,1,1,1,1
+access_hr_employee_grade,employee.grade,model_employee_grade,hr.group_hr_user,1,1,1,0
+access_hr_operating_unit,operating.unit,model_operating_unit,hr.group_hr_user,1,1,1,0
 access_hr_report_code_user,hr.report.code user,model_hr_report_code,base.group_user,1,0,0,0
 access_hr_report_code_manager,hr.report.code manager,model_hr_report_code,base.group_system,1,1,1,1
 access_hr_award_manager,hr.awards manager,model_hr_awards,base.group_system,1,1,1,1
-access_hr_awards_hr_awards,hr_awards.hr_awards,model_hr_awards,hr.group_hr_user,1,0,0,0
+access_hr_awards_hr_awards,hr_awards.hr_awards,model_hr_awards,hr.group_hr_user,1,1,1,0
 access_hr_awards_hr_manager,hr_awards.hr_manager,model_hr_awards,hr.group_hr_manager,1,1,1,1
 access_service_award_service_award,service_award.service_award,model_service_award,hr.group_hr_manager,1,1,1,1
 access_recruitment_qualification,access.recruitment.qualification,model_recruitment_qualification,,1,1,1,0
 access_recruitment_experience,access.recruitment.experience,model_recruitment_experience,,1,1,1,0
 access_recruitment_competency,access.recruitment.competency,model_recruitment_competency,hr.group_hr_manager,1,1,1,1
-access_hr_job_history,hr.job.history,model_hr_job_history,hr.group_hr_user,1,1,1,1
+access_hr_job_history,hr.job.history,model_hr_job_history,hr.group_hr_user,1,1,1,0
 access_hr_job_history_manager,hr.job.history,model_hr_job_history,hr.group_hr_manager,1,1,1,1
-access_hr_employee_contract_history_user,hr.employee.contract.history.user,model_hr_employee_contract_history,hr.group_hr_user,1,1,1,1
+access_hr_employee_contract_history_user,hr.employee.contract.history.user,model_hr_employee_contract_history,hr.group_hr_user,1,1,1,0
 access_hr_employee_contract_history_system,hr.employee.contract.history.system,model_hr_employee_contract_history,base.group_system,1,1,1,1
-access_hr_employee_transfer_history_user,hr.employee.transfer.history.user,model_hr_employee_transfer_history,hr.group_hr_user,1,1,1,1
+access_hr_employee_transfer_history_user,hr.employee.transfer.history.user,model_hr_employee_transfer_history,hr.group_hr_user,1,1,1,0
 access_hr_employee_transfer_history_system,hr.employee.transfer.history.system,model_hr_employee_transfer_history,base.group_system,1,1,1,1
-access_hr_training_history,hr.training.history,model_hr_training_history,hr.group_hr_user,1,1,1,1
+access_hr_training_history,hr.training.history,model_hr_training_history,hr.group_hr_user,1,1,1,0
 access_hr_training_history_manager,hr.training.history,model_hr_training_history,hr.group_hr_manager,1,1,1,1
-access_hr_reinstated_history,hr.reinstated.history,model_hr_reinstated_history,hr.group_hr_user,1,1,1,1
+access_hr_reinstated_history,hr.reinstated.history,model_hr_reinstated_history,hr.group_hr_user,1,1,1,0
 access_hr_reinstated_history_manager,hr.reinstated.history,model_hr_reinstated_history,hr.group_hr_manager,1,1,1,1
-access_hr_employee_insurance,hr.employee.insurance,model_hr_employee_insurance,hr.group_hr_user,1,1,1,1
+access_hr_employee_insurance,hr.employee.insurance,model_hr_employee_insurance,hr.group_hr_user,1,1,1,0
 access_hr_employee_insurance_manager,hr.employee.insurance,model_hr_employee_insurance,hr.group_hr_manager,1,1,1,1
-access_hr_contract_user,hr.version user,hr.model_hr_version,hr.group_hr_user,1,0,0,0
+access_hr_contract_base_user,hr.version base user,hr.model_hr_version,base.group_user,1,0,0,0
+access_hr_contract_user,hr.version user,hr.model_hr_version,hr.group_hr_user,1,1,1,0
 access_hr_contract_manager,hr.version manager,hr.model_hr_version,hr_employee_custom.group_hr_contract_manager,1,1,1,1
 access_hr_payroll_structure_type_manager,hr.payroll.structure.type manager,model_hr_payroll_structure_type,hr_employee_custom.group_hr_contract_manager,1,1,1,1
-access_hr_contract_type_user,hr.contract.type user,hr.model_hr_contract_type,hr.group_hr_user,1,0,0,0
+access_hr_contract_type_user,hr.contract.type user,hr.model_hr_contract_type,hr.group_hr_user,1,1,1,0
 access_hr_contract_type_manager,hr.contract.type manager,hr.model_hr_contract_type,hr_employee_custom.group_hr_contract_manager,1,1,1,1
-access_hr_payroll_structure_type_user,hr.payroll.structure.type user,model_hr_payroll_structure_type,hr.group_hr_user,1,0,0,0
-access_guarentees_details,guarentees.details,model_guarentees_details,,1,1,1,1
+access_hr_payroll_structure_type_user,hr.payroll.structure.type user,model_hr_payroll_structure_type,hr.group_hr_user,1,1,1,0
+access_guarentees_details_user,guarentees.details user,model_guarentees_details,base.group_user,1,1,1,0
+access_guarentees_details_manager,guarentees.details manager,model_guarentees_details,hr.group_hr_manager,1,1,1,1
 access_service_request_type,service.request.type,model_service_request_type,,1,1,1,1
 access_employee_service_request,employee.service.request,model_employee_service_request,,1,1,1,1
 access_service_request_completion_wizard,service.request.completion.wizard,model_service_request_completion_wizard,,1,1,1,1
@@ -52,39 +54,42 @@ access_hr_supplementary_payout_user,hr.supplementary.payout user,model_hr_supple
 access_hr_supplementary_payout_manager,hr.supplementary.payout manager,model_hr_supplementary_payout,hr.group_hr_manager,1,1,1,1
 access_supplementary_delegation_team_user,supplementary.delegation.team user,model_supplementary_delegation_team,base.group_user,1,0,0,0
 access_supplementary_delegation_team_manager,supplementary.delegation.team manager,model_supplementary_delegation_team,hr.group_hr_manager,1,1,1,1
+access_re_instating_user,re.instating user,model_re_instating,base.group_user,1,0,0,0
 access_re_instating,re.instating,model_re_instating,hr.group_hr_manager,1,1,1,1
+access_transfer_form_user,transfer.form user,model_transfer_form,base.group_user,1,1,1,0
 access_transfer_form,transfer.form,model_transfer_form,hr.group_hr_manager,1,1,1,1
 access_hr_transform_salary,hr.transform.salary,model_hr_transform_salary,hr.group_hr_manager,1,1,1,1
 access_transfer_delegation_team,transfer.delegation.team,model_transfer_delegation_team,hr.group_hr_manager,1,1,1,1
-access_employee_demotion_user,employee.demotion user,model_employee_demotion,hr.group_hr_user,1,0,0,0
+access_employee_demotion_user,employee.demotion user,model_employee_demotion,hr.group_hr_user,1,1,1,0
 access_employee_demotion_manager,employee.demotion manager,model_employee_demotion,hr.group_hr_manager,1,1,1,1
-access_salary_detail_demotion_user,salary.detail.demotion user,model_salary_detail_demotion,hr.group_hr_user,1,0,0,0
+access_salary_detail_demotion_user,salary.detail.demotion user,model_salary_detail_demotion,hr.group_hr_user,1,1,1,0
 access_salary_detail_demotion_manager,salary.detail.demotion manager,model_salary_detail_demotion,hr.group_hr_manager,1,1,1,1
-access_part_time_employment_user,part.time.employment user,model_part_time_employment,hr.group_hr_user,1,0,0,0
+access_part_time_employment_user,part.time.employment user,model_part_time_employment,hr.group_hr_user,1,1,1,0
 access_part_time_employment_manager,part.time.employment manager,model_part_time_employment,hr.group_hr_manager,1,1,1,1
-access_print_employee_report_user,print_employee_report.user,model_print_employee_report,hr.group_hr_user,1,1,1,1
+access_print_employee_report_user,print_employee_report.user,model_print_employee_report,hr.group_hr_user,1,1,1,0
 access_print_employee_report_mgr,print_employee_report.manager,model_print_employee_report,hr.group_hr_manager,1,1,1,1
+access_print_employee_report_base_user,print_employee_report.base_user,model_print_employee_report,base.group_user,1,1,1,0
 ,,,,,,,
 view_ir_attachment,view.ir.attachment,base.model_ir_attachment,,1,1,1,1
 officer_access_employee,access.hr.employee,hr.model_hr_employee,hr.group_hr_user,1,0,0,0
-officer_access_supplementary_multi_role,access.supplementary.multi.role,model_supplementary_multi_role,hr.group_hr_user,1,0,0,0
-officer_access_hr_employee_family,access.hr_employee_family,model_hr_employee_family,hr.group_hr_user,1,0,0,0
-Officer_access_hr_employee_education,access.hr.employee.education,model_hr_employee_education,hr.group_hr_user,1,0,0,0
+officer_access_supplementary_multi_role,access.supplementary.multi.role,model_supplementary_multi_role,hr.group_hr_user,1,1,1,0
+officer_access_hr_employee_family,access.hr_employee_family,model_hr_employee_family,hr.group_hr_user,1,1,1,0
+Officer_access_hr_employee_education,access.hr.employee.education,model_hr_employee_education,hr.group_hr_user,1,1,1,0
 get_res_users,get.res.users,base.model_res_users,,1,1,1,1
 get_res_partner,get.res.partner,model_res_partner,hr.group_hr_manager,1,1,1,1
 access_vacancy_workunit,access.vacancy.workunit,model_vacancy_workunit,hr.group_hr_manager,1,1,1,1
 access_job_form,access.job.form,model_job_form,hr.group_hr_manager,1,1,1,1
 access_acting_employee_recruitment_grade,access.acting.employee.recruitment.grade,model_employee_recruitment_grade,hr.group_hr_manager,1,1,1,1
 access_acting_employee_recruitment_position,access.acting.employee.recruitment.position,model_employee_recruitment_position,hr.group_hr_manager,1,1,1,1
-view_salary_history_base_user,view.salary_history.user,model_salary_history,hr.group_hr_user,1,0,0,0
-view_timesheet_cost_base_user,view.timesheet_cost.user,model_timesheet_cost,hr.group_hr_user,1,0,0,0
-view_contract_history_base_user,view.contract_history.user,model_contract_history,hr.group_hr_user,1,0,0,0
+view_salary_history_base_user,view.salary_history.user,model_salary_history,hr.group_hr_user,1,1,1,0
+view_timesheet_cost_base_user,view.timesheet_cost.user,model_timesheet_cost,hr.group_hr_user,1,1,1,0
+view_contract_history_base_user,view.contract_history.user,model_contract_history,hr.group_hr_user,1,1,1,0
 view_salary_history_manager,view.salary_history.manager,model_salary_history,hr.group_hr_manager,1,1,1,1
 view_contract_history_manager,view.contract_history.manager,model_contract_history,hr.group_hr_manager,1,1,1,1
 view_transfer_history_base_user,view.transfer_history.user,model_transfer_history,hr.group_hr_manager,1,1,1,1
-view_training_history_base_user,view.training.history.user,model_training_history,hr.group_hr_user,1,0,0,0
-view_education_fee_sponsorship_base_user,view.education.fee.sponsorship.user,model_education_fee_sponsorship,hr.group_hr_user,1,0,0,0
-view_training_commitment_base_user,view.training.commitment.user,model_training_commitment,hr.group_hr_user,1,0,0,0
+view_training_history_base_user,view.training.history.user,model_training_history,hr.group_hr_user,1,1,1,0
+view_education_fee_sponsorship_base_user,view.education.fee.sponsorship.user,model_education_fee_sponsorship,hr.group_hr_user,1,1,1,0
+view_training_commitment_base_user,view.training.commitment.user,model_training_commitment,hr.group_hr_user,1,1,1,0
 access_populate_salary_details_populate_salary_details,populate_salary_details.populate_salary_details,model_populate_salary_details,hr.group_hr_manager,1,1,1,1
 access_populate_salary_information_populate_salary_information,populate_salary_information.populate_salary_information,model_populate_salary_information,hr.group_hr_manager,1,1,1,1
 access_preprocessing_salary_information_preprocessing_salary_information,preprocessing_salary_information.preprocessing_salary_information,model_preprocessing_salary_information,hr.group_hr_manager,1,1,1,1
@@ -103,7 +108,7 @@ access_hr_ability_languages_hr_ability_languages,hr_ability_languages.hr_ability
 access_part_time_employment_part_time_employment,part_time_employment.part_time_employment,model_part_time_employment,hr.group_hr_manager,1,1,1,1
 access_hr_salary_breakup_hr_salary_breakup,hr_salary_breakup.hr_salary_breakup,model_hr_salary_breakup,hr.group_hr_manager,1,1,1,1
 access_non_monetary_benefits_non_monetary_benefits,non_monetary_benefits.non_monetary_benefits,model_non_monetary_benefits,hr.group_hr_manager,1,1,1,1
-access_bank_info_bank_info,bank_info.bank_info,model_bank_info,hr.group_hr_user,1,0,0,0
+access_bank_info_bank_info,bank_info.bank_info,model_bank_info,hr.group_hr_user,1,1,1,0
 access_hr_employee_education_hr_employee_education,hr_employee_education.hr_employee_education,model_hr_employee_education,hr.group_hr_manager,1,1,1,1
 access_hr_qualification_info_job_hr_qualification_info_job,hr_qualification_info_job.hr_qualification_info_job,model_hr_qualification_info_job,,1,1,1,0
 access_supplementary_role_supplementary_role,supplementary_role.supplementary_role,model_supplementary_role,hr.group_hr_manager,1,1,1,1
@@ -116,7 +121,6 @@ access_mail_thread2,mail_thread2,mail.model_mail_thread,,1,1,1,1
 access_mail_activity_mixin2,mail_activity_mixin2,mail.model_mail_activity_mixin,,1,1,1,1
 access_mail_followers2,mail_followers2,mail.model_mail_followers,,1,1,1,1
 access_res_partner_group_cortex_hr1,res_partner_group_group_cortex_hr1,model_res_partner,hr.group_hr_manager,1,1,1,1
-
 access_employee_increment,access.employee.increment,model_employee_increment,hr.group_hr_manager,1,1,1,1
 access_employee_demotion,access.employee.demotion,model_employee_demotion,hr.group_hr_manager,1,1,1,1
 access_salary_detail_demotion,access.salary.detail.demotion,model_salary_detail_demotion,hr.group_hr_manager,1,1,1,1
@@ -134,17 +138,17 @@ access_generate_employee_attendance_report,access.generate.employee.attendance.r
 access_increment_transfer_wizard,access.increment.transfer.wizard,model_increment_transfer_wizard,hr.group_hr_manager,1,1,1,1
 access_post_processing_salary_information,access.post.processing.salary.information,model_post_processing_salary_information,,1,1,1,1
 access_hr_resource_manager,hr.employee.resource.manager,resource.model_resource_resource,hr.group_hr_manager,1,1,1,1
-access_hr_resource_calendar_user,hr.employee.resource.calendar.user,resource.model_resource_calendar,hr.group_hr_user,1,1,1,1
-access_hr_resource_calendar_attendance_user,hr.employee.resource.calendar.attendance.user,resource.model_resource_calendar_attendance,hr.group_hr_user,1,1,1,1
+access_hr_resource_calendar_user,hr.employee.resource.calendar.user,resource.model_resource_calendar,hr.group_hr_user,1,1,1,0
+access_hr_resource_calendar_attendance_user,hr.employee.resource.calendar.attendance.user,resource.model_resource_calendar_attendance,hr.group_hr_user,1,1,1,0
 access_account_operating_unit_erp_manager,operating.unit erp.manager,model_operating_unit,group_manager_operating_unit,1,1,1,1
 access_account_operating_unit_user,operating_unit user,model_operating_unit,,1,0,0,0
-access_hr_new_department_info_job_user,hr_new_department_info_job.user,model_hr_new_department_info_job,hr.group_hr_user,1,0,0,0
+access_hr_new_department_info_job_user,hr_new_department_info_job.user,model_hr_new_department_info_job,hr.group_hr_user,1,1,1,0
 access_hr_new_department_info_job_manager,hr_new_department_info_job.manager,model_hr_new_department_info_job,hr.group_hr_manager,1,1,1,1
-access_hr_payroll_structure_user,hr.payroll.structure.user,model_hr_payroll_structure,hr.group_hr_user,1,0,0,0
+access_hr_payroll_structure_user,hr.payroll.structure.user,model_hr_payroll_structure,hr.group_hr_user,1,1,1,0
 access_hr_payroll_structure_manager,hr.payroll.structure.manager,model_hr_payroll_structure,hr.group_hr_manager,1,1,1,1
 access_operating_unit_job_position,operating.unit.job.position,model_operating_unit_job_position,base.group_user,1,1,1,1
 access_employee_grade_increment,employee.grade.increment,model_employee_grade_increment,base.group_user,1,1,1,1
-access_hr_leave_allocation_accruement_user,hr.leave.allocation.accruement.user,model_hr_leave_allocation_accruement,hr.group_hr_user,1,0,0,0
+access_hr_leave_allocation_accruement_user,hr.leave.allocation.accruement.user,model_hr_leave_allocation_accruement,hr.group_hr_user,1,1,1,0
 access_hr_leave_allocation_accruement_manager,hr.leave.allocation.accruement.manager,model_hr_leave_allocation_accruement,hr.group_hr_manager,1,1,1,1
 access_hr_experience_info_job_user,hr_experience_info_job.user,model_hr_experience_info_job,hr.group_hr_user,1,1,1,0
 access_hr_experience_info_job_manager,hr_experience_info_job.manager,model_hr_experience_info_job,hr.group_hr_manager,1,1,1,1
@@ -152,11 +156,12 @@ access_hr_qualification_info_job_user,hr_qualification_info_job.user,model_hr_qu
 access_hr_qualification_info_job_manager,hr_qualification_info_job.manager,model_hr_qualification_info_job,hr.group_hr_manager,1,1,1,1
 access_hr_competencies_info_job_user,hr_competencies_info_job.user,model_hr_competencies_info_job,hr.group_hr_user,1,1,1,0
 access_hr_competencies_info_job_manager,hr_competencies_info_job.manager,model_hr_competencies_info_job,hr.group_hr_manager,1,1,1,1
-access_vacancy_workunit_user,vacancy.workunit.user,model_vacancy_workunit,hr.group_hr_user,1,1,1,1
+access_vacancy_workunit_user,vacancy.workunit.user,model_vacancy_workunit,hr.group_hr_user,1,1,1,0
 access_employee_category_manager,employee.category.manager,model_employee_category,hr.group_hr_manager,1,1,1,1
+access_hr_employee_document_base_user,hr.employee.document base user,model_hr_employee_document,base.group_user,1,1,1,0
 access_hr_employee_document_user,hr.employee.document.user,model_hr_employee_document,hr.group_hr_user,1,1,1,0
 access_hr_employee_document_manager,hr.employee.document.manager,model_hr_employee_document,hr.group_hr_manager,1,1,1,1
-access_hr_document_type_user,hr.document.type.user,model_hr_document_type,hr.group_hr_user,1,0,0,0
+access_hr_document_type_user,hr.document.type.user,model_hr_document_type,hr.group_hr_user,1,1,1,0
 access_hr_document_type_manager,hr.document.type.manager,model_hr_document_type,hr.group_hr_manager,1,1,1,1
 access_employee_relative_user,employee.relative.user,model_employee_relative,hr.group_hr_user,1,1,1,0
 access_employee_relative_manager,employee.relative.manager,model_employee_relative,hr.group_hr_manager,1,1,1,1
@@ -166,7 +171,62 @@ access_employee_previous_occupation_user,employee.previous.occupation.user,model
 access_employee_previous_occupation_manager,employee.previous.occupation.manager,model_employee_previous_occupation,hr.group_hr_manager,1,1,1,1
 access_hr_employee_delegation_user,hr.employee.delegation.user,model_hr_employee_delegation,base.group_user,1,1,1,1
 access_hr_employee_delegation_manager,hr.employee.delegation.manager,model_hr_employee_delegation,hr.group_hr_manager,1,1,1,1
-access_hr_employee_base_user,access.hr.employee.base.user,hr.model_hr_employee,base.group_user,1,0,0,0
-
-
-
+access_hr_employee_delegation_cancel_wizard_user,hr.employee.delegation.cancel.wizard.user,model_hr_employee_delegation_cancel_wizard,base.group_user,1,1,1,1
+access_hr_employee_delegation_cancel_wizard_manager,hr.employee.delegation.cancel.wizard.manager,model_hr_employee_delegation_cancel_wizard,hr.group_hr_manager,1,1,1,1
+access_hr_delegated_approval_user,hr.delegated.approval.user,model_hr_delegated_approval,base.group_user,1,1,1,1
+access_hr_delegated_approval_manager,hr.delegated.approval.manager,model_hr_delegated_approval,hr.group_hr_manager,1,1,1,1
+access_hr_employee_delegation_stakeholder_user,hr.employee.delegation.stakeholder.user,model_hr_employee_delegation_stakeholder,base.group_user,1,1,1,1
+access_hr_employee_delegation_stakeholder_manager,hr.employee.delegation.stakeholder.manager,model_hr_employee_delegation_stakeholder,hr.group_hr_manager,1,1,1,1
+access_res_company_ldap,res_company_ldap,model_res_company_ldap,base.group_system,1,1,1,1
+access_employee_demotion_base_user,employee.demotion base user,model_employee_demotion,base.group_user,1,0,0,0
+access_hr_job_history_base_user,hr.job.history base user,model_hr_job_history,base.group_user,1,0,0,0
+access_department_history_user,department.history user,model_department_history,base.group_user,1,0,0,0
+access_department_history_officer,department.history officer,model_department_history,hr.group_hr_user,1,1,1,0
+access_department_history_manager,department.history manager,model_department_history,hr.group_hr_manager,1,1,1,1
+access_hr_employee_education_base_user,hr.employee.education base user,model_hr_employee_education,base.group_user,1,0,0,0
+access_employee_grade_base_user,employee.grade base user,model_employee_grade,base.group_user,1,0,0,0
+access_hr_awards_base_user,hr.awards base user,model_hr_awards,base.group_user,1,0,0,0
+access_service_award_base_user,service.award base user,model_service_award,base.group_user,1,0,0,0
+access_hr_competencies_info_job_base_user,hr_competencies_info_job base user,model_hr_competencies_info_job,base.group_user,1,0,0,0
+access_hr_experience_info_job_base_user,hr_experience_info_job base user,model_hr_experience_info_job,base.group_user,1,0,0,0
+access_employee_category_base_user,employee.category base user,model_employee_category,base.group_user,1,0,0,0
+access_hr_payroll_structure_base_user,hr.payroll.structure base user,model_hr_payroll_structure,base.group_user,1,0,0,0
+access_hr_payroll_structure_type_base_user,hr.payroll.structure.type base user,model_hr_payroll_structure_type,base.group_user,1,0,0,0
+access_hr_hr_contract_type_base_user,hr.contract.type base user,hr.model_hr_contract_type,base.group_user,1,0,0,0
+access_part_time_employment_base_user,part.time.employment base user,model_part_time_employment,base.group_user,1,0,0,0
+access_supplementary_multi_role_base_user,supplementary.multi.role base user,model_supplementary_multi_role,base.group_user,1,0,0,0
+access_training_commitment_base_user,training.commitment base user,model_training_commitment,base.group_user,1,0,0,0
+access_education_fee_sponsorship_base_user,education.fee.sponsorship base user,model_education_fee_sponsorship,base.group_user,1,0,0,0
+access_bank_info_base_user,bank.info base user,model_bank_info,base.group_user,1,0,0,0
+access_hr_employee_family_base_user,hr.employee.family base user,model_hr_employee_family,base.group_user,1,0,0,0
+access_hr_employee_insurance_base_user,hr.employee.insurance base user,model_hr_employee_insurance,base.group_user,1,0,0,0
+access_hr_languages_base_user,hr.languages base user,model_hr_languages,base.group_user,1,0,0,0
+access_employee_education_base_user,employee.education base user,model_employee_education,base.group_user,1,0,0,0
+access_employee_relative_base_user,employee.relative base user,model_employee_relative,base.group_user,1,0,0,0
+access_employee_previous_occupation_base_user,employee.previous.occupation base user,model_employee_previous_occupation,base.group_user,1,0,0,0
+access_hr_contract_salary_base_user,hr.contract.salary base user,model_hr_contract_salary,base.group_user,1,0,0,0
+access_hr_due_base_user,hr.due base user,model_hr_due,base.group_user,1,0,0,0
+access_hr_salary_breakup_base_user,hr_salary_breakup base user,model_hr_salary_breakup,base.group_user,1,0,0,0
+access_non_monetary_benefits_base_user,non_monetary_benefits base user,model_non_monetary_benefits,base.group_user,1,0,0,0
+access_pension_multi_record_base_user,pension.multi.record base user,model_pension_multi_record,base.group_user,1,0,0,0
+access_hr_employee_contract_history_base_user,hr.employee.contract.history base user,model_hr_employee_contract_history,base.group_user,1,0,0,0
+access_hr_employee_transfer_history_base_user,hr.employee.transfer.history base user,model_hr_employee_transfer_history,base.group_user,1,0,0,0
+access_hr_training_history_base_user,hr.training.history base user,model_hr_training_history,base.group_user,1,0,0,0
+access_hr_reinstated_history_base_user,hr.reinstated.history base user,model_hr_reinstated_history,base.group_user,1,0,0,0
+access_contract_history_base_user,contract.history base user,model_contract_history,base.group_user,1,0,0,0
+access_salary_history_base_user,salary.history base user,model_salary_history,base.group_user,1,0,0,0
+access_timesheet_cost_base_user,timesheet.cost base user,model_timesheet_cost,base.group_user,1,0,0,0
+access_transfer_history_base_user,transfer.history base user,model_transfer_history,base.group_user,1,0,0,0
+access_hr_ability_languages_base_user,hr.ability.languages base user,model_hr_ability_languages,base.group_user,1,0,0,0
+access_hr_qualification_info_job_base_user,hr_qualification_info_job base user,model_hr_qualification_info_job,base.group_user,1,0,0,0
+access_hr_document_type_base_user,hr.document.type base user,model_hr_document_type,base.group_user,1,0,0,0
+access_hr_new_department_info_job_base_user,hr_new_department_info_job base user,model_hr_new_department_info_job,base.group_user,1,0,0,0
+access_service_award_officer,service.award officer,model_service_award,hr.group_hr_user,1,1,1,0
+access_employee_category_officer,employee.category officer,model_employee_category,hr.group_hr_user,1,1,1,0
+access_hr_contract_salary_officer,hr.contract.salary officer,model_hr_contract_salary,hr.group_hr_user,1,1,1,0
+access_hr_due_officer,hr.due officer,model_hr_due,hr.group_hr_user,1,1,1,0
+access_hr_salary_breakup_officer,hr_salary_breakup officer,model_hr_salary_breakup,hr.group_hr_user,1,1,1,0
+access_non_monetary_benefits_officer,non_monetary_benefits officer,model_non_monetary_benefits,hr.group_hr_user,1,1,1,0
+access_pension_multi_record_officer,pension.multi.record officer,model_pension_multi_record,hr.group_hr_user,1,1,1,0
+access_hr_languages_officer,hr.languages officer,model_hr_languages,hr.group_hr_user,1,1,1,0
+access_hr_ability_languages_officer,hr.ability.languages officer,model_hr_ability_languages,hr.group_hr_user,1,1,1,0

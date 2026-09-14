@@ -29,3 +29,10 @@ def post_init_hook(env):
                 menu.write({'group_ids': [(6, 0, groups)]})
         except Exception:
             pass
+
+    # Auto-seed all directorate positions into competency.director.peer.config with empty peers
+    try:
+        env['competency.director.peer.config'].action_generate_director_records()
+    except Exception:
+        pass
+

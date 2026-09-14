@@ -47,7 +47,7 @@ dependency, so they were intentionally left in place.
     """,
     'version': '19.0.1.0.0',
     'category': 'Human Resources',
-    'author': 'Bunna Bank',
+    'author': 'EAD Team',
     'license': 'LGPL-3',
     'depends': [
         'base',
@@ -58,6 +58,11 @@ dependency, so they were intentionally left in place.
         'website',
         'hr_employee_custom',
         'discipline_management',
+        'competency_management',
+        'hr_recruitment_skills',
+        'hr_holidays',
+        'bunna_pbms',
+
     ],
     'data': [
         'security/recruitment_security_groups.xml',
@@ -72,21 +77,26 @@ dependency, so they were intentionally left in place.
         'data/employee_transfer_probation.xml',
         'data/recruitment_request_sequence.xml',
         'data/recruitment_selection_minute_sequence.xml',
-        'data/interview_rate_sheet_seed_data.xml',
         'data/recruitment_scoring_data.xml',
-        'data/recruitment_master_seed_data.xml',
+        'data/promotion_letter_sequence.xml',
+        'data/recruitment_employment_letter_sequence.xml',
+        'data/transfer_letter_sequence.xml',
 
         # -- Reports (must load before views referencing their actions) --
         'reports/minute_template.xml',
         'reports/transfer_minute_template.xml',
         'reports/internal_recruitment_minute.xml',
         'reports/recruitment_selection_minute_report.xml',
+        'reports/promotion_letter_report.xml',
+        'reports/recruitment_employment_letter_report.xml',
+        'reports/transfer_letter_report.xml',
 
         # -- Menus Root (must load first so parent menus exist early) --
-        # 'views/menu_recruitment_root.xml',
+        'views/menu_recruitment_root.xml',
 
         # -- Dashboard --
         'views/recruitment_dashboard_action.xml',
+        'views/manpower_dashboard_action.xml',
 
         # -- Recruitment Criteria / Internal Job Position --
         'views/internal_job_position_views.xml',
@@ -97,17 +107,12 @@ dependency, so they were intentionally left in place.
         'views/ats_portal_templates.xml',
 
         # -- Core Recruitment Views --
-        'views/applicant_assessment.xml',
         'views/applicant_shortlist.xml',
-        'views/assessment_criteria.xml',
         'views/candidate_shortlist.xml',
         'views/blacklist_pool.xml',
         'views/eligible_employees_external.xml',
         'views/eligible_employees_internal.xml',
-        'views/internal_recruitment.xml',
 
-        'views/interview_rate_sheet_views.xml',
-        'views/interview_assessment.xml',
         'views/job_vacancy.xml',
         'views/recruitment_process_external.xml',
         'views/external_default_criteria_views.xml',
@@ -115,13 +120,12 @@ dependency, so they were intentionally left in place.
         'views/selected_external.xml',
         'views/selected_internal.xml',
         'views/recruitment_selection_minute_views.xml',
-        'views/my_panel_assignments_views.xml',
         'views/hr_applicant_views.xml',
         'views/employee_probation.xml',
-        'views/hr_onboarding.xml',
         'views/employee_transfer.xml',
         'views/transfer_ranking.xml',
-        'views/transfer_config_settings.xml',
+        'views/transfer_letter_views.xml',
+        'views/recruitment_signatory_config_views.xml',
         'views/job_vacancy_competency_views.xml',
         'views/employee_education_views.xml',
         # -- Recruitment Request Management  --
@@ -129,6 +133,9 @@ dependency, so they were intentionally left in place.
         'views/hr_job.xml',
 
         # -- Scoring Engine, Offer Management, Application Window, Blacklist (FRS 5,6,9,11) --
+        'reports/recruitment_offer_letter_report.xml',
+        'views/recruitment_offer_letter.xml',
+        'views/recruitment_employment_letter_views.xml',
         'views/recruitment_scoring_views.xml',
         'views/talent_roster_views.xml',
         'data/talent_roster_cron.xml',
@@ -146,6 +153,7 @@ dependency, so they were intentionally left in place.
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',
+
     ],
     'installable': True,
     'application': False,
@@ -154,6 +162,9 @@ dependency, so they were intentionally left in place.
             'custom_recruitment/static/src/recruitment_dashboard/recruitment_dashboard.css',
             'custom_recruitment/static/src/recruitment_dashboard/recruitment_dashboard.xml',
             'custom_recruitment/static/src/recruitment_dashboard/recruitment_dashboard.js',
+            'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.scss',
+            'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.xml',
+            'custom_recruitment/static/src/manpower_dashboard/manpower_dashboard.js',
         ],
     },
 }

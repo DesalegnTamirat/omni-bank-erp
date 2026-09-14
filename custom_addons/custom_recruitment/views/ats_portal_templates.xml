@@ -110,8 +110,9 @@
                             <p class="text-muted small mb-0"><i class="fa fa-map-marker me-1"/> <t t-esc="vacancy.operating_unit_id.name if vacancy.operating_unit_id else 'Addis Ababa'"/> | Released: <t t-esc="vacancy.release_date or 'N/A'"/></p>
                         </div>
                         <div class="mt-3 mt-sm-0">
-                            <t t-if="vacancy.vacancy_status == 'closed'">
-                                <span class="btn btn-danger disabled fw-bold"><i class="fa fa-lock me-1"/> Closed</span>
+                            <t t-set="today" t-value="datetime.date.today()"/>
+                            <t t-if="vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply &lt; today)">
+                                <span class="btn btn-danger disabled fw-bold" style="pointer-events: none; opacity: 0.7;"><i class="fa fa-lock me-1"/> Closed</span>
                             </t>
                             <t t-elif="has_applied">
                                 <span class="btn btn-success disabled fw-bold" style="background-color: #2e7d32 !important; border-color: #2e7d32 !important;"><i class="fa fa-check-circle me-1"/> Applied</span>
@@ -337,7 +338,7 @@
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
                                     <span class="text-muted small fw-semibold text-uppercase">Profile Status</span>
-                                    <h2 class="fw-bold my-1" style="color: #1D2B32;"><t t-esc="completeness"/>%</h2>
+                                    <h2 class="fw-bold my-1" style="color: #1D2B32;"><t t-esc="completeness or 0"/>%</h2>
                                     <a href="/my/candidate/profile" class="text-decoration-none small fw-bold" style="color: #C17540;">Update Profile &amp; CV &#8594;</a>
                                 </div>
                                 <div class="rounded-circle p-3 d-flex align-items-center justify-content-center" style="background-color: rgba(29, 43, 50, 0.1); width: 50px; height: 50px;">
@@ -393,10 +394,20 @@
                                                          <t t-set="raw_st" t-value="app.stage_id.name if app.stage_id else 'Applied'"/>
                                                          <t t-set="dash_st" t-value="'Applied' if raw_st in ['New', 'Initial', 'Initial Screening', 'Draft', 'Submitted'] else raw_st"/>
                                                      </t>
-                                                     <t t-set="badge_clr" t-value="'#28a745' if dash_st in ['Hired', 'Selected', 'Offer Issued'] else ('#dc3545' if dash_st in ['Rejected', 'Disqualified', 'Refused', 'Cancelled'] else ('#17a2b8' if 'Interview' in dash_st else ('#C17540' if dash_st in ['Shortlisted', 'Reserved', 'Eligible'] else '#1D2B32')))"/>
+                                                     <t t-set="badge_clr" t-value="'#1D2B32' if dash_st in ['Hired', 'Selected', 'Offer Issued'] else ('#dc3545' if dash_st in ['Rejected', 'Disqualified', 'Refused', 'Cancelled'] else ('#17a2b8' if 'Interview' in dash_st else ('#C17540' if dash_st in ['Shortlisted', 'Reserved', 'Eligible'] else '#1D2B32')))"/>
                                                      <span class="badge px-3 py-2 text-white fw-bold" t-attf-style="background-color: #{badge_clr};">
                                                          <t t-esc="dash_st"/>
                                                      </span>
+                                                     <t t-if="app.scheduled_exam_date and app.is_exam_notified">
+                                                         <div class="small text-primary fw-semibold mt-1">
+                                                             <i class="fa fa-pencil-square-o me-1"/> Exam: <t t-esc="app.scheduled_exam_date.strftime('%b %d, %Y at %I:%M %p')"/>
+                                                         </div>
+                                                     </t>
+                                                     <t t-if="app.scheduled_interview_date and app.is_interview_notified">
+                                                         <div class="small text-success fw-semibold mt-1">
+                                                             <i class="fa fa-calendar-check-o me-1"/> Interview: <t t-esc="app.scheduled_interview_date.strftime('%b %d, %Y at %I:%M %p')"/>
+                                                         </div>
+                                                     </t>
                                                  </td>
                                             </tr>
                                         </t>
@@ -420,6 +431,12 @@
                 <t t-if="submitted == 1">
                     <div class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
                         <i class="fa fa-check-circle me-2"/> <strong>Application Submitted Successfully!</strong> Your application has been logged into the recruitment system.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+                <t t-if="request.params.get('withdrawn') == '1' or withdrawn == 1">
+                    <div class="alert alert-info alert-dismissible fade show shadow-sm mb-4" role="alert">
+                        <i class="fa fa-info-circle me-2"/> <strong>Application Withdrawn.</strong> Your application has been successfully withdrawn.
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
                     </div>
                 </t>
@@ -453,6 +470,7 @@
                                     </thead>
                                     <tbody>
                                         <t t-foreach="applications" t-as="app">
+                                            <t t-set="is_withdrawn" t-value="bool(app.rejection_reason and 'Withdrawn' in app.rejection_reason)"/>
                                             <tr>
                                                 <td class="ps-4 fw-bold text-dark"><t t-esc="app.app_reference.reference if app.app_reference else 'N/A'"/></td>
                                                 <td class="fw-semibold">
@@ -461,44 +479,89 @@
                                                 <td><t t-esc="app.create_date.strftime('%Y-%m-%d')"/></td>
                                                 <td><t t-esc="'{:,.2f}'.format(app.expected_salary or 0.0)"/> ETB</td>
                                                  <td>
-                                                     <!-- Candidate status: ext_sel_map > score > bunna_status > stage -->
-                                                     <t t-set="st_name" t-value="ext_sel_map.get(app.id) if ext_sel_map else False"/>
-                                                     <t t-if="not st_name">
-                                                         <t t-set="score_st2" t-value="app.candidate_score_id.selection_status if app.candidate_score_id else False"/>
-                                                         <t t-set="st_name" t-value="'Selected' if score_st2 == 'selected' else ('Reserved' if score_st2 == 'reserve' else ('Rejected' if score_st2 == 'rejected' else ('Disqualified' if score_st2 == 'disqualified' else ('Eligible' if score_st2 == 'pending' else False))))"/>
+                                                     <!-- Candidate status: Withdrawn > ext_sel_map > score > bunna_status > stage -->
+                                                     <t t-if="is_withdrawn">
+                                                         <t t-set="st_name" t-value="'Withdrawn'"/>
                                                      </t>
-                                                     <t t-if="not st_name">
-                                                         <t t-set="bunna_st2" t-value="app.bunna_app_status"/>
-                                                         <t t-set="st_name" t-value="'Shortlisted' if bunna_st2 == 'shortlisted' else ('Interview' if bunna_st2 == 'interview' else ('Offer Issued' if bunna_st2 == 'offer' else ('Hired' if bunna_st2 == 'hired' else ('Rejected' if bunna_st2 == 'rejected' else False))))"/>
+                                                     <t t-if="not is_withdrawn">
+                                                         <t t-set="st_name" t-value="ext_sel_map.get(app.id) if ext_sel_map else False"/>
+                                                         <t t-if="not st_name">
+                                                             <t t-set="score_st2" t-value="app.candidate_score_id.selection_status if app.candidate_score_id else False"/>
+                                                             <t t-set="st_name" t-value="'Selected' if score_st2 == 'selected' else ('Reserved' if score_st2 == 'reserve' else ('Rejected' if score_st2 == 'rejected' else ('Disqualified' if score_st2 == 'disqualified' else ('Eligible' if score_st2 == 'pending' else False))))"/>
+                                                         </t>
+                                                         <t t-if="not st_name">
+                                                             <t t-set="bunna_st2" t-value="app.bunna_app_status"/>
+                                                             <t t-set="st_name" t-value="'Shortlisted' if bunna_st2 == 'shortlisted' else ('Interview' if bunna_st2 == 'interview' else ('Offer Issued' if bunna_st2 == 'offer' else ('Hired' if bunna_st2 == 'hired' else ('Rejected' if bunna_st2 == 'rejected' else False))))"/>
+                                                         </t>
+                                                         <t t-if="not st_name">
+                                                             <t t-set="raw_st2" t-value="app.stage_id.name if app.stage_id else 'Applied'"/>
+                                                             <t t-set="st_name" t-value="'Applied' if raw_st2 in ['New', 'Initial', 'Initial Screening', 'Draft', 'Submitted'] else raw_st2"/>
+                                                         </t>
                                                      </t>
-                                                     <t t-if="not st_name">
-                                                         <t t-set="raw_st2" t-value="app.stage_id.name if app.stage_id else 'Applied'"/>
-                                                         <t t-set="st_name" t-value="'Applied' if raw_st2 in ['New', 'Initial', 'Initial Screening', 'Draft', 'Submitted'] else raw_st2"/>
-                                                     </t>
-                                                     <t t-set="badge_clr2" t-value="'#28a745' if st_name in ['Hired', 'Selected', 'Offer Issued'] else ('#dc3545' if st_name in ['Rejected', 'Disqualified', 'Refused', 'Cancelled'] else ('#17a2b8' if 'Interview' in st_name else ('#C17540' if st_name in ['Shortlisted', 'Reserved', 'Eligible'] else '#1D2B32')))"/>
-                                                     <t t-set="bar_width" t-value="'100%' if st_name in ['Hired', 'Selected', 'Rejected', 'Disqualified'] else ('90%' if st_name == 'Offer Issued' else ('70%' if 'Interview' in st_name else ('55%' if st_name in ['Shortlisted', 'Eligible', 'Reserved'] else '25%')))"/>
+                                                     <t t-set="badge_clr2" t-value="'#6c757d' if is_withdrawn else ('#1D2B32' if st_name in ['Hired', 'Selected', 'Offer Issued'] else ('#dc3545' if st_name in ['Rejected', 'Disqualified', 'Refused', 'Cancelled'] else ('#17a2b8' if 'Interview' in st_name else ('#C17540' if st_name in ['Shortlisted', 'Reserved', 'Eligible'] else '#1D2B32'))))"/>
+                                                     <t t-set="bar_width" t-value="'100%' if (is_withdrawn or st_name in ['Hired', 'Selected', 'Rejected', 'Disqualified']) else ('90%' if st_name == 'Offer Issued' else ('70%' if 'Interview' in st_name else ('55%' if st_name in ['Shortlisted', 'Eligible', 'Reserved'] else '25%')))"/>
                                                      <div class="d-flex flex-column">
-                                                         <span class="badge px-3 py-2 text-white mb-1 align-self-start fw-bold" t-attf-style="background-color: #{badge_clr2};">
+                                                         <span class="badge px-3 py-2 text-white mb-1 align-self-start fw-bold shadow-sm" t-attf-style="background-color: #{badge_clr2};">
                                                              <i class="fa fa-tag me-1"/> <t t-esc="st_name"/>
                                                          </span>
                                                          <!-- Timeline Step Bar -->
                                                          <div class="progress" style="height: 6px; width: 140px;" t-attf-title="Status: #{st_name}">
                                                              <div class="progress-bar" role="progressbar" t-attf-style="width: #{bar_width}; background-color: #{badge_clr2};"/>
                                                          </div>
+
+                                                         <!-- ATS Exam Notification for Candidate -->
+                                                         <t t-if="not is_withdrawn and app.scheduled_exam_date and app.is_exam_notified">
+                                                             <div class="mt-2 p-2 rounded shadow-sm text-start" style="background-color: #eef7ff; border-left: 4px solid #0d6efd; font-size: 0.78rem; line-height: 1.4;">
+                                                                 <div class="fw-bold text-primary mb-1"><i class="fa fa-pencil-square-o me-1"/> Written Exam Assessment</div>
+                                                                 <div class="text-dark">
+                                                                     You have been selected for written exam assessment for the position of <strong><t t-esc="app.job_id.name if app.job_id else (app.app_reference.job_title if app.app_reference else 'this position')"/></strong> for <strong><t t-esc="app.app_reference.operating_unit_id.name if (app.app_reference and app.app_reference.operating_unit_id) else (app.app_reference.job_location if app.app_reference else 'Main')"/></strong> work unit.
+                                                                 </div>
+                                                                 <div class="text-dark mt-1">
+                                                                     Scheduled for <strong><t t-esc="app.scheduled_exam_date.strftime('%b %d, %Y at %I:%M %p')"/></strong> at <strong><t t-esc="app.scheduled_exam_location or 'Main Branch'"/></strong>.
+                                                                 </div>
+                                                                 <div class="text-muted small mt-1">Please confirm your attendance through the ERP portal. <em>Best of luck!</em></div>
+                                                             </div>
+                                                         </t>
+
+                                                         <!-- ATS Interview Notification for Candidate -->
+                                                         <t t-if="not is_withdrawn and app.scheduled_interview_date and app.is_interview_notified">
+                                                             <div class="mt-2 p-2 rounded shadow-sm text-start" style="background-color: #f0fff4; border-left: 4px solid #198754; font-size: 0.78rem; line-height: 1.4;">
+                                                                 <div class="fw-bold text-success mb-1"><i class="fa fa-calendar-check-o me-1"/> Interview Assessment</div>
+                                                                 <div class="text-dark">
+                                                                     You have been selected for an interview assessment for the position of <strong><t t-esc="app.job_id.name if app.job_id else (app.app_reference.job_title if app.app_reference else 'this position')"/></strong> for <strong><t t-esc="app.app_reference.operating_unit_id.name if (app.app_reference and app.app_reference.operating_unit_id) else (app.app_reference.job_location if app.app_reference else 'Head Office')"/></strong> work unit.
+                                                                 </div>
+                                                                 <div class="text-dark mt-1">
+                                                                     Scheduled for <strong><t t-esc="app.scheduled_interview_date.strftime('%b %d, %Y at %I:%M %p')"/></strong> at <strong><t t-esc="app.scheduled_interview_location or 'Head Office'"/></strong>.
+                                                                 </div>
+                                                                 <div class="text-muted small mt-1"><em>Best of luck!</em></div>
+                                                             </div>
+                                                         </t>
                                                      </div>
                                                  </td>
                                                 <td class="text-end pe-4">
+                                                    <!-- Offer Letter Quick Action -->
+                                                    <t t-set="cand_off" t-value="request.env['recruitment.offer.letter'].sudo().search([('applicant_id', '=', app.id), ('state', '=', 'sent')], limit=1)"/>
+                                                    <t t-if="cand_off">
+                                                        <a href="/my/candidate/offers" class="btn btn-sm text-white fw-bold me-1 animate__animated animate__pulse animate__infinite shadow-sm" style="background-color: #541718;">
+                                                             <i class="fa fa-envelope-open me-1" style="color: #c17540;"/> View &amp; Respond to Offer
+                                                        </a>
+                                                    </t>
+                                                    <t t-elif="app.job_offer_status == 'accepted'">
+                                                        <span class="badge py-2 px-3 fw-bold me-1 text-white shadow-sm" style="background-color: #1D2B32;"><i class="fa fa-check me-1" style="color: #c17540;"/> Offer Accepted</span>
+                                                    </t>
                                                     <!-- Application Withdrawal Action (BRD FR-ATS-026) -->
                                                     <t t-set="status_val" t-value="app.bunna_app_status or 'draft'"/>
-                                                    <t t-if="status_val not in ['rejected', 'hired']">
-                                                        <form t-attf-action="/my/candidate/applications/withdraw/#{app.id}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to withdraw your application for this position?');">
-                                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                                            <button type="submit" class="btn btn-sm btn-outline-danger fw-bold">
-                                                                <i class="fa fa-times-circle me-1"/> Withdraw
-                                                            </button>
-                                                        </form>
+                                                    <t t-if="not is_withdrawn and status_val not in ['rejected', 'hired'] and not cand_off and app.job_offer_status != 'accepted'">
+                                                        <a t-attf-href="/my/candidate/applications/withdraw/#{app.id}"
+                                                           class="btn btn-sm btn-outline-danger fw-bold shadow-sm"
+                                                           onclick="return confirm('Are you sure you want to withdraw your application for this position?');">
+                                                            <i class="fa fa-times-circle me-1"/> Withdraw
+                                                        </a>
                                                     </t>
-                                                    <t t-else="">
+                                                    <t t-elif="is_withdrawn">
+                                                        <span class="badge bg-secondary py-2 px-3 fw-bold text-white shadow-sm"><i class="fa fa-ban me-1"/> Withdrawn</span>
+                                                    </t>
+                                                    <t t-elif="status_val in ['rejected', 'hired']">
                                                         <span class="text-muted small">Closed</span>
                                                     </t>
                                                 </td>
@@ -524,70 +587,160 @@
             <style>
                 .ats-profile-card {
                     background-color: #ffffff;
-                    border-radius: 10px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+                    border-radius: 12px;
+                    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
                     margin-bottom: 2rem;
-                    border: none;
+                    border: 1px solid #edf2f7;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                }
+                .ats-profile-card h4, .ats-profile-card h5, .ats-profile-card h6 {
+                    letter-spacing: -0.01em;
+                    font-weight: 700;
+                    color: #1e293b;
                 }
                 .ats-step-tabs {
                     display: flex;
                     border-bottom: 2px solid #e5e7eb;
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 1.75rem;
                     overflow-x: auto;
+                    gap: 0.25rem;
                 }
                 .ats-step-tab {
-                    padding: 1rem 1.2rem;
+                    padding: 0.85rem 1.15rem;
                     color: #6b7280;
                     text-decoration: none;
                     font-weight: 600;
-                    font-size: 0.88rem;
+                    font-size: 0.875rem;
                     white-space: nowrap;
                     border-bottom: 3px solid transparent;
-                    transition: all 0.2s;
+                    transition: all 0.2s ease-in-out;
+                    display: inline-flex;
+                    align-items: center;
                 }
                 .ats-step-tab:hover {
                     color: #541718;
+                    background-color: #fcf8f8;
+                    border-radius: 6px 6px 0 0;
                 }
                 .ats-step-tab.active {
                     color: #541718;
                     border-bottom-color: #541718;
+                    font-weight: 700;
                 }
                 .ats-step-tab-num {
-                    background-color: #e5e7eb;
+                    background-color: #f3f4f6;
                     color: #4b5563;
                     border-radius: 50%;
-                    width: 22px;
-                    height: 22px;
+                    width: 24px;
+                    height: 24px;
                     display: inline-flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 0.75rem;
-                    margin-right: 0.4rem;
+                    font-weight: 700;
+                    margin-right: 0.5rem;
+                    border: 1px solid #e5e7eb;
                 }
                 .ats-step-tab.active .ats-step-tab-num {
                     background-color: #541718;
                     color: #ffffff;
+                    border-color: #541718;
+                }
+                .form-label {
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 0.35rem;
+                    display: inline-block;
+                    letter-spacing: 0.01em;
+                }
+                .form-control, .form-select {
+                    font-size: 0.875rem;
+                    color: #1f2937;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                    padding: 0.55rem 0.85rem;
+                    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+                }
+                .form-control:focus, .form-select:focus {
+                    border-color: #541718;
+                    box-shadow: 0 0 0 0.2rem rgba(84, 23, 24, 0.15);
+                }
+                .form-check-label {
+                    font-size: 0.85rem;
+                    user-select: none;
+                }
+                .table {
+                    font-size: 0.875rem;
+                    margin-bottom: 0;
+                }
+                .table thead th {
+                    background-color: #f8fafc;
+                    color: #475569;
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                    border-bottom: 2px solid #e2e8f0;
+                    padding: 0.75rem 1rem;
+                    vertical-align: middle;
+                }
+                .table tbody td {
+                    padding: 0.8rem 1rem;
+                    vertical-align: middle;
+                    color: #334155;
+                    border-bottom: 1px solid #f1f5f9;
+                }
+                .table-hover tbody tr:hover {
+                    background-color: #f8fafc;
                 }
                 .btn-bunna {
                     background-color: #541718;
                     color: #ffffff;
                     font-weight: 600;
+                    font-size: 0.875rem;
                     border-radius: 6px;
                     padding: 0.55rem 1.4rem;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.4rem;
+                    transition: all 0.2s ease;
+                    border: 1px solid #541718;
                 }
                 .btn-bunna:hover {
                     background-color: #3b0f10;
                     color: #ffffff;
+                    border-color: #3b0f10;
+                    box-shadow: 0 2px 6px rgba(84, 23, 24, 0.25);
                 }
                 .btn-terracotta {
                     background-color: #C17540;
                     color: #ffffff;
                     font-weight: 600;
+                    font-size: 0.85rem;
                     border-radius: 6px;
+                    padding: 0.5rem 1.1rem;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.4rem;
+                    transition: all 0.2s ease;
+                    border: 1px solid #C17540;
                 }
                 .btn-terracotta:hover {
                     background-color: #a35d2f;
                     color: #ffffff;
+                    border-color: #a35d2f;
+                    box-shadow: 0 2px 6px rgba(193, 117, 64, 0.25);
+                }
+                .edu-entry-card, .exp-entry-card, .cert-entry-card, .lang-entry-card {
+                    border: 1px solid #e2e8f0 !important;
+                    border-radius: 8px !important;
+                    transition: box-shadow 0.2s ease;
+                }
+                .edu-entry-card:hover, .exp-entry-card:hover, .cert-entry-card:hover, .lang-entry-card:hover {
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
                 }
             </style>
 
@@ -661,6 +814,32 @@
                                 </div>
                             </t>
 
+                            <t t-if="error_msg or request.params.get('error')">
+                                <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" role="alert">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fa fa-exclamation-triangle fa-2x me-3 text-danger"/>
+                                        <div>
+                                            <h6 class="fw-bold mb-1 text-danger">Application Requirement</h6>
+                                            <p class="small mb-0 text-dark"><t t-esc="error_msg or request.params.get('error')"/></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+
+                            <t t-if="request.params.get('upload_error')">
+                                <div class="alert alert-danger alert-dismissible fade show mb-4 shadow-sm" role="alert">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fa fa-exclamation-circle fa-2x me-3 text-danger"/>
+                                        <div>
+                                            <h6 class="fw-bold mb-1 text-danger">Upload Validation Failed</h6>
+                                            <p class="small mb-0 text-dark"><t t-esc="request.params.get('upload_error')"/></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            </t>
+
                             <!-- 7 STEP NAVIGATION TABS -->
                             <div class="ats-step-tabs">
                                 <a href="/my/candidate/profile?step=1" t-attf-class="ats-step-tab #{'active' if step == 1 else ''}">
@@ -690,14 +869,14 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-semibold text-dark small"><i class="fa fa-tasks me-1" style="color: #C17540;"/> Master Profile Completeness</span>
                                 <span class="badge rounded-pill px-3 py-2 fw-bold text-white" style="background-color: #C17540; font-size: 0.85rem;">
-                                    <t t-out="completeness"/>% Completed
+                                    <t t-out="completeness or 0"/>% Completed
                                 </span>
                             </div>
                             <div class="ats-progress-bar-container position-relative mb-4" style="height: 18px; background-color: #e5e7eb; border-radius: 9px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
                                 <div class="ats-progress-bar-fill d-flex align-items-center justify-content-center text-white fw-bold" 
-                                     t-attf-style="width: #{completeness}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
-                                    <t t-if="completeness &gt; 10">
-                                        <t t-out="completeness"/>%
+                                     t-attf-style="width: #{completeness or 0}%; height: 100%; font-size: 0.75rem; background-image: linear-gradient(90deg, #541718 0%, #C17540 100%); transition: width 0.6s ease-in-out;">
+                                    <t t-if="(completeness or 0) &gt; 10">
+                                        <t t-out="completeness or 0"/>%
                                     </t>
                                 </div>
                             </div>
@@ -1215,16 +1394,13 @@
                             <!-- TAB 3: EDUCATION -->
                             <t t-if="step == 3">
                                 <div>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="mb-3">
                                         <h5 class="fw-bold mb-0" style="color: #1D2B32;">Step 3: Educational Qualifications</h5>
-                                        <button type="button" class="btn btn-sm btn-terracotta text-white" onclick="document.getElementById('addEduContainer').style.display = document.getElementById('addEduContainer').style.display === 'none' ? 'block' : 'none';">
-                                            <i class="fa fa-plus-circle me-1"/> Add Education Entry
-                                        </button>
                                     </div>
 
                                     <!-- Table of Existing Education Entries -->
                                     <t t-if="candidate.education_ids">
-                                        <div class="table-responsive mb-4">
+                                        <div class="table-responsive mb-3">
                                             <table class="table table-bordered table-hover align-middle">
                                                 <thead class="bg-light">
                                                     <tr>
@@ -1254,7 +1430,7 @@
                                                                 </t>
                                                             </td>
                                                             <td class="text-center">
-                                                                <a t-attf-href="/my/candidate/profile?step=3&amp;edit_edu_id=#{edu.id}" class="btn btn-sm btn-outline-primary me-1" title="Edit Entry" onclick="document.getElementById('addEduContainer').style.display='block';"><i class="fa fa-pencil"/></a>
+                                                                <a t-attf-href="/my/candidate/profile?step=3&amp;edit_edu_id=#{edu.id}" class="btn btn-sm btn-outline-primary me-1" title="Edit Entry"><i class="fa fa-pencil"/></a>
                                                                 <a t-attf-href="/my/candidate/profile/education/delete/#{edu.id}" class="btn btn-sm btn-outline-danger" title="Delete Entry" onclick="return confirm('Are you sure you want to delete this education entry?');"><i class="fa fa-trash"/></a>
                                                             </td>
                                                         </tr>
@@ -1264,188 +1440,160 @@
                                         </div>
                                     </t>
 
-                                    <!-- Collapsible Form for Add / Edit Education -->
-                                    <div id="addEduContainer" t-att-style="'display: block;' if edit_edu or not candidate.education_ids else 'display: none;'" class="card border p-4 bg-light shadow-sm mb-4">
-                                        <form action="/my/candidate/profile?step=3" method="post" enctype="multipart/form-data">
-                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <t t-if="edit_edu">
-                                                <input type="hidden" name="edit_id" t-att-value="edit_edu.id"/>
-                                            </t>
+                                    <!-- Form for Add / Edit Education -->
+                                    <form action="/my/candidate/profile?step=3" method="post" enctype="multipart/form-data" id="eduMainForm">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <t t-if="edit_edu">
+                                            <input type="hidden" name="edit_id" t-att-value="edit_edu.id"/>
+                                        </t>
 
-                                            <h6 class="fw-bold mb-3" style="color: #541718;"><t t-esc="'Edit Education Entry' if edit_edu else 'New Education Entry'"/></h6>
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Education Level <span class="text-danger">*</span></label>
-                                                    <select name="education_level" class="form-select" required="required">
-                                                        <option value="bsc" t-att-selected="edit_edu.education_level == 'bsc' if edit_edu else True">Bachelor of Science (BSc)</option>
-                                                        <option value="ba" t-att-selected="edit_edu.education_level == 'ba' if edit_edu else False">Bachelor of Arts (BA)</option>
-                                                        <option value="ma_msc" t-att-selected="edit_edu.education_level == 'ma_msc' if edit_edu else False">Master's Degree (MA/MSc)</option>
-                                                        <option value="diploma" t-att-selected="edit_edu.education_level == 'diploma' if edit_edu else False">Diploma</option>
-                                                        <option value="highschool" t-att-selected="edit_edu.education_level == 'highschool' if edit_edu else False">High School</option>
-                                                        <option value="phd" t-att-selected="edit_edu.education_level == 'phd' if edit_edu else False">PhD / Doctorate</option>
-                                                        <option value="other" t-att-selected="edit_edu.education_level == 'other' if edit_edu else False">Other</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Program Type <span class="text-danger">*</span></label>
-                                                    <select name="program_type" class="form-select" required="required">
-                                                        <option value="regular" t-att-selected="edit_edu.program_type == 'regular' if edit_edu else True">Regular</option>
-                                                        <option value="extension" t-att-selected="edit_edu.program_type == 'extension' if edit_edu else False">Extension / Evening</option>
-                                                        <option value="distance" t-att-selected="edit_edu.program_type == 'distance' if edit_edu else False">Distance / Online</option>
-                                                        <option value="weekend" t-att-selected="edit_edu.program_type == 'weekend' if edit_edu else False">Weekend</option>
-                                                        <option value="summer" t-att-selected="edit_edu.program_type == 'summer' if edit_edu else False">Summer</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
-                                                    <input list="fieldsList" name="field_of_study" id="field_of_study" class="form-control" t-att-value="edit_edu.field_of_study if edit_edu else ''" placeholder="Type to search e.g. Computer Science" required="required" onchange="if(this.value==='Other'){document.getElementById('otherFieldDiv').style.display='block';}else{document.getElementById('otherFieldDiv').style.display='none';}"/>
-                                                    <datalist id="fieldsList">
-                                                        <option value="Computer Science"/>
-                                                        <option value="Information Technology"/>
-                                                        <option value="Software Engineering"/>
-                                                        <option value="Accounting &amp; Finance"/>
-                                                        <option value="Business Administration"/>
-                                                        <option value="Economics"/>
-                                                        <option value="Management"/>
-                                                        <option value="Electrical Engineering"/>
-                                                        <option value="Civil Engineering"/>
-                                                        <option value="Banking &amp; Finance"/>
-                                                        <option value="Marketing"/>
-                                                        <option value="Law"/>
-                                                        <option value="Other"/>
-                                                    </datalist>
-                                                </div>
-                                                <div class="col-md-6" id="otherFieldDiv" style="display: none;">
-                                                    <label class="form-label fw-bold small">Custom Field of Study</label>
-                                                    <input type="text" name="other_field_of_study" class="form-control" t-att-value="edit_edu.other_field_of_study if edit_edu else ''" placeholder="Specify Custom Field of Study"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">School / College / University <span class="text-danger">*</span></label>
-                                                    <input list="instList" name="institution" id="institution" class="form-control" t-att-value="edit_edu.institution if edit_edu else ''" placeholder="Type to search e.g. Addis Ababa University" required="required" onchange="if(this.value==='Other'){document.getElementById('otherInstDiv').style.display='block';}else{document.getElementById('otherInstDiv').style.display='none';}"/>
-                                                    <datalist id="instList">
-                                                         <!-- Public Universities &amp; Institutes -->
-                                                         <option value="Adama Science and Technology University (ASTU)"/>
-                                                         <option value="Addis Ababa Science and Technology University (AASTU)"/>
-                                                         <option value="Addis Ababa University (AAU)"/>
-                                                         <option value="Ambo University"/>
-                                                         <option value="Arba Minch University (AMU)"/>
-                                                         <option value="Arsi University"/>
-                                                         <option value="Assosa University"/>
-                                                         <option value="Bahir Dar University (BDU)"/>
-                                                         <option value="Borana University"/>
-                                                         <option value="Bule Hora University"/>
-                                                         <option value="Debre Berhan University (DBU)"/>
-                                                         <option value="Debre Markos University (DMU)"/>
-                                                         <option value="Debre Tabor University"/>
-                                                         <option value="Dilla University"/>
-                                                         <option value="Dire Dawa University"/>
-                                                         <option value="Ethiopian Civil Service University (ECSU)"/>
-                                                         <option value="Ethiopian Defence University"/>
-                                                         <option value="Ethiopian Management Institute (EMI)"/>
-                                                         <option value="Ethiopian Police University"/>
-                                                         <option value="Gambella University"/>
-                                                         <option value="Haramaya University"/>
-                                                         <option value="Hawassa University"/>
-                                                         <option value="Injibara University"/>
-                                                         <option value="Jigjiga University"/>
-                                                         <option value="Jimma University"/>
-                                                         <option value="Kebri Dehar University"/>
-                                                         <option value="Kotebe University of Education (KUE)"/>
-                                                         <option value="Mekelle University"/>
-                                                         <option value="Mettu University"/>
-                                                         <option value="Mizan-Tepi University"/>
-                                                         <option value="Oda Bultum University"/>
-                                                         <option value="Raya University"/>
-                                                         <option value="Salale University"/>
-                                                         <option value="Samara University"/>
-                                                         <option value="University of Gondar (UOG)"/>
-                                                         <option value="Wachemo University"/>
-                                                         <option value="Werabe University"/>
-                                                         <option value="Wolaita Sodo University"/>
-                                                         <option value="Woldia University"/>
-                                                         <option value="Wollega University"/>
-                                                         <option value="Wollo University"/>
+                                        <div id="addEduContainer" class="card border p-4 bg-light shadow-sm mb-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="fw-bold mb-0" style="color: #541718;"><t t-esc="'Edit Education Entry' if edit_edu else 'Educational Qualifications'"/></h6>
+                                                <t t-if="edit_edu">
+                                                    <a href="/my/candidate/profile?step=3" class="btn btn-sm btn-outline-secondary"><i class="fa fa-times me-1"/> Cancel Edit</a>
+                                                </t>
+                                            </div>
 
-                                                         <!-- Private Universities &amp; Colleges -->
-                                                         <option value="Admas University"/>
-                                                         <option value="Africa Beza University College"/>
-                                                         <option value="Alpha University College"/>
-                                                         <option value="Atlas University College"/>
-                                                         <option value="Bethel Medical College"/>
-                                                         <option value="CPU University College"/>
-                                                         <option value="Dandy Boru College"/>
-                                                         <option value="Gage University College"/>
-                                                         <option value="Grace Leadership University"/>
-                                                         <option value="Hayat Medical College"/>
-                                                         <option value="HilCoE School of Computer Science &amp; Technology"/>
-                                                         <option value="Hope Enterprise University College"/>
-                                                         <option value="Leadstar University College"/>
-                                                         <option value="Lucy University College"/>
-                                                         <option value="Microlink Information Technology College"/>
-                                                         <option value="New Generation University College"/>
-                                                         <option value="Paradise Valley University College"/>
-                                                         <option value="Rift Valley University"/>
-                                                         <option value="Royal University College"/>
-                                                         <option value="St. Mary's University"/>
-                                                         <option value="Unity University"/>
-                                                         <option value="Universal Medical College"/>
-                                                         <option value="Yardstick International College"/>
-                                                         <option value="Other"/>
-                                                     </datalist>
-                                                </div>
-                                                <div class="col-md-6" id="otherInstDiv" style="display: none;">
-                                                    <label class="form-label fw-bold small">Custom Institution</label>
-                                                    <input type="text" name="other_institution" class="form-control" t-att-value="edit_edu.other_institution if edit_edu else ''" placeholder="Specify Custom Institution"/>
-                                                </div>
-                                                <div class="col-md-4">
-                                                     <label class="form-label fw-bold small">Year of Graduation</label>
-                                                     <input type="date" name="graduation_year" class="form-control" t-att-value="edit_edu.graduation_year.strftime('%Y-%m-%d') if edit_edu and edit_edu.graduation_year else ''" placeholder="Select graduation date"/>
-                                                 </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold small">CGPA / Grade</label>
-                                                    <input type="number" step="0.01" name="cgpa" class="form-control" t-att-value="edit_edu.cgpa if edit_edu else '3.50'" placeholder="e.g. 3.50"/>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold small">Have Cost Sharing?</label>
-                                                    <div class="form-check mt-2">
-                                                        <input class="form-check-input" type="checkbox" name="has_cost_sharing" value="1" id="costSharingCheck" t-att-checked="edit_edu and edit_edu.has_cost_sharing" onchange="document.getElementById('costSharingFileDiv').style.display = this.checked ? 'block' : 'none';"/>
-                                                        <label class="form-check-label small fw-semibold" for="costSharingCheck">Yes, I have Cost Sharing</label>
+                                            <div id="eduCardsContainer">
+                                                <div class="edu-entry-card card border p-3 mb-3 bg-white shadow-xs">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="badge bg-light text-dark border edu-badge-num">Qualification #1</span>
+                                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-edu" style="display: none;" onclick="removeEduCard(this);"><i class="fa fa-trash me-1"/> Remove</button>
+                                                    </div>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Education Level <span class="text-danger">*</span></label>
+                                                            <select name="education_level" class="form-select">
+                                                                <option value="bsc" t-att-selected="edit_edu.education_level == 'bsc' if edit_edu else True">Bachelor of Science (BSc)</option>
+                                                                <option value="ba" t-att-selected="edit_edu.education_level == 'ba' if edit_edu else False">Bachelor of Arts (BA)</option>
+                                                                <option value="ma_msc" t-att-selected="edit_edu.education_level == 'ma_msc' if edit_edu else False">Master's Degree (MA/MSc)</option>
+                                                                <option value="diploma" t-att-selected="edit_edu.education_level == 'diploma' if edit_edu else False">Diploma</option>
+                                                                <option value="highschool" t-att-selected="edit_edu.education_level == 'highschool' if edit_edu else False">High School</option>
+                                                                <option value="phd" t-att-selected="edit_edu.education_level == 'phd' if edit_edu else False">PhD / Doctorate</option>
+                                                                <option value="other" t-att-selected="edit_edu.education_level == 'other' if edit_edu else False">Other</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Program Type <span class="text-danger">*</span></label>
+                                                            <select name="program_type" class="form-select">
+                                                                <option value="regular" t-att-selected="edit_edu.program_type == 'regular' if edit_edu else True">Regular</option>
+                                                                <option value="extension" t-att-selected="edit_edu.program_type == 'extension' if edit_edu else False">Extension / Evening</option>
+                                                                <option value="distance" t-att-selected="edit_edu.program_type == 'distance' if edit_edu else False">Distance / Online</option>
+                                                                <option value="weekend" t-att-selected="edit_edu.program_type == 'weekend' if edit_edu else False">Weekend</option>
+                                                                <option value="summer" t-att-selected="edit_edu.program_type == 'summer' if edit_edu else False">Summer</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Field of Study <span class="text-danger">*</span></label>
+                                                            <input list="fieldsList" name="field_of_study" class="form-control" t-att-value="edit_edu.field_of_study if edit_edu else ''" placeholder="Type to search e.g. Computer Science" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-field-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
+                                                        </div>
+                                                        <div class="col-md-6 other-field-div" style="display: none;">
+                                                            <label class="form-label fw-bold small">Custom Field of Study</label>
+                                                            <input type="text" name="other_field_of_study" class="form-control" t-att-value="edit_edu.other_field_of_study if edit_edu else ''" placeholder="Specify Custom Field of Study"/>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">School / College / University <span class="text-danger">*</span></label>
+                                                            <input list="instList" name="institution" class="form-control" t-att-value="edit_edu.institution if edit_edu else ''" placeholder="Type to search e.g. Addis Ababa University" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.other-inst-div'); if(this.value==='Other'){d.style.display='block';}else{d.style.display='none';}"/>
+                                                        </div>
+                                                        <div class="col-md-6 other-inst-div" style="display: none;">
+                                                            <label class="form-label fw-bold small">Custom Institution</label>
+                                                            <input type="text" name="other_institution" class="form-control" t-att-value="edit_edu.other_institution if edit_edu else ''" placeholder="Specify Custom Institution"/>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                             <label class="form-label fw-bold small">Year of Graduation</label>
+                                                             <input type="date" name="graduation_year" class="form-control" t-att-value="edit_edu.graduation_year.strftime('%Y-%m-%d') if edit_edu and edit_edu.graduation_year else ''" placeholder="Select graduation date"/>
+                                                         </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-bold small">CGPA / Grade</label>
+                                                            <input type="number" step="0.01" name="cgpa" class="form-control" t-att-value="edit_edu.cgpa if edit_edu else '3.50'" placeholder="e.g. 3.50"/>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-bold small">Have Cost Sharing?</label>
+                                                            <div class="form-check mt-2">
+                                                                <input class="form-check-input" type="checkbox" name="has_cost_sharing" value="1" t-att-checked="edit_edu and edit_edu.has_cost_sharing" onchange="var p=this.closest('.edu-entry-card'); var d=p.querySelector('.cost-sharing-div'); d.style.display = this.checked ? 'block' : 'none';"/>
+                                                                <label class="form-check-label small fw-semibold">Yes, I have Cost Sharing</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6 cost-sharing-div" t-att-style="'display: block;' if edit_edu and edit_edu.has_cost_sharing else 'display: none;'">
+                                                            <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                                <span>Cost Sharing Agreement (PDF)</span>
+                                                                <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
+                                                            </label>
+                                                            <input type="file" name="cost_sharing_file" class="form-control file-validate-input" accept=".pdf,.jpg,.jpeg,.png" data-max-size="5" data-rec-size="2" data-type-name="Cost Sharing Agreement"/>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">Ideal format: <strong>PDF</strong>. Scanned copies (JPG, PNG) supported up to 5 MB.</small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                                <span>Degree / Diploma / Transcript Document</span>
+                                                                <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
+                                                            </label>
+                                                            <input type="file" name="education_doc_file" class="form-control file-validate-input" accept=".pdf,.jpg,.jpeg,.png" data-max-size="5" data-rec-size="2" data-type-name="Degree / Diploma / Transcript Document"/>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">Ideal format: <strong>PDF</strong>. Recommended: &lt; 2 MB (Max Practical: 5 MB).</small>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-6" id="costSharingFileDiv" t-att-style="'display: block;' if edit_edu and edit_edu.has_cost_sharing else 'display: none;'">
-                                                    <label class="form-label fw-bold small">Upload Cost Sharing Agreement (PDF/Image)</label>
-                                                    <input type="file" name="cost_sharing_file" class="form-control"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Upload Education Degree/Diploma Document (PDF/Image)</label>
-                                                    <input type="file" name="education_doc_file" class="form-control"/>
-                                                </div>
                                             </div>
 
-                                            <div class="d-flex justify-content-end mt-3">
-                                                <t t-if="edit_edu"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save Entry</button></t>
-                                                <t t-if="not edit_edu"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save &amp; Next &#8594;</button></t>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <t t-if="candidate.education_ids and not edit_edu">
-                                        <div class="d-flex justify-content-between mt-4">
-                                            <a href="/my/candidate/profile?step=2" class="btn btn-outline-secondary">&#8592; Back to Personal Info</a>
-                                            <a href="/my/candidate/profile?step=4" class="btn btn-bunna">Save &amp; Next &#8594;</a>
+                                            <t t-if="not edit_edu">
+                                                <div class="mt-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAnotherEduCard();">
+                                                        <i class="fa fa-plus-circle me-1"/> + Add Additional Entry
+                                                    </button>
+                                                </div>
+                                            </t>
                                         </div>
-                                    </t>
+
+                                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                                            <a href="/my/candidate/profile?step=2" class="btn btn-outline-secondary">&#8592; Back to Personal Info</a>
+                                            <button type="submit" class="btn btn-bunna"><t t-esc="'Save Changes' if edit_edu else 'Save &amp; Next &#8594;'"/></button>
+                                        </div>
+                                    </form>
+
+                                    <script type="text/javascript">
+                                        function addAnotherEduCard() {
+                                            var container = document.getElementById('eduCardsContainer');
+                                            var firstCard = container.querySelector('.edu-entry-card');
+                                            var clone = firstCard.cloneNode(true);
+                                            clone.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"])').forEach(function(i) { i.value = ''; });
+                                            clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
+                                            clone.querySelectorAll('input[type="checkbox"]').forEach(function(c) { c.checked = false; });
+                                            clone.querySelectorAll('input[type="file"]').forEach(function(f) { f.value = ''; });
+                                            clone.querySelectorAll('.other-field-div, .other-inst-div, .cost-sharing-div').forEach(function(d) { d.style.display = 'none'; });
+                                            container.appendChild(clone);
+                                            updateEduCardBadges();
+                                        }
+
+                                        function removeEduCard(btn) {
+                                            var container = document.getElementById('eduCardsContainer');
+                                            var cards = container.querySelectorAll('.edu-entry-card');
+                                            if (cards.length > 1) {
+                                                btn.closest('.edu-entry-card').remove();
+                                                updateEduCardBadges();
+                                            }
+                                        }
+
+                                        function updateEduCardBadges() {
+                                            var container = document.getElementById('eduCardsContainer');
+                                            var cards = container.querySelectorAll('.edu-entry-card');
+                                            cards.forEach(function(card, idx) {
+                                                var badge = card.querySelector('.edu-badge-num');
+                                                if (badge) badge.innerText = 'Qualification #' + (idx + 1);
+                                                var removeBtn = card.querySelector('.btn-remove-edu');
+                                                if (removeBtn) {
+                                                    removeBtn.style.display = (cards.length > 1) ? 'inline-block' : 'none';
+                                                }
+                                            });
+                                        }
+                                    </script>
                                 </div>
                             </t>
 
                             <!-- TAB 4: EXPERIENCE -->
                             <t t-if="step == 4">
                                 <div>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="mb-3">
                                         <h5 class="fw-bold mb-0" style="color: #1D2B32;">Step 4: Professional Experience</h5>
-                                        <button type="button" class="btn btn-sm btn-terracotta text-white" onclick="document.getElementById('addExpContainer').style.display = document.getElementById('addExpContainer').style.display === 'none' ? 'block' : 'none';">
-                                            <i class="fa fa-plus-circle me-1"/> Add Experience Entry
-                                        </button>
                                     </div>
 
                                     <!-- Computed Experience Summary Cards -->
@@ -1591,7 +1739,7 @@
                                     </script>
 
                                     <t t-if="candidate.experience_ids">
-                                        <div class="table-responsive mb-4">
+                                        <div class="table-responsive mb-3">
                                             <table class="table table-bordered table-hover align-middle">
                                                 <thead class="bg-light">
                                                     <tr>
@@ -1627,94 +1775,148 @@
                                         </div>
                                     </t>
 
-                                    <!-- Collapsible Experience Form -->
-                                    <div id="addExpContainer" t-att-style="'display: block;' if edit_exp or not candidate.experience_ids else 'display: none;'" class="card border p-4 bg-light shadow-sm mb-4">
-                                        <form action="/my/candidate/profile?step=4" method="post" enctype="multipart/form-data">
-                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <t t-if="edit_exp">
-                                                <input type="hidden" name="edit_id" t-att-value="edit_exp.id"/>
-                                            </t>
+                                    <!-- Experience Form -->
+                                    <form action="/my/candidate/profile?step=4" method="post" enctype="multipart/form-data" id="expMainForm">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <t t-if="edit_exp">
+                                            <input type="hidden" name="edit_id" t-att-value="edit_exp.id"/>
+                                        </t>
 
-                                            <h6 class="fw-bold mb-3" style="color: #541718;"><t t-esc="'Edit Experience Entry' if edit_exp else 'New Experience Entry'"/></h6>
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Job Title / Position <span class="text-danger">*</span></label>
-                                                    <input type="text" name="position" class="form-control" t-att-value="edit_exp.position if edit_exp else ''" required="required" placeholder="e.g. Senior Software Engineer"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Company / Organization <span class="text-danger">*</span></label>
-                                                    <input type="text" name="organization" class="form-control" t-att-value="edit_exp.organization if edit_exp else ''" required="required" placeholder="e.g. Bunna Bank"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Company Sector Type <span class="text-danger">*</span></label>
-                                                    <select name="sector_type" class="form-select" required="required">
-                                                        <option value="banking" t-att-selected="edit_exp.sector_type == 'banking' if edit_exp else True">Banking Sector</option>
-                                                        <option value="non_banking" t-att-selected="edit_exp.sector_type == 'non_banking' if edit_exp else False">Non-Banking Sector</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Employment Type <span class="text-danger">*</span></label>
-                                                    <select name="employment_type" class="form-select" required="required">
-                                                        <option value="full_time" t-att-selected="edit_exp.employment_type == 'full_time' if edit_exp else True">Full Time</option>
-                                                        <option value="permanent" t-att-selected="edit_exp.employment_type == 'permanent' if edit_exp else False">Permanent</option>
-                                                        <option value="contract" t-att-selected="edit_exp.employment_type == 'contract' if edit_exp else False">Contract</option>
-                                                        <option value="internship" t-att-selected="edit_exp.employment_type == 'internship' if edit_exp else False">Internship</option>
-                                                        <option value="part_time" t-att-selected="edit_exp.employment_type == 'part_time' if edit_exp else False">Part Time</option>
-                                                        <option value="freelance" t-att-selected="edit_exp.employment_type == 'freelance' if edit_exp else False">Freelance / Temporary</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-3">
-                                                    <label class="form-label fw-bold small">Start Date <span class="text-danger">*</span></label>
-                                                    <input type="date" name="start_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_exp.start_date if edit_exp else ''" required="required"/>
-                                                </div>
-                                                <div class="col-md-3" id="endDateDiv" t-att-style="'display: none;' if edit_exp and edit_exp.is_current else 'display: block;'">
-                                                    <label class="form-label fw-bold small">End Date</label>
-                                                    <input type="date" name="end_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_exp.end_date if edit_exp else ''"/>
-                                                </div>
-                                                <div class="col-12">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" name="is_current" value="1" id="isCurrentCheck" t-att-checked="edit_exp and edit_exp.is_current" onchange="document.getElementById('endDateDiv').style.display = this.checked ? 'none' : 'block';"/>
-                                                        <label class="form-check-label small fw-bold text-primary" for="isCurrentCheck">Currently Working Here (Present)</label>
+                                        <div id="addExpContainer" class="card border p-4 bg-light shadow-sm mb-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="fw-bold mb-0" style="color: #541718;"><t t-esc="'Edit Experience Entry' if edit_exp else 'Professional Experience'"/></h6>
+                                                <t t-if="edit_exp">
+                                                    <a href="/my/candidate/profile?step=4" class="btn btn-sm btn-outline-secondary"><i class="fa fa-times me-1"/> Cancel Edit</a>
+                                                </t>
+                                            </div>
+
+                                            <div id="expCardsContainer">
+                                                <div class="exp-entry-card card border p-3 mb-3 bg-white shadow-xs">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="badge bg-light text-dark border exp-badge-num">Experience #1</span>
+                                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-exp" style="display: none;" onclick="removeExpCard(this);"><i class="fa fa-trash me-1"/> Remove</button>
+                                                    </div>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Job Title / Position <span class="text-danger">*</span></label>
+                                                            <input type="text" name="position" class="form-control" t-att-value="edit_exp.position if edit_exp else ''" placeholder="e.g. Senior Software Engineer"/>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Company / Organization <span class="text-danger">*</span></label>
+                                                            <input type="text" name="organization" class="form-control" t-att-value="edit_exp.organization if edit_exp else ''" placeholder="e.g. Bunna Bank"/>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Company Sector Type <span class="text-danger">*</span></label>
+                                                            <select name="sector_type" class="form-select">
+                                                                <option value="banking" t-att-selected="edit_exp.sector_type == 'banking' if edit_exp else True">Banking Sector</option>
+                                                                <option value="non_banking" t-att-selected="edit_exp.sector_type == 'non_banking' if edit_exp else False">Non-Banking Sector</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Employment Type <span class="text-danger">*</span></label>
+                                                            <select name="employment_type" class="form-select">
+                                                                <option value="full_time" t-att-selected="edit_exp.employment_type == 'full_time' if edit_exp else True">Full Time</option>
+                                                                <option value="permanent" t-att-selected="edit_exp.employment_type == 'permanent' if edit_exp else False">Permanent</option>
+                                                                <option value="contract" t-att-selected="edit_exp.employment_type == 'contract' if edit_exp else False">Contract</option>
+                                                                <option value="internship" t-att-selected="edit_exp.employment_type == 'internship' if edit_exp else False">Internship</option>
+                                                                <option value="part_time" t-att-selected="edit_exp.employment_type == 'part_time' if edit_exp else False">Part Time</option>
+                                                                <option value="freelance" t-att-selected="edit_exp.employment_type == 'freelance' if edit_exp else False">Freelance / Temporary</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <label class="form-label fw-bold small">Start Date <span class="text-danger">*</span></label>
+                                                            <input type="date" name="start_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_exp.start_date if edit_exp else ''"/>
+                                                        </div>
+                                                        <div class="col-md-3 end-date-div" t-att-style="'display: none;' if edit_exp and edit_exp.is_current else 'display: block;'">
+                                                            <label class="form-label fw-bold small">End Date</label>
+                                                            <input type="date" name="end_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_exp.end_date if edit_exp else ''"/>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="is_current" value="1" t-att-checked="edit_exp and edit_exp.is_current" onchange="var p=this.closest('.exp-entry-card'); var d=p.querySelector('.end-date-div'); d.style.display = this.checked ? 'none' : 'block';"/>
+                                                                <label class="form-check-label small fw-bold text-primary">Currently Working Here (Present)</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                                <span>Attach Experience Letter / Service Certificate</span>
+                                                                <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
+                                                            </label>
+                                                            <input type="file" name="exp_file" class="form-control file-validate-input" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png" data-max-size="5" data-rec-size="2" data-type-name="Experience / Service Certificate"/>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">Supported formats: <strong>PDF, DOCX, JPG, PNG</strong>. Recommended: &lt; 2 MB (Max Practical: 5 MB).</small>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <label class="form-label fw-bold small">Key Responsibilities &amp; Achievements</label>
+                                                            <textarea name="responsibilities" class="form-control" rows="3"><t t-esc="edit_exp.responsibilities if edit_exp else ''"/></textarea>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-12">
-                                                    <label class="form-label fw-bold small">Attach Experience Letter / Service Certificate (PDF/Image)</label>
-                                                    <input type="file" name="exp_file" class="form-control"/>
-                                                </div>
-                                                <div class="col-12">
-                                                    <label class="form-label fw-bold small">Key Responsibilities &amp; Achievements</label>
-                                                    <textarea name="responsibilities" class="form-control" rows="3"><t t-esc="edit_exp.responsibilities if edit_exp else ''"/></textarea>
-                                                </div>
                                             </div>
 
-                                            <div class="d-flex justify-content-end mt-3">
-                                                <t t-if="edit_exp"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save Entry</button></t>
-                                                <t t-if="not edit_exp"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save &amp; Next &#8594;</button></t>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <t t-if="candidate.experience_ids and not edit_exp">
-                                        <div class="d-flex justify-content-between mt-4">
-                                            <a href="/my/candidate/profile?step=3" class="btn btn-outline-secondary">&#8592; Back to Education</a>
-                                            <a href="/my/candidate/profile?step=5" class="btn btn-bunna">Save &amp; Next &#8594;</a>
+                                            <t t-if="not edit_exp">
+                                                <div class="mt-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAnotherExpCard();">
+                                                        <i class="fa fa-plus-circle me-1"/> + Add Additional Entry
+                                                    </button>
+                                                </div>
+                                            </t>
                                         </div>
-                                    </t>
+
+                                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                                            <a href="/my/candidate/profile?step=3" class="btn btn-outline-secondary">&#8592; Back to Education</a>
+                                            <button type="submit" class="btn btn-bunna"><t t-esc="'Save Changes' if edit_exp else 'Save &amp; Next &#8594;'"/></button>
+                                        </div>
+                                    </form>
+
+                                    <script type="text/javascript">
+                                        function addAnotherExpCard() {
+                                            var container = document.getElementById('expCardsContainer');
+                                            var firstCard = container.querySelector('.exp-entry-card');
+                                            var clone = firstCard.cloneNode(true);
+                                            clone.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"])').forEach(function(i) { i.value = ''; });
+                                            clone.querySelectorAll('textarea').forEach(function(t) { t.value = ''; });
+                                            clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
+                                            clone.querySelectorAll('input[type="checkbox"]').forEach(function(c) { c.checked = false; });
+                                            clone.querySelectorAll('input[type="file"]').forEach(function(f) { f.value = ''; });
+                                            clone.querySelectorAll('.end-date-div').forEach(function(d) { d.style.display = 'block'; });
+                                            container.appendChild(clone);
+                                            updateExpCardBadges();
+                                        }
+
+                                        function removeExpCard(btn) {
+                                            var container = document.getElementById('expCardsContainer');
+                                            var cards = container.querySelectorAll('.exp-entry-card');
+                                            if (cards.length > 1) {
+                                                btn.closest('.exp-entry-card').remove();
+                                                updateExpCardBadges();
+                                            }
+                                        }
+
+                                        function updateExpCardBadges() {
+                                            var container = document.getElementById('expCardsContainer');
+                                            var cards = container.querySelectorAll('.exp-entry-card');
+                                            cards.forEach(function(card, idx) {
+                                                var badge = card.querySelector('.exp-badge-num');
+                                                if (badge) badge.innerText = 'Experience #' + (idx + 1);
+                                                var removeBtn = card.querySelector('.btn-remove-exp');
+                                                if (removeBtn) {
+                                                    removeBtn.style.display = (cards.length > 1) ? 'inline-block' : 'none';
+                                                }
+                                            });
+                                        }
+                                    </script>
                                 </div>
                             </t>
 
                             <!-- TAB 5: CERTIFICATION -->
                             <t t-if="step == 5">
                                 <div>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="mb-3">
                                         <h5 class="fw-bold mb-0" style="color: #1D2B32;">Step 5: Certifications &amp; Training</h5>
-                                        <button type="button" class="btn btn-sm btn-terracotta text-white" onclick="document.getElementById('addCertContainer').style.display = document.getElementById('addCertContainer').style.display === 'none' ? 'block' : 'none';">
-                                            <i class="fa fa-plus-circle me-1"/> Add Certification Entry
-                                        </button>
                                     </div>
 
                                     <t t-if="candidate.certification_ids">
-                                        <div class="table-responsive mb-4">
+                                        <div class="table-responsive mb-3">
                                             <table class="table table-bordered table-hover align-middle">
                                                 <thead class="bg-light">
                                                     <tr>
@@ -1751,77 +1953,129 @@
                                         </div>
                                     </t>
 
-                                    <!-- Collapsible Certification Form -->
-                                    <div id="addCertContainer" t-att-style="'display: block;' if edit_cert or not candidate.certification_ids else 'display: none;'" class="card border p-4 bg-light shadow-sm mb-4">
-                                        <form action="/my/candidate/profile?step=5" method="post" enctype="multipart/form-data">
-                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <t t-if="edit_cert">
-                                                <input type="hidden" name="edit_id" t-att-value="edit_cert.id"/>
-                                            </t>
+                                    <!-- Certification Form -->
+                                    <form action="/my/candidate/profile?step=5" method="post" enctype="multipart/form-data" id="certMainForm">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <t t-if="edit_cert">
+                                            <input type="hidden" name="edit_id" t-att-value="edit_cert.id"/>
+                                        </t>
 
-                                            <h6 class="fw-bold mb-3" style="color: #541718;"><t t-esc="'Edit Certification Entry' if edit_cert else 'New Certification Entry'"/></h6>
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Certification Title <span class="text-danger">*</span></label>
-                                                    <input type="text" name="cert_name" class="form-control" t-att-value="edit_cert.name if edit_cert else ''" required="required" placeholder="e.g. AWS Certified Solutions Architect"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Issuing Organization</label>
-                                                    <input type="text" name="issuing_organization" class="form-control" t-att-value="edit_cert.issuing_organization if edit_cert else ''" placeholder="e.g. Amazon Web Services"/>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold small">Issue Date</label>
-                                                    <input type="date" name="issue_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_cert.issue_date if edit_cert else ''"/>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold small">Has Expiry Date?</label>
-                                                    <div class="form-check mt-2">
-                                                        <input class="form-check-input" type="checkbox" name="has_expiry" value="1" id="hasExpiryCheck" t-att-checked="edit_cert and edit_cert.has_expiry" onchange="document.getElementById('expiryDiv').style.display = this.checked ? 'block' : 'none';"/>
-                                                        <label class="form-check-label small fw-semibold" for="hasExpiryCheck">Yes, has expiration date</label>
+                                        <div id="addCertContainer" class="card border p-4 bg-light shadow-sm mb-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="fw-bold mb-0" style="color: #541718;"><t t-esc="'Edit Certification Entry' if edit_cert else 'Certifications &amp; Training'"/></h6>
+                                                <t t-if="edit_cert">
+                                                    <a href="/my/candidate/profile?step=5" class="btn btn-sm btn-outline-secondary"><i class="fa fa-times me-1"/> Cancel Edit</a>
+                                                </t>
+                                            </div>
+
+                                            <div id="certCardsContainer">
+                                                <div class="cert-entry-card card border p-3 mb-3 bg-white shadow-xs">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="badge bg-light text-dark border cert-badge-num">Certification #1</span>
+                                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-cert" style="display: none;" onclick="removeCertCard(this);"><i class="fa fa-trash me-1"/> Remove</button>
+                                                    </div>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Certification Title <span class="text-danger">*</span></label>
+                                                            <input type="text" name="cert_name" class="form-control" t-att-value="edit_cert.name if edit_cert else ''" placeholder="e.g. AWS Certified Solutions Architect"/>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Issuing Organization</label>
+                                                            <input type="text" name="issuing_organization" class="form-control" t-att-value="edit_cert.issuing_organization if edit_cert else ''" placeholder="e.g. Amazon Web Services"/>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-bold small">Issue Date</label>
+                                                            <input type="date" name="issue_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_cert.issue_date if edit_cert else ''"/>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <label class="form-label fw-bold small">Has Expiry Date?</label>
+                                                            <div class="form-check mt-2">
+                                                                <input class="form-check-input has-expiry-check" type="checkbox" name="has_expiry" value="1" t-att-checked="edit_cert and edit_cert.has_expiry" onchange="var p=this.closest('.cert-entry-card'); var d=p.querySelector('.expiry-date-div'); d.style.display = this.checked ? 'block' : 'none';"/>
+                                                                <label class="form-check-label small fw-semibold">Yes, has expiration date</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-4 expiry-date-div" t-att-style="'display: block;' if edit_cert and edit_cert.has_expiry else 'display: none;'">
+                                                            <label class="form-label fw-bold small">Expiration Date</label>
+                                                            <input type="date" name="expiry_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_cert.expiry_date if edit_cert else ''"/>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                                <span>Attach Certificate File (PDF)</span>
+                                                                <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
+                                                            </label>
+                                                            <input type="file" name="cert_file" class="form-control file-validate-input" accept=".pdf,.jpg,.jpeg,.png" data-max-size="5" data-rec-size="2" data-type-name="Certification Document"/>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">Ideal format: <strong>PDF</strong>. Scanned images (JPG, PNG) supported up to 5 MB.</small>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Credential Verification URL / Link</label>
+                                                            <input type="url" name="cert_url" class="form-control" t-att-value="edit_cert.cert_url if edit_cert else ''" placeholder="https://"/>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-4" id="expiryDiv" t-att-style="'display: block;' if edit_cert and edit_cert.has_expiry else 'display: none;'">
-                                                    <label class="form-label fw-bold small">Expiration Date</label>
-                                                    <input type="date" name="expiry_date" class="form-control" min="1900-01-01" max="2099-12-31" t-att-value="edit_cert.expiry_date if edit_cert else ''"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Attach Certificate File (PDF/Image)</label>
-                                                    <input type="file" name="cert_file" class="form-control"/>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Credential Verification URL / Link</label>
-                                                    <input type="url" name="cert_url" class="form-control" t-att-value="edit_cert.cert_url if edit_cert else ''" placeholder="https://"/>
-                                                </div>
                                             </div>
 
-                                            <div class="d-flex justify-content-end mt-3">
-                                                <t t-if="edit_cert"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save Entry</button></t>
-                                                <t t-if="not edit_cert"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save &amp; Next &#8594;</button></t>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <t t-if="candidate.certification_ids and not edit_cert">
-                                        <div class="d-flex justify-content-between mt-4">
-                                            <a href="/my/candidate/profile?step=4" class="btn btn-outline-secondary">&#8592; Back to Experience</a>
-                                            <a href="/my/candidate/profile?step=6" class="btn btn-bunna">Save &amp; Next &#8594;</a>
+                                            <t t-if="not edit_cert">
+                                                <div class="mt-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAnotherCertCard();">
+                                                        <i class="fa fa-plus-circle me-1"/> + Add Additional Entry
+                                                    </button>
+                                                </div>
+                                            </t>
                                         </div>
-                                    </t>
+
+                                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                                            <a href="/my/candidate/profile?step=4" class="btn btn-outline-secondary">&#8592; Back to Experience</a>
+                                            <button type="submit" class="btn btn-bunna"><t t-esc="'Save Changes' if edit_cert else 'Save &amp; Next &#8594;'"/></button>
+                                        </div>
+                                    </form>
+
+                                    <script type="text/javascript">
+                                        function addAnotherCertCard() {
+                                            var container = document.getElementById('certCardsContainer');
+                                            var firstCard = container.querySelector('.cert-entry-card');
+                                            var clone = firstCard.cloneNode(true);
+                                            clone.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"])').forEach(function(i) { i.value = ''; });
+                                            clone.querySelectorAll('input[type="checkbox"]').forEach(function(c) { c.checked = false; });
+                                            clone.querySelectorAll('input[type="file"]').forEach(function(f) { f.value = ''; });
+                                            clone.querySelectorAll('.expiry-date-div').forEach(function(d) { d.style.display = 'none'; });
+                                            container.appendChild(clone);
+                                            updateCertCardBadges();
+                                        }
+
+                                        function removeCertCard(btn) {
+                                            var container = document.getElementById('certCardsContainer');
+                                            var cards = container.querySelectorAll('.cert-entry-card');
+                                            if (cards.length > 1) {
+                                                btn.closest('.cert-entry-card').remove();
+                                                updateCertCardBadges();
+                                            }
+                                        }
+
+                                        function updateCertCardBadges() {
+                                            var container = document.getElementById('certCardsContainer');
+                                            var cards = container.querySelectorAll('.cert-entry-card');
+                                            cards.forEach(function(card, idx) {
+                                                var badge = card.querySelector('.cert-badge-num');
+                                                if (badge) badge.innerText = 'Certification #' + (idx + 1);
+                                                var removeBtn = card.querySelector('.btn-remove-cert');
+                                                if (removeBtn) {
+                                                    removeBtn.style.display = (cards.length > 1) ? 'inline-block' : 'none';
+                                                }
+                                            });
+                                        }
+                                    </script>
                                 </div>
                             </t>
 
                             <!-- TAB 6: LANGUAGE -->
                             <t t-if="step == 6">
                                 <div>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="mb-3">
                                         <h5 class="fw-bold mb-0" style="color: #1D2B32;">Step 6: Language Proficiency</h5>
-                                        <button type="button" class="btn btn-sm btn-terracotta text-white" onclick="document.getElementById('addLangContainer').style.display = document.getElementById('addLangContainer').style.display === 'none' ? 'block' : 'none';">
-                                            <i class="fa fa-plus-circle me-1"/> Add Language Entry
-                                        </button>
                                     </div>
 
                                     <t t-if="candidate.language_ids">
-                                        <div class="table-responsive mb-4">
+                                        <div class="table-responsive mb-3">
                                             <table class="table table-bordered table-hover align-middle">
                                                 <thead class="bg-light">
                                                     <tr>
@@ -1846,53 +2100,104 @@
                                         </div>
                                     </t>
 
-                                    <!-- Collapsible Language Form -->
-                                    <div id="addLangContainer" t-att-style="'display: block;' if edit_lang or not candidate.language_ids else 'display: none;'" class="card border p-4 bg-light shadow-sm mb-4">
-                                        <form action="/my/candidate/profile?step=6" method="post">
-                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                                            <t t-if="edit_lang">
-                                                <input type="hidden" name="edit_id" t-att-value="edit_lang.id"/>
+                                    <!-- Language Form -->
+                                    <form action="/my/candidate/profile?step=6" method="post" id="langMainForm">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <t t-if="edit_lang">
+                                            <input type="hidden" name="edit_id" t-att-value="edit_lang.id"/>
+                                        </t>
+
+                                        <div id="addLangContainer" class="card border p-4 bg-light shadow-sm mb-4">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="fw-bold mb-0" style="color: #541718;"><t t-esc="'Edit Language Entry' if edit_lang else 'Language Proficiency'"/></h6>
+                                                <t t-if="edit_lang">
+                                                    <a href="/my/candidate/profile?step=6" class="btn btn-sm btn-outline-secondary"><i class="fa fa-times me-1"/> Cancel Edit</a>
+                                                </t>
+                                            </div>
+
+                                            <div id="langCardsContainer">
+                                                <div class="lang-entry-card card border p-3 mb-3 bg-white shadow-xs">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="badge bg-light text-dark border lang-badge-num">Language #1</span>
+                                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 btn-remove-lang" style="display: none;" onclick="removeLangCard(this);"><i class="fa fa-trash me-1"/> Remove</button>
+                                                    </div>
+                                                    <div class="row g-3">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Language <span class="text-danger">*</span></label>
+                                                            <select name="lang_name" class="form-select">
+                                                                <option value="" t-att-selected="not edit_lang">-- Select Language --</option>
+                                                                <option value="Amharic" t-att-selected="edit_lang.name == 'Amharic' if edit_lang else False">Amharic</option>
+                                                                <option value="English" t-att-selected="edit_lang.name == 'English' if edit_lang else False">English</option>
+                                                                <option value="Afan Oromo" t-att-selected="edit_lang.name == 'Afan Oromo' if edit_lang else False">Afan Oromo</option>
+                                                                <option value="Tigrinya" t-att-selected="edit_lang.name == 'Tigrinya' if edit_lang else False">Tigrinya</option>
+                                                                <option value="Somali" t-att-selected="edit_lang.name == 'Somali' if edit_lang else False">Somali</option>
+                                                                <option value="Afar" t-att-selected="edit_lang.name == 'Afar' if edit_lang else False">Afar</option>
+                                                                <option value="Sidama" t-att-selected="edit_lang.name == 'Sidama' if edit_lang else False">Sidama</option>
+                                                                <option value="Wolaytta" t-att-selected="edit_lang.name == 'Wolaytta' if edit_lang else False">Wolaytta</option>
+                                                                <option value="French" t-att-selected="edit_lang.name == 'French' if edit_lang else False">French</option>
+                                                                <option value="Arabic" t-att-selected="edit_lang.name == 'Arabic' if edit_lang else False">Arabic</option>
+                                                                <option value="Other" t-att-selected="edit_lang.name == 'Other' if edit_lang else False">Other</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold small">Proficiency Level <span class="text-danger">*</span></label>
+                                                            <select name="proficiency" class="form-select">
+                                                                <option value="fluent" t-att-selected="edit_lang.proficiency == 'fluent' if edit_lang else True">Fluent</option>
+                                                                <option value="native" t-att-selected="edit_lang.proficiency == 'native' if edit_lang else False">Native / Mother Tongue</option>
+                                                                <option value="basic" t-att-selected="edit_lang.proficiency == 'basic' if edit_lang else False">Basic</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <t t-if="not edit_lang">
+                                                <div class="mt-2">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addAnotherLangCard();">
+                                                        <i class="fa fa-plus-circle me-1"/> + Add Additional Entry
+                                                    </button>
+                                                </div>
                                             </t>
+                                        </div>
 
-                                            <h6 class="fw-bold mb-3" style="color: #541718;"><t t-esc="'Edit Language Entry' if edit_lang else 'New Language Entry'"/></h6>
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Language <span class="text-danger">*</span></label>
-                                                    <select name="lang_name" class="form-select" required="required">
-                                                        <option value="Amharic" t-att-selected="edit_lang.name == 'Amharic' if edit_lang else True">Amharic</option>
-                                                        <option value="English" t-att-selected="edit_lang.name == 'English' if edit_lang else False">English</option>
-                                                        <option value="Afan Oromo" t-att-selected="edit_lang.name == 'Afan Oromo' if edit_lang else False">Afan Oromo</option>
-                                                        <option value="Tigrinya" t-att-selected="edit_lang.name == 'Tigrinya' if edit_lang else False">Tigrinya</option>
-                                                        <option value="Somali" t-att-selected="edit_lang.name == 'Somali' if edit_lang else False">Somali</option>
-                                                        <option value="Afar" t-att-selected="edit_lang.name == 'Afar' if edit_lang else False">Afar</option>
-                                                        <option value="Sidama" t-att-selected="edit_lang.name == 'Sidama' if edit_lang else False">Sidama</option>
-                                                        <option value="Wolaytta" t-att-selected="edit_lang.name == 'Wolaytta' if edit_lang else False">Wolaytta</option>
-                                                        <option value="French" t-att-selected="edit_lang.name == 'French' if edit_lang else False">French</option>
-                                                        <option value="Arabic" t-att-selected="edit_lang.name == 'Arabic' if edit_lang else False">Arabic</option>
-                                                        <option value="Other" t-att-selected="edit_lang.name == 'Other' if edit_lang else False">Other</option>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold small">Proficiency Level <span class="text-danger">*</span></label>
-                                                    <select name="proficiency" class="form-select" required="required">
-                                                        <option value="fluent" t-att-selected="edit_lang.proficiency == 'fluent' if edit_lang else True">Fluent</option>
-                                                        <option value="native" t-att-selected="edit_lang.proficiency == 'native' if edit_lang else False">Native / Mother Tongue</option>
-                                                        <option value="basic" t-att-selected="edit_lang.proficiency == 'basic' if edit_lang else False">Basic</option>
-                                                    </select>
-                                                </div>
-                                            </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                                            <a href="/my/candidate/profile?step=5" class="btn btn-outline-secondary">&#8592; Back to Certification</a>
+                                            <button type="submit" class="btn btn-bunna"><t t-esc="'Save Changes' if edit_lang else 'Save &amp; Next &#8594;'"/></button>
+                                        </div>
+                                    </form>
 
-                                            <div class="d-flex justify-content-end mt-3">
-                                                <t t-if="edit_lang"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save Entry</button></t>
-                                                <t t-if="not edit_lang"><button type="submit" class="btn btn-bunna"><i class="fa fa-save me-1"/> Save &amp; Next &#8594;</button></t>
-                                            </div>
-                                        </form>
-                                    </div>
+                                    <script type="text/javascript">
+                                        function addAnotherLangCard() {
+                                            var container = document.getElementById('langCardsContainer');
+                                            var firstCard = container.querySelector('.lang-entry-card');
+                                            var clone = firstCard.cloneNode(true);
+                                            clone.querySelectorAll('select').forEach(function(s) { s.selectedIndex = 0; });
+                                            container.appendChild(clone);
+                                            updateLangCardBadges();
+                                        }
 
-                                    <div class="d-flex justify-content-between mt-4">
-                                        <a href="/my/candidate/profile?step=5" class="btn btn-outline-secondary">&#8592; Back to Certification</a>
-                                        <a href="/my/candidate/profile?step=7" class="btn btn-bunna">Save &amp; Next &#8594; &#8594;</a>
-                                    </div>
+                                        function removeLangCard(btn) {
+                                            var container = document.getElementById('langCardsContainer');
+                                            var cards = container.querySelectorAll('.lang-entry-card');
+                                            if (cards.length > 1) {
+                                                btn.closest('.lang-entry-card').remove();
+                                                updateLangCardBadges();
+                                            }
+                                        }
+
+                                        function updateLangCardBadges() {
+                                            var container = document.getElementById('langCardsContainer');
+                                            var cards = container.querySelectorAll('.lang-entry-card');
+                                            cards.forEach(function(card, idx) {
+                                                var badge = card.querySelector('.lang-badge-num');
+                                                if (badge) badge.innerText = 'Language #' + (idx + 1);
+                                                var removeBtn = card.querySelector('.btn-remove-lang');
+                                                if (removeBtn) {
+                                                    removeBtn.style.display = (cards.length > 1) ? 'inline-block' : 'none';
+                                                }
+                                            });
+                                        }
+                                    </script>
                                 </div>
                             </t>
 
@@ -1906,8 +2211,12 @@
                                         <h6 class="fw-bold text-dark mb-3"><i class="fa fa-file-text-o me-2" style="color: #541718;"/> Core Resume </h6>
                                         <div class="row g-3">
                                             <div class="col-md-6">
-                                                <label class="form-label fw-bold small">Upload Master CV / Resume (PDF / DOCX)</label>
-                                                <input type="file" name="cv_file" class="form-control"/>
+                                                <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                    <span>Upload Master CV / Resume</span>
+                                                    <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 2 MB (Max: 5 MB)</span>
+                                                </label>
+                                                <input type="file" name="cv_file" class="form-control file-validate-input" accept=".pdf,.docx,.doc" data-max-size="5" data-rec-size="2" data-type-name="Curriculum Vitae (CV / Resume)"/>
+                                                <small class="text-muted" style="font-size: 0.75rem;">Ideal format: <strong>PDF, DOCX</strong>. Maximum allowed limit: 5 MB.</small>
                                                 <t t-if="candidate.cv_file">
                                                     <div class="mt-2">
                                                         <span class="badge bg-success me-2"><i class="fa fa-check"/> Master CV Uploaded</span>
@@ -1915,16 +2224,6 @@
                                                     </div>
                                                 </t>
                                             </div>
-<!--                                            <div class="col-md-6">-->
-<!--                                                <label class="form-label fw-bold small">Upload Cover Letter (PDF / DOCX)</label>-->
-<!--                                                <input type="file" name="cover_letter_file" class="form-control"/>-->
-<!--                                                <t t-if="candidate.cover_letter_file">-->
-<!--                                                    <div class="mt-2">-->
-<!--                                                        <span class="badge bg-success me-2"><i class="fa fa-check"/> Cover Letter Uploaded</span>-->
-<!--                                                        <a href="/my/candidate/cover_letter/download" class="btn btn-sm btn-outline-success py-0" style="font-size: 0.8rem;"><i class="fa fa-download"/> Download Cover Letter</a>-->
-<!--                                                    </div>-->
-<!--                                                </t>-->
-<!--                                            </div>-->
                                         </div>
                                     </div>
 
@@ -1947,15 +2246,19 @@
                                     </div>
 
                                     <div class="card border p-3 mb-4 bg-light shadow-sm">
-                                        <h6 class="fw-bold text-dark mb-3"><i class="fa fa-paperclip me-2" style="color: #541718;"/> Additional Supporting Documents</h6>
+                                        <h6 class="fw-bold text-dark mb-3"><i class="fa fa-paperclip me-2" style="color: #541718;"/> Additional Supporting Documents (Recommendation)</h6>
                                         <div class="row g-3">
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold small">Document Title / Name</label>
-                                                <input type="text" name="doc_title" class="form-control" placeholder="e.g. Recommendation Letter"/>
+                                                <input type="text" name="doc_title" class="form-control" placeholder="e.g. Recommendation"/>
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label fw-bold small">Upload File (PDF/Image)</label>
-                                                <input type="file" name="doc_file" class="form-control"/>
+                                                <label class="form-label fw-bold small d-flex justify-content-between align-items-center">
+                                                    <span>Upload File</span>
+                                                    <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">Rec: &lt; 1 MB (Max: 2 MB)</span>
+                                                </label>
+                                                <input type="file" name="doc_file" class="form-control file-validate-input" accept=".pdf,.jpg,.jpeg,.png" data-max-size="2" data-rec-size="1" data-type-name="Tempo / Work ID / Supporting Document"/>
+                                                <small class="text-muted" style="font-size: 0.75rem;">Supported formats: <strong>PDF, JPG, PNG</strong>. Recommended: &lt; 1 MB (Max Practical: 2 MB).</small>
                                             </div>
                                         </div>
                                     </div>
@@ -1998,6 +2301,29 @@
                                         <button type="submit" class="btn btn-bunna"><i class="fa fa-check-circle me-1"/> Save Master Profile &amp; Complete Summary</button>
                                     </div>
                                 </form>
+
+                                <!-- Universal Client-side File Validation Script -->
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        var fileInputs = document.querySelectorAll('.file-validate-input');
+                                        fileInputs.forEach(function(input) {
+                                            input.addEventListener('change', function() {
+                                                var file = this.files[0];
+                                                if (!file) return;
+                                                var maxMb = parseFloat(this.getAttribute('data-max-size') || '5');
+                                                var recMb = parseFloat(this.getAttribute('data-rec-size') || '2');
+                                                var typeName = this.getAttribute('data-type-name') || 'File';
+                                                var maxBytes = maxMb * 1024 * 1024;
+                                                var fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
+
+                                                if (file.size > maxBytes) {
+                                                    alert("⚠️ File Too Large!\n\nThe selected " + typeName + " (" + fileSizeMb + " MB) exceeds the maximum allowed limit of " + maxMb + " MB.\n\nPlease upload a smaller or compressed file (Recommended: &lt; " + recMb + " MB).");
+                                                    this.value = "";
+                                                }
+                                            });
+                                        });
+                                    });
+                                </script>
                             </t>
 
                         </div>
@@ -2900,6 +3226,334 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- =============================================================== -->
+    <!-- 8. CANDIDATE JOB OFFERS TEMPLATE (/my/candidate/offers) -->
+    <!-- =============================================================== -->
+    <template id="ats_candidate_offers_template" name="Candidate Job Offers">
+        <t t-call="bunna_custom_web_page.dashboard_layout">
+            <t t-set="active_tab" t-value="'offers'"/>
+            <div class="container-fluid p-0">
+                <!-- Notifications & Alerts -->
+                <t t-if="success == 'accepted'">
+                    <div class="card border-0 shadow-sm mb-4 p-4 text-white" style="background: linear-gradient(135deg, #541718 0%, #1D2B32 100%); border-left: 6px solid #c17540 !important; border-radius: 12px;">
+                        <div class="d-flex align-items-center">
+                            <div class="p-3 rounded-circle me-3 d-flex align-items-center justify-content-center text-white" style="background-color: #c17540; width: 60px; height: 60px;">
+                                <i class="fa fa-check-circle fa-2x"/>
+                            </div>
+                            <div>
+                                <h4 class="fw-bold mb-1">Congratulations! Offer Accepted Successfully</h4>
+                                <p class="mb-0 text-white-50">You have officially accepted the job offer with Bunna Bank. Our HR Onboarding Officer will contact you shortly to coordinate pre-employment clearance (Medical Fitness &amp; Police Clearance Certificates).</p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <t t-if="success == 'declined'">
+                    <div class="alert alert-dismissible fade show shadow-sm mb-4 p-3 border-0 d-flex align-items-center" role="alert" style="background-color: #fdf8f4; border-left: 5px solid #c17540 !important; border-radius: 10px;">
+                        <i class="fa fa-info-circle fa-2x me-3" style="color: #c17540;"/>
+                        <div>
+                            <h6 class="fw-bold mb-1" style="color: #541718;">Job Offer Declined</h6>
+                            <p class="mb-0 small text-muted">Your response has been registered in our recruitment system. We appreciate your consideration and wish you success in your career endeavors.</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+
+                <t t-if="error">
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm mb-4 p-3 border-0 d-flex align-items-center" role="alert" style="border-radius: 10px;">
+                        <i class="fa fa-exclamation-triangle fa-2x text-danger me-3"/>
+                        <div>
+                            <h6 class="fw-bold mb-1">Notice</h6>
+                            <p class="mb-0 small"><t t-esc="error"/></p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"/>
+                    </div>
+                </t>
+
+                <!-- Page Header Banner -->
+                <div class="card border-0 shadow-sm p-4 mb-4" style="background: linear-gradient(135deg, #1D2B32 0%, #541718 100%); color: #ffffff; border-radius: 12px; border-bottom: 3px solid #c17540;">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                        <div>
+                            <h3 class="fw-bold mb-1"><i class="fa fa-envelope-open-o me-2" style="color: #c17540;"/> Job Offers &amp; Employment Proposals</h3>
+                            <p class="mb-0 text-white-50">Review, accept, or decline official employment offers issued by Bunna Bank Share Company.</p>
+                        </div>
+                        <div class="mt-3 mt-md-0">
+                            <span class="badge px-3 py-2 fs-6 fw-bold shadow-sm" style="background-color: #c17540; color: #ffffff;">
+                                <t t-esc="total_offers"/> Total Offer<t t-if="total_offers != 1">s</t>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <t t-if="not offers_data">
+                    <div class="card border-0 shadow-sm bg-white p-5 text-center" style="border-radius: 12px;">
+                        <div class="py-4">
+                            <i class="fa fa-folder-open-o fa-3x text-muted mb-3"/>
+                            <h5 class="fw-bold text-dark">No Job Offers Available</h5>
+                            <p class="text-muted small mb-3">Once you are successfully selected through our examination and interview stages, your official employment offer letters will appear here.</p>
+                            <a href="/my/candidate/applications" class="btn btn-outline-secondary px-4 fw-bold">
+                                <i class="fa fa-file-text-o me-1"/> View Application Status
+                            </a>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- Offers List -->
+                <t t-if="offers_data">
+                    <div class="row g-4">
+                        <t t-foreach="offers_data" t-as="item">
+                            <t t-set="off" t-value="item['offer']"/>
+                            <t t-set="days_left" t-value="item['days_left']"/>
+                            <t t-set="is_urgent" t-value="item['is_urgent']"/>
+                            <t t-set="app" t-value="item['applicant']"/>
+
+                            <div class="col-12">
+                                <div class="card border-0 shadow-sm bg-white overflow-hidden" style="border-radius: 12px; border-left: 6px solid #{'#541718' if off.state == 'accepted' else ('#1D2B32' if off.state in ('declined', 'expired') else '#c17540')} !important;">
+                                    <div class="card-body p-4">
+                                        <!-- Header Row -->
+                                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center border-bottom pb-3 mb-3">
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2 mb-1">
+                                                    <span class="badge bg-light text-dark border font-monospace small"><t t-esc="off.reference"/></span>
+                                                    <span class="badge text-white small" style="background-color: #1D2B32;">Vacancy: <t t-esc="off.vacancy_id.reference if off.vacancy_id else 'N/A'"/></span>
+                                                </div>
+                                                <h4 class="fw-bold mb-0" style="color: #541718;">
+                                                    <t t-esc="off.vacancy_id.job_position.name if off.vacancy_id and off.vacancy_id.job_position else (off.vacancy_id.job_title if off.vacancy_id else 'Job Position')"/>
+                                                </h4>
+                                            </div>
+                                            <div class="mt-2 mt-md-0 text-md-end">
+                                                <t t-if="off.state == 'sent'">
+                                                    <span class="badge px-3 py-2 fs-6 fw-bold shadow-sm" style="background-color: #c17540; color: #ffffff;">
+                                                        <i class="fa fa-clock-o me-1"/> Pending Your Response
+                                                    </span>
+                                                </t>
+                                                <t t-elif="off.state == 'accepted'">
+                                                    <span class="badge px-3 py-2 fs-6 fw-bold shadow-sm" style="background-color: #541718; color: #ffffff;">
+                                                        <i class="fa fa-check-circle me-1"/> Offer Accepted
+                                                    </span>
+                                                </t>
+                                                <t t-elif="off.state == 'declined'">
+                                                    <span class="badge bg-secondary px-3 py-2 fs-6 fw-bold">
+                                                        <i class="fa fa-times-circle me-1"/> Offer Declined
+                                                    </span>
+                                                </t>
+                                                <t t-elif="off.state == 'expired'">
+                                                    <span class="badge bg-dark px-3 py-2 fs-6 fw-bold">
+                                                        <i class="fa fa-hourglass-end me-1"/> Offer Expired (3 Days Exceeded)
+                                                    </span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge bg-secondary px-3 py-2 fs-6 fw-bold"><t t-esc="off.state.capitalize()"/></span>
+                                                </t>
+                                            </div>
+                                        </div>
+
+                                        <!-- Offer Details Grid -->
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-md-3">
+                                                <span class="text-muted d-block small">Work Unit / Department</span>
+                                                <strong class="text-dark"><i class="fa fa-building-o me-1" style="color: #c17540;"/> <t t-esc="off.work_unit or (off.vacancy_id.operating_unit_id.name if off.vacancy_id and off.vacancy_id.operating_unit_id else (off.vacancy_id.job_location or 'Head Office'))"/></strong>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted d-block small">Job Grade</span>
+                                                <strong class="text-dark"><i class="fa fa-id-badge me-1" style="color: #c17540;"/> <t t-esc="off.job_grade or (off.vacancy_id.job_grade.grade_name if (off.vacancy_id and hasattr(off.vacancy_id, 'job_grade') and off.vacancy_id.job_grade) else 'Standard Grade')"/></strong>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted d-block small">Monthly Base Salary</span>
+                                                <strong class="fs-6" style="color: #541718;"><i class="fa fa-money me-1" style="color: #c17540;"/> <t t-esc="'{:,.2f}'.format(off.salary_figure or 0.0)"/> ETB</strong>
+                                                <t t-if="off.salary_words">
+                                                    <small class="text-muted d-block" style="font-size: 0.75rem;">(<t t-esc="off.salary_words"/>)</small>
+                                                </t>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <span class="text-muted d-block small">Offer Dispatched Date</span>
+                                                <strong class="text-dark"><i class="fa fa-calendar me-1" style="color: #c17540;"/> <t t-esc="off.offer_date or off.create_date.strftime('%Y-%m-%d')"/></strong>
+                                            </div>
+
+                                            <!-- Allowances Row -->
+                                            <div class="col-12 pt-2 border-top">
+                                                <div class="d-flex flex-wrap gap-3 align-items-center">
+                                                    <div class="badge bg-light text-dark border p-2">
+                                                        <i class="fa fa-home me-1" style="color: #c17540;"/> Housing Allowance: <strong><t t-esc="'{:,.2f}'.format(off.housing_allowance or 0.0)"/> ETB</strong>
+                                                    </div>
+                                                    <div class="badge bg-light text-dark border p-2">
+                                                        <i class="fa fa-tint me-1" style="color: #c17540;"/> Fuel Allowance: <strong><t t-esc="'{:,.0f}'.format(off.fuel_allowance_liters or 0.0)"/> Liters</strong>
+                                                    </div>
+                                                    <t t-if="off.is_managerial and off.representation_allowance &gt; 0">
+                                                        <div class="badge p-2 text-white" style="background-color: #541718;">
+                                                            <i class="fa fa-briefcase me-1"/> 10% Representation Allowance: <strong><t t-esc="'{:,.2f}'.format(off.representation_allowance)"/> ETB</strong>
+                                                        </div>
+                                                    </t>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Response Deadline Countdown Banner (For Sent Offers) -->
+                                        <t t-if="off.state == 'sent'">
+                                            <div class="alert p-3 mb-3 rounded-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center shadow-sm" style="background-color: #fdf8f4; border-left: 5px solid #c17540 !important;">
+                                                <div class="d-flex align-items-center mb-2 mb-md-0">
+                                                    <div class="p-2 rounded-circle me-3 d-flex align-items-center justify-content-center" style="background-color: rgba(193, 117, 64, 0.15); width: 48px; height: 48px;">
+                                                        <i class="fa fa-hourglass-half fa-lg" style="color: #c17540;"/>
+                                                    </div>
+                                                    <div>
+                                                        <strong class="d-block" style="color: #541718;">Response Deadline: <t t-esc="(off.deadline_date or off.expiry_date).strftime('%B %d, %Y') if (off.deadline_date or off.expiry_date) else 'Pending'"/></strong>
+                                                        <span class="small text-muted">
+                                                            Please accept or decline this offer before the deadline. After the deadline, the offer expires and is automatically transferred to the next reserve candidate.
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="text-md-end">
+                                                    <span class="badge px-3 py-2 fw-bold shadow-sm" style="background-color: #541718; color: #ffffff;">
+                                                        <i class="fa fa-clock-o me-1"/> <t t-esc="days_left"/> Day<t t-if="days_left != 1">s</t> Left
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Interactive Decision & Download Buttons -->
+                                            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center pt-2 border-top">
+                                                <div class="d-flex gap-2 align-items-center">
+                                                    <a t-attf-href="/my/candidate/offers/preview/#{off.id}" target="_blank" class="btn text-white fw-bold px-3 py-2 shadow-sm" style="background-color: #541718; border-radius: 8px;">
+                                                        <i class="fa fa-eye me-1" style="color: #c17540;"/> View Offer Letter (PDF)
+                                                    </a>
+                                                    <a t-attf-href="/my/candidate/offers/download/#{off.id}" class="btn btn-outline-secondary fw-bold px-3 py-2" style="border-radius: 8px;">
+                                                        <i class="fa fa-download me-1"/> Download PDF
+                                                    </a>
+                                                </div>
+                                                <div class="d-flex gap-2">
+                                                    <button type="button" class="btn fw-bold px-4 py-2" style="background-color: transparent; border: 2px solid #c17540; color: #c17540; border-radius: 8px;" t-attf-onclick="openOfferModal('declineModal_#{off.id}')">
+                                                        <i class="fa fa-times-circle me-1"/> Decline Offer
+                                                    </button>
+                                                    <button type="button" class="btn text-white fw-bold px-4 py-2 shadow-sm" style="background-color: #541718; border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(84, 23, 24, 0.25);" t-attf-onclick="openOfferModal('acceptModal_#{off.id}')">
+                                                        <i class="fa fa-check-circle me-1" style="color: #c17540;"/> Accept Job Offer
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Embedded Official Offer Letter Document Viewer -->
+                                            <div class="mt-4 pt-3 border-top">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <h6 class="fw-bold mb-0" style="color: #541718;">
+                                                        <i class="fa fa-file-pdf-o me-2" style="color: #c17540;"/> Official Offer Letter Document
+                                                    </h6>
+                                                    <a t-attf-href="/my/candidate/offers/preview/#{off.id}" target="_blank" class="btn btn-sm btn-outline-dark fw-bold" style="border-radius: 6px;">
+                                                        <i class="fa fa-external-link me-1"/> Open Fullscreen
+                                                    </a>
+                                                </div>
+                                                <div class="rounded-3 overflow-hidden shadow-sm border" style="background-color: #525659; min-height: 520px;">
+                                                    <iframe t-attf-src="/my/candidate/offers/preview/#{off.id}#toolbar=1&amp;navpanes=0" style="width: 100%; height: 550px; border: none;" title="Official Employment Offer Letter PDF"/>
+                                                </div>
+                                            </div>
+
+                                            <!-- Accept Confirmation Modal (Themed with Primary #541718) -->
+                                            <div class="modal fade" t-attf-id="acceptModal_#{off.id}" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.55);">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content border-0 shadow" style="border-radius: 14px; overflow: hidden;">
+                                                        <div class="modal-header text-white" style="background-color: #541718; border-bottom: 3px solid #3b0f0f;">
+                                                            <h5 class="modal-title fw-bold text-white"><i class="fa fa-check-circle me-2"/> Confirm Offer Acceptance</h5>
+                                                            <button type="button" class="btn-close btn-close-white" t-attf-onclick="closeOfferModal('acceptModal_#{off.id}')" aria-label="Close"/>
+                                                        </div>
+                                                        <form action="/my/candidate/offers/respond" method="POST">
+                                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                            <input type="hidden" name="offer_id" t-att-value="off.id"/>
+                                                            <input type="hidden" name="decision" value="accept"/>
+                                                            <div class="modal-body p-4 text-center">
+                                                                <div class="mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 72px; height: 72px; border-radius: 50%; background-color: rgba(84, 23, 24, 0.1);">
+                                                                    <i class="fa fa-handshake-o fa-2x" style="color: #541718;"/>
+                                                                </div>
+                                                                <h5 class="fw-bold mb-2" style="color: #541718;">Accept Employment with Bunna Bank?</h5>
+                                                                <p class="text-muted small mb-0">
+                                                                    By accepting this offer, you confirm your commitment to join Bunna Bank S.C. for the position of <strong><t t-esc="off.vacancy_id.job_position.name if off.vacancy_id and off.vacancy_id.job_position else (off.vacancy_id.job_title if off.vacancy_id else 'this role')"/></strong>.
+                                                                </p>
+                                                            </div>
+                                                            <div class="modal-footer bg-light border-0 px-4 pb-4">
+                                                                <button type="button" class="btn btn-outline-secondary fw-bold px-4 py-2" style="border-radius: 8px;" t-attf-onclick="closeOfferModal('acceptModal_#{off.id}')">Cancel</button>
+                                                                <button type="submit" class="btn text-white fw-bold px-4 py-2 shadow-sm" style="background-color: #541718; border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(84, 23, 24, 0.25);"><i class="fa fa-check me-1"/> Yes, Accept Offer</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Decline Modal with Reason Form (Themed with Secondary #c17540) -->
+                                            <div class="modal fade" t-attf-id="declineModal_#{off.id}" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.55);">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content border-0 shadow" style="border-radius: 14px; overflow: hidden;">
+                                                        <div class="modal-header text-white" style="background-color: #c17540; border-bottom: 3px solid #9e5b2b;">
+                                                            <h5 class="modal-title fw-bold text-white"><i class="fa fa-times-circle me-2"/> Decline Employment Offer</h5>
+                                                            <button type="button" class="btn-close btn-close-white" t-attf-onclick="closeOfferModal('declineModal_#{off.id}')" aria-label="Close"/>
+                                                        </div>
+                                                        <form action="/my/candidate/offers/respond" method="POST">
+                                                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                                            <input type="hidden" name="offer_id" t-att-value="off.id"/>
+                                                            <input type="hidden" name="decision" value="decline"/>
+                                                            <div class="modal-body p-4">
+                                                                <div class="text-center mb-3">
+                                                                    <div class="mx-auto mb-2 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; border-radius: 50%; background-color: rgba(193, 117, 64, 0.12);">
+                                                                        <i class="fa fa-exclamation-triangle fa-2x" style="color: #c17540;"/>
+                                                                    </div>
+                                                                    <h6 class="fw-bold mb-0" style="color: #c17540;">Are you sure you want to decline?</h6>
+                                                                </div>
+                                                                <div class="p-3 mb-3 rounded-3 small" style="background-color: #fdf8f4; border-left: 4px solid #c17540; color: #541718;">
+                                                                    <strong>Important:</strong> Declining this offer will close your application for this position and allow the vacancy committee to proceed with the next qualified candidate.
+                                                                </div>
+                                                                <label class="form-label fw-bold small" style="color: #1D2B32;">Reason for Declining (Optional / Feedback)</label>
+                                                                <textarea name="reason" class="form-control" rows="3" placeholder="e.g. Accepted another offer, relocation constraints, salary expectation mismatch..."></textarea>
+                                                            </div>
+                                                            <div class="modal-footer bg-light border-0 px-4 pb-4">
+                                                                <button type="button" class="btn btn-outline-secondary fw-bold px-4 py-2" style="border-radius: 8px;" t-attf-onclick="closeOfferModal('declineModal_#{off.id}')">Cancel</button>
+                                                                <button type="submit" class="btn text-white fw-bold px-4 py-2 shadow-sm" style="background-color: #c17540; border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(193, 117, 64, 0.25);"><i class="fa fa-times me-1"/> Confirm &amp; Decline</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </t>
+
+                                        <!-- Accepted State Instructions -->
+                                        <t t-if="off.state == 'accepted'">
+                                            <div class="p-3 rounded-3 mt-2 shadow-sm" style="background-color: #fdf8f4; border-left: 5px solid #c17540;">
+                                                <h6 class="fw-bold mb-1" style="color: #541718;"><i class="fa fa-check-square-o me-2" style="color: #c17540;"/> Next Steps: Onboarding Clearances</h6>
+                                                <p class="mb-0 small text-muted">
+                                                    Please prepare your <strong>Medical Fitness Certificate</strong> and <strong>Police / Forensic Clearance Certificate</strong>. Our Onboarding Team will reach out to schedule your contract signing date.
+                                                </p>
+                                            </div>
+                                        </t>
+
+                                        <!-- Declined / Expired State Info -->
+                                        <t t-if="off.state in ('declined', 'expired')">
+                                            <div class="bg-light p-3 rounded-3 border-start border-secondary border-4 mt-2 small text-muted">
+                                                <strong>Status Note:</strong> <t t-esc="off.rejection_reason or 'Offer closed without acceptance.'"/>
+                                            </div>
+                                        </t>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+
+                <!-- Standalone Modal Script -->
+                <script>
+                    function openOfferModal(modalId) {
+                        var el = document.getElementById(modalId);
+                        if (!el) return;
+                        el.style.display = 'block';
+                        el.classList.add('show');
+                        document.body.classList.add('modal-open');
+                    }
+                    function closeOfferModal(modalId) {
+                        var el = document.getElementById(modalId);
+                        if (!el) return;
+                        el.style.display = 'none';
+                        el.classList.remove('show');
+                        document.body.classList.remove('modal-open');
+                    }
+                </script>
             </div>
         </t>
     </template>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: Transfer Assessment Record -->
+    <record id="view_transfer_assessment_record_form" model="ir.ui.view">
+        <field name="name">transfer.assessment.record.form</field>
+        <field name="model">transfer.assessment.record</field>
+        <field name="arch" type="xml">
+            <form string="Employee Transfer Assessment">
+                <header>
+                    <button name="action_evaluate" string="Compute Composite Scores" type="object" invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_approve_transfer_assessment" string="HR Approve &amp; Push to Ranking" type="object" invisible="state != 'evaluated'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,evaluated,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Assessment Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="employee_code"/>
+                            <field name="transfer_request_id"/>
+                        </group>
+                        <group>
+                            <field name="target_job_id"/>
+                            <field name="target_branch_id"/>
+                            <field name="assessment_mode"/>
+                        </group>
+                    </group>
+                    <group string="Transfer Weight Scoring Matrix">
+                        <group string="1. PMS Rating (30%)">
+                            <field name="pms_score"/>
+                            <field name="pms_weight" readonly="1"/>
+                            <field name="pms_weighted_score"/>
+                        </group>
+                        <group string="2. Application Date Seniority (20%)">
+                            <field name="application_date"/>
+                            <field name="application_date_score"/>
+                            <field name="application_date_weight" readonly="1"/>
+                            <field name="application_date_weighted_score"/>
+                        </group>
+                        <group string="3. Total Experience (20%)">
+                            <field name="total_experience_years"/>
+                            <field name="total_experience_score"/>
+                            <field name="total_experience_weight" readonly="1"/>
+                            <field name="total_experience_weighted_score"/>
+                        </group>
+                        <group string="4. Service in Current Location (20%)">
+                            <field name="service_years_in_location"/>
+                            <field name="service_location_score"/>
+                            <field name="service_location_weight" readonly="1"/>
+                            <field name="service_location_weighted_score"/>
+                        </group>
+                        <group string="5. Managerial Recommendation (10%)">
+                            <field name="recommendation_score"/>
+                            <field name="recommendation_weight" readonly="1"/>
+                            <field name="recommendation_weighted_score"/>
+                            <field name="recommendation_notes"/>
+                        </group>
+                    </group>
+                    <group string="Transfer Final Composite Score">
+                        <group>
+                            <field name="total_transfer_score"/>
+                        </group>
+                        <group>
+                            <field name="transfer_rank"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Transfer Assessment Records -->
+    <record id="view_transfer_assessment_record_tree" model="ir.ui.view">
+        <field name="name">transfer.assessment.record.list</field>
+        <field name="model">transfer.assessment.record</field>
+        <field name="arch" type="xml">
+            <list string="Transfer Assessments" decoration-info="state == 'draft'" decoration-success="state == 'approved'">
+                <field name="name"/>
+                <field name="employee_code"/>
+                <field name="employee_id"/>
+                <field name="target_job_id"/>
+                <field name="total_transfer_score"/>
+                <field name="transfer_rank"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Transfer Assessments -->
+    <record id="action_transfer_assessment_records" model="ir.actions.act_window">
+        <field name="name">Transfer Assessments</field>
+        <field name="res_model">transfer.assessment.record</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="module_category_assessment_management" model="ir.module.category">
+        <field name="name">Assessment Management</field>
+        <field name="description">Access rights for Assessment System Management (Exam System + Competency-Based Interview System)</field>
+        <field name="sequence">25</field>
+    </record>
+
+    <record id="assessment_privilege" model="res.groups.privilege">
+        <field name="name">Assessment Management</field>
+        <field name="placeholder"></field>
+        <field name="sequence">25</field>
+        <field name="category_id" ref="module_category_assessment_management"/>
+    </record>
+
+
+    <!-- 1. User (Candidate Tier) -->
+    <record id="group_assessment_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">10</field>
+        <field name="comment">Candidate access: can view own candidate exam sittings and sit for assigned exams.</field>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <!-- 2. Panel Member (CBIS Interview Tier) -->
+    <record id="group_assessment_panel_member" model="res.groups">
+        <field name="name">Panel Member</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">15</field>
+        <field name="comment">Interview panel member: evaluates candidates in assigned CBIS competency interview sessions and submits rate sheets.</field>
+        <field name="implied_ids" eval="[(4, ref('group_assessment_user'))]"/>
+    </record>
+
+    <!-- 3. Workunit Manager (Work Unit Grading Tier) -->
+    <record id="group_assessment_workunit_manager" model="res.groups">
+        <field name="name">Workunit Manager</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">20</field>
+        <field name="comment">Work Unit Manager: has Panel Member access plus Manual Grading Queue and Question Bank for their own Work Unit / Operating Unit.</field>
+        <field name="implied_ids" eval="[(4, ref('group_assessment_panel_member'))]"/>
+    </record>
+
+    <!-- 4. HR Officer (Operational Tier - Full access except Approve) -->
+    <record id="group_assessment_officer" model="res.groups">
+        <field name="name">HR Officer</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">25</field>
+        <field name="comment">HR Operational Officer: full operational access across all work units (create sessions, import questions, grade, generate ranking reports) except final approvals.</field>
+        <field name="implied_ids" eval="[(4, ref('group_assessment_workunit_manager')), (4, ref('custom_recruitment.group_recruitment_officer'))]"/>
+    </record>
+
+    <!-- 5. HR Manager (Supervisory Tier - Full access including Approve, except Delete) -->
+    <record id="group_assessment_manager" model="res.groups">
+        <field name="name">HR Manager</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">30</field>
+        <field name="comment">HR Manager: full managerial control including approvals of exams, questions, result publications, and manual score overrides, without deletion permissions.</field>
+        <field name="implied_ids" eval="[(4, ref('group_assessment_officer')), (4, ref('custom_recruitment.group_recruitment_manager'))]"/>
+    </record>
+
+    <!-- 6. Administrator (Top Tier - Full access including Delete) -->
+    <record id="group_assessment_administrator" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="privilege_id" ref="assessment_privilege"/>
+        <field name="sequence">35</field>
+        <field name="comment">System Administrator: unrestricted access across all assessment operations, configurations, and record deletion.</field>
+        <field name="implied_ids" eval="[(4, ref('group_assessment_manager')), (4, ref('custom_recruitment.group_recruitment_administrator'))]"/>
+    </record>
+
+</odoo>

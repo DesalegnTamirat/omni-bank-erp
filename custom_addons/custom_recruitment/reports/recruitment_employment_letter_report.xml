@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Employment Letter Report Action -->
+    <record id="action_report_recruitment_employment_letter" model="ir.actions.report">
+        <field name="name">External Employment Letter</field>
+        <field name="model">recruitment.employment.letter</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">custom_recruitment.report_recruitment_employment_letter_document</field>
+        <field name="report_file">custom_recruitment.report_recruitment_employment_letter_document</field>
+        <field name="print_report_name">'Employment_Letter_' + (object.candidate_name or object.name or 'Candidate').replace(' ', '_')</field>
+        <field name="binding_model_id" ref="model_recruitment_employment_letter"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Employment Letter QWeb Template -->
+    <template id="report_recruitment_employment_letter_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <div class="article" t-att-data-oe-model="o._name" t-att-data-oe-id="o.id" style="font-family: 'Times New Roman', Times, serif; color: #111111; font-size: 13.5px; line-height: 1.6; padding: 15px 35px; position: relative;">
+
+                    <!-- Official Header: Full Bunna Logo (Emblem + Text) + Brown Accent Bar -->
+                    <table style="width: 100%; margin-bottom: 22px; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 32%; vertical-align: middle;">
+                                <img t-att-src="'data:image/png;base64,%s' % o.get_official_bunna_logo_base64()" style="max-height: 95px; max-width: 180px; height: auto;" alt="Bunna Bank S.C."/>
+                            </td>
+                            <td style="width: 68%; vertical-align: middle; padding-left: 15px;">
+                                <div style="background-color: #9C7D73; height: 26px; width: 100%; border-radius: 2px;"></div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Date & Reference Numbers -->
+                    <table style="width: 100%; margin-bottom: 20px; border-collapse: collapse;">
+                        <tr>
+                            <td style="width: 58%;"></td>
+                            <td style="width: 42%; font-size: 13.5px; line-height: 1.6; text-align: left; padding-left: 20px;">
+                                <div>
+                                    <strong>Date: </strong>
+                                    <span t-esc="o.letter_date.strftime('%B %d, %Y') if o.letter_date else ''"/>
+                                </div>
+                                <div>
+                                    <strong>Ref No: </strong>
+                                    <span t-esc="o.name or ''"/>
+                                </div>
+                                <div>
+                                    <strong>ID No: </strong>
+                                    <span t-esc="o.id_no or ''"/>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Recipient Block -->
+                    <div class="mb-3" style="font-size: 14px; line-height: 1.4;">
+                        <div>
+                            <strong><span t-esc="o.get_formatted_candidate_name()"/></strong>
+                        </div>
+                        <div>
+                            <u><strong><span t-esc="o.candidate_address or 'Addis Ababa'"/></strong></u>
+                        </div>
+                    </div>
+
+                    <!-- Salutation -->
+                    <div class="mb-3" style="font-size: 14px;">
+                        Dear <span t-esc="o.get_salutation_title_and_first_name()"/>,
+                    </div>
+
+                    <!-- Body Paragraphs -->
+                    <div style="text-align: justify; font-size: 13.5px; line-height: 1.65;">
+                        <p>
+                            I am pleased to inform you that, your application for employment has been accepted by the Management of Bunna Bank S.C. and you are employed as <strong><span t-esc="o.job_position_name"/></strong> effective <strong><span t-esc="o.effective_date.strftime('%B %d, %Y') if o.effective_date else ''"/></strong> and you are assigned to work at <strong><span t-esc="o.work_unit_name"/> (work unit)</strong>.
+                        </p>
+
+                        <p>
+                            Accordingly, you will get a monthly salary of Birr <strong><span t-esc="'{:,.2f}'.format(o.monthly_salary)"/> (<span t-esc="o.salary_words"/>)</strong> corresponding to your job grade <strong><span t-esc="o.job_grade_name"/></strong> and you will also be entitled to other benefits attached to the position as per the bank's benefit package.
+                        </p>
+
+                        <p>
+                            In accordance with the Human Resource Management Policy, your employment will be for a probationary period of <strong><span t-esc="o.probation_days"/> working days</strong>.
+                        </p>
+
+                        <p>
+                            The Bank's Code of Conduct, User level Agreement for Bunna Bank S.C Information Systems Services and your Job Description, to be observed in your subsequent activities, are attached herewith.
+                        </p>
+
+                        <p>
+                            Management of the Bank is confident that you will discharge your duties and responsibilities with diligence, efficiency and utmost integrity.
+                        </p>
+
+                        <p>
+                            By copy of this letter, <strong><span t-esc="o.work_unit_name"/> (work unit)</strong> is advised to evaluate the probationary period performance of <strong><span t-esc="o.get_formatted_candidate_name()"/></strong> five days before the expiry of the probation period.
+                        </p>
+
+                        <p>
+                            Wishing you a remarkable success in your career, you are warmly welcome to the Bunna family.
+                        </p>
+
+                        <p class="mt-3">
+                            Sincerely yours,
+                        </p>
+                    </div>
+
+                    <!-- Sign-off Block with Authorized Signature & Official Stamp -->
+                    <div class="mt-2 mb-3" style="font-size: 13px;">
+                        <t t-set="emp_sig" t-value="o.signatory_config_id or env['recruitment.signatory.config'].get_active_signatory('employment_letter')"/>
+                        <t t-set="emp_b64" t-value="o.get_signatory_stamp_base64()"/>
+                        <t t-if="emp_b64">
+                            <div style="margin-bottom: 2px;">
+                                <img t-att-src="emp_b64" alt="Authorized Signature &amp; Stamp" style="max-height: 85px; max-width: 220px; object-fit: contain;"/>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div style="height: 35px;"></div>
+                        </t>
+                        <t t-set="disp_name" t-value="(emp_sig.signatory_name if emp_sig and emp_sig.signatory_name else False) or o.signatory_name"/>
+                        <t t-if="disp_name">
+                            <div style="margin-bottom: 2px;"><strong><span t-esc="disp_name"/></strong></div>
+                        </t>
+                        <t t-set="disp_title" t-value="(emp_sig.signatory_title if emp_sig and emp_sig.signatory_title else False) or o.signatory_title or 'People Operation Directorate'"/>
+                        <div><strong><span t-esc="disp_title"/></strong></div>
+                        <div><strong><span t-esc="o.signatory_company or (emp_sig.signatory_company if emp_sig else 'Bunna Bank S.C.')"/></strong></div>
+                    </div>
+
+                    <!-- CC Block -->
+                    <div class="mt-3" style="font-size: 12.5px; line-height: 1.5;">
+                        <div><strong>CC: -</strong></div>
+                        <ul style="list-style-type: disc; margin-left: 20px; padding-left: 0; margin-top: 4px;">
+                            <li>IT Security Management Directorate</li>
+                            <li><span t-esc="o.cc_district_or_work_unit or o.work_unit_name or 'Respective Work Unit'"/></li>
+                            <li>People Operation Management Directorate</li>
+                            <li><u><strong>Bunna Bank S.C</strong></u></li>
+                        </ul>
+                    </div>
+
+                    <!-- Official Footer -->
+                    <div class="footer" style="border-top: 1px solid #7d8285; padding-top: 8px; margin-top: 25px; font-size: 10px; color: #555555;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: center; vertical-align: middle;">
+                            <tr>
+                                <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                                <td style="width: 32%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>Tel</strong> +251 111 580 861 | 62</div>
+                                    <div><strong>Fax</strong> +251 111 580 832 | 76</div>
+                                </td>
+                                <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>Email</strong> info@bunnabanksc.com</div>
+                                    <div><strong>Website</strong> www.bunnabanksc.com</div>
+                                </td>
+                                <td style="width: 29%; font-size: 10px; line-height: 1.4;">
+                                    <div><strong>P.O.Box</strong> 1743 code 1110</div>
+                                    <div>Addis Ababa | Ethiopia</div>
+                                </td>
+                                <td style="width: 5%;"><div style="background-color: #8C948D; height: 18px; width: 100%; border-radius: 2px;"></div></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>

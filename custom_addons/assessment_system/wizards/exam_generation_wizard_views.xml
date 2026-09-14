@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: Exam Generation Wizard -->
+    <record id="view_exam_generation_wizard_form" model="ir.ui.view">
+        <field name="name">exam.generation.wizard.form</field>
+        <field name="model">exam.generation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Written Exam Papers &amp; Versions">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Master Exam Name"/>
+                        <h2><field name="name" placeholder="e.g. Written Assessment - IT Officer II"/></h2>
+                    </div>
+
+                    <group>
+                        <group string="1. Target Scope &amp; Position">
+                            <field name="vacancy_id" options="{'no_create': True}"/>
+                            <field name="job_id" options="{'no_create': True}"/>
+                            <field name="difficulty_level" widget="radio"/>
+                        </group>
+                        <group string="2. Timing &amp; Passing Score">
+                            <field name="duration_minutes"/>
+                            <field name="passing_score_percentage"/>
+                            <field name="version_count" widget="integer"/>
+                        </group>
+                    </group>
+
+                    <group string="3. Question Composition by Type">
+                        <group string="Essay &amp; MCQ">
+                            <label for="essay_count" string="Essay Questions"/>
+                            <div class="o_row">
+                                <field name="essay_count" class="oe_inline"/>
+                                <span class="text-muted">Questions @</span>
+                                <field name="marks_per_essay" class="oe_inline"/>
+                                <span class="text-muted">Marks</span>
+                            </div>
+
+                            <label for="mcq_count" string="Multiple Choice (MCQ)"/>
+                            <div class="o_row">
+                                <field name="mcq_count" class="oe_inline"/>
+                                <span class="text-muted">Questions @</span>
+                                <field name="marks_per_mcq" class="oe_inline"/>
+                                <span class="text-muted">Marks</span>
+                            </div>
+                        </group>
+
+                        <group string="True/False &amp; Fill-in-the-Blank">
+                            <label for="true_false_count" string="True / False"/>
+                            <div class="o_row">
+                                <field name="true_false_count" class="oe_inline"/>
+                                <span class="text-muted">Questions @</span>
+                                <field name="marks_per_tf" class="oe_inline"/>
+                                <span class="text-muted">Marks</span>
+                            </div>
+
+                            <label for="fill_blank_count" string="Fill-in-the-Blank"/>
+                            <div class="o_row">
+                                <field name="fill_blank_count" class="oe_inline"/>
+                                <span class="text-muted">Questions @</span>
+                                <field name="marks_per_blank" class="oe_inline"/>
+                                <span class="text-muted">Marks</span>
+                            </div>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info d-flex justify-content-between align-items-center mt-3" role="status">
+                        <div>
+                            <b>Exam Paper Summary per Version:</b>
+                            <span class="ms-2 badge bg-primary fs-6"><field name="total_questions" readonly="1"/> Total Questions</span>
+                            <span class="ms-2 badge bg-success fs-6"><field name="total_marks" readonly="1"/> Total Marks</span>
+                        </div>
+                        <div>
+                            <span class="text-secondary small">Sampling from approved Question Bank pool</span>
+                        </div>
+                    </div>
+                </sheet>
+
+                <footer>
+                    <button name="action_generate_exams" string="Generate Exam Versions" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action: Exam Generation Wizard -->
+    <record id="action_exam_generation_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Written Exam Papers</field>
+        <field name="res_model">exam.generation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

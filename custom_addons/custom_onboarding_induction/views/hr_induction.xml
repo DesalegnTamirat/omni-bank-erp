@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View for Corporate Induction Plans -->
+    <record id="hr_induction_plan_view_tree" model="ir.ui.view">
+        <field name="name">hr.induction.plan.list</field>
+        <field name="model">hr.induction.plan</field>
+        <field name="arch" type="xml">
+            <list string="Corporate Induction Plans"
+                  decoration-info="state=='scheduled'"
+                  decoration-warning="state=='in_progress'"
+                  decoration-success="state=='completed'"
+                  decoration-danger="state=='escalated'">
+                <field name="name"/>
+                <field name="employee_id" string="New Hire"/>
+                <field name="job_position_id"/>
+                <field name="ppdd_coordinator_id"/>
+                <field name="scheduled_orientation_date"/>
+                <field name="lms_progress_percentage" widget="progressbar"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View for Corporate Induction Plans -->
+    <record id="hr_induction_plan_view_form" model="ir.ui.view">
+        <field name="name">hr.induction.plan.form</field>
+        <field name="model">hr.induction.plan</field>
+        <field name="arch" type="xml">
+            <form string="Corporate Induction &amp; POMD Orientation Plan">
+                <header>
+                    <button name="action_schedule_orientation" string="Schedule Orientation" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_start_lms" string="Start LMS &amp; Training" type="object" class="oe_highlight" invisible="state not in ('draft', 'scheduled')"/>
+                    <button name="action_mark_completed" string="Mark Induction Completed" type="object" class="btn-success" invisible="state == 'completed'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,in_progress,completed"/>
+                </header>
+                <sheet>
+                    <div class="text-center mb-4 p-3 rounded" style="background: linear-gradient(135deg, #4A261A 0%, #6E382A 100%); color: #FFFFFF;">
+                        <h2 class="fw-bold" style="letter-spacing: 1px; color: #F0C27B;">Bunna Bank S.C.</h2>
+                        <h3 class="fw-bold text-uppercase" style="color: #FFFFFF;">Corporate Induction &amp; POMD Orientation System</h3>
+                        <h5 style="color: #E2C095;">POMD General Orientation &amp; LMS Training Module</h5>
+                    </div>
+
+                    <div class="oe_title mb-3">
+                        <label for="name" string="Induction Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <!-- Employee Details Header Card -->
+                    <div class="card p-3 mb-4 bg-light">
+                        <group>
+                            <group>
+                                <field name="employee_id" string="NEW HIRE EMPLOYEE" readonly="state != 'draft'"/>
+                                <field name="job_position_id" string="POSITION TITLE" readonly="1"/>
+                                <field name="department_id" string="DEPARTMENT" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="ppdd_coordinator_id" string="POMD COORDINATOR" readonly="state == 'completed'"/>
+                                <field name="scheduled_orientation_date" string="SCHEDULED ORIENTATION DATE" readonly="state == 'completed'"/>
+                                <field name="lms_progress_percentage" widget="progressbar" string="ORIENTATION PROGRESS"/>
+                                <field name="induction_completed_date" string="COMPLETED ON" readonly="1"/>
+                            </group>
+                        </group>
+                    </div>
+
+                    <notebook>
+                        <!-- Tab 1: PPDD Mandatory Orientation & LMS Tasks -->
+                        <page string="Orientation &amp; LMS Training Tasks">
+                            <div class="alert alert-info" role="alert">
+                                <strong>PPDD Corporate Orientation:</strong> Complete all mandatory general bank orientation modules, policy awareness videos, and ERP/Finacle training sessions.
+                            </div>
+                            <field name="lms_task_ids" readonly="state == 'completed'">
+                                <list editable="bottom"
+                                      decoration-danger="is_overdue"
+                                      decoration-success="state == 'completed'">
+                                    <field name="name" string="Training / Orientation Module Title"/>
+                                    <field name="training_type" string="Training Type"/>
+                                    <field name="is_mandatory" string="Mandatory?" widget="boolean_toggle"/>
+                                    <field name="due_date" string="Due Date"/>
+                                    <field name="is_overdue" column_invisible="1"/>
+                                    <field name="state" string="Status" widget="badge"
+                                           decoration-success="state == 'completed'"
+                                           decoration-warning="state == 'pending'"/>
+                                    <field name="completed_date" string="Completed On" readonly="1" optional="show"/>
+                                    <field name="completed_by_user_id" string="Completed By" readonly="1" optional="show"/>
+                                    <field name="notes" string="Notes" optional="hide"/>
+                                    <button name="action_mark_completed" string="Mark Done" type="object"
+                                            icon="fa-check-circle" class="btn-success"
+                                            invisible="state == 'completed'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 2: Audit & Segregation of Duties -->
+                        <page string="Audit &amp; Responsibility Controls">
+                            <group string="Segregation of Duties Audit Log">
+                                <group>
+                                    <field name="submitted_by_user_id" string="Initiated By User" readonly="1"/>
+                                    <field name="scheduled_by_user_id" string="Scheduled By User" readonly="1"/>
+                                    <field name="completed_by_user_id" string="Completed &amp; Verified By User" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View for Corporate Induction Plans -->
+    <record id="hr_induction_plan_view_search" model="ir.ui.view">
+        <field name="name">hr.induction.plan.search</field>
+        <field name="model">hr.induction.plan</field>
+        <field name="arch" type="xml">
+            <search string="Search Corporate Induction Plans">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="job_position_id"/>
+                <field name="ppdd_coordinator_id"/>
+                <separator/>
+                <filter name="filter_scheduled" string="Scheduled" domain="[('state', '=', 'scheduled')]"/>
+                <filter name="filter_in_progress" string="In-Progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter name="filter_completed" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    <filter name="group_coordinator" string="PPDD Coordinator" context="{'group_by': 'ppdd_coordinator_id'}"/>
+                    <filter name="group_job" string="Position Title" context="{'group_by': 'job_position_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action for Corporate Induction Plans -->
+    <record id="hr_induction_plan_action" model="ir.actions.act_window">
+        <field name="name">Corporate Induction Plans</field>
+        <field name="res_model">hr.induction.plan</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="hr_induction_plan_view_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Corporate Induction &amp; Orientation Plan!
+            </p>
+            <p>
+                Manage POMD corporate orientation, LMS training, and general bank integration.
+            </p>
+        </field>
+    </record>
+</odoo>

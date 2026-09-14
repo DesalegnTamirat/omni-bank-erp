@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_recruitment.ManpowerDashboard">
+        <div class="o_recruitment_dashboard">
+
+            <!-- ── Header ── -->
+            <div class="o_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4">
+                <div>
+                    <h2 class="o_dashboard_title mb-0">Recruitment Request &amp; Manpower Tracking Dashboard</h2>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Level filter -->
+                    <select class="form-select o_period_select" style="min-width:180px;"
+                            t-on-change="onLevelChange"
+                            t-att-value="state.level">
+                        <option value="corporate">Bank-wide (Corporate)</option>
+                        <option value="department">Department / District</option>
+                        <option value="workunit">Work Unit (Branch)</option>
+                    </select>
+
+                    <!-- Department filter -->
+                    <t t-if="state.level === 'department'">
+                        <select class="form-select o_period_select" style="min-width:200px;"
+                                t-on-change="onDepartmentChange"
+                                t-att-value="state.selectedDepartment">
+                            <option value="">All Departments</option>
+                            <t t-foreach="state.departments" t-as="d" t-key="d.id">
+                                <option t-att-value="d.id" t-esc="d.display_name"/>
+                            </t>
+                        </select>
+                    </t>
+
+                    <!-- Work Unit filter -->
+                    <t t-if="state.level === 'workunit'">
+                        <select class="form-select o_period_select" style="min-width:200px;"
+                                t-on-change="onWorkUnitChange"
+                                t-att-value="state.selectedWorkUnit">
+                            <option value="">All Work Units</option>
+                            <t t-foreach="state.workUnits" t-as="u" t-key="u.id">
+                                <option t-att-value="u.id" t-esc="u.display_name"/>
+                            </t>
+                        </select>
+                    </t>
+
+                    <!-- Budget cycle -->
+                    <select class="form-select o_period_select" style="min-width:130px;"
+                            t-on-change="onCycleChange"
+                            t-att-value="state.selectedCycle">
+                        <option value="">All Cycles</option>
+                        <t t-foreach="state.cycles" t-as="c" t-key="c.id">
+                            <option t-att-value="c.id" t-esc="c.name"/>
+                        </t>
+                    </select>
+
+                    <!-- Search input -->
+                    <input type="text"
+                           class="form-control o_period_select"
+                           style="width:130px;"
+                           placeholder="Filter..."
+                           t-att-value="state.searchTerm"
+                           t-on-input="onSearchInput"/>
+
+                    <!-- Refresh button -->
+                    <button class="btn btn-primary btn-sm" title="Refresh Dashboard" t-on-click="onRefresh">
+                        <i class="fa fa-refresh" t-att-class="{'fa-spin': state.loading}"/>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── Loading Indicator ── -->
+            <div t-if="state.loading" class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-2x" style="color:#425727;"/>
+            </div>
+
+            <!-- ── Dashboard Content ── -->
+            <div t-else="" class="px-4 pb-4">
+
+                <!-- ── SECTION 1: Manpower Establishment Overview ── -->
+                <div class="o_dashboard_section_title mb-2">Manpower Establishment</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_total" t-on-click="onClickAuthorized" title="Total Authorized Establishment">
+                            <div class="o_stat_label">Total Authorized</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.summary.total_authorized"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="onClickBaseline" title="Baseline Headcount">
+                            <div class="o_stat_label">Baseline Count</div>
+                            <div class="o_stat_value v-draft"><t t-esc="state.summary.total_baseline"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_total" t-on-click="onClickActiveStaff" title="Active Staff on Duty">
+                            <div class="o_stat_label">Active Staff</div>
+                            <div class="o_stat_value v-internal"><t t-esc="state.summary.total_active"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="onClickApprovedPlan" title="Approved PBMS Plan Additions">
+                            <div class="o_stat_label">Approved Plan</div>
+                            <div class="o_stat_value v-published"><t t-esc="state.summary.total_approved_plan"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_positive" t-on-click="onClickVacantPosts" title="Vacant Posts Gap">
+                            <div class="o_stat_label">Vacant Posts (Gap)</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.summary.total_vacant"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="onClickInFlight" title="In-Flight Recruitment Requests">
+                            <div class="o_stat_label">In-Flight Requests</div>
+                            <div class="o_stat_value v-progress"><t t-esc="state.summary.total_inflight"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 2: Movement & Turnover Tracking ── -->
+                <div class="o_dashboard_section_title mb-2">Movement &amp; Position Tracking</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_positive" t-on-click="onClickVacantPosts" title="Uninitiated Vacancy Gap">
+                            <div class="o_stat_label">Uninitiated Gap</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.summary.uninitiated_gap"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="() => this.onClickMovement('lateral')" title="Lateral Transfers">
+                            <div class="o_stat_label">Lateral Transfers</div>
+                            <div class="o_stat_value v-draft"><t t-esc="state.summary.total_lateral"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="() => this.onClickMovement('replacement')" title="Replacements">
+                            <div class="o_stat_label">Replacements</div>
+                            <div class="o_stat_value v-published"><t t-esc="state.summary.total_replacement"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card o_stat_total" t-on-click="() => this.onClickMovement('promotion')" title="Promotions">
+                            <div class="o_stat_label">Promotions</div>
+                            <div class="o_stat_value v-external"><t t-esc="state.summary.total_promotion"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="() => this.onClickMovement('resignation')" title="Resignations">
+                            <div class="o_stat_label">Resignations</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.summary.total_resignation"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-2">
+                        <div class="o_stat_card" t-on-click="onClickAuthorized" title="Tracked Establishment Position Lines">
+                            <div class="o_stat_label">Position Lines</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.summary.total_positions_tracked"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 3: Visual Analytics Charts ── -->
+                <div class="row g-3 mb-4">
+                    <!-- Donut Chart: Staffing Fulfillment -->
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Staffing Fulfillment &amp; Gap Status</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas t-ref="donutChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bar Chart: Top Vacancies by Work Unit -->
+                    <div class="col-12 col-md-8">
+                        <div class="o_chart_card">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="o_chart_title mb-0">Top Work Units with Vacancy Gaps</div>
+                                <span class="small text-muted">Comparison of Establishment vs Active vs Vacant</span>
+                            </div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas t-ref="barChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 4: Detail Matrix Table ── -->
+                <div class="o_chart_card p-0 overflow-hidden">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-bottom">
+                        <div>
+                            <div class="o_chart_title mb-0">Work Unit Establishment &amp; Vacancy Detail Matrix</div>
+                            <span class="text-muted small">
+                                Showing <t t-esc="paginatedRows.length"/> of <t t-esc="state.tableRows.length"/> tracked establishment positions
+                            </span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    t-att-disabled="state.currentPage &lt;= 1"
+                                    t-on-click="prevPage">
+                                <i class="fa fa-chevron-left"/>
+                            </button>
+                            <span class="small text-muted">
+                                Page <strong t-esc="state.currentPage"/> of <strong t-esc="totalPages"/>
+                            </span>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                    t-att-disabled="state.currentPage &gt;= totalPages"
+                                    t-on-click="nextPage">
+                                <i class="fa fa-chevron-right"/>
+                            </button>
+                            <button class="btn btn-primary btn-sm ms-2"
+                                    title="View All Recruitment Requests"
+                                    t-on-click="() => this.openRecruitmentRequests()">
+                                <i class="fa fa-list me-1"/> All Requests
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 0.86rem;">
+                            <thead class="text-uppercase" style="font-size: 0.76rem; letter-spacing: 0.5px; background-color: #f7f9f5;">
+                                <tr>
+                                    <th class="ps-3">Work Unit</th>
+                                    <th>District / Directorate</th>
+                                    <th>Job Position</th>
+                                    <th>Grade</th>
+                                    <th class="text-center">Total</th>
+                                    <th class="text-center">Baseline</th>
+                                    <th class="text-center">Active</th>
+                                    <th class="text-center">Plan</th>
+                                    <th class="text-center">Vacant</th>
+                                    <th class="text-center">Movements (L/R/P/D)</th>
+                                    <th class="text-center">In-Flight</th>
+                                    <th class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-if="paginatedRows.length === 0">
+                                    <tr>
+                                        <td colspan="12" class="text-center py-5 text-muted">
+                                            <i class="fa fa-search-minus fa-2x mb-2 d-block"/>
+                                            No establishment records match the selected hierarchy filter.
+                                        </td>
+                                    </tr>
+                                </t>
+                                <t t-foreach="paginatedRows" t-as="row" t-key="row.id">
+                                    <tr t-att-class="row.vacant_position_count &gt; 0 ? 'table-vacant-row' : ''">
+                                        <!-- Work Unit -->
+                                        <td class="ps-3">
+                                            <a href="#" class="fw-bold text-decoration-none" style="color:#425727;" t-on-click.prevent="() => this.openOperatingUnit(row)">
+                                                <t t-esc="row.operating_unit_name"/>
+                                            </a>
+                                            <t t-if="row.sol_id">
+                                                <span class="badge bg-light text-muted border ms-1" style="font-size: 0.7rem;"><t t-esc="row.sol_id"/></span>
+                                            </t>
+                                        </td>
+                                        <!-- District -->
+                                        <td class="text-muted" t-esc="row.district_name"/>
+                                        <!-- Position -->
+                                        <td class="fw-semibold text-dark" t-esc="row.job_position_name"/>
+                                        <!-- Grade -->
+                                        <td>
+                                            <span class="badge bg-light text-dark border"><t t-esc="row.grade_name"/></span>
+                                        </td>
+                                        <!-- Total Headcount -->
+                                        <td class="text-center fw-bold" style="color:#1d2b32;" t-esc="row.total_headcount"/>
+                                        <!-- Baseline -->
+                                        <td class="text-center text-muted" t-esc="row.baseline_count"/>
+                                        <!-- Active Staff -->
+                                        <td class="text-center fw-bold" style="color:#425727;" t-esc="row.active_employee_count"/>
+                                        <!-- Approved Plan -->
+                                        <td class="text-center fw-semibold" style="color:#c17540;" t-esc="row.approved_plan_count"/>
+                                        <!-- Vacant Posts -->
+                                        <td class="text-center">
+                                            <t t-if="row.vacant_position_count &gt; 0">
+                                                <span class="badge px-2 py-1 fw-bold" style="background-color:rgba(84,24,24,0.12); color:#541718; border:1px solid rgba(84,24,24,0.3);">
+                                                    <t t-esc="row.vacant_position_count"/> Vacant
+                                                </span>
+                                            </t>
+                                            <t t-elif="row.vacant_position_count === 0">
+                                                <span class="badge px-2 py-1" style="background-color:rgba(66,87,39,0.12); color:#425727; border:1px solid rgba(66,87,39,0.3);">
+                                                    0 Vacant
+                                                </span>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="badge px-2 py-1" style="background-color:rgba(114,103,50,0.12); color:#726732; border:1px solid rgba(114,103,50,0.3);">
+                                                    +<t t-esc="Math.abs(row.vacant_position_count)"/> Surplus
+                                                </span>
+                                            </t>
+                                        </td>
+                                        <!-- Movements -->
+                                        <td class="text-center small text-muted">
+                                            <span title="Lateral Transfers" style="color:#726732;" class="fw-semibold"><t t-esc="row.lateral_count"/>L</span> /
+                                            <span title="Replacements" style="color:#c17540;" class="fw-semibold"><t t-esc="row.replacement_count"/>R</span> /
+                                            <span title="Promotions" style="color:#425727;" class="fw-semibold"><t t-esc="row.promotion_count"/>P</span> /
+                                            <span title="Resignations" style="color:#541718;" class="fw-semibold"><t t-esc="row.resignation_count"/>D</span>
+                                        </td>
+                                        <!-- In-Flight Requests -->
+                                        <td class="text-center">
+                                            <t t-if="row.inflight_recruitment &gt; 0">
+                                                <a href="#" class="badge text-decoration-none fw-bold" style="background-color:rgba(193,117,64,0.12); color:#c17540; border:1px solid rgba(193,117,64,0.3);" t-on-click.prevent="() => this.openRecruitmentRequests(row)">
+                                                    <t t-esc="row.inflight_recruitment"/> In-Flight
+                                                </a>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-muted">-</span>
+                                            </t>
+                                        </td>
+                                        <!-- Actions -->
+                                        <td class="text-end text-nowrap pe-3">
+                                            <t t-if="row.vacant_position_count &gt; 0">
+                                                <button class="btn btn-sm btn-primary py-0 px-2"
+                                                        title="Initiate Planned Recruitment Request"
+                                                        t-on-click="() => this.createNewRecruitmentRequest(row)">
+                                                    <i class="fa fa-plus me-1"/> Request
+                                                </button>
+                                            </t>
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-2 ms-1"
+                                                    title="View Requests for this position"
+                                                    t-on-click="() => this.openRecruitmentRequests(row)">
+                                                <i class="fa fa-eye"/>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

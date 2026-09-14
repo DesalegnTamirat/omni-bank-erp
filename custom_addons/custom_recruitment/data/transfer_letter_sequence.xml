@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="sequence_lateral_transfer_letter" model="ir.sequence">
+            <field name="name">Bunna Bank Lateral Transfer Letter Reference</field>
+            <field name="code">bunna.lateral.transfer.letter</field>
+            <field name="prefix">-BB/TMD/</field>
+            <field name="padding">2</field>
+            <field name="suffix">/%(month)s/%(year)s</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

@@ -12,6 +12,93 @@ class HrEmployeeCompetency(models.Model):
     competency_assessment_count = fields.Integer(
         string='Competency Assessments', compute='_compute_competency_assessment_count')
 
+    latest_competency_assessment_id = fields.Many2one(
+        'competency.assessment', string='Latest Competency Assessment',
+        compute='_compute_latest_competency_assessment', store=True,
+        help="Points to the employee's most recent approved/completed competency evaluation.")
+    latest_competency_overall_score = fields.Float(
+        string='Latest Competency Score (%)',
+        compute='_compute_latest_competency_assessment', store=True,
+        help="Overall weighted score percentage achieved in the latest evaluation.")
+    latest_competency_assessment_date = fields.Date(
+        string='Latest Assessment Date',
+        compute='_compute_latest_competency_assessment', store=True)
+    latest_competency_gap_summary = fields.Text(
+        string='Latest Competency Gap Summary',
+        compute='_compute_latest_competency_assessment',
+        help="Summary of competency requirements, achieved levels, and gaps for Career Path and external analytics.")
+
+    @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.overall_score', 'competency_assessment_ids.evaluation_date')
+    def _compute_latest_competency_assessment(self):
+        for emp in self:
+            assessments = emp.competency_assessment_ids.filtered(
+                lambda a: a.state in ('approved', 'completed', 'locked') or not a.state
+            ).sorted(key=lambda a: (a.evaluation_date or fields.Date.today(), a.id), reverse=True)
+            if not assessments:
+                # Fallback to any assessment if none approved
+                assessments = emp.competency_assessment_ids.sorted(key=lambda a: (a.evaluation_date or fields.Date.today(), a.id), reverse=True)
+
+            latest = assessments[0] if assessments else False
+            if latest:
+                emp.latest_competency_assessment_id = latest.id
+                emp.latest_competency_overall_score = getattr(latest, 'overall_score', 0.0) or 0.0
+                emp.latest_competency_assessment_date = getattr(latest, 'evaluation_date', False) or False
+
+                lines_summary = []
+                for line in getattr(latest, 'line_ids', []):
+                    comp_name = line.competency_id.name if line.competency_id else 'N/A'
+                    req_lvl = line.required_level_id.name if getattr(line, 'required_level_id', False) else 'N/A'
+                    ach_lvl = line.achieved_level_id.name if getattr(line, 'achieved_level_id', False) else 'N/A'
+                    gap = getattr(line, 'gap', 0.0) or 0.0
+                    lines_summary.append(f"- {comp_name}: Required={req_lvl}, Achieved={ach_lvl}, Gap={gap}")
+                emp.latest_competency_gap_summary = "\n".join(lines_summary) if lines_summary else "No line details available."
+            else:
+                emp.latest_competency_assessment_id = False
+                emp.latest_competency_overall_score = 0.0
+                emp.latest_competency_assessment_date = False
+                emp.latest_competency_gap_summary = "No competency assessment logged."
+
+    def get_latest_competency_evaluation(self):
+        """API helper method for Career Path, HR Analytics, and external modules to fetch the employee's latest evaluation."""
+        self.ensure_one()
+        latest = self.latest_competency_assessment_id
+        if not latest:
+            return {
+                'employee_id': self.id,
+                'employee_name': self.name,
+                'has_assessment': False,
+                'assessment_id': False,
+                'evaluation_date': False,
+                'overall_score': 0.0,
+                'cycle_name': False,
+                'state': False,
+                'lines': [],
+            }
+
+        line_data = []
+        for line in getattr(latest, 'line_ids', []):
+            line_data.append({
+                'competency_id': line.competency_id.id if line.competency_id else False,
+                'competency_name': line.competency_id.name if line.competency_id else '',
+                'required_level_id': line.required_level_id.id if getattr(line, 'required_level_id', False) else False,
+                'required_level_name': line.required_level_id.name if getattr(line, 'required_level_id', False) else '',
+                'achieved_level_id': line.achieved_level_id.id if getattr(line, 'achieved_level_id', False) else False,
+                'achieved_level_name': line.achieved_level_id.name if getattr(line, 'achieved_level_id', False) else '',
+                'gap': getattr(line, 'gap', 0.0) or 0.0,
+            })
+
+        return {
+            'employee_id': self.id,
+            'employee_name': self.name,
+            'has_assessment': True,
+            'assessment_id': latest.id,
+            'evaluation_date': latest.evaluation_date or False,
+            'overall_score': getattr(latest, 'overall_score', 0.0) or 0.0,
+            'cycle_name': latest.cycle_id.name if getattr(latest, 'cycle_id', False) else '',
+            'state': latest.state or '',
+            'lines': line_data,
+        }
+
     @api.depends('competency_assessment_ids')
     def _compute_competency_assessment_count(self):
         for rec in self:

@@ -3,19 +3,18 @@
     <data>
 
 
+        <!--        <record id="menu_courses" model="website.menu">-->
+        <!--            <field name="name">Courses</field>-->
+        <!--            <field name="url">/courses</field>-->
+        <!--            <field name="parent_id" ref="website.main_menu"/>-->
+        <!--            <field name="sequence" eval="52"/>-->
+        <!--        </record>-->
 
-        <record id="menu_jobs" model="website.menu">
-            <field name="name">Jobs</field>
+        <record id="menu_jobs" model="website.menu" forcecreate="1">
+            <field name="name">Job</field>
             <field name="url">/jobs</field>
             <field name="parent_id" ref="website.main_menu"/>
-            <field name="sequence" eval="51"/>
-        </record>
-
-        <record id="menu_courses" model="website.menu">
-            <field name="name">Courses</field>
-            <field name="url">/courses</field>
-            <field name="parent_id" ref="website.main_menu"/>
-            <field name="sequence" eval="52"/>
+            <field name="sequence" eval="11"/>
         </record>
 
         <record id="menu_tender" model="website.menu">
@@ -39,6 +38,21 @@
             <field name="sequence" eval="56"/>
         </record>
 
+        <template id="header_cta_feedback" inherit_id="website.header_call_to_action"
+                  name="Bunna Header CTA - Feedback">
+            <xpath expr="//a[hasclass('btn_cta')]" position="replace">
+                <a href="/contactus" class="oe_unremovable btn btn-primary btn_cta">Feedback</a>
+            </xpath>
+        </template>
+
+        <!-- The /contactus page itself: rename its heading/title too -->
+        <template id="contactus_page_feedback" inherit_id="website.contactus"
+                  name="Bunna Contact Us Page - Feedback">
+            <xpath expr="//h1" position="replace">
+                <h1>Feedback</h1>
+            </xpath>
+        </template>
+
 
         <template id="custom_header_logo" inherit_id="website.navbar_nav" name="Bunna Header Realignment">
 
@@ -61,13 +75,16 @@
             </xpath>
 
             <xpath expr="//ul" position="attributes">
-                <attribute name="t-attf-class">#{'nav navbar-nav d-flex flex-row flex-nowrap align-items-center w-100' if request.env.user._is_public() else 'd-none'}</attribute>
+                <attribute name="t-attf-class">
+                    nav navbar-nav d-flex flex-row flex-nowrap align-items-center w-100
+                </attribute>
             </xpath>
 
             <xpath expr="//ul" position="after">
                 <style t-if="request.env.user._is_public()">
                     .o_searchbar_form, .o_wsale_products_searchbar_form, .o_search_nav_item,
-                    a[href*='/search'], .o_nav_search_box, button[data-bs-target*='search'] { display: none !important; }
+                    a[href*='/search'], .o_nav_search_box, button[data-bs-target*='search'] { display: none !important;
+                    }
                     #top_menu a[href*='/contactus'], #top_menu a[href*='/contact_us'] { display: none !important; }
                 </style>
 
@@ -75,214 +92,1207 @@
                 <style>
                     .o_header_phone, a[href^='tel:'], .fa-phone { display: none !important; }
                 </style>
+
+                <script>
+                    (function () {
+                        function ensureBunnaLogo() {
+                            const brands = document.querySelectorAll(".navbar-brand, .o_header_standard_logo, a.logo");
+                            brands.forEach(function (brandLink) {
+                                let img = brandLink.querySelector("img");
+                                if (!img) {
+                                    brandLink.innerHTML = '';
+                                    img = document.createElement("img");
+                                    img.src = "/bunna_custom_web_page/static/src/img/bunna_logo.png";
+                                    img.alt = "Bunna Bank Logo";
+                                    img.className = "img-fluid";
+                                    img.style.maxHeight = "44px";
+                                    img.style.width = "auto";
+                                    img.style.objectFit = "contain";
+                                    brandLink.appendChild(img);
+                                } else if (!img.src.includes("bunna_logo.png")) {
+                                    img.src = "/bunna_custom_web_page/static/src/img/bunna_logo.png";
+                                    img.style.maxHeight = "44px";
+                                    img.style.width = "auto";
+                                    img.style.objectFit = "contain";
+                                }
+                            });
+                        }
+
+                        function ensureSingleJobMenu() {
+                            ensureBunnaLogo();
+                            const topMenu = document.getElementById("top_menu") || document.querySelector(".navbar-nav");
+                            if (!topMenu) return;
+
+                            const allItems = Array.from(topMenu.querySelectorAll("li.nav-item"));
+                            const jobItems = allItems.filter(function(li) {
+                                const link = li.querySelector("a");
+                                if (!link) return false;
+                                const text = link.textContent.trim().toLowerCase();
+                                const href = (link.getAttribute("href") || "").toLowerCase();
+                                return text === "job" || text === "jobs" || href === "/jobs" || href.startsWith("/jobs");
+                            });
+
+                            if (jobItems.length === 0) {
+                                const homeItem = allItems.find(function(li) {
+                                    const link = li.querySelector("a");
+                                    return link &amp;&amp; (link.textContent.trim().toLowerCase() === "home" || link.getAttribute("href") === "/");
+                                });
+                                const jobLi = document.createElement("li");
+                                jobLi.className = "nav-item";
+                                jobLi.role = "presentation";
+                                jobLi.innerHTML = '&lt;a role="menuitem" href="/jobs" class="nav-link"&gt;&lt;span&gt;Job&lt;/span&gt;&lt;/a&gt;';
+                                if (homeItem &amp;&amp; homeItem.nextElementSibling) {
+                                    topMenu.insertBefore(jobLi, homeItem.nextElementSibling);
+                                } else {
+                                    topMenu.appendChild(jobLi);
+                                }
+                            } else if (jobItems.length &gt; 1) {
+                                const firstLink = jobItems[0].querySelector("a");
+                                if (firstLink) {
+                                    const span = firstLink.querySelector("span") || firstLink;
+                                    span.textContent = "Job";
+                                }
+                                for (let i = 1; i &lt; jobItems.length; i++) {
+                                    jobItems[i].remove();
+                                }
+                            } else {
+                                const link = jobItems[0].querySelector("a");
+                                if (link) {
+                                    const span = link.querySelector("span") || link;
+                                    span.textContent = "Job";
+                                }
+                            }
+                        }
+
+                        if (document.readyState === "loading") {
+                            document.addEventListener("DOMContentLoaded", function() {
+                                ensureBunnaLogo();
+                                ensureSingleJobMenu();
+                            });
+                        } else {
+                            ensureBunnaLogo();
+                            ensureSingleJobMenu();
+                        }
+                    })();
+                </script>
             </xpath>
 
 
-            <xpath expr="//ul" position="inside">
-                <li t-if="request.env.user._is_public()" class="nav-item dropdown mx-2">
-                    <!-- Changed text-dark to text-white for visibility -->
-                    <a class="nav-link dropdown-toggle text-white fw-medium"
-                       href="#"
-                       id="empServicesDropdown"
-                       role="button"
-                       data-bs-toggle="dropdown"
-                       aria-expanded="false"
-                       style="font-size: 16px; white-space: nowrap;">
-                        Employee Service's
-                    </a>
-                    <ul class="dropdown-menu shadow border-0 p-3 mt-2"
-                        aria-labelledby="empServicesDropdown"
-                        style="min-width: 560px; border-radius: 4px;">
-                        <style>
-                            .emp-services-menu { display: flex; gap: 2rem; }
-                            .emp-services-section h6 {
-                            font-size: 11px;
-                            font-weight: 700;
-                            letter-spacing: 1px;
-                            text-transform: uppercase;
-                            color: #333;
-                            border-bottom: 2px solid #009688;
-                            padding-bottom: 6px;
-                            margin-bottom: 10px;
-                            }
-                            .emp-services-section a {
-                            display: block;
-                            color: #009688;
-                            font-size: 14px;
-                            padding: 4px 0;
-                            text-decoration: none;
-                            }
-                            .emp-services-section a:hover { text-decoration: underline; }
-                        </style>
-                        <li>
-                            <div class="emp-services-menu">
-                                <!-- SELF SERVICE -->
-                                <div class="emp-services-section" style="min-width: 160px;">
-                                    <h6>Self Service</h6>
-                                    <a href="/odoo/payslips">View Payslip</a>
-                                    <a href="/odoo/time-off">Request Leave</a>
-                                </div>
-                                <!-- SERVICE REQUEST -->
-                                <div class="emp-services-section" style="min-width: 220px;">
-                                    <h6>Service Request</h6>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Medical+Expense+Claim">Medical Expense Claim</a>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Guarantee+Letter">Guarantee Letter Request</a>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Support+Letter">Support Letter Request</a>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Marriage+Gift">Marriage Gift Request</a>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Transportation">Transportation</a>
-                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Tuition+Fee">Tuition Fee Request</a>
-                                </div>
-                            </div>
-                        </li>
-                    </ul>
-                </li>
-            </xpath>
+<!--            <xpath expr="//ul" position="inside">-->
+<!--                <li t-if="request.env.user._is_public()" class="nav-item dropdown mx-2">-->
+<!--                    &lt;!&ndash; Changed text-dark to text-white for visibility &ndash;&gt;-->
+<!--                    <a class="nav-link dropdown-toggle text-white fw-medium"-->
+<!--                       href="#"-->
+<!--                       id="empServicesDropdown"-->
+<!--                       role="button"-->
+<!--                       data-bs-toggle="dropdown"-->
+<!--                       aria-expanded="false"-->
+<!--                       style="font-size: 16px; white-space: nowrap;">-->
+<!--                        Employee Service's-->
+<!--                    </a>-->
+<!--                    <ul class="dropdown-menu shadow border-0 p-3 mt-2"-->
+<!--                        aria-labelledby="empServicesDropdown"-->
+<!--                        style="min-width: 560px; border-radius: 4px;">-->
+<!--                        <style>-->
+<!--                            .emp-services-menu { display: flex; gap: 2rem; }-->
+<!--                            .emp-services-section h6 {-->
+<!--                            font-size: 11px;-->
+<!--                            font-weight: 700;-->
+<!--                            letter-spacing: 1px;-->
+<!--                            text-transform: uppercase;-->
+<!--                            color: #333;-->
+<!--                            border-bottom: 2px solid #009688;-->
+<!--                            padding-bottom: 6px;-->
+<!--                            margin-bottom: 10px;-->
+<!--                            }-->
+<!--                            .emp-services-section a {-->
+<!--                            display: block;-->
+<!--                            color: #009688;-->
+<!--                            font-size: 14px;-->
+<!--                            padding: 4px 0;-->
+<!--                            text-decoration: none;-->
+<!--                            }-->
+<!--                            .emp-services-section a:hover { text-decoration: underline; }-->
+<!--                        </style>-->
+<!--                        <li>-->
+<!--                            <div class="emp-services-menu">-->
+<!--                                &lt;!&ndash; SELF SERVICE &ndash;&gt;-->
+<!--                                <div class="emp-services-section" style="min-width: 160px;">-->
+<!--                                    <h6>Self Service</h6>-->
+<!--                                    <a href="/odoo/payslips">View Payslip</a>-->
+<!--                                    <a href="/odoo/time-off">Request Leave</a>-->
+<!--                                </div>-->
+<!--                                &lt;!&ndash;                                &lt;!&ndash; SERVICE REQUEST &ndash;&gt;&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                <div class="emp-services-section" style="min-width: 220px;">&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <h6>Service Request</h6>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Medical+Expense+Claim">Medical Expense Claim</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Guarantee+Letter">Guarantee Letter Request</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Self+Service+Letter&amp;letter_name=Support+Letter">Support Letter Request</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Marriage+Gift">Marriage Gift Request</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Transportation">Transportation</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                    <a href="/odoo/employee-service-requests/new?sr_category=Others&amp;letter_name=Tuition+Fee">Tuition Fee Request</a>&ndash;&gt;-->
+<!--                                &lt;!&ndash;                                </div>&ndash;&gt;-->
+<!--                            </div>-->
+<!--                        </li>-->
+<!--                    </ul>-->
+<!--                </li>-->
+<!--            </xpath>-->
         </template>
 
 
-        <template id="hello_page_template" name="Bunna Internal Portal">
-            <t t-call="website.layout">
-                <style>
-                    /* Hero Welcome Section */
-                    .hero-welcome {
+        <!-- Bunna Internal Portal Content: Single-Page Viewport Layout -->
+        <template id="hello_page_content" name="Bunna Portal Content">
+            <style>
+                /* Scoped non-scrollable single-page layout for Bunna Portal */
+                html:has(.bunna-portal-wrapper),
+                body:has(.bunna-portal-wrapper) {
+                    height: 100vh !important;
+                    max-height: 100vh !important;
+                    overflow: hidden !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+
+                body:has(.bunna-portal-wrapper) #wrapwrap {
+                    height: 100vh !important;
+                    max-height: 100vh !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: space-between !important;
+                    overflow: hidden !important;
+                }
+
+                body:has(.bunna-portal-wrapper) #wrapwrap > main {
+                    flex: 1 1 auto !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    min-height: 0 !important;
+                    overflow: hidden !important;
+                }
+
+                .bunna-portal-wrapper {
+                    flex: 1 1 auto !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: space-evenly !important;
+                    min-height: 0 !important;
+                    overflow: hidden !important;
+                    background-color: #fbfbfb;
+                }
+
+                .bunna-hero-banner {
                     background: #ffffff;
                     color: #4a1515;
-                    padding: 4rem 0;
+                    padding: clamp(0.55rem, 1.4vh, 1.2rem) 0 clamp(0.45rem, 1.2vh, 1rem) 0;
                     text-align: center;
-                    border-bottom: 5px solid #b38b59;
+                    border-bottom: 2px solid #b38b59;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+                    flex-shrink: 0;
+                }
+
+                .bunna-hero-banner h1 {
+                    color: #4a1515;
+                    font-size: clamp(1.6rem, 2.8vh, 2.3rem);
+                    font-weight: 800;
+                    margin-bottom: 0.25rem;
+                    letter-spacing: -0.5px;
+                }
+
+                .bunna-hero-banner p {
+                    color: #555555;
+                    font-size: clamp(0.92rem, 1.6vh, 1.12rem);
+                    margin-bottom: 0;
+                    opacity: 0.95;
+                }
+
+                .bunna-portal-body {
+                    flex: 1 1 auto;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-evenly;
+                    min-height: 0;
+                    padding: clamp(0.4rem, 1.2vh, 1.2rem) 0;
+                }
+
+                .vision-mission-card {
+                    background: #ffffff;
+                    border-radius: 12px;
+                    padding: clamp(0.95rem, 2vh, 1.6rem) clamp(1.1rem, 2vw, 1.8rem);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+                    border-left: 5px solid #b32d2e;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+
+                .vision-mission-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 22px rgba(74, 21, 21, 0.12);
+                }
+
+                .vision-mission-card h2 {
+                    color: #4a1515;
+                    font-size: clamp(1.2rem, 2.2vh, 1.45rem);
+                    font-weight: 700;
+                    margin-bottom: clamp(0.3rem, 0.7vh, 0.6rem);
+                    display: flex;
+                    align-items: center;
+                }
+
+                .vision-mission-card h2 i {
+                    color: #4a1515;
+                    margin-right: 0.6rem;
+                    font-size: clamp(1.2rem, 2.2vh, 1.45rem);
+                }
+
+                .vision-mission-card p {
+                    color: #555555;
+                    font-size: clamp(0.92rem, 1.6vh, 1.05rem);
+                    line-height: 1.45;
+                    margin-bottom: 0;
+                }
+
+                .core-values-header {
+                    color: #4a1515;
+                    font-weight: 700;
+                    text-align: center;
+                    font-size: clamp(1.25rem, 2.2vh, 1.5rem);
+                    margin: clamp(0.4rem, 0.9vh, 0.8rem) 0;
+                    flex-shrink: 0;
+                }
+
+                .core-value-card {
+                    background: #ffffff;
+                    border-radius: 10px;
+                    padding: clamp(0.75rem, 1.5vh, 1.25rem) clamp(0.65rem, 1.1vw, 1.1rem);
+                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+                    border-top: 3px solid #b32d2e;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+
+                .core-value-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 15px rgba(74, 21, 21, 0.1);
+                }
+
+                .core-value-card h6 {
+                    color: #4a1515;
+                    font-size: clamp(0.82rem, 1.4vh, 0.96rem);
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    margin-bottom: clamp(0.2rem, 0.4vh, 0.45rem);
+                    letter-spacing: 0.5px;
+                }
+
+                .core-value-card small {
+                    color: #555555;
+                    font-size: clamp(0.76rem, 1.25vh, 0.86rem);
+                    line-height: 1.35;
+                    display: block;
+                }
+            </style>
+
+            <script type="text/javascript">
+                (function() {
+                    document.documentElement.style.overflow = 'hidden';
+                    document.body.style.overflow = 'hidden';
+                    var wrapwrap = document.getElementById('wrapwrap');
+                    if (wrapwrap) {
+                        wrapwrap.style.height = '100vh';
+                        wrapwrap.style.maxHeight = '100vh';
+                        wrapwrap.style.overflow = 'hidden';
                     }
-                    .hero-welcome h1 { font-size: 3rem; font-weight: 800; }
-                    .hero-welcome p { font-size: 1.25rem; opacity: 0.9; }
+                })();
+            </script>
 
+            <div id="wrap" class="bunna-portal-wrapper">
+                <!-- Hero Welcome Header -->
+                <div class="bunna-hero-banner">
+                    <div class="container">
+                        <h1>Welcome to the Bunna Internal Portal</h1>
+                        <p>Empowering our team with seamless ERP solutions. Hello, <span t-esc="user_name or 'Public user'"/>.</p>
+                    </div>
+                </div>
 
-                </style>
-
-                <div id="wrap">
-                    <!-- Hero Welcome Header -->
-                    <div class="hero-welcome">
-                        <div class="container">
-                            <h1 class="mb-3">Welcome to the Bunna Internal Portal</h1>
-                            <p>Empowering our team with seamless ERP solutions. Hello, <span t-esc="user_name"/>.</p>
+                <!-- Middle Portal Content: Vision, Mission & Core Values -->
+                <div class="bunna-portal-body">
+                    <!-- Vision & Mission -->
+                    <div class="container mb-1">
+                        <div class="row g-3 justify-content-center">
+                            <!-- Vision -->
+                            <div class="col-md-5">
+                                <div class="vision-mission-card">
+                                    <h2><i class="fa fa-eye"></i> Our Vision</h2>
+                                    <p>To Be One of the Top Three Financial Services Provider in Ethiopia by the year 2030.</p>
+                                </div>
+                            </div>
+                            <!-- Mission -->
+                            <div class="col-md-5">
+                                <div class="vision-mission-card">
+                                    <h2><i class="fa fa-rocket"></i> Our Mission</h2>
+                                    <p>To deliver platform-based financial services by collaborating with partners, elevating the value for stakeholders.</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="oe_structure py-5 bunna-gradient">
-                        <div class="container mb-5">
-                            <div class="row g-4">
-                                <!-- Vision -->
-                                <div class="col-md-6">
-                                    <div class="p-5 bg-white rounded-4 h-100 shadow-sm border-start border-5 border-danger card-hover">
-                                        <h2 class="fw-bold mb-3 bank-text"><i class="fa fa-eye me-2"></i> Our Vision</h2>
-                                        <p class="text-muted fs-5 lh-base mb-0">To Be One of the Top Three Financial Services Provider in Ethiopia by the year 2030.</p>
-                                    </div>
+                    <!-- Core Values Section -->
+                    <div class="container">
+                        <h2 class="core-values-header">Our Core Values</h2>
+                        <div class="row g-2 g-lg-3 justify-content-center flex-nowrap px-lg-3">
+                            <!-- Core Value 01 -->
+                            <div class="col" style="min-width: 0;">
+                                <div class="core-value-card">
+                                    <h6>01 Winning</h6>
+                                    <small>Striving for excellence and professionalism with an ethical competitive edge.</small>
                                 </div>
-                                <!-- Mission -->
-                                <div class="col-md-6">
-                                    <div class="p-5 bg-white rounded-4 h-100 shadow-sm border-start border-5 border-danger card-hover">
-                                        <h2 class="fw-bold mb-3 bank-text"><i class="fa fa-rocket me-2"></i> Our Mission</h2>
-                                        <p class="text-muted fs-5 lh-base mb-0">To deliver platform-based financial services by collaborating with partners, elevating the value for stakeholders.</p>
+                            </div>
+
+                            <!-- Core Value 02 -->
+                            <div class="col" style="min-width: 0;">
+                                <div class="core-value-card">
+                                    <h6>02 Respect</h6>
+                                    <small>Valuing contributions from customers, shareholders, and our community.</small>
+                                </div>
+                            </div>
+
+                            <!-- Core Value 03 -->
+                            <div class="col" style="min-width: 0;">
+                                <div class="core-value-card">
+                                    <h6>03 Responsibility</h6>
+                                    <small>Acting with purpose to balance stakeholder interests and fiscal duties.</small>
+                                </div>
+                            </div>
+
+                            <!-- Core Value 04 -->
+                            <div class="col" style="min-width: 0;">
+                                <div class="core-value-card">
+                                    <h6>04 Collaboration</h6>
+                                    <small>Supporting our customers, regulatory bodies, and society through collective care.</small>
+                                </div>
+                            </div>
+
+                            <!-- Core Value 05 -->
+                            <div class="col" style="min-width: 0;">
+                                <div class="core-value-card">
+                                    <h6>05 Innovation</h6>
+                                    <small>Relentlessly pursuing groundbreaking ideas to shape the future of banking.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template id="hello_page_template" name="Bunna Internal Portal">
+            <t t-call="website.layout">
+                <t t-call="bunna_custom_web_page.hello_page_content"/>
+            </t>
+        </template>
+
+        <template id="custom_homepage" inherit_id="website.homepage" name="Bunna Bank Custom Homepage">
+            <xpath expr="//div[@id='wrap']" position="replace">
+                <t t-call="bunna_custom_web_page.hello_page_content"/>
+            </xpath>
+        </template>
+
+        <template id="jobs_coming_soon_template" name="Jobs / Careers">
+            <t t-call="bunna_custom_web_page.dashboard_layout">
+                <t t-set="active_tab" t-value="'vacancy'"/>
+                <style>
+                    .vacancy-card {
+                        background: #ffffff;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+                        border: 1px solid #e5e7eb;
+                        margin-bottom: 1.5rem;
+                        transition: all 0.3s;
+                    }
+                    .vacancy-card:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 8px 25px rgba(84,23,24,0.1);
+                        border-color: #541718;
+                    }
+                    .vacancy-badge {
+                        background-color: #541718;
+                        color: #ffffff;
+                        font-size: 0.8rem;
+                        font-weight: 600;
+                        padding: 0.3rem 0.8rem;
+                        border-radius: 6px;
+                    }
+                    .btn-apply {
+                        background-color: #C17540;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        transition: background-color 0.2s;
+                    }
+                    .btn-apply:hover {
+                        background-color: #a45e2f;
+                        color: #ffffff;
+                    }
+                </style>
+
+
+                <div class="mb-4">
+                    <h3 class="fw-bold" style="color: #1D2B32;">Career Opportunities</h3>
+                    <p class="text-muted">Explore open positions at Bunna Bank Share Company.</p>
+                </div>
+
+                <div class="row">
+                    <t t-if="vacancies">
+                        <t t-foreach="vacancies" t-as="vacancy">
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card vacancy-card p-4 position-relative">
+                                    <!-- Featured Vacancy Indicator (BRD FR-ATS-018) -->
+                                    <t t-if="vacancy.is_featured">
+                                        <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-3 fw-bold"><i class="fa fa-star me-1"/> Featured</span>
+                                    </t>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="vacancy-badge"><t t-esc="vacancy.reference"/></span>
+                                        <small class="text-muted"><i class="fa fa-calendar me-1"/> <t t-esc="vacancy.create_date.strftime('%Y-%m-%d')"/></small>
                                     </div>
+                                    <h5 class="fw-bold mb-2" style="color: #541718;"><t t-esc="vacancy.job_position.name if vacancy.job_position else (vacancy.vacant_job_position or vacancy.reference)"/></h5>
+                                    <p class="text-muted small mb-2"><i class="fa fa-map-marker me-1"/> <t t-esc="vacancy.operating_unit_id.name if vacancy.operating_unit_id else 'Addis Ababa'"/></p>
+
+                                    <!-- Status Indicator Badge (BRD FR-ATS-016) -->
+                                    <div class="mb-3">
+                                        <t t-set="today" t-value="datetime.date.today()"/>
+                                        <t t-if="vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply &lt; today)">
+                                            <span class="badge bg-secondary">Closed</span>
+                                        </t>
+                                        <t t-elif="vacancy.last_date_to_apply and (vacancy.last_date_to_apply - today).days &lt;= 3">
+                                            <span class="badge bg-danger"><i class="fa fa-clock-o me-1"/> Closing Soon (<t t-esc="(vacancy.last_date_to_apply - today).days"/> days left)</span>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="badge bg-success">Open</span>
+                                        </t>
+                                    </div>
+
+                                     <!-- Social Media Share Links (Visible ONLY to Administrator Role) -->
+                                     <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
+                                         <t t-set="share_data" t-value="vacancy.get_social_share_urls()"/>
+                                         <div class="d-flex align-items-center gap-1 mb-3 flex-wrap">
+                                             <span class="small text-muted fw-bold me-1">Share:</span>
+                                             <a t-att-href="share_data['telegram']" target="_blank" class="btn btn-sm btn-light border p-1 px-2" title="Share Title, Company &amp; Link on Telegram"><i class="fa fa-paper-plane text-info me-1"/> Telegram</a>
+                                             <a t-att-href="share_data['whatsapp']" target="_blank" class="btn btn-sm btn-light border p-1 px-2" title="Share Title, Company &amp; Link on WhatsApp"><i class="fa fa-whatsapp text-success me-1"/> WhatsApp</a>
+                                             <a t-att-href="share_data['linkedin']" target="_blank" class="btn btn-sm btn-light border p-1 px-2" title="Share on LinkedIn"><i class="fa fa-linkedin text-primary me-1"/> LinkedIn</a>
+                                             <a t-att-href="share_data['facebook']" target="_blank" class="btn btn-sm btn-light border p-1 px-2" title="Share on Facebook"><i class="fa fa-facebook text-primary me-1"/> Facebook</a>
+                                             <a t-att-href="share_data['twitter']" target="_blank" class="btn btn-sm btn-light border p-1 px-2" title="Share on Twitter/X"><i class="fa fa-twitter text-info me-1"/> Twitter</a>
+                                         </div>
+                                     </t>
+
+                                    <div class="border-top pt-3 d-flex justify-content-between align-items-center">
+                                        <span class="small text-muted">CGPA: <strong class="text-dark"><t t-esc="vacancy.minimum_cgpa or 'N/A'"/></strong></span>
+                                        <t t-set="app_info" t-value="applied_vacancies_map.get(vacancy.id) or applied_vacancies_map.get(str(vacancy.id)) or applied_vacancies_map.get(vacancy.reference) if applied_vacancies_map else False"/>
+                                        <t t-if="app_info">
+                                            <span class="btn btn-sm btn-success disabled px-3 rounded text-white fw-bold" style="background-color: #2e7d32 !important; border-color: #2e7d32 !important;">
+                                                <i class="fa fa-check-circle me-1"/> Applied
+                                            </span>
+                                        </t>
+                                        <t t-elif="vacancy.vacancy_status == 'closed' or (vacancy.last_date_to_apply and vacancy.last_date_to_apply &lt; today)">
+                                            <span class="btn btn-sm btn-secondary disabled px-3 rounded" style="pointer-events: none; opacity: 0.7;"><i class="fa fa-lock me-1"/> Closed</span>
+                                        </t>
+                                        <t t-else="">
+                                            <a t-attf-href="/jobs/apply/#{vacancy.id}" class="btn btn-sm btn-apply px-3 rounded">Apply Now</a>
+                                        </t>
+                                    </div>
+                                    <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
+                                        <div class="mt-2">
+                                            <a t-attf-href="/my/recruitment/applicants?vacancy_id=#{vacancy.id}" class="btn btn-sm btn-outline-warning text-dark fw-bold w-100"><i class="fa fa-users me-1"/> View Applicants for this Vacancy</a>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+                        </t>
+                    </t>
+                    <t t-else="">
+                        <div class="col-12 text-center py-5">
+                            <i class="fa fa-folder-open fa-3x text-muted mb-3"/>
+                            <h5 class="text-muted">No vacancies are posted at this time. Please check back later.</h5>
+                        </div>
+                    </t>
+                </div>
+            </t>
+        </template>
+
+        <!-- JOB APPLICATION FORM TEMPLATE -->
+        <template id="job_application_form_template" name="ATS Job Application Form">
+            <t t-call="bunna_custom_web_page.dashboard_layout">
+                <t t-set="active_tab" t-value="'vacancy'"/>
+                
+                <div class="mb-4">
+                    <h3 class="fw-bold" style="color: #1D2B32;">Apply for Position</h3>
+                    <p class="text-muted">Apply for <strong style="color: #541718;"><t t-esc="vacancy.job_position.name if vacancy.job_position else (vacancy.vacant_job_position or vacancy.reference)"/></strong> (Ref: <t t-esc="vacancy.reference"/>).</p>
+                </div>
+
+                <div class="card border-0 shadow-sm p-4 bg-white rounded-3">
+<!--                    <div class="alert alert-info border-0 rounded-3 mb-4 d-flex align-items-center" style="background-color: #f8f1f1; color: #541718;">-->
+<!--                        <i class="fa fa-info-circle fa-2x me-3" style="color: #541718;"></i>-->
+<!--                        <div>-->
+<!--                            <h6 class="fw-bold mb-1">Electronic CV Auto-Synchronization</h6>-->
+<!--                            <p class="mb-0 small">Your qualifications are synced automatically from your Master Candidate Profile.</p>-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+                    <div class="card border-0 rounded-3 p-4 mb-4" style="background-color: #fcf9f9; border-left: 5px solid #541718 !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold mb-0" style="color: #541718;"><i class="fa fa-user-circle me-2"/>Linked Master CV Profile</h5>
+                            <a href="/my/candidate/profile" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fa fa-edit me-1"/> Edit  Profile</a>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <span class="text-muted small d-block">Full Name</span>
+                                <strong class="text-dark"><t t-esc="candidate.name"/></strong>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted small d-block">Email Address</span>
+                                <strong class="text-dark"><t t-esc="candidate.email"/></strong>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted small d-block">Phone Number</span>
+                                <strong class="text-dark"><t t-esc="candidate.phone or 'N/A'"/></strong>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted small d-block">Total Experience</span>
+                                <strong class="text-dark"><t t-esc="candidate.total_experience_years"/> Years</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form action="/jobs/apply/submit" method="POST">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="vacancy_id" t-att-value="vacancy.id"/>
+
+<!--                        <h4 class="fw-bold mb-3 border-bottom pb-2" style="color: #1D2B32;"><i class="fa fa-file-text-o me-2"></i>Job Application Details</h4>-->
+
+                        <div class="mb-4">
+                            <label class="form-label-custom">Cover Letter / Application Letter <span class="text-danger">*</span></label>
+                            <textarea name="cover_letter" class="form-control form-control-custom" rows="8"  required="1"></textarea>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Working Status <span class="text-danger">*</span></label>
+                                <select name="working_status" class="form-select form-control-custom" required="required">
+                                    <option value="employed" t-att-selected="candidate.working_status == 'employed'">Employed</option>
+                                    <option value="unemployed" t-att-selected="candidate.working_status == 'unemployed'">Unemployed</option>
+                                    <option value="notice_period" t-att-selected="candidate.working_status == 'notice_period'">Serving Notice Period</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Current Company / Employer</label>
+                                <input type="text" name="current_company" class="form-control form-control-custom" placeholder="e.g. Commercial Bank of Ethiopia" t-att-value="candidate.current_company or ''"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-custom">Current Monthly Salary (ETB)</label>
+                                <input type="number" name="current_salary" class="form-control form-control-custom" placeholder="e.g. 25000" min="0" step="100" t-att-value="candidate.current_salary or ''"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-custom">Expected Monthly Salary (ETB)</label>
+                                <input type="number" name="expected_salary" class="form-control form-control-custom" placeholder="e.g. 30000" min="0" step="100"/>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-center pt-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="join_immediately" value="1" id="joinImmediatelyCheck" t-att-checked="candidate.join_immediately"/>
+                                    <label class="form-check-label small fw-bold text-dark" for="joinImmediatelyCheck">Can Join Immediately?</label>
                                 </div>
                             </div>
                         </div>
 
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="/jobs" class="btn btn-outline-secondary px-4 py-2">
+                                <i class="fa fa-arrow-left me-2"></i> Back to Vacancies
+                            </a>
+                            <button type="submit" id="apply_submit_btn" class="btn btn-primary px-5 py-2 fw-bold"
+                                    style="background-color: #541718; border-color: #541718;">
+                                Submit Application <i class="fa fa-paper-plane ms-2"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </t>
+        </template>
 
-                        <!-- Core Values Section -->
-                        <div class="container mb-5">
-                            <h2 class="text-center fw-bold mb-5 bank-text">Our Core Values</h2>
-                            <div class="row g-4 justify-content-center">
+        <!-- JOB APPLICATION SUCCESS ACKNOWLEDGMENT TEMPLATE -->
+        <template id="job_application_success_template" name="Application Acknowledgment">
+            <t t-call="bunna_custom_web_page.dashboard_layout">
+                <t t-set="active_tab" t-value="'applications'"/>
+                <style>
+                    .ack-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        border-top: 6px solid #C17540;
+                        padding: 3.5rem 2.5rem;
+                        max-width: 800px;
+                        margin: 0 auto;
+                    }
+                    .ack-badge {
+                        width: 90px;
+                        height: 90px;
+                        background: linear-gradient(135deg, #C17540 0%, #541718 100%);
+                        color: #ffffff;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 3rem;
+                        margin: 0 auto 1.5rem auto;
+                        box-shadow: 0 10px 25px rgba(193, 117, 64, 0.35);
+                    }
+                    .ack-title {
+                        color: #1D2B32;
+                        font-weight: 800;
+                        font-size: 2rem;
+                        margin-bottom: 0.5rem;
+                        text-align: center;
+                    }
+                    .ack-subtitle {
+                        color: #726732;
+                        font-size: 1.05rem;
+                        text-align: center;
+                        margin-bottom: 2rem;
+                    }
+                    .info-box {
+                        background-color: #f8f9fa;
+                        border: 1px solid #e9ecef;
+                        border-left: 4px solid #C17540;
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        margin-bottom: 2rem;
+                    }
+                    .timeline-step {
+                        display: flex;
+                        align-items: flex-start;
+                        margin-bottom: 1rem;
+                    }
+                    .timeline-icon {
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #541718 0%, #C17540 100%);
+                        color: #ffffff;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 0.9rem;
+                        margin-right: 1rem;
+                        flex-shrink: 0;
+                    }
+                    .btn-ack-primary {
+                        background-color: #541718;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.8rem 2rem;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 12px rgba(84, 23, 24, 0.25);
+                    }
+                    .btn-ack-primary:hover {
+                        background-color: #3b0f0f;
+                        color: #ffffff;
+                        transform: translateY(-2px);
+                    }
+                    .btn-ack-outline {
+                        border: 2px solid #C17540;
+                        color: #C17540;
+                        background: transparent;
+                        font-weight: 700;
+                        padding: 0.75rem 2rem;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        transition: all 0.2s;
+                    }
+                    .btn-ack-outline:hover {
+                        background-color: #C17540;
+                        color: #ffffff;
+                        transform: translateY(-2px);
+                    }
+                </style>
 
-                                <!-- Core Value 01 -->
-                                <div class="col-lg-2 col-md-4">
-                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
-                                        <h6 class="fw-bold text-uppercase bank-text mb-2">01 Winning</h6>
-                                        <small class="text-muted">Striving for excellence and professionalism with an ethical competitive edge.</small>
-                                    </div>
+                <div class="container-fluid py-4">
+                    <div class="ack-card">
+                        <div class="ack-badge">
+                            <i class="fa fa-check"/>
+                        </div>
+                        <h2 class="ack-title">Application Submitted Successfully!</h2>
+                        <p class="ack-subtitle">
+                            Thank you, <strong><t t-esc="applicant_name"/></strong>. Your job application has been received and registered in our Recruitment Portal.
+                        </p>
+
+                        <!-- Summary Details Box -->
+                        <div class="info-box shadow-sm">
+                            <h6 class="fw-bold mb-3" style="color: #541718;"><i class="fa fa-file-text-o me-2"/>Application Summary</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <span class="text-muted small d-block">Position Applied For</span>
+                                    <strong class="text-dark"><t t-esc="vacancy.job_position.name if vacancy and vacancy.job_position else (vacancy.vacant_job_position if vacancy else 'Job Position')"/></strong>
                                 </div>
-
-                                <!-- Core Value 02 -->
-                                <div class="col-lg-2 col-md-4">
-                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
-                                        <h6 class="fw-bold text-uppercase bank-text mb-2">02 Respect</h6>
-                                        <small class="text-muted">Valuing contributions from customers, shareholders, and our community.</small>
-                                    </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted small d-block">Vacancy Reference</span>
+                                    <strong class="badge bg-secondary"><t t-esc="vacancy.reference if vacancy else 'N/A'"/></strong>
                                 </div>
-
-                                <!-- Core Value 03 -->
-                                <div class="col-lg-2 col-md-4">
-                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
-                                        <h6 class="fw-bold text-uppercase bank-text mb-2">03 Responsibility</h6>
-                                        <small class="text-muted">Acting with purpose to balance stakeholder interests and fiscal duties.</small>
-                                    </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted small d-block">Registered Email</span>
+                                    <strong class="text-dark"><t t-esc="applicant_email"/></strong>
                                 </div>
-
-                                <!-- Core Value 04 -->
-                                <div class="col-lg-2 col-md-4">
-                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
-                                        <h6 class="fw-bold text-uppercase bank-text mb-2">04 Collaboration</h6>
-                                        <small class="text-muted">Supporting our customers, regulatory bodies, and society through collective care.</small>
-                                    </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted small d-block">Application Status</span>
+                                    <span class="badge text-white px-3 py-2 fw-semibold" style="background-color: #C17540;"><i class="fa fa-clock-o me-1"/> Submitted / Initial Screening</span>
                                 </div>
-
-                                <!-- Core Value 05 -->
-                                <div class="col-lg-2 col-md-4">
-                                    <div class="p-4 bg-white rounded-4 shadow-sm h-100 card-hover border-top border-4 border-danger">
-                                        <h6 class="fw-bold text-uppercase bank-text mb-2">05 Innovation</h6>
-                                        <small class="text-muted">Relentlessly pursuing groundbreaking ideas to shape the future of banking.</small>
-                                    </div>
-                                </div>
-
                             </div>
+                        </div>
+
+                        <!-- What Happens Next Section -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold mb-3" style="color: #1D2B32;"><i class="fa fa-map-signs me-2"/>What Happens Next?</h6>
+                            <div class="timeline-step">
+                                <div class="timeline-icon">1</div>
+                                <div>
+                                    <strong class="d-block text-dark small">Document Screening &amp; Shortlisting</strong>
+                                    <span class="text-muted small">Our HR Recruitment team will evaluate your Master Profile, Experience, and Education against position requirements.</span>
+                                </div>
+                            </div>
+                            <div class="timeline-step">
+                                <div class="timeline-icon">2</div>
+                                <div>
+                                    <strong class="d-block text-dark small">Exam / Interview Notification</strong>
+                                    <span class="text-muted small">Shortlisted candidates will be notified via email (<strong><t t-esc="applicant_email"/></strong>) and SMS regarding interview dates.</span>
+                                </div>
+                            </div>
+                            <div class="timeline-step">
+                                <div class="timeline-icon">3</div>
+                                <div>
+                                    <strong class="d-block text-dark small">Track Status Anytime</strong>
+                                    <span class="text-muted small">You can track real-time progress on your Candidate Applications Dashboard.</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex justify-content-center gap-3 pt-3 border-top">
+                            <a href="/my/candidate/applications" class="btn-ack-primary">
+                                <i class="fa fa-dashboard me-2"/> My Applications Dashboard
+                            </a>
+                            <a href="/jobs" class="btn-ack-outline">
+                                <i class="fa fa-briefcase me-2"/> View Other Vacancies
+                            </a>
                         </div>
                     </div>
                 </div>
             </t>
         </template>
 
-        <template id="jobs_coming_soon_template" name="Jobs Coming Soon">
+        <!-- CHECK APPLICATION STATUS TEMPLATE -->
+        <template id="job_application_status_template" name="Check Application Status">
             <t t-call="website.layout">
                 <style>
-                    .coming-soon-container {
-                    min-height: 70vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                    }
-                    .glass-card {
-                    background: rgba(255, 255, 255, 0.95);
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    padding: 4rem;
-                    border-radius: 2rem;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                    .status-header {
+                    background: linear-gradient(135deg, #4a1515 0%, #2b0c0c 100%);
+                    color: #ffffff;
+                    padding: 3rem 1rem;
                     text-align: center;
-                    max-width: 600px;
+                    border-bottom: 4px solid #d4af37;
                     }
-                    .animate-pulse { animation: pulse 2s infinite; }
-                    @keyframes pulse {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.6; }
-                    100% { opacity: 1; }
+                    .search-card {
+                    background: #ffffff;
+                    border-radius: 16px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+                    padding: 2.5rem;
+                    margin-top: -2rem;
+                    }
+                    .status-card {
+                    background: #ffffff;
+                    border: 1px solid #e9ecef;
+                    border-radius: 14px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+                    transition: all 0.3s ease;
+                    }
+                    .status-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
                     }
                 </style>
 
-                <div id="wrap" class="coming-soon-container">
-                    <div class="glass-card">
-                        <div class="mb-4">
-                            <i class="fa fa-briefcase fa-4x" style="color: #4a1515;"></i>
-                        </div>
-                        <h1 class="fw-bold mb-3" style="color: #4a1515;">Career Opportunities</h1>
-                        <p class="lead text-muted mb-4">We are currently refining our recruitment portal. Exciting new roles at Bunna Bank are coming soon.</p>
-                        <div class="animate-pulse">
-                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
-                                Work in Progress
-                            </span>
-                        </div>
-                        <div class="mt-5">
-                            <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
-                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
-                            </a>
+                <div class="status-header">
+                    <div class="container">
+                        <h1 class="fw-bold display-5 mb-2"><i class="fa fa-search me-3"></i>Track Application Status
+                        </h1>
+                        <p class="lead mb-0 text-white-50">Enter your registered email address below to view the
+                            real-time status of your job applications.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="container mb-5">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-8">
+                            <div class="search-card mb-4">
+                                <t t-if="error_message">
+                                    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                                        <i class="fa fa-exclamation-triangle me-2"></i>
+                                        <strong t-esc="error_message"/>
+                                    </div>
+                                </t>
+
+                                <form action="/jobs/status" method="POST" class="row g-3">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <div class="col-md-9">
+                                        <label class="form-label fw-bold">Email Address
+                                            <span class="text-danger">*</span>
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-light">
+                                                <i class="fa fa-envelope text-muted"></i>
+                                            </span>
+                                            <input type="email" name="email" class="form-control form-control-lg"
+                                                   placeholder="Enter your Gmail address (e.g. name@gmail.com)"
+                                                   t-att-value="email or ''" required="1"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold"
+                                                style="background-color: #4a1515; border-color: #4a1515;">
+                                            Check Status
+                                            <i class="fa fa-arrow-right ms-1"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <t t-if="searched">
+                                <t t-if="applications">
+                                    <div class="mb-4">
+                                        <h4 class="fw-bold" style="color: #4a1515;">
+                                            <i class="fa fa-list-alt me-2"></i>
+                                            Applications Found (<t t-esc="len(applications)"/>)
+                                        </h4>
+                                    </div>
+
+                                    <t t-foreach="applications" t-as="app">
+                                        <div class="status-card p-4 mb-4">
+                                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 pb-3 border-bottom">
+                                                <div>
+                                                    <span class="badge bg-secondary px-3 py-2 me-2">
+                                                        Ref:
+                                                        <t t-esc="app['vacancy_ref']"/>
+                                                    </span>
+                                                    <h4 class="fw-bold mt-2 mb-1" style="color: #4a1515;">
+                                                        <t t-esc="app['job_title']"/>
+                                                    </h4>
+                                                    <small class="text-muted">
+                                                        Applicant:
+                                                        <strong>
+                                                            <t t-esc="app['applicant_name']"/>
+                                                        </strong>
+                                                        | Submitted On:
+                                                        <strong>
+                                                            <t t-esc="app['applied_date']"/>
+                                                        </strong>
+                                                    </small>
+                                                </div>
+                                                <div class="mt-3 mt-md-0">
+                                                    <span t-attf-class="badge #{app['status_badge']} px-3 py-2 fs-6 fw-bold">
+                                                        <i t-attf-class="fa #{app['status_icon']} me-1"></i>
+                                                        <t t-esc="app['status_title']"/>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div class="p-3 bg-light rounded d-flex align-items-start">
+                                                <i t-attf-class="fa #{app['status_icon']} fa-2x me-3 text-secondary mt-1"></i>
+                                                <div class="w-100">
+                                                    <h6 class="fw-bold mb-1" style="color: #4a1515;">Current Application
+                                                        Phase
+                                                    </h6>
+                                                    <p class="mb-2 text-muted small">
+                                                        <t t-esc="app['status_desc']"/>
+                                                    </p>
+                                                    <button class="btn btn-outline-secondary btn-sm fw-bold"
+                                                            type="button"
+                                                            t-attf-data-bs-toggle="collapse"
+                                                            t-attf-data-bs-target="#appDetails_#{app['id']}">
+                                                        <i class="fa fa-eye me-1"></i>
+                                                        View Registered Profile
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <!-- READONLY REGISTERED PROFILE DETAILS -->
+                                            <div t-attf-id="appDetails_#{app['id']}"
+                                                 class="collapse mt-3 pt-3 border-top">
+                                                <!-- 1. Personal Info -->
+                                                <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                        class="fa fa-user me-2"></i>1. Personal Information
+                                                </h6>
+                                                <div class="row g-2 mb-3 small bg-light p-3 rounded">
+                                                    <div class="col-md-6">
+                                                        <strong>Full Name:</strong>
+                                                        <t t-esc="app['applicant_name']"/>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <strong>Email:</strong>
+                                                        <t t-esc="app['applicant_email']"/>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <strong>Phone:</strong>
+                                                        <t t-esc="app['applicant_phone']"/>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <strong>Date of Birth:</strong>
+                                                        <t t-esc="app['date_of_birth'] or 'N/A'"/>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <strong>Gender:</strong>
+                                                        <t t-esc="app['gender'] or 'N/A'"/>
+                                                    </div>
+                                                </div>
+
+                                                <!-- 2. Academic Qualifications -->
+                                                <t t-if="app['education_ids']">
+                                                    <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                            class="fa fa-graduation-cap me-2"></i>2. Academic
+                                                        Qualifications
+                                                    </h6>
+                                                    <div class="table-responsive mb-3">
+                                                        <table class="table table-sm table-bordered bg-white small mb-0">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Level</th>
+                                                                    <th>Field of Study</th>
+                                                                    <th>Institution</th>
+                                                                    <th>Graduation Date</th>
+                                                                    <th>CGPA / GPA</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <t t-foreach="app['education_ids']" t-as="edu">
+                                                                    <tr>
+                                                                        <td>
+                                                                            <t t-esc="edu.level"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="edu.field_of_study"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="edu.institution_name"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="edu.graduation_date or '-'"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="'%.2f' % edu.cgpa if edu.cgpa else '-'"/>
+                                                                        </td>
+                                                                    </tr>
+                                                                </t>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </t>
+
+                                                <!-- 3. Work Experience Summary -->
+                                                <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                        class="fa fa-briefcase me-2"></i>3. Work Experience Summary
+                                                </h6>
+                                                <div class="row g-2 mb-3 small bg-light p-3 rounded">
+                                                    <div class="col-md-4">
+                                                        <strong>Total Experience:</strong>
+                                                        <t t-esc="app['total_experience']"/>
+                                                        years
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <strong>Banking Experience:</strong>
+                                                        <t t-esc="app['banking_experience']"/>
+                                                        years
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <strong>Non-Banking Experience:</strong>
+                                                        <t t-esc="app['non_banking_experience']"/>
+                                                        years
+                                                    </div>
+                                                </div>
+
+                                                <!-- 4. Work History -->
+                                                <t t-if="app['work_history_ids']">
+                                                    <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                            class="fa fa-building me-2"></i>4. Work History
+                                                    </h6>
+                                                    <div class="table-responsive mb-3">
+                                                        <table class="table table-sm table-bordered bg-white small mb-0">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Company / Employer</th>
+                                                                    <th>Job Title</th>
+                                                                    <th>Employment Type</th>
+                                                                    <th>Period</th>
+                                                                    <th>Responsibilities</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <t t-foreach="app['work_history_ids']" t-as="wh">
+                                                                    <tr>
+                                                                        <td>
+                                                                            <strong>
+                                                                                <t t-esc="wh.company_name"/>
+                                                                            </strong>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="wh.job_title or '-'"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="wh.employment_type or '-'"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="wh.start_date or '-'"/>
+                                                                            to
+                                                                            <t t-if="wh.is_current">Present</t>
+                                                                            <t t-else="">
+                                                                                <t t-esc="wh.end_date or '-'"/>
+                                                                            </t>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="wh.responsibilities or '-'"/>
+                                                                        </td>
+                                                                    </tr>
+                                                                </t>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </t>
+
+                                                <!-- 5. Additional Preferences -->
+                                                <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                        class="fa fa-info-circle me-2"></i>5. Additional Preferences
+                                                </h6>
+                                                <div class="row g-2 mb-3 small bg-light p-3 rounded">
+                                                    <div class="col-md-6">
+                                                        <strong>Join Immediately:</strong>
+                                                        <t t-esc="app['join_immediately']"/>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <strong>Ex-Bunna Employee:</strong>
+                                                        <t t-esc="app['ex_bunna']"/>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <strong>Current Salary:</strong>
+                                                        <t t-esc="app['current_salary'] and 'Birr %.2f' % app['current_salary'] or '-'"/>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <strong>Expected Salary:</strong>
+                                                        <t t-esc="app['expected_salary'] and 'Birr %.2f' % app['expected_salary'] or '-'"/>
+                                                    </div>
+                                                </div>
+
+                                                <!-- 6. Certifications -->
+                                                <t t-if="app['certification_ids']">
+                                                    <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                            class="fa fa-certificate me-2"></i>6. Certifications &amp;
+                                                        Licenses
+                                                    </h6>
+                                                    <div class="table-responsive mb-3">
+                                                        <table class="table table-sm table-bordered bg-white small mb-0">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Certification Name</th>
+                                                                    <th>Issuing Body</th>
+                                                                    <th>Issue Date</th>
+                                                                    <th>Expiry Date</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <t t-foreach="app['certification_ids']" t-as="crt">
+                                                                    <tr>
+                                                                        <td>
+                                                                            <strong>
+                                                                                <t t-esc="crt.name"/>
+                                                                            </strong>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="crt.issuing_institution or '-'"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-esc="crt.issue_date or '-'"/>
+                                                                        </td>
+                                                                        <td>
+                                                                            <t t-if="crt.has_expiry and crt.expiry_date">
+                                                                                <span t-attf-class="badge #{'bg-danger' if crt.is_expired else 'bg-success'}">
+                                                                                    <t t-esc="crt.expiry_date"/>
+                                                                                </span>
+                                                                            </t>
+                                                                            <t t-else="">Lifetime</t>
+                                                                        </td>
+                                                                    </tr>
+                                                                </t>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </t>
+
+
+                                                <!-- 8. Languages -->
+                                                <t t-if="app['language_ids']">
+                                                    <h6 class="fw-bold mb-2" style="color: #4a1515;"><i
+                                                            class="fa fa-language me-2"></i>8. Languages
+                                                    </h6>
+                                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                                        <t t-foreach="app['language_ids']" t-as="lng">
+                                                            <span class="badge bg-light text-dark border p-2">
+                                                                <i class="fa fa-comments me-1"></i>
+                                                                <strong>
+                                                                    <t t-esc="lng.language"/>
+                                                                </strong>
+                                                                :
+                                                                <t t-esc="lng.proficiency"/>
+                                                            </span>
+                                                        </t>
+                                                    </div>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </t>
+                                <t t-else="">
+                                    <div class="card p-5 text-center shadow-sm rounded-4 border-0">
+                                        <div class="mb-3">
+                                            <i class="fa fa-folder-open-o fa-4x text-muted"></i>
+                                        </div>
+                                        <h4 class="fw-bold" style="color: #4a1515;">No Applications Found</h4>
+                                        <p class="text-muted mb-4">
+                                            No job applications were found for email address
+                                            <strong>
+                                                <t t-esc="email"/>
+                                            </strong>
+                                            . Please verify that you entered the same Gmail address used during your
+                                            application.
+                                        </p>
+                                        <div>
+                                            <a href="/jobs" class="btn btn-primary px-4 py-2 fw-bold"
+                                               style="background-color: #4a1515; border-color: #4a1515;">
+                                                Explore Vacancies &amp; Apply
+                                            </a>
+                                        </div>
+                                    </div>
+                                </t>
+                            </t>
+
+                            <div class="mt-4 text-center">
+                                <a href="/jobs" class="text-decoration-none fw-bold" style="color: #4a1515;">
+                                    <i class="fa fa-arrow-left me-1"></i>
+                                    Return to All Vacancies
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -324,15 +1334,19 @@
                             <i class="fa fa-graduation-cap fa-4x" style="color: #4a1515;"></i>
                         </div>
                         <h1 class="fw-bold mb-3" style="color: #4a1515;">Learning Academy</h1>
-                        <p class="lead text-muted mb-4">Our professional development and internal training courses are being curated for you. Coming soon.</p>
+                        <p class="lead text-muted mb-4">Our professional development and internal training courses are
+                            being curated for you. Coming soon.
+                        </p>
                         <div class="animate-pulse">
-                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
+                            <span class="badge rounded-pill bg-danger px-4 py-2"
+                                  style="background-color: #4a1515 !important;">
                                 Preparing Content
                             </span>
                         </div>
                         <div class="mt-5">
                             <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
-                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
+                                <i class="fa fa-arrow-left me-2"></i>
+                                Return to Portal
                             </a>
                         </div>
                     </div>
@@ -375,15 +1389,19 @@
                             <i class="fa fa-gavel fa-4x" style="color: #4a1515;"></i>
                         </div>
                         <h1 class="fw-bold mb-3" style="color: #4a1515;">Tender Portal</h1>
-                        <p class="lead text-muted mb-4">We are setting up our digital bidding and procurement system. New tender announcements will be published here shortly.</p>
+                        <p class="lead text-muted mb-4">We are setting up our digital bidding and procurement system.
+                            New tender announcements will be published here shortly.
+                        </p>
                         <div class="animate-pulse">
-                            <span class="badge rounded-pill bg-danger px-4 py-2" style="background-color: #4a1515 !important;">
+                            <span class="badge rounded-pill bg-danger px-4 py-2"
+                                  style="background-color: #4a1515 !important;">
                                 System Integration
                             </span>
                         </div>
                         <div class="mt-5">
                             <a href="/" class="text-decoration-none" style="color: #4a1515; font-weight: 600;">
-                                <i class="fa fa-arrow-left me-2"></i> Return to Portal
+                                <i class="fa fa-arrow-left me-2"></i>
+                                Return to Portal
                             </a>
                         </div>
                     </div>
@@ -403,14 +1421,18 @@
                 <div id="wrap" class="py-5 bg-light">
                     <div class="container">
                         <h2 class="fw-bold mb-4" style="color: #4a1515;">Policies and Documents</h2>
-                        <p class="mb-5 text-muted">Access official bank policies, employee guidelines, and regulatory documentation.</p>
+                        <p class="mb-5 text-muted">Access official bank policies, employee guidelines, and regulatory
+                            documentation.
+                        </p>
 
                         <div class="row">
                             <div class="col-lg-8 mx-auto">
                                 <!-- Document Item 1 -->
                                 <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
                                     <div class="d-flex align-items-center">
-                                        <div class="icon-box"><i class="fa fa-file-pdf-o fa-2x"></i></div>
+                                        <div class="icon-box">
+                                            <i class="fa fa-file-pdf-o fa-2x"></i>
+                                        </div>
                                         <div>
                                             <h5 class="mb-1">HR Policy Handbook 2026</h5>
                                             <small class="text-muted">Updated: June 2026 | PDF (2.4 MB)</small>
@@ -422,7 +1444,9 @@
                                 <!-- Document Item 2 -->
                                 <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
                                     <div class="d-flex align-items-center">
-                                        <div class="icon-box"><i class="fa fa-file-word-o fa-2x"></i></div>
+                                        <div class="icon-box">
+                                            <i class="fa fa-file-word-o fa-2x"></i>
+                                        </div>
                                         <div>
                                             <h5 class="mb-1">Code of Conduct</h5>
                                             <small class="text-muted">Updated: January 2026 | Word (1.1 MB)</small>
@@ -434,7 +1458,9 @@
                                 <!-- Document Item 3 -->
                                 <div class="bg-white p-4 mb-3 rounded-3 shadow-sm policy-card d-flex align-items-center justify-content-between">
                                     <div class="d-flex align-items-center">
-                                        <div class="icon-box"><i class="fa fa-file-excel-o fa-2x"></i></div>
+                                        <div class="icon-box">
+                                            <i class="fa fa-file-excel-o fa-2x"></i>
+                                        </div>
                                         <div>
                                             <h5 class="mb-1">Expense Claim Form</h5>
                                             <small class="text-muted">Updated: May 2026 | Excel (0.5 MB)</small>
@@ -464,19 +1490,25 @@
                         <div class="row justify-content-center">
                             <div class="col-lg-8">
                                 <h2 class="fw-bold mb-4 faq-header text-center">Frequently Asked Questions</h2>
-                                <p class="text-center text-muted mb-5">Find answers to common inquiries regarding bank internal services and IT operations.</p>
+                                <p class="text-center text-muted mb-5">Find answers to common inquiries regarding bank
+                                    internal services and IT operations.
+                                </p>
 
                                 <div class="accordion" id="faqAccordion">
                                     <!-- Q1 -->
                                     <div class="accordion-item shadow-sm">
                                         <h2 class="accordion-header">
-                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#q1">
+                                            <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                                    data-bs-target="#q1">
                                                 How do I report a system outage?
                                             </button>
                                         </h2>
-                                        <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                        <div id="q1" class="accordion-collapse collapse show"
+                                             data-bs-parent="#faqAccordion">
                                             <div class="accordion-body text-muted">
-                                                Please contact the IT Helpdesk immediately via your internal dashboard or by calling the extension 9030. Provide your terminal ID and a screenshot of the error.
+                                                Please contact the IT Helpdesk immediately via your internal dashboard
+                                                or by calling the extension 9030. Provide your terminal ID and a
+                                                screenshot of the error.
                                             </div>
                                         </div>
                                     </div>
@@ -484,13 +1516,16 @@
                                     <!-- Q2 -->
                                     <div class="accordion-item shadow-sm">
                                         <h2 class="accordion-header">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q2">
+                                            <button class="accordion-button collapsed" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#q2">
                                                 When will the Odoo 19 migration be complete?
                                             </button>
                                         </h2>
                                         <div id="q2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                             <div class="accordion-body text-muted">
-                                                The migration is currently in the validation phase. We expect full implementation by the end of Q3 2026. Updates will be posted on the portal homepage.
+                                                The migration is currently in the validation phase. We expect full
+                                                implementation by the end of Q3 2026. Updates will be posted on the
+                                                portal homepage.
                                             </div>
                                         </div>
                                     </div>
@@ -498,13 +1533,15 @@
                                     <!-- Q3 -->
                                     <div class="accordion-item shadow-sm">
                                         <h2 class="accordion-header">
-                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q3">
+                                            <button class="accordion-button collapsed" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#q3">
                                                 How do I access my payroll documents?
                                             </button>
                                         </h2>
                                         <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
                                             <div class="accordion-body text-muted">
-                                                Payroll slips are available through the "Employee Services" dropdown in the main navigation menu under the dedicated HR portal link.
+                                                Payroll slips are available through the "Employee Services" dropdown in
+                                                the main navigation menu under the dedicated HR portal link.
                                             </div>
                                         </div>
                                     </div>
@@ -610,53 +1647,944 @@
 
         <template id="custom_corporate_footer" inherit_id="website.layout" name="Bunna Custom Corporate Footer">
             <xpath expr="//footer" position="replace">
-                <footer t-if="request.env.user._is_public() or request.httprequest.path == '/web/login'" class="bg-dark text-white pt-3" style="background-color: #1d2b32 !important;">
-                    <div class="container mb-1">
-                        <div class="row">
-                            <div class="col-md-3 mb-1">
-                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">Useful Links</h6>
-                                <ul class="list-unstyled text-white-50 small">
-                                    <li class="mb-1"><a href="/" class="text-white text-decoration-none opacity-75">Home</a></li>
-                                    <li class="mb-1"><a href="https://bunnabanksc.com/about-us/" class="text-white text-decoration-none opacity-75" target="_blank">About us</a></li>
-                                    <li class="mb-1"><a href="https://bunnabanksc.com/accounts/" class="text-white text-decoration-none opacity-75" target="_blank">Products and Services</a></li>
-                                    <li class="mb-1"><a href="https://onboardingportal.bunnabanksc.com/" class="text-white text-decoration-none opacity-75" target="_blank">Bunna Onboarding</a></li>
-                                    <li class="mb-1"><a href="https://bunnabanksc.com/contactus/" class="text-white text-decoration-none opacity-75" target="_blank">Contact us</a></li>
-                                </ul>
-                            </div>
-
-                            <div class="col-md-5 mb-1">
-                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">About us</h6>
-                                <p class="small text-white-50 lh-sm" style="opacity: 0.85; font-size: 0.85rem;">
-                                    Bunna Bank S.C. is one of Ethiopia's prominent private commercial banks, established in 2009. It operates a network of nearly 450 branches across the country.
-                                </p>
-                            </div>
-
-                            <div class="col-md-4 mb-1">
-                                <h6 class="text-uppercase mb-2 font-weight-bold" style="letter-spacing: 1px; font-size: 0.9rem;">Connect with us</h6>
-                                <p class="mb-1 fw-semibold small">Contact us</p>
-                                <ul class="list-unstyled text-white-50 small">
-                                    <li class="mb-1 d-flex align-items-center">
-                                        <i class="fa fa-envelope me-2 text-white"></i>
-                                        <a href="mailto:info@bunnabanksc.com" class="text-white text-decoration-none">info@bunnabanksc.com</a>
-                                    </li>
-                                    <li class="mb-1 d-flex align-items-center">
-                                        <i class="fa fa-phone me-2 text-white"></i>
-                                        <a href="tel:+251918979030" class="text-white text-decoration-none">+251 918 979 030</a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="footer_copyright" class="o_footer_copyright py-1" style="background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255,255,255,0.1);">
-                        <div class="container text-center">
-                            <p class="mb-0 small text-white-50" style="font-size: 0.75rem;">
-                                © 2026 Bunna Bank Share Company. All rights reserved.
-                            </p>
+                <footer t-if="request.env.user._is_public() or request.httprequest.path == '/web/login'"
+                        class="bunna-compact-footer text-white">
+                    <style>
+                        .bunna-compact-footer {
+                            background-color: #1d2b32 !important;
+                            border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+                            flex-shrink: 0 !important;
+                            padding: 8px 0 !important;
+                        }
+                    </style>
+                    <div class="container text-center">
+                        <div style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); line-height: 1.2;">
+                            &#169; 2026 Bunna Bank Share Company. All rights reserved.
                         </div>
                     </div>
                 </footer>
             </xpath>
+        </template>
+    
+        <!-- ATS Minimal Layout (Bypasses Odoo default website elements) -->
+        <template id="minimal_layout" name="ATS Minimal Layout">
+            &lt;!DOCTYPE html&gt;
+            <html lang="en">
+                <head>
+                    <title>Bunna Bank - Application Tracking System</title>
+                    <meta charset="utf-8"/>
+                    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                    <!-- CDN Bootstrap & FontAwesome -->
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
+                    <style>
+                        body {
+                            background-color: #f8fafc;
+                            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            color: #1D2B32;
+                            margin: 0;
+                            padding: 0;
+                            min-height: 100vh;
+                            display: flex;
+                            flex-direction: column;
+                        }
+                        .bunna-header {
+                            background-color: #1D2B32; /* Corporate Dark Blue */
+                            border-bottom: 4px solid #726732; /* Gold */
+                            padding: 1.2rem 2rem;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            color: #ffffff;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                        }
+                        .bunna-header-left {
+                            display: flex;
+                            align-items: center;
+                        }
+                        .bunna-logo {
+                            height: 42px;
+                            border-radius: 4px;
+                        }
+                        .bunna-title {
+                            font-size: 1.4rem;
+                            font-weight: 700;
+                            margin-left: 1rem;
+                            border-left: 2px solid rgba(255,255,255,0.3);
+                            padding-left: 1rem;
+                            color: #ffffff;
+                            letter-spacing: 0.5px;
+                        }
+                        .bunna-dropdown-btn {
+                            background: transparent;
+                            color: #ffffff;
+                            border: 1px solid rgba(255,255,255,0.4);
+                            padding: 0.55rem 1.3rem;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            text-decoration: none;
+                            transition: all 0.2s;
+                        }
+                        .bunna-dropdown-btn:hover {
+                            background-color: #ffffff;
+                            color: #1D2B32;
+                            border-color: #ffffff;
+                        }
+                        .main-content {
+                            flex: 1;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 3rem 1.5rem;
+                            background: radial-gradient(circle at 10% 20%, rgba(244, 246, 248, 1) 0%, rgba(225, 230, 235, 0.7) 100%);
+                        }
+                        .form-label-custom {
+                            font-weight: 600;
+                            color: #1D2B32;
+                            margin-bottom: 0.4rem;
+                            font-size: 0.9rem;
+                        }
+                        .form-control-custom {
+                            background-color: #f8fafc;
+                            border: 1.5px solid #e2e8f0;
+                            padding: 0.7rem 1rem;
+                            border-radius: 8px;
+                            font-size: 0.95rem;
+                            transition: all 0.2s;
+                        }
+                        .form-control-custom:focus {
+                            background-color: #ffffff;
+                            border-color: #C17540;
+                            box-shadow: 0 0 0 3px rgba(193, 117, 64, 0.15);
+                            outline: none;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- HEADER -->
+                    <header class="bunna-header">
+                        <div class="bunna-header-left">
+                            <img src="/bunna_custom_web_page/static/src/img/bunna_logo.jpg" class="bunna-logo" alt="Bunna Bank"/>
+                            <span class="bunna-title">Application Tracking System</span>
+                        </div>
+                        <div class="bunna-header-right">
+                            <a href="/jobs/login" class="bunna-dropdown-btn">Login to Apply</a>
+                        </div>
+                    </header>
+
+                    <!-- BODY -->
+                    <div class="main-content">
+                        <t t-out="0"/>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <footer class="text-center py-4 text-muted border-top bg-white" style="font-size: 0.85rem; letter-spacing: 0.3px;">
+                        Copyright &amp;copy; 2026 <strong style="color: #561818;">Bunna Bank Share Company</strong>. All Rights Reserved.
+                    </footer>
+                </body>
+            </html>
+        </template>
+
+        <!-- Landing Page (Image 1) -->
+        <template id="jobs_landing_page" name="Career Opportunities Landing">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .landing-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 680px;
+                        width: 100%;
+                        padding: 4rem 3rem;
+                        text-align: center;
+                        border-top: 6px solid #726732; /* Gold accent */
+                        transition: transform 0.3s;
+                    }
+                    .landing-card:hover {
+                        transform: translateY(-5px);
+                    }
+                    .landing-title {
+                        color: #1D2B32;
+                        font-weight: 800;
+                        font-size: 1.6rem;
+                        margin-bottom: 2.2rem;
+                        line-height: 1.4;
+                    }
+                    .btn-landing-primary {
+                        background-color: #C17540; /* Orange/Terracotta */
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.95rem 2.8rem;
+                        border-radius: 8px;
+                        transition: all 0.2s;
+                        text-decoration: none;
+                        display: inline-block;
+                        box-shadow: 0 4px 14px rgba(193, 117, 64, 0.3);
+                    }
+                    .btn-landing-primary:hover {
+                        background-color: #a45e2f;
+                        color: #ffffff;
+                        transform: translateY(-2px);
+                    }
+                </style>
+                <div class="landing-card">
+                    <h4 class="landing-title">Select below link to apply as an external applicant.</h4>
+                    <div class="mt-4">
+                        <a href="/jobs/login" class="btn-landing-primary">External Applicants</a>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- Login Page (Image 2) -->
+        <template id="jobs_login_template" name="ATS Candidate Login">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .login-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 450px;
+                        width: 100%;
+                        padding: 3rem 2.5rem;
+                        border-top: 6px solid #561818;
+                    }
+                    .login-title {
+                        color: #1D2B32;
+                        font-weight: 800;
+                        margin-bottom: 0.5rem;
+                        text-align: center;
+                        font-size: 1.8rem;
+                    }
+                    .login-subtitle {
+                        color: #726732;
+                        font-size: 0.95rem;
+                        text-align: center;
+                        margin-bottom: 2rem;
+                        font-weight: 500;
+                    }
+                    .form-control-login {
+                        height: 50px;
+                        border-radius: 8px;
+                        border: 1.5px solid #e5e7eb;
+                    }
+                    .form-control-login:focus {
+                        border-color: #C17540;
+                        box-shadow: 0 0 0 0.2rem rgba(193, 117, 64, 0.15);
+                    }
+                    .btn-signin {
+                        background-color: #561818;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        height: 50px;
+                        border-radius: 8px;
+                        width: 100%;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 14px rgba(86, 24, 24, 0.3);
+                    }
+                    .btn-signin:hover {
+                        background-color: #3b0f0f;
+                        color: #ffffff;
+                        transform: translateY(-1px);
+                    }
+                </style>
+
+                <div class="login-card">
+                    <h3 class="login-title">Sign In</h3>
+                    <p class="login-subtitle">Bunna Bank Application Tracking System</p>
+
+                    <t t-if="registered == 1">
+                        <div class="alert alert-success mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-check-circle me-2 fs-5"/> Account created successfully! Please sign in with your email address.
+                        </div>
+                    </t>
+
+                    <t t-if="activated == 1">
+                        <div class="alert alert-success mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-check-circle me-2 fs-5"/> Email verified successfully! You can now log in.
+                        </div>
+                    </t>
+
+                    <t t-if="error">
+                        <div class="alert alert-danger mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-exclamation-triangle me-2 fs-5"/> <t t-esc="error"/>
+                        </div>
+                    </t>
+
+                    <form action="/jobs/login/submit" method="POST">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        
+                        <div class="mb-4">
+                            <label class="form-label-custom">Official Email Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-envelope-o"/></span>
+                                <input type="email" name="email" class="form-control form-control-custom form-control-login" placeholder="candidate@domain.com" required="1" t-att-value="email"/>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label-custom">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fa fa-lock"/></span>
+                                <input type="password" name="password" class="form-control form-control-custom form-control-login" placeholder="••••••••" required="1"/>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-signin mb-4">Sign In</button>
+
+                        <div class="d-flex justify-content-between small mb-4">
+                            <a href="/jobs/forgot_password" class="text-decoration-none text-muted fw-semibold">Forgot Password?</a>
+                            <a href="/jobs/register" class="text-decoration-none fw-bold" style="color: #C17540;">Create Account</a>
+                        </div>
+                    </form>
+                </div>
+            </t>
+        </template>
+<!-- Register Page (Image 3) -->
+        <template id="jobs_register_template" name="ATS Candidate Registration">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .register-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 600px;
+                        width: 100%;
+                        padding: 3rem 2.5rem;
+                        border-top: 6px solid #561818; /* Burgundy top border */
+                    }
+                    .register-title {
+                        color: #1D2B32;
+                        font-weight: 800;
+                        margin-bottom: 0.5rem;
+                        text-align: center;
+                        font-size: 1.7rem;
+                    }
+                    .register-subtitle {
+                        color: #726732;
+                        font-size: 1rem;
+                        text-align: center;
+                        margin-bottom: 2.5rem;
+                        font-weight: 500;
+                    }
+                    .btn-register {
+                        background-color: #561818;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.9rem;
+                        border-radius: 8px;
+                        width: 100%;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 14px rgba(86, 24, 24, 0.3);
+                    }
+                    .btn-register:hover {
+                        background-color: #3b0f0f;
+                        color: #ffffff;
+                        transform: translateY(-1px);
+                    }
+                </style>
+                <div class="register-card">
+                    <h4 class="register-title">Create Your Account</h4>
+                    <p class="register-subtitle">Get started with Bunna Bank careers</p>
+
+                    <t t-if="error">
+                        <div class="alert alert-danger mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-exclamation-triangle me-2 fs-5"/> <t t-esc="error"/>
+                        </div>
+                    </t>
+
+                    <form action="/jobs/register/submit" method="POST">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label-custom">First Name</label>
+                                <input type="text" name="first_name" class="form-control form-control-custom" placeholder="e.g. Abebe" required="1" t-att-value="first_name"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-custom">Middle Name</label>
+                                <input type="text" name="middle_name" class="form-control form-control-custom" placeholder="e.g. Yonas" required="1" t-att-value="middle_name"/>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-custom">Last Name</label>
+                                <input type="text" name="last_name" class="form-control form-control-custom" placeholder="e.g. Desta" required="1" t-att-value="last_name"/>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" name="email" class="form-control form-control-custom" placeholder="e.g. candidate@gmail.com" required="1" t-att-value="email"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Phone Number <span class="text-danger">*</span></label>
+                                <input type="tel" name="phone" class="form-control form-control-custom" placeholder="e.g. 0911002233" required="1" t-att-value="phone"/>
+                            </div>
+                        </div>
+
+
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Password</label>
+                                <input type="password" name="password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-custom">Confirm Password</label>
+                                <input type="password" name="confirm_password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-register mb-4">Create Account</button>
+
+                        <p class="text-center small text-muted mb-0 fw-semibold">
+                            Already have an account? <a href="/jobs/login" class="fw-bold text-decoration-none" style="color: #561818;">Login</a>
+                        </p>
+                    </form>
+                </div>
+            </t>
+        </template>
+
+        <!-- Register Success (Image 4) -->
+        <template id="jobs_register_success_template" name="Registration Successful">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .success-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 540px;
+                        width: 100%;
+                        padding: 4rem 3rem;
+                        text-align: center;
+                        border-top: 6px solid #385721; /* Forest green top border */
+                    }
+                    .success-icon {
+                        color: #385721;
+                        font-size: 4.5rem;
+                        margin-bottom: 1.5rem;
+                    }
+                    .success-title {
+                        color: #1D2B32;
+                        font-weight: 800;
+                        margin-bottom: 1rem;
+                    }
+                    .success-text {
+                        color: #726732;
+                        font-size: 1rem;
+                        line-height: 1.7;
+                        margin-bottom: 2.5rem;
+                        font-weight: 500;
+                    }
+                    .btn-proceed {
+                        background-color: #385721;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.95rem 3rem;
+                        border-radius: 8px;
+                        transition: all 0.2s;
+                        text-decoration: none;
+                        display: inline-block;
+                        box-shadow: 0 4px 14px rgba(56, 87, 33, 0.3);
+                    }
+                    .btn-proceed:hover {
+                        background-color: #263d16;
+                        color: #ffffff;
+                        transform: translateY(-2px);
+                    }
+                </style>
+                <div class="success-card">
+                    <div class="success-icon"><i class="fa fa-check-circle"/></div>
+                    <h3 class="success-title">Registration Successful!</h3>
+                    <p class="success-text">
+                        Your account has been created successfully.<br/>
+                        A verification link has been sent to your email address. Please check your inbox and click the verification link to activate your account.
+                    </p>
+                    <a href="/jobs/login" class="btn-proceed">Proceed to Login</a>
+                </div>
+            </t>
+        </template>
+    
+        <!-- ATS Dashboard Layout (Branded sidebar framework for logged-in users) -->
+        <template id="dashboard_layout" name="ATS Dashboard Layout">
+            &lt;!DOCTYPE html&gt;
+            <html lang="en">
+                <head>
+                    <title>Bunna Bank - Application Tracking System</title>
+                    <meta charset="utf-8"/>
+                    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+                    <meta http-equiv="Pragma" content="no-cache"/>
+                    <meta http-equiv="Expires" content="0"/>
+                    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
+                    <style>
+                        body {
+                            background-color: #f3f4f6;
+                            font-family: 'Inter', sans-serif;
+                            margin: 0;
+                            padding: 0;
+                            min-height: 100vh;
+                        }
+                        /* Sidebar */
+                        .ats-sidebar {
+                            background-color: #1D2B32; /* Corporate Dark Blue */
+                            min-height: 100vh;
+                            width: 250px;
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            color: #ffffff;
+                            padding-top: 1.5rem;
+                            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+                            z-index: 100;
+                            transition: width 0.3s ease-in-out;
+                            overflow-x: hidden;
+                        }
+                        .ats-sidebar-brand {
+                            padding: 0 1.5rem 1.5rem 1.5rem;
+                            border-bottom: 1px solid rgba(255,255,255,0.1);
+                            margin-bottom: 1rem;
+                            display: flex;
+                            align-items: center;
+                            white-space: nowrap;
+                        }
+                        .ats-sidebar-logo {
+                            height: 35px;
+                        }
+                        .ats-sidebar-title {
+                            font-size: 0.95rem;
+                            font-weight: 700;
+                            margin-left: 0.5rem;
+                            color: #C17540;
+                        }
+                        .ats-nav-item {
+                            padding: 0.85rem 1.5rem;
+                            color: rgba(255,255,255,0.75);
+                            text-decoration: none;
+                            display: flex;
+                            align-items: center;
+                            font-size: 0.95rem;
+                            font-weight: 500;
+                            transition: all 0.2s;
+                            cursor: pointer;
+                            white-space: nowrap;
+                        }
+                        .ats-nav-item:hover {
+                            background-color: rgba(255,255,255,0.05);
+                            color: #ffffff;
+                        }
+                        .ats-nav-item.active {
+                            background-color: #541718; /* Burgundy active highlight */
+                            color: #ffffff !important;
+                            border-left: 4px solid #C17540;
+                        }
+                        .nav-icon {
+                            width: 20px;
+                            text-align: center;
+                            margin-right: 0.75rem;
+                            font-size: 1rem;
+                        }
+                        .ats-nav-sub {
+                            padding-left: 1rem;
+                            background-color: rgba(0,0,0,0.15);
+                            transition: all 0.3s ease;
+                        }
+
+                        /* COMPACT ICON-ONLY SIDEBAR WHEN 3 LINES BUTTON IS CLICKED */
+                        body.sidebar-collapsed .ats-sidebar {
+                            width: 70px !important;
+                        }
+                        body.sidebar-collapsed .ats-main {
+                            margin-left: 70px !important;
+                        }
+                        body.sidebar-collapsed .ats-sidebar-title {
+                            display: none !important;
+                        }
+                        body.sidebar-collapsed .ats-sidebar-brand {
+                            padding: 0 0.8rem 1rem 0.8rem !important;
+                            justify-content: center;
+                        }
+                        body.sidebar-collapsed .ats-nav-text {
+                            display: none !important;
+                        }
+                        body.sidebar-collapsed .nav-arrow {
+                            display: none !important;
+                        }
+                        body.sidebar-collapsed .ats-nav-sub {
+                            display: none !important;
+                        }
+                        body.sidebar-collapsed .ats-nav-item {
+                            padding: 1rem 0 !important;
+                            justify-content: center;
+                        }
+                        body.sidebar-collapsed .nav-icon {
+                            margin-right: 0 !important;
+                            font-size: 1.25rem !important;
+                        }
+
+                        /* Main Area */
+                        .ats-main {
+                            margin-left: 250px;
+                            min-height: 100vh;
+                            display: flex;
+                            flex-direction: column;
+                            transition: margin-left 0.3s ease-in-out;
+                        }
+                        .ats-navbar {
+                            background-color: #ffffff;
+                            height: 60px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 0 2rem;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+                        }
+                        .ats-navbar-title {
+                            font-weight: 600;
+                            color: #1D2B32;
+                        }
+                        .ats-navbar-user {
+                            color: #726732;
+                            font-weight: 600;
+                            font-size: 0.9rem;
+                        }
+                        .ats-content {
+                            flex: 1;
+                            padding: 2rem;
+                        }
+                        .btn-hamburger {
+                            background: transparent;
+                            border: none;
+                            color: #1D2B32;
+                            font-size: 1.3rem;
+                            cursor: pointer;
+                            padding: 0.25rem 0.5rem;
+                            border-radius: 4px;
+                            transition: background-color 0.2s;
+                        }
+                        .btn-hamburger:hover {
+                            background-color: #f3f4f6;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Determine Profile Completion Status -->
+                    <t t-set="cand" t-value="candidate if candidate else request.env['candidate.profile'].sudo().search([('partner_id', '=', request.env.user.partner_id.id)], limit=1)"/>
+                    <t t-set="is_admin_user" t-value="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('base.group_system') or request.env.user.has_group('base.group_erp_manager')"/>
+                    <t t-set="is_profile_complete" t-value="is_admin_user or bool(cand and cand.cv_file and cand.education_ids and cand.experience_ids)"/>
+
+                    <!-- SIDEBAR -->
+                    <div class="ats-sidebar" id="ats-sidebar">
+                        <div class="ats-sidebar-brand">
+                            <img src="/bunna_custom_web_page/static/src/img/bunna_logo.jpg" class="ats-sidebar-logo" alt="Bunna Logo"/>
+                            <span class="ats-sidebar-title">Bunna ATS</span>
+                        </div>
+
+                        <!-- Full Navigation ONLY visible when Profile is 100% Completed -->
+                        <t t-if="is_profile_complete">
+                            <!-- 1. Dashboard Menu -->
+                            <a href="/my/candidate/dashboard" t-attf-class="ats-nav-item #{'active' if active_tab == 'dashboard' else ''}" title="Dashboard">
+                                <i class="fa fa-dashboard nav-icon"/>
+                                <span class="ats-nav-text">Dashboard</span>
+                            </a>
+
+                            <!-- 1b. News & Announcements Menu -->
+                            <a href="/my/candidate/news" t-attf-class="ats-nav-item #{'active' if active_tab == 'news' else ''}" title="News &amp; Announcements">
+                                <i class="fa fa-newspaper-o nav-icon"/>
+                                <span class="ats-nav-text">News &amp; Announcements</span>
+                            </a>
+
+                            <!-- 2. Open Vacancy Menu -->
+                            <a href="/jobs" t-attf-class="ats-nav-item #{'active' if active_tab == 'vacancy' else ''}" title="Open Vacancies">
+                                <i class="fa fa-briefcase nav-icon"/>
+                                <span class="ats-nav-text">Open Vacancies</span>
+                            </a>
+
+                            <!-- 3. Application Menu -->
+                            <a href="/my/candidate/applications" t-attf-class="ats-nav-item #{'active' if active_tab == 'application' else ''}" title="Applications">
+                                <i class="fa fa-file-text-o nav-icon"/>
+                                <span class="ats-nav-text">Applications</span>
+                            </a>
+
+                            <!-- 3b. Job Offers Menu (BRD FR-ATS: External Selected Candidates 3-Day Offer Response) -->
+                            <t t-set="cand_email_val" t-value="cand.email if cand else request.env.user.email"/>
+                            <t t-set="pending_offer_cnt" t-value="request.env['recruitment.offer.letter'].sudo().search_count([('state', '=', 'sent'), '|', ('candidate_email', '=ilike', cand_email_val), ('applicant_id.partner_id', '=', request.env.user.partner_id.id)]) if cand_email_val else 0"/>
+                            <a href="/my/candidate/offers" t-attf-class="ats-nav-item #{'active' if active_tab == 'offers' else ''}" title="Job Offers">
+                                <i class="fa fa-envelope-open-o nav-icon"/>
+                                <span class="ats-nav-text">Job Offers</span>
+                                <t t-if="pending_offer_cnt &gt; 0">
+                                    <span class="badge bg-danger rounded-pill ms-auto px-2 py-1 small" style="font-size: 0.75rem;"><t t-esc="pending_offer_cnt"/> New</span>
+                                </t>
+                            </a>
+
+                            <!-- 3c. Admin Applicants List Menu (Visible ONLY to Recruitment Administrators) -->
+                            <t t-if="request.env.user.has_group('custom_recruitment.group_recruitment_administrator') or request.env.user.has_group('custom_recruitment.group_recruitment_manager') or request.env.user.has_group('hr_recruitment.group_hr_recruitment_manager') or request.env.user.has_group('base.group_system')">
+                                <a href="/my/recruitment/applicants" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_applicants' else ''}" title="Applicants List per Vacancy">
+                                    <i class="fa fa-users nav-icon text-warning"/>
+                                    <span class="ats-nav-text">Applicants List</span>
+                                </a>
+                                <a href="/my/recruitment/candidates" t-attf-class="ats-nav-item #{'active' if active_tab == 'admin_candidates' else ''}" title="All Registered Candidate Profiles">
+                                    <i class="fa fa-id-card-o nav-icon text-info"/>
+                                    <span class="ats-nav-text">Candidate Profiles</span>
+                                </a>
+                            </t>
+                        </t>
+
+                        <!-- 4. My Profile Menu (ALWAYS VISIBLE) -->
+                        <a href="/my/candidate/profile" t-attf-class="ats-nav-item #{'active' if active_tab == 'profile' else ''}" title="My Profile">
+                            <i class="fa fa-user nav-icon"/>
+                            <span class="ats-nav-text">My Profile</span> 
+                        </a>
+
+                        <!-- 5. Settings Menu (ONLY visible when Profile is Completed) -->
+                        <t t-if="is_profile_complete">
+                            <a href="#" id="settingsToggle" t-attf-class="ats-nav-item #{'active' if active_tab == 'settings' or active_tab == 'password' else ''}" title="Settings">
+                                <i class="fa fa-cog nav-icon"/>
+                                <span class="ats-nav-text me-auto">Settings</span>
+                                <i t-attf-class="fa #{'fa-chevron-down' if active_tab in ['settings', 'password'] else 'fa-chevron-right'} nav-arrow" id="settingsChevron"/>
+                            </a>
+                            <div class="ats-nav-sub" id="settingsSubmenu" t-att-style="'display: block;' if active_tab in ['settings', 'password'] else 'display: none;'">
+                                <a href="/my/candidate/change_password" t-attf-class="ats-nav-item #{'active' if active_tab == 'password' else ''}" style="font-size: 0.85rem; padding: 0.5rem 1.5rem;" title="Change Password">
+                                    <i class="fa fa-key nav-icon"/>
+                                    <span class="ats-nav-text">Change Password</span>
+                                </a>
+                            </div>
+                        </t>
+                    </div>
+
+                    <!-- MAIN -->
+                    <div class="ats-main">
+                        <!-- NAVBAR -->
+                        <div class="ats-navbar">
+                            <div class="d-flex align-items-center">
+                                <!-- Smart Button (3 Lines Toggle) -->
+                                <button id="sidebarToggle" class="btn-hamburger me-3" title="Toggle Compact Icon-Only Sidebar">
+                                    <i class="fa fa-bars"/>
+                                </button>
+                                <span class="ats-navbar-title">Application Tracking System</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="ats-navbar-user me-3"><i class="fa fa-user-circle me-1"/> <t t-esc="cand.email if cand else request.env.user.email"/></span>
+                                <a href="/web/session/logout?redirect=/jobs" class="btn btn-sm btn-outline-danger" style="font-size: 0.8rem; font-weight: 600;"><i class="fa fa-sign-out me-1"/> Logout</a>
+                            </div>
+                        </div>
+
+                        <!-- CONTENT -->
+                        <div class="ats-content">
+                            <t t-out="0"/>
+                        </div>
+                    </div>
+
+                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+                    <script>
+                        <![CDATA[
+                        document.addEventListener('DOMContentLoaded', function() {
+                            // Smart Button (3 lines) Icon-Only Sidebar Toggle
+                            var sidebarBtn = document.getElementById('sidebarToggle');
+                            if (sidebarBtn) {
+                                sidebarBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    document.body.classList.toggle('sidebar-collapsed');
+                                });
+                            }
+
+                            // Settings Sub-menu Accordion Toggle
+                            var settingsToggle = document.getElementById('settingsToggle');
+                            var settingsSubmenu = document.getElementById('settingsSubmenu');
+                            var settingsChevron = document.getElementById('settingsChevron');
+                            if (settingsToggle && settingsSubmenu) {
+                                settingsToggle.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    if (settingsSubmenu.style.display === 'none' || settingsSubmenu.style.display === '') {
+                                        settingsSubmenu.style.display = 'block';
+                                        if (settingsChevron) settingsChevron.className = 'fa fa-chevron-down nav-arrow';
+                                    } else {
+                                        settingsSubmenu.style.display = 'none';
+                                        if (settingsChevron) settingsChevron.className = 'fa fa-chevron-right nav-arrow';
+                                    }
+                                });
+                            }
+                            // Force page reload from server if navigated back via browser Back button after logout
+                            window.addEventListener('pageshow', function (event) {
+                                if (event.persisted || (window.performance && window.performance.getEntriesByType("navigation")[0] && window.performance.getEntriesByType("navigation")[0].type === "back_forward")) {
+                                    window.location.reload();
+                                }
+                            });
+                        });
+                        ]]>
+                    </script>
+                </body>
+            </html>
+        </template><!-- Forgot Password Template -->
+        <template id="jobs_forgot_password_template" name="ATS Forgot Password">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .forgot-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 480px;
+                        width: 100%;
+                        padding: 3rem 2.5rem;
+                        border-top: 6px solid #C17540;
+                    }
+                    .btn-forgot {
+                        background-color: #C17540;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.9rem;
+                        border-radius: 8px;
+                        width: 100%;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 14px rgba(193, 117, 64, 0.3);
+                    }
+                    .btn-forgot:hover {
+                        background-color: #a45e2f;
+                        color: #ffffff;
+                    }
+                </style>
+                <div class="forgot-card">
+                    <h4 class="text-center fw-bold mb-2">Forgot Password?</h4>
+                    <p class="text-muted text-center small mb-4">Enter your registered email address below, and we will send you an email with a link to reset your password.</p>
+
+                    <t t-if="error">
+                        <div class="alert alert-danger mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-exclamation-triangle me-2 fs-5"/> <t t-esc="error"/>
+                        </div>
+                    </t>
+                    <t t-if="success_msg">
+                        <div class="alert alert-success mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-check-circle me-2 fs-5" style="color: #385721;"/> <t t-esc="success_msg"/>
+                        </div>
+                    </t>
+
+                    <form action="/jobs/forgot_password/submit" method="POST">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <div class="mb-4">
+                            <label class="form-label-custom">Email Address</label>
+                            <input type="email" name="email" class="form-control form-control-custom" placeholder="e.g. yourname@gmail.com" required="1"/>
+                        </div>
+                        <button type="submit" class="btn-forgot mb-4">Send Reset Link</button>
+                        <div class="text-center">
+                            <a href="/jobs/login" class="text-decoration-none text-muted fw-bold small"><i class="fa fa-arrow-left me-1"/> Back to Login</a>
+                        </div>
+                    </form>
+                </div>
+            </t>
+        </template>
+
+        <!-- Reset Password Template -->
+        <template id="jobs_reset_password_template" name="ATS Reset Password">
+            <t t-call="bunna_custom_web_page.minimal_layout">
+                <style>
+                    .reset-card {
+                        background: #ffffff;
+                        border-radius: 20px;
+                        box-shadow: 0 15px 35px rgba(29, 43, 50, 0.08);
+                        max-width: 480px;
+                        width: 100%;
+                        padding: 3rem 2.5rem;
+                        border-top: 6px solid #561818;
+                    }
+                    .btn-reset {
+                        background-color: #561818;
+                        color: #ffffff;
+                        border: none;
+                        font-weight: 700;
+                        padding: 0.9rem;
+                        border-radius: 8px;
+                        width: 100%;
+                        transition: all 0.2s;
+                        box-shadow: 0 4px 14px rgba(86, 24, 24, 0.3);
+                    }
+                    .btn-reset:hover {
+                        background-color: #3b0f0f;
+                        color: #ffffff;
+                    }
+                </style>
+                <div class="reset-card">
+                    <h4 class="text-center fw-bold mb-2">Reset Password</h4>
+                    <p class="text-muted text-center small mb-4">Choose a strong password for your job application account.</p>
+
+                    <t t-if="error">
+                        <div class="alert alert-danger mb-4 p-3 rounded-3 small border-0 shadow-sm d-flex align-items-center">
+                            <i class="fa fa-exclamation-triangle me-2 fs-5"/> <t t-esc="error"/>
+                        </div>
+                    </t>
+
+                    <form action="/jobs/reset_password/submit" method="POST">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="token" t-att-value="token"/>
+                        
+                        <div class="mb-3">
+                            <label class="form-label-custom">New Password</label>
+                            <input type="password" name="password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label-custom">Confirm Password</label>
+                            <input type="password" name="confirm_password" class="form-control form-control-custom" placeholder="••••••••" required="1"/>
+                        </div>
+                        <button type="submit" class="btn-reset">Reset Password</button>
+                    </form>
+                </div>
+            </t>
+        </template>
+    
+
+        <!-- CHANGE PASSWORD TEMPLATE -->
+        <template id="change_password_template" name="ATS Change Password">
+            <t t-call="bunna_custom_web_page.dashboard_layout">
+                <div class="container-fluid py-4">
+                    <div class="row justify-content-center">
+                        <div class="col-md-6 col-lg-5">
+                            <div class="card border-0 shadow-sm rounded-3">
+                                <div class="card-header bg-white py-3 border-bottom text-center">
+                                    <h5 class="fw-bold mb-0" style="color: #541718;"><i class="fa fa-key me-2"/> Change Password</h5>
+                                    <p class="text-muted small mb-0">Update your account security credentials</p>
+                                </div>
+                                <div class="card-body p-4">
+                                    <t t-if="error">
+                                        <div class="alert alert-danger alert-dismissible fade show small mb-3" role="alert">
+                                            <i class="fa fa-exclamation-circle me-1"/> <t t-esc="error"/>
+                                        </div>
+                                    </t>
+                                    <t t-if="success">
+                                        <div class="alert alert-success alert-dismissible fade show small mb-3" role="alert">
+                                            <i class="fa fa-check-circle me-1"/> <t t-esc="success"/>
+                                        </div>
+                                    </t>
+
+                                    <form action="/my/candidate/change_password" method="POST">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold small">Current Password <span class="text-danger">*</span></label>
+                                            <input type="password" name="old_password" class="form-control" required="required" placeholder="Enter current password"/>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold small">New Password <span class="text-danger">*</span></label>
+                                            <input type="password" name="new_password" class="form-control" minlength="6" required="required" placeholder="Enter new password (min 6 chars)"/>
+                                        </div>
+                                        <div class="mb-4">
+                                            <label class="form-label fw-bold small">Confirm New Password <span class="text-danger">*</span></label>
+                                            <input type="password" name="confirm_password" class="form-control" minlength="6" required="required" placeholder="Confirm new password"/>
+                                        </div>
+                                        <div class="d-grid">
+                                            <button type="submit" class="btn btn-bunna py-2" style="background-color: #541718; color: #fff; border: none; font-weight: 600;"><i class="fa fa-save me-1"/> Update Password</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
         </template>
     </data>
 </odoo>

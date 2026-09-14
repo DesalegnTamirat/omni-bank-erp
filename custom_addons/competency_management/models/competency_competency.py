@@ -4,7 +4,7 @@ from odoo.exceptions import UserError, ValidationError
 
 
 class CompetencyRatingModel(models.Model):
-    """Evaluation scale attachable to competencies ."""
+    """Evaluation scale attachable to competencies."""
     _name = 'competency.rating.model'
     _description = 'Competency Rating Model'
     _order = 'name'
@@ -13,17 +13,69 @@ class CompetencyRatingModel(models.Model):
     code = fields.Char(string='Code', required=True)
     description = fields.Text(string='Description')
     max_rating = fields.Integer(
-        string='Maximum Rating', default=4,
+        string='Number of Levels / Rank', default=4, required=True,
         help='Highest proficiency/rating value in this scale.')
     active = fields.Boolean(default=True)
+    line_ids = fields.One2many('competency.rating.model.line', 'rating_model_id', string='Proficiency Levels', copy=True)
 
     _sql_constraints = [
         ('code_uniq', 'unique(code)', 'The Rating Model code must be unique!'),
     ]
 
+    @api.onchange('max_rating')
+    def _onchange_max_rating(self):
+        if self.max_rating and self.max_rating > 0 and not self.line_ids:
+            self._sync_level_lines()
+
+    def action_generate_lines(self):
+        """Action button to auto-generate or reset proficiency level lines based on max_rating."""
+        for rec in self:
+            rec._sync_level_lines(force_reset=True)
+
+    def _sync_level_lines(self, force_reset=False):
+        for rec in self:
+            if not rec.max_rating or rec.max_rating <= 0:
+                continue
+            if force_reset or not rec.line_ids:
+                if force_reset:
+                    rec.line_ids = [(5, 0, 0)]
+                line_vals = []
+                for i in range(1, rec.max_rating + 1):
+                    lvl_str = str(i)
+                    name_str = f"Level {i}"
+                    if rec.max_rating == 4:
+                        def_names = {'1': 'Level 1 - Basic', '2': 'Level 2 - Intermediate', '3': 'Level 3 - Advanced', '4': 'Level 4 - Expert'}
+                        name_str = def_names.get(lvl_str, name_str)
+                    elif rec.max_rating == 5:
+                        def_names = {'1': 'Very Bad', '2': 'Bad', '3': 'Good', '4': 'Better', '5': 'Best'}
+                        name_str = def_names.get(lvl_str, name_str)
+                    
+                    line_vals.append((0, 0, {
+                        'level': lvl_str,
+                        'name': name_str,
+                        'sequence': i * 10,
+                    }))
+                rec.line_ids = line_vals
+
+
+class CompetencyRatingModelLine(models.Model):
+    """Proficiency Level definition line for a Competency Rating Model."""
+    _name = 'competency.rating.model.line'
+    _description = 'Competency Rating Model Line'
+    _order = 'sequence, level'
+
+    rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model', required=True, ondelete='cascade')
+    level = fields.Char(string='Level / Rank', required=True, default='1')
+    name = fields.Char(string='Level Name', required=True)
+    sequence = fields.Integer(string='Sequence', default=10)
+
+    _sql_constraints = [
+        ('rating_model_level_uniq', 'unique(rating_model_id, level)', 'Level rank number must be unique per Rating Model!'),
+    ]
+
 
 class CompetencyLevelChangeLog(models.Model):
-    """Audit log for definition changes on competency proficiency levels (FR-COM-006)."""
+    """Audit log for definition changes on competency proficiency levels."""
     _name = 'competency.level.change.log'
     _description = 'Competency Level Definition Change Log'
     _order = 'effective_date desc, id desc'
@@ -41,32 +93,15 @@ class CompetencyLevelChangeLog(models.Model):
 
 
 class CompetencyProficiencyLevel(models.Model):
-    """One proficiency level (Basic..Expert) with mandatory behavioral indicators (FR-COM-003, FR-COM-004, FR-COM-005)."""
+    """Proficiency level line with mandatory behavioral indicators."""
     _name = 'competency.proficiency.level'
     _description = 'Competency Proficiency Level'
     _order = 'competency_id, level'
 
-    LEVEL_NAME_MAP = {
-        '1': 'Basic',
-        '2': 'Intermediate',
-        '3': 'Advanced',
-        '4': 'Expert',
-    }
-
     competency_id = fields.Many2one(
         'competency.competency', string='Competency', required=True, ondelete='cascade')
-    level = fields.Selection([
-        ('1', 'Level 1 - Basic'),
-        ('2', 'Level 2 - Intermediate'),
-        ('3', 'Level 3 - Advanced'),
-        ('4', 'Level 4 - Expert'),
-    ], string='Level', required=True, default='1')
-    name = fields.Selection([
-        ('Basic', 'Basic'),
-        ('Intermediate', 'Intermediate'),
-        ('Advanced', 'Advanced'),
-        ('Expert', 'Expert'),
-    ], string='Level Name', compute='_compute_name', store=True, readonly=True)
+    level = fields.Char(string='Level / Rank', required=True, default='1')
+    name = fields.Char(string='Level Name', required=True, default='Level 1 - Basic')
     definition = fields.Text(string='Definition')
     behavioral_indicators = fields.Text(string='Behavioral Indicators', required=True)
 
@@ -75,23 +110,14 @@ class CompetencyProficiencyLevel(models.Model):
          'This proficiency level already exists for this competency. You cannot create duplicate levels. Please edit the existing record instead.'),
     ]
 
-    @api.depends('level')
-    def _compute_name(self):
-        for rec in self:
-            rec.name = self.LEVEL_NAME_MAP.get(str(rec.level or '1'), 'Basic')
-
-    @api.onchange('level')
-    def _onchange_level(self):
-        if self.level:
-            self.name = self.LEVEL_NAME_MAP.get(str(self.level), 'Basic')
-
     @api.constrains('competency_id', 'level')
     def _check_level_uniqueness_and_limit(self):
         for rec in self:
             if rec.competency_id:
+                max_req = rec.competency_id.rating_model_id.max_rating if rec.competency_id.rating_model_id else 4
                 all_levels = self.search([('competency_id', '=', rec.competency_id.id)])
-                if len(all_levels) > 4:
-                    raise ValidationError(_("A competency cannot have more than 4 proficiency levels. Exactly 4 levels (Level 1 - Basic, Level 2 - Intermediate, Level 3 - Advanced, Level 4 - Expert) are required."))
+                if len(all_levels) > max_req:
+                    raise ValidationError(_("A competency using '%s' cannot have more than %d proficiency levels.") % (rec.competency_id.rating_model_id.name, max_req))
                 duplicates = self.search([
                     ('competency_id', '=', rec.competency_id.id),
                     ('level', '=', rec.level),
@@ -104,14 +130,12 @@ class CompetencyProficiencyLevel(models.Model):
     def _check_behavioral_indicators(self):
         for rec in self:
             if not rec.behavioral_indicators or not rec.behavioral_indicators.strip():
-                name_str = rec.name or self.LEVEL_NAME_MAP.get(str(rec.level or '1'), 'Basic')
+                name_str = rec.name or f"Level {rec.level}"
                 raise ValidationError(_("Behavioral Indicators are required for Level %s (%s). Please fill in the behavioral indicators before saving.") % (rec.level, name_str))
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            lvl = str(vals.get('level') or '1')
-            vals['name'] = self.LEVEL_NAME_MAP.get(lvl, 'Basic')
             comp_id = vals.get('competency_id')
             if comp_id:
                 comp = self.env['competency.competency'].browse(comp_id)
@@ -123,11 +147,6 @@ class CompetencyProficiencyLevel(models.Model):
         for rec in self:
             if rec.competency_id and rec.competency_id.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
                 raise ValidationError(_("Cannot modify proficiency levels on a retired competency (%s).") % rec.competency_id.name)
-            
-        if 'level' in vals or 'name' in vals:
-            for rec in self:
-                lvl = str(vals.get('level', rec.level) or '1')
-                vals['name'] = self.LEVEL_NAME_MAP.get(lvl, 'Basic')
                 
         if 'definition' in vals:
             for rec in self:
@@ -173,7 +192,7 @@ class CompetencyProficiencyLevel(models.Model):
 
 
 class Competency(models.Model):
-    """Competency dictionary entry (FR-COM-002, FR-COM-003).
+    """Competency dictionary entry.
     
     NOTE: Shared globally across all companies (intentionally not company-scoped
     to maintain a unified bank-wide competency framework for Bunna Bank S.C.).
@@ -195,17 +214,17 @@ class Competency(models.Model):
 
     @api.model
     def _default_rating_model_id(self):
-        models_rec = self.env['competency.rating.model'].search([])
-        if len(models_rec) == 1:
-            return models_rec.id
-        return False
+        m = self.env['competency.rating.model'].search([('code', '=', '4SCALE')], limit=1)
+        if not m:
+            m = self.env['competency.rating.model'].search([], limit=1)
+        return m.id if m else False
 
     rating_model_id = fields.Many2one('competency.rating.model', string='Rating Model', default=_default_rating_model_id)
     is_rating_model_readonly = fields.Boolean(compute='_compute_is_rating_model_readonly')
 
     def _compute_is_rating_model_readonly(self):
         count = self.env['competency.rating.model'].search_count([])
-        is_ro = (count == 1)
+        is_ro = (count <= 1)
         for rec in self:
             rec.is_rating_model_readonly = is_ro
     proficiency_level_ids = fields.One2many(
@@ -247,10 +266,39 @@ class Competency(models.Model):
             else:
                 rec.status = 'inactive'
 
+    @api.onchange('rating_model_id')
+    def _onchange_rating_model_id(self):
+        if self.rating_model_id:
+            self._sync_proficiency_levels_from_rating_model()
+
+    def _sync_proficiency_levels_from_rating_model(self):
+        for rec in self:
+            if not rec.rating_model_id:
+                continue
+            model_lines = rec.rating_model_id.line_ids
+            if not model_lines:
+                rec.rating_model_id._sync_level_lines()
+                model_lines = rec.rating_model_id.line_ids
+
+            matrix_config = self.env['competency.matrix.config'].get_active_config()
+            new_lines = []
+            for mline in model_lines:
+                lvl_str = str(mline.level)
+                b_ind = getattr(matrix_config, f'tech_indicator_level_{lvl_str}', f"Level {lvl_str} ({mline.name}) behavioral indicator for {rec.name or 'competency'}.")
+                new_lines.append((0, 0, {
+                    'level': lvl_str,
+                    'name': mline.name,
+                    'behavioral_indicators': b_ind,
+                    'definition': f"{mline.name} proficiency level.",
+                }))
+
+            rec.proficiency_level_ids = [(5, 0, 0)] + new_lines
+
     def action_submit(self):
         for rec in self:
-            if not rec.proficiency_level_ids or len(rec.proficiency_level_ids) < 4:
-                raise ValidationError(_("Competency '%s' must have all 4 proficiency levels defined before submitting for approval.") % rec.name)
+            req_count = rec.rating_model_id.max_rating if rec.rating_model_id else 4
+            if not rec.proficiency_level_ids or len(rec.proficiency_level_ids) < req_count:
+                raise ValidationError(_("Competency '%s' must have all %d proficiency levels defined before submitting for approval.") % (rec.name, req_count))
             rec.write({'state': 'submitted'})
 
     def action_approve(self):
@@ -264,7 +312,9 @@ class Competency(models.Model):
         for rec in self:
             rec.write({'state': 'retired', 'active': False})
             # Auto-disappear from clusters and role mappings
-            self.env['competency.cluster.line'].search([('competency_id', '=', rec.id)]).unlink()
+            clusters = self.env['competency.cluster'].search([('competency_ids', 'in', [rec.id])])
+            for cluster in clusters:
+                cluster.write({'competency_ids': [(3, rec.id)]})
             self.env['competency.role.mapping.line'].search([('competency_id', '=', rec.id)]).unlink()
             rec.message_post(body=_("Competency '%s' has been retired and automatically unlinked from all clusters and role mappings.") % rec.name)
 
@@ -287,56 +337,59 @@ class Competency(models.Model):
         ('code_uniq', 'unique(code)', 'The Competency Code must be unique!'),
     ]
 
-    @api.constrains('proficiency_level_ids')
+    @api.constrains('proficiency_level_ids', 'rating_model_id')
     def _check_proficiency_levels_completeness(self):
         for rec in self:
+            if not rec.rating_model_id:
+                continue
             levels = rec.proficiency_level_ids
             existing_lvl_codes = set(levels.mapped('level'))
-            required_lvl_codes = {'1', '2', '3', '4'}
+            model_lines = rec.rating_model_id.line_ids
+            required_lvl_codes = set(model_lines.mapped('level')) if model_lines else {str(i) for i in range(1, rec.rating_model_id.max_rating + 1)}
             
-            if len(levels) > 4:
-                raise ValidationError(_("A competency cannot have more than 4 proficiency levels. Exactly 4 levels (Level 1 - Basic, Level 2 - Intermediate, Level 3 - Advanced, Level 4 - Expert) are required."))
+            if len(levels) > rec.rating_model_id.max_rating:
+                raise ValidationError(_("Competency '%s' cannot have more than %d proficiency levels under rating model '%s'.") % (rec.name, rec.rating_model_id.max_rating, rec.rating_model_id.name))
                 
             if len(levels) != len(existing_lvl_codes):
-                raise ValidationError(_("Duplicate proficiency levels detected on competency '%s'. Each competency must have unique levels (Level 1, Level 2, Level 3, Level 4).") % rec.name)
+                raise ValidationError(_("Duplicate proficiency levels detected on competency '%s'. Each level must be unique.") % rec.name)
                 
             missing = required_lvl_codes - existing_lvl_codes
             if missing:
-                missing_names = []
-                name_map = {'1': 'Level 1 (Basic)', '2': 'Level 2 (Intermediate)', '3': 'Level 3 (Advanced)', '4': 'Level 4 (Expert)'}
-                for m in sorted(missing):
-                    missing_names.append(name_map.get(m, m))
-                raise ValidationError(_("Competencies must have all 4 proficiency levels. Missing level(s): %s.") % ", ".join(missing_names))
+                raise ValidationError(_("Competency '%s' is missing required level(s) for rating model '%s': %s.") % (rec.name, rec.rating_model_id.name, ", ".join(sorted(missing))))
 
     @api.model_create_multi
     def create(self, vals_list):
-        records = super().create(vals_list)
-        for record in records:
-            # Auto-create the standard 4 proficiency levels unless provided.
-            if not record.proficiency_level_ids:
-                record._generate_default_proficiency_levels()
-        return records
+        for vals in vals_list:
+            if not vals.get('proficiency_level_ids'):
+                rating_model_id = vals.get('rating_model_id')
+                if not rating_model_id:
+                    rating_model_id = self._default_rating_model_id()
+                    vals['rating_model_id'] = rating_model_id
+                if rating_model_id:
+                    rating_model = self.env['competency.rating.model'].browse(rating_model_id)
+                    model_lines = rating_model.line_ids
+                    if not model_lines:
+                        rating_model._sync_level_lines()
+                        model_lines = rating_model.line_ids
+                    matrix_config = self.env['competency.matrix.config'].get_active_config()
+                    comp_name = vals.get('name', 'competency')
+                    new_lines = []
+                    for mline in model_lines:
+                        lvl_str = str(mline.level)
+                        b_ind = getattr(matrix_config, f'tech_indicator_level_{lvl_str}', f"Level {lvl_str} ({mline.name}) behavioral indicator for {comp_name}.")
+                        new_lines.append((0, 0, {
+                            'level': lvl_str,
+                            'name': mline.name,
+                            'behavioral_indicators': b_ind,
+                            'definition': f"{mline.name} proficiency level.",
+                        }))
+                    if new_lines:
+                        vals['proficiency_level_ids'] = new_lines
+        return super().create(vals_list)
 
     def _generate_default_proficiency_levels(self):
-        defaults = [
-            ('1', 'Basic', 'Foundational understanding; applies with guidance.',
-             'Demonstrates basic awareness and foundational knowledge; applies skills under direct supervision and guidance.'),
-            ('2', 'Intermediate', 'Solid working knowledge; applies independently.',
-             'Applies solid working knowledge independently in routine operational situations; resolves standard technical issues.'),
-            ('3', 'Advanced', 'Deep expertise; serves as go-to resource.',
-             'Demonstrates advanced proficiency and deep subject matter expertise; guides and mentors team members on complex scenarios.'),
-            ('4', 'Expert', 'Mastery and thought leadership; shapes organizational direction.',
-             'Displays strategic mastery and thought leadership; defines institutional standards and drives organizational innovation.'),
-        ]
-        Level = self.env['competency.proficiency.level']
-        for level, name, definition, indicators in defaults:
-            Level.create({
-                'competency_id': self.id,
-                'level': level,
-                'name': name,
-                'definition': definition,
-                'behavioral_indicators': indicators,
-            })
+        self.ensure_one()
+        self._sync_proficiency_levels_from_rating_model()
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
@@ -344,7 +397,7 @@ class Competency(models.Model):
         
         for rec in self:
             # 1. Retired status lock
-            if rec.status == 'retired' and not force_write and not self.env.su:
+            if (rec.state == 'retired' or rec.status == 'retired') and not force_write and not self.env.su:
                 if set(vals.keys()) - {'status', 'active'}:
                     raise ValidationError(_("This competency (%s) is retired and cannot be edited. Reactivate the competency or use an Admin override instead.") % rec.name)
             
@@ -353,16 +406,17 @@ class Competency(models.Model):
                 new_name = vals.get('name', rec.name)
                 new_pillar = vals.get('pillar', rec.pillar)
                 if new_name != rec.name or new_pillar != rec.pillar:
-                    approved_fw = self.env['competency.framework.line'].search([
-                        ('competency_id', '=', rec.id),
-                        ('framework_id.state', '=', 'approved')
-                    ], limit=1)
-                    if approved_fw:
-                        raise ValidationError(_(
-                            "Competency name or pillar cannot be re-edited for a competency on an approved framework (%s) "
-                            "without going through the Competency Framework change/version-control workflow. "
-                            "Create a new framework version or submit an approved change request."
-                        ) % approved_fw.framework_id.name)
+                    if 'competency.framework.line' in self.env:
+                        approved_fw = self.env['competency.framework.line'].search([
+                            ('competency_id', '=', rec.id),
+                            ('framework_id.state', '=', 'approved')
+                        ], limit=1)
+                        if approved_fw:
+                            raise ValidationError(_(
+                                "Competency name or pillar cannot be re-edited for a competency on an approved framework (%s) "
+                                "without going through the Competency Framework change/version-control workflow. "
+                                "Create a new framework version or submit an approved change request."
+                            ) % approved_fw.framework_id.name)
                         
         return super().write(vals)
 

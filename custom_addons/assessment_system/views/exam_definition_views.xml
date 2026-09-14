@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Search View: Exam Definition -->
+    <record id="view_exam_definition_search" model="ir.ui.view">
+        <field name="name">exam.definition.search</field>
+        <field name="model">exam.definition</field>
+        <field name="arch" type="xml">
+            <search string="Search Exam Definitions">
+                <field name="name" string="Exam Title"/>
+                <field name="code" string="Exam Code"/>
+                <field name="job_id" string="Job Position"/>
+                <field name="vacancy_id" string="Vacancy"/>
+                <filter string="Master Exam Templates" name="master_exams" domain="[('is_version_paper', '=', False)]"/>
+                <filter string="Version Papers" name="version_papers" domain="[('is_version_paper', '=', True)]"/>
+                <separator/>
+                <filter string="Confirmed" name="filter_confirmed" domain="[('state', '=', 'confirmed')]"/>
+                <filter string="Draft" name="filter_draft" domain="[('state', '=', 'draft')]"/>
+                <group>
+                    <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
+                    <filter string="Vacancy" name="group_vacancy" context="{'group_by': 'vacancy_id'}"/>
+                    <filter string="Status" name="group_status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Form View: Exam Definition -->
+    <record id="view_exam_definition_form" model="ir.ui.view">
+        <field name="name">exam.definition.form</field>
+        <field name="model">exam.definition</field>
+        <field name="arch" type="xml">
+            <form string="Assessment Exam Definition">
+                <header>
+                    <button name="action_confirm" string="Confirm &amp; Validate" type="object" invisible="state != 'draft'" class="btn-primary" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state != 'confirmed'" groups="assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_view_sessions" string="View Sessions" type="object" invisible="session_count == 0" class="btn-secondary"/>
+                    <button name="action_generate_multi_versions" string="Generate Multi-Version Papers" type="object" class="btn-primary" invisible="is_version_paper or state == 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,in_progress,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_versions" type="object" class="oe_stat_button" icon="fa-clone" invisible="child_version_count == 0">
+                            <field name="child_version_count" widget="statinfo" string="Versions"/>
+                        </button>
+                        <button name="action_view_sessions" type="object" class="oe_stat_button" icon="fa-calendar">
+                            <field name="session_count" widget="statinfo" string="Sessions"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name" string="Exam Title"/>
+                        <h1><field name="name" placeholder="e.g. Senior Credit Analyst Written Assessment 2026"/></h1>
+                        <h3><field name="code" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group>
+                             <field name="vacancy_id"/>
+                            <field name="job_id"/>
+                            <field name="recruitment_request_id"/>
+                            <field name="assessment_type"/>
+                            <field name="is_version_paper" invisible="1"/>
+                            <field name="version_code" invisible="not is_version_paper" readonly="1"/>
+                            <field name="parent_exam_id" invisible="not is_version_paper" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="duration_minutes"/>
+                            <field name="passing_score_percentage"/>
+                            <field name="number_of_versions_to_generate" invisible="is_version_paper"/>
+                            <field name="late_arrival_lockout_minutes"/>
+                            <field name="tab_switch_violation_limit"/>
+                        </group>
+                    </group>
+                    <group string="Cheating Prevention, Randomization &amp; Fresh Question Rotation">
+                        <group>
+                            <field name="randomize_questions"/>
+                            <field name="randomize_options"/>
+                            <field name="exclude_previously_used_questions"/>
+                            <field name="question_cooldown_days" invisible="not exclude_previously_used_questions"/>
+                        </group>
+                        <group>
+                            <field name="block_copy_paste"/>
+                            <field name="block_screenshot"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Automated Question Distribution Rules" invisible="selection_mode != 'auto_distribution'">
+                            <field name="distribution_line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+<!--                                    <field name="eligible_competency_ids" invisible="True"/>-->
+                                    <field name="competency_id" domain="[('id', 'in', eligible_competency_ids)]" context="{'show_pillar_only': 1}"/>
+                                    <field name="difficulty"/>
+                                    <field name="question_type"/>
+                                    <field name="number_of_questions"/>
+                                    <field name="marks_per_question"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Assigned Version Questions" invisible="selection_mode != 'manual_select'">
+                            <field name="manual_question_ids"/>
+                        </page>
+                        <page string="Generated Child Versions" invisible="child_version_count == 0">
+                            <field name="child_version_ids" readonly="1">
+                                <list>
+                                    <field name="version_code"/>
+                                    <field name="name"/>
+                                    <field name="total_questions"/>
+                                    <field name="total_marks"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Summary Totals">
+                            <group>
+                                <field name="selection_mode"/>
+                                <field name="total_questions"/>
+                                <field name="total_marks"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Exam Definition -->
+    <record id="view_exam_definition_tree" model="ir.ui.view">
+        <field name="name">exam.definition.list</field>
+        <field name="model">exam.definition</field>
+        <field name="arch" type="xml">
+            <list string="Exam Definitions" decoration-info="state == 'draft'" decoration-success="state == 'confirmed'">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="version_code" optional="show"/>
+                <field name="job_id"/>
+                <field name="duration_minutes"/>
+                <field name="total_questions"/>
+                <field name="total_marks"/>
+                <field name="passing_score_percentage"/>
+                <field name="child_version_count" optional="show" string="Versions"/>
+                <field name="session_count"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Exam Definitions -->
+    <record id="action_exam_definitions" model="ir.actions.act_window">
+        <field name="name">Exam Definitions</field>
+        <field name="res_model">exam.definition</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_version_paper', '=', False)]</field>
+        <field name="context">{'default_is_version_paper': False, 'search_default_master_exams': 1}</field>
+        <field name="search_view_id" ref="view_exam_definition_search"/>
+    </record>
+
+</odoo>

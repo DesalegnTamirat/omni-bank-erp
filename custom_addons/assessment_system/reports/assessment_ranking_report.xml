@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- PDF Ranking Report Action (FR-CBIS-028) -->
+    <record id="action_report_cbis_ranking_pdf" model="ir.actions.report">
+        <field name="name">Candidate Ranking &amp; Evaluation Report</field>
+        <field name="model">cbis.interview.session</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">assessment_system.report_cbis_ranking_document</field>
+        <field name="report_file">assessment_system.report_cbis_ranking_document</field>
+        <field name="binding_model_id" ref="model_cbis_interview_session"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>

@@ -33,10 +33,10 @@ class RecruitmentProcessInternal(models.Model):
     vacancy_announced_on = fields.Date(string="Vacancy Announced On")
     last_date_to_apply = fields.Date(string="Last Date To Apply")
     no_of_vacancies = fields.Integer(string="Number of Vacancies")
-    minimum_number_years_in_company = fields.Integer(string="Minimum Number of Years in the Company")
-    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice")
-    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion")
-    minimum_pms_score = fields.Float(string="Minimum PMS Score")
+    minimum_number_years_in_company = fields.Integer(string="Minimum Number of Years in the Company", default=1)
+    no_of_months_since_last_written_notice = fields.Integer(string="No of Months since last Written notice", default=12)
+    no_of_months_since_last_promotion = fields.Integer(string="No of Months since last Promotion", default=12)
+    minimum_pms_score = fields.Float(string="Minimum PMS Score", default=75.0)
     status = fields.Selection([('notify', 'Notified')], string="Status")
     responsible = fields.Many2one('hr.employee', string="Responsible", required=True)
     eligible_emp = fields.One2many("internal.recruitment.eligible.employees", "internal_recruitment_id",
@@ -118,42 +118,50 @@ class RecruitmentProcessInternal(models.Model):
                 emp_user = val.emp_name.user_id
                 _logger.info("Notifying Employee: %s (User ID: %s)", val.emp_name.name, emp_user.id if emp_user else None)
 
+                domain = [('vacancy_reference', '=', self.vacancy_reference)]
                 if emp_user:
-                    existing = Available.search([
+                    domain = [
                         ('vacancy_reference', '=', self.vacancy_reference),
-                        ('employee_user_id', '=', emp_user.id),
-                    ], limit=1)
-                    avail_vals = {
-                        'vacancy_id': vac.id if vac else False,
-                        'vacancy_reference': self.vacancy_reference,
-                        'job_position': self.job_position.name if self.job_position else False,
-                        'job_location': self.job_location,
-                        'employee_grade': self.job_grade,
-                        'employee_category': self.job_category,
-                        'type_of_employment': self.emp_type,
-                        'number_of_vacancies': self.no_of_vacancies,
-                        'vacancy_announced_on': self.vacancy_announced_on,
-                        'last_date_to_apply': self.last_date_to_apply,
-                        'job_description': vac.vacancy_description if vac else '',
-                        'employee_id': val.emp_name.id,
-                        'employee_user_id': emp_user.id,
-                        'employee_applicant': val.emp_name.name,
-                        'application_status': 'New',
-                    }
-                    if existing:
-                        existing.write(avail_vals)
-                        avail_rec = existing
-                    else:
-                        avail_rec = Available.create(avail_vals)
+                        '|', ('employee_id', '=', val.emp_name.id), ('employee_user_id', '=', emp_user.id)
+                    ]
+                else:
+                    domain = [
+                        ('vacancy_reference', '=', self.vacancy_reference),
+                        ('employee_id', '=', val.emp_name.id)
+                    ]
 
-                    if vac and vac.hiring_details:
-                        avail_rec.employee_vacancy_ids.unlink()
-                        vac_lines = [(0, 0, {
-                            'operating_unit': h.work_unit.name if h.work_unit else False,
-                            'number_of_vacancies': h.number_of_openings or 0,
-                            'location_preference': 0,
-                        }) for h in vac.hiring_details]
-                        avail_rec.write({'employee_vacancy_ids': vac_lines})
+                existing = Available.search(domain, limit=1)
+                avail_vals = {
+                    'vacancy_id': vac.id if vac else (self.vacancy_id.id if hasattr(self, 'vacancy_id') and self.vacancy_id else False),
+                    'vacancy_reference': self.vacancy_reference,
+                    'job_position': self.job_position.name if self.job_position else False,
+                    'job_location': self.job_location,
+                    'employee_grade': self.job_grade,
+                    'employee_category': self.job_category,
+                    'type_of_employment': self.emp_type,
+                    'number_of_vacancies': self.no_of_vacancies,
+                    'vacancy_announced_on': self.vacancy_announced_on,
+                    'last_date_to_apply': self.last_date_to_apply,
+                    'job_description': vac.vacancy_description if vac else '',
+                    'employee_id': val.emp_name.id,
+                    'employee_user_id': emp_user.id if emp_user else False,
+                    'employee_applicant': val.emp_name.name,
+                    'application_status': 'New',
+                }
+                if existing:
+                    existing.write(avail_vals)
+                    avail_rec = existing
+                else:
+                    avail_rec = Available.create(avail_vals)
+
+                if vac and vac.hiring_details:
+                    avail_rec.employee_vacancy_ids.unlink()
+                    vac_lines = [(0, 0, {
+                        'operating_unit': h.work_unit.name if h.work_unit else False,
+                        'number_of_vacancies': h.number_of_openings or 0,
+                        'location_preference': 0,
+                    }) for h in vac.hiring_details]
+                    avail_rec.write({'employee_vacancy_ids': vac_lines})
 
                 if emp_user and emp_user.partner_id:
                     self.mail_channel_msgs(emp_user.partner_id.id, self.job_position.name if self.job_position else '', self.last_date_to_apply, work_units_str)
@@ -163,12 +171,17 @@ class RecruitmentProcessInternal(models.Model):
 
     def mail_channel_msgs(self, rec_id, ref, arg1, arg2):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-        channel_id = channel
-        message = """Hi This is a Message from Bunna Bank HR <br><br>
-                    You have been shortlisted for an Internal Recruitment position of <b><u>%s</u></b><br><br>
-                    If you are interested, please apply before <b><u>%s</u></b> - The Vacancy is available in <b><u>%s</u></b><br><br>Thanks """ % (
-            ref, arg1, arg2)
-        channel_id.message_post(
+        message = (
+            f"Dear Candidate,\n\n"
+            f"You have been shortlisted for an Internal Recruitment position:\n\n"
+            f"• Position: {ref}\n"
+            f"• Application Deadline: {arg1}\n"
+            f"• Place of Assignment: {arg2}\n\n"
+            f"If you are interested, please submit your application before the deadline.\n\n"
+            f"Best regards,\n"
+            f"Bunna Bank HR Department"
+        )
+        channel.message_post(
             body=message,
             message_type='comment',
             subtype_xmlid='mail.mt_comment',
@@ -181,6 +194,7 @@ class EligibleEmployees(models.Model):
 
     emp_name = fields.Many2one("hr.employee", string="Name")
     active = fields.Boolean(default=True)
+    vacancy_id = fields.Many2one("job.vacancy", string="Job Vacancy", index=True)
 
     def unlink(self):
         """ Soft delete: Archive records instead of removing from DB """
@@ -424,27 +438,3 @@ class InternalEligibleEmployees(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     select_flag = fields.Boolean(string="Select")
     internal_selected_id = fields.Many2one("internal.selected", string="Internal Selected Candidates for Recruitment")
-
-
-class InternalCandidatesV(models.Model):
-    _name = 'internal.candidates.v'
-    _table = 'internal_candidates_v'
-    _auto = False
-    _description = 'Internal Candidates View'
-
-    employee_id = fields.Many2one('hr.employee', string='Employee')
-    supervisory_experience = fields.Float(string='Supervisory Experience')
-    current_position = fields.Char(string='Current Position')
-    service_in_company = fields.Float(string='Service in Company')
-    employment_experience = fields.Float(string='Employment Experience')
-    total_experience = fields.Float(string='Total Experience')
-    educational_qualification = fields.Char(string='Educational Qualification')
-    name = fields.Char(string='Current Department')
-    last_promotion = fields.Float(string='Months since last Promotion')
-    pms_score = fields.Float(string='PMS Score')
-
-    def init(self):
-        pass
-
-
-

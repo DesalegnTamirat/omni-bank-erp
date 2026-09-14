@@ -6,6 +6,7 @@ class RecruitmentQualifications(models.Model):
     _description = "Recruitment Qualifications"
     _rec_name = "display_name"
 
+    name = fields.Char(string="Name", related="display_name", store=False)
     qualification = fields.Char(string="Qualification Level", required=True)
     specialization = fields.Char(string="Specialization / Field of Study")
     status = fields.Selection([('yes', 'Y'), ('no', 'N')],

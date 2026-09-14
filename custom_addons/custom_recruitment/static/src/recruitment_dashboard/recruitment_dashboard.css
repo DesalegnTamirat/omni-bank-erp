@@ -1,17 +1,24 @@
 /* ── Recruitment Dashboard ── */
-/* Brand colors from palette:
-   Primary Dark Teal : #1d2632
-   Primary Maroon    : #b47198  (last two from color card)
+/* Official Corporate Brand Colors:
+   Forest Green: #425727
+   Olive Gold:   #726732
+   Warm Bronze:  #c17540
+   Dark Navy:    #1d2b32
+   Forest Teal:  #1e2917
+   Burgundy:     #541718
 */
 
 :root {
-    --rd-primary:   #1d2632;   /* dark teal/navy  */
-    --rd-secondary: #b47198;   /* maroon/wine     */
-    --rd-bg:        #f4f1ee;
+    --rd-primary:   #425727;   /* Forest Green */
+    --rd-secondary: #726732;   /* Olive Gold */
+    --rd-accent:    #c17540;   /* Warm Bronze */
+    --rd-navy:      #1d2b32;   /* Dark Navy */
+    --rd-burgundy:  #541718;   /* Deep Burgundy */
+    --rd-bg:        #f7f9f5;
     --rd-card-bg:   #ffffff;
-    --rd-border:    #e0d9d0;
-    --rd-text:      #2d1e0f;
-    --rd-muted:     #7a6f66;
+    --rd-border:    #dcdfd8;
+    --rd-text:      #1d2b32;
+    --rd-muted:     #6b7762;
 }
 
 .o_recruitment_dashboard {

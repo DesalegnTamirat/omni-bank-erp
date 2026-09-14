@@ -42,6 +42,9 @@
                                     <td><strong>Approved Status:</strong> <span t-field="doc.state" style="text-transform: capitalize;"/></td>
                                     <td><strong>Vacancy Capacity:</strong> <span t-field="doc.vacancy_id.no_of_vacancies"/> Positions</td>
                                 </tr>
+                                <tr t-if="doc.approval_hierarchy_type">
+                                    <td colspan="2"><strong>Approval Hierarchy Category:</strong> <span t-field="doc.approval_hierarchy_type"/></td>
+                                </tr>
                             </table>
 
                             <!-- Candidate Ranking Matrix -->
@@ -115,7 +118,8 @@
                                                 <span t-field="sig.user_id.name"/>
                                             </p>
                                             <p class="text-muted small mb-2" style="font-style: italic;">
-                                                <span t-field="sig.role" t-if="sig.role"/>
+                                                <span t-field="sig.role_label" t-if="sig.role_label"/>
+                                                <span t-elif="sig.role" t-field="sig.role"/>
                                                 <span t-else="">Committee Member</span>
                                             </p>
 

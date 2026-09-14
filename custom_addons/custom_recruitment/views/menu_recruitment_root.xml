@@ -22,19 +22,5 @@
                   groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator"/>
 
 
-        <menuitem id="menu_offer_letters"
-                  name="Offer Letters"
-                  parent="menu_external_recruitment"
-                  action="action_recruitment_offer_letter"
-                  groups="group_recruitment_manager,group_recruitment_administrator"
-                  sequence="10"/>
-
-        <menuitem id="menu_application_windows"
-                  name="Application Windows"
-                  parent="menu_internal_recruitment"
-                  action="action_recruitment_application_window"
-                  groups="group_recruitment_manager,group_recruitment_administrator"
-                  sequence="9"/>
-
     </data>
 </odoo>

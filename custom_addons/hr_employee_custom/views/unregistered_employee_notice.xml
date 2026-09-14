@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="unregistered_employee_notice" name="Unregistered Employee Notice">
+        <t t-call="web.login_layout">
+            <div class="text-center">
+                <div class="mb-3">
+                    <span class="fa fa-exclamation-triangle" style="font-size: 3.5rem; color: #c17540;"/>
+                </div>
+                <h4 class="fw-bold mb-2" style="color: #1d2b32;">Profile Notice</h4>
+                <div class="alert alert-warning text-start small mb-3" style="border-left: 4px solid #c17540; background-color: #fdf8f4; color: #541718;">
+                    <p class="mb-1 fw-bold">
+                        You have successfully logged in, but your information does not exist in contract and master data.
+                    </p>
+                    <p class="mb-0 text-muted">
+                        Please contact the system administrator to complete your HR master record and contract setup.
+                    </p>
+                </div>
+
+                <div class="card bg-white border p-3 mb-3 text-start small" style="border-radius: 8px;">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">User Account:</span>
+                        <strong class="text-dark"><t t-esc="user_name"/> (<t t-esc="user_login"/>)</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">Master Data:</span>
+                        <t t-if="has_employee">
+                            <span class="badge bg-success">Configured</span>
+                        </t>
+                        <t t-else="">
+                            <span class="badge bg-danger">Not Found</span>
+                        </t>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Contract Data:</span>
+                        <t t-if="has_contract">
+                            <span class="badge bg-success">Configured</span>
+                        </t>
+                        <t t-else="">
+                            <span class="badge bg-danger">Not Found</span>
+                        </t>
+                    </div>
+                </div>
+
+                <a href="/web/session/logout" class="btn btn-danger w-100 fw-bold py-2" style="background-color: #b02a37; border-color: #a52834;">
+                    <i class="fa fa-sign-out me-1"/> Log Out
+                </a>
+            </div>
+        </t>
+    </template>
+</odoo>

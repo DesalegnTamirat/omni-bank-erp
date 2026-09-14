@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- WIZARD FORM VIEW -->
+        <record id="view_hr_employee_delegation_cancel_wizard_form" model="ir.ui.view">
+            <field name="name">hr.employee.delegation.cancel.wizard.form</field>
+            <field name="model">hr.employee.delegation.cancel.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Cancel Delegation">
+                    <p class="text-muted">
+                        Cancelling this delegation will immediately revoke all delegated managerial authority and send an official cancellation notification to the delegated staff member and all assigned stakeholders.
+                    </p>
+                    <group>
+                        <group string="Delegation Details">
+                            <field name="delegation_id" invisible="1"/>
+                            <field name="delegator_id"/>
+                            <field name="delegate_id"/>
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                        </group>
+                        <group string="Cancellation Information">
+                            <field name="effective_date"/>
+                            <field name="reason_code" widget="radio"/>
+                        </group>
+                    </group>
+                    <group string="Additional Explanation / Notes">
+                        <field name="reason_details" placeholder="Provide any additional details or notes regarding the early return or reassignment..." nolabel="1"/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm_cancel"
+                                string="Confirm Cancellation &amp; Notify Stakeholders"
+                                type="object"
+                                class="btn-danger"/>
+                        <button string="Discard"
+                                class="btn-secondary"
+                                special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- WIZARD ACTION -->
+        <record id="action_hr_employee_delegation_cancel_wizard" model="ir.actions.act_window">
+            <field name="name">Cancel Delegation</field>
+            <field name="res_model">hr.employee.delegation.cancel.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

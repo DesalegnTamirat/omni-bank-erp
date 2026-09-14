@@ -8,13 +8,20 @@
             <field name="arch" type="xml">
                 <list string="Job History">
                     <field name="employee_id"/>
-                    <field name="job_id"/>
-                    <field name="grade_id"/>
-                    <field name="operating_unit_id"/>
-                    <field name="position"/>
                     <field name="job_history_start_date"/>
                     <field name="job_history_end_date"/>
                     <field name="reason_for_change"/>
+                    <field name="from_operating_unit_id"/>
+                    <field name="to_operating_unit_id"/>
+                    <field name="from_department_id"/>
+                    <field name="to_department_id"/>
+                    <field name="from_grade_id"/>
+                    <field name="to_grade_id"/>
+                    <field name="from_job_id"/>
+                    <field name="to_job_id"/>
+                    <field name="old_wage"/>
+                    <field name="new_wage"/>
+                    <field name="is_current"/>
                 </list>
             </field>
         </record>
@@ -24,20 +31,36 @@
             <field name="model">hr.job.history</field>
             <field name="arch" type="xml">
                 <form string="Job History">
-                    <group>
+                    <sheet>
                         <group>
-                            <field name="employee_id"/>
-                            <field name="job_id"/>
-                            <field name="grade_id"/>
-                            <field name="operating_unit_id"/>
+                            <group string="Employee Information &amp; Status">
+                                <field name="employee_id"/>
+                                <field name="job_history_start_date"/>
+                                <field name="job_history_end_date"/>
+                                <field name="reason_for_change"/>
+                                <field name="is_current"/>
+                            </group>
+                            <group string="Operating Unit Transition">
+                                <field name="from_operating_unit_id"/>
+                                <field name="to_operating_unit_id"/>
+                            </group>
                         </group>
                         <group>
-                            <field name="position"/>
-                            <field name="job_history_start_date"/>
-                            <field name="job_history_end_date"/>
-                            <field name="reason_for_change"/>
+                            <group string="Department, Grade &amp; Position Transition">
+                                <field name="from_department_id"/>
+                                <field name="to_department_id"/>
+                                <field name="from_grade_id"/>
+                                <field name="to_grade_id"/>
+                                <field name="from_job_id"/>
+                                <field name="to_job_id"/>
+                            </group>
+                            <group string="Wage / Compensation Transition">
+                                <field name="currency_id" invisible="1"/>
+                                <field name="old_wage"/>
+                                <field name="new_wage"/>
+                            </group>
                         </group>
-                    </group>
+                    </sheet>
                 </form>
             </field>
         </record>

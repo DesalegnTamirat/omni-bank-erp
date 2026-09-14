@@ -7,14 +7,54 @@
             <field name="name">competency.rating.model.list</field>
             <field name="model">competency.rating.model</field>
             <field name="arch" type="xml">
-                <list editable="bottom">
+                <list>
                     <field name="code"/>
                     <field name="name"/>
-                    <field name="max_rating"/>
+                    <field name="max_rating" string="Number of Levels / Rank"/>
                     <field name="active"/>
                 </list>
             </field>
         </record>
+
+        <record id="view_competency_rating_model_form" model="ir.ui.view">
+            <field name="name">competency.rating.model.form</field>
+            <field name="model">competency.rating.model</field>
+            <field name="arch" type="xml">
+                <form string="Rating Model">
+                    <header>
+                        <button name="action_generate_lines" string="Generate / Reset Level Lines" type="object" class="oe_highlight"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <group>
+                            <group>
+                                <field name="name" placeholder="e.g. 5 Point Proficiency Scale"/>
+                                <field name="code" placeholder="e.g. 5SCALE"/>
+                            </group>
+                            <group>
+                                <field name="max_rating" string="Number of Levels / Rank"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Description">
+                            <field name="description" placeholder="Describe when and how this rating scale is used..."/>
+                        </group>
+                        <notebook>
+                            <page string="Proficiency Levels (Rank &amp; Names)">
+                                <field name="line_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="level" string="Level / Rank"/>
+                                        <field name="name" string="Level Name"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
         <record id="action_competency_rating_model" model="ir.actions.act_window">
             <field name="name">Rating Models</field>
             <field name="res_model">competency.rating.model</field>
@@ -75,7 +115,7 @@
                                 <field name="proficiency_level_ids" readonly="status == 'retired'">
                                     <list editable="bottom">
                                         <field name="level"/>
-                                        <field name="name" readonly="1"/>
+                                        <field name="name"/>
                                         <field name="behavioral_indicators" required="1"/>
                                     </list>
                                 </field>

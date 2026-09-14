@@ -32,22 +32,27 @@
                             class="btn-secondary"
                             invisible="state != 'draft'"
                             help="Reload the list of eligible transfer requests based on the current Target Vacancy (or direct transfers if left empty). This overwrites any manually added/removed requests."/>
-                    <!-- /073/074: Compute the weighted ranking -->
+                    <!-- Compute weighted ranking -->
                     <button name="action_compute_ranking" string="Compute Ranking" type="object"
                             class="oe_highlight"
                             invisible="state == 'approved'"
-                            help="Calculate weighted Transfer Suitability Scores for all eligible candidates ."/>
-                    <!-- : Approve minutes and auto-approve selected candidates -->
-                    <button name="action_approve_minutes" string="Approve Minutes" type="object"
+                            help="Calculate weighted Transfer Suitability Scores for all eligible candidates."/>
+                    <!-- Submit for Digital Signatures -->
+                    <button name="action_submit_for_signatures" string="Submit for Digital Signatures" type="object"
                             class="oe_highlight"
-                            invisible="state != 'ranked'"
-                            confirm="Approving minutes will automatically approve the transfer requests of all candidates marked as 'Selected'. Proceed?"/>
-                    <!-- Print PDF Report -->
-                    <button name="%(action_report_transfer_minute)d" string="Print Minutes"
-                            type="action"
-                            invisible="state == 'draft'"
-                            help="Generate a printable Transfer Committee Minutes PDF report ."/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,ranked,approved"/>
+                            invisible="state not in ['ranked']"
+                            help="Generate digital signature lines for assigned committee members and change status to Waiting Signatures."/>
+                    <!-- Approve minutes and auto-approve selected candidates -->
+                    <button name="action_approve_minutes" string="Approve &amp; Complete Transfer" type="object"
+                            class="oe_highlight"
+                            invisible="state not in ['ranked', 'waiting_signature']"
+                            confirm="Approving minutes will verify all mandatory digital signatures and automatically complete the transfer requests of all candidates marked as 'Selected'. Proceed?"/>
+                    <!-- Generate transfer letters for selected candidates -->
+                    <button name="action_generate_all_transfer_letters" string="Generate Transfer Letters" type="object"
+                            class="btn-success" icon="fa-file-text-o"
+                            invisible="state != 'approved'"
+                            help="Generate and preview lateral transfer letters for all selected candidates."/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,ranked,waiting_signature,approved"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -56,15 +61,28 @@
 
                     <!-- Info banner when approved -->
                     <div class="alert alert-success" role="alert" invisible="state != 'approved'">
-                        <strong>✅ Minutes Approved</strong> – Selected candidates' transfer requests
-                        have been automatically approved and employee records updated.
+                        <strong>✅ Minutes Digitally Approved</strong> – All mandatory committee members have signed. Selected candidates' transfer requests have been completed.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="state != 'waiting_signature'">
+                        <strong>✍️ Waiting for Digital Signatures</strong> – Designated committee members must digitally sign their approval under the 'Committee Signatures' tab before HR can finalize.
                     </div>
 
                     <group>
-                        <field name="target_vacancy_id" readonly="state != 'draft'"
-                               options="{'no_create': True}"
-                               placeholder="Leave empty for direct transfers"/>
-                        <field name="meeting_date" readonly="state == 'approved'"/>
+                        <group string="Transfer Settings">
+                            <field name="target_vacancy_id" readonly="state != 'draft'"
+                                   options="{'no_create': True}"
+                                   placeholder="Leave empty for direct transfers"/>
+                            <field name="meeting_date" readonly="state == 'approved'"/>
+                            <field name="approval_hierarchy_type" widget="radio" readonly="state == 'approved'"/>
+                        </group>
+                        <group string="Committee Approval Roles">
+                            <field name="chairperson_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
+                            <field name="panel_member_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
+                            <field name="secretary_id" required="1" readonly="state == 'approved'" options="{'no_create': True}"/>
+                            <field name="observer_id" readonly="state == 'approved'" options="{'no_create': True}"
+                                   help="Labor Representative (Optional to sign)"/>
+                            <field name="is_fully_signed" invisible="1"/>
+                        </group>
                     </group>
 
                     <notebook>
@@ -91,10 +109,10 @@
                             </field>
                         </page>
 
-                        <!-- Tab 2: Ranked List  /  /  -->
-                        <page string="Ranked Candidates ">
-                            <field name="ranking_line_ids">
-                                <list editable="bottom"
+                        <!-- Tab 2: Ranked List -->
+                        <page string="Ranked Candidates">
+                            <field name="ranking_line_ids" readonly="state == 'approved'">
+                                <list editable="bottom" create="0" delete="0"
                                       decoration-success="selection_decision == 'selected'"
                                       decoration-muted="selection_decision == 'not_selected'">
                                     <field name="rank" readonly="1"/>
@@ -115,13 +133,34 @@
                                     <field name="final_score" readonly="1"
                                            string="Final Score"/>
                                     <field name="selection_decision" widget="badge"
+                                           readonly="parent.state in ['waiting_signature', 'approved']"
                                            decoration-success="selection_decision == 'selected'"
                                            decoration-muted="selection_decision == 'not_selected'"/>
                                 </list>
                             </field>
                         </page>
 
-                        <!-- Tab 3: Selection Decision / Committee Notes -->
+                        <!-- Tab 3: Committee Digital Signatures -->
+                        <page string="Committee Digital Signatures">
+                            <field name="signature_line_ids" readonly="state == 'approved'">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-success="state == 'signed'"
+                                      decoration-warning="state == 'pending' and is_mandatory"
+                                      decoration-muted="state == 'pending' and not is_mandatory">
+                                    <field name="role_label" readonly="1"/>
+                                    <field name="user_id" readonly="1"/>
+                                    <field name="is_mandatory" readonly="1" widget="boolean_toggle" string="Mandatory?"/>
+                                    <field name="digital_signature" widget="signature"/>
+                                    <field name="signed_on" readonly="1"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'signed'"
+                                           decoration-warning="state == 'pending'"/>
+                                    <button name="action_sign_digitally" string="Confirm Sign" type="object" class="btn-primary" invisible="state == 'signed'"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- Tab 4: Selection Decision / Committee Notes -->
                         <page string="Committee Notes">
                             <field name="selection_decision"
                                    placeholder="Record the committee's final selection decision and any supporting notes..."

@@ -77,6 +77,7 @@
                     <button name="action_generate_minute" string="Generate Minute" type="object" class="btn-secondary" icon="fa-file-text-o"/>
                     <button name="action_open_digital_minute" string="Digital Selection Minute" type="object" class="btn-primary" icon="fa-pencil-square-o" help="Open or create the digital committee selection minute for digital signatures."/>
                     <button name="action_promote_selected_employees" string="Promote Selected Employees" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-rocket" invisible="not scores_computed"/>
+                    <button name="action_print_all_promotion_letters" string="📄 Promotion Letters" type="object" class="btn-secondary" icon="fa-print" invisible="not employees_promoted"/>
                     <button name="notify_selection" invisible="selection_notified == True" string="Notify Selection" type="object" class="btn-success" style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;" icon="fa-trophy"/>
                     <field name="state" widget="statusbar" statusbar_visible="notify,evaluate,approved"/>
                 </header>
@@ -111,6 +112,9 @@
                             <field name="pms_weight" widget="float" readonly="scores_computed == True"/>
                             <field name="written_weight" widget="float" readonly="scores_computed == True"/>
                             <field name="interview_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="exam_candidate_summary"
+                                   placeholder="Write summary about exams &amp; selected candidates for Approval Committee..."
+                                   invisible="state != 'notify'"/>
                         </group>
                         <group string="Exam &amp; Interview Schedules">
                             <field name="written_exam_date" readonly="scores_computed == True"/>
@@ -126,7 +130,7 @@
                     <notebook>
                         <page string="Selected Employees">
                             <field name="new_int_rec_sel" readonly="scores_computed == True">
-                                <list string="Selected Employees" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']">
+                                <list string="Selected Employees" editable="bottom" delete="0" decoration-success="selection_type in ['selected', 'Selected']" decoration-warning="selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']" decoration-danger="selection_type in ['rejected', 'Disqualified']" decoration-muted="selection_type in ['pending', 'Pending Evaluation']">
                                     <field name="emp_name" readonly="parent.scores_computed == True"/>
                                     <field name="select_flag" readonly="parent.scores_computed == True"/>
                                     <field name="emp_position" readonly="parent.scores_computed == True"/>
@@ -141,15 +145,19 @@
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
                                     <field name="promotion_type" readonly="1" optional="show"/>
                                     <field name="promotion_status" readonly="1" optional="show"/>
-                                    <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or promotion_status in ('promoted', 'released')"/>
+                                    <field name="promoted_salary" optional="show" string="Salary (ETB)"/>
+                                    <field name="promotion_ref_no" readonly="1" optional="show" string="Ref No"/>
+                                    <button name="action_print_promotion_letter" string="📄 Letter" type="object" class="btn-secondary btn-sm" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'"/>
+                                    <button name="action_open_release_wizard" string="📋 Release Form" type="object" class="btn-warning btn-sm" invisible="selection_type != 'selected' or promotion_type != 'diff_unit' or not parent.minute_signed or promotion_status in ('promoted', 'released')"/>
                                     <field name="remarks"/>
                                 </list>
                             </field>
                         </page>
                         <page string="Panel Members">
-                            <field name="new_int_rec_panel">
+                            <field name="new_int_rec_panel" context="{'parent_workunit_id': workunit_id, 'default_vacancy_id': vacancy_id}">
                                 <list string="Panel Members" editable="bottom" delete="0">
-                                    <field name="emp_name"/>
+                                    <field name="eligible_employee_ids" column_invisible="1"/>
+                                    <field name="emp_name" domain="[('id', 'in', eligible_employee_ids)]"/>
                                     <field name="selection_criteria"/>
                                     <field name="accepted"/>
                                     <field name="response_status"
@@ -163,22 +171,25 @@
                                            decoration-success="delegation_state == 'approved'"
                                            decoration-danger="delegation_state == 'rejected'"/>
                                     <field name="response_reason" optional="show"/>
-                                    <button name="action_open_response_wizard" string="Respond" type="object" class="btn-sm btn-secondary"/>
+                                    <button name="action_open_response_wizard" string="Respond" type="object" class="btn-sm btn-secondary" invisible="response_status != 'pending'"/>
                                     <button name="action_approve_delegation" string="Approve Delegation" type="object" class="btn-sm btn-success" invisible="delegation_state != 'pending_hr'"/>
                                     <button name="action_reject_delegation" string="Reject Delegation" type="object" class="btn-sm btn-danger" invisible="delegation_state != 'pending_hr'"/>
                                 </list>
                             </field>
                         </page>
                         <page string="Recruitment Approval Committee">
-                            <field name="recr_selected_team_id">
-                                <list editable="bottom" delete="0">
-                                    <field name="role" width="20%"/>
-                                    <field name="employee_name" width="20%"/>
-                                    <field name="operating_unit" width="20%"/>
-                                    <field name="status" width="20%"/>
-                                    <field name="alternate_committee_member" width="20%"/>
-                                    <field name="alter_operating_unit" width="20%"/>
-                                    <field name="approve" width="20%"/>
+                            <field name="recr_selected_team_id" context="{'parent_workunit_id': workunit_id, 'default_new_rec_del_id': id}">
+                                <list editable="bottom" delete="0" decoration-success="approve == True">
+                                    <field name="eligible_user_ids" column_invisible="1"/>
+                                    <field name="role"/>
+                                    <field name="employee_name" domain="[('id', 'in', eligible_user_ids)]"/>
+                                    <field name="operating_unit"/>
+                                    <field name="status"/>
+                                    <field name="alternate_committee_member" domain="[('id', 'in', eligible_user_ids)]"/>
+                                    <field name="alter_operating_unit"/>
+                                    <field name="digital_signature" widget="signature" readonly="1"/>
+                                    <field name="signed_on" readonly="1"/>
+                                    <field name="approve"/>
                                 </list>
                             </field>
                         </page>

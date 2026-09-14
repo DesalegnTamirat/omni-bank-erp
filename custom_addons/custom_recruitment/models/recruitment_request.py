@@ -4,8 +4,11 @@ from datetime import timedelta
 
 from xlwt.ExcelFormulaLexer import false_pattern
 
+import logging
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class RecruitmentRequest(models.Model):
@@ -40,10 +43,11 @@ class RecruitmentRequest(models.Model):
         unit_id = self._default_operating_unit_id()
         if not unit_id:
             return False
-        plans = self.env["planning.work.unit.manpower"].search([
-            ("work_unit_id", "=", unit_id),
+        plans = self.env["pbms.planning.category"].search([
+            ("category", "=", "manpower"),
+            ("org_unit_id", "=", unit_id),
             ("state", "=", "approved"),
-            ("del_flg", "=", "N"),
+            ("active", "=", True),
         ], order="id desc")
         return plans[0].id if plans else False
 
@@ -74,18 +78,17 @@ class RecruitmentRequest(models.Model):
     )
     operating_unit_id = fields.Many2one(
         "operating.unit", string="Work Unit", required=True, tracking=True,
-        default=lambda self: self._default_operating_unit_id(),readonly= True,
+        default=lambda self: self._default_operating_unit_id(),
         help="Defaults to the logged-in user's own Work Unit and is "
              "read-only in Draft."
     )
 
     workforce_plan_id = fields.Many2one(
-        "planning.work.unit.manpower", string="Approved Workforce Plan",
+        "pbms.planning.category", string="Approved Workforce Plan",
         tracking=True,
         default=lambda self: self._default_workforce_plan_id(),
-        domain="[('work_unit_id', '=', operating_unit_id), "
-               "('state', '=', 'approved'), ('del_flg', '=', 'N')]",
-        help=": Required for Planned requests. Only approved plans "
+        domain="[('category', '=', 'manpower'), ('org_unit_id', '=', operating_unit_id), ('state', '=', 'approved'), ('active', '=', True)]",
+        help="Required for Planned requests. Only approved PBMS Manpower plans "
              "belonging to the selected Work Unit are selectable. "
              "Auto-filled when an Approved plan exists for your Work Unit."
     )
@@ -171,6 +174,9 @@ class RecruitmentRequest(models.Model):
         for rec in self:
             user = rec.env.user
             has_hr_group = (
+                user.has_group("custom_recruitment.group_recruitment_officer") or
+                user.has_group("custom_recruitment.group_recruitment_manager") or
+                user.has_group("custom_recruitment.group_recruitment_administrator") or
                 user.has_group("hr.group_hr_user") or
                 user.has_group("hr.group_hr_manager") or
                 user.has_group("hr_recruitment.group_hr_recruitment_user") or
@@ -204,14 +210,17 @@ class RecruitmentRequest(models.Model):
             if rec.request_type == "unplanned":
                 jobs = self.env["hr.job"].search([])
             elif rec.workforce_plan_id:
-                jobs = rec.workforce_plan_id.manpower_line_ids.mapped("job_id")
+                lines = rec.workforce_plan_id.line_ids.filtered(lambda l: l.line_type == "manpower" and l.job_id)
+                jobs = lines.mapped("job_id")
             elif rec.operating_unit_id:
-                plans = self.env["planning.work.unit.manpower"].search([
-                    ("work_unit_id", "=", rec.operating_unit_id.id),
+                plans = self.env["pbms.planning.category"].search([
+                    ("category", "=", "manpower"),
+                    ("org_unit_id", "=", rec.operating_unit_id.id),
                     ("state", "=", "approved"),
-                    ("del_flg", "=", "N"),
+                    ("active", "=", True),
                 ])
-                jobs = plans.mapped("manpower_line_ids.job_id")
+                lines = plans.mapped("line_ids").filtered(lambda l: l.line_type == "manpower" and l.job_id)
+                jobs = lines.mapped("job_id")
             rec.allowed_job_ids = jobs
 
     @api.depends("operating_unit_id", "workforce_plan_id", "job_position_id", "request_type")
@@ -220,21 +229,22 @@ class RecruitmentRequest(models.Model):
             if not rec.job_position_id:
                 rec.allowed_grade_ids = self.env["employee.grade"].search([])
                 continue
-            lines = self.env["planning.manpower.line"]
+            lines = self.env["pbms.plan.category.line"]
             if rec.workforce_plan_id:
-                lines = rec.workforce_plan_id.manpower_line_ids.filtered(
-                    lambda l: l.job_id == rec.job_position_id
+                lines = rec.workforce_plan_id.line_ids.filtered(
+                    lambda l: l.line_type == "manpower" and l.job_id == rec.job_position_id
                 )
             elif rec.operating_unit_id:
-                plans = self.env["planning.work.unit.manpower"].search([
-                    ("work_unit_id", "=", rec.operating_unit_id.id),
+                plans = self.env["pbms.planning.category"].search([
+                    ("category", "=", "manpower"),
+                    ("org_unit_id", "=", rec.operating_unit_id.id),
                     ("state", "=", "approved"),
-                    ("del_flg", "=", "N"),
+                    ("active", "=", True),
                 ])
-                lines = plans.mapped("manpower_line_ids").filtered(
-                    lambda l: l.job_id == rec.job_position_id
+                lines = plans.mapped("line_ids").filtered(
+                    lambda l: l.line_type == "manpower" and l.job_id == rec.job_position_id
                 )
-            grades = lines.mapped("grade_id")
+            grades = lines.mapped("job_grade_id")
             if not grades and getattr(rec.job_position_id, 'grade', False):
                 grades = rec.job_position_id.grade
             if not grades:
@@ -323,14 +333,14 @@ class RecruitmentRequest(models.Model):
         (and `grade`, if one is set on the request). If no grade is set on
         the request, all grades/categories for that job are summed."""
         if not plan or not job:
-            return self.env["planning.manpower.line"]
-        lines = plan.manpower_line_ids.filtered(lambda l: l.job_id == job)
+            return self.env["pbms.plan.category.line"]
+        lines = plan.line_ids.filtered(lambda l: l.line_type == "manpower" and l.job_id == job)
         if grade:
-            lines = lines.filtered(lambda l: l.grade_id == grade)
+            lines = lines.filtered(lambda l: l.job_grade_id == grade)
         return lines
 
     def _get_plan_total_headcount(self, plan, job, grade):
-        return sum(self._get_matching_plan_lines(plan, job, grade).mapped("total_headcount"))
+        return sum(self._get_matching_plan_lines(plan, job, grade).mapped("quantity"))
 
     def _get_plan_consumed_headcount(self, plan, job, grade, exclude=None):
         """Sum of required_headcount from other active (submitted / under
@@ -399,21 +409,22 @@ class RecruitmentRequest(models.Model):
             ))
             return failures
 
-        # Plan must actually be approved (and not soft-deleted).
-        if plan.state != "approved" or plan.del_flg != "N":
+        plan_display_name = plan.display_name or plan.name or _("Plan #%s") % plan.id
+        # Plan must actually be approved (and active).
+        if plan.state != "approved" or not plan.active:
             failures.append((
                 "plan_not_approved",
                 _("Workforce Plan '%s' is not Approved (current status: %s).")
-                % (plan.name, dict(plan._fields["state"].selection).get(plan.state)),
+                % (plan_display_name, dict(plan._fields["state"].selection).get(plan.state)),
             ))
 
         # Plan must belong to the SAME work unit as the request.
-        if plan.work_unit_id != self.operating_unit_id:
+        if plan.org_unit_id != self.operating_unit_id:
             failures.append((
                 "work_unit_mismatch",
                 _("Workforce Plan '%s' belongs to Work Unit '%s', not this "
                   "request's Work Unit '%s'.")
-                % (plan.name, plan.work_unit_id.name, self.operating_unit_id.name),
+                % (plan_display_name, plan.org_unit_id.name, self.operating_unit_id.name),
             ))
 
         # : Position ID must exist in the Approved Workforce Plan.
@@ -423,15 +434,15 @@ class RecruitmentRequest(models.Model):
                 failures.append((
                     "position_not_on_plan",
                     _("Job Position '%s' with Grade '%s' does not exist in "
-                      "the Approved Workforce Plan  for '%s' list.So Please Contact People Operation Directorate teams")
-                    % (self.job_position_id.name, self.job_grade_id.grade_name, plan.name),
+                      "the Approved Workforce Plan for '%s'. Please contact People Operations Directorate.")
+                    % (self.job_position_id.name, self.job_grade_id.grade_name, plan_display_name),
                 ))
             else:
                 failures.append((
                     "position_not_on_plan",
                     _("Job Position '%s' does not exist in the Approved "
                       "Workforce Plan '%s'.")
-                    % (self.job_position_id.name, plan.name),
+                    % (self.job_position_id.name, plan_display_name),
                 ))
 
         # : Requested Headcount must not exceed Approved Budgeted
@@ -453,7 +464,7 @@ class RecruitmentRequest(models.Model):
                     % {
                         "req": self.required_headcount,
                         "job": self.job_position_id.name,
-                        "plan": plan.name,
+                        "plan": plan_display_name,
                         "total": plan_total,
                         "consumed": consumed_by_others,
                         "avail": available,
@@ -551,10 +562,11 @@ class RecruitmentRequest(models.Model):
         """If the Work Unit changes, auto-sync the approved workforce plan for that unit
         and clear selected job position if no longer valid under the new unit."""
         if self.operating_unit_id:
-            plans = self.env["planning.work.unit.manpower"].search([
-                ("work_unit_id", "=", self.operating_unit_id.id),
+            plans = self.env["pbms.planning.category"].search([
+                ("category", "=", "manpower"),
+                ("org_unit_id", "=", self.operating_unit_id.id),
                 ("state", "=", "approved"),
-                ("del_flg", "=", "N"),
+                ("active", "=", True),
             ])
             if len(plans) == 1:
                 self.workforce_plan_id = plans.id
@@ -566,7 +578,7 @@ class RecruitmentRequest(models.Model):
             if hasattr(self.operating_unit_id, "department") and self.operating_unit_id.department:
                 self.department_id = self.operating_unit_id.department
 
-        if self.workforce_plan_id and self.workforce_plan_id.work_unit_id != self.operating_unit_id:
+        if self.workforce_plan_id and self.workforce_plan_id.org_unit_id != self.operating_unit_id:
             self.workforce_plan_id = False
 
         if self.job_position_id and self.allowed_job_ids and self.job_position_id not in self.allowed_job_ids:
@@ -610,18 +622,23 @@ class RecruitmentRequest(models.Model):
             self.required_qualifications = self.job_position_id.requirements
 
         # Auto-sync grade if exactly one grade planned
-        lines = self.env["planning.manpower.line"]
+        lines = self.env["pbms.plan.category.line"]
         if self.workforce_plan_id:
-            lines = self.workforce_plan_id.manpower_line_ids.filtered(lambda l: l.job_id == self.job_position_id)
+            lines = self.workforce_plan_id.line_ids.filtered(
+                lambda l: l.line_type == "manpower" and l.job_id == self.job_position_id
+            )
         elif self.operating_unit_id:
-            plans = self.env["planning.work.unit.manpower"].search([
-                ("work_unit_id", "=", self.operating_unit_id.id),
+            plans = self.env["pbms.planning.category"].search([
+                ("category", "=", "manpower"),
+                ("org_unit_id", "=", self.operating_unit_id.id),
                 ("state", "=", "approved"),
-                ("del_flg", "=", "N"),
+                ("active", "=", True),
             ])
-            lines = plans.mapped("manpower_line_ids").filtered(lambda l: l.job_id == self.job_position_id)
+            lines = plans.mapped("line_ids").filtered(
+                lambda l: l.line_type == "manpower" and l.job_id == self.job_position_id
+            )
 
-        grades = lines.mapped("grade_id")
+        grades = lines.mapped("job_grade_id")
         if len(grades) == 1:
             self.job_grade_id = grades.id
         elif getattr(self.job_position_id, 'grade', False):
@@ -635,6 +652,7 @@ class RecruitmentRequest(models.Model):
         if self.request_type != "planned" or not self.workforce_plan_id or not self.job_position_id:
             return
         plan = self.workforce_plan_id
+        plan_display_name = plan.display_name or plan.name or _("Plan #%s") % plan.id
         matching_lines = self._get_matching_plan_lines(plan, self.job_position_id, self.job_grade_id)
         if not matching_lines:
             return {
@@ -644,7 +662,7 @@ class RecruitmentRequest(models.Model):
                         "Job Position '%s' is not part of the Approved Workforce "
                         "Plan '%s'. You will not be able to save this request "
                         "until you correct this."
-                    ) % (self.job_position_id.name, plan.name),
+                    ) % (self.job_position_id.name, plan_display_name),
                 }
             }
         total = self._get_plan_total_headcount(plan, self.job_position_id, self.job_grade_id)
@@ -732,11 +750,43 @@ class RecruitmentRequest(models.Model):
             "tag": "reload",
         }
 
+    def _check_segregation_of_duties(self, action_type):
+        """Enforces Segregation of Duties (SoD / Four-Eyes Principle):
+        1. Requester cannot Review or Approve their own request.
+        2. Reviewer cannot Approve the request (must be a distinct manager)."""
+        self.ensure_one()
+        current_uid = self.env.uid
+
+        # Requester check
+        is_requester = (
+            (self.create_uid and self.create_uid.id == current_uid) or
+            (self.requested_by and self.requested_by.user_id and self.requested_by.user_id.id == current_uid)
+        )
+
+        if action_type == "review":
+            if is_requester and not self.env.su:
+                raise UserError(_(
+                    "Segregation of Duties (SoD) Violation: The initiator/requester cannot review their own recruitment request. "
+                    "Verification must be performed by an independent HR Officer."
+                ))
+
+        elif action_type == "approve":
+            if is_requester and not self.env.su:
+                raise UserError(_(
+                    "Segregation of Duties (SoD) Violation: The initiator/requester cannot approve their own recruitment request."
+                ))
+            if self.reviewed_by and self.reviewed_by.id == current_uid and not self.env.su:
+                raise UserError(_(
+                    "Segregation of Duties (SoD) Violation: The HR Reviewer (%(reviewer)s) cannot also approve this request. "
+                    "Approval must be completed by a separate authorized manager (Four-Eyes Principle)."
+                ) % {"reviewer": self.reviewed_by.name})
+
     def action_start_review(self):
         for rec in self:
             rec._check_hr_role_or_raise()
+            rec._check_segregation_of_duties("review")
             rec.write({"state": "under_review", "reviewed_by": self.env.uid})
-            rec.message_post(body=_("Request is now under HR review."))
+            rec.message_post(body=_("Request is now under HR review by %s.") % self.env.user.name)
 
         # Reload the form to reflect status change immediately
         return {
@@ -747,6 +797,7 @@ class RecruitmentRequest(models.Model):
     def action_approve(self):
         for rec in self:
             rec._check_hr_role_or_raise()
+            rec._check_segregation_of_duties("approve")
             # Re-run checks at approval time since other requests may have consumed headcount.
             rec._check_workforce_plan_or_raise()
             rec.write({
@@ -754,7 +805,7 @@ class RecruitmentRequest(models.Model):
                 "approved_by": self.env.uid,
                 "approved_on": fields.Datetime.now(),
             })
-            rec.message_post(body=_("Recruitment request approved. Eligible for vacancy creation."))
+            rec.message_post(body=_("Recruitment request approved by %s. Eligible for vacancy creation.") % self.env.user.name)
 
         # Reload the form to reflect status change immediately
         return {
@@ -809,6 +860,7 @@ class RecruitmentRequest(models.Model):
         if self.state != "approved":
             raise UserError(_("Only approved requests can be converted to a vacancy."))
         if self.vacancy_id:
+            self.vacancy_id._auto_sync_hiring_and_competencies()
             return {
                 "type": "ir.actions.act_window",
                 "res_model": "job.vacancy",
@@ -817,25 +869,85 @@ class RecruitmentRequest(models.Model):
                 "target": "current",
             }
 
-        # Default last_date_to_apply to 30 days from now if not set
-        last_date = self.last_date_to_apply
-        if not last_date:
-            last_date = fields.Date.today() + timedelta(days=30)
+        # Calculate opening date and closing date according to sourcing policy
+        opening_date = fields.Date.today()
+        days = 3 if self.sourcing_type == "internal" else 5
+        last_date = getattr(self, 'last_date_to_apply', False) or (opening_date + timedelta(days=days))
 
+        # Build competency lines from job position / mapping if available
+        comp_lines = []
+        if self.job_position_id:
+            job = self.job_position_id
+            if getattr(job, 'competencies_id', False) and job.competencies_id:
+                for comp_line in job.competencies_id:
+                    if comp_line.competencies:
+                        comp_lines.append((0, 0, {
+                            'competency_id': comp_line.competencies.id,
+                            'required_level': 'intermediate',
+                            'notes': getattr(comp_line, 'requirement', '') or '',
+                        }))
+            if not comp_lines:
+                mapping = self.env['competency.role.mapping'].search([
+                    ('job_position_id', '=', job.id),
+                    ('state', '=', 'approved')
+                ], limit=1)
+                if not mapping:
+                    mapping = self.env['competency.role.mapping'].search([
+                        ('job_position_id', '=', job.id)
+                    ], limit=1)
+                level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
+                if mapping and mapping.line_ids:
+                    for line in mapping.line_ids:
+                        req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
+                        comp_lines.append((0, 0, {
+                            'competency_id': line.competency_id.id,
+                            'required_level': req_lvl,
+                        }))
+                else:
+                    comps = self.env['competency.competency'].search([
+                        ('applicable_job_ids', 'in', [job.id]),
+                        ('status', '=', 'active')
+                    ])
+                    if not comps:
+                        comps = self.env['competency.competency'].search([
+                            ('status', '=', 'active')
+                        ], limit=4)
+                    for comp in comps:
+                        comp_lines.append((0, 0, {
+                            'competency_id': comp.id,
+                            'required_level': 'intermediate',
+                        }))
+
+        grade_id = self.job_grade_id.id if self.job_grade_id else (
+            self.job_position_id.grade.id if getattr(self.job_position_id, 'grade', False) else False
+        )
+
+        resp_id = self.requested_by.id if self.requested_by else (self.env.user.employee_id.id if self.env.user.employee_id else False)
         vacancy = self.env["job.vacancy"].create({
             "recruitment_request_id": self.id,
             "recruitment_reference": self.reference,
             "job_position": self.job_position_id.id,
+            "job_grade": grade_id,
             "operating_unit_id": self.operating_unit_id.id,
-            "responsible": self.requested_by.id,
+            "responsible": resp_id,
             "no_of_vacancies": self.required_headcount,
             "type_of_employment": "Permanent" if self.employment_type == "permanent" else "Contractual",
             "sourcing_type": self.sourcing_type,
             "recruitment_type": "Internal" if self.sourcing_type == "internal" else "External",
+            "internal_movement_type": "external" if self.sourcing_type == "external" else "promotion",
             "vacancy_description": self.job_description or "",
+            "opening_date": opening_date,
             "last_date_to_apply": last_date,
             "employee_category": self.employee_category,
             "job_level": self.job_level if self.employee_category == "Non Managerial" else False,
+            "competency_line_ids": comp_lines,
+            "hiring_details": [(0, 0, {
+                "work_unit": self.operating_unit_id.id,
+                "responsible_employee": resp_id,
+                "number_of_openings": self.required_headcount or 1,
+                "planned_positions": self.required_headcount or 1,
+                "status": "In Progress",
+            })],
         })
         self.write({"vacancy_id": vacancy.id})
         self.message_post(body=_("Vacancy %s created from this request.") % vacancy.reference)
@@ -862,14 +974,14 @@ class RecruitmentRequest(models.Model):
         partners = hr_users.mapped("partner_id")
         if partners:
             body = _(
-                "A new Recruitment Request <b>%(ref)s</b> has been submitted by <b>%(user)s</b> "
-                "for the position <b>%(pos)s</b> in <b>%(unit)s</b>. Please review."
+                "A new Recruitment Request %(ref)s has been submitted by %(user)s "
+                "for the position %(pos)s in %(unit)s. Please review."
             ) % {
-                       "ref": self.reference,
-                       "user": self.requested_by.name,
-                       "pos": self.job_position_id.name or "",
-                       "unit": self.operating_unit_id.name or "",
-                   }
+                "ref": self.reference,
+                "user": self.requested_by.name if self.requested_by else self.env.user.name,
+                "pos": self.job_position_id.name or "",
+                "unit": self.operating_unit_id.name or "",
+            }
             # Use chat for 1-2 people, group for 3+ people
             if len(partners) <= 2:
                 channel = self.env["discuss.channel"]._get_or_create_chat(
@@ -888,3 +1000,66 @@ class RecruitmentRequest(models.Model):
             channel.message_post(
                 body=body, message_type="comment", subtype_xmlid="mail.mt_comment"
             )
+
+
+class OperatingUnitRecruitment(models.Model):
+    _inherit = "operating.unit"
+
+    recruitment_request_ids = fields.One2many(
+        "recruitment.request", "operating_unit_id", string="Recruitment Requests"
+    )
+    recruitment_request_count = fields.Integer(
+        string="Total Requests", compute="_compute_recruitment_request_stats"
+    )
+    recruitment_headcount_total = fields.Integer(
+        string="Total Headcount Requested", compute="_compute_recruitment_request_stats"
+    )
+    recruitment_pending_count = fields.Integer(
+        string="Pending Requests", compute="_compute_recruitment_request_stats"
+    )
+    recruitment_approved_count = fields.Integer(
+        string="Approved Requests", compute="_compute_recruitment_request_stats"
+    )
+
+    def _compute_recruitment_request_stats(self):
+        for rec in self:
+            requests = rec.recruitment_request_ids.filtered(lambda r: r.state != 'cancelled')
+            rec.recruitment_request_count = len(requests)
+            rec.recruitment_headcount_total = sum(requests.mapped('required_headcount'))
+            rec.recruitment_pending_count = len(requests.filtered(lambda r: r.state in ('submitted', 'under_review')))
+            rec.recruitment_approved_count = len(requests.filtered(lambda r: r.state == 'approved'))
+
+    def action_view_recruitment_requests(self):
+        self.ensure_one()
+        domain = [("operating_unit_id", "=", self.id)]
+        if self.env.context.get("my_requests_only"):
+            domain.extend([
+                "|",
+                ("create_uid", "=", self.env.uid),
+                ("requested_by.user_id", "=", self.env.uid),
+            ])
+        return {
+            "name": _("Recruitment Requests: %s") % self.name,
+            "type": "ir.actions.act_window",
+            "res_model": "recruitment.request",
+            "view_mode": "list,form",
+            "domain": domain,
+            "context": {
+                "default_operating_unit_id": self.id,
+                "search_default_grp_pos": 1,
+            },
+        }
+
+    def action_create_new_recruitment_request(self):
+        ctx = dict(self.env.context)
+        if len(self) == 1:
+            ctx['default_operating_unit_id'] = self.id
+        return {
+            'name': _('New Recruitment Request'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'recruitment.request',
+            'view_mode': 'form',
+            'views': [(self.env.ref('custom_recruitment.recruitment_request_form_view').id, 'form')],
+            'target': 'current',
+            'context': ctx,
+        }

@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="assessment_system.AssessmentDashboard">
+        <div class="o_assessment_dashboard">
+
+            <!-- ── Header ── -->
+            <div class="o_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4">
+                <h2 class="o_dashboard_title mb-0">Assessment Dashboard</h2>
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Period filter -->
+                    <select class="form-select o_period_select" style="width:150px;"
+                            t-on-change="onPeriodChange">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    <!-- Assessment module filter -->
+                    <select class="form-select o_period_select" style="width:170px;"
+                            t-on-change="onTypeChange">
+                        <option value="all">All Assessments</option>
+                        <option value="exam">Written Exams</option>
+                        <option value="interview">CBIS Interviews</option>
+                        <option value="transfer">Transfer Assessments</option>
+                    </select>
+                    <!-- Custom date inputs -->
+                    <div t-if="state.period === 'custom'" class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateFrom"
+                               t-on-change="onDateFromChange"/>
+                        <span class="text-muted fw-bold">–</span>
+                        <input type="date" class="form-control" style="width:140px;"
+                               t-att-value="state.dateTo"
+                               t-on-change="onDateToChange"/>
+                        <button class="btn btn-primary btn-sm" t-on-click="applyCustomRange">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-2x" style="color:#1d2632;"/>
+            </div>
+
+            <div t-else="" class="px-4 pb-4">
+
+                <!-- ── SECTION 1: Written Exam System Stat Cards ── -->
+                <div class="o_dashboard_section_title mb-2">Written Exams (EXM)</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_total" t-on-click="openSittingsAll">
+                            <div class="o_stat_label">Total Sittings</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.stats.total_sittings"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openSessionsDraft">
+                            <div class="o_stat_label">Draft Sessions</div>
+                            <div class="o_stat_value v-draft"><t t-esc="state.stats.draft_exam_sessions"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openSittingsLive">
+                            <div class="o_stat_label">Live / In Progress</div>
+                            <div class="o_stat_value v-progress"><t t-esc="state.stats.active_sittings"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_positive" t-on-click="openSittingsCompleted">
+                            <div class="o_stat_label">Completed</div>
+                            <div class="o_stat_value v-completed"><t t-esc="state.stats.completed_sittings"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openSittingsPassed">
+                            <div class="o_stat_label">Passed (&gt;= 50%)</div>
+                            <div class="o_stat_value v-external"><t t-esc="state.stats.passed_sittings"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openSittingsDisqualified">
+                            <div class="o_stat_label">Disqualified</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.stats.disqualified_sittings"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openGradingQueue">
+                            <div class="o_stat_label">Grading Queue</div>
+                            <div class="o_stat_value v-published"><t t-esc="state.stats.pending_grading_tasks"/></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 2: CBIS Interviews + Transfer Assessments ── -->
+                <div class="row g-3 mb-4">
+                    <!-- CBIS Interviews -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">Competency-Based Interviews (CBIS)</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_total" t-on-click="openInterviewsAll">
+                                    <div class="o_stat_label">Total Candidates</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.interview_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openMyEvaluationsDone">
+                                    <div class="o_stat_label">Evaluations Done</div>
+                                    <div class="o_stat_value v-completed"><t t-esc="state.stats.interview_completed"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openMyEvaluationsPending">
+                                    <div class="o_stat_label">Pending Eval</div>
+                                    <div class="o_stat_value v-progress"><t t-esc="state.stats.interview_pending"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Transfer Assessments -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">Transfer Assessments</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_total" t-on-click="openTransfersAll">
+                                    <div class="o_stat_label">Total Requests</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.transfer_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openTransfersApproved">
+                                    <div class="o_stat_label">Approved</div>
+                                    <div class="o_stat_value v-approved"><t t-esc="state.stats.transfer_approved"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openTransfersPending">
+                                    <div class="o_stat_label">In Progress</div>
+                                    <div class="o_stat_value v-pending"><t t-esc="state.stats.transfer_pending"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 3: Charts ── -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Assessment Distribution</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="assessmentPieChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Assessment Comparison</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="assessmentBarChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Assessment Trend</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="assessmentTrendChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 4: Pending Evaluator Action Table ── -->
+                <div class="row g-3" t-if="state.my_action_evals.length">
+                    <div class="col-12">
+                        <div class="o_chart_card">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div class="o_chart_title mb-0">My Pending Interview Evaluations</div>
+                                <button class="btn btn-sm btn-link text-decoration-none fw-bold" t-on-click="openMyEvaluations">
+                                    View All Evaluations <i class="fa fa-arrow-right"/>
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Candidate Code</th>
+                                            <th>Candidate Name</th>
+                                            <th>Target Job Position</th>
+                                            <th>Session Name</th>
+                                            <th class="text-end">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="state.my_action_evals" t-as="ev" t-key="ev.id">
+                                            <tr>
+                                                <td class="fw-bold"><t t-esc="ev.candidate_code"/></td>
+                                                <td><t t-esc="ev.candidate_name"/></td>
+                                                <td class="text-muted"><t t-esc="ev.job_title"/></td>
+                                                <td><t t-esc="ev.session_name"/></td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-primary" t-on-click="openSpecificEvaluation" t-att-data-eval-id="ev.id">
+                                                        Score Candidate <i class="fa fa-arrow-right"/>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

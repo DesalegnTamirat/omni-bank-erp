@@ -195,23 +195,28 @@ class EligibleEmployeesexternal(models.Model):
                                 compute='_compute_highest_qualification', store=True)
 
     def _auto_init(self):
-        self.env.cr.execute("""
-            SELECT data_type FROM information_schema.columns 
-            WHERE table_name = %s AND column_name = 'graduation_year'
-        """, (self._table,))
-        res = self.env.cr.fetchone()
-        if res and res[0] in ('integer', 'bigint', 'numeric', 'double precision'):
-            self.env.cr.execute(f"""
-                ALTER TABLE {self._table} 
-                ALTER COLUMN graduation_year TYPE date 
-                USING (
-                    CASE 
-                        WHEN graduation_year IS NULL OR graduation_year::text = '0' OR length(graduation_year::text) < 4 
-                        THEN NULL 
-                        ELSE (left(graduation_year::text, 4) || '-01-01')::date 
-                    END
-                );
-            """)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    SELECT data_type FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = 'graduation_year'
+                """, (self._table,))
+                res = self.env.cr.fetchone()
+                if res and res[0].lower() != 'date':
+                    self.env.cr.execute(f"""
+                        ALTER TABLE {self._table} 
+                        ALTER COLUMN graduation_year TYPE date 
+                        USING (
+                            CASE 
+                                WHEN graduation_year IS NULL THEN NULL 
+                                WHEN graduation_year::text ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}' THEN substring(graduation_year::text from 1 for 10)::date 
+                                WHEN graduation_year::text ~ '^\\d{{4}}' THEN (substring(graduation_year::text from 1 for 4) || '-01-01')::date 
+                                ELSE NULL 
+                            END
+                        );
+                    """)
+        except Exception as e:
+            _logger.warning("Safe migration on %s.graduation_year: %s", self._table, e)
         super()._auto_init()
 
     # ── Education list (multiple qualifications) ────────────────────────────
@@ -489,23 +494,28 @@ class ExternalApplicantEducation(models.Model):
     cgpa = fields.Float(string="CGPA / GPA", digits=(4, 2))
 
     def _auto_init(self):
-        self.env.cr.execute("""
-            SELECT data_type FROM information_schema.columns 
-            WHERE table_name = %s AND column_name = 'graduation_year'
-        """, (self._table,))
-        res = self.env.cr.fetchone()
-        if res and res[0] in ('integer', 'bigint', 'numeric', 'double precision'):
-            self.env.cr.execute(f"""
-                ALTER TABLE {self._table} 
-                ALTER COLUMN graduation_year TYPE date 
-                USING (
-                    CASE 
-                        WHEN graduation_year IS NULL OR graduation_year::text = '0' OR length(graduation_year::text) < 4 
-                        THEN NULL 
-                        ELSE (left(graduation_year::text, 4) || '-01-01')::date 
-                    END
-                );
-            """)
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    SELECT data_type FROM information_schema.columns 
+                    WHERE table_name = %s AND column_name = 'graduation_year'
+                """, (self._table,))
+                res = self.env.cr.fetchone()
+                if res and res[0].lower() != 'date':
+                    self.env.cr.execute(f"""
+                        ALTER TABLE {self._table} 
+                        ALTER COLUMN graduation_year TYPE date 
+                        USING (
+                            CASE 
+                                WHEN graduation_year IS NULL THEN NULL 
+                                WHEN graduation_year::text ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}' THEN substring(graduation_year::text from 1 for 10)::date 
+                                WHEN graduation_year::text ~ '^\\d{{4}}' THEN (substring(graduation_year::text from 1 for 4) || '-01-01')::date 
+                                ELSE NULL 
+                            END
+                        );
+                    """)
+        except Exception as e:
+            _logger.warning("Safe migration on %s.graduation_year: %s", self._table, e)
         super()._auto_init()
 
     @api.depends('graduation_date')

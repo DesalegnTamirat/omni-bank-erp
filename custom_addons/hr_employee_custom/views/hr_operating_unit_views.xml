@@ -51,30 +51,35 @@
                     </group>
 
                     <notebook>
-                        <page string="Job Positions" name="job_positions">
+                        <page string="Job Positions &amp; Establishment" name="job_positions">
                             <field name="job_position_ids" context="{'default_operating_unit_id': id}">
                                 <list editable="bottom"
                                       delete="0"
                                       decoration-danger="vacant_position_count &gt; 0"
                                       decoration-success="vacant_position_count == 0"
+                                      decoration-info="vacant_position_count &lt; 0"
                                       decoration-muted="not active">
-                                    <field name="job_position_id" string="Job Position" widget="many2one_avatar"/>
-                                    <field name="active" widget="boolean_toggle" string="Active" optional="show"/>
-                                    <field name="approved_plan_count" string="Approved Plan" sum="Total Approved"/>
+                                    <field name="job_position_id" string="Job Position"/>
+                                    <field name="job_grade_id" string="Grade" optional="show"/>
+                                    <field name="active" widget="boolean_toggle" string="Active" optional="hide"/>
+                                    <field name="total_headcount" string="Total Headcount" sum="Total Headcount" readonly="1" class="fw-bold"/>
+                                    <field name="baseline_count" string="Baseline Count" sum="Total Baseline" readonly="1"
+                                           help="Auto-computed from active employees with an open or probation contract."/>
+                                    <field name="approved_plan_count" string="Approved Plan" sum="Total Approved Plan"/>
                                     <field name="active_employee_count"
                                            string="Active Employees"
                                            sum="Total Active"
                                            readonly="1"
-                                           decoration-muted="active_employee_count == 0"/>
+                                           class="fw-bold"/>
                                     <field name="vacant_position_count"
-                                           string="Vacant"
+                                           string="Vacant Posts"
                                            sum="Total Vacant"
                                            readonly="1"
-                                           decoration-danger="vacant_position_count &gt; 0"
-                                           decoration-success="vacant_position_count == 0"/>
-                                    <field name="lateral_count" string="Lateral" readonly="1" optional="hide"/>
-                                    <field name="promotion_count" string="Promotion" readonly="1" optional="hide"/>
-                                    <field name="replacement_count" string="Replacement" readonly="1" optional="hide"/>
+                                           class="fw-bold text-danger"/>
+                                    <field name="lateral_count" string="Lateral" readonly="1" optional="show"/>
+                                    <field name="replacement_count" string="Replacement" readonly="1" optional="show"/>
+                                    <field name="promotion_count" string="Promotion" readonly="1" optional="show"/>
+                                    <field name="resignation_count" string="Resignation" readonly="1" optional="show"/>
                                 </list>
                             </field>
                         </page>

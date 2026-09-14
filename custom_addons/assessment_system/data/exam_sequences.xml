@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <record id="seq_exam_question" model="ir.sequence">
+        <field name="name">Exam Question Bank Sequence</field>
+        <field name="code">exam.question</field>
+        <field name="prefix">QST/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_definition" model="ir.sequence">
+        <field name="name">Exam Definition Sequence</field>
+        <field name="code">exam.definition</field>
+        <field name="prefix">EXM/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_session_cohort" model="ir.sequence">
+        <field name="name">Exam Session Cohort Sequence</field>
+        <field name="code">exam.session</field>
+        <field name="prefix">SESS/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_candidate_attempt" model="ir.sequence">
+        <field name="name">Exam Candidate Attempt Sequence</field>
+        <field name="code">exam.candidate.attempt</field>
+        <field name="prefix">ATT/</field>
+        <field name="padding">6</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_grading_task" model="ir.sequence">
+        <field name="name">Exam Grading Task Sequence</field>
+        <field name="code">exam.grading.task</field>
+        <field name="prefix">GRADE/</field>
+        <field name="padding">6</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_manual_override" model="ir.sequence">
+        <field name="name">Exam Score Manual Override Sequence</field>
+        <field name="code">exam.manual.override</field>
+        <field name="prefix">OVR/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_disqualification_log" model="ir.sequence">
+        <field name="name">Exam Disqualification Log Sequence</field>
+        <field name="code">exam.disqualification.log</field>
+        <field name="prefix">DISQ/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_exam_disqualification_appeal" model="ir.sequence">
+        <field name="name">Disqualification Appeal Sequence</field>
+        <field name="code">exam.disqualification.appeal</field>
+        <field name="prefix">APL/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_assessment_result_publication" model="ir.sequence">
+        <field name="name">Assessment Result Publication Sequence</field>
+        <field name="code">assessment.result.publication</field>
+        <field name="prefix">PUB/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_cbis_interview_session" model="ir.sequence">
+        <field name="name">CBIS Interview Session Sequence</field>
+        <field name="code">cbis.interview.session</field>
+        <field name="prefix">INT/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <record id="seq_transfer_assessment_record" model="ir.sequence">
+        <field name="name">Transfer Assessment Record Sequence</field>
+        <field name="code">transfer.assessment.record</field>
+        <field name="prefix">TRA/</field>
+        <field name="padding">5</field>
+        <field name="number_next">1</field>
+        <field name="number_increment">1</field>
+    </record>
+
+</odoo>

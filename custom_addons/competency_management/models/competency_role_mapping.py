@@ -54,6 +54,16 @@ class CompetencyRoleMapping(models.Model):
             else:
                 rec.grade_id = False
 
+    @api.model
+    def get_competencies_for_job_and_grade(self, job_id, grade_id=None):
+        """API helper method for Career Path, Recruitment, and external modules.
+        Returns mapped required competencies for a job position (or grade fallback).
+        """
+        job = self.env['hr.job'].browse(job_id) if isinstance(job_id, int) else job_id
+        if not job or not job.exists():
+            return []
+        return job.get_required_competencies(grade_id=grade_id)
+
     @api.depends('job_position_id', 'grade_id', 'is_operating_unit_specific', 'operating_unit_ids')
     def _compute_mapping_name(self):
         for rec in self:
@@ -74,7 +84,7 @@ class CompetencyRoleMapping(models.Model):
             if rec.job_position_id and rec.state in ('under_approval', 'approved'):
                 domain = [
                     ('job_position_id', '=', rec.job_position_id.id),
-                    ('state', 'in', ('under_approval', 'approved')),
+                    ('state', '=', rec.state),
                     ('id', '!=', rec.id),
                     ('is_operating_unit_specific', '=', rec.is_operating_unit_specific),
                 ]
@@ -233,6 +243,7 @@ class CompetencyRoleMapping(models.Model):
             'approved_by_id': False,
             'approval_date': False,
             'change_description': change_desc,
+            'line_ids': [(0, 0, line.copy_data()[0]) for line in self.line_ids],
         })
         return {
             'type': 'ir.actions.act_window',

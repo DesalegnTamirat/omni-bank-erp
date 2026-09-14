@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Renames the top-navbar "Contact Us" website menu item to "Feedback".
+        Only the label is changed - the link/URL and every other menu item
+        are left untouched. This runs on both install and module upgrade
+        (unlike a post_init_hook, which only runs on fresh install).
+    -->
+    <function model="website.menu" name="write">
+        <value model="website.menu"
+               search="[('name', 'ilike', 'contact')]"/>
+        <value eval="{'name': 'Feedback'}"/>
+    </function>
+</odoo>

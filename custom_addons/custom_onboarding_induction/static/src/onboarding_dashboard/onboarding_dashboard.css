@@ -1,0 +1,133 @@
+/* Onboarding & Induction Dashboard — Bunna Bank S.C. */
+:root {
+    --ob-primary:   #425707;
+    --ob-secondary: #726732;
+    --ob-accent:    #C17540;
+    --ob-navy:      #1d2b32;
+    --ob-teal:      #1e2917;
+    --ob-berry:     #7A1F3D;
+    --ob-coffee:    #4A261A;
+    --ob-gold:      #D4A359;
+    --ob-bg:        #f7f9f5;
+    --ob-card-bg:   #ffffff;
+    --ob-border:    #dcdfd8;
+    --ob-text:      #1d2b32;
+    --ob-muted:     #6b7762;
+}
+
+.o_onboarding_dashboard {
+    background: var(--ob-bg);
+    min-height: 100%;
+    font-family: inherit;
+}
+
+.o_ob_dashboard_header {
+    border-bottom: 2px solid var(--ob-coffee);
+    padding-bottom: 12px;
+}
+
+.o_ob_dashboard_title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ob-coffee);
+}
+
+.o_ob_period_select {
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid var(--ob-primary);
+}
+
+.o_ob_dashboard_header input[type="date"] {
+    font-size: 13px;
+    border-radius: 6px;
+    border: 1px solid var(--ob-primary);
+}
+
+.o_ob_apply_btn {
+    background: var(--ob-coffee);
+    border-color: var(--ob-coffee);
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.o_ob_apply_btn:hover {
+    background: #2e1510;
+    border-color: #2e1510;
+}
+
+.o_ob_section_title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ob-coffee);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.o_ob_stat_card {
+    background: var(--ob-card-bg);
+    border-radius: 10px;
+    padding: 16px 16px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.15s;
+    border-left: 4px solid var(--ob-border);
+    min-height: 86px;
+}
+
+.o_ob_stat_card:hover {
+    box-shadow: 0 4px 18px rgba(29,38,50,0.15);
+    transform: translateY(-2px);
+}
+
+.o_ob_stat_card.o_ob_stat_total    { border-left-color: var(--ob-coffee);   }
+.o_ob_stat_card.o_ob_stat_positive { border-left-color: var(--ob-primary);  }
+.o_ob_stat_card.o_ob_stat_warning  { border-left-color: var(--ob-accent);   }
+.o_ob_stat_card.o_ob_stat_danger   { border-left-color: var(--ob-berry);    }
+
+.o_ob_stat_label {
+    font-size: 11px;
+    color: var(--ob-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.o_ob_stat_value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.o_ob_stat_value.v-total     { color: var(--ob-coffee);    }
+.o_ob_stat_value.v-draft     { color: #8a8a72;              }
+.o_ob_stat_value.v-preboard  { color: var(--ob-accent);    }
+.o_ob_stat_value.v-gate      { color: var(--ob-navy);      }
+.o_ob_stat_value.v-workunit  { color: #1e6b7a;              }
+.o_ob_stat_value.v-midterm   { color: #8B6914;              }
+.o_ob_stat_value.v-completed { color: var(--ob-primary);   }
+.o_ob_stat_value.v-escalated { color: var(--ob-berry);     }
+.o_ob_stat_value.v-progress  { color: var(--ob-accent);    }
+.o_ob_stat_value.v-overdue   { color: var(--ob-berry);     }
+.o_ob_stat_value.v-pending   { color: var(--ob-secondary); }
+
+.o_ob_chart_card {
+    background: var(--ob-card-bg);
+    border-radius: 12px;
+    padding: 18px 16px 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border-top: 3px solid var(--ob-coffee);
+    height: 100%;
+}
+
+.o_ob_chart_title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ob-coffee);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Form View: Exam Session -->
+    <record id="view_exam_session_form" model="ir.ui.view">
+        <field name="name">exam.session.form</field>
+        <field name="model">exam.session</field>
+        <field name="arch" type="xml">
+            <form string="Exam Sitting Session">
+                <header>
+                    <button name="action_fetch_recruitment_candidates" string="Fetch Candidates from Recruitment" type="object" invisible="state != 'draft'" class="btn-primary" icon="fa-users"/>
+                    <button name="action_schedule" string="Confirm Schedule" type="object" invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_send_invitations" string="Dispatch Candidate Invitations" type="object" invisible="state not in ['scheduled', 'active']" class="btn-success"/>
+                    <button name="action_start_session" string="Open / Start Session" type="object" invisible="state != 'scheduled'" class="btn-warning"/>
+                    <button name="action_submit_all_essay_evaluations" string="Compute &amp; Finalize All Essay Evaluations" type="object" class="btn-success" invisible="state not in ['active', 'evaluating']" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    <button name="action_close_session" string="Close Session &amp; Evaluate" type="object" invisible="state != 'active'" class="btn-danger"/>
+                    <button name="action_finalize_results" string="Finalize Results" type="object" invisible="state != 'evaluating'" class="btn-primary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,scheduled,active,evaluating,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Session Reference"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="exam_id" domain="[('is_version_paper', '=', False)]"/>
+                            <field name="job_id"/>
+                            <field name="vacancy_id"/>
+                            <field name="venue_type"/>
+                        </group>
+                        <group>
+                            <field name="start_datetime"/>
+                            <field name="end_datetime"/>
+                            <field name="duration_minutes"/>
+                            <field name="location_notes"/>
+                        </group>
+                    </group>
+                    <group string="Proctors &amp; Invigilators">
+                        <field name="invigilator_user_ids" widget="many2many_tags"/>
+                    </group>
+                    <notebook>
+                        <page string="Candidate Exam Attempts">
+                            <field name="attempt_ids">
+                                <list decoration-danger="state == 'disqualified'" decoration-success="is_passed and state == 'completed'" decoration-warning="state == 'in_progress'">
+                                    <field name="candidate_code"/>
+                                    <field name="candidate_name"/>
+                                    <field name="candidate_type"/>
+                                    <field name="version_code" string="Version" widget="badge"/>
+                                    <field name="version_exam_id" string="Assigned Paper" optional="show"/>
+                                    <field name="tab_switch_count"/>
+                                    <field name="total_score"/>
+                                    <field name="score_percentage"/>
+                                    <field name="is_passed"/>
+                                    <field name="state" widget="badge"/>
+                                    <button name="action_open_exam_portal" string="Open Exam" type="object" icon="fa-external-link" class="btn-link"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Session Statistics">
+                            <group>
+                                <group>
+                                    <field name="candidate_count"/>
+                                    <field name="completed_count"/>
+                                </group>
+                                <group>
+                                    <field name="passed_count"/>
+                                    <field name="disqualified_count"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Exam Session -->
+    <record id="view_exam_session_tree" model="ir.ui.view">
+        <field name="name">exam.session.list</field>
+        <field name="model">exam.session</field>
+        <field name="arch" type="xml">
+            <list string="Exam Sessions" decoration-info="state == 'draft'" decoration-warning="state == 'active'" decoration-success="state == 'completed'">
+                <field name="name"/>
+                <field name="exam_id"/>
+                <field name="job_id"/>
+                <field name="start_datetime"/>
+                <field name="end_datetime"/>
+                <field name="candidate_count"/>
+                <field name="passed_count"/>
+                <field name="disqualified_count"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action: Exam Sessions -->
+    <record id="action_exam_sessions" model="ir.actions.act_window">
+        <field name="name">Exam Sessions</field>
+        <field name="res_model">exam.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Form View: Candidate Attempt -->
+    <record id="view_exam_candidate_attempt_form" model="ir.ui.view">
+        <field name="name">exam.candidate.attempt.form</field>
+        <field name="model">exam.candidate.attempt</field>
+        <field name="arch" type="xml">
+            <form string="Candidate Exam Attempt">
+                <header>
+                    <button name="action_open_exam_portal" string="Open Exam Sitting" type="object" class="btn-primary"/>
+                    <button name="action_recalculate_scores" string="Recalculate Scores" type="object" class="btn-outline-primary" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    <button name="action_send_invitation_email" string="Resend Invitation Email" type="object" invisible="state == 'completed'" class="btn-secondary" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    <field name="state" widget="statusbar" statusbar_visible="assigned,invited,in_progress,completed,disqualified"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Attempt Reference"/>
+                        <h3><field name="name" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <field name="exam_portal_url" widget="CopyClipboardChar" readonly="1" string="Candidate Exam Link" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="candidate_code"/>
+                            <field name="candidate_name"/>
+                            <field name="candidate_type"/>
+                            <field name="applicant_id" invisible="candidate_type != 'external'"/>
+                            <field name="employee_id" invisible="candidate_type == 'external'"/>
+                            <field name="candidate_email"/>
+                        </group>
+                        <group>
+                            <field name="session_id"/>
+                            <field name="exam_id"/>
+                            <field name="job_id"/>
+                            <field name="access_token" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                        </group>
+                    </group>
+                    <group string="Timestamps &amp; Duration">
+                        <group>
+                            <field name="start_datetime"/>
+                            <field name="submit_datetime"/>
+                        </group>
+                        <group>
+                            <field name="duration_used_seconds"/>
+                            <field name="token_expiry"/>
+                        </group>
+                    </group>
+                    <group string="Anti-Cheating Violations &amp; Proctoring Logs" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
+                        <group>
+                            <field name="tab_switch_count" decoration-danger="tab_switch_count &gt;= 3"/>
+                            <field name="copy_paste_attempt_count"/>
+                        </group>
+                        <group>
+                            <field name="screenshot_attempt_count"/>
+                            <field name="disqualification_reason" invisible="not disqualification_reason"/>
+                        </group>
+                    </group>
+                    <group string="Exam Score Summary">
+                        <group>
+                            <field name="objective_score" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                            <field name="manual_score" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                            <field name="total_score"/>
+                        </group>
+                        <group>
+                            <field name="total_marks_available"/>
+                            <field name="score_percentage"/>
+                            <field name="is_passed" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <!-- 1. Candidate Responses: Only visible to Administrative & HR roles -->
+                        <page string="Candidate Responses" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
+                            <field name="answer_ids" readonly="1">
+                                <list create="0" edit="0" delete="0">
+                                    <field name="sequence"/>
+                                    <field name="question_text"/>
+                                    <field name="question_type"/>
+                                    <field name="text_answer" string="Candidate Response"/>
+                                    <field name="marks_available"/>
+                                    <field name="marks_awarded"/>
+                                    <field name="is_correct"/>
+                                    <field name="is_marked_for_review"/>
+                                </list>
+                            </field>
+                        </page>
+                        <!-- 2. Proctoring Event Stream: Read-only without editing -->
+                        <page string="Proctoring Event Stream" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
+                            <field name="proctor_event_ids" readonly="1">
+                                <list create="0" edit="0" delete="0">
+                                    <field name="timestamp"/>
+                                    <field name="event_type"/>
+                                    <field name="details"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View: Candidate Attempts -->
+    <record id="view_exam_candidate_attempt_tree" model="ir.ui.view">
+        <field name="name">exam.candidate.attempt.list</field>
+        <field name="model">exam.candidate.attempt</field>
+        <field name="arch" type="xml">
+            <list string="Candidate Exam Sittings" decoration-danger="state == 'disqualified'" decoration-success="is_passed">
+                <field name="name"/>
+                <field name="candidate_code"/>
+                <field name="candidate_name"/>
+                <field name="session_id"/>
+                <field name="total_score"/>
+                <field name="score_percentage"/>
+                <field name="is_passed"/>
+                <field name="tab_switch_count" optional="hide" groups="assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Search View: Candidate Attempts -->
+    <record id="view_exam_candidate_attempt_search" model="ir.ui.view">
+        <field name="name">exam.candidate.attempt.search</field>
+        <field name="model">exam.candidate.attempt</field>
+        <field name="arch" type="xml">
+            <search string="Search Candidate Attempts">
+                <field name="name" string="Attempt Ref / Token"/>
+                <field name="candidate_name"/>
+                <field name="candidate_code"/>
+                <field name="candidate_email"/>
+                <field name="session_id"/>
+                <field name="job_id"/>
+
+                <filter string="My Attempts" name="filter_my_attempts" domain="[('user_id', '=', uid)]"/>
+                <separator/>
+                <filter string="In Progress" name="filter_in_progress" domain="[('state', '=', 'in_progress')]"/>
+                <filter string="Completed" name="filter_completed" domain="[('state', '=', 'completed')]"/>
+                <filter string="Passed (>=50%)" name="filter_passed" domain="[('is_passed', '=', True)]"/>
+                <filter string="Disqualified" name="filter_disqualified" domain="[('state', '=', 'disqualified')]"/>
+
+                <group>
+                    <filter string="Exam Session" name="group_session" context="{'group_by': 'session_id'}"/>
+                    <filter string="Job Position" name="group_job" context="{'group_by': 'job_id'}"/>
+                    <filter string="Attempt Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Passed" name="group_passed" context="{'group_by': 'is_passed'}"/>
+                </group>
+
+<!--                <searchpanel>-->
+<!--                    <field name="session_id" icon="fa-clock-o" enable_counters="1" string="Exam Session"/>-->
+<!--                    <field name="state" icon="fa-tasks" enable_counters="1" select="multi" string="Attempt Status"/>-->
+<!--                </searchpanel>-->
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: Candidate Attempts -->
+    <record id="action_exam_candidate_attempts" model="ir.actions.act_window">
+        <field name="name">Candidate Exam Sittings</field>
+        <field name="res_model">exam.candidate.attempt</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_exam_candidate_attempt_search"/>
+    </record>
+
+</odoo>

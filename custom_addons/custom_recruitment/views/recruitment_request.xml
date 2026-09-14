@@ -14,19 +14,19 @@
                   decoration-danger="state == 'rejected'"
                   decoration-muted="state == 'cancelled'">
                 <field name="reference"/>
-                <field name="request_date"/>
-                <field name="request_type" widget="badge"
-                       decoration-info="request_type == 'planned'"
-                       decoration-warning="request_type == 'unplanned'"/>
-                <field name="requested_by"/>
                 <field name="operating_unit_id"/>
                 <field name="job_position_id"/>
                 <field name="required_headcount"/>
-                <field name="employment_type"/>
-                <field name="employee_category" widget="badge"/>
-                <field name="job_level" widget="badge" optional="show"/>
-                <field name="sourcing_type"/>
-                <field name="is_replacement"/>
+                <field name="request_date"/>
+                <field name="request_type" widget="badge" optional="hide"
+                       decoration-info="request_type == 'planned'"
+                       decoration-warning="request_type == 'unplanned'"/>
+                <field name="requested_by" optional="hide"/>
+                <field name="employment_type" optional="hide"/>
+                <field name="employee_category" widget="badge" optional="hide"/>
+                <field name="job_level" widget="badge" optional="hide"/>
+                <field name="sourcing_type" optional="hide"/>
+                <field name="is_replacement" optional="hide"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'draft'"
                        decoration-warning="state == 'submitted'"
@@ -43,37 +43,51 @@
         <field name="arch" type="xml">
             <form string="Recruitment Request">
                 <header>
+                    <!-- Initiator / Work Unit: Submit -->
                     <button name="action_submit" string="Submit" type="object"
                             class="btn-primary" invisible="state != 'draft'"/>
+
+                    <!-- HR Team: Start Review -->
                     <button name="action_start_review" string="Start Review" type="object"
-                            class="btn-primary" invisible="state != 'submitted'"
-                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
+                            class="btn-primary" invisible="state != 'submitted' or not is_hr"
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_user,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_user,hr_recruitment.group_hr_recruitment_manager"/>
+
+                    <!-- HR Team: Approve -->
                     <button name="action_approve" string="Approve" type="object"
-                            class="btn-primary" invisible="state != 'under_review'"
-                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
+                            class="btn-primary" invisible="state != 'under_review' or not is_hr"
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_manager"/>
+
+                    <!-- HR Team: Reject -->
                     <button name="action_reject" string="Reject" type="object"
-                            invisible="state not in ('submitted', 'under_review')"
-                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
+                            invisible="(state != 'submitted' and state != 'under_review') or not is_hr"
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_user,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_user,hr_recruitment.group_hr_recruitment_manager"/>
+
+                    <!-- HR Team: Create Vacancy -->
                     <button name="action_create_vacancy" string="Create Vacancy" type="object"
                             class="btn-primary"
-                            invisible="state != 'approved' or vacancy_id != False"
-                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
+                            invisible="state != 'approved' or vacancy_id or not is_hr"
+                            groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_user,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_user,hr_recruitment.group_hr_recruitment_manager"/>
+
+                    <!-- Initiator: Cancel -->
                     <button name="action_cancel" string="Cancel" type="object"
                             invisible="state != 'draft'"/>
+
+                    <!-- HR Team: Reset to Draft -->
                     <button name="action_reset_draft" string="Reset to Draft" type="object"
-                            invisible="state not in ('rejected', 'cancelled')"
-                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr_recruitment.group_hr_recruitment_manager"/>
+                            invisible="(state != 'rejected' and state != 'cancelled') or not is_hr"
+                            groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_manager"/>
+
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,submitted,under_review,approved"/>
                 </header>
 
-
-
                 <sheet>
+                    <field name="is_hr" invisible="1"/>
                     <div class="oe_button_box" name="button_box">
                         <button name="action_create_vacancy" type="object"
                                 class="oe_stat_button" icon="fa-briefcase"
-                                invisible="not vacancy_id">
+                                invisible="not vacancy_id or not is_hr"
+                                groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,hr.group_hr_user,hr.group_hr_manager,hr_recruitment.group_hr_recruitment_user,hr_recruitment.group_hr_recruitment_manager">
                             <field name="vacancy_id" widget="statinfo" string="Vacancy"/>
                         </button>
                     </div>
@@ -203,32 +217,171 @@
                 <filter name="submitted"  string="Submitted"   domain="[('state','=','submitted')]"/>
                 <filter name="review"     string="Under Review" domain="[('state','=','under_review')]"/>
                 <filter name="approved"   string="Approved"    domain="[('state','=','approved')]"/>
-                <filter name="rejected"   string="Rejected"    domain="[('state','=','rejected')]"/>
+                <filter name="my_requests" string="My Requests" domain="['|', ('create_uid', '=', uid), ('requested_by.user_id', '=', uid)]"/>
                 <separator/>
-                <filter name="replacement" string="Replacement Hiring" domain="[('is_replacement','=',True)]"/>
-                <group>
-                    <filter string="Request Type"  name="grp_type"  context="{'group_by':'request_type'}"/>
-                    <filter string="Status"        name="grp_state" context="{'group_by':'state'}"/>
+                <group name="group_by">
                     <filter string="Work Unit"     name="grp_unit"  context="{'group_by':'operating_unit_id'}"/>
                     <filter string="Job Position"  name="grp_pos"   context="{'group_by':'job_position_id'}"/>
+                    <filter string="Status"        name="grp_state" context="{'group_by':'state'}"/>
+                    <filter string="Request Type"  name="grp_type"  context="{'group_by':'request_type'}"/>
                     <filter string="Workforce Plan" name="grp_plan" context="{'group_by':'workforce_plan_id'}"/>
                 </group>
             </search>
         </field>
     </record>
 
-    <!-- ── Window Action ─────────────────────────────────────────────── -->
+    <!-- ── Window Action: All Requests ── -->
     <record id="action_recruitment_request" model="ir.actions.act_window">
-        <field name="name">Recruitment Requests</field>
+        <field name="name">All Recruitment Requests</field>
         <field name="res_model">recruitment.request</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="recruitment_request_search_view"/>
-        <field name="context">{'search_default_submitted': 1}</field>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Recruitment Requests found!
+            </p>
+            <p>Review recruitment requests submitted by Work Units and track their approval status.</p>
+        </field>
+    </record>
+
+    <!-- ── Window Action: My Requests ── -->
+    <record id="action_my_recruitment_request" model="ir.actions.act_window">
+        <field name="name">My Recruitment Requests</field>
+        <field name="res_model">recruitment.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="recruitment_request_search_view"/>
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Create your first Recruitment Request!
             </p>
-            <p>Use recruitment requests to initiate planned or unplanned hiring and track approvals.</p>
+            <p>Track your submitted recruitment requests and approval status.</p>
+        </field>
+    </record>
+
+    <!-- ── Window Action: Create New Request ── -->
+    <record id="action_recruitment_request_new" model="ir.actions.act_window">
+        <field name="name">New Recruitment Request</field>
+        <field name="res_model">recruitment.request</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="recruitment_request_form_view"/>
+        <field name="target">current</field>
+    </record>
+
+    <!-- ── Operating Unit: Work Unit List View for Recruitment Requests ── -->
+    <record id="operating_unit_recruitment_list_view" model="ir.ui.view">
+        <field name="name">operating.unit.recruitment.list</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <list string="Work Units with Recruitment Requests" create="false">
+                <header>
+                    <button name="action_create_new_recruitment_request" string="+ New Recruitment Request" type="object" class="btn-primary"/>
+                </header>
+                <field name="name" string="Work Unit / Branch / Directorate"/>
+                <field name="code" string="Code"/>
+                <field name="recruitment_request_count" string="Total Requests"/>
+                <field name="recruitment_headcount_total" string="Requested Headcount"/>
+                <field name="recruitment_pending_count" string="Pending Review" widget="badge" decoration-warning="recruitment_pending_count &gt; 0"/>
+                <field name="recruitment_approved_count" string="Approved" widget="badge" decoration-success="recruitment_approved_count &gt; 0"/>
+                <button name="action_view_recruitment_requests" string="View Requests" type="object" class="btn-primary" icon="fa-arrow-right"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ── Operating Unit: Kanban View ── -->
+    <record id="operating_unit_recruitment_kanban_view" model="ir.ui.view">
+        <field name="name">operating.unit.recruitment.kanban</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <kanban create="false" action="action_view_recruitment_requests" type="object">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="recruitment_request_count"/>
+                <field name="recruitment_headcount_total"/>
+                <field name="recruitment_pending_count"/>
+                <field name="recruitment_approved_count"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click p-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h4 class="fw-bold mb-0 text-primary"><field name="name"/></h4>
+                                <span class="badge bg-secondary" t-if="record.code.raw_value"><field name="code"/></span>
+                            </div>
+                            <div class="row mt-3 text-center">
+                                <div class="col-6 border-end">
+                                    <h3 class="fw-bold text-dark mb-0"><field name="recruitment_request_count"/></h3>
+                                    <small class="text-muted text-uppercase">Requests</small>
+                                </div>
+                                <div class="col-6">
+                                    <h3 class="fw-bold text-success mb-0"><field name="recruitment_headcount_total"/></h3>
+                                    <small class="text-muted text-uppercase">Headcount</small>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                <span class="badge bg-warning text-dark" t-if="record.recruitment_pending_count.raw_value &gt; 0">
+                                    <t t-esc="record.recruitment_pending_count.raw_value"/> Pending Review
+                                </span>
+                                <span class="badge bg-success" t-if="record.recruitment_approved_count.raw_value &gt; 0">
+                                    <t t-esc="record.recruitment_approved_count.raw_value"/> Approved
+                                </span>
+                                <button name="action_view_recruitment_requests" type="object" class="btn btn-sm btn-outline-primary ms-auto">
+                                    View Requests <i class="fa fa-arrow-right ms-1"/>
+                                </button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ── Search View for Work Units with Requests ── -->
+    <record id="operating_unit_recruitment_search_view" model="ir.ui.view">
+        <field name="name">operating.unit.recruitment.search</field>
+        <field name="model">operating.unit</field>
+        <field name="arch" type="xml">
+            <search string="Search Work Units">
+                <field name="name"/>
+                <field name="code"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- ── Action: Work Units with Recruitment Requests (All) ── -->
+    <record id="action_recruitment_request_work_units" model="ir.actions.act_window">
+        <field name="name">Work Units with Recruitment Requests</field>
+        <field name="res_model">operating.unit</field>
+        <field name="view_mode">list,kanban</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('operating_unit_recruitment_list_view')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('operating_unit_recruitment_kanban_view')})]"/>
+        <field name="search_view_id" ref="operating_unit_recruitment_search_view"/>
+        <field name="domain">[('recruitment_request_ids', '!=', False)]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Work Units with active Recruitment Requests!
+            </p>
+            <p>Work Units that submit recruitment requests will appear here. Click on any Work Unit to view its positions and requests.</p>
+        </field>
+    </record>
+
+    <!-- ── Action: Work Units with Recruitment Requests (My Requests) ── -->
+    <record id="action_my_recruitment_request_work_units" model="ir.actions.act_window">
+        <field name="name">My Recruitment Requests by Work Unit</field>
+        <field name="res_model">operating.unit</field>
+        <field name="view_mode">list,kanban</field>
+        <field name="view_ids" eval="[(5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('operating_unit_recruitment_list_view')}),
+            (0, 0, {'view_mode': 'kanban', 'view_id': ref('operating_unit_recruitment_kanban_view')})]"/>
+        <field name="search_view_id" ref="operating_unit_recruitment_search_view"/>
+        <field name="domain">['|', ('recruitment_request_ids.create_uid', '=', uid), ('recruitment_request_ids.requested_by.user_id', '=', uid)]</field>
+        <field name="context">{'my_requests_only': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Recruitment Requests submitted by you yet!
+            </p>
+            <p>Work Units where you have submitted recruitment requests will appear here. Click on any Work Unit to view your submitted positions and requests.</p>
         </field>
     </record>
 

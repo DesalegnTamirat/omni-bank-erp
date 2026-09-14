@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Employee Experience Letter Reference Sequence -->
+        <record id="sequence_employee_experience_letter" model="ir.sequence">
+            <field name="name">Employee Experience Letter Sequence</field>
+            <field name="code">employee.experience.letter</field>
+            <field name="prefix">BB/POMD-PSR/</field>
+            <field name="padding">4</field>
+            <field name="suffix">/0%(y)s</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

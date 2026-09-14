@@ -9,5 +9,13 @@
             <field name="padding">5</field>
             <field name="company_id" eval="False"/>
         </record>
+        <!-- Sequence for Recruitment Offer Letter -->
+        <record id="seq_recruitment_offer_letter" model="ir.sequence">
+            <field name="name">Recruitment Offer Letter Sequence</field>
+            <field name="code">recruitment.offer.letter</field>
+            <field name="prefix">BB/OFFER/%(range_year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
     </data>
 </odoo>

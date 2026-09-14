@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Inherit Form View: competency.competency from competency_management -->
+    <record id="view_competency_competency_form_inherit_assessment" model="ir.ui.view">
+        <field name="name">competency.competency.form.inherit.assessment</field>
+        <field name="model">competency.competency</field>
+        <field name="inherit_id" ref="competency_management.view_competency_competency_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='rating_model_id']" position="after">
+                <field name="evaluation_method"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Suggested Interview Questions (CBIS)">
+                    <field name="question_ids">
+                        <list editable="bottom">
+                            <field name="sequence" widget="handle"/>
+                            <field name="name" string="Question Prompt"/>
+                            <field name="look_for" string="What to Look For"/>
+                            <field name="difficulty"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Action: Competency Library -->
+    <record id="action_assessment_competencies" model="ir.actions.act_window">
+        <field name="name">Competency Library</field>
+        <field name="res_model">competency.competency</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Form View: Job-Competency Mapping -->
+    <record id="view_assessment_competency_job_rel_tree" model="ir.ui.view">
+        <field name="name">assessment.competency.job.rel.list</field>
+        <field name="model">assessment.competency.job.rel</field>
+        <field name="arch" type="xml">
+            <list string="Job Competency Profiles" editable="bottom">
+                <field name="job_id"/>
+                <field name="competency_id"/>
+                <field name="evaluation_method"/>
+                <field name="weight_percentage"/>
+                <field name="target_score"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_assessment_job_competency_profiles" model="ir.actions.act_window">
+        <field name="name">Job Competency Profiles</field>
+        <field name="res_model">assessment.competency.job.rel</field>
+        <field name="view_mode">list</field>
+    </record>
+
+</odoo>
