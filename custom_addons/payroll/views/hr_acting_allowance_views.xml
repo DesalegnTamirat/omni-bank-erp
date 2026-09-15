@@ -41,7 +41,7 @@
                             <field name="acting_job_id"/>
                             <field name="acting_grade_id"/>
                         </group>
-                        <group string="Duration &amp; Policy Status (FR-PAY-028)">
+                        <group string="Duration &amp; Allowance Policy Status">
                             <field name="start_date"/>
                             <field name="end_date"/>
                             <field name="elapsed_months"/>

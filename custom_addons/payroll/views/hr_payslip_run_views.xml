@@ -100,7 +100,7 @@
                         </div>
                     </div>
 
-                    <!-- 3-Tier Governance & Audit Block (FR-PAY-032) -->
+                    <!-- Multi-Tier Governance & Segregation of Duties Audit Block -->
                     <div class="card mb-3 p-3 bg-light">
                         <h6 style="color: #4a148c; font-weight: bold;">Multi-Tier Governance &amp; Segregation of Duties Audit</h6>
                         <div class="row" style="font-size: 12px;">

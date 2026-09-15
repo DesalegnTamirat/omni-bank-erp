@@ -7,8 +7,8 @@ from odoo.exceptions import ValidationError
 
 class HrHardshipAllowanceRate(models.Model):
     """
-    Location-Based Hardship Allowance Rate Specification Model (FR-PAY-007).
-    Maps bank branch location codes and regions to hardship tiers and percentage rates.
+    Location-Based Hardship Allowance Rate Specification Model.
+    Maps bank branch location codes and remote regions to hardship tiers and percentage rates.
     """
     _name = 'hr.hardship.allowance.rate'
     _description = 'Hardship Allowance Rate Table'
@@ -32,7 +32,7 @@ class HrHardshipAllowanceRate(models.Model):
 
 class HrHardshipAllowanceHistory(models.Model):
     """
-    Employee Hardship Allowance Audit Ledger (FR-PAY-009).
+    Employee Hardship Allowance Audit Ledger.
     Maintains complete immutable historical trace of hardship allowance eligibility, location assignments, rates, and effective dates.
     """
     _name = 'hr.hardship.allowance.history'

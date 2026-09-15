@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 class HrPayrollRetroactive(models.Model):
     """
-    Retroactive Salary Calculation & Adjustments Engine (FR-PAY-029).
+    Retroactive Salary Calculation & Adjustments Engine.
     
     Manages backdated lifecycle changes (promotions, salary increments, retroactive demotions, branch adjustments).
     Performs comparative diffing against previously finalized/locked payslips, automatically computing

@@ -6,7 +6,7 @@ from odoo import api, fields, models, _
 
 class HrPayrollAuditLog(models.Model):
     """
-    Immutable Payroll Transaction Audit Ledger (FR-PAY-004, FR-PAY-035).
+    Immutable Payroll Transaction Audit Ledger.
     
     Provides bank auditors, regulatory inspectors, and executive leadership with an unalterable,
     comprehensive chronological journal of all payroll adjustments, retroactive calculations,

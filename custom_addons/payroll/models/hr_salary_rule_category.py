@@ -29,6 +29,11 @@ class HrSalaryRuleCategory(models.Model):
         'parent_id',
         string='Child Categories'
     )
+    child_ids = fields.One2many(
+        'hr.salary.rule.category',
+        'parent_id',
+        string='Child Categories'
+    )
     note = fields.Text(string='Description')
 
     @api.constrains('code')

@@ -4,7 +4,7 @@
         <t t-call="web.external_layout">
             <div class="page" style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;">
                 <div class="text-center mb-4">
-                    <h3 style="color: #c2185b; font-weight: bold;">PAYROLL VARIANCE &amp; EXCEPTION AUDIT REPORT (FR-PAY-036)</h3>
+                    <h3 style="color: #c2185b; font-weight: bold;">PAYROLL VARIANCE &amp; EXCEPTION AUDIT REPORT</h3>
                     <h5>Batch: <t t-esc="o.name"/> (<t t-esc="o.number"/>)</h5>
                 </div>
 

@@ -48,6 +48,20 @@
             <field name="privilege_id" ref="payroll.res_groups_privilege_payroll"/>
             <field name="comment">Read-only access to all payroll records, change logs, and statutory audit trails.</field>
         </record>
+
+        <!-- Administrator / Full Payroll Superuser Authority -->
+        <record id="group_payroll_admin" model="res.groups">
+            <field name="name">Administrator</field>
+            <field name="sequence">50</field>
+            <field name="privilege_id" ref="payroll.res_groups_privilege_payroll"/>
+            <field name="implied_ids" eval="[(4, ref('payroll.group_payroll_manager')), (4, ref('payroll.group_payroll_auditor'))]"/>
+            <field name="comment">Full Administrative and Superuser Authority over all Payroll configuration, structures, salary rules, periods, payrun lifecycles, overrides, audit logs, GL accounting postings, and CBS direct credit payment batch exports.</field>
+        </record>
+
+        <!-- Grant Settings Administrator full Payroll Admin rights -->
+        <record id="base.group_system" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('payroll.group_payroll_admin'))]"/>
+        </record>
     </data>
 
     <data noupdate="1">
@@ -72,12 +86,12 @@
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
         </record>
 
-        <!-- Payroll Officer/Manager/Auditor: Access all payslips in company -->
+        <!-- Payroll Officer/Manager/Auditor/Admin: Access all payslips in company -->
         <record id="rule_hr_payslip_officer" model="ir.rule">
             <field name="name">Payroll Officer All Payslips</field>
             <field name="model_id" ref="model_hr_payslip"/>
             <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
-            <field name="groups" eval="[(4, ref('payroll.group_payroll_user')), (4, ref('payroll.group_payroll_auditor'))]"/>
+            <field name="groups" eval="[(4, ref('payroll.group_payroll_user')), (4, ref('payroll.group_payroll_auditor')), (4, ref('payroll.group_payroll_admin'))]"/>
         </record>
     </data>
 </odoo>

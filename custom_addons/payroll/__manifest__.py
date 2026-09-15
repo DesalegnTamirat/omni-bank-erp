@@ -7,8 +7,8 @@
     'category': 'Human Resources/Payroll',
     'summary': 'Enterprise Effective-Date-Driven Payroll Engine with Multi-Segment Proration, Statutory Compliance, and Full ERP Integration.',
     'description': """
-Enterprise Payroll Processing and Compensation Management System (Module 8)
-===========================================================================
+Enterprise Payroll Processing and Compensation Management System
+================================================================
 
 Key Architectural Capabilities:
 -------------------------------
@@ -42,6 +42,11 @@ Key Architectural Capabilities:
         'data/ethiopian_tax_pension_data.xml',
         'data/hardship_allowance_tier_data.xml',
         'data/payroll_cron.xml',
+        'wizards/hr_payslip_by_employees_views.xml',
+        'wizards/payroll_simulation_wizard_views.xml',
+        'wizards/payroll_cutoff_override_wizard_views.xml',
+        'wizards/payroll_retroactive_wizard_views.xml',
+        'wizards/payroll_cbs_export_wizard_views.xml',
         'views/hr_payroll_period_views.xml',
         'views/hr_salary_rule_views.xml',
         'views/hr_payroll_structure_views.xml',
@@ -56,11 +61,6 @@ Key Architectural Capabilities:
         'views/hr_payroll_audit_log_views.xml',
         'views/payroll_cbs_export_views.xml',
         'views/hr_employee_payroll_views.xml',
-        'wizards/hr_payslip_by_employees_views.xml',
-        'wizards/payroll_simulation_wizard_views.xml',
-        'wizards/payroll_cutoff_override_wizard_views.xml',
-        'wizards/payroll_retroactive_wizard_views.xml',
-        'wizards/payroll_cbs_export_wizard_views.xml',
         'report/payslip_report_template.xml',
         'report/payroll_summary_report.xml',
         'report/payroll_variance_report.xml',

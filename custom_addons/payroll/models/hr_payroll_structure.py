@@ -27,6 +27,16 @@ class HrPayrollStructure(models.Model):
         string='Parent Structure',
         help="Optional parent structure from which this structure can inherit salary rules."
     )
+    children_ids = fields.One2many(
+        'hr.payroll.structure',
+        'parent_id',
+        string='Children Structures'
+    )
+    child_ids = fields.One2many(
+        'hr.payroll.structure',
+        'parent_id',
+        string='Child Structures'
+    )
     company_id = fields.Many2one(
         'res.company',
         string='Company',

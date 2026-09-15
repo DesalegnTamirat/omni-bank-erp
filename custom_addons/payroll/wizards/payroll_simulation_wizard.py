@@ -7,7 +7,7 @@ from odoo.exceptions import UserError
 
 class PayrollSimulationWizard(models.TransientModel):
     """
-    Enterprise Payroll Simulation & Budgetary Impact Wizard (FR-PAY-034).
+    Enterprise Payroll Simulation & Budgetary Impact Wizard.
     
     Allows HR and Financial planning leaders to execute non-committal virtual dry-runs
     evaluating projected wage bills, statutory liabilities, and department variance.

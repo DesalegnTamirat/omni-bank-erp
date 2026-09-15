@@ -7,8 +7,8 @@ from odoo.exceptions import UserError
 
 class PayrollCutoffOverrideWizard(models.TransientModel):
     """
-    Cut-Off Override Submission Wizard (FR-PAY-030, 031).
-    Allows HR Accountants to submit urgent late changes for locked periods.
+    Cut-Off Override Submission Wizard.
+    Allows HR Accountants to submit urgent late changes for locked periods with justification.
     """
     _name = 'payroll.cutoff.override.wizard'
     _description = 'Submit Post-Cutoff Override Request'

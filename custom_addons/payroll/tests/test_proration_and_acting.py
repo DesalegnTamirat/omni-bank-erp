@@ -55,7 +55,7 @@ class TestProrationAndActing(TransactionCase):
         self.assertAlmostEqual(payslip.pension_ee, 1050.0, places=2)
 
     def test_02_acting_allowance_lifecycle_rules(self):
-        """FR-PAY-028: Test acting allowance Month 1 (0%), Months 2-6 (100%), Month 7+ (0%)."""
+        """Test acting allowance lifecycle: Month 1 Buffer (0%), Months 2-6 Active (100%), Month 7+ Capped (0%)."""
         manager_job = self.Job.create({'name': 'Branch Operations Manager'})
         staff = self.Employee.create({
             'name': 'Dawit Lemma',

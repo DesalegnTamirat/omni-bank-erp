@@ -11,7 +11,8 @@ class HrPayslipSegment(models.Model):
     
     Implements dynamic multi-segment time slicing for payroll cycles intersecting with
     employee lifecycle events (mid-month joiners, branch transfers, promotions, demotions, increments).
-    Computes exact prorated basic wages and location-dependent hardship benefits (FR-PAY-002, 006, 008, 012, 017, 020).
+    Computes exact prorated basic wages, grade adjustments, and location-dependent hardship benefits
+    standardized against a 30-day commercial banking divisor.
     """
     _name = 'hr.payslip.segment'
     _description = 'Payroll Proration Sub-Period Time Slice'

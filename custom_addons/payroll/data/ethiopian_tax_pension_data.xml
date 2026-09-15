@@ -70,7 +70,7 @@ else:
             </field>
         </record>
 
-        <!-- 2. Hardship Allowance Rule (FR-PAY-007, 008) -->
+        <!-- Hardship Allowance Calculation Rule (Location Tier Based Prorated Rate) -->
         <record id="rule_hardship_allowance" model="hr.salary.rule">
             <field name="name">Hardship Allowance</field>
             <field name="code">HARDSHIP</field>
@@ -87,7 +87,7 @@ else:
             </field>
         </record>
 
-        <!-- 3. Acting Allowance Rule (FR-PAY-026, 027, 028: Month 1: 0%, M2-6: 100%, M7+: 0%) -->
+        <!-- Managerial Acting Allowance Rule (Month 1: 0%, Month 2-6: 100%, Month 7+: Ceased) -->
         <record id="rule_acting_allowance" model="hr.salary.rule">
             <field name="name">Acting Allowance</field>
             <field name="code">ACTING_ALW</field>
@@ -145,7 +145,7 @@ result = payslip.get_approved_overtime_amount()
             </field>
         </record>
 
-        <!-- 7. Retroactive Arrears (Backdated promotions, increments) (FR-PAY-029) -->
+        <!-- Retroactive Salary Arrears (Backdated promotions and general salary increments) -->
         <record id="rule_retroactive_arrears" model="hr.salary.rule">
             <field name="name">Retroactive Salary Arrears</field>
             <field name="code">RETRO_ARREARS</field>
@@ -184,7 +184,7 @@ result = payslip.get_unauthorized_absence_deduction()
             </field>
         </record>
 
-        <!-- 10. Disciplinary Wage Cut / Penalty (Integrated from discipline_management) (FR-PAY-023, 024, 025) -->
+        <!-- Disciplinary Salary Penalty Deduction (Integrated from discipline_management) -->
         <record id="rule_disciplinary_penalty" model="hr.salary.rule">
             <field name="name">Disciplinary Salary Penalty Deduction</field>
             <field name="code">DISC_PEN</field>
@@ -197,7 +197,7 @@ result = payslip.get_disciplinary_penalties_amount()
             </field>
         </record>
 
-        <!-- 11. Retroactive Recoveries (Overpayment adjustments) (FR-PAY-029) -->
+        <!-- Retroactive Overpayment Recovery Deduction -->
         <record id="rule_retroactive_recovery" model="hr.salary.rule">
             <field name="name">Retroactive Overpayment Recovery</field>
             <field name="code">RETRO_RECOVER</field>
@@ -210,7 +210,7 @@ result = payslip.get_retroactive_recovery_amount()
             </field>
         </record>
 
-        <!-- 12. Employee Statutory Pension Contribution (7% of Basic Wage) (FR-PAY-014) -->
+        <!-- Employee Statutory Pension Contribution (7% of Basic Wage) -->
         <record id="rule_pension_employee" model="hr.salary.rule">
             <field name="name">Employee Pension Contribution (7%)</field>
             <field name="code">PENSION_EE</field>
@@ -241,7 +241,7 @@ result = max(0.0, taxable)
             </field>
         </record>
 
-        <!-- 14. Ethiopian Statutory Personal Income Tax (FR-PAY-010, 013, 021) -->
+        <!-- Ethiopian Statutory Personal Income Tax (Progressive Schedule) -->
         <record id="rule_income_tax" model="hr.salary.rule">
             <field name="name">Personal Income Tax (Statutory Schedule)</field>
             <field name="code">INCOME_TAX</field>
@@ -291,7 +291,7 @@ result = getattr(contract, 'cost_sharing', 0.0) or 0.0
             </field>
         </record>
 
-        <!-- 16. Net Salary Rule (FR-PAY-002, 010) -->
+        <!-- Net Payable Salary Calculation Rule -->
         <record id="rule_net_salary" model="hr.salary.rule">
             <field name="name">Net Payable Salary</field>
             <field name="code">NET</field>

@@ -38,10 +38,11 @@ class RuleResult(object):
 
 class HrPayslip(models.Model):
     """
-    Enterprise Core Payslip Model (Module 8 - Compensation Management).
+    Enterprise Core Payslip Model.
     
-    Coordinates multi-segment proration, attendance and discipline ingestion,
-    statutory tax/pension rule execution, and 3-tier approval lifecycle.
+    Coordinates multi-segment proration time-slices, attendance overtime/absence payloads,
+    disciplinary penalty deductions, separation settlements, statutory tax/pension rule execution,
+    and multi-tier approval lifecycle.
     """
     _name = 'hr.payslip'
     _description = 'Employee Enterprise Payslip'
@@ -77,7 +78,7 @@ class HrPayslip(models.Model):
         ('cancel', 'Cancelled / Voided'),
     ], string='Status', default='draft', required=True, tracking=True, copy=False)
 
-    # Sub-Period Proration Segments (FR-PAY-002, 006, 012, 017, 020)
+    # Sub-Period Proration Segments (Mid-Month Joiners, Branch Hardship Transfers, Promotions, Demotions)
     segment_ids = fields.One2many('hr.payslip.segment', 'payslip_id', string='Proration Time Slices', copy=True)
     
     # Financial Lines & Inputs
@@ -149,12 +150,13 @@ class HrPayslip(models.Model):
                 self.struct_id = default_struct.id
 
     # ─────────────────────────────────────────────────────────────────────────
-    # DYNAMIC TIME SLICE & PRORATION ENGINE (FR-PAY-002, 006, 008, 012, 017)
+    # DYNAMIC TIME SLICE & PRORATION ENGINE
     # ─────────────────────────────────────────────────────────────────────────
     def _generate_proration_segments(self):
         """
         Calculates mid-month proration time slices based on employee lifecycle events.
-        Handles join dates, branch transfers (hardship), promotions, and demotions.
+        Handles join dates, branch transfers (hardship), promotions, and demotions
+        using the commercial banking 30-day divisor standard.
         """
         self.ensure_one()
         self.segment_ids.unlink()
@@ -169,7 +171,7 @@ class HrPayslip(models.Model):
         trans_alw = getattr(contract, 'transportation_allowance', 0.0) or 0.0
         house_alw = getattr(contract, 'housing_allowance', 0.0) or 0.0
 
-        # Scenario 1: Mid-Month Joiner (FR-PAY-012)
+        # Scenario 1: Mid-Month Joiner (Prorate from effective start date through end of pay period)
         join_date = getattr(emp, 'joining_date', False) or getattr(emp, 'first_contract_date', False) or start_dt
         if join_date and start_dt < join_date <= end_dt:
             # Days worked from join date through end of period
@@ -189,7 +191,7 @@ class HrPayslip(models.Model):
             })
             return
 
-        # Scenario 2: Mid-Month Branch Transfer (FR-PAY-005, 006, 007, 008)
+        # Scenario 2: Mid-Month Branch Transfer (Dynamic Hardship Tier Changes)
         TransferModel = self.env.get('hr.job.transfer') or self.env.get('transfer.form')
         transfer = False
         if TransferModel:
@@ -282,7 +284,10 @@ class HrPayslip(models.Model):
         return round((base * rate) / 100.0, 2)
 
     def get_acting_allowance_amount(self):
-        """FR-PAY-026, 027, 028: Ingest managerial acting assignment."""
+        """
+        Calculates approved managerial acting compensation.
+        Enforces policy duration rules: Month 1 (0%), Months 2-6 (100% Differential), Month 7+ (Cease payment).
+        """
         self.ensure_one()
         ActingModel = self.env.get('hr.acting.assignment')
         if not ActingModel:
@@ -346,7 +351,7 @@ class HrPayslip(models.Model):
         return round(total_abs_ded, 2)
 
     def get_disciplinary_penalties_amount(self):
-        """FR-PAY-023, 024, 025: Ingest penalties from discipline.payroll.penalty."""
+        """Ingest approved penalty deductions and salary withholdings from disciplinary cases."""
         self.ensure_one()
         PenaltyModel = self.env.get('discipline.payroll.penalty')
         total_penalty = 0.0
@@ -364,7 +369,7 @@ class HrPayslip(models.Model):
         return round(total_penalty, 2)
 
     def get_retroactive_arrears_amount(self):
-        """FR-PAY-029: Ingest approved retroactive arrears."""
+        """Ingest approved retroactive arrears adjustments resulting from backdated promotions or increments."""
         self.ensure_one()
         RetroModel = self.env.get('hr.payroll.retroactive')
         if not RetroModel:
@@ -380,7 +385,7 @@ class HrPayslip(models.Model):
         return round(total, 2)
 
     def get_retroactive_recovery_amount(self):
-        """FR-PAY-029: Ingest approved retroactive recoveries."""
+        """Ingest approved retroactive recoveries resulting from backdated reductions or overpayments."""
         self.ensure_one()
         RetroModel = self.env.get('hr.payroll.retroactive')
         if not RetroModel:
@@ -396,7 +401,7 @@ class HrPayslip(models.Model):
         return round(total, 2)
 
     # ─────────────────────────────────────────────────────────────────────────
-    # CORE CALCULATION ENGINE & CONFLICT RESOLUTION MATRIX (FR-PAY-033)
+    # CORE CALCULATION ENGINE & CONFLICT RESOLUTION MATRIX
     # ─────────────────────────────────────────────────────────────────────────
     def compute_sheet(self):
         """
@@ -480,7 +485,7 @@ class HrPayslip(models.Model):
             payslip.retroactive_arrears = rules_dict.get('RETRO_ARREARS', RuleResult('RETRO_ARREARS', 0, 0, 0, 0)).total
             payslip.retroactive_recoveries = rules_dict.get('RETRO_RECOVER', RuleResult('RETRO_RECOVER', 0, 0, 0, 0)).total
 
-            # 5. Execute Pre-Flight Exception Scanner (FR-PAY-036)
+            # 5. Execute Pre-Flight Exception Diagnostics Scanner
             self.env['hr.payroll.exception'].scan_payslip_for_exceptions(payslip)
 
         return True

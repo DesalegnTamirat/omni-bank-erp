@@ -15,7 +15,7 @@ class HrPayrollPeriod(models.Model):
     
     Enforces the organization's monthly payroll calculation boundaries and cut-off date.
     All employee lifecycle changes, attendance hours, and disciplinary penalties are evaluated
-    against the active period's start, end, and cut-off dates (FR-PAY-001, FR-PAY-030).
+    against the active period's start, end, and cut-off dates.
     """
     _name = 'hr.payroll.period'
     _description = 'Payroll Accounting Period & Cut-Off Governance'
@@ -52,7 +52,7 @@ class HrPayrollPeriod(models.Model):
         string='Cut-Off Date',
         required=True,
         tracking=True,
-        help="Hard boundary date after which no HR actions may affect this payroll without formal override (FR-PAY-030)."
+        help="Hard boundary date after which no HR actions may affect this payroll without formal override approval."
     )
     cutoff_locked = fields.Boolean(
         string='Cut-Off Locked',
@@ -108,7 +108,7 @@ class HrPayrollPeriod(models.Model):
             rec.message_post(body=_("Payroll period opened for active HR data ingestion."))
 
     def action_lock_cutoff(self):
-        """Enforce cut-off lock on the period (FR-PAY-030)."""
+        """Enforce automated cut-off lock on the active payroll period."""
         for rec in self:
             rec.write({
                 'cutoff_locked': True,

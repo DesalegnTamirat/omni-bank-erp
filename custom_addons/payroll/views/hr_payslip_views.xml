@@ -106,7 +106,7 @@
                             </field>
                         </page>
 
-                        <page string="Mid-Month Proration Segments (FR-PAY-002)" name="segments">
+                        <page string="Mid-Month Proration Segments" name="segments">
                             <field name="segment_ids">
                                 <list>
                                     <field name="name"/>
@@ -136,7 +136,7 @@
                             </field>
                         </page>
 
-                        <page string="Diagnostics &amp; Exceptions (FR-PAY-036)" name="exceptions">
+                        <page string="Diagnostics &amp; Pre-Flight Exceptions" name="exceptions">
                             <field name="exception_ids" readonly="1">
                                 <list decoration-danger="severity == 'critical'" decoration-warning="severity == 'warning'" decoration-info="severity == 'info'">
                                     <field name="exception_type"/>

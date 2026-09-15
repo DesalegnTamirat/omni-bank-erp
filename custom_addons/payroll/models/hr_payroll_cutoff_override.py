@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 class HrPayrollCutoffOverride(models.Model):
     """
-    Formally Audited Cut-Off Override Governance Model (FR-PAY-030, 031).
+    Formally Audited Cut-Off Override Governance Model.
     
     When payroll is locked post-cutoff date, no standard HR data modifications can enter the pay cycle.
     Emergency late changes (urgent bonus, executive joining, critical correction) must follow this formal,

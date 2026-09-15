@@ -7,7 +7,8 @@ from odoo.exceptions import UserError
 
 class PayrollRetroactiveWizard(models.TransientModel):
     """
-    Backdated Salary Retroactive Calculation Wizard (FR-PAY-029).
+    Backdated Salary Retroactive Calculation Wizard.
+    Facilitates comparative backdated recalculation against locked historical payslips.
     """
     _name = 'payroll.retroactive.wizard'
     _description = 'Generate Backdated Retroactive Adjustment'

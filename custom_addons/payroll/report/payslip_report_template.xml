@@ -49,7 +49,7 @@
                 <!-- Proration Sub-Period Slices (If applicable) -->
                 <t t-if="len(o.segment_ids) &gt; 1 or o.segment_ids[0].segment_type != 'standard'">
                     <h6 style="color: #4a148c; font-weight: bold; border-bottom: 2px solid #ce93d8; padding-bottom: 4px;">
-                        Mid-Month Proration &amp; Lifecycle Breakdown (FR-PAY-002)
+                        Mid-Month Proration &amp; Lifecycle Breakdown
                     </h6>
                     <table class="table table-sm table-striped mb-4" style="font-size: 12px;">
                         <thead class="table-secondary">

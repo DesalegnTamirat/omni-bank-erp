@@ -12,12 +12,12 @@ _logger = logging.getLogger(__name__)
 
 class HrActingAssignment(models.Model):
     """
-    Managerial Acting Assignment Lifecycle & Allowance Gatekeeper (FR-PAY-026, 027, 028).
+    Managerial Acting Assignment Lifecycle & Allowance Gatekeeper.
     
     Enforces the bank's strict acting compensation governance:
     * Eligibility: Formal assignment to managerial job position in an acting capacity.
-    * Month 1: 0% payout (buffer/probationary period).
-    * Months 2 to 6: 100% full acting allowance payment.
+    * Month 1: 0% payout (buffer/probationary evaluation period).
+    * Months 2 to 6: 100% full acting allowance payment (salary grade differential).
     * Month 7+: Automatic hard-stop of payment and notification trigger for permanent decision.
     """
     _name = 'hr.acting.assignment'
@@ -33,7 +33,7 @@ class HrActingAssignment(models.Model):
     start_date = fields.Date(string='Effective Start Date', required=True, default=fields.Date.context_today, tracking=True)
     end_date = fields.Date(string='Planned / Actual End Date', tracking=True)
     
-    # Duration tracking (FR-PAY-027)
+    # Duration tracking and policy enforcement
     elapsed_months = fields.Integer(string='Elapsed Active Months', compute='_compute_duration_metrics', store=True)
     current_cycle_status = fields.Selection([
         ('month_1_buffer', 'Month 1: Buffer Period (0% Allowance)'),
@@ -80,7 +80,7 @@ class HrActingAssignment(models.Model):
 
     @api.constrains('acting_job_id', 'employee_id')
     def _check_managerial_role(self):
-        """FR-PAY-026: Restrict Acting Allowance exclusively to managerial roles."""
+        """Restrict Acting Allowance exclusively to verified managerial and executive positions."""
         for rec in self:
             job_title = (rec.acting_job_id.name or '').lower()
             is_managerial = any(term in job_title for term in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor', 'controller'])
@@ -90,7 +90,7 @@ class HrActingAssignment(models.Model):
     @api.depends('start_date', 'end_date', 'state')
     def _compute_duration_metrics(self):
         """
-        Evaluate duration and determine exact payment schedule (FR-PAY-028).
+        Evaluate assignment duration and enforce acting compensation rules.
         """
         today = fields.Date.context_today(self)
         for rec in self:

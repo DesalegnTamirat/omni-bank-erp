@@ -47,7 +47,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Hardship History (FR-PAY-009)" name="hardship_history">
+                        <page string="Hardship Tier History" name="hardship_history">
                             <field name="hardship_history_ids" readonly="1">
                                 <list>
                                     <field name="effective_date"/>
@@ -57,7 +57,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Retroactive Adjustments (FR-PAY-029)" name="retroactive_adjustments">
+                        <page string="Retroactive Adjustments" name="retroactive_adjustments">
                             <field name="retroactive_adjustment_ids" readonly="1">
                                 <list>
                                     <field name="name"/>

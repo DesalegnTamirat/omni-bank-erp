@@ -9,7 +9,7 @@ _logger = logging.getLogger(__name__)
 
 class HrPayrollException(models.Model):
     """
-    Automated Pre-Flight Payroll Exception & Variance Scanner (FR-PAY-036).
+    Automated Pre-Flight Payroll Exception & Variance Scanner.
     
     Identifies risk factors and data anomalies prior to final payroll commitment:
     * Unusually high variance (> 25% shift compared to previous month).

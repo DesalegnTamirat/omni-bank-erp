@@ -11,7 +11,7 @@ _logger = logging.getLogger(__name__)
 
 class HrPayslipRun(models.Model):
     """
-    Enterprise Payroll Batch Run & 3-Tier Approval Workflow Model (FR-PAY-032).
+    Enterprise Payroll Batch Run & 3-Tier Approval Workflow Model.
     
     Orchestrates bank-wide or branch-level monthly payroll processing batches.
     Enforces strict segregation of duties:
@@ -56,7 +56,7 @@ class HrPayslipRun(models.Model):
     exception_count = fields.Integer(string='Exceptions Count', compute='_compute_counts')
     has_critical_blockers = fields.Boolean(string='Critical Blockers Detected', compute='_compute_counts')
 
-    # State State Machine (FR-PAY-032)
+    # State Machine for Multi-Tier Segregation of Duties
     state = fields.Selection([
         ('draft', 'Draft / Preparation'),
         ('simulated', 'Simulated (Dry-Run Preview)'),
@@ -114,7 +114,7 @@ class HrPayslipRun(models.Model):
             run.message_post(body=_("Batch calculation executed for %d payslips.") % len(run.slip_ids))
 
     def action_simulate(self):
-        """FR-PAY-034: Run complete batch simulation dry-run."""
+        """Execute complete batch simulation dry-run for budgetary variance analysis."""
         for run in self:
             run.action_compute_batch()
             run.write({'state': 'simulated'})
