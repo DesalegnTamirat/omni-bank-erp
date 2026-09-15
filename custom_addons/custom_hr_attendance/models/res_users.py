@@ -5,7 +5,7 @@ from odoo.exceptions import ValidationError
 class ResUsers(models.Model):
     _inherit = 'res.users'
 
-    @api.constrains('group_ids')
+    @api.constrains('groups_id')
     def _check_attendance_role_rules(self):
         job_position = self.env.ref(
             'custom_hr_attendance.group_hr_attendance_job_position_Officer',
@@ -25,7 +25,7 @@ class ResUsers(models.Model):
             return
 
         for user in self:
-            groups = user.group_ids
+            groups = user.groups_id
 
             # Mutually exclusive roles
             if job_position in groups and it_driver in groups:

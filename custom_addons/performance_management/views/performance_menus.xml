@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Root App Menu -->
+    <menuitem id="menu_performance_management_root"
+              name="Performance Management"
+              web_icon="performance_management,static/description/iconpm.png"
+              sequence="10"/>
+
+    <!-- Top-level menus (navbar tabs) -->
+    <menuitem id="menu_performance"
+              name="Performance"
+              parent="menu_performance_management_root"
+              action="action_corporate_scorecard"
+              sequence="10"/>
+
+    <menuitem id="menu_appraisals"
+              name="Appraisals"
+              parent="menu_performance_management_root"
+              sequence="20"/>
+    <menuitem id="menu_automation"
+               name="Automation"
+               parent="menu_performance_management_root"
+               sequence="30"/>
+
+    <menuitem id="menu_configuration"
+              name="Configuration"
+              parent="menu_performance_management_root"
+              sequence="40"/>
+
+    <menuitem id="menu_reports"
+              name="Reports"
+              parent="menu_performance_management_root"
+              sequence="50"/>
+
+    <!-- ================Menus under Performance=========== -->
+    <!-- ===================== Tier 1 ===================== -->
+    <menuitem id="menu_tier1"
+              name="Tier1"
+              parent="menu_performance"
+              sequence="10"/>
+    <menuitem id="menu_tier1_populate_corporate_scorecard"
+              name="Populate Corporate Score Card"
+              parent="menu_tier1"
+              action="action_populate_corporate_scorecard_wizard"
+              sequence="20"/>
+    <menuitem id="menu_tier1_corporate_scorecard"
+              name="Corporate Score Card"
+              parent="menu_tier1"
+              action="action_corporate_scorecard"
+              sequence="30"/>
+
+
+      <!-- ===================== Tier 2 ===================== -->
+    <menuitem id="menu_tier2"
+              name="Tier2"
+              parent="menu_performance"
+              sequence="20"/>
+    <menuitem id="menu_tier2_populate_tier2_wizard"
+          name="Populate Tier2 Scorecard Wizard"
+          parent="menu_tier2"
+          action="action_populate_t2_scorecard_wizard"
+          sequence="30"/>
+    <menuitem id="menu_t2_scorecard"
+              name="T2 Scorecard"
+              parent="menu_tier2"
+              action="action_t2_scorecard"
+              sequence="40"/>
+     <!-- ===================== Tier 3 ===================== -->
+    <menuitem id="menu_tier3"
+              name="Tier3"
+              parent="menu_performance"
+              sequence="30"/>
+
+    <menuitem id="menu_tier3_populate_wizard"
+          name="Populate Tier3 Scorecard Wizard"
+          parent="menu_tier3"
+          action="action_populate_t3_scorecard_wizard"
+          sequence="10"/>
+    <menuitem id="menu_tier3_scorecard"
+          name="Tier3 Scorecards"
+          parent="menu_tier3"
+          action="action_t3_scorecard"
+          sequence="20"/>
+
+    <!-- Menus under Automation -->
+    <menuitem id="menu_automatic_scorecard_notify_wizard"
+              name="Automatic Scorecard Notify"
+              parent="menu_automation"
+              action="action_automatic_scorecard_notify_wizard"
+              sequence="10"/>
+</odoo>

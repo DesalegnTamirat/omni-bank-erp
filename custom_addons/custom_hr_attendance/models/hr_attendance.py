@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 import datetime
 import pytz
 import logging
@@ -245,15 +245,25 @@ class HrAttendance(models.Model):
             if eff_check_out > eff_check_in:
                 raw_hours = (eff_check_out - eff_check_in).total_seconds() / 3600.0
                 
+                lunch_start_float = shift_info.get('lunch_out_time', 12.0) if (shift_info and shift_info.get('has_lunch_break')) else 12.0
+                lunch_dur = shift_info.get('lunch_duration', default_lunch_duration) if (shift_info and shift_info.get('has_lunch_break')) else default_lunch_duration
+                lunch_end_float = lunch_start_float + lunch_dur
+
+                check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
+                check_out_float = check_out_local.hour + (check_out_local.minute / 60.0)
+
                 # Check real punches first
                 if hasattr(rec, 'lunch_out') and hasattr(rec, 'lunch_in') and rec.lunch_out and rec.lunch_in:
                     lunch_hrs = (rec.lunch_in - rec.lunch_out).total_seconds() / 3600.0
                 elif hasattr(rec, 'lunch_break_hours') and rec.lunch_break_hours > 0:
                     lunch_hrs = rec.lunch_break_hours
-                elif shift_info and shift_info.get('has_lunch_break'):
-                    lunch_hrs = shift_info.get('lunch_duration', default_lunch_duration if enable_lunch else 0.0)
-                elif enable_lunch:
-                    lunch_hrs = default_lunch_duration
+                elif (shift_info and shift_info.get('has_lunch_break')) or enable_lunch:
+                    # Deduct lunch ONLY if this single attendance record spans across the entire lunch break window
+                    if check_in_float < lunch_start_float and check_out_float > lunch_end_float:
+                        lunch_hrs = lunch_dur
+                    else:
+                        # Session is either purely morning or purely afternoon -> 0 lunch deduction
+                        lunch_hrs = 0.0
                 else:
                     lunch_hrs = 0.0
 
@@ -316,10 +326,12 @@ class HrAttendance(models.Model):
 
 
     def unlink(self):
-        """ Soft delete: Archive records instead of removing them from database """
-        for rec in self:
-            rec.write({'active': False})
-        return True
+        if not self.env.context.get('force_unlink_attendance'):
+            raise UserError(_('Attendance records cannot be deleted. All attendance data is strictly retained for compliance and audit.'))
+        return super().unlink()
+
+    def action_archive(self):
+        raise UserError(_('Attendance records cannot be archived. All attendance data must remain permanently active.'))
 
     def _compute_discipline_case_count(self):
         """Count discipline cases referencing this attendance record."""
@@ -619,7 +631,11 @@ class HrAttendance(models.Model):
             dt_local = pytz.utc.localize(self.check_in).astimezone(local_tz)
             f_time = dt_local.hour + dt_local.minute / 60 + dt_local.second / 3600
 
-            s_start, s_end = emp._select_applicable_shift(f_time, m_start,  e_time, loc_ex, job_ex, is_manager=True)
+            s_start, s_end = emp._select_applicable_shift(
+                f_time, m_start, e_time, loc_ex, job_ex, 
+                target_date=dt_local.date(), 
+                is_manager=True
+            )
             if self.shift_start_float:
                 s_start = self.shift_start_float
 
@@ -836,11 +852,11 @@ class HrAttendance(models.Model):
     @api.model
     def cron_automatic_force_checkout(self):
         """
-        Executes high-performance PostgreSQL routine process_automated_force_checkouts()
-        to perform lunch-time and shift-end auto checkouts while protecting night shifts.
+        Executes high-performance PostgreSQL routine auto_checkout_all_employees()
+        to perform shift-aware auto checkouts for all unclosed attendances past shift end.
         """
-        self.env.cr.execute("SELECT process_automated_force_checkouts();")
-        _logger.info("Executed process_automated_force_checkouts PostgreSQL function.")
+        self.env.cr.execute("SELECT auto_checkout_all_employees();")
+        _logger.info("Executed auto_checkout_all_employees PostgreSQL function.")
 
     @api.model
     def cron_automatic_absence_detection(self):
@@ -943,30 +959,27 @@ class HrAttendance(models.Model):
         res = super()._auto_init()
         # Partial index: open attendance records (WHERE check_out IS NULL).
         # Used by every check-out lookup — avoid full-table scans.
-        try:
-            with self.env.cr.savepoint():
-                self.env.cr.execute("""
-                    CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
-                    ON hr_attendance (employee_id)
-                    WHERE check_out IS NULL;
-                """)
-                self.env.cr.execute("""
-                    CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
-                    ON hr_attendance (employee_id, check_in);
-                """)
-                # Index on check_in_status for discipline counter queries.
-                self.env.cr.execute("""
-                    CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
-                    ON hr_attendance (check_in_status);
-                """)
-                # Partial index on is_force_checkout for discipline and reporting queries.
-                self.env.cr.execute("""
-                    CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
-                    ON hr_attendance (employee_id)
-                    WHERE is_force_checkout = TRUE;
-                """)
-        except Exception:
-            pass
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
+            ON hr_attendance (employee_id)
+            WHERE check_out IS NULL;
+        """)
+        # Composite index for date-range queries on attendance per employee.
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
+            ON hr_attendance (employee_id, check_in);
+        """)
+        # Index on check_in_status for discipline counter queries.
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
+            ON hr_attendance (check_in_status);
+        """)
+        # Partial index on is_force_checkout for discipline and reporting queries.
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
+            ON hr_attendance (employee_id)
+            WHERE is_force_checkout = TRUE;
+        """)
         return res
 
     # ============================================================
@@ -1063,7 +1076,14 @@ class HrAttendance(models.Model):
                     write_date = NOW()
                 FROM resolved_shifts rs
                 WHERE ha.id = rs.att_id
-                  AND NOW() >= (rs.shift_end_utc + INTERVAL '3 hours');
+                  AND NOW() >= rs.shift_end_utc;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE OR REPLACE FUNCTION process_automated_force_checkouts()
+            RETURNS void AS $$
+            BEGIN
+                PERFORM auto_checkout_all_employees();
             END;
             $$ LANGUAGE plpgsql;
         """)

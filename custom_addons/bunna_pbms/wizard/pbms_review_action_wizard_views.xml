@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Review Action Wizard Form -->
+    <record id="view_pbms_review_action_wizard_form" model="ir.ui.view">
+        <field name="name">pbms.review.action.wizard.form</field>
+        <field name="model">pbms.review.action.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reviewer Action &amp; Comments">
+                <sheet>
+                    <group>
+                        <field name="plan_id" readonly="1" options="{'no_open': True}"/>
+                        <field name="action_type" widget="radio"/>
+                    </group>
+                    <group string="Review Comments &amp; Justification" col="1" class="w-100">
+                        <field name="comment" nolabel="1" colspan="1" class="w-100" style="width: 100% !important; min-height: 120px;" placeholder="Enter specific comments, rationale, requested information, or revision details..." required="1"/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Submit Decision / Comment" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Specific Actions for Buttons -->
+    <record id="action_pbms_review_comment_wizard" model="ir.actions.act_window">
+        <field name="name">Add Review Comment</field>
+        <field name="res_model">pbms.review.action.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'review_comment'}</field>
+    </record>
+
+    <record id="action_pbms_request_info_wizard" model="ir.actions.act_window">
+        <field name="name">Request Additional Information</field>
+        <field name="res_model">pbms.review.action.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'request_info'}</field>
+    </record>
+
+    <record id="action_pbms_return_revision_wizard" model="ir.actions.act_window">
+        <field name="name">Return for Revision</field>
+        <field name="res_model">pbms.review.action.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'return'}</field>
+    </record>
+
+    <record id="action_pbms_recommend_rejection_wizard" model="ir.actions.act_window">
+        <field name="name">Recommend Rejection</field>
+        <field name="res_model">pbms.review.action.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'recommend_rejection'}</field>
+    </record>
+
+    <record id="action_pbms_reject_wizard" model="ir.actions.act_window">
+        <field name="name">Reject Plan</field>
+        <field name="res_model">pbms.review.action.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_action_type': 'reject'}</field>
+    </record>
+</odoo>

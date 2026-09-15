@@ -620,17 +620,29 @@ class HrAttendanceDashboardService(models.Model):
             ('check_in', '<=', range_e_utc)
         ], order='check_in desc')
 
+        # Query approved leaves (hr.leave) in range
+        range_leaves = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', datetime.datetime.combine(e_d, datetime.time.max)),
+            ('date_to', '>=', datetime.datetime.combine(s_d, datetime.time.min)),
+        ])
+        period_leave_days = sum(l.number_of_days or 1.0 for l in range_leaves)
+        period_leave_hours = round(period_leave_days * 8.0, 2)
+        period_leave_count = len(range_leaves)
+
         # Card 1: Total Worked Hours & Target Hours
         period_worked_hours = round(sum(att.worked_hours or 0.0 for att in range_atts), 2)
+        period_predefined_hours = round(sum((att.pre_defined_lateness or 0.0) + (getattr(att, 'pre_approved_early_checkout', 0.0) or 0.0) for att in range_atts), 2)
+        period_compensable_hours = round(period_worked_hours + period_leave_hours + period_predefined_hours + sum((att.acknowledged_late or 0.0) + (att.acknowledged_exit or 0.0) for att in range_atts), 2)
         period_days = (e_d - s_d).days + 1
         target_hours = 160.0 if (date_range == 'this_month' or period_days > 14) else round(period_days * 8.0, 1)
-        worked_hours_pct = min(100.0, round((period_worked_hours / max(1.0, target_hours)) * 100, 1))
+        worked_hours_pct = min(100.0, round((period_compensable_hours / max(1.0, target_hours)) * 100, 1))
         avg_daily_hours = round(period_worked_hours / max(1, period_days), 1)
 
         # Card 2: Cumulative Late Hours & Punctuality Rating
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
         period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
-        period_leave_count = sum(1 for att in range_atts if 'Rest' in (att.check_in_status or ''))
         period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
         total_sessions = len(range_atts)
         punctuality_score = round(((total_sessions - period_late_count) / max(1, total_sessions)) * 100, 1) if total_sessions > 0 else 100.0
@@ -639,10 +651,9 @@ class HrAttendanceDashboardService(models.Model):
         late_mins_int = int(round((period_late_hours_float - late_hrs_int) * 60))
         late_hours_formatted = f"{late_hrs_int:02d}:{late_mins_int:02d}"
 
-        # Card 3: Offenses
+        # Card 3: Offenses & Shift-Aware Absence Evaluation
         force_checkout_count = sum(1 for att in range_atts if (att.check_out_status in ('Force Checkout', 'force_checkout', 'Forced Check-Out') or getattr(att, 'is_force_checkout', False) or getattr(att, 'is_forced_checkout', False)))
         eval_end_d = min(e_d, today)
-        elapsed_days = max(0, (eval_end_d - s_d).days + 1)
 
         def _get_att_work_date(a):
             if getattr(a, 'work_date', False):
@@ -652,8 +663,57 @@ class HrAttendanceDashboardService(models.Model):
             dt_loc = pytz.utc.localize(a.check_in).astimezone(local_tz) if not a.check_in.tzinfo else a.check_in.astimezone(local_tz)
             return (dt_loc - datetime.timedelta(days=1)).date() if dt_loc.hour < 4 else dt_loc.date()
 
-        recorded_days = len(set(_get_att_work_date(att) for att in range_atts if _get_att_work_date(att)))
-        absent_count = max(0, elapsed_days - recorded_days)
+        now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
+        current_float = now_dt.hour + (now_dt.minute / 60.0)
+
+        # Date-by-date absence evaluation
+        full_day_absent = 0
+        missed_sessions_count = 0
+        cur_d = s_d
+        while cur_d <= eval_end_d:
+            d_shift = employee._get_employee_shift_info(target_date=cur_d) if hasattr(employee, '_get_employee_shift_info') else None
+            is_day_off = bool(d_shift.get('is_day_off')) if d_shift else (cur_d.weekday() == 6)
+
+            # Check approved leave on cur_d
+            on_leave = False
+            if 'hr.leave' in self.env:
+                on_leave = self.env['hr.leave'].sudo().search_count([
+                    ('employee_id', '=', employee.id),
+                    ('state', '=', 'validate'),
+                    ('date_from', '<=', datetime.datetime.combine(cur_d, datetime.time.max)),
+                    ('date_to', '>=', datetime.datetime.combine(cur_d, datetime.time.min))
+                ]) > 0
+
+            if not is_day_off and not on_leave:
+                d_atts = [a for a in range_atts if _get_att_work_date(a) == cur_d]
+                m_start = d_shift.get('start_time', 8.0) if d_shift else 8.0
+                m_end = d_shift.get('lunch_out_time', 12.0) if d_shift else 12.0
+                a_end = d_shift.get('end_time', 17.0) if d_shift else 17.0
+
+                if cur_d < today:
+                    if not d_atts:
+                        full_day_absent += 1
+                    elif d_shift and d_shift.get('has_lunch_break'):
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        if not has_morning: missed_sessions_count += 1
+                        if not has_afternoon: missed_sessions_count += 1
+                elif cur_d == today:
+                    # For today: only evaluate if shift/session has already elapsed
+                    if not d_atts:
+                        if current_float >= a_end:
+                            full_day_absent += 1
+                        elif d_shift and d_shift.get('has_lunch_break') and current_float >= m_end:
+                            missed_sessions_count += 1
+                    elif d_shift and d_shift.get('has_lunch_break'):
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        if not has_morning and current_float >= m_end: missed_sessions_count += 1
+                        if not has_afternoon and current_float >= a_end: missed_sessions_count += 1
+
+            cur_d += datetime.timedelta(days=1)
+
+        absent_count = full_day_absent + round(missed_sessions_count * 0.5, 1)
 
         # Card 4: Approvals
         acknowledged_count = sum(1 for att in range_atts if (getattr(att, 'is_acknowledged', False) or (getattr(att, 'acknowledged_late', 0.0) or 0.0) > 0 or (getattr(att, 'acknowledged_exit', 0.0) or 0.0) > 0))
@@ -722,9 +782,21 @@ class HrAttendanceDashboardService(models.Model):
             w_h = round(sum(a.worked_hours or 0.0 for a in b_atts), 2)
             l_h = round(sum(a.late_time_hour or 0.0 for a in b_atts), 2)
             b_days = (block['end_date'] - block['start_date']).days + 1
-            working_days = sum(1 for d in (block['start_date'] + datetime.timedelta(days=i) for i in range(b_days)) if d.weekday() != 6)
-            expected_hours = working_days * 8.0
-            a_h = max(0.0, round(expected_hours - w_h, 2))
+            
+            # Count only elapsed or past working days
+            past_working_days = sum(1 for d in (block['start_date'] + datetime.timedelta(days=i) for i in range(b_days)) if d.weekday() != 6 and d < today)
+            if block['start_date'] <= today <= block['end_date'] and today.weekday() != 6:
+                # Include today only if today's shift cutoff has passed
+                t_shift = employee._get_employee_shift_info(target_date=today) if hasattr(employee, '_get_employee_shift_info') else None
+                t_end = t_shift.get('end_time', 17.0) if t_shift else 17.0
+                if current_float >= t_end:
+                    past_working_days += 1
+
+            b_leaves = [l for l in range_leaves if l.date_from and l.date_to and l.date_from.date() <= block['end_date'] and l.date_to.date() >= block['start_date']]
+            b_leave_h = round(sum((l.number_of_days or 1.0) * 8.0 for l in b_leaves), 2)
+            comp_h = w_h + b_leave_h + round(sum((a.pre_defined_lateness or 0.0) + (getattr(a, 'pre_approved_early_checkout', 0.0) or 0.0) + (a.acknowledged_late or 0.0) + (a.acknowledged_exit or 0.0) for a in b_atts), 2)
+            expected_past_hours = past_working_days * 8.0
+            a_h = max(0.0, round(expected_past_hours - comp_h, 2)) if past_working_days > 0 else 0.0
             a_days = round(a_h / 8.0, 1)
             a_days_formatted = int(a_days) if (a_days % 1 == 0) else a_days
             max_bar_h = max(max_bar_h, w_h, l_h, a_h)
@@ -802,4 +874,133 @@ class HrAttendanceDashboardService(models.Model):
             },
             'progression_points': prog_svg_points,
             'recent_logs': logs,
+        }
+
+    # ------------------------------------------------------------------
+    # On-Demand Absence & Attendance Query Helpers (For Reports, Discipline & Payroll)
+    # ------------------------------------------------------------------
+    @api.model
+    def get_employee_absent_dates(self, employee_id, start_date, end_date):
+        """Compute the list of unexcused absent dates for a specific employee over a date range.
+        Excludes approved leaves and Sundays/rest days. Zero cron required.
+        """
+        s_d = fields.Date.to_date(start_date)
+        e_d = fields.Date.to_date(end_date)
+        if not (employee_id and s_d and e_d and s_d <= e_d):
+            return []
+
+        # 1. Get all check-in dates for employee in range
+        s_dt = datetime.datetime.combine(s_d, datetime.time.min)
+        e_dt = datetime.datetime.combine(e_d, datetime.time.max)
+        atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('check_in', '>=', s_dt),
+            ('check_in', '<=', e_dt),
+        ])
+        checked_dates = set()
+        for a in atts:
+            if a.check_in:
+                checked_dates.add(a.check_in.date())
+
+        # 2. Get approved leave dates
+        leaves = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', e_dt),
+            ('date_to', '>=', s_dt),
+        ])
+        leave_dates = set()
+        for l in leaves:
+            cur_l = max(s_d, l.date_from.date())
+            end_l = min(e_d, l.date_to.date())
+            while cur_l <= end_l:
+                leave_dates.add(cur_l)
+                cur_l += datetime.timedelta(days=1)
+
+        # 3. Evaluate calendar working days
+        absent_dates = []
+        cur = s_d
+        while cur <= e_d:
+            # Skip Sunday (weekday 6)
+            if cur.weekday() != 6:
+                if cur not in checked_dates and cur not in leave_dates:
+                    absent_dates.append(str(cur))
+            cur += datetime.timedelta(days=1)
+
+        return absent_dates
+
+    @api.model
+    def get_operating_unit_absent_employees(self, ou_id, target_date=None):
+        """Retrieve the list of absent employees for an Operating Unit on a given date.
+        Zero cron required.
+        """
+        t_d = fields.Date.to_date(target_date) if target_date else fields.Date.context_today(self)
+        emp_model = self.env['hr.employee'].sudo()
+        employees = emp_model.search([
+            ('active', '=', True),
+            ('default_operating_unit_id', '=', int(ou_id))
+        ])
+        if not employees:
+            return []
+
+        emp_ids = employees.ids
+        t_s = datetime.datetime.combine(t_d, datetime.time.min)
+        t_e = datetime.datetime.combine(t_d, datetime.time.max)
+
+        # Check-in employee IDs today
+        att_emp_ids = set(self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('check_in', '>=', t_s),
+            ('check_in', '<=', t_e),
+        ]).mapped('employee_id.id'))
+
+        # Approved leave employee IDs today
+        leave_emp_ids = set(self.env['hr.leave'].sudo().search([
+            ('employee_id', 'in', emp_ids),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', t_e),
+            ('date_to', '>=', t_s),
+        ]).mapped('employee_id.id'))
+
+        absent_list = []
+        for emp in employees:
+            if emp.id not in att_emp_ids and emp.id not in leave_emp_ids:
+                absent_list.append({
+                    'id': emp.id,
+                    'name': emp.name,
+                    'job_title': emp.job_id.name if emp.job_id else '',
+                    'work_email': emp.work_email or '',
+                    'work_phone': emp.work_phone or '',
+                })
+
+        return absent_list
+
+    @api.model
+    def get_payroll_attendance_summary(self, employee_id, start_date, end_date):
+        """Clean data endpoint for Payroll to pull attendance metrics without pushing penalties."""
+        s_d = fields.Date.to_date(start_date)
+        e_d = fields.Date.to_date(end_date)
+        s_dt = datetime.datetime.combine(s_d, datetime.time.min)
+        e_dt = datetime.datetime.combine(e_d, datetime.time.max)
+
+        atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee_id),
+            ('check_in', '>=', s_dt),
+            ('check_in', '<=', e_dt),
+        ])
+
+        worked_hours = round(sum(a.worked_hours or 0.0 for a in atts), 2)
+        late_hours = round(sum(a.late_time_hour or 0.0 for a in atts), 2)
+        force_checkout_count = sum(1 for a in atts if a.is_force_checkout)
+        absent_dates = self.get_employee_absent_dates(employee_id, start_date, end_date)
+
+        return {
+            'employee_id': employee_id,
+            'start_date': str(s_d),
+            'end_date': str(e_d),
+            'worked_hours': worked_hours,
+            'late_hours': late_hours,
+            'force_checkout_count': force_checkout_count,
+            'absent_days_count': len(absent_dates),
+            'absent_dates': absent_dates,
         }

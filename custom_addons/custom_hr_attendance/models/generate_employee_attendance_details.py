@@ -21,6 +21,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
     remarks = fields.Char(string="Remarks")
 
     worked_hours = fields.Float(string="Worked Hours")
+    payable_hours = fields.Float(string="Total Compensable (Hours)")
     leave_hours = fields.Float(string="Leave Hours")
     late_time_hour = fields.Float(string="Late Time (Hours)")
     early_exit_hour = fields.Float(string="Early Exit (Hours)")
@@ -100,6 +101,8 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     work_unit,
                     job_title,
                     worked_hours,
+                    payable_hours,
+                    leave_hours,
                     late_time_hour,
                     early_exit_hour,
                     over_time_hour,
@@ -125,6 +128,13 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                         ELSE COALESCE(job.name::text, '')
                     END AS job_title,
                     COALESCE(SUM(att.worked_hours), 0.0) AS worked_hours,
+                    (COALESCE(SUM(att.worked_hours), 0.0) 
+                     + COALESCE(leave_agg.total_leave_hours, 0.0)
+                     + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                     + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                     + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                     + COALESCE(SUM(att.acknowledged_exit), 0.0)) AS payable_hours,
+                    COALESCE(leave_agg.total_leave_hours, 0.0) AS leave_hours,
                     COALESCE(SUM(att.late_time_hour), 0.0) AS late_time_hour,
                     COALESCE(SUM(att.early_exit_hour), 0.0) AS early_exit_hour,
                     COALESCE(SUM(att.over_time_hour), 0.0) AS over_time_hour,
@@ -136,10 +146,24 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     COALESCE(exp_wh.total_wh, 0.0) AS working_hours,
                     CASE 
                         WHEN COALESCE(exp_wh.total_wh, 0.0) > 0 THEN 
-                            ROUND(CAST((COALESCE(SUM(att.worked_hours), 0.0) / exp_wh.total_wh) * 100 AS numeric), 2)
+                            ROUND(CAST((LEAST(exp_wh.total_wh, 
+                                COALESCE(SUM(att.worked_hours), 0.0) 
+                                + COALESCE(leave_agg.total_leave_hours, 0.0)
+                                + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                                + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                                + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                                + COALESCE(SUM(att.acknowledged_exit), 0.0)
+                            ) / exp_wh.total_wh) * 100 AS numeric), 2)
                         ELSE 0.0 
                     END AS attendance_percentage,
-                    GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - COALESCE(SUM(att.worked_hours), 0.0)) AS absent_hours,
+                    GREATEST(0.0, COALESCE(exp_wh.total_wh, 0.0) - (
+                        COALESCE(SUM(att.worked_hours), 0.0) 
+                        + COALESCE(leave_agg.total_leave_hours, 0.0)
+                        + COALESCE(SUM(att.pre_defined_lateness), 0.0) 
+                        + COALESCE(SUM(att.pre_approved_early_checkout), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_late), 0.0) 
+                        + COALESCE(SUM(att.acknowledged_exit), 0.0)
+                    )) AS absent_hours,
                     NOW(),
                     NOW()
                 FROM hr_employee emp
@@ -152,15 +176,86 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                 LEFT JOIN LATERAL (
                     SELECT SUM(
                         CASE 
-                            WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
-                            WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
-                            ELSE 0.0
+                            WHEN l.number_of_days > 0 THEN l.number_of_days * 8.0
+                            WHEN l.number_of_hours > 0 THEN l.number_of_hours
+                            ELSE 8.0
                         END
+                    ) AS total_leave_hours
+                    FROM hr_leave l
+                    WHERE l.employee_id = emp.id
+                      AND l.state = 'validate'
+                      AND l.date_from::date <= p_to
+                      AND l.date_to::date >= p_from
+                ) leave_agg ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT SUM(
+                        COALESCE(
+                            -- 1. Check Approved Leave (hr_leave) on this date
+                            (
+                                SELECT 0.0
+                                FROM hr_leave l
+                                WHERE l.employee_id = emp.id
+                                  AND l.state = 'validate'
+                                  AND l.date_from::date <= d::date
+                                  AND l.date_to::date >= d::date
+                                LIMIT 1
+                            ),
+                            -- 2. Check Date-based Roster Exception (job_position_roster_exception_line)
+                            (
+                                SELECT CASE 
+                                    WHEN rl.schedule_type = 'day_off' THEN 0.0
+                                    WHEN js.id IS NOT NULL THEN 
+                                        GREATEST(0.0, (js.end_time - js.start_time) - CASE WHEN js.has_lunch_break THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                                    ELSE 8.0
+                                END
+                                FROM job_position_roster_exception_line rl
+                                JOIN job_position_roster_exception re ON rl.roster_id = re.id
+                                LEFT JOIN job_shift js ON rl.shift_id = js.id
+                                WHERE (rl.employee_id = emp.id OR re.employee_id = emp.id)
+                                  AND re.status = 'active'
+                                  AND (re.active = TRUE OR re.active IS NULL)
+                                  AND rl.date = d::date
+                                ORDER BY re.start_date DESC, re.id DESC
+                                LIMIT 1
+                            ),
+                            -- 3. Check Job Position Exception (job_position_exception)
+                            (
+                                SELECT GREATEST(0.0, (js.end_time - js.start_time) - CASE WHEN js.has_lunch_break THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                                FROM job_position_exception jpe
+                                JOIN job_shift js ON jpe.shift_id = js.id
+                                WHERE jpe.employee_id = emp.id
+                                  AND jpe.status = 'active'
+                                  AND (jpe.active = TRUE OR jpe.active IS NULL)
+                                  AND jpe.start_date <= d::date
+                                  AND (jpe.end_date IS NULL OR jpe.end_date >= d::date)
+                                ORDER BY jpe.start_date DESC, jpe.id DESC
+                                LIMIT 1
+                            ),
+                            -- 4. Check Location Exception (location_based_exception)
+                            (
+                                SELECT GREATEST(0.0, (COALESCE(js.end_time, lbe.end_time, 17.0) - COALESCE(js.start_time, lbe.start_time, 8.0)) - CASE WHEN COALESCE(js.has_lunch_break, lbe.has_lunch_break, FALSE) THEN COALESCE(js.lunch_duration, 1.0) ELSE 0.0 END)
+                                FROM location_based_exception lbe
+                                LEFT JOIN job_shift js ON lbe.shift_id = js.id
+                                WHERE (lbe.active = TRUE OR lbe.active IS NULL)
+                                  AND (lbe.operating_unit = emp.default_operating_unit_id OR lbe.id IN (
+                                      SELECT location_exception_id FROM rel_location_exception_operating_unit WHERE operating_unit_id = emp.default_operating_unit_id
+                                  ))
+                                  AND lbe.start_date <= d::date
+                                  AND (lbe.end_date IS NULL OR lbe.end_date >= d::date)
+                                LIMIT 1
+                            ),
+                            -- 5. Default Global Working Calendar
+                            CASE 
+                                WHEN EXTRACT(DOW FROM d) BETWEEN 1 AND 5 THEN 8.0
+                                WHEN EXTRACT(DOW FROM d) = 6 THEN (CASE WHEN ou.work_unit_type IN ('head_office', 'district') THEN 4.0 ELSE 8.0 END)
+                                ELSE 0.0
+                            END
+                        )
                     ) AS total_wh
                     FROM generate_series(p_from, p_to, '1 day'::interval) d
                 ) exp_wh ON TRUE
                 WHERE emp.active = TRUE
-                GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh;
+                GROUP BY emp.id, emp.employee_identification, emp.name, ou.name, ou.work_unit_type, job.id, job.name, exp_wh.total_wh, leave_agg.total_leave_hours;
 
             ELSE
                 -- Daily Employee Attendance Detail mode (per-attendance row)
@@ -179,6 +274,7 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     checkout_time,
                     remarks,
                     worked_hours,
+                    payable_hours,
                     late_time_hour,
                     early_exit_hour,
                     over_time_hour,
@@ -209,6 +305,11 @@ class GenerateEmployeeAttendanceDetails(models.Model):
                     att.check_out AS checkout_time,
                     COALESCE(att.check_in_status, att.check_out_status, '') AS remarks,
                     COALESCE(att.worked_hours, 0.0) AS worked_hours,
+                    (COALESCE(att.worked_hours, 0.0) 
+                     + COALESCE(att.pre_defined_lateness, 0.0) 
+                     + COALESCE(att.pre_approved_early_checkout, 0.0) 
+                     + COALESCE(att.acknowledged_late, 0.0) 
+                     + COALESCE(att.acknowledged_exit, 0.0)) AS payable_hours,
                     COALESCE(att.late_time_hour, 0.0) AS late_time_hour,
                     COALESCE(att.early_exit_hour, 0.0) AS early_exit_hour,
                     COALESCE(att.over_time_hour, 0.0) AS over_time_hour,

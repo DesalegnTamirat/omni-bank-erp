@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_pbms_dashboard" model="ir.actions.client">
+        <field name="name">Planning &amp; Budget Dashboard</field>
+        <field name="tag">pbms_dashboard</field>
+    </record>
+</odoo>

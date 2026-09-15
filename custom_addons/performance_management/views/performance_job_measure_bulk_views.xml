@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_performance_job_measure_bulk_list" model="ir.ui.view">
+        <field name="name">performance.job.measure.bulk.list</field>
+        <field name="model">performance.job.measure</field>
+        <field name="arch" type="xml">
+            <list string="Job Position KPIs and Measurements" editable="bottom">
+                <field name="perspective_id" readonly="1"/>
+                <field name="parent_objective_id" readonly="1"/>
+                <field name="job_objective_id" string="Key Performance Indicator"
+                       context="{'default_operating_unit_id': operating_unit_id, 'default_job_id': job_id}"/>
+                <field name="name" string="Measurement"/>
+                <field name="weight" string="Weight %" sum="Total Weight"/>
+                <field name="target_type"/>
+                <field name="operating_unit_id" column_invisible="1"/>
+                <field name="job_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_performance_job_measure_bulk" model="ir.actions.act_window">
+        <field name="name">Job Position KPIs and Measurements</field>
+        <field name="res_model">performance.job.measure</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_performance_job_measure_bulk_list"/>
+    </record>
+
+</odoo>

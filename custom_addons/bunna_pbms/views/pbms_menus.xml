@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root Menu: Visible only to users who have at least one PBMS privilege -->
+    <menuitem id="menu_pbms_root"
+              name="Plan &amp; Budget"
+              sequence="35"
+              web_icon="bunna_pbms,static/description/icon.png"
+              groups="bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <!-- Dashboard -->
+    <menuitem id="menu_pbms_dashboard"
+              name="Dashboard"
+              parent="menu_pbms_root"
+              action="action_pbms_dashboard"
+              sequence="10"
+              groups="bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <!-- Planning Parent Menu -->
+    <menuitem id="menu_pbms_planning"
+              name="Planning"
+              parent="menu_pbms_root"
+              sequence="15"
+              groups="bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <menuitem id="menu_pbms_planning_category"
+              name="Planning Categories"
+              parent="menu_pbms_planning"
+              action="action_pbms_planning_category"
+              sequence="10"
+              groups="bunna_pbms.group_pbms_branch_user,bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <record id="menu_pbms_planning_workspace" model="ir.ui.menu">
+        <field name="name">Planning Request</field>
+        <field name="parent_id" ref="menu_pbms_planning"/>
+        <field name="action" ref="action_pbms_planning_request_server"/>
+        <field name="sequence">20</field>
+        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_branch_user')])]"/>
+    </record>
+
+    <record id="menu_pbms_exceptional_workforce" model="ir.ui.menu">
+        <field name="name">Exceptional Workforce Requests</field>
+        <field name="parent_id" ref="menu_pbms_planning"/>
+        <field name="action" ref="action_pbms_exceptional_workforce"/>
+        <field name="sequence">30</field>
+        <field name="group_ids" eval="[(6, 0, [
+            ref('bunna_pbms.group_pbms_district_reviewer'),
+            ref('bunna_pbms.group_pbms_approver'),
+            ref('bunna_pbms.group_pbms_manager'),
+            ref('bunna_pbms.group_pbms_respective_chief'),
+            ref('bunna_pbms.group_pbms_people_solutions'),
+            ref('bunna_pbms.group_pbms_cpco'),
+            ref('bunna_pbms.group_pbms_ceo'),
+            ref('bunna_pbms.group_pbms_people_operations'),
+        ])]"/>
+    </record>
+
+    <!-- Review & Consolidation -->
+    <menuitem id="menu_pbms_review"
+              name="Review &amp; Consolidation"
+              parent="menu_pbms_root"
+              sequence="30"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <menuitem id="menu_pbms_review_retail"
+              name="Retail Banking (Deposit &amp; Customer)"
+              parent="menu_pbms_review"
+              action="action_pbms_review_retail"
+              sequence="10"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_review_workforce"
+              name="Human Resources (Workforce)"
+              parent="menu_pbms_review"
+              action="action_pbms_review_workforce"
+              sequence="20"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_people_operations"/>
+
+    <menuitem id="menu_pbms_review_fx"
+              name="International Banking (FX Mobilization)"
+              parent="menu_pbms_review"
+              action="action_pbms_review_fx"
+              sequence="30"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_review_digital"
+              name="Digital Banking Operations"
+              parent="menu_pbms_review"
+              action="action_pbms_review_digital"
+              sequence="40"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_review_expense"
+              name="Finance &amp; Accounts (General Expense)"
+              parent="menu_pbms_review"
+              action="action_pbms_review_expense"
+              sequence="50"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee"/>
+
+    <menuitem id="menu_pbms_review_fixed_asset"
+              name="Procurement &amp; Property (Fixed Assets)"
+              parent="menu_pbms_review"
+              action="action_pbms_review_fixed_asset"
+              sequence="60"
+              groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager,bunna_pbms.group_pbms_budget_hiring_committee"/>
+
+    <menuitem id="menu_pbms_consolidation"
+              name="Bank-Wide Consolidation"
+              parent="menu_pbms_review"
+              action="action_pbms_consolidation"
+              sequence="70"
+              groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+    <!-- Configuration -->
+    <menuitem id="menu_pbms_config"
+              name="Configuration"
+              parent="menu_pbms_root"
+              sequence="90"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_planning_config"
+              name="Planning Configuration"
+              parent="menu_pbms_config"
+              action="action_pbms_planning_config"
+              sequence="5"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_cycles"
+              name="Planning Cycles"
+              parent="menu_pbms_config"
+              action="action_pbms_planning_cycle"
+              sequence="10"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_org_units"
+              name="Org Units (Operating Units)"
+              parent="menu_pbms_config"
+              action="hr_employee_custom.action_hr_operating_unit"
+              sequence="20"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_deposit_types"
+              name="Deposit Types"
+              parent="menu_pbms_config"
+              action="action_pbms_deposit_type"
+              sequence="30"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_expense_accounts"
+              name="Expense Accounts"
+              parent="menu_pbms_config"
+              action="action_pbms_expense_account"
+              sequence="40"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_fixed_asset_categories"
+              name="Fixed Asset Categories"
+              parent="menu_pbms_config"
+              action="action_pbms_fixed_asset_category"
+              sequence="50"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_digital_channels"
+              name="Digital Banking Channels"
+              parent="menu_pbms_config"
+              action="action_pbms_digital_channel"
+              sequence="60"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_justification_categories"
+              name="Justification Categories"
+              parent="menu_pbms_config"
+              action="action_pbms_justification_category"
+              sequence="65"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_position_types"
+              name="Work Force Position Types"
+              parent="menu_pbms_config"
+              action="action_pbms_position_type"
+              sequence="68"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+    <menuitem id="menu_pbms_fx_source_types"
+              name="FX Source Types"
+              parent="menu_pbms_config"
+              action="action_pbms_fx_source_type"
+              sequence="70"
+              groups="bunna_pbms.group_pbms_manager"/>
+
+</odoo>

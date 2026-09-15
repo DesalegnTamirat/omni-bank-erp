@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Clearance Configuration Seed Data
+    ───────────────────────────────────
+    Provides:
+      1. hr.separation.type          — separation type records replacing the
+                                       old hardcoded Selection field values
+      2. hr.clearance.category       — functional groupings for work units
+
+    These records carry noupdate="1" so manual admin edits survive upgrades.
+-->
+<odoo noupdate="1">
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SEPARATION TYPES
+         These replace the old hard-coded Selection field on hr.resignation.
+         The `code` field is the stable technical key used in Python logic.
+         Do NOT change the `code` once in use.
+    ════════════════════════════════════════════════════════════════ -->
+
+    <record id="sep_type_voluntary" model="hr.separation.type">
+        <field name="name">Voluntary Resignation</field>
+        <field name="code">voluntary</field>
+        <field name="sequence">10</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee voluntarily initiates their own resignation.</field>
+    </record>
+
+    <record id="sep_type_retirement_age" model="hr.separation.type">
+        <field name="name">Age-Related Retirement</field>
+        <field name="code">retirement_age</field>
+        <field name="sequence">20</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee retires upon reaching the mandatory retirement age.</field>
+    </record>
+
+    <record id="sep_type_medical" model="hr.separation.type">
+        <field name="name">Medical Retirement</field>
+        <field name="code">medical</field>
+        <field name="sequence">30</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee retires due to a medical condition or permanent disability.</field>
+    </record>
+
+    <record id="sep_type_probation_termination" model="hr.separation.type">
+        <field name="name">Probation Termination</field>
+        <field name="code">probation_termination</field>
+        <field name="sequence">40</field>
+        <field name="is_company_terminated">True</field>
+        <field name="description">Employment ended during the probation period by the company.</field>
+    </record>
+
+    <record id="sep_type_termination" model="hr.separation.type">
+        <field name="name">Termination / Dismissal</field>
+        <field name="code">termination</field>
+        <field name="sequence">50</field>
+        <field name="is_company_terminated">True</field>
+        <field name="description">Company-initiated termination or disciplinary dismissal. Excluded from PF eligibility (FR-15).</field>
+    </record>
+
+    <record id="sep_type_contract_end" model="hr.separation.type">
+        <field name="name">Contract End / Non-Renewal</field>
+        <field name="code">contract_end</field>
+        <field name="sequence">60</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Fixed-term contract expires and is not renewed.</field>
+    </record>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         CLEARANCE CATEGORIES
+         One per functional area. Color index maps to Odoo's built-in
+         palette (0=grey, 1=red, 2=orange, 3=yellow, 4=light-blue,
+         5=dark-purple, 6=salmon, 7=medium-blue, 8=light-purple,
+         9=fushia, 10=green, 11=purple).
+    ════════════════════════════════════════════════════════════════ -->
+
+    <record id="clearance_category_finance" model="hr.clearance.category">
+        <field name="name">Finance</field>
+        <field name="sequence">10</field>
+        <field name="color">10</field>
+    </record>
+
+    <record id="clearance_category_it" model="hr.clearance.category">
+        <field name="name">Information Technology</field>
+        <field name="sequence">20</field>
+        <field name="color">4</field>
+    </record>
+
+    <record id="clearance_category_facilities" model="hr.clearance.category">
+        <field name="name">Facilities &amp; Administration</field>
+        <field name="sequence">30</field>
+        <field name="color">2</field>
+    </record>
+
+    <record id="clearance_category_hr" model="hr.clearance.category">
+        <field name="name">Human Resources</field>
+        <field name="sequence">40</field>
+        <field name="color">7</field>
+    </record>
+
+    <record id="clearance_category_legal" model="hr.clearance.category">
+        <field name="name">Legal &amp; Compliance</field>
+        <field name="sequence">50</field>
+        <field name="color">5</field>
+    </record>
+
+    <record id="clearance_category_fleet" model="hr.clearance.category">
+        <field name="name">Fleet &amp; Transport</field>
+        <field name="sequence">60</field>
+        <field name="color">6</field>
+    </record>
+
+    <record id="clearance_category_security" model="hr.clearance.category">
+        <field name="name">Security &amp; Access Control</field>
+        <field name="sequence">70</field>
+        <field name="color">1</field>
+    </record>
+
+    <record id="clearance_category_operations" model="hr.clearance.category">
+        <field name="name">Operations / Business Unit</field>
+        <field name="sequence">80</field>
+        <field name="color">8</field>
+    </record>
+
+</odoo>

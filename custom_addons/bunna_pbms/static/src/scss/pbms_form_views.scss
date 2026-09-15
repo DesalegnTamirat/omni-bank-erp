@@ -1,0 +1,1558 @@
+/* ========================================================================= */
+/* Bunna Bank PBMS Form View, Statusbar & Notebook Tab Styling               */
+/* ========================================================================= */
+
+/* Bunna Bank S.C. Official 6 Brand Colors */
+/* Primary Colors (Image 4 & 6) */
+$bunna-primary-slate: #1D2B32;       /* Swatch 4: C:83 M:67 Y:58 K:62 | R:29 G:43 B:50 */
+$bunna-primary-maroon: #54171820;      /* Swatch 6: C:39 M:89 Y:79 K:60 | R:84 G:24 B:24 */
+
+/* Secondary Colors (Image 1, 2, 3, 5) */
+$bunna-secondary-forest: #425727;    /* Swatch 1: C:70 M:44 Y:100 K:39 | R:66 G:87 B:39 */
+$bunna-secondary-bronze: #726732;    /* Swatch 2: C:50 M:47 Y:92 K:26 | R:114 G:103 B:50 */
+$bunna-secondary-terracotta: #C17540;/* Swatch 3: C:20 M:60 Y:84 K:5 | R:193 G:117 B:64 */
+$bunna-secondary-pine: #1E2917;      /* Swatch 5: C:73 M:56 Y:81 K:73 | R:30 G:41 B:23 */
+
+$bunna-primary: $bunna-primary-maroon;
+$bunna-secondary: $bunna-secondary-pine;
+$bunna-light: #F4F6F7;
+
+// Global Odoo & Bootstrap CSS Theme Variables (Bunna Bank Brand)
+:root {
+    accent-color: #541718 !important;
+    --primary: #541718;
+    --bs-primary: #541718;
+    --bs-primary-rgb: 84, 24, 24;
+    --secondary: #1E2917;
+    --bs-secondary: #1E2917;
+    --bs-secondary-rgb: 30, 41, 23;
+    --bs-info: #726732;
+    --bs-info-rgb: 114, 103, 50;
+    --bs-success: #425727;
+    --bs-success-rgb: 66, 87, 39;
+    --bs-warning: #C17540;
+    --bs-warning-rgb: 193, 117, 64;
+    --bs-danger: #541718;
+    --bs-danger-rgb: 84, 24, 24;
+    --o-brand-primary: #541718;
+    --o-brand-secondary: #1E2917;
+    --o-brand-odoo: #541718;
+    --o-color-1: #541718;
+    --o-color-2: #1E2917;
+    --o-color-3: #425727;
+    --o-color-4: #C17540;
+    --o-color-5: #726732;
+    --o-color-6: #1D2B32;
+}
+
+*,
+*::before,
+*::after {
+    accent-color: #541718 !important;
+}
+
+/* Form Sheet & Header Styling for PBMS */
+.o_form_view {
+    // -------------------------------------------------------------------------
+    // Header Statusbar & Buttons
+    // -------------------------------------------------------------------------
+    .o_form_statusbar {
+        padding: 0.5rem 1rem;
+        background-color: #F8FAFC;
+        border-bottom: 1px solid #E2E8F0;
+
+        .o_statusbar_buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+
+            .btn {
+                font-weight: 600;
+                border-radius: 6px;
+                padding: 0.4rem 0.95rem;
+                font-size: 0.875rem;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+                &:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+                }
+
+                // Submit & HO Review Buttons - Primary Maroon (#541718)
+                &.btn-primary[name="action_submit"],
+                &[name="action_ho_review"],
+                &.btn-primary {
+                    background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                    border: 1px solid #3E1011 !important;
+                    color: #FFFFFF !important;
+                    font-weight: 700;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                        box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
+                    }
+                }
+
+                // Approval Buttons - Secondary Forest Olive (#425727)
+                &.btn-success,
+                &[name="action_district_approve"],
+                &[name="action_approve"] {
+                    background: linear-gradient(135deg, #425727 0%, #597435 100%) !important;
+                    border: 1px solid #2F3E1C !important;
+                    color: #FFFFFF !important;
+                    font-weight: 700;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #2F3E1C 0%, #425727 100%) !important;
+                        box-shadow: 0 4px 12px rgba(66, 87, 39, 0.35);
+                    }
+                }
+
+                // Consolidate Buttons - Soft Olive Accent (#F0F4ED / #425727)
+                &[name="action_consolidate_district_overview"],
+                &[name="action_consolidate_bank_overview"] {
+                    background: #F0F4ED !important;
+                    border: 1.5px solid #425727 !important;
+                    color: #1D2B32 !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: #425727 !important;
+                        color: #FFFFFF !important;
+                        box-shadow: 0 4px 10px rgba(66, 87, 39, 0.3);
+                    }
+                }
+
+                // Request Information - Secondary Bronze Olive (#726732)
+                &.btn-info {
+                    background: linear-gradient(135deg, #726732 0%, #8C7F40 100%) !important;
+                    border: 1px solid #544C24 !important;
+                    color: #FFFFFF !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #544C24 0%, #726732 100%) !important;
+                        box-shadow: 0 4px 12px rgba(114, 103, 50, 0.35);
+                    }
+                }
+
+                // Cascade Target Buttons - Soft Bronze Outline
+                &.btn-outline-info {
+                    background: #F6F4EB !important;
+                    border: 1.5px solid #726732 !important;
+                    color: #1D2B32 !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: #726732 !important;
+                        color: #FFFFFF !important;
+                        box-shadow: 0 4px 10px rgba(114, 103, 50, 0.3);
+                    }
+                }
+
+                // Return for Revision - Secondary Terracotta Cinnamon (#C17540)
+                &.btn-warning {
+                    background: linear-gradient(135deg, #C17540 0%, #A85E2B 100%) !important;
+                    border: 1px solid #8A481B !important;
+                    color: #FFFFFF !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #8A481B 0%, #C17540 100%) !important;
+                        box-shadow: 0 4px 12px rgba(193, 117, 64, 0.35);
+                    }
+                }
+
+                // Reject & Recommend Rejection - Primary Deep Maroon (#541718)
+                &.btn-danger {
+                    background: linear-gradient(135deg, #541718 0%, #74252620 100%) !important;
+                    border: 1px solid #3E101120 !important;
+                    color: #FFFFFF !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                        box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
+                    }
+                }
+
+                // Reset to Draft & Review Comments - Secondary Deep Pine (#1E2917)
+                &.btn-secondary {
+                    background: #EAECE8 !important;
+                    border: 1px solid #CCD3C5 !important;
+                    color: #1E2917 !important;
+                    font-weight: 600;
+
+                    &:hover {
+                        background: #1E2917 !important;
+                        border-color: #1E2917 !important;
+                        color: #FFFFFF !important;
+                        box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+                    }
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Statusbar Arrow Buttons (Workflow Stages)
+        // ---------------------------------------------------------------------
+        .o_field_statusbar > .o_statusbar_status {
+            .o_arrow_button {
+                font-weight: 600;
+                font-size: 0.835rem;
+                padding-top: 0.38rem;
+                padding-bottom: 0.38rem;
+                transition: all 0.2s ease;
+
+                // Active Stage Highlight - Branded Deep Maroon Gradient (#541718)
+                &.o_arrow_button_current,
+                &.o_arrow_button_current:disabled,
+                &:active:not(.o_last) {
+                    background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                    border-color: #3E1011 !important;
+                    color: #FFFFFF !important;
+                    font-weight: 700 !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+                    &::before {
+                        background-color: #3E1011 !important;
+                    }
+                    &:after {
+                        border-left-color: #541718 !important;
+                    }
+                }
+
+                // Inactive / Prior Stages
+                &:not(.o_arrow_button_current) {
+                    color: #475569 !important;
+                    background-color: #EDF2F7 !important;
+                    border-color: #CBD5E1 !important;
+
+                    &:hover {
+                        background-color: #E2E8F0 !important;
+                        color: #541718 !important;
+                    }
+
+                    &::before {
+                        background-color: #CBD5E1 !important;
+                    }
+                    &:after {
+                        border-left-color: #EDF2F7 !important;
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Notebook Tabs Styling (PBMS Categories)
+    // -------------------------------------------------------------------------
+    .o_notebook {
+        margin-top: 1rem;
+
+        .o_notebook_headers {
+            background: #F1F5F9;
+            border-radius: 8px 8px 0 0;
+            padding: 0.4rem 0.6rem 0 0.6rem;
+            border-bottom: 2px solid #CBD5E1;
+        }
+
+        .nav-tabs {
+            border-bottom: none;
+            gap: 0.3rem;
+
+            .nav-item {
+                margin-bottom: -2px;
+
+                .nav-link {
+                    border: 1px solid transparent;
+                    border-bottom: 2px solid transparent;
+                    border-radius: 6px 6px 0 0;
+                    padding: 0.65rem 1.15rem;
+                    font-size: 0.92rem;
+                    font-weight: 600;
+                    color: #475569;
+                    background: transparent;
+                    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.45rem;
+
+                    &:hover:not(.active) {
+                        background-color: #E2E8F0;
+                        color: #541718;
+                        border-color: transparent;
+                    }
+
+                    // Active Tab - Crisp White Card with Top Deep Maroon Accent & Shadow
+                    &.active {
+                        background-color: #FFFFFF !important;
+                        color: #541718 !important;
+                        border: 1px solid #CBD5E1 !important;
+                        border-top: 3.5px solid #541718 !important;
+                        border-bottom: 2px solid #FFFFFF !important;
+                        box-shadow: 0 -3px 8px rgba(84, 24, 24, 0.08);
+                        font-weight: 700;
+                    }
+                }
+            }
+        }
+
+        // Sub-notebook tabs (e.g. inside Manpower Planning: Manpower Request & Existing Manpower)
+        .tab-content .o_notebook {
+            margin-top: 0.75rem;
+
+            .o_notebook_headers {
+                background: #E8EEF5;
+                border-radius: 6px 6px 0 0;
+                padding: 0.3rem 0.5rem 0 0.5rem;
+                border-bottom: 2px solid #B0C4DE;
+            }
+
+            .nav-tabs .nav-item .nav-link {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+
+                &.active {
+                    border-top: 3.5px solid #541718 !important;
+                    color: #541718 !important;
+                    border-bottom: 2px solid #FFFFFF !important;
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Title & Request Number Badge Styling (High Visibility & Crisp Contrast)
+    // -------------------------------------------------------------------------
+    .oe_title {
+        .badge {
+            background-color: #EDF3E8 !important;
+            border: 1px solid #425727 !important;
+            color: #541718 !important;
+            border-radius: 6px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+
+            * {
+                color: #541718 !important;
+                font-weight: 700 !important;
+            }
+        }
+
+        h1 {
+            color: #541718;
+            font-weight: 700;
+            margin-top: 0.25rem;
+        }
+    }
+}
+
+/* ========================================================================= */
+/* Bunna Bank PBMS Kanban View & Card Styling                                */
+/* ========================================================================= */
+.o_kanban_view {
+    // Kanban card container
+    .o_kanban_record {
+        border-radius: 8px !important;
+        border: 1px solid #E2E8F0 !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+
+        &:hover {
+            border-color: #541718 !important;
+            box-shadow: 0 4px 12px rgba(84, 24, 24, 0.08) !important;
+        }
+
+        // Request number link in header
+        a.text-primary,
+        .text-primary {
+            color: #541718 !important;
+            font-weight: 700;
+
+            &:hover {
+                color: #425727 !important;
+            }
+        }
+
+        // State Badges on Kanban Cards
+        .badge {
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 0.25rem 0.55rem;
+            font-size: 0.75rem;
+
+            // Warning: Submitted / Pending Review -> Secondary Terracotta Cinnamon (#C17540)
+            &.text-bg-warning,
+            &.bg-warning,
+            &[data-decoration="warning"] {
+                background-color: #FAF1EB !important;
+                color: #C17540 !important;
+                border: 1px solid #EAD0BC !important;
+            }
+
+            // Success: Approved -> Secondary Forest Olive (#425727)
+            &.text-bg-success,
+            &.bg-success,
+            &[data-decoration="success"] {
+                background-color: #EDF3E8 !important;
+                color: #425727 !important;
+                border: 1px solid #C8DCB8 !important;
+            }
+
+            // Danger: Returned / Rejected -> Primary Deep Maroon (#541718)
+            &.text-bg-danger,
+            &.bg-danger,
+            &[data-decoration="danger"] {
+                background-color: #F6EBEB !important;
+                color: #541718 !important;
+                border: 1px solid #DDB8B8 !important;
+            }
+
+            // Muted: Draft -> Secondary Deep Pine (#1E2917)
+            &.text-bg-secondary,
+            &.text-bg-light,
+            &.bg-secondary,
+            &.bg-light,
+            &[data-decoration="muted"] {
+                background-color: #EAECE8 !important;
+                color: #1E2917 !important;
+                border: 1px solid #CCD3C5 !important;
+            }
+        }
+
+        // Card breakdown section
+        .o_pbms_kanban_breakdown {
+            .badge {
+                background-color: #EAEFF2 !important;
+                color: #541718 !important;
+                border: 1px solid #CBD5E1 !important;
+                font-weight: 600;
+            }
+        }
+
+        // Annual Total Amount in card
+        .fs-5.text-primary,
+        .text-primary.fs-5 {
+            color: #541718 !important;
+            font-weight: 700;
+        }
+
+        // Quick action buttons in card footer
+        .btn {
+            font-weight: 600;
+            font-size: 0.78rem;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+
+            // Submit Button - Primary Deep Maroon (#541718)
+            &.btn-primary[name="action_submit"],
+            &.btn-primary {
+                background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                border: 1px solid #3E101120 !important;
+                color: #FFFFFF !important;
+
+                &:hover {
+                    background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                    box-shadow: 0 2px 6px rgba(84, 24, 24, 0.35);
+                }
+            }
+
+            // Endorse / Approve Buttons - Secondary Forest Olive (#425727)
+            &.btn-success[name="action_district_approve"],
+            &.btn-success[name="action_approve"],
+            &.btn-success {
+                background: linear-gradient(135deg, #425727 0%, #597435 100%) !important;
+                border: 1px solid #2F3E1C !important;
+                color: #FFFFFF !important;
+
+                &:hover {
+                    background: linear-gradient(135deg, #2F3E1C 0%, #425727 100%) !important;
+                    box-shadow: 0 2px 6px rgba(66, 87, 39, 0.35);
+                }
+            }
+
+            // Reset Button - Secondary Terracotta (#C17540) Soft Outline
+            &.btn-outline-warning[name="action_reset_to_draft"],
+            &.btn-outline-warning {
+                background: #FAF1EB !important;
+                border: 1px solid #C17540 !important;
+                color: #C17540 !important;
+
+                &:hover {
+                    background: #C17540 !important;
+                    color: #FFFFFF !important;
+                    box-shadow: 0 2px 6px rgba(193, 117, 64, 0.3);
+                }
+            }
+
+            // External Link Button - Secondary Deep Pine (#1E2917)
+            &.btn-outline-secondary[name="action_open_plan_form"],
+            &.btn-outline-secondary {
+                background: #FFFFFF !important;
+                border: 1px solid #CCD3C5 !important;
+                color: #1E2917 !important;
+
+                &:hover {
+                    background: #EAECE8 !important;
+                    border-color: #1E2917 !important;
+                    color: #1E2917 !important;
+                }
+            }
+        }
+    }
+}
+
+/* ========================================================================= */
+/* Bunna Bank PBMS Global Controls, Toggles & Typography Colors              */
+/* ========================================================================= */
+
+// -------------------------------------------------------------------------
+// 1. Boolean Toggle Switches (Active Enable/Disable in Form, List & Config)
+// -------------------------------------------------------------------------
+.form-check.form-switch .form-check-input,
+.form-switch .form-check-input,
+.o_field_boolean_toggle .form-check-input,
+.o_field_boolean_toggle input[type="checkbox"],
+.o_boolean_toggle input[type="checkbox"] {
+    // Disabled / Unchecked state: Clean Slate Muted Gray
+    background-color: #CBD5E1 !important;
+    border-color: #94A3B8 !important;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+
+    // Enabled / Checked state: Bunna Secondary Forest Olive (#425727)
+    &:checked {
+        background-color: #425727 !important;
+        border-color: #2F3E1C !important;
+        box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
+    }
+
+    &:focus {
+        border-color: #425727 !important;
+        box-shadow: 0 0 0 0.2rem rgba(66, 87, 39, 0.25) !important;
+    }
+}
+
+// Standard Checkbox & Radio Buttons
+.form-check-input {
+    &:checked[type="checkbox"]:not(.form-switch .form-check-input) {
+        background-color: #425727 !important;
+        border-color: #2F3E1C !important;
+    }
+
+    &:checked[type="radio"] {
+        background-color: #1D2B32 !important;
+        border-color: #1D2B32 !important;
+    }
+}
+
+// -------------------------------------------------------------------------
+// 2. Approved Target & Brand Text Colors (High Contrast & Official Palette)
+// -------------------------------------------------------------------------
+// Approved Targets & Success Metrics: Secondary Forest Olive (#425727)
+.text-success,
+span.text-success,
+div.text-success,
+td.text-success,
+p.text-success,
+strong.text-success,
+.o_field_monetary.text-success,
+.o_field_integer.text-success {
+    color: #425727 !important;
+    font-weight: 700;
+}
+
+// Primary Brand Metrics & Active Annual Totals: Primary Deep Maroon (#541718)
+.text-primary,
+span.text-primary,
+div.text-primary,
+td.text-primary,
+p.text-primary,
+strong.text-primary,
+.o_field_monetary.text-primary,
+.o_field_integer.text-primary {
+    color: #541718 !important;
+    font-weight: 700;
+}
+
+// Revision / Return / Warning Indicators: Secondary Terracotta (#C17540)
+.text-warning,
+.text-warning-emphasis,
+span.text-warning,
+div.text-warning,
+td.text-warning {
+    color: #C17540 !important;
+    font-weight: 700;
+}
+
+// Rejections & Critical Alerts: Primary Deep Maroon (#541718)
+.text-danger,
+span.text-danger,
+div.text-danger,
+td.text-danger {
+    color: #541718 !important;
+    font-weight: 700;
+}
+
+// Informational & Alternate Category Metrics: Secondary Bronze Olive (#726732)
+.text-info,
+span.text-info,
+div.text-info,
+td.text-info {
+    color: #726732 !important;
+    font-weight: 700;
+}
+
+// -------------------------------------------------------------------------
+// 3. Planning Configuration & Master Data Tags (Many2Many Badges)
+// -------------------------------------------------------------------------
+.o_field_many2many_tags {
+    .badge,
+    .o_tag {
+        background-color: #EDF3E8 !important;
+        color: #1D2B32 !important;
+        border: 1px solid #C8DCB8 !important;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 0.3rem 0.6rem;
+
+        .o_delete {
+            color: #1D2B32 !important;
+            opacity: 0.7;
+            transition: opacity 0.15s ease, color 0.15s ease;
+
+            &:hover {
+                color: #541718 !important;
+                opacity: 1;
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 4. Section Separators & Group Titles in Forms & Configs
+// -------------------------------------------------------------------------
+.o_form_view {
+    .o_horizontal_separator,
+    .o_group .o_group_header {
+        color: #541718 !important;
+        font-weight: 700 !important;
+        border-bottom: 2px solid #541718 !important;
+        padding-bottom: 4px;
+        margin-top: 1rem;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+    }
+
+    // Form Overview Numbers Contrast
+    .o_field_widget {
+        &.fs-6 {
+            font-size: 0.95rem !important;
+        }
+
+        &.fs-5 {
+            font-size: 1.15rem !important;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 5. List View Table Headers & Aggregation Footers
+// -------------------------------------------------------------------------
+.o_list_table {
+    thead th {
+        color: #1D2B32 !important;
+        font-weight: 700 !important;
+        background-color: #F8FAFC !important;
+    }
+
+    tfoot {
+        background-color: #F1F5F9 !important;
+        font-weight: 700 !important;
+
+        td {
+            color: #1D2B32 !important;
+            border-top: 2px solid #CBD5E1 !important;
+        }
+
+        .text-success {
+            color: #425727 !important;
+        }
+
+        .text-primary {
+            color: #541718 !important;
+        }
+
+        .text-danger {
+            color: #541718 !important;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 6. Global Text Selection & Focus Styling (Bunna Primary Maroon #541718)
+// -------------------------------------------------------------------------
+::selection {
+    background-color: #541718 !important;
+    color: #FFFFFF !important;
+}
+
+::-moz-selection {
+    background-color: #541718 !important;
+    color: #FFFFFF !important;
+}
+
+*::selection {
+    background-color: #541718 !important;
+    color: #FFFFFF !important;
+}
+
+*::-moz-selection {
+    background-color: #541718 !important;
+    color: #FFFFFF !important;
+}
+
+// Inputs, textareas & editable fields text selection
+input::selection,
+textarea::selection,
+select::selection,
+.form-control::selection,
+.o_input::selection {
+    background-color: #541718 !important;
+    color: #FFFFFF !important;
+}
+
+// Input focus rings - Bunna Primary Maroon (#541718)
+.form-control:focus,
+.o_input:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: #541718 !important;
+    box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+    outline: none !important;
+}
+
+// Dropdown & Autocomplete item active / selected state
+.dropdown-item:active,
+.dropdown-item.active,
+.dropdown-item:hover,
+.dropdown-item:focus,
+.o-autocomplete--dropdown-item.active,
+.o-autocomplete--dropdown-item:hover,
+.ui-menu-item.ui-state-focus,
+.ui-menu-item .ui-menu-item-wrapper.ui-state-active {
+    background-color: #EDF3E8 !important;
+    color: #1D2B32 !important;
+    font-weight: 600 !important;
+}
+
+// Selected table rows in List View
+.o_list_table {
+    tr.o_data_row.o_is_selected,
+    tr.o_data_row.o_is_selected td,
+    tr.o_data_row.table-info,
+    tr.o_data_row.table-info td {
+        background-color: #EDF3E8 !important;
+        color: #1D2B32 !important;
+    }
+}
+
+// -------------------------------------------------------------------------
+// 7. Modal & Wizard Action Buttons (Primary Maroon #541718)
+// -------------------------------------------------------------------------
+.modal-footer,
+footer {
+    .btn-primary {
+        background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+        border: 1px solid #3E101120 !important;
+        color: #FFFFFF !important;
+        font-weight: 700;
+
+        &:hover {
+            background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+            box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
+        }
+    }
+
+    .btn-secondary {
+        background: #EAECE8 !important;
+        border: 1px solid #CCD3C5 !important;
+        color: #1E2917 !important;
+        font-weight: 600;
+
+        &:hover {
+            background: #1E2917 !important;
+            border-color: #1E2917 !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+        }
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #425727 0%, #597435 100%) !important;
+        border: 1px solid #2F3E1C !important;
+        color: #FFFFFF !important;
+        font-weight: 700;
+
+        &:hover {
+            background: linear-gradient(135deg, #2F3E1C 0%, #425727 100%) !important;
+            box-shadow: 0 4px 12px rgba(66, 87, 39, 0.35);
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 8. Alert Boxes & Callouts (Bunna Bank Palette)
+// -------------------------------------------------------------------------
+.alert-info {
+    background-color: #EDF3E8 !important;
+    border-color: #C8DCB8 !important;
+    color: #1D2B32 !important;
+
+    i, .fa {
+        color: #425727 !important;
+    }
+}
+
+.alert-warning {
+    background-color: #FAF1EB !important;
+    border-color: #EAD0BC !important;
+    color: #C17540 !important;
+
+    i, .fa {
+        color: #C17540 !important;
+    }
+}
+
+.alert-danger {
+    background-color: #F6EBEB !important;
+    border-color: #DDB8B8 !important;
+    color: #541718 !important;
+
+    i, .fa {
+        color: #541718 !important;
+    }
+}
+
+.alert-success {
+    background-color: #EDF3E8 !important;
+    border-color: #C8DCB8 !important;
+    color: #425727 !important;
+
+    i, .fa {
+        color: #425727 !important;
+    }
+}
+
+// -------------------------------------------------------------------------
+// 9. Global State Badges (Kanban, List, Form, and Line Tables)
+// -------------------------------------------------------------------------
+.badge,
+.o_badge,
+.o_tag,
+.o_kanban_view .badge,
+.o_list_view .badge,
+.o_form_view .badge {
+    font-weight: 600 !important;
+
+    &.text-bg-warning,
+    &.bg-warning,
+    &[data-decoration="warning"] {
+        background-color: #FAF1EB !important;
+        color: #C17540 !important;
+        border: 1px solid #EAD0BC !important;
+    }
+
+    &.text-bg-success,
+    &.bg-success,
+    &[data-decoration="success"] {
+        background-color: #EDF3E8 !important;
+        color: #425727 !important;
+        border: 1px solid #C8DCB8 !important;
+    }
+
+    &.text-bg-danger,
+    &.bg-danger,
+    &[data-decoration="danger"] {
+        background-color: #F6EBEB !important;
+        color: #541718 !important;
+        border: 1px solid #DDB8B8 !important;
+    }
+
+    &.text-bg-secondary,
+    &.text-bg-light,
+    &.bg-secondary,
+    &.bg-light,
+    &[data-decoration="muted"] {
+        background-color: #EAECE8 !important;
+        color: #1E2917 !important;
+        border: 1px solid #CCD3C5 !important;
+    }
+
+    &.text-bg-info,
+    &.bg-info,
+    &[data-decoration="info"] {
+        background-color: #F6F4EB !important;
+        color: #726732 !important;
+        border: 1px solid #DCD6B8 !important;
+    }
+
+    &.text-bg-primary,
+    &.bg-primary,
+    &[data-decoration="primary"] {
+        background-color: #FAF1EB !important;
+        color: #541718 !important;
+        border: 1px solid #EAD0BC !important;
+    }
+}
+
+// -------------------------------------------------------------------------
+// 10. Global Select Controls, Options & Dropdown Hover Highlighting
+// -------------------------------------------------------------------------
+select,
+.form-select,
+select.form-control,
+select.o_input {
+    border-color: #CBD5E1 !important;
+    color: #1D2B32 !important;
+    background-color: #FFFFFF !important;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+        border-color: #541718 !important;
+        box-shadow: 0 2px 6px rgba(84, 24, 24, 0.15) !important;
+    }
+
+    &:focus {
+        border-color: #541718 !important;
+        box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+        outline: none !important;
+    }
+
+    option {
+        background-color: #FFFFFF !important;
+        color: #1D2B32 !important;
+        padding: 6px 10px;
+
+        &:hover,
+        &:focus,
+        &:active,
+        &:checked {
+            background-color: #541718 !important;
+            background: #541718 !important;
+            color: #FFFFFF !important;
+        }
+    }
+}
+
+// Universal Dropdown Menus, Submenus, Popovers & Autocomplete
+.dropdown-menu,
+.o_dropdown_menu,
+.o-dropdown--menu,
+.o_popover,
+.popover,
+.o_select_menu_menu,
+.ui-autocomplete {
+    border-radius: 8px !important;
+    border: 1.5px solid #CBD5E1 !important;
+    box-shadow: 0 8px 24px rgba(84, 24, 24, 0.12) !important;
+    padding: 0.35rem 0 !important;
+    background-color: #FFFFFF !important;
+
+    .dropdown-item,
+    .o_dropdown_item,
+    .o-dropdown-item,
+    .o_menu_item,
+    .o_select_menu_item,
+    .o-autocomplete--dropdown-item,
+    .ui-menu-item-wrapper,
+    [role="menuitem"],
+    [role="option"] {
+        color: #1D2B32 !important;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        transition: background-color 0.15s ease, color 0.15s ease;
+
+        &:hover,
+        &:focus,
+        &:active,
+        &.hover,
+        &.active,
+        &.focus,
+        &.selected,
+        &.ui-state-active,
+        &.ui-state-focus,
+        &.o-autocomplete--dropdown-item.active {
+            background-color: #FAF1EB !important;
+            background: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 600 !important;
+        }
+    }
+}
+
+// Universal Hover Override for Any Dropdown Item in the Backend
+.dropdown-item:hover,
+.dropdown-item:focus,
+.dropdown-item:active,
+.dropdown-item.active,
+.o_dropdown_item:hover,
+.o_dropdown_item:focus,
+.o_dropdown_item.active,
+.o-dropdown-item:hover,
+.o-dropdown-item:focus,
+.o-dropdown-item.active,
+.o_menu_item:hover,
+.o_menu_item:focus,
+.o_menu_item.active,
+.o_select_menu_item:hover,
+.o_select_menu_item:focus,
+.o_select_menu_item.active,
+[role="menuitem"]:hover,
+[role="menuitem"]:focus,
+[role="menuitem"].active,
+[role="option"]:hover,
+[role="option"]:focus,
+[role="option"].active {
+    background-color: #FAF1EB !important;
+    background: #FAF1EB !important;
+    color: #541718 !important;
+}
+
+// -------------------------------------------------------------------------
+// 11. Search View, Filters & Group By Branding (Bunna Bank Palette)
+// -------------------------------------------------------------------------
+
+// Search Bar Container
+.o_searchview {
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+    padding: 0.15rem 0.4rem !important;
+    transition: all 0.2s ease;
+
+    &:focus-within {
+        border-color: #541718 !important;
+        box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+    }
+
+    .o_searchview_icon {
+        color: #541718 !important;
+    }
+
+    // Search Facets (Pills in search bar)
+    .o_searchview_facet {
+        border-radius: 4px !important;
+        margin: 2px 3px !important;
+        overflow: hidden;
+        border: 1px solid #EAD0BC !important;
+
+        // Filter Facet Label
+        .o_searchview_facet_label {
+            background-color: #541718 !important;
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            padding: 2px 7px !important;
+            font-size: 0.78rem;
+        }
+
+        // Facet Values
+        .o_facet_values {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 600 !important;
+            padding: 2px 7px !important;
+            font-size: 0.78rem;
+        }
+
+        // Remove Cross
+        .o_facet_remove {
+            color: #541718 !important;
+            padding: 2px 5px !important;
+            background-color: #FAF1EB !important;
+
+            &:hover {
+                color: #FFFFFF !important;
+                background-color: #541718 !important;
+            }
+        }
+    }
+}
+
+// Search Dropdown Menu (Filters, Group By, Favorites)
+.o_search_bar_menu,
+.o_filter_menu,
+.o_group_by_menu,
+.o_favorite_menu {
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 24px rgba(84, 24, 24, 0.15) !important;
+    background-color: #FFFFFF !important;
+
+    // Dropdown Group Headings
+    .o_dropdown_title,
+    .dropdown-header {
+        color: #541718 !important;
+        font-weight: 700 !important;
+        font-size: 0.82rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #541718;
+        padding-bottom: 4px;
+        margin-bottom: 6px;
+    }
+
+    // Select boxes inside search menu (e.g. Custom Group field list, Custom Filter fields)
+    select,
+    .form-select,
+    .o_input,
+    .o_add_custom_group_menu,
+    .o_generator_menu select {
+        accent-color: #541718 !important;
+        border: 1.5px solid #CBD5E1 !important;
+        border-radius: 6px !important;
+        color: #541718 !important;
+        background-color: #FFFFFF !important;
+        font-weight: 500;
+        cursor: pointer;
+
+        &:hover,
+        &:focus {
+            border-color: #541718 !important;
+            box-shadow: 0 0 0 0.2rem rgba(84, 24, 24, 0.25) !important;
+            outline: none !important;
+        }
+
+        option {
+            background-color: #FFFFFF !important;
+            color: #1D2B32 !important;
+            padding: 6px 12px;
+            accent-color: #541718 !important;
+
+            &:hover,
+            &:focus,
+            &:active,
+            &:checked,
+            &[selected] {
+                background-color: #541718 !important;
+                background: #541718 !important;
+                color: #FFFFFF !important;
+                -webkit-text-fill-color: #FFFFFF !important;
+            }
+        }
+    }
+
+    .dropdown-item,
+    .o_menu_item,
+    .o_item_option,
+    .o_accordion_item,
+    .o_accordion_value {
+        color: #1D2B32 !important;
+        font-weight: 500;
+        padding: 0.45rem 1rem;
+        border-radius: 4px;
+        margin: 1px 4px;
+
+        &:hover,
+        &:focus,
+        &:active {
+            background-color: #FAF1EB !important;
+            background: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 600 !important;
+        }
+
+        &.selected,
+        &.active {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 700 !important;
+
+            &::before {
+                color: #541718 !important;
+            }
+        }
+    }
+}
+
+// Search Autocomplete Results Dropdown
+.o_searchview_autocomplete {
+    .o-autocomplete--dropdown-item {
+        .o_search_match {
+            color: #541718 !important;
+            font-weight: 700 !important;
+        }
+
+        &:hover,
+        &.active {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 12. List View Group Headers & Row Highlights
+// -------------------------------------------------------------------------
+.o_list_table {
+    thead th {
+        color: #541718 !important;
+        font-weight: 700 !important;
+        background-color: #F8FAFC !important;
+        border-bottom: 2px solid #541718 !important;
+
+        &.o_column_sortable:hover {
+            background-color: #FAF1EB !important;
+            color: #742526 !important;
+        }
+
+        &.o_sort_down,
+        &.o_sort_up {
+            color: #541718 !important;
+            background-color: #FAF1EB !important;
+
+            &::after {
+                color: #541718 !important;
+            }
+        }
+    }
+
+    tbody tr.o_data_row {
+        &:hover td {
+            background-color: #FAF1EB !important;
+        }
+
+        &.o_is_selected td,
+        &.table-info td {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+        }
+    }
+
+    tbody tr.o_group_header {
+        background-color: #FAF1EB !important;
+        border-top: 1.5px solid #EAD0BC !important;
+        border-bottom: 1.5px solid #EAD0BC !important;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+
+        &:hover {
+            background-color: #F4E8DF !important;
+        }
+
+        td {
+            color: #541718 !important;
+            font-weight: 700 !important;
+            font-size: 0.88rem;
+        }
+
+        // Caret Arrow
+        .o_group_caret,
+        .fa-caret-right,
+        .fa-caret-down {
+            color: #541718 !important;
+            font-size: 1rem;
+        }
+
+        // Group Count Badge
+        .badge {
+            background-color: #FFFFFF !important;
+            color: #541718 !important;
+            border: 1px solid #541718 !important;
+            font-weight: 700 !important;
+            font-size: 0.78rem;
+            margin-left: 0.5rem;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 13. Kanban Group Columns & Headers (When Grouped in Kanban View)
+// -------------------------------------------------------------------------
+.o_kanban_view {
+    .o_kanban_group {
+        border-radius: 8px;
+        background-color: #F8FAFC !important;
+
+        .o_kanban_header {
+            border-bottom: 2px solid #541718;
+
+            .o_kanban_header_title {
+                color: #541718 !important;
+                font-weight: 700 !important;
+                font-size: 0.95rem;
+
+                .badge {
+                    background-color: #FAF1EB !important;
+                    color: #541718 !important;
+                    border: 1px solid #EAD0BC !important;
+                    font-weight: 700;
+                    margin-left: 0.4rem;
+                }
+            }
+
+            // Quick add button '+' in kanban group
+            .o_kanban_quick_add {
+                color: #541718 !important;
+
+                &:hover {
+                    color: #742526 !important;
+                    background: #FAF1EB;
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 14. Pivot View Styling (PBMS Analytics & Multi-Dimensional Consolidation)
+// -------------------------------------------------------------------------
+.o_pivot_view,
+.o_view_pivot {
+    background-color: #FAFAFA;
+    padding: 0.5rem;
+
+    .o_pivot_table {
+        background-color: #FFFFFF !important;
+        border: 1.5px solid #CBD5E1 !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        border-radius: 8px !important;
+        overflow: hidden;
+
+        // Header Rows
+        thead th {
+            background-color: #F8FAFC !important;
+            color: #541718 !important;
+            font-weight: 700 !important;
+            border-bottom: 2px solid #541718 !important;
+            border-color: #CBD5E1;
+            padding: 0.65rem 0.85rem;
+            font-size: 0.86rem;
+            letter-spacing: 0.3px;
+        }
+
+        // Expandable Dimension Headers
+        .o_pivot_header_cell_closed,
+        .o_pivot_header_cell_opened {
+            color: #541718 !important;
+            font-weight: 700 !important;
+            cursor: pointer;
+            transition: all 0.15s ease;
+
+            &:hover {
+                background-color: #FAF1EB !important;
+                color: #742526 !important;
+            }
+
+            &::before,
+            .fa {
+                color: #541718 !important;
+                font-weight: bold;
+            }
+        }
+
+        // Measure Headers
+        th.o_pivot_measure_row {
+            color: #1E2917 !important;
+            font-weight: 600 !important;
+            background-color: #F1F5F9 !important;
+        }
+
+        // Table Data Values
+        tbody td {
+            color: #1D2B32;
+            border-color: #E2E8F0;
+            padding: 0.55rem 0.85rem;
+            font-size: 0.875rem;
+            transition: background-color 0.12s ease;
+        }
+
+        tbody tr:hover td {
+            background-color: #FAF1EB !important;
+        }
+
+        // Total Column & Row Highlights
+        tbody tr.o_pivot_measure_row td.o_pivot_cell_value,
+        td.o_pivot_cell_value:last-child,
+        tfoot tr td,
+        .o_pivot_total_row td,
+        .o_pivot_total_col {
+            background-color: #FDF9F7 !important;
+            color: #541718 !important;
+            font-weight: 700 !important;
+        }
+
+        // Grand Total Cell
+        tfoot tr:last-child td,
+        tr:last-child td:last-child {
+            background: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 800 !important;
+            border-top: 2px solid #541718 !important;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// 15. Graph View Styling (PBMS Analytics & Charts)
+// -------------------------------------------------------------------------
+.o_graph_view,
+.o_view_graph {
+    background-color: #FAFAFA;
+
+    .btn-group {
+        .btn.active,
+        .btn:active {
+            background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+            border-color: #3E1011 !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 2px 6px rgba(84, 24, 24, 0.35) !important;
+        }
+
+        .btn:not(.active) {
+            background-color: #FFFFFF !important;
+            border-color: #CBD5E1 !important;
+            color: #1E2917 !important;
+
+            &:hover {
+                background-color: #FAF1EB !important;
+                border-color: #541718 !important;
+                color: #541718 !important;
+            }
+        }
+    }
+
+    .o_graph_measures_list {
+        .dropdown-item.selected,
+        .dropdown-item.active {
+            background-color: #FAF1EB !important;
+            color: #541718 !important;
+            font-weight: 700 !important;
+        }
+
+        .dropdown-item:hover {
+            background-color: #541718 !important;
+            color: #FFFFFF !important;
+        }
+    }
+
+    .o_graph_canvas_container {
+        padding: 1.5rem;
+        background: #FFFFFF;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        border: 1px solid #E2E8F0;
+    }
+}
+
+// -------------------------------------------------------------------------
+// 16. Control Panel, Breadcrumbs & View Switcher Buttons
+// -------------------------------------------------------------------------
+.o_control_panel {
+    background-color: #FFFFFF !important;
+    border-bottom: 1.5px solid #E2E8F0 !important;
+
+    // Breadcrumbs
+    .breadcrumb {
+        .breadcrumb-item {
+            color: #64748B;
+            font-weight: 600;
+
+            a {
+                color: #541718 !important;
+                text-decoration: none;
+
+                &:hover {
+                    color: #742526 !important;
+                    text-decoration: underline;
+                }
+            }
+
+            &.active {
+                color: #541718 !important;
+                font-weight: 700 !important;
+            }
+        }
+    }
+
+    // View Switcher Buttons (List, Kanban, Pivot, Graph)
+    .o_cp_switch_buttons {
+        .btn {
+            border: 1px solid #CBD5E1;
+            color: #475569;
+            background: #FFFFFF;
+            transition: all 0.15s ease;
+
+            &:hover {
+                background-color: #FAF1EB !important;
+                color: #541718 !important;
+                border-color: #541718 !important;
+            }
+
+            // Active View Button Highlight (Deep Maroon Gradient)
+            &.active {
+                background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+                border-color: #3E1011 !important;
+                color: #FFFFFF !important;
+                box-shadow: 0 2px 6px rgba(84, 24, 24, 0.3) !important;
+            }
+        }
+    }
+
+    // Control Panel Action Buttons (New, Save, Discard, Action Menu)
+    .o_cp_buttons {
+        .btn-primary {
+            background: linear-gradient(135deg, #541718 0%, #742526 100%) !important;
+            border: 1px solid #3E1011 !important;
+            color: #FFFFFF !important;
+            font-weight: 700;
+
+            &:hover {
+                background: linear-gradient(135deg, #3E1011 0%, #541718 100%) !important;
+                box-shadow: 0 4px 12px rgba(84, 24, 24, 0.35);
+            }
+        }
+
+        .btn-secondary {
+            background: #EAECE8 !important;
+            border: 1px solid #CCD3C5 !important;
+            color: #1E2917 !important;
+            font-weight: 600;
+
+            &:hover {
+                background: #1E2917 !important;
+                border-color: #1E2917 !important;
+                color: #FFFFFF !important;
+                box-shadow: 0 2px 6px rgba(30, 41, 23, 0.25);
+            }
+        }
+    }
+
+    // Pagination Controls
+    .o_pager {
+        .btn {
+            color: #541718 !important;
+
+            &:hover {
+                background-color: #FAF1EB !important;
+            }
+        }
+    }
+}
+
+
+
+
+

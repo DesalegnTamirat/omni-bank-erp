@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Deposit Plan Rules -->
+    <record id="rule_deposit_own_unit" model="ir.rule">
+        <field name="name">PBMS Deposit Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_deposit_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_deposit_district" model="ir.rule">
+        <field name="name">PBMS Deposit Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_deposit_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_deposit_ho" model="ir.rule">
+        <field name="name">PBMS Deposit Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_deposit_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- General Expense Plan Rules -->
+    <record id="rule_expense_own_unit" model="ir.rule">
+        <field name="name">PBMS General Expense: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_general_expense_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_expense_district" model="ir.rule">
+        <field name="name">PBMS General Expense: own district's branches</field>
+        <field name="model_id" ref="model_pbms_general_expense_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_expense_ho" model="ir.rule">
+        <field name="name">PBMS General Expense: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_general_expense_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- Customer Base Plan Rules -->
+    <record id="rule_customer_base_own_unit" model="ir.rule">
+        <field name="name">PBMS Customer Base Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_customer_base_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_customer_base_district" model="ir.rule">
+        <field name="name">PBMS Customer Base Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_customer_base_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_customer_base_ho" model="ir.rule">
+        <field name="name">PBMS Customer Base Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_customer_base_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- FX Plan Rules -->
+    <record id="rule_fx_own_unit" model="ir.rule">
+        <field name="name">PBMS FX Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_fx_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_fx_district" model="ir.rule">
+        <field name="name">PBMS FX Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_fx_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_fx_ho" model="ir.rule">
+        <field name="name">PBMS FX Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_fx_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- Digital Banking Plan Rules -->
+    <record id="rule_digital_banking_own_unit" model="ir.rule">
+        <field name="name">PBMS Digital Banking Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_digital_banking_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_digital_banking_district" model="ir.rule">
+        <field name="name">PBMS Digital Banking Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_digital_banking_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_digital_banking_ho" model="ir.rule">
+        <field name="name">PBMS Digital Banking Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_digital_banking_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- Manpower Plan Rules -->
+    <record id="rule_manpower_own_unit" model="ir.rule">
+        <field name="name">PBMS Manpower Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_manpower_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_manpower_district" model="ir.rule">
+        <field name="name">PBMS Manpower Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_manpower_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_manpower_ho" model="ir.rule">
+        <field name="name">PBMS Manpower Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_manpower_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+
+    <!-- Fixed Asset Plan Rules -->
+    <record id="rule_fixed_asset_own_unit" model="ir.rule">
+        <field name="name">PBMS Fixed Asset Plan: own unit(s) only</field>
+        <field name="model_id" ref="model_pbms_fixed_asset_plan"/>
+        <field name="domain_force">[('org_unit_id', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_fixed_asset_district" model="ir.rule">
+        <field name="name">PBMS Fixed Asset Plan: own district's branches</field>
+        <field name="model_id" ref="model_pbms_fixed_asset_plan"/>
+        <field name="domain_force">['|', ('org_unit_id', 'in', user.operating_unit_ids.ids), ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_fixed_asset_ho" model="ir.rule">
+        <field name="name">PBMS Fixed Asset Plan: bank-wide (Head Office / SPPMD)</field>
+        <field name="model_id" ref="model_pbms_fixed_asset_plan"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+</odoo>

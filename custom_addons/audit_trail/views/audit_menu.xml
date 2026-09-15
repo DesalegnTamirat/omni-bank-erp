@@ -7,11 +7,19 @@
               sequence="99"
               groups="audit_trail.group_audit_user"/>
 
+    <!-- ── Dashboard ─────────────────────────────────────────────────── -->
+    <menuitem id="menu_audit_dashboard"
+              name="Dashboard"
+              parent="menu_audit_root"
+              action="action_audit_dashboard_client"
+              sequence="5"
+              groups="audit_trail.group_audit_user"/>
+
     <!-- ── Audit Logs ────────────────────────────────────────────────── -->
     <menuitem id="menu_audit_log"
               name="Audit Logs"
               parent="menu_audit_root"
-              action="action_audit_log"
+              action="action_audit_log_dashboard"
               sequence="10"
               groups="audit_trail.group_audit_user"/>
 

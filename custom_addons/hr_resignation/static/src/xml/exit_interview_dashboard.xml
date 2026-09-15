@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="hr_resignation.ExitInterviewDashboard">
+        <div class="o_action_manager">
+            <div class="o_content" style="overflow-y: auto;">
+                <div class="eid-app">
+                    <style>
+                        .eid-app {
+                            --paper: #F6F4EE;
+                            --ink: #1E2A26;
+                            --ink-soft: #4C5B55;
+                            --line: #DAD5C7;
+                            --primary: #2F5D50;
+                            --primary-soft: #E4ECE8;
+                            --gold: #B98A3D;
+                            --gold-soft: #F3E7D2;
+                            --rust: #A85341;
+                            --rust-soft: #F1E0DA;
+                            --sage: #6B8F71;
+                            --sage-soft: #E4EDE3;
+                            --card: #FFFFFF;
+                            --radius-card: 10px;
+                            --radius-pill: 999px;
+                            background: var(--paper);
+                            color: var(--ink);
+                            font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+                            -webkit-font-smoothing: antialiased;
+                            padding: 28px 24px 80px;
+                            min-height: 100vh;
+                            box-sizing: border-box;
+                        }
+                        .eid-app * { box-sizing: border-box; }
+                        .eid-app h2, .eid-app h3 {
+                            font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+                            font-weight: 600;
+                            margin: 0 0 6px 0;
+                            color: var(--ink);
+                        }
+                        /* DASHBOARD HEADER */
+                        .dash-head {
+                            display: flex; justify-content: space-between; align-items: flex-end;
+                            margin-bottom: 22px; flex-wrap: wrap; gap: 14px;
+                        }
+                        .dash-head .sub { color: var(--ink-soft); font-size: 13px; }
+                        
+                        /* KPIs */
+                        .kpi-row {
+                            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                            gap: 14px; margin-bottom: 22px;
+                        }
+                        .kpi {
+                            background: var(--card); border: 1px solid var(--line);
+                            border-radius: var(--radius-card); padding: 18px 20px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                        }
+                        .kpi .val {
+                            font-family: "Source Serif 4", serif; font-size: 30px; font-weight: 600;
+                        }
+                        .kpi .lbl { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+                        .kpi .delta {
+                            font-size: 12px; margin-top: 6px; display: inline-block;
+                            padding: 2px 8px; border-radius: 999px; font-weight: 500;
+                        }
+                        .delta.up { background: var(--sage-soft); color: var(--sage); }
+                        .delta.down { background: var(--rust-soft); color: var(--rust); }
+                        .delta.neutral { background: var(--primary-soft); color: var(--primary); }
+
+                        /* PANELS AND GRIDS */
+                        .chart-grid {
+                            display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                            gap: 16px; margin-bottom: 16px;
+                        }
+                        .panel {
+                            background: var(--card); border: 1px solid var(--line);
+                            border-radius: var(--radius-card); padding: 20px 22px;
+                            display: flex; flex-direction: column;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+                        }
+                        .panel h3 { font-size: 15px; margin-bottom: 2px; }
+                        .panel .sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 14px; }
+                        .chart-wrap { position: relative; flex-grow: 1; min-height: 250px; }
+                        
+                        /* LIKERT */
+                        .likert-bar-row {
+                            display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 13px;
+                        }
+                        .likert-bar-row .q-name {
+                            width: 220px; color: var(--ink-soft); flex-shrink: 0; line-height: 1.3;
+                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                        }
+                        .likert-bar-track {
+                            flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden;
+                        }
+                        .likert-bar-fill { height: 100%; background: var(--primary); border-radius: 4px; transition: width 0.5s ease; }
+                        .likert-bar-row .score { width: 32px; text-align: right; font-weight: 600; font-family: "Source Serif 4", serif;}
+                        
+                        /* THEMES */
+                        .theme-tags { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+                        .theme-tag {
+                            display: flex; align-items: center; gap: 6px; background: var(--paper);
+                            border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12.5px;
+                        }
+                        .theme-tag .n {
+                            background: var(--gold); color: #fff; font-size: 10.5px;
+                            padding: 1px 6px; border-radius: 999px; font-weight: 600;
+                        }
+
+                        .loading-spinner {
+                            text-align: center; padding: 100px; color: var(--ink-soft);
+                        }
+                    </style>
+
+                    <t t-if="!state.dataLoaded">
+                        <div class="loading-spinner">
+                            <i class="fa fa-spinner fa-spin fa-2x"></i>
+                            <p class="mt-2">Analyzing feedback data...</p>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div class="dash-head">
+                            <div>
+                                <h2 style="font-size:24px;">Exit Interview Insights</h2>
+                                <div class="sub">Dynamic HR Dashboard · Aggregated from all submitted interviews</div>
+                            </div>
+                            <div class="filters">
+                                <button class="btn btn-sm" style="background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; color:var(--ink-soft);" disabled="disabled">
+                                    <i class="fa fa-filter"></i> Filters active automatically
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- KPIs -->
+                        <div class="kpi-row">
+                            <div class="kpi" style="cursor:pointer" t-on-click="() => this.openRecords([['state', '=', 'done']], 'Completed Exit Interviews')">
+                                <div class="val"><t t-esc="state.data.meta.total"/></div>
+                                <div class="lbl">Exit interviews completed</div>
+                            </div>
+                            <div class="kpi">
+                                <div class="val"><t t-esc="state.data.meta.avg_rating"/><span style="font-size:15px;color:var(--ink-soft);">/5</span></div>
+                                <div class="lbl">Avg. satisfaction across all metrics</div>
+                                <t t-if="state.data.meta.avg_rating_raw &gt; 0">
+                                    <span t-attf-class="delta {{state.data.meta.avg_rating_raw >= 3.5 ? 'up' : (state.data.meta.avg_rating_raw &lt; 2.5 ? 'down' : 'neutral')}}">
+                                        <t t-esc="state.data.meta.avg_rating_raw >= 3.5 ? 'On target' : (state.data.meta.avg_rating_raw &lt; 2.5 ? 'Below target' : 'Watch')"/>
+                                    </span>
+                                </t>
+                            </div>
+                            <div class="kpi">
+                                <div class="val"><t t-esc="state.data.meta.this_month"/></div>
+                                <div class="lbl">Interviews this month</div>
+                            </div>
+                            <div class="kpi">
+                                <div class="val"><t t-esc="state.data.meta.dept_count"/></div>
+                                <div class="lbl">Departments represented</div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Grid -->
+                        <div class="chart-grid">
+                            <t t-foreach="state.data.charts" t-as="chart" t-key="chart.id">
+                                <div class="panel">
+                                    <h3><t t-esc="chart.title"/></h3>
+                                    <div class="sub"><t t-esc="chart.subtitle"/></div>
+                                    <div class="chart-wrap">
+                                        <canvas t-att-id="'eid_chart_' + chart.id"></canvas>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+
+                        <!-- Likert and Themes Grid -->
+                        <div class="chart-grid" style="grid-template-columns: 1.3fr 1fr;">
+                            <div class="panel" style="min-height: 300px;">
+                                <h3>Sentiment &amp; Ratings, Averaged</h3>
+                                <div class="sub">1–5 scale · Higher is better</div>
+                                <div style="margin-top:6px; overflow-y: auto;">
+                                    <t t-if="state.data.likerts.length">
+                                        <t t-foreach="state.data.likerts" t-as="likert" t-key="likert_index">
+                                            <div class="likert-bar-row">
+                                                <div class="q-name" t-att-title="likert.label"><t t-esc="likert.label"/></div>
+                                                <div class="likert-bar-track">
+                                                    <div class="likert-bar-fill" t-attf-style="width:{{(likert.v/5)*100}}%; background:{{likert.v&lt;3?'#A85341':'#2F5D50'}};"></div>
+                                                </div>
+                                                <div class="score"><t t-esc="likert.v.toFixed(1)"/></div>
+                                            </div>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <p style="color:var(--ink-soft); font-size:13px; font-style:italic;">No rating data available.</p>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="panel">
+                                <h3>Recurring Feedback Themes</h3>
+                                <div class="sub">Extracted from open text responses</div>
+                                <div class="theme-tags">
+                                    <t t-if="state.data.themes.length">
+                                        <t t-foreach="state.data.themes" t-as="theme" t-key="theme_index">
+                                            <div class="theme-tag">
+                                                <t t-esc="theme.t"/> <span class="n"><t t-esc="theme.n"/></span>
+                                            </div>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <p style="color:var(--ink-soft); font-size:13px; font-style:italic;">No text feedback available.</p>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <t t-if="state.data.meta.total == 0">
+                            <div style="text-align:center; padding: 40px; color: var(--ink-soft); font-size: 14px; background:var(--card); border-radius:var(--radius-card); margin-top:20px;">
+                                <i class="fa fa-bar-chart fa-2x" style="display:block; margin-bottom:12px; color:var(--line);"/>
+                                No completed exit interviews found. Charts will populate once interviews are marked as <b>Done</b>.
+                            </div>
+                        </t>
+                    </t>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

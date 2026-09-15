@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+<t t-name="bunna_pbms.PbmsDashboard" owl="1">
+    <div class="o_pbms_dashboard p-4" style="height: 100%; overflow-y: auto; background: #f0f2f5;">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3">
+            <div>
+                <h2 class="mb-1 text-white fw-bold">
+                    <i class="fa fa-chart-pie me-2 text-white"></i>Planning &amp; Budget Dashboard
+                </h2>
+                <div class="text-white opacity-75 small">Real-time status, KPI summaries, and planning pipeline analytics</div>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <!-- Cycle Custom Dropdown -->
+                <div class="position-relative">
+                    <label class="me-2 fw-semibold text-white">Cycle:</label>
+                    <div class="btn-group position-relative d-inline-block">
+                        <button type="button"
+                                class="btn pbms-custom-select shadow-sm d-inline-flex align-items-center justify-content-between gap-2"
+                                t-on-click="toggleCycleDropdown">
+                            <span class="text-white fw-bold"><t t-esc="getSelectedCycleName()"/></span>
+                            <i class="fa fa-chevron-down small text-white ms-2"></i>
+                        </button>
+                        <ul t-if="state.cycleDropdownOpen"
+                            class="dropdown-menu show shadow-lg pbms-dropdown-menu mt-1"
+                            style="position: absolute; top: 100%; left: 0; z-index: 1050; min-width: 210px; max-height: 320px; overflow-y: auto;">
+                            <t t-foreach="state.cycles" t-as="cycle" t-key="cycle.id">
+                                <li>
+                                    <button type="button"
+                                            class="dropdown-item d-flex align-items-center justify-content-between"
+                                            t-att-class="{'active-item': cycle.id === state.cycleId}"
+                                            t-on-click="() => this.selectCycle(cycle.id)">
+                                        <span><t t-esc="cycle.name"/> (<t t-esc="cycle.state"/>)</span>
+                                        <i t-if="cycle.id === state.cycleId" class="fa fa-check small text-primary ms-2"></i>
+                                    </button>
+                                </li>
+                            </t>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Plan Type Custom Dropdown -->
+                <div class="position-relative">
+                    <label class="me-2 fw-semibold text-white">Plan Type:</label>
+                    <div class="btn-group position-relative d-inline-block">
+                        <button type="button"
+                                class="btn pbms-custom-select shadow-sm d-inline-flex align-items-center justify-content-between gap-2"
+                                t-on-click="togglePlanTypeDropdown">
+                            <span class="text-white fw-bold"><t t-esc="getSelectedPlanTypeName()"/></span>
+                            <i class="fa fa-chevron-down small text-white ms-2"></i>
+                        </button>
+                        <ul t-if="state.planTypeDropdownOpen"
+                            class="dropdown-menu show shadow-lg pbms-dropdown-menu mt-1"
+                            style="position: absolute; top: 100%; left: 0; z-index: 1050; min-width: 230px; max-height: 350px; overflow-y: auto;">
+                            <t t-foreach="PLAN_TYPES" t-as="plan" t-key="plan.id">
+                                <li>
+                                    <button type="button"
+                                            class="dropdown-item d-flex align-items-center justify-content-between"
+                                            t-att-class="{'active-item': plan.id === state.selectedModel}"
+                                            t-on-click="() => this.selectPlanType(plan.id)">
+                                        <span><t t-esc="plan.name"/></span>
+                                        <i t-if="plan.id === state.selectedModel" class="fa fa-check small text-primary ms-2"></i>
+                                    </button>
+                                </li>
+                            </t>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div t-if="state.loading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="text-muted mt-2">Fetching dashboard metrics...</div>
+        </div>
+
+        <t t-if="!state.loading">
+            <!-- KPI Summary Cards - Clickable -->
+            <div class="row g-3 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="card h-100 shadow-sm border-0 kpi-card kpi-total clickable"
+                         t-on-click="() => this.openKPIView()">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-muted small fw-semibold text-uppercase">Total Submissions</div>
+                                    <div class="fs-2 fw-bold"><t t-esc="getTotalSubmissions()"/></div>
+                                </div>
+                                <div class="rounded-3 p-3 kpi-icon total-icon">
+                                    <i class="fa fa-file-alt fs-4"></i>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 4px;">
+                                <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #425727 0%, #597435 100%);"></div>
+                            </div>
+                            <div class="text-end text-white-50 small mt-1">Click to view all</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="card h-100 shadow-sm border-0 kpi-card kpi-draft clickable"
+                         t-on-click="() => this.openKPIView(null, 'draft')">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-muted small fw-semibold text-uppercase">Draft</div>
+                                    <div class="fs-2 fw-bold"><t t-esc="getTotalByStatus('draft')"/></div>
+                                </div>
+                                <div class="rounded-3 p-3 kpi-icon draft-icon">
+                                    <i class="fa fa-pencil-alt fs-4"></i>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 4px;">
+                                <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%);"></div>
+                            </div>
+                            <div class="text-end text-white-50 small mt-1">Click to view drafts</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="card h-100 shadow-sm border-0 kpi-card kpi-submitted clickable"
+                         t-on-click="() => this.openKPIView(null, 'submitted')">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-muted small fw-semibold text-uppercase">In Review / Submitted</div>
+                                    <div class="fs-2 fw-bold"><t t-esc="getTotalByStatus('submitted') + getTotalByStatus('in_review')"/></div>
+                                </div>
+                                <div class="rounded-3 p-3 kpi-icon submitted-icon">
+                                    <i class="fa fa-tasks fs-4"></i>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 4px;">
+                                <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #2A6F7B 0%, #4FA3B3 100%);"></div>
+                            </div>
+                            <div class="text-end text-white-50 small mt-1">Click to view active pipeline</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6">
+                    <div class="card h-100 shadow-sm border-0 kpi-card kpi-approved clickable"
+                         t-on-click="() => this.openKPIView(null, 'approved')">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="text-muted small fw-semibold text-uppercase">Approved</div>
+                                    <div class="fs-2 fw-bold"><t t-esc="getTotalByStatus('approved')"/></div>
+                                </div>
+                                <div class="rounded-3 p-3 kpi-icon approved-icon">
+                                    <i class="fa fa-check-circle fs-4"></i>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 4px;">
+                                <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #425727 0%, #6C8D41 100%);"></div>
+                            </div>
+                            <div class="text-end text-white-50 small mt-1">Click to view approved</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-xl-4 col-lg-12">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-header bg-white border-0 pt-3">
+                            <h6 class="fw-bold mb-0"><i class="fa fa-chart-pie me-2 text-primary"></i>Plan Distribution <span class="text-muted small fw-normal">(Click segment to view)</span></h6>
+                        </div>
+                        <div class="card-body" style="height: 300px;">
+                            <canvas t-ref="chartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-8 col-lg-12">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-header bg-white border-0 pt-3">
+                            <h6 class="fw-bold mb-0"><i class="fa fa-chart-bar me-2 text-info"></i>Status Distribution <span class="text-muted small fw-normal">(Click bar to view)</span></h6>
+                        </div>
+                        <div class="card-body" style="height: 300px;">
+                            <canvas t-ref="statusChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-white border-0 pt-3">
+                            <h6 class="fw-bold mb-0"><i class="fa fa-chart-line me-2 text-success"></i>Monthly Trend Analysis <span class="text-muted small fw-normal">(Click line to view)</span></h6>
+                        </div>
+                        <div class="card-body" style="height: 250px;">
+                            <canvas t-ref="trendChartCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plan Cards -->
+            <div class="mb-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">
+                    <i class="fa fa-list me-2"></i>
+                    <span t-if="state.selectedModel === 'all'">All Plans</span>
+                    <span t-if="state.selectedModel !== 'all'"><t t-esc="getModelLabel(state.selectedModel)"/></span>
+                    <span class="text-muted fs-6 fw-normal ms-2">
+                        (<t t-esc="getFilteredData().length"/> plans)
+                    </span>
+                </h5>
+            </div>
+
+            <!-- Plan Cards Grid -->
+            <div class="row g-4 mb-4">
+                <t t-foreach="getPaginatedData()" t-as="plan" t-key="plan.model">
+                    <div class="col-xl-4 col-lg-6 col-md-6">
+                        <div class="card h-100 shadow-sm border-0 hover-card">
+                            <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3 border-bottom">
+                                <div class="d-flex align-items-center gap-2 clickable"
+                                     t-on-click="() => this.openModelView(plan.model, null, 'kanban')">
+                                    <div class="rounded-circle p-2 plan-icon" t-att-style="'background-color: ' + getModelColor(plan.model) + '20; color: ' + getModelColor(plan.model)">
+                                        <i class="fa" t-att-class="getModelIcon(plan.model)"></i>
+                                    </div>
+                                    <h6 class="mb-0 fw-bold"><t t-esc="plan.label"/></h6>
+                                </div>
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        t-on-click="() => this.openModelView(plan.model, null, 'kanban')">
+                                    <i class="fa fa-arrow-right"></i>
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="status-item total-item clickable"
+                                             t-on-click="() => this.openModelView(plan.model, null, 'list')">
+                                            <span class="small text-muted">Total</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).total"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="status-item draft-item clickable"
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'draft')">
+                                            <span class="small text-muted">Draft</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).draft"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="status-item submitted-item clickable"
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'submitted')">
+                                            <span class="small text-muted">Submitted</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).submitted"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="status-item endorsed-item clickable"
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'in_review')">
+                                            <span class="small text-muted">In Review</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).in_review"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="status-item ho-item clickable"
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'returned')">
+                                            <span class="small text-muted">Revision / Rejected</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).returned_rejected"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="status-item approved-item clickable"
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'approved')">
+                                            <span class="small text-muted">Approved</span>
+                                            <span class="fw-bold"><t t-esc="getStatusCounts(plan).approved"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0 pt-0">
+                                <div class="progress" style="height: 6px;"
+                                     t-on-click="() => this.openModelView(plan.model, null, 'list')">
+                                    <div class="progress-bar progress-approved"
+                                         t-att-style="'width: ' + (getStatusCounts(plan).total > 0 ? (getStatusCounts(plan).approved / getStatusCounts(plan).total * 100) : 0) + '%'">
+                                    </div>
+                                </div>
+                                <div class="text-end small text-muted mt-1 clickable"
+                                     t-on-click="() => this.openModelView(plan.model, null, 'list')">
+                                    <t t-esc="getStatusCounts(plan).total > 0 ? Math.round((getStatusCounts(plan).approved / getStatusCounts(plan).total) * 100) : 0"/>% approved - Click to view
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </div>
+
+            <!-- No data message -->
+            <div t-if="getFilteredData().length === 0" class="text-center py-5">
+                <i class="fa fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No data available for the selected plan type.</p>
+            </div>
+
+            <!-- Pagination -->
+            <t t-if="getTotalPages() > 1">
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item" t-att-class="{'disabled': state.currentPage === 1}">
+                            <a class="page-link" href="#" t-on-click.prevent="previousPage">
+                                <i class="fa fa-chevron-left"></i> Previous
+                            </a>
+                        </li>
+                        <t t-foreach="getPageNumbers()" t-as="page" t-key="page">
+                            <li class="page-item" t-att-class="{'active': page === state.currentPage, 'disabled': page === '...'}">
+                                <a class="page-link" href="#" t-on-click.prevent="() => this.goToPage(page)">
+                                    <t t-esc="page"/>
+                                </a>
+                            </li>
+                        </t>
+                        <li class="page-item" t-att-class="{'disabled': state.currentPage === getTotalPages()}">
+                            <a class="page-link" href="#" t-on-click.prevent="nextPage">
+                                Next <i class="fa fa-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="text-center text-muted small">
+                    Showing <t t-esc="(state.currentPage - 1) * state.itemsPerPage + 1"/>
+                    to <t t-esc="Math.min(state.currentPage * state.itemsPerPage, getFilteredData().length)"/>
+                    of <t t-esc="getFilteredData().length"/> items
+                </div>
+            </t>
+        </t>
+    </div>
+</t>
+
+</templates>

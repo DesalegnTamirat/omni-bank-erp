@@ -69,9 +69,15 @@
         <field name="arch" type="xml">
             <data>
                 <xpath expr="//group[@name='other_preferences']" position="inside">
-                <field name="is_redirect_home" invisible="action_id" />
-            </xpath>
-]            </data>
+                    <field name="is_redirect_home" invisible="action_id" />
+                </xpath>
+            </data>
         </field>
+    </record>
+
+    <!-- Set default apps_menu_theme to 'community' for all users -->
+    <record id="default_apps_menu_theme_community" model="ir.default">
+        <field name="field_id" search="[('model', '=', 'res.users'), ('name', '=', 'apps_menu_theme')]"/>
+        <field name="json_value">"community"</field>
     </record>
 </odoo>

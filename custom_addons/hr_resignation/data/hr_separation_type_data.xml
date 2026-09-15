@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Seed data recreating the six separation types that used to be hardcoded
+    as a Selection. noupdate="1" so HR/POMD edits (renames, new types,
+    archiving) survive module upgrades.
+-->
+<odoo noupdate="1">
+
+    <record id="separation_type_voluntary" model="hr.separation.type">
+        <field name="name">Voluntary Resignation</field>
+        <field name="code">voluntary</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="separation_type_retirement_age" model="hr.separation.type">
+        <field name="name">Age-Related Retirement</field>
+        <field name="code">retirement_age</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="separation_type_medical" model="hr.separation.type">
+        <field name="name">Medical Retirement</field>
+        <field name="code">medical</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="separation_type_probation_termination" model="hr.separation.type">
+        <field name="name">Probation Termination</field>
+        <field name="code">probation_termination</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="separation_type_termination" model="hr.separation.type">
+        <field name="name">Termination / Dismissal</field>
+        <field name="code">termination</field>
+        <field name="sequence">50</field>
+        <field name="is_company_terminated">True</field>
+    </record>
+
+    <record id="separation_type_contract_end" model="hr.separation.type">
+        <field name="name">Contract End / Non-Renewal</field>
+        <field name="code">contract_end</field>
+        <field name="sequence">60</field>
+    </record>
+
+</odoo>

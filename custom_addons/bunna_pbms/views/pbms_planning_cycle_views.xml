@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pbms_planning_cycle_list" model="ir.ui.view">
+        <field name="name">pbms.planning.cycle.list</field>
+        <field name="model">pbms.planning.cycle</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('open', 'budget_call', 'consolidation', 'board_approval')"
+                       decoration-muted="state == 'closed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_pbms_planning_cycle_kanban" model="ir.ui.view">
+        <field name="name">pbms.planning.cycle.kanban</field>
+        <field name="model">pbms.planning.cycle</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state" class="o_kanban_mobile">
+                <field name="state"/>
+                <field name="name"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fs-5 fw-bold"><field name="name"/></span>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'approved'"
+                                       decoration-warning="state in ('open', 'budget_call', 'consolidation', 'board_approval')"
+                                       decoration-muted="state == 'closed'"/>
+                            </div>
+                            <div class="text-muted small">
+                                Start: <field name="date_start"/><br/>
+                                End: <field name="date_end"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_pbms_planning_cycle_form" model="ir.ui.view">
+        <field name="name">pbms.planning.cycle.form</field>
+        <field name="model">pbms.planning.cycle</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <!-- NEW: Start Budget Call button -->
+                    <button name="action_start_budget_call" type="object" string="Start Budget Call"
+                            invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_open_for_input" type="object" string="Open for Input"
+                            invisible="state != 'budget_call'" class="btn-primary"/>
+                    <button name="action_start_consolidation" type="object" string="Start Consolidation"
+                            invisible="state != 'open'" class="btn-primary"/>
+                    <button name="action_send_to_board" type="object" string="Send to Board"
+                            invisible="state != 'consolidation'" class="btn-primary"/>
+                    <button name="action_approve" type="object" string="Mark Approved"
+                            invisible="state != 'board_approval'" class="btn-primary"/>
+                    <button name="action_close" type="object" string="Close Cycle"
+                            invisible="state != 'approved'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,budget_call,open,consolidation,board_approval,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. FY 2026/27"/></h1>
+                    </div>
+                    <notebook>
+                        <page string="Schedule" name="page_schedule">
+                            <group>
+                                <field name="date_start"/>
+                                <field name="date_end"/>
+                                <field name="company_id" groups="base.group_multi_company"/>
+                            </group>
+                        </page>
+                        <page string="Deadlines" name="page_deadlines">
+                            <group>
+                                <field name="branch_deadline"/>
+                                <field name="district_deadline"/>
+                                <field name="head_office_deadline"/>
+                                <field name="board_deadline"/>
+                            </group>
+                        </page>
+                        <page string="Workforce Submission Window" name="page_workforce_window">
+                            <group>
+                                <group string="Window Period">
+                                    <field name="workforce_window_start"/>
+                                    <field name="workforce_window_end"/>
+                                    <field name="is_workforce_window_open" widget="boolean_toggle" readonly="1"/>
+                                </group>
+                                <group string="Notification Status">
+                                    <field name="workforce_window_notified" readonly="1"/>
+                                    <field name="workforce_window_notified_date" readonly="1"/>
+                                </group>
+                            </group>
+                            <div class="mt-2">
+                                <button name="action_notify_workforce_window"
+                                        type="object"
+                                        string="Notify Branches &amp; Departments"
+                                        class="btn btn-primary"
+                                        icon="fa-bullhorn"/>
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_pbms_planning_cycle_search" model="ir.ui.view">
+        <field name="name">pbms.planning.cycle.search</field>
+        <field name="model">pbms.planning.cycle</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <filter string="Active Cycles" name="filter_active" domain="[('state', 'in', ('budget_call', 'open', 'consolidation', 'board_approval'))]"/>
+                <filter string="Official Approved ABP" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                <separator/>
+                <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_pbms_planning_cycle" model="ir.actions.act_window">
+        <field name="name">Planning Cycles</field>
+        <field name="res_model">pbms.planning.cycle</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_pbms_planning_cycle_search"/>
+    </record>
+</odoo>

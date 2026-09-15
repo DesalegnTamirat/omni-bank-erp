@@ -79,6 +79,7 @@
                 <field name="job_title" string="Job Title"/>
                 <field name="working_hours" string="Working Hours" widget="float_time"/>
                 <field name="worked_hours" string="Worked Hours" widget="float_time"/>
+                <field name="payable_hours" string="Total Compensable (Hours)" widget="float_time"/>
                 <field name="attendance_percentage" string="Attendance Percentage"/>
                 <field name="leave_hours" string="Leave Hours" widget="float_time"/>
                 <field name="absent_hours" string="Absent Hours" widget="float_time"/>

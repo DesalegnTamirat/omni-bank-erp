@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo
+>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RUNTIME CLEARANCE LINE — Standalone Form / Modal View
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_line_view_form" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.form</field>
+        <field name="model">hr.resignation.clearance</field>
+        <field name="arch" type="xml">
+            <form string="Clearance Task" create="false" duplicate="false">
+                <header>
+                    <field name="can_approve" invisible="1"/>
+                    <button string="Submit to Manager"
+                            type="object" name="action_submit"
+                            class="btn-primary"
+                            invisible="state not in ('pending','rejected') or can_approve"
+                            confirm="Submit this clearance line to the Work Unit Manager for approval?"/>
+                    <button string="Approve Clearance"
+                            type="object" name="action_clear"
+                            class="btn-success"
+                            invisible="state not in ('pending', 'waiting_approval', 'rejected') or not can_approve"
+                            confirm="Mark this clearance line as Cleared?"/>
+                    <button string="Reject"
+                            type="object" name="action_reject"
+                            class="btn-danger"
+                            invisible="state != 'waiting_approval' or not can_approve"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,waiting_approval,cleared,rejected"/>
+                </header>
+                <sheet>
+                    <!-- Waiting banner -->
+                    <div class="alert alert-warning mb-3" role="alert"
+                         invisible="state != 'waiting'">
+                        <i class="fa fa-clock-o me-2"/>
+                        <strong>Waiting for previous group to complete.</strong>
+                        You will be notified automatically once all mandatory clearances
+                        in the preceding group are approved.
+                    </div>
+
+                    <!-- Rejected banner -->
+                    <div class="alert alert-danger mb-3" role="alert"
+                         invisible="state != 'rejected'">
+                        <i class="fa fa-exclamation-triangle me-2"/>
+                        <strong>Rejected</strong> by
+                        <field name="rejected_by" readonly="1" class="d-inline fw-bold"/>
+                        on <field name="rejected_date" readonly="1" class="d-inline fw-bold"/>:
+                        <div class="mt-1 ps-3 border-start border-danger border-2">
+                            <field name="rejection_reason" readonly="1" nolabel="1"/>
+                        </div>
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="work_unit_id" string="Clearance Department / Work Unit"/>
+                        <h1>
+                            <field name="work_unit_id" readonly="1"/>
+                        </h1>
+                        <div class="text-muted fs-6 mt-1">
+                            <span>Employee: </span>
+                            <field name="employee_id" readonly="1" class="fw-bold me-3"
+                                   options="{'no_open': True}"/>
+                            <span>Resignation: </span>
+                            <field name="resignation_id" readonly="1" class="fw-bold"
+                                   options="{'no_open': True}"/>
+                        </div>
+                        <div class="text-muted fs-6 mt-1">
+                            <span>Separation Type: </span>
+                            <field name="resignation_type_id" readonly="1" class="fw-bold"
+                                   options="{'no_open': True}"/>
+                        </div>
+                    </div>
+
+                    <group class="mt-4">
+                        <group string="Assignment Details">
+                            <field name="responsible_user" string="Responsible User"
+                                   readonly="1" options="{'no_open': True}"/>
+                            <field name="manager_user" string="Work Unit Manager"
+                                   readonly="1" options="{'no_open': True}"/>
+                            <field name="is_mandatory" readonly="1" widget="boolean_toggle"/>
+                            <field name="release_date" string="Release Date" readonly="1" class="fw-bold text-danger"/>
+                        </group>
+                        <group string="Approval Status">
+                            <field name="cleared_by" readonly="1" options="{'no_open': True}"/>
+                            <field name="cleared_date" readonly="1"/>
+                            <field name="items_progress" readonly="1"
+                                   string="Checklist Progress"/>
+                        </group>
+                    </group>
+
+                    <group string="Notes &amp; Remarks">
+                        <field name="notes" nolabel="1" readonly="state != 'pending'"
+                               placeholder="Add any clearance notes, hand-over remarks, or asset return details..."/>
+                    </group>
+
+                    <group string="Rejection Resolution"
+                           invisible="state != 'rejected'">
+                        <field name="resolution_notes" nolabel="1"
+                               placeholder="Describe how the rejection reason was resolved before re-approving..."/>
+                        <field name="resolved_by" readonly="1" options="{'no_open': True}"/>
+                        <field name="resolved_date" readonly="1"/>
+                    </group>
+
+                    <notebook invisible="not item_ids">
+                        <page string="Checklist Items" name="items">
+                            <field name="item_ids" nolabel="1">
+                                <list create="false" delete="false"
+                                      decoration-success="is_done"
+                                      decoration-muted="not is_mandatory and not is_done">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" string="Task / Requirement" readonly="1"/>
+                                    <field name="is_mandatory" string="Mandatory"
+                                           readonly="1" widget="boolean"/>
+                                    <field name="can_clear" column_invisible="1"/>
+                                    <field name="is_done" column_invisible="1"/>
+                                    <button string="Clear" type="object" name="action_mark_done"
+                                            class="btn-sm btn-success"
+                                            confirm="Are you sure you want to mark this task as cleared? This action will be logged."
+                                            invisible="is_done"/>
+                                    <button string="Cleared ✓" type="object" name="action_unmark_done"
+                                            class="btn-sm btn-outline-success"
+                                            invisible="not is_done"/>
+                                </list>
+                                <form string="Checklist Item">
+                                    <sheet>
+                                        <group>
+                                            <group>
+                                                <field name="clearance_line_id" readonly="1"/>
+                                                <field name="name" readonly="1" string="Task"/>
+                                                <field name="is_done" readonly="1"/>
+                                                <field name="done_by" readonly="1" invisible="not is_done"/>
+                                                <field name="note"/>
+                                            </group>
+                                            <group>
+                                                <field name="sequence" readonly="1"/>
+                                                <field name="is_mandatory" readonly="1"/>
+                                                <field name="can_clear" invisible="1"/>
+                                                <field name="done_date" readonly="1" invisible="not is_done"/>
+                                            </group>
+                                        </group>
+                                    </sheet>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <footer>
+                    <button string="Close" class="btn-secondary" special="cancel"
+                            data-bs-dismiss="modal"/>
+                </footer>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RUNTIME CLEARANCE LINE — List View
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_line_view_list" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.list</field>
+        <field name="model">hr.resignation.clearance</field>
+        <field name="arch" type="xml">
+            <list string="Clearance Lines"
+                  create="false"
+                  decoration-muted="state == 'waiting'"
+                  decoration-danger="state == 'rejected'"
+                  decoration-success="state == 'cleared'"
+                  decoration-warning="state == 'pending'">
+                <field name="sequence" widget="handle" optional="hide"/>
+                <field name="employee_id" optional="show"/>
+                <field name="work_unit_id" string="Operating Unit"/>
+                <field name="resignation_type_id" string="Separation Type" optional="show"/>
+                <field name="is_mandatory" string="Mand." widget="boolean"/>
+                <field name="responsible_user" string="Responsible User"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'rejected'"
+                       decoration-success="state == 'cleared'"/>
+                <field name="notification_sent" string="Notified"
+                       widget="boolean" optional="show"/>
+                <field name="items_progress" string="Tasks" optional="show"/>
+                <field name="cleared_by" optional="show"/>
+                <field name="cleared_date" optional="show"/>
+                <field name="rejected_by" optional="show"/>
+                <field name="rejection_reason" optional="hide"/>
+                <button string="Open"
+                        type="object" name="action_open_form"
+                        class="btn-sm btn-outline-primary"
+                        icon="fa-external-link"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RUNTIME CLEARANCE LINE — Search View
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_line_view_search" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.search</field>
+        <field name="model">hr.resignation.clearance</field>
+        <field name="arch" type="xml">
+            <search string="Search Clearance Lines">
+                <field name="employee_id"/>
+                <field name="work_unit_id"/>
+                <field name="responsible_user" string="Responsible User"/>
+                <field name="resignation_type_id" string="Separation Type"/>
+                <filter name="filter_pending" string="Pending"
+                        domain="[('state','in',('pending','waiting_approval'))]"/>
+                <filter name="filter_waiting" string="Waiting"
+                        domain="[('state','=','waiting')]"/>
+                <filter name="filter_rejected" string="Rejected"
+                        domain="[('state','=','rejected')]"/>
+                <filter name="filter_cleared" string="Cleared"
+                        domain="[('state','=','cleared')]"/>
+                <filter name="filter_mandatory" string="Mandatory Only"
+                        domain="[('is_mandatory','=',True)]"/>
+                <group name="group_by">
+                    <filter name="group_sep_type" string="Separation Type"
+                            context="{'group_by':'resignation_type_id'}"/>
+                    <filter name="group_state" string="Status"
+                            context="{'group_by':'state'}"/>
+                    <filter name="group_employee" string="Employee"
+                            context="{'group_by':'employee_id'}"/>
+                    <filter name="group_work_unit" string="Operating Unit"
+                            context="{'group_by':'work_unit_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RUNTIME CLEARANCE LINE — Window Action (All Lines)
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="action_clearance_lines_all" model="ir.actions.act_window">
+        <field name="name">All Clearance Lines</field>
+        <field name="res_model">hr.resignation.clearance</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="hr_clearance_line_view_search"/>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         PERSONAL QUEUE — My Clearance Tasks (filtered for responsible user)
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_line_view_list_my" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.list.my</field>
+        <field name="model">hr.resignation.clearance</field>
+        <field name="arch" type="xml">
+            <list string="My Clearance Tasks"
+                  create="false"
+                  decoration-danger="state == 'rejected'"
+                  decoration-warning="state == 'pending'">
+                <field name="employee_id"/>
+                <field name="work_unit_id" string="Operating Unit"/>
+                <field name="is_mandatory" string="Mand." widget="boolean"/>
+                <field name="items_progress" string="Checklist" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'"
+                       decoration-danger="state == 'rejected'"
+                       decoration-info="state == 'waiting_approval'"/>
+                <button string="Submit to Manager"
+                        type="object" name="action_submit"
+                        class="btn-sm btn-primary"
+                        invisible="state not in ('pending','rejected') or can_approve"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_my_clearance_tasks" model="ir.actions.act_window">
+        <field name="name">My Clearance Tasks</field>
+        <field name="res_model">hr.resignation.clearance</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">['|', ('responsible_user', '=', uid), ('manager_user', '=', uid)]</field>
+        <field name="context">{}</field>
+        <field name="search_view_id" ref="hr_clearance_line_view_search"/>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'view_id': ref('hr_clearance_line_view_list_my')}),
+                      (0, 0, {'view_mode': 'form', 'view_id': ref('hr_clearance_line_view_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No clearance tasks found.
+            </p>
+        </field>
+    </record>
+
+    <!-- Action: My Clearance Tasks -->
+    <record id="action_hr_resignation_clearance_my" model="ir.actions.act_window">
+        <field name="name">My Clearance Tasks</field>
+        <field name="res_model">hr.resignation.clearance</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('responsible_user', '=', uid), ('state', 'in', ['pending', 'rejected'])]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                You have no pending clearance tasks at the moment!
+            </p>
+        </field>
+    </record>
+
+</odoo>

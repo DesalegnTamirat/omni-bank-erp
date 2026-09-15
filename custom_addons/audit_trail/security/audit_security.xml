@@ -27,24 +27,24 @@
 
 
 
-<!-- <?xml version="1.0" encoding="utf-8"?> -->
-<!-- <odoo> -->
-<!-- <data noupdate="1"> -->
+<!--<?xml version="1.0" encoding="utf-8"?>-->
+<!--<odoo>-->
+<!--    <data noupdate="1">-->
 
-<!-- &lt;!&ndash; -->
-<!-- Odoo 19: res.groups only supports 'name' and 'implied_ids'. -->
-<!-- Fields removed in v19: category_id, comment, users. -->
-<!-- Admin users are granted the Manager group via res.users after install. -->
-<!-- &ndash;&gt; -->
+<!--        &lt;!&ndash;-->
+<!--            Odoo 19: res.groups only supports 'name' and 'implied_ids'.-->
+<!--            Fields removed in v19: category_id, comment, users.-->
+<!--            Admin users are granted the Manager group via res.users after install.-->
+<!--        &ndash;&gt;-->
 
-<!-- <record id="group_audit_user" model="res.groups"> -->
-<!-- <field name="name">Audit / Viewer</field> -->
-<!-- </record> -->
+<!--        <record id="group_audit_user" model="res.groups">-->
+<!--            <field name="name">Audit / Viewer</field>-->
+<!--        </record>-->
 
-<!-- <record id="group_audit_manager" model="res.groups"> -->
-<!-- <field name="name">Audit / Manager</field> -->
-<!-- <field name="implied_ids" eval="[(4, ref('group_audit_user'))]"/> -->
-<!-- </record> -->
+<!--        <record id="group_audit_manager" model="res.groups">-->
+<!--            <field name="name">Audit / Manager</field>-->
+<!--            <field name="implied_ids" eval="[(4, ref('group_audit_user'))]"/>-->
+<!--        </record>-->
 
-<!-- </data> -->
-<!-- </odoo> -->
+<!--    </data>-->
+<!--</odoo>-->

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Deposit Type -->
+    <record id="view_pbms_deposit_type_list" model="ir.ui.view">
+        <field name="name">pbms.deposit.type.list</field>
+        <field name="model">pbms.deposit.type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="is_ifb" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_deposit_type" model="ir.actions.act_window">
+        <field name="name">Deposit Types</field>
+        <field name="res_model">pbms.deposit.type</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Expense Account -->
+    <record id="view_pbms_expense_account_list" model="ir.ui.view">
+        <field name="name">pbms.expense.account.list</field>
+        <field name="model">pbms.expense.account</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_expense_account" model="ir.actions.act_window">
+        <field name="name">Expense Accounts</field>
+        <field name="res_model">pbms.expense.account</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Fixed Asset Category -->
+    <record id="view_pbms_fixed_asset_category_list" model="ir.ui.view">
+        <field name="name">pbms.fixed.asset.category.list</field>
+        <field name="model">pbms.fixed.asset.category</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="reference_unit_price" widget="monetary"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_fixed_asset_category" model="ir.actions.act_window">
+        <field name="name">Fixed Asset Categories</field>
+        <field name="res_model">pbms.fixed.asset.category</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Digital Channel -->
+    <record id="view_pbms_digital_channel_list" model="ir.ui.view">
+        <field name="name">pbms.digital.channel.list</field>
+        <field name="model">pbms.digital.channel</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="unit_of_measure"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_digital_channel" model="ir.actions.act_window">
+        <field name="name">Digital Banking Channels</field>
+        <field name="res_model">pbms.digital.channel</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- FX Source Type -->
+    <record id="view_pbms_fx_source_type_list" model="ir.ui.view">
+        <field name="name">pbms.fx.source.type.list</field>
+        <field name="model">pbms.fx.source.type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_fx_source_type" model="ir.actions.act_window">
+        <field name="name">FX Source Types</field>
+        <field name="res_model">pbms.fx.source.type</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Manpower Position Type (Request Type) -->
+    <record id="view_pbms_position_type_list" model="ir.ui.view">
+        <field name="name">pbms.position.type.list</field>
+        <field name="model">pbms.position.type</field>
+        <field name="arch" type="xml">
+            <list editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="is_new_position" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+    <record id="action_pbms_position_type" model="ir.actions.act_window">
+        <field name="name">Work Force Position Types</field>
+        <field name="res_model">pbms.position.type</field>
+        <field name="view_mode">list</field>
+    </record>
+</odoo>

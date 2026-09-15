@@ -7,20 +7,12 @@ create / write / unlink is intercepted. Only models with an active
 audit.rule are actually logged — the check is fast and cheap.
 """
 import logging
-import threading
 from datetime import datetime
 
 from odoo import models, api
 from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
-
-# Thread-local flag to prevent re-entrant audit logging (e.g., audit logs
-# triggering more writes that get intercepted → infinite loop / mail cascade).
-_audit_local = threading.local()
-
-# Fields that must never be audited — they trigger expensive or recursive ops.
-_SKIP_FIELDS = frozenset({'password', 'password_crypt', '__last_update'})
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,15 +92,31 @@ _ORIGINAL_UNLINK = models.BaseModel.unlink
 _PATCHED = False  # guard against double-patching
 
 
-@api.model_create_multi
+# def _patched_create(self, vals_list):
+#     records = _ORIGINAL_CREATE(self, vals_list)
+#     rule = _get_active_rule(self.env, self._name)
+#     if rule and rule.log_create:
+#         try:
+#             mctx = _model_ctx(self.env, self._name)
+#             uctx = _user_ctx(self.env)
+#             logs = [{
+#                 **mctx, **uctx,
+#                 'res_id': r.id,
+#                 'res_name': r.display_name if hasattr(r, 'display_name') else str(r.id),
+#                 'operation': 'create',
+#                 'field_id': False, 'field_name': False,
+#                 'field_description': False, 'field_type': False,
+#                 'old_value': False, 'new_value': 'Record created',
+#             } for r in records]
+#             _write_logs(self.env, logs)
+#         except Exception as e:
+#             _logger.error('Audit create failed [%s]: %s', self._name, e)
+#     return records
+
 def _patched_create(self, vals_list):
     records = _ORIGINAL_CREATE(self, vals_list)
-    # Skip if we are already inside an audit log call (re-entrancy guard)
-    if getattr(_audit_local, 'active', False):
-        return records
     rule = _get_active_rule(self.env, self._name)
     if rule and rule.log_create:
-        _audit_local.active = True
         try:
             mctx = _model_ctx(self.env, self._name)
             uctx = _user_ctx(self.env)
@@ -124,28 +132,26 @@ def _patched_create(self, vals_list):
             _write_logs(self.env, logs)
         except Exception as e:
             _logger.error('Audit create failed [%s]: %s', self._name, e)
-        finally:
-            _audit_local.active = False
     return records
 
 
-def _patched_write(self, vals):
-    # Re-entrancy guard: prevent audit logging from triggering itself
-    # (e.g., writing audit.log → chatter → mail → more writes → loop)
-    if getattr(_audit_local, 'active', False):
-        return _ORIGINAL_WRITE(self, vals)
+# Wrap with the same decorator the original create() had,
+# so call-normalization (e.g. dict vs list, wizard-style calls) still works.
+_patched_create = api.model_create_multi(_patched_create)
 
+
+def _patched_write(self, vals):
     rule = _get_active_rule(self.env, self._name)
     old_vals = {}
 
     if rule and rule.log_write:
         try:
-            # Determine which fields to audit — skip sensitive/expensive fields
+            # Determine which fields to audit
             if rule.field_ids:
-                allowed = {f.name for f in rule.field_ids} - _SKIP_FIELDS
+                allowed = {f.name for f in rule.field_ids}
                 audit_fields = [k for k in vals if k in allowed]
             else:
-                audit_fields = [k for k in vals if k not in _SKIP_FIELDS]
+                audit_fields = list(vals.keys())
 
             # Snapshot old values before write
             for rec in self:
@@ -156,7 +162,6 @@ def _patched_write(self, vals):
     result = _ORIGINAL_WRITE(self, vals)
 
     if rule and rule.log_write and old_vals:
-        _audit_local.active = True
         try:
             mctx = _model_ctx(self.env, self._name)
             uctx = _user_ctx(self.env)
@@ -192,21 +197,14 @@ def _patched_write(self, vals):
             _write_logs(self.env, logs)
         except Exception as e:
             _logger.error('Audit post-write failed [%s]: %s', self._name, e)
-        finally:
-            _audit_local.active = False
 
     return result
 
 
 def _patched_unlink(self):
-    # Re-entrancy guard
-    if getattr(_audit_local, 'active', False):
-        return _ORIGINAL_UNLINK(self)
-
     rule = _get_active_rule(self.env, self._name)
     snapshots = []
     if rule and rule.log_unlink:
-        _audit_local.active = True
         try:
             mctx = _model_ctx(self.env, self._name)
             uctx = _user_ctx(self.env)
@@ -221,22 +219,27 @@ def _patched_unlink(self):
             } for r in self]
         except Exception as e:
             _logger.error('Audit pre-unlink snapshot failed [%s]: %s', self._name, e)
-        finally:
-            _audit_local.active = False
 
     result = _ORIGINAL_UNLINK(self)
 
     if snapshots:
-        _audit_local.active = True
         try:
             _write_logs(self.env, snapshots)
         except Exception as e:
             _logger.error('Audit post-unlink log failed [%s]: %s', self._name, e)
-        finally:
-            _audit_local.active = False
 
     return result
 
+
+# def apply_patch():
+#     global _PATCHED
+#     if _PATCHED:
+#         return
+#     models.BaseModel.create = _patched_create
+#     models.BaseModel.write  = _patched_write
+#     models.BaseModel.unlink = _patched_unlink
+#     _PATCHED = True
+#     _logger.info('audit_trail: ORM patch applied (create/write/unlink)')
 
 def apply_patch():
     global _PATCHED

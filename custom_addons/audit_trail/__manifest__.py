@@ -15,7 +15,7 @@
         - Export to Excel / PDF
         - Access controlled by security groups
     """,
-    'author': 'Desalegn & Abeza',
+    'author': 'Your Company',
     'depends': ['base', 'mail'],
     'data': [
         'security/audit_security.xml',
@@ -23,8 +23,18 @@
         'data/audit_rule_data.xml',
         'views/audit_log_views.xml',
         'views/audit_rule_views.xml',
+        'views/audit_dashboard_views.xml',
         'views/audit_menu.xml',
+
     ],
+
+     'assets': {
+        'web.assets_backend': [
+            'audit_trail/static/src/js/audit_dashboard.js',
+            'audit_trail/static/src/xml/audit_dashboard.xml',
+        ],
+     },
+
     'installable': True,
     'auto_install': False,
     'license': 'LGPL-3',

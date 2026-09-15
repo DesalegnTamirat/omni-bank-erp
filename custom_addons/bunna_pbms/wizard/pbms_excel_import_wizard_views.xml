@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pbms_excel_import_wizard_form" model="ir.ui.view">
+        <field name="name">pbms.excel.import.wizard.form</field>
+        <field name="model">pbms.excel.import.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Import Plan Data from Excel">
+                <div class="alert alert-info d-flex align-items-center justify-content-between p-3 mb-3" role="alert">
+                    <div>
+                        <i class="fa fa-info-circle me-2 fs-5"/>
+                        <span>Need the official format? Download a pre-formatted Excel template with your category's product/account codes.</span>
+                    </div>
+                    <button name="action_download_template" type="object" string="Download Template (.xlsx)"
+                            icon="fa-download" class="btn btn-outline-primary btn-sm text-nowrap"/>
+                </div>
+                <group>
+                    <group>
+                        <field name="plan_id" invisible="not plan_id"/>
+                        <field name="format_type" readonly="plan_id != False"/>
+                        <field name="import_mode" widget="radio"/>
+                    </group>
+                    <group>
+                        <field name="cycle_id" readonly="plan_id != False"/>
+                        <field name="org_unit_id" readonly="plan_id != False"/>
+                    </group>
+                </group>
+                <group string="Attach Completed File">
+                    <field name="file_name" invisible="1"/>
+                    <field name="file_data" filename="file_name" string="Excel Spreadsheet (.xlsx)"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Import Lines" icon="fa-upload" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action with model binding: appears inside the ⚙ Action dropdown menu on pbms.planning.category -->
+    <record id="action_pbms_excel_import_wizard" model="ir.actions.act_window">
+        <field name="name">Import from Excel</field>
+        <field name="res_model">pbms.excel.import.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="bunna_pbms.model_pbms_planning_category"/>
+        <field name="binding_view_types">form,list</field>
+    </record>
+</odoo>

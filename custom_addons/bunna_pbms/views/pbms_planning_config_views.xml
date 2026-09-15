@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Planning Configuration List View -->
+    <record id="view_pbms_planning_config_list" model="ir.ui.view">
+        <field name="name">pbms.planning.config.list</field>
+        <field name="model">pbms.planning.config</field>
+        <field name="arch" type="xml">
+            <list string="Planning Configurations">
+                <field name="config_type"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="org_unit_id" optional="show"/>
+                <field name="currency_id" optional="hide"/>
+                <field name="enable_deposit" widget="boolean_toggle"/>
+                <field name="enable_customer_base" widget="boolean_toggle"/>
+                <field name="enable_fx" widget="boolean_toggle"/>
+                <field name="enable_digital_banking" widget="boolean_toggle"/>
+                <field name="enable_expense" widget="boolean_toggle"/>
+                <field name="enable_manpower" widget="boolean_toggle"/>
+                <field name="enable_fixed_asset" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Planning Configuration Form View -->
+    <record id="view_pbms_planning_config_form" model="ir.ui.view">
+        <field name="name">pbms.planning.config.form</field>
+        <field name="model">pbms.planning.config</field>
+        <field name="arch" type="xml">
+            <form string="Planning Configuration">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="config_type" class="oe_edit_only" string="Configuration Scope"/>
+                        <h1><field name="config_type" widget="radio" options="{'horizontal': true}"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="work_unit_type" invisible="config_type != 'work_unit_type'" required="config_type == 'work_unit_type'"/>
+                            <field name="org_unit_id" invisible="config_type != 'operating_unit'" required="config_type == 'operating_unit'"/>
+                            <field name="work_unit_type" string="Work Unit Type" invisible="config_type != 'operating_unit'" readonly="1" force_save="1"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" groups="base.group_multi_currency"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Eligible Planning Categories" name="page_categories">
+                            <group string="Financial &amp; Core Mobilization">
+                                <group>
+                                    <field name="enable_deposit" widget="boolean_toggle"/>
+                                    <field name="enable_customer_base" widget="boolean_toggle"/>
+                                    <field name="enable_fx" widget="boolean_toggle"/>
+                                    <field name="enable_digital_banking" widget="boolean_toggle"/>
+                                </group>
+                                <group string="Measurement Types">
+                                    <field name="deposit_measurement_type" invisible="not enable_deposit"/>
+                                    <field name="customer_base_measurement_type" invisible="not enable_customer_base"/>
+                                    <field name="fx_measurement_type" invisible="not enable_fx"/>
+                                    <field name="digital_banking_measurement_type" invisible="not enable_digital_banking"/>
+                                </group>
+                            </group>
+                            <group string="Budgets &amp; Resources">
+                                <group>
+                                    <field name="enable_expense" widget="boolean_toggle"/>
+                                    <field name="enable_manpower" widget="boolean_toggle"/>
+                                    <field name="enable_fixed_asset" widget="boolean_toggle"/>
+                                </group>
+                                <group string="Measurement Types">
+                                    <field name="expense_measurement_type" invisible="not enable_expense"/>
+                                    <field name="manpower_measurement_type" invisible="not enable_manpower"/>
+                                    <field name="fixed_asset_measurement_type" invisible="not enable_fixed_asset"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Operating Unit Exceptions" name="page_exceptions" invisible="config_type != 'work_unit_type'">
+                            <p class="text-muted">
+                                Select specific Operating Units under this Work Unit Type that are <b>NOT eligible</b> for each planning category.
+                            </p>
+                            <group>
+                                <group string="Mobilization Exclusions">
+                                    <field name="deposit_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_deposit"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Deposit..."/>
+                                    <field name="customer_base_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_customer_base"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Customer Base..."/>
+                                    <field name="fx_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_fx"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for FX Mobilization..."/>
+                                    <field name="digital_banking_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_digital_banking"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Digital Banking..."/>
+                                </group>
+                                <group string="Budget &amp; Resource Exclusions">
+                                    <field name="expense_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_expense"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for General Expense..."/>
+                                    <field name="manpower_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_manpower"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Manpower..."/>
+                                    <field name="fixed_asset_excluded_org_unit_ids" widget="many2many_tags"
+                                           invisible="not enable_fixed_asset"
+                                           domain="[('work_unit_type', '=', work_unit_type)]"
+                                           placeholder="Select units not eligible for Fixed Asset..."/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Configurable Dropdowns" name="page_dropdowns">
+                            <group string="Deposit Mobilization &amp; Customer Base" invisible="not enable_deposit and not enable_customer_base">
+                                <field name="deposit_type_ids" widget="many2many_tags"
+                                       string="Available Deposit Types"
+                                       help="Select which deposit types (Savings, Demand, Time, IFB, etc.) are available for this configuration."/>
+                            </group>
+                            <group string="FX Mobilization Sources" invisible="not enable_fx">
+                                <field name="fx_source_type_ids" widget="many2many_tags"
+                                       string="Available FX Sources"
+                                       help="Select which FX sources (Remittance, Export, etc.) are available for this configuration."/>
+                            </group>
+                            <group string="Digital Banking Channels" invisible="not enable_digital_banking">
+                                <field name="digital_channel_ids" widget="many2many_tags"
+                                       string="Available Digital Channels"
+                                       help="Select which digital channels are available for this configuration."/>
+                            </group>
+                            <group string="General Expense Accounts" invisible="not enable_expense">
+                                <field name="expense_account_ids" widget="many2many_tags"
+                                       string="Available Expense Accounts"
+                                       help="Select which expense accounts are available for this configuration."/>
+                            </group>
+                            <group string="Fixed Asset Categories" invisible="not enable_fixed_asset">
+                                <field name="fixed_asset_category_ids" widget="many2many_tags"
+                                       string="Available Fixed Asset Categories"
+                                       help="Select which fixed asset categories are available for this configuration."/>
+                            </group>
+                            <group string="Work Force Justification Categories" invisible="not enable_manpower">
+                                <field name="justification_category_ids" widget="many2many_tags"
+                                       string="Available Justification Categories"
+                                       help="Select which justification categories are available for this configuration."/>
+                            </group>
+                            <group string="Work Force Position / Request Types" invisible="not enable_manpower">
+                                <field name="position_type_ids" widget="many2many_tags"
+                                       string="Available Position Types"
+                                       help="Select which request types (New Position, Additional Position, Replacement, Position Transfer, Position Upgrade) are available for this configuration."/>
+                            </group>
+                        </page>
+
+                        <page string="Planning Currencies &amp; FX" name="page_currencies">
+                            <group string="Foreign Exchange (FX) Mobilization Currencies" invisible="not enable_fx">
+                                <group>
+                                    <field name="fx_currency_id" string="Default FX Currency" placeholder="e.g. USD, EUR, GBP..."/>
+                                </group>
+                                <group>
+                                    <field name="fx_allowed_currency_ids" widget="many2many_tags"
+                                           string="Allowed FX Currencies"
+                                           placeholder="Select allowed foreign currencies (USD, EUR, GBP, AED...)..."/>
+                                </group>
+                            </group>
+                            <group string="Domestic &amp; Operational Currencies">
+                                <group>
+                                    <field name="deposit_currency_id" string="Deposit Planning Currency" invisible="not enable_deposit"/>
+                                    <field name="expense_currency_id" string="Expense Planning Currency" invisible="not enable_expense"/>
+                                </group>
+                                <group>
+                                    <field name="currency_id" string="Base Default Currency"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Functional Reviewers &amp; Department Routing" name="page_functional_routing">
+                            <p class="text-muted">
+                                Configure the responsible Head Office Operating Unit, Department, and Designated Reviewer users for each planning category.
+                            </p>
+                            <group string="Core &amp; Mobilization Categories">
+                                <group string="Deposit Mobilization">
+                                    <field name="deposit_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="deposit_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="deposit_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                                <group string="Customer Base">
+                                    <field name="customer_base_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="customer_base_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="customer_base_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                            <group string="International &amp; Digital Channels">
+                                <group string="FX Mobilization">
+                                    <field name="fx_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="fx_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="fx_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                                <group string="Digital Banking Channels">
+                                    <field name="digital_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="digital_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="digital_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                            <group string="Resources &amp; Operating Expenses">
+                                <group string="Workforce Requirement">
+                                    <field name="manpower_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="manpower_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="manpower_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                    <field name="budget_hiring_committee_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                    <field name="ceo_user_id" options="{'no_create': True}"/>
+                                </group>
+                                <group string="General Expense Budget">
+                                    <field name="expense_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="expense_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="expense_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                            <group string="Fixed Assets &amp; Facilities">
+                                <group string="Fixed Asset Requirement">
+                                    <field name="fixed_asset_reviewer_ou_id" options="{'no_create': True}"/>
+                                    <field name="fixed_asset_reviewer_dept_id" options="{'no_create': True}"/>
+                                    <field name="fixed_asset_reviewer_user_ids" widget="many2many_tags" options="{'no_create': True}"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_pbms_planning_config_search" model="ir.ui.view">
+        <field name="name">pbms.planning.config.search</field>
+        <field name="model">pbms.planning.config</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="work_unit_type"/>
+                <field name="org_unit_id"/>
+                <filter string="Work Unit Type Defaults" name="filter_type_defaults"
+                        domain="[('config_type', '=', 'work_unit_type')]"/>
+                <filter string="Operating Unit Overrides" name="filter_ou_overrides"
+                        domain="[('config_type', '=', 'operating_unit')]"/>
+                <separator/>
+                <filter string="Scope" name="group_config_type" context="{'group_by': 'config_type'}"/>
+                <filter string="Work Unit Type" name="group_work_unit_type" context="{'group_by': 'work_unit_type'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Planning Configuration Action -->
+    <record id="action_pbms_planning_config" model="ir.actions.act_window">
+        <field name="name">Planning Configuration</field>
+        <field name="res_model">pbms.planning.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_pbms_planning_config_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure eligible planning categories and category reviewers per Work Unit Type or specific Operating Unit.
+            </p>
+            <p>
+                Configure defaults for Work Unit Types (Branch, District Office, Head Office, ...)
+                or create custom overrides and exceptions for specific Operating Units.
+            </p>
+        </field>
+    </record>
+
+    <!-- Window Action opening the Planning Request directly in Form View -->
+    <record id="action_pbms_planning_request_form" model="ir.actions.act_window">
+        <field name="name">Planning Request</field>
+        <field name="res_model">pbms.planning.category</field>
+        <field name="view_mode">form,list</field>
+        <field name="view_id" ref="bunna_pbms.view_pbms_planning_request_form"/>
+        <field name="search_view_id" ref="bunna_pbms.view_pbms_planning_category_search"/>
+        <field name="target">current</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create a new Planning Request
+            </p>
+            <p>
+                Fill out annual business plan targets across all eligible planning categories
+                for your work unit and submit for review.
+            </p>
+        </field>
+    </record>
+
+    <!-- Server Action Opening / Resolving Active Planning Request for Current User -->
+    <record id="action_pbms_planning_request_server" model="ir.actions.server">
+        <field name="name">Planning Request</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="state">code</field>
+        <field name="code">
+action = model.with_context(is_planning_request=True).action_open_planning_request()
+        </field>
+    </record>
+</odoo>

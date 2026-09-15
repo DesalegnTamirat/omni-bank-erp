@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_pbms" model="ir.module.category">
+        <field name="name">Plan and Budget Management</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <!-- Odoo 19: res.groups no longer has category_id directly; groups are
+         now linked to a category via an intermediate res.groups.privilege
+         record (res.groups.privilege_id -> res.groups.privilege.category_id). -->
+    <record id="privilege_pbms" model="res.groups.privilege">
+        <field name="name">Plan and Budget Management</field>
+        <field name="sequence">20</field>
+        <field name="category_id" ref="module_category_pbms"/>
+    </record>
+
+    <record id="group_pbms_branch_user" model="res.groups">
+        <field name="name">Branch / Head Office User</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_allow_export'))]"/>
+        <field name="comment">Create, edit, and delete own work unit plans before submission. View only after submission.</field>
+    </record>
+
+    <record id="group_pbms_district_reviewer" model="res.groups">
+        <field name="name">District Reviewer</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(6, 0, [ref('base.group_allow_export')])]"/>
+        <field name="comment">Review, edit, approve, return, reject, and comment on child work unit plans while under district review. View only after district action is completed.</field>
+    </record>
+
+    <record id="group_pbms_ho_reviewer" model="res.groups">
+        <field name="name">Head Office Functional Reviewer</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(6, 0, [ref('base.group_allow_export')])]"/>
+        <field name="comment">Review, edit, approve, return, reject, and comment on child work unit plans while under head office review. View only after HO review is completed.</field>
+    </record>
+
+    <record id="group_pbms_approver" model="res.groups">
+        <field name="name">SPPMD Plan Approver</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(6, 0, [ref('base.group_allow_export')])]"/>
+        <field name="comment">Final plan approver privilege: view, edit, add comments, return for revision, reject, and final approve plans.</field>
+    </record>
+
+    <record id="group_pbms_budget_hiring_committee" model="res.groups">
+        <field name="name">PBMS Budget Hiring Committee</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Reviews, edits, and approves requested manpower targets before HR sourcing and fulfillment planning.</field>
+    </record>
+
+    <record id="group_pbms_ceo" model="res.groups">
+        <field name="name">PBMS Chief Executive Officer (CEO)</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Executive authority: reviews and grants final executive approval for external vacancy workforce fulfillment.</field>
+    </record>
+
+    <record id="group_pbms_respective_chief" model="res.groups">
+        <field name="name">PBMS Respective Chief</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Respective Chief: reviews district and department annual workforce plans, approves and escalates, reduces headcount, or rejects.</field>
+    </record>
+
+    <record id="group_pbms_people_solutions" model="res.groups">
+        <field name="name">PBMS People Solutions Directorate</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">People Solutions Directorate: sets submission window, reviews exceptional and annual workforce plans, escalates to CPCO.</field>
+    </record>
+
+    <record id="group_pbms_cpco" model="res.groups">
+        <field name="name">PBMS Chief of People &amp; Culture Office (CPCO)</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">CPCO: prepares memos, submits to CEO / Board, records decisions in the system.</field>
+    </record>
+
+    <record id="group_pbms_people_operations" model="res.groups">
+        <field name="name">PBMS People Operations &amp; Management Directorate</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">People Operations &amp; Management: receives auto-initiated vacancy requests and takes recruitment action.</field>
+    </record>
+
+    <record id="group_pbms_manager" model="res.groups">
+        <field name="name">SPPMD Administrator</field>
+        <field name="privilege_id" ref="privilege_pbms"/>
+        <field name="implied_ids" eval="[(4, ref('group_pbms_branch_user')), (4, ref('group_pbms_district_reviewer')), (4, ref('group_pbms_ho_reviewer')), (4, ref('group_pbms_approver')), (4, ref('group_pbms_budget_hiring_committee')), (4, ref('group_pbms_ceo')), (4, ref('group_pbms_respective_chief')), (4, ref('group_pbms_people_solutions')), (4, ref('group_pbms_cpco')), (4, ref('group_pbms_people_operations')), (4, ref('base.group_allow_export')), (4, ref('base.group_user'))]"/>
+        <field name="comment">Administrator privilege: manages planning cycles, configurations, master data, bank-wide consolidation, and plan reopening.</field>
+    </record>
+
+    <!-- Record rules on the single unified plan model. Branch users see their
+         own work units, district reviewers their direct child branches, and HO
+         reviewers their direct child units, while SPPMD approvers/managers see everything.
+         Uses hr_employee_custom's user.operating_unit_ids. -->
+    <record id="rule_plan_own_unit" model="ir.rule">
+        <field name="name">PBMS Plan: own work unit(s) only</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">
+            ['|', '|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('create_uid', '=', user.id),
+             ('submitted_by', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+    <record id="rule_plan_district" model="ir.rule">
+        <field name="name">PBMS Plan: direct child operating units (District Reviewer)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">
+            ['&amp;', ('org_unit_type', '!=', 'head_office'),
+             '|', '|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('district_id', 'in', user.operating_unit_ids.ids),
+             ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+    <record id="rule_plan_ho" model="ir.rule">
+        <field name="name">PBMS Plan: category-specific functional review (Head Office Reviewer)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">
+            ['&amp;',
+                ('category', 'in', user._pbms_allowed_categories()),
+                '|',
+                    ('org_unit_type', '=', 'head_office'),
+                    '|',
+                        '&amp;',
+                            ('category', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
+                            ('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
+                        '|',
+                            '&amp;',
+                                ('category', '=', 'manpower'),
+                                ('state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                            '&amp;',
+                                ('category', 'in', ('general_expense', 'fixed_asset')),
+                                ('state', 'in', ('district_approved', 'district_endorsed', 'committee_review', 'board_ceo_approval', 'ho_reviewed', 'approved'))]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+    <record id="rule_plan_approver" model="ir.rule">
+        <field name="name">PBMS Plan: Head Office Bank-Wide &amp; Branch Resource Plans only (SPPMD Plan Approver)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">
+            ['|',
+             ('org_unit_type', '=', 'head_office'),
+             ('category', 'in', ('manpower', 'general_expense', 'fixed_asset'))]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_approver'))]"/>
+    </record>
+    <record id="rule_plan_manager" model="ir.rule">
+        <field name="name">PBMS Plan: bank-wide all units (SPPMD Administrator)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_manager'))]"/>
+    </record>
+    <record id="rule_plan_committee" model="ir.rule">
+        <field name="name">PBMS Plan: Review Committee (Manpower, Expense, Fixed Asset)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[('category', 'in', ('manpower', 'general_expense', 'fixed_asset'))]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_budget_hiring_committee'))]"/>
+    </record>
+    <record id="rule_plan_ceo" model="ir.rule">
+        <field name="name">PBMS Plan: bank-wide plans for CEO</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ceo'))]"/>
+    </record>
+    <record id="rule_plan_chief" model="ir.rule">
+        <field name="name">PBMS Plan: Respective Chief (Manpower)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[('category', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_respective_chief'))]"/>
+    </record>
+    <record id="rule_plan_solutions" model="ir.rule">
+        <field name="name">PBMS Plan: People Solutions (Manpower)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[('category', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_solutions'))]"/>
+    </record>
+    <record id="rule_plan_cpco" model="ir.rule">
+        <field name="name">PBMS Plan: CPCO (Manpower)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[('category', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_cpco'))]"/>
+    </record>
+    <record id="rule_plan_operations" model="ir.rule">
+        <field name="name">PBMS Plan: People Operations (Manpower)</field>
+        <field name="model_id" ref="model_pbms_planning_category"/>
+        <field name="domain_force">[('category', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_operations'))]"/>
+    </record>
+
+    <!-- ========================================================= -->
+    <!-- PBMS CONSOLIDATION LINE RECORD RULES                      -->
+    <!-- ========================================================= -->
+    <record id="rule_consolidation_own_unit" model="ir.rule">
+        <field name="name">PBMS Consolidation: own work unit(s) only</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">
+            ['|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('create_uid', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+    <record id="rule_consolidation_district" model="ir.rule">
+        <field name="name">PBMS Consolidation: district office only</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">
+            ['&amp;', ('org_unit_type', 'in', ('district_office', 'regional_office')),
+             '|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('district_id', 'in', user.operating_unit_ids.ids)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+    <record id="rule_consolidation_ho" model="ir.rule">
+        <field name="name">PBMS Consolidation: Districts &amp; Head Office only (Head Office Reviewer)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office'))]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+    <record id="rule_consolidation_approver" model="ir.rule">
+        <field name="name">PBMS Consolidation: Districts &amp; Head Office only (SPPMD Approver)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office'))]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_approver'))]"/>
+    </record>
+    <record id="rule_consolidation_manager" model="ir.rule">
+        <field name="name">PBMS Consolidation: bank-wide all units (SPPMD Administrator)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_manager'))]"/>
+    </record>
+    <record id="rule_consolidation_ceo" model="ir.rule">
+        <field name="name">PBMS Consolidation: Districts &amp; Head Office only (CEO)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office'))]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ceo'))]"/>
+    </record>
+    <record id="rule_consolidation_chief" model="ir.rule">
+        <field name="name">PBMS Consolidation: Respective Chief (Manpower)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('source_model', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_respective_chief'))]"/>
+    </record>
+    <record id="rule_consolidation_solutions" model="ir.rule">
+        <field name="name">PBMS Consolidation: People Solutions (Manpower)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('source_model', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_solutions'))]"/>
+    </record>
+    <record id="rule_consolidation_cpco" model="ir.rule">
+        <field name="name">PBMS Consolidation: CPCO (Manpower)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('source_model', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_cpco'))]"/>
+    </record>
+    <record id="rule_consolidation_operations" model="ir.rule">
+        <field name="name">PBMS Consolidation: People Operations (Manpower)</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="domain_force">[('source_model', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_operations'))]"/>
+    </record>
+
+    <!-- ========================================================= -->
+    <!-- PBMS PLAN CATEGORY LINE RECORD RULES                      -->
+    <!-- ========================================================= -->
+    <record id="rule_plan_line_own_unit" model="ir.rule">
+        <field name="name">PBMS Plan Line: own work unit(s) only</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">
+            ['|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('create_uid', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+    <record id="rule_plan_line_district" model="ir.rule">
+        <field name="name">PBMS Plan Line: district &amp; child operating units</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">
+            ['&amp;', ('plan_id.org_unit_type', '!=', 'head_office'),
+             '|', '|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('district_id', 'in', user.operating_unit_ids.ids),
+             ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+    <record id="rule_plan_line_ho" model="ir.rule">
+        <field name="name">PBMS Plan Line: category-specific functional review (Head Office Reviewer)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">
+            ['&amp;',
+                ('line_type', 'in', user._pbms_allowed_categories()),
+                '|',
+                    ('plan_id.org_unit_type', '=', 'head_office'),
+                    '|',
+                        '&amp;',
+                            ('line_type', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
+                            ('plan_id.org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
+                        '|',
+                            '&amp;',
+                                ('line_type', '=', 'manpower'),
+                                ('plan_id.state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                            '&amp;',
+                                ('line_type', 'in', ('general_expense', 'fixed_asset')),
+                                ('plan_id.state', 'in', ('district_approved', 'district_endorsed', 'committee_review', 'board_ceo_approval', 'ho_reviewed', 'approved'))]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_ho_reviewer'))]"/>
+    </record>
+    <record id="rule_plan_line_approver" model="ir.rule">
+        <field name="name">PBMS Plan Line: Head Office Bank-Wide &amp; Branch Resource Plans only (SPPMD Approver)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">
+            ['|',
+             ('plan_id.org_unit_type', '=', 'head_office'),
+             ('plan_id.category', 'in', ('manpower', 'general_expense', 'fixed_asset'))]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_approver'))]"/>
+    </record>
+    <record id="rule_plan_line_manager" model="ir.rule">
+        <field name="name">PBMS Plan Line: bank-wide all units (SPPMD Administrator)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_manager'))]"/>
+    </record>
+    <record id="rule_plan_line_committee" model="ir.rule">
+        <field name="name">PBMS Plan Line: Review Committee (Manpower, Expense, Fixed Asset)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[('line_type', 'in', ('manpower', 'general_expense', 'fixed_asset'))]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_budget_hiring_committee'))]"/>
+    </record>
+    <record id="rule_plan_line_ceo" model="ir.rule">
+        <field name="name">PBMS Plan Line: bank-wide all units (CEO)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ceo'))]"/>
+    </record>
+    <record id="rule_plan_line_chief" model="ir.rule">
+        <field name="name">PBMS Plan Line: Respective Chief (Manpower)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[('line_type', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_respective_chief'))]"/>
+    </record>
+    <record id="rule_plan_line_solutions" model="ir.rule">
+        <field name="name">PBMS Plan Line: People Solutions (Manpower)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[('line_type', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_solutions'))]"/>
+    </record>
+    <record id="rule_plan_line_cpco" model="ir.rule">
+        <field name="name">PBMS Plan Line: CPCO (Manpower)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[('line_type', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_cpco'))]"/>
+    </record>
+    <record id="rule_plan_line_operations" model="ir.rule">
+        <field name="name">PBMS Plan Line: People Operations (Manpower)</field>
+        <field name="model_id" ref="model_pbms_plan_category_line"/>
+        <field name="domain_force">[('line_type', '=', 'manpower')]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_operations'))]"/>
+    </record>
+
+    <!-- Exceptional Workforce Request Record Rules -->
+    <record id="rule_exceptional_workforce_branch" model="ir.rule">
+        <field name="name">Exceptional Workforce: own work unit</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">
+            ['|', '|',
+             ('operating_unit_id', 'in', user.operating_unit_ids.ids),
+             ('create_uid', '=', user.id),
+             ('initiator_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_district" model="ir.rule">
+        <field name="name">Exceptional Workforce: district child units</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">
+            ['|', '|', '|',
+             ('operating_unit_id', 'in', user.operating_unit_ids.ids),
+             ('operating_unit_id.parent_unit', 'in', user.operating_unit_ids.ids),
+             ('create_uid', '=', user.id),
+             ('initiator_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_solutions" model="ir.rule">
+        <field name="name">Exceptional Workforce: People Solutions Bank-Wide</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_solutions'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_cpco" model="ir.rule">
+        <field name="name">Exceptional Workforce: CPCO Bank-Wide</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_cpco'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_ceo" model="ir.rule">
+        <field name="name">Exceptional Workforce: CEO Bank-Wide</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_ceo'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_operations" model="ir.rule">
+        <field name="name">Exceptional Workforce: People Operations Bank-Wide</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_people_operations'))]"/>
+    </record>
+
+    <record id="rule_exceptional_workforce_manager" model="ir.rule">
+        <field name="name">Exceptional Workforce: Manager Bank-Wide</field>
+        <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_manager'))]"/>
+    </record>
+</odoo>

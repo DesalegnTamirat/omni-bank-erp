@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="hr_resignation_reject_wizard_view_form" model="ir.ui.view">
+        <field name="name">hr.resignation.reject.wizard.form</field>
+        <field name="model">hr.resignation.reject.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Rejection Reason">
+                <group>
+                    <field name="rejection_reason" nolabel="1"
+                           placeholder="Please provide a reason for rejection..."
+                           required="1"/>
+                </group>
+                <footer>
+                    <button string="Confirm Rejection" type="object"
+                            name="action_confirm_reject" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

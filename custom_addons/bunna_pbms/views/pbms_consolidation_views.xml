@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- List View -->
+    <record id="view_pbms_consolidation_list" model="ir.ui.view">
+        <field name="name">pbms.consolidation.line.list</field>
+        <field name="model">pbms.consolidation.line</field>
+        <field name="arch" type="xml">
+            <list create="false" edit="false" delete="false">
+                <field name="org_unit_id"/>
+                <field name="district_id"/>
+                <field name="org_unit_type"/>
+                <field name="source_model"/>
+                <field name="account_name"/>
+                <field name="cycle_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed')"
+                       decoration-danger="state in ('returned', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+
+                <!-- Monthly fields -->
+                <field name="m01" optional="show" sum="Total" string="Jul" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m02" optional="show" sum="Total" string="Aug" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m03" optional="show" sum="Total" string="Sep" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m04" optional="show" sum="Total" string="Oct" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m05" optional="show" sum="Total" string="Nov" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m06" optional="show" sum="Total" string="Dec" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m07" optional="show" sum="Total" string="Jan" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m08" optional="show" sum="Total" string="Feb" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m09" optional="show" sum="Total" string="Mar" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m10" optional="show" sum="Total" string="Apr" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m11" optional="show" sum="Total" string="May" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="m12" optional="show" sum="Total" string="Jun" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+
+                <!-- Quarterly totals -->
+                <field name="quarter1_total" sum="Total" string="Q1 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter2_total" sum="Total" string="Q2 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter3_total" sum="Total" string="Q3 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="quarter4_total" sum="Total" string="Q4 Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+                <field name="annual_total" sum="Total" string="Annual Total" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+
+                <!-- Itemized category specific fields -->
+                <field name="line_count" optional="show" string="Lines"/>
+                <field name="total_estimated_amount" optional="show" sum="Total" string="Est. Amount" widget="float" digits="[16, 2]" options="{'no_symbol': True}"/>
+
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Kanban View -->
+    <record id="view_pbms_consolidation_kanban" model="ir.ui.view">
+        <field name="name">pbms.consolidation.line.kanban</field>
+        <field name="model">pbms.consolidation.line</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="source_model" class="o_kanban_mobile">
+                <field name="source_model"/>
+                <field name="org_unit_id"/>
+                <field name="account_name"/>
+                <field name="cycle_id"/>
+                <field name="state"/>
+                <field name="annual_total"/>
+                <field name="currency_id"/>
+                <field name="line_count"/>
+                <field name="total_estimated_amount"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-bold"><field name="org_unit_id"/></span>
+                                <field name="state" widget="badge"
+                                       decoration-success="state == 'approved'"
+                                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed')"
+                                       decoration-danger="state in ('returned', 'rejected')"
+                                       decoration-muted="state == 'draft'"/>
+                            </div>
+                            <div class="text-muted small mb-2">
+                                <field name="account_name"/> (<field name="cycle_id"/>)
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">Category:</span>
+                                <span class="fw-bold"><field name="source_model"/></span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted small">Annual Total:</span>
+                                <span class="fs-5 fw-bold text-end text-primary">
+                                    <field name="annual_total" widget="float"/>
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1" invisible="line_count == 0">
+                                <span class="text-muted small">Requirement Lines:</span>
+                                <span class="fw-bold"><field name="line_count"/></span>
+                            </div>
+                            <div class="d-flex justify-content-between" invisible="total_estimated_amount == 0.0">
+                                <span class="text-muted small">Est. Amount:</span>
+                                <span class="fw-bold"><field name="total_estimated_amount" widget="float"/></span>
+                            </div>
+                            <div class="mt-2 border-top pt-1">
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span>Q1: <field name="quarter1_total" widget="float"/></span>
+                                    <span>Q2: <field name="quarter2_total" widget="float"/></span>
+                                    <span>Q3: <field name="quarter3_total" widget="float"/></span>
+                                    <span>Q4: <field name="quarter4_total" widget="float"/></span>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Pivot View -->
+    <record id="view_pbms_consolidation_pivot" model="ir.ui.view">
+        <field name="name">pbms.consolidation.line.pivot</field>
+        <field name="model">pbms.consolidation.line</field>
+        <field name="arch" type="xml">
+            <pivot>
+                <field name="org_unit_type" type="row"/>
+                <field name="source_model" type="col"/>
+                <field name="annual_total" type="measure"/>
+                <field name="quarter1_total" type="measure"/>
+                <field name="quarter2_total" type="measure"/>
+                <field name="quarter3_total" type="measure"/>
+                <field name="quarter4_total" type="measure"/>
+                <field name="total_estimated_amount" type="measure"/>
+                <field name="line_count" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Graph View -->
+    <record id="view_pbms_consolidation_graph" model="ir.ui.view">
+        <field name="name">pbms.consolidation.line.graph</field>
+        <field name="model">pbms.consolidation.line</field>
+        <field name="arch" type="xml">
+            <graph type="bar" stacked="1">
+                <field name="district_id"/>
+                <field name="annual_total" type="measure"/>
+                <field name="quarter1_total" type="measure"/>
+                <field name="quarter2_total" type="measure"/>
+                <field name="quarter3_total" type="measure"/>
+                <field name="quarter4_total" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_pbms_consolidation_search" model="ir.ui.view">
+        <field name="name">pbms.consolidation.line.search</field>
+        <field name="model">pbms.consolidation.line</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="org_unit_id"/>
+                <field name="district_id"/>
+                <field name="cycle_id"/>
+                <field name="source_model"/>
+                <field name="account_name"/>
+                <field name="state"/>
+                <filter string="Approved Plans" name="filter_approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Pending Review" name="filter_pending" domain="[('state', 'in', ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed'))]"/>
+                <filter string="Draft / Returned" name="filter_draft" domain="[('state', 'in', ('draft', 'returned'))]"/>
+                <separator/>
+                <filter string="Work Unit" name="group_org_unit" context="{'group_by': 'org_unit_id'}"/>
+                <filter string="District" name="group_district" context="{'group_by': 'district_id'}"/>
+                <filter string="Unit Type" name="group_unit_type" context="{'group_by': 'org_unit_type'}"/>
+                <filter string="Planning Category" name="group_source_model" context="{'group_by': 'source_model'}"/>
+                <filter string="State" name="group_state" context="{'group_by': 'state'}"/>
+                <filter string="Cycle" name="group_cycle" context="{'group_by': 'cycle_id'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Actions -->
+    <record id="action_pbms_consolidation" model="ir.actions.act_window">
+        <field name="name">Bank-Wide Consolidation</field>
+        <field name="res_model">pbms.consolidation.line</field>
+        <field name="view_mode">kanban,list,pivot,graph</field>
+    </record>
+
+    <!-- Server Action: Export to Excel from Consolidation -->
+    <record id="action_server_export_consolidation_excel" model="ir.actions.server">
+        <field name="name">Export to Excel</field>
+        <field name="model_id" ref="model_pbms_consolidation_line"/>
+        <field name="binding_model_id" ref="model_pbms_consolidation_line"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+action = records.action_export_excel()
+        </field>
+    </record>
+</odoo>

@@ -40,6 +40,7 @@ export class MyAttendance extends Component {
             weeklyHoursFormatted: "00h 00m",
             monthlyHoursFormatted: "00h 00m",
             dailyBreakdown: [],
+            todaySessions: [],
             checkInTimeStr: "",
             checkInStatus: "",
             checkInRaw: false,
@@ -61,15 +62,10 @@ export class MyAttendance extends Component {
                 enable_checkout_restriction: true,
                 enable_saturday_halfday: true,
                 enable_lunch_break: false,
-                enable_auto_absence: true,
                 enable_checkin_gate: false,
-                morning_time: 8.0,
-                exit_time: 17.0,
                 dead_time: 0.25,
                 checkin_buffer: 0.5,
                 post_shift_grace_hours: 3.0,
-                saturday_exit_time: 12.0,
-                lunch_out_time: 12.0,
                 lunch_duration: 1.0,
                 lunch_grace_time: 0.25,
                 lateness_hours_violation_threshold: 4.0,
@@ -130,6 +126,19 @@ export class MyAttendance extends Component {
                             String(tHrs).padStart(2, '0') + ":" +
                             String(tMins).padStart(2, '0') + ":" +
                             String(tSecs).padStart(2, '0');
+                        this.state.hoursToday =
+                            String(tHrs).padStart(2, '0') + "h " +
+                            String(tMins).padStart(2, '0') + "m";
+
+                        // Synchronize today's row in weekly breakdown live
+                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length) {
+                            const todayRow = this.state.dailyBreakdown.find(d => d.is_today);
+                            if (todayRow) {
+                                todayRow.hours_formatted = this.state.hoursToday;
+                                todayRow.hours = totalSecsToday / 3600.0;
+                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / 8.0) * 100));
+                            }
+                        }
 
                         // WEEKLY TOTAL = completed sessions this week + live elapsed
                         const completedSecsWeek = Math.round((this.state.hoursCompletedWeek || 0) * 3600);
@@ -162,6 +171,12 @@ export class MyAttendance extends Component {
             }
         } else {
             this.state.liveWorkedTimer = "00:00:00";
+            const completedSecsToday = Math.round((this.state.hoursCompletedToday || 0) * 3600);
+            const tHrs = Math.floor(completedSecsToday / 3600);
+            const tMins = Math.floor((completedSecsToday % 3600) / 60);
+            this.state.hoursToday =
+                String(tHrs).padStart(2, '0') + "h " +
+                String(tMins).padStart(2, '0') + "m";
             this.state.todayTotalFormatted = this.state.hoursToday;
         }
     }
@@ -185,10 +200,15 @@ export class MyAttendance extends Component {
         this.state.employeeAvatar = data.employee_avatar || "";
         this.state.jobTitle = data.job_title || "Employee";
         this.state.departmentName = data.department_name || "";
-        this.state.hoursToday = this.formatFloatTime(data.hours_today || 0);
+        const hToday = data.hours_today || 0;
+        const hHrs = Math.floor(hToday);
+        const hMins = Math.floor((hToday - hHrs) * 60);
+        this.state.hoursToday = String(hHrs).padStart(2, '0') + "h " + String(hMins).padStart(2, '0') + "m";
+
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
         this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];
+        this.state.todaySessions = data.today_sessions || [];
         this.state.checkInTimeStr = data.check_in_time_str || "";
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;
@@ -232,11 +252,10 @@ export class MyAttendance extends Component {
                 this.state.settings.exit_time_str = this.floatToTimeStr(s.exit_time);
                 this.state.settings.saturday_exit_time_str = this.floatToTimeStr(s.saturday_exit_time);
                 this.state.settings.lunch_out_time_str = this.floatToTimeStr(s.lunch_out_time);
+                this.state.settings.checkin_grace_period_str = this.floatToTimeStr(s.checkin_grace_period);
                 this.state.settings.dead_time_str = this.floatToTimeStr(s.dead_time);
                 this.state.settings.checkin_buffer_str = this.floatToTimeStr(s.checkin_buffer);
-                this.state.settings.post_shift_grace_hours_str = this.floatToTimeStr(s.post_shift_grace_hours);
                 this.state.settings.lunch_duration_str = this.floatToTimeStr(s.lunch_duration);
-                this.state.settings.lunch_grace_time_str = this.floatToTimeStr(s.lunch_grace_time);
                 this.state.settings.lateness_hours_violation_threshold_str = this.floatToTimeStr(s.lateness_hours_violation_threshold);
             }
         } catch (e) {
@@ -259,11 +278,10 @@ export class MyAttendance extends Component {
                 exit_time: this.timeStrToFloat(s.exit_time_str !== undefined ? s.exit_time_str : s.exit_time),
                 saturday_exit_time: this.timeStrToFloat(s.saturday_exit_time_str !== undefined ? s.saturday_exit_time_str : s.saturday_exit_time),
                 lunch_out_time: this.timeStrToFloat(s.lunch_out_time_str !== undefined ? s.lunch_out_time_str : s.lunch_out_time),
+                checkin_grace_period: this.timeStrToFloat(s.checkin_grace_period_str !== undefined ? s.checkin_grace_period_str : s.checkin_grace_period),
                 dead_time: this.timeStrToFloat(s.dead_time_str !== undefined ? s.dead_time_str : s.dead_time),
                 checkin_buffer: this.timeStrToFloat(s.checkin_buffer_str !== undefined ? s.checkin_buffer_str : s.checkin_buffer),
-                post_shift_grace_hours: this.timeStrToFloat(s.post_shift_grace_hours_str !== undefined ? s.post_shift_grace_hours_str : s.post_shift_grace_hours),
                 lunch_duration: this.timeStrToFloat(s.lunch_duration_str !== undefined ? s.lunch_duration_str : s.lunch_duration),
-                lunch_grace_time: this.timeStrToFloat(s.lunch_grace_time_str !== undefined ? s.lunch_grace_time_str : s.lunch_grace_time),
                 lateness_hours_violation_threshold: this.timeStrToFloat(s.lateness_hours_violation_threshold_str !== undefined ? s.lateness_hours_violation_threshold_str : s.lateness_hours_violation_threshold),
             };
 
@@ -330,20 +348,17 @@ export class MyAttendance extends Component {
         this.state.settings.lunch_out_time_str = ev.target.value;
     }
 
+    onInputCheckinGracePeriod(ev) {
+        this.state.settings.checkin_grace_period_str = ev.target.value;
+    }
     onInputDeadTime(ev) {
         this.state.settings.dead_time_str = ev.target.value;
     }
     onInputCheckinBuffer(ev) {
         this.state.settings.checkin_buffer_str = ev.target.value;
     }
-    onInputPostShiftGraceHours(ev) {
-        this.state.settings.post_shift_grace_hours_str = ev.target.value;
-    }
     onInputLunchDuration(ev) {
         this.state.settings.lunch_duration_str = ev.target.value;
-    }
-    onInputLunchGraceTime(ev) {
-        this.state.settings.lunch_grace_time_str = ev.target.value;
     }
     onInputLatenessHoursThreshold(ev) {
         this.state.settings.lateness_hours_violation_threshold_str = ev.target.value;
@@ -357,6 +372,9 @@ export class MyAttendance extends Component {
     onToggleCheckinRestrict(ev) {
         this.state.settings.enable_checkin_restriction = ev.target.checked;
     }
+    onToggleCheckinGrace(ev) {
+        this.state.settings.enable_checkin_grace = ev.target.checked;
+    }
     onToggleCheckoutRestrict(ev) {
         this.state.settings.enable_checkout_restriction = ev.target.checked;
     }
@@ -368,9 +386,6 @@ export class MyAttendance extends Component {
     }
     onToggleLunchBreak(ev) {
         this.state.settings.enable_lunch_break = ev.target.checked;
-    }
-    onToggleAutoAbsence(ev) {
-        this.state.settings.enable_auto_absence = ev.target.checked;
     }
     onToggleCheckinGate(ev) {
         this.state.settings.enable_checkin_gate = ev.target.checked;

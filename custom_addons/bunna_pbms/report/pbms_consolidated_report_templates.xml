@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_pbms_consolidated_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="cycle">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div class="mb-4 pb-2" style="border-bottom: 2px solid #541718;">
+                            <h2 style="color: #541718; font-weight: 700;">Consolidated Annual Plan and Budget</h2>
+                            <h4 style="color: #425727; font-weight: 600;"><t t-esc="cycle.name"/></h4>
+                            <p class="text-muted mb-0">
+                                <strong>Period:</strong> <span t-esc="cycle.date_start"/> to <span t-esc="cycle.date_end"/> |
+                                <strong>Status:</strong> <span class="badge" style="background-color: #541718; color: #ffffff;" t-esc="dict(cycle._fields['state'].selection).get(cycle.state)"/>
+                            </p>
+                        </div>
+
+                        <t t-set="lines" t-value="request.env['pbms.consolidation.line'].search([('cycle_id', '=', cycle.id)])"/>
+
+                        <table class="table table-sm table-bordered" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background-color: #541718; color: #ffffff;">
+                                    <th>Org Unit</th>
+                                    <th>Format</th>
+                                    <th>Account</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Q1</th>
+                                    <th class="text-end">Q2</th>
+                                    <th class="text-end">Q3</th>
+                                    <th class="text-end">Q4</th>
+                                    <th class="text-end" style="background-color: #425727; color: #ffffff;">Annual Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="lines" t-as="line">
+                                    <td><span t-esc="line.org_unit_id.display_name"/></td>
+                                    <td><span t-esc="dict(line._fields['source_model'].selection).get(line.source_model)"/></td>
+                                    <td><span t-esc="line.account_name"/></td>
+                                    <td><span t-esc="dict(line._fields['state'].selection).get(line.state)"/></td>
+                                    <td class="text-end"><span t-esc="'{:,.0f}'.format(line.quarter1_total)"/></td>
+                                    <td class="text-end"><span t-esc="'{:,.0f}'.format(line.quarter2_total)"/></td>
+                                    <td class="text-end"><span t-esc="'{:,.0f}'.format(line.quarter3_total)"/></td>
+                                    <td class="text-end"><span t-esc="'{:,.0f}'.format(line.quarter4_total)"/></td>
+                                    <td class="text-end fw-bold" style="background-color: #F4F7EE;"><span t-esc="'{:,.0f}'.format(line.annual_total)"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

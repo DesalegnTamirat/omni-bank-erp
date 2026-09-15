@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Client Action for Dashboard -->
+    <record id="action_exit_interview_dashboard" model="ir.actions.client">
+        <field name="name">Exit Interview Dashboard</field>
+        <field name="tag">hr_resignation.exit_interview_dashboard</field>
+        <field name="target">main</field>
+    </record>
+
+    <!-- Menu Item (Assuming there is a parent menu for Resignation/Exit Interviews) -->
+    <!-- Let's find the existing menus in hr_resignation_views.xml or similar and attach it to the root or sub-menu -->
+    <menuitem id="menu_exit_interview_dashboard"
+              name="Dashboard"
+              parent="hr_resignation.menu_hr_resignation_reporting"
+              action="action_exit_interview_dashboard"
+              sequence="5"
+              active="False"
+              groups="hr.group_hr_manager"/>
+</odoo>

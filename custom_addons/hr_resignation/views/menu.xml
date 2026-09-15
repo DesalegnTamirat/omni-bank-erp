@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <menuitem id="menu_hr_resignation_root"
+              name="Resignation"
+              groups="hr_resignation.group_resignation_user"
+              sequence="45"
+              web_icon="hr_resignation,static/description/icon.png"/>
+
+    <menuitem id="menu_hr_resignation_dashboard"
+              name="Dashboard"
+              parent="menu_hr_resignation_root"
+              action="action_hr_resignation_dashboard"
+              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
+              sequence="5"/>
+
+    <menuitem id="menu_hr_resignation_my"
+              name="My Resignation Request"
+              parent="menu_hr_resignation_root"
+              action="action_hr_resignation_my"
+              groups="hr_resignation.group_resignation_user"
+              sequence="10"/>
+
+    <!--
+        Shown to users whose privilege is "Manager" OR "HR Manager" OR "POMD Officer" OR "Administrator".
+        - Manager: sees only their own direct reports (via record rule)
+        - HR Manager: also sees their direct reports (via separate record rule)
+        Both record rules use manager_id.user_id = user.id so each user
+        only sees their own team regardless of their privilege level.
+        POMD and Clearance Officers are excluded — they use their own menus.
+    -->
+    <menuitem id="menu_hr_resignation_team_restricted"
+              name="My Team's Resignations"
+              parent="menu_hr_resignation_root"
+              action="action_hr_resignation_team"
+              groups="hr_resignation.group_resignation_manager"
+              sequence="15"/>
+
+    <!--
+        ONLY shown to users whose privilege is exactly "Clearance Officer".
+        Points to the dedicated clearance task action which opens
+        hr.resignation.clearance directly — showing only lines where
+        the logged-in user is the responsible user.
+        POMD officers and HR use "All Resignation Requests" instead.
+    -->
+    <menuitem id="menu_hr_resignation_clearance_tasks"
+              name="My Clearance Tasks"
+              parent="menu_hr_resignation_root"
+              action="hr_resignation.action_my_clearance_tasks"
+              groups="hr_resignation.group_clearance_officer,hr_resignation.group_resignation_manager"
+              sequence="12"/>
+
+    <menuitem id="menu_hr_resignation_all"
+              name="All Resignation Requests"
+              parent="menu_hr_resignation_root"
+              action="action_hr_resignation_all"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,base.group_system"
+              sequence="12"/>
+
+
+    <menuitem id="menu_hr_resignation_reporting"
+              name="Reporting"
+              parent="menu_hr_resignation_root"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin,hr.group_hr_manager"
+              active="False"
+              sequence="80"/>
+
+    <menuitem id="menu_hr_exit_analytics"
+              name="Exit Interview Analytics"
+              parent="menu_hr_resignation_reporting"
+              action="action_hr_exit_analytics"
+              groups="hr_resignation.group_resignation_hr_manager,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_admin,hr.group_hr_manager"
+              active="False"
+              sequence="10"/>
+
+    <!-- ── Configuration ──────────────────────────────────────────────── -->
+    <menuitem id="menu_hr_resignation_config"
+              name="Configuration"
+              parent="menu_hr_resignation_root"
+              groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,hr_resignation.group_resignation_admin"
+              sequence="90"/>
+
+    <menuitem id="menu_separation_type"
+              name="Separation Types"
+              parent="menu_hr_resignation_config"
+              action="action_separation_type"
+              sequence="5"/>
+
+    <menuitem id="menu_clearance_template"
+              name="Clearance Work Units"
+              parent="menu_hr_resignation_config"
+              action="action_clearance_template"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_exit_interview_template"
+              name="Exit Interview Templates"
+              parent="menu_hr_resignation_config"
+              action="action_hr_exit_interview_template"
+              sequence="40"/>
+
+    <menuitem id="menu_hr_resignation_tax_bracket"
+              name="Tax Brackets"
+              parent="menu_hr_resignation_config"
+              action="action_hr_resignation_tax_bracket"
+              sequence="50"/>
+
+
+</odoo>
