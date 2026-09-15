@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_run_tree" model="ir.ui.view">
+        <field name="name">hr.payslip.run.list</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Batches">
+                <field name="number"/>
+                <field name="name"/>
+                <field name="period_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="payslip_count"/>
+                <field name="total_gross"/>
+                <field name="total_tax"/>
+                <field name="total_pension_ee"/>
+                <field name="total_net" decoration-bf="1"/>
+                <field name="exception_count" string="Exceptions"/>
+                <field name="state" widget="badge" decoration-info="state in ['draft', 'simulated']" decoration-warning="state in ['initiated', 'verified']" decoration-success="state in ['approved', 'posted', 'disbursed']" decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payslip_run_form" model="ir.ui.view">
+        <field name="name">hr.payslip.run.form</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Batch Payrun">
+                <header>
+                    <button string="Compute All Payslips" name="action_compute_batch" type="object" class="btn-primary" invisible="state in ['approved', 'posted', 'disbursed', 'cancelled']"/>
+                    <button string="Run Simulation Dry-Run" name="action_simulate" type="object" class="btn-info" invisible="state not in ['draft', 'simulated']"/>
+                    <button string="Level 1: Initiate (HR Accountant)" name="action_initiate" type="object" class="btn-primary" invisible="state not in ['draft', 'simulated']"/>
+                    <button string="Level 2: Verify (Senior Controller)" name="action_verify" type="object" class="btn-warning" invisible="state != 'initiated'" groups="payroll.group_payroll_verifier"/>
+                    <button string="Level 3: Final Approval (Division Manager)" name="action_approve" type="object" class="btn-success" invisible="state != 'verified'" groups="payroll.group_payroll_manager"/>
+                    <button string="Post Accounting to GL" name="action_post_gl" type="object" class="btn-secondary" invisible="state != 'approved'" groups="payroll.group_payroll_manager"/>
+                    <button string="Generate CBS Direct Credit Batch" name="action_generate_cbs_batch" type="object" class="btn-success" invisible="state not in ['approved', 'posted']" groups="payroll.group_payroll_manager"/>
+                    <button string="Reset to Draft" name="action_reset_draft" type="object" invisible="state not in ['simulated', 'initiated', 'verified', 'cancelled']"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,simulated,initiated,verified,approved,posted,disbursed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert" invisible="not has_critical_blockers">
+                        <strong>Critical Approval Blocker:</strong> One or more payslips in this batch contain unresolved critical diagnostic exceptions. Final verification and approval are blocked until acknowledged.
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. September 2026 Commercial Payroll Batch"/></h1>
+                        <h3><field name="number"/></h3>
+                    </div>
+                    <group>
+                        <group string="Period &amp; Structure">
+                            <field name="period_id" options="{'no_create': True}"/>
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                            <field name="struct_id" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Operating Unit &amp; Company">
+                            <field name="operating_unit_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="has_critical_blockers" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <!-- Financial Aggregate Metrics -->
+                    <div class="row my-3">
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Total Staff</small>
+                                <h4 class="mb-0"><field name="payslip_count" readonly="1"/></h4>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Total Basic</small>
+                                <h4 class="mb-0">ETB <field name="total_basic" readonly="1"/></h4>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Total Gross</small>
+                                <h4 class="mb-0 text-primary">ETB <field name="total_gross" readonly="1"/></h4>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Tax Withholding</small>
+                                <h4 class="mb-0 text-danger">ETB <field name="total_tax" readonly="1"/></h4>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Pension (18%)</small>
+                                <h4 class="mb-0 text-info">ETB <field name="total_pension_ee" readonly="1"/></h4>
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <div class="card text-center bg-light p-2 border">
+                                <small class="text-muted">Net Disbursement</small>
+                                <h4 class="mb-0 text-success font-weight-bold">ETB <field name="total_net" readonly="1"/></h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3-Tier Governance & Audit Block (FR-PAY-032) -->
+                    <div class="card mb-3 p-3 bg-light">
+                        <h6 style="color: #4a148c; font-weight: bold;">Multi-Tier Governance &amp; Segregation of Duties Audit</h6>
+                        <div class="row" style="font-size: 12px;">
+                            <div class="col-4 border-end">
+                                <strong>Level 1: Initiation</strong><br/>
+                                Initiated By: <field name="initiator_id" readonly="1"/><br/>
+                                Timestamp: <field name="initiation_date" readonly="1"/>
+                            </div>
+                            <div class="col-4 border-end">
+                                <strong>Level 2: Verification</strong><br/>
+                                Verified By: <field name="verifier_id" readonly="1"/><br/>
+                                Timestamp: <field name="verification_date" readonly="1"/>
+                            </div>
+                            <div class="col-4">
+                                <strong>Level 3: Final Approval</strong><br/>
+                                Approved By: <field name="approver_id" readonly="1"/><br/>
+                                Timestamp: <field name="approval_date" readonly="1"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <page string="Payslips in Batch" name="payslips">
+                            <button string="Generate Payslips by Employees Wizard" name="%(payroll.action_hr_payslip_by_employees)d" type="action" class="btn-primary mb-2" invisible="state in ['approved', 'posted', 'disbursed', 'cancelled']"/>
+                            <field name="slip_ids">
+                                <list decoration-danger="has_critical_exceptions">
+                                    <field name="number"/>
+                                    <field name="employee_id"/>
+                                    <field name="basic_wage"/>
+                                    <field name="gross_wage"/>
+                                    <field name="income_tax"/>
+                                    <field name="pension_ee"/>
+                                    <field name="net_wage" decoration-bf="1"/>
+                                    <field name="bank_account"/>
+                                    <field name="has_critical_exceptions" string="Blocker"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Downstream Integrations" name="integrations">
+                            <group>
+                                <group string="General Ledger (Accounting)">
+                                    <field name="move_ref" readonly="1"/>
+                                </group>
+                                <group string="Banking &amp; Payment (CBS)">
+                                    <field name="payment_batch_id" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Notes" name="notes">
+                            <field name="notes" placeholder="Payrun instructions or batch memo..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payslip_run" model="ir.actions.act_window">
+        <field name="name">Payroll Batches (Payruns)</field>
+        <field name="res_model">hr.payslip.run</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payslip_by_employees" model="ir.ui.view">
+        <field name="name">hr_payslip_by_employees.form</field>
+        <field name="model">hr.payslip.employees</field>
+        <field name="arch" type="xml">
+            <form string="Generate Batch Payslips">
+                <group>
+                    <field name="department_id" options="{'no_create': True}"/>
+                    <field name="structure_id" options="{'no_create': True}"/>
+                </group>
+                <group string="Target Employees">
+                    <field name="employee_ids" nolabel="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="job_id"/>
+                            <field name="department_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </list>
+                    </field>
+                </group>
+                <footer>
+                    <button string="Generate Payslips" name="compute_sheet" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payslip_by_employees" model="ir.actions.act_window">
+        <field name="name">Generate Payslips by Employees</field>
+        <field name="res_model">hr.payslip.employees</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

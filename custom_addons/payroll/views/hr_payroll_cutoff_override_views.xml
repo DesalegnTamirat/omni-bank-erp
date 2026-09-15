@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payroll_cutoff_override_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.cutoff.override.list</field>
+        <field name="model">hr.payroll.cutoff.override</field>
+        <field name="arch" type="xml">
+            <list string="Cut-Off Overrides">
+                <field name="name"/>
+                <field name="period_id"/>
+                <field name="employee_id"/>
+                <field name="override_category"/>
+                <field name="financial_impact_estimate"/>
+                <field name="initiator_id"/>
+                <field name="state" widget="badge" decoration-info="state == 'submitted'" decoration-warning="state == 'verified'" decoration-success="state == 'approved'" decoration-danger="state == 'rejected'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_cutoff_override_form" model="ir.ui.view">
+        <field name="name">hr.payroll.cutoff.override.form</field>
+        <field name="model">hr.payroll.cutoff.override</field>
+        <field name="arch" type="xml">
+            <form string="Cut-Off Exception Override">
+                <header>
+                    <button name="action_verify" string="Verify (Sr Controller)" type="object" class="btn-warning" invisible="state != 'submitted'" groups="payroll.group_payroll_verifier"/>
+                    <button name="action_approve" string="Authorize (Division Manager)" type="object" class="btn-success" invisible="state != 'verified'" groups="payroll.group_payroll_manager"/>
+                    <button name="action_reject" string="Reject Request" type="object" class="btn-danger" invisible="state not in ['submitted', 'verified']" groups="payroll.group_payroll_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="submitted,verified,approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Target Pay Period &amp; Employee">
+                            <field name="period_id"/>
+                            <field name="employee_id"/>
+                        </group>
+                        <group string="Category &amp; Financial Impact">
+                            <field name="override_category"/>
+                            <field name="financial_impact_estimate"/>
+                        </group>
+                    </group>
+                    <group string="Business Justification &amp; Audit Rationale">
+                        <field name="justification" nolabel="1"/>
+                    </group>
+                    <group string="Approval Audit Trail">
+                        <group>
+                            <field name="initiator_id" readonly="1"/>
+                            <field name="request_date" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="verifier_id" readonly="1"/>
+                            <field name="verification_date" readonly="1"/>
+                            <field name="approver_id" readonly="1"/>
+                            <field name="approval_date" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_cutoff_override" model="ir.actions.act_window">
+        <field name="name">Cut-Off Overrides</field>
+        <field name="res_model">hr.payroll.cutoff.override</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

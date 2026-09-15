@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_employee_form_payroll_inherit" model="ir.ui.view">
+        <field name="name">hr.employee.form.payroll.inherit</field>
+        <field name="model">hr.employee</field>
+        <field name="inherit_id" ref="hr.view_employee_form"/>
+        <field name="arch" type="xml">
+            <!-- Smart Button for Payslips -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_employee_payslips" type="object" class="oe_stat_button" icon="fa-money">
+                    <field name="payslip_count" widget="statinfo" string="Payslips"/>
+                </button>
+            </xpath>
+
+            <!-- Payroll Tab inside Employee Form -->
+            <xpath expr="//notebook" position="inside">
+                <page string="Payroll &amp; Compensation" name="payroll_tab">
+                    <group>
+                        <group string="Latest Compensation Metrics">
+                            <field name="latest_net_wage"/>
+                            <field name="active_acting_assignment_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Historical Payslips" name="payslips">
+                            <field name="payslip_ids" readonly="1">
+                                <list>
+                                    <field name="number"/>
+                                    <field name="date_from"/>
+                                    <field name="date_to"/>
+                                    <field name="basic_wage"/>
+                                    <field name="gross_wage"/>
+                                    <field name="income_tax"/>
+                                    <field name="net_wage" decoration-bf="1"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Acting Role Assignments" name="acting_assignments">
+                            <field name="acting_assignment_ids" readonly="1">
+                                <list>
+                                    <field name="acting_job_id"/>
+                                    <field name="start_date"/>
+                                    <field name="elapsed_months"/>
+                                    <field name="current_cycle_status" widget="badge"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Hardship History (FR-PAY-009)" name="hardship_history">
+                            <field name="hardship_history_ids" readonly="1">
+                                <list>
+                                    <field name="effective_date"/>
+                                    <field name="branch_id"/>
+                                    <field name="hardship_rate_id"/>
+                                    <field name="rate_percentage"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Retroactive Adjustments (FR-PAY-029)" name="retroactive_adjustments">
+                            <field name="retroactive_adjustment_ids" readonly="1">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="reason"/>
+                                    <field name="effective_date"/>
+                                    <field name="total_arrears"/>
+                                    <field name="total_recoveries"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_acting_assignment_tree" model="ir.ui.view">
+        <field name="name">hr.acting.assignment.list</field>
+        <field name="model">hr.acting.assignment</field>
+        <field name="arch" type="xml">
+            <list string="Managerial Acting Assignments">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="acting_job_id"/>
+                <field name="start_date"/>
+                <field name="elapsed_months"/>
+                <field name="current_cycle_status" widget="badge" decoration-warning="current_cycle_status == 'month_1_buffer'" decoration-success="current_cycle_status == 'active_paying'" decoration-danger="current_cycle_status == 'month_7_capped'"/>
+                <field name="payout_multiplier"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'approved'" decoration-danger="state == 'capped'" decoration-muted="state == 'completed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_acting_assignment_form" model="ir.ui.view">
+        <field name="name">hr.acting.assignment.form</field>
+        <field name="model">hr.acting.assignment</field>
+        <field name="arch" type="xml">
+            <form string="Managerial Acting Assignment">
+                <header>
+                    <button name="action_approve" string="Approve Assignment" type="object" class="btn-primary" invisible="state != 'draft'" groups="payroll.group_payroll_manager"/>
+                    <button name="action_terminate" string="Terminate Assignment" type="object" class="btn-secondary" invisible="state not in ['approved', 'capped']" groups="payroll.group_payroll_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approved,capped,completed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="alert" invisible="current_cycle_status != 'month_7_capped'">
+                        <strong>Policy Threshold Exceeded:</strong> This acting assignment has reached or exceeded 7 months. Automated payroll payouts are ceased per bank governance. Formalize appointment or conclude assignment.
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Role &amp; Assignment">
+                            <field name="employee_id"/>
+                            <field name="acting_job_id"/>
+                            <field name="acting_grade_id"/>
+                        </group>
+                        <group string="Duration &amp; Policy Status (FR-PAY-028)">
+                            <field name="start_date"/>
+                            <field name="end_date"/>
+                            <field name="elapsed_months"/>
+                            <field name="current_cycle_status"/>
+                            <field name="payout_multiplier"/>
+                        </group>
+                    </group>
+                    <group string="Financial Terms">
+                        <field name="fixed_allowance_amount"/>
+                    </group>
+                    <group string="Terms &amp; Justification">
+                        <field name="notes" placeholder="Specify acting responsibilities and authority terms..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_acting_assignment" model="ir.actions.act_window">
+        <field name="name">Acting Assignments</field>
+        <field name="res_model">hr.acting.assignment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

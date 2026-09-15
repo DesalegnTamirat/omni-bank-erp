@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_payroll_dashboard" model="ir.actions.client">
+        <field name="name">Payroll Executive Dashboard</field>
+        <field name="tag">payroll_dashboard_tag</field>
+    </record>
+</odoo>

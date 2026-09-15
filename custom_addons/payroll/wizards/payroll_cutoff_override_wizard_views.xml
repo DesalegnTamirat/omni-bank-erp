@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_payroll_cutoff_override_wizard_form" model="ir.ui.view">
+        <field name="name">payroll.cutoff.override.wizard.form</field>
+        <field name="model">payroll.cutoff.override.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Request Post-Cutoff Override">
+                <group>
+                    <group>
+                        <field name="period_id" options="{'no_create': True}"/>
+                        <field name="employee_id" options="{'no_create': True}"/>
+                    </group>
+                    <group>
+                        <field name="override_category"/>
+                        <field name="financial_impact_estimate"/>
+                    </group>
+                </group>
+                <group string="Business Justification &amp; Audit Rationale">
+                    <field name="justification" nolabel="1" placeholder="Provide clear business justification for post-cutoff override..."/>
+                </group>
+                <footer>
+                    <button string="Submit for Approval" name="action_submit_override" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_payroll_cutoff_override_wizard" model="ir.actions.act_window">
+        <field name="name">Request Cutoff Override</field>
+        <field name="res_model">payroll.cutoff.override.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

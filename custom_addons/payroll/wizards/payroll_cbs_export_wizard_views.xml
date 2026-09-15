@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_payroll_cbs_export_wizard_form" model="ir.ui.view">
+        <field name="name">payroll.cbs.export.wizard.form</field>
+        <field name="model">payroll.cbs.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Export CBS Direct Credit Payment File">
+                <group>
+                    <field name="batch_id" readonly="1"/>
+                    <field name="export_format"/>
+                </group>
+                <footer>
+                    <button string="Generate Export File" name="action_export" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_payroll_cbs_export_wizard" model="ir.actions.act_window">
+        <field name="name">Export CBS Payment File</field>
+        <field name="res_model">payroll.cbs.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

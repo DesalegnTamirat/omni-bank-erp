@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payroll_variance_document">
+        <t t-call="web.external_layout">
+            <div class="page" style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;">
+                <div class="text-center mb-4">
+                    <h3 style="color: #c2185b; font-weight: bold;">PAYROLL VARIANCE &amp; EXCEPTION AUDIT REPORT (FR-PAY-036)</h3>
+                    <h5>Batch: <t t-esc="o.name"/> (<t t-esc="o.number"/>)</h5>
+                </div>
+
+                <table class="table table-sm table-bordered">
+                    <thead class="table-warning">
+                        <tr>
+                            <th>Employee</th>
+                            <th>Anomaly Type</th>
+                            <th>Severity</th>
+                            <th class="text-end">Prior Net</th>
+                            <th class="text-end">Current Net</th>
+                            <th class="text-end">Variance %</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="o.slip_ids.mapped('exception_ids')" t-as="exc">
+                            <tr>
+                                <td><strong><t t-esc="exc.employee_id.name"/></strong></td>
+                                <td><t t-esc="exc.exception_type"/></td>
+                                <td>
+                                    <span t-if="exc.severity == 'critical'" class="badge bg-danger">CRITICAL</span>
+                                    <span t-elif="exc.severity == 'warning'" class="badge bg-warning text-dark">WARNING</span>
+                                    <span t-else="" class="badge bg-info">INFO</span>
+                                </td>
+                                <td class="text-end"><t t-esc="'%.2f' % exc.previous_net"/></td>
+                                <td class="text-end font-weight-bold"><t t-esc="'%.2f' % exc.current_net"/></td>
+                                <td class="text-end text-danger"><t t-esc="'%.2f' % exc.variance_percentage"/>%</td>
+                                <td><t t-esc="exc.description"/></td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_payroll_variance">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="payroll.report_payroll_variance_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>

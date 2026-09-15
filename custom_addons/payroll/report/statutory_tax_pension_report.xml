@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_statutory_tax_pension_document">
+        <t t-call="web.external_layout">
+            <div class="page" style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;">
+                <div class="text-center mb-4">
+                    <h3 style="color: #004d40; font-weight: bold;">ETHIOPIAN STATUTORY TAX &amp; PENSION REMITTANCE SCHEDULE</h3>
+                    <h5>Ministry of Revenues &amp; Public Servants / Private Organization Employees Pension Agency</h5>
+                    <p class="text-muted">Batch: <t t-esc="o.name"/> | Period: <t t-esc="o.date_start"/> to <t t-esc="o.date_end"/></p>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-4 p-2 text-center bg-light border">
+                        <strong>Total Tax Remittance:</strong><br/>
+                        <span class="fs-6 font-weight-bold" style="color: #d32f2f;">ETB <t t-esc="'%.2f' % o.total_tax"/></span>
+                    </div>
+                    <div class="col-4 p-2 text-center bg-light border">
+                        <strong>Employee Pension (7%):</strong><br/>
+                        <span class="fs-6 font-weight-bold">ETB <t t-esc="'%.2f' % o.total_pension_ee"/></span>
+                    </div>
+                    <div class="col-4 p-2 text-center bg-light border">
+                        <strong>Total Pension Pool (18%):</strong><br/>
+                        <span class="fs-6 font-weight-bold" style="color: #1976d2;">ETB <t t-esc="'%.2f' % (o.total_pension_ee + o.total_pension_er)"/></span>
+                    </div>
+                </div>
+
+                <table class="table table-sm table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Employee Name</th>
+                            <th>TIN Number</th>
+                            <th class="text-end">Basic Wage</th>
+                            <th class="text-end">Taxable Income</th>
+                            <th class="text-end">Income Tax</th>
+                            <th class="text-end">Pension EE (7%)</th>
+                            <th class="text-end">Pension ER (11%)</th>
+                            <th class="text-end">Total Pension (18%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.slip_ids" t-as="slip">
+                            <td><t t-esc="slip_index + 1"/></td>
+                            <td><t t-esc="slip.employee_id.name"/></td>
+                            <td><t t-esc="slip.employee_tin or slip.employee_id.tin or '-'"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.basic_wage"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % (slip.gross_wage - 2200.0 if slip.gross_wage &gt; 2200 else slip.gross_wage)"/></td>
+                            <td class="text-end text-danger"><t t-esc="'%.2f' % slip.income_tax"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.pension_ee"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.pension_er"/></td>
+                            <td class="text-end font-weight-bold"><t t-esc="'%.2f' % (slip.pension_ee + slip.pension_er)"/></td>
+                        </tr>
+                        <tr class="table-secondary font-weight-bold">
+                            <td colspan="3">TOTAL REMITTANCE:</td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_basic"/></td>
+                            <td class="text-end">-</td>
+                            <td class="text-end text-danger">ETB <t t-esc="'%.2f' % o.total_tax"/></td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_pension_ee"/></td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_pension_er"/></td>
+                            <td class="text-end text-primary">ETB <t t-esc="'%.2f' % (o.total_pension_ee + o.total_pension_er)"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_statutory_tax_pension">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="payroll.report_statutory_tax_pension_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>

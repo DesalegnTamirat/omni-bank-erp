@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Cron 1: Automated Cut-Off Date Lock Monitor (FR-PAY-030) -->
+        <record id="ir_cron_payroll_cutoff_enforcer" model="ir.cron">
+            <field name="name">Payroll: Enforce Monthly Cut-Off Locks</field>
+            <field name="model_id" ref="model_hr_payroll_period"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_enforce_cutoff_locks()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron 2: Acting Allowance Duration Monitor (FR-PAY-027, 028) -->
+        <record id="ir_cron_acting_allowance_monitor" model="ir.cron">
+            <field name="name">Payroll: Monitor Acting Assignment Durations</field>
+            <field name="model_id" ref="model_hr_acting_assignment"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_check_acting_durations()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron 3: Ingest Pending Payloads from Attendance and Discipline (FR-PAY-003, 023) -->
+        <record id="ir_cron_ingest_pending_payloads" model="ir.cron">
+            <field name="name">Payroll: Ingest External ERP Payloads</field>
+            <field name="model_id" ref="model_hr_payslip"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_sync_pending_erp_payloads()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Cron 4: Pre-flight Payroll Exception Scanner (FR-PAY-036) -->
+        <record id="ir_cron_payroll_exception_scanner" model="ir.cron">
+            <field name="name">Payroll: Pre-Flight Exception Scanner</field>
+            <field name="model_id" ref="model_hr_payroll_exception"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_run_exception_scanner()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

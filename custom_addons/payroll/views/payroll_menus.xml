@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Root Menu -->
+    <menuitem id="menu_payroll_root"
+              name="Payroll"
+              sequence="45"
+              web_icon="payroll,static/description/icon.png"
+              groups="payroll.group_payroll_user,payroll.group_payroll_auditor"/>
+
+    <!-- 1. Executive Dashboard -->
+    <menuitem id="menu_payroll_dashboard"
+              name="Dashboard"
+              parent="menu_payroll_root"
+              action="action_payroll_dashboard"
+              sequence="5"/>
+
+    <!-- 2. Operations Menu -->
+    <menuitem id="menu_payroll_operations"
+              name="Payroll Operations"
+              parent="menu_payroll_root"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_payslip_run"
+              name="Payroll Batches (Payruns)"
+              parent="menu_payroll_operations"
+              action="action_hr_payslip_run"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_payslip"
+              name="Employee Payslips"
+              parent="menu_payroll_operations"
+              action="action_hr_payslip"
+              sequence="20"/>
+
+    <menuitem id="menu_payroll_simulation"
+              name="Dry-Run Simulation"
+              parent="menu_payroll_operations"
+              action="action_payroll_simulation_wizard"
+              sequence="30"/>
+
+    <menuitem id="menu_payroll_payment_batch"
+              name="CBS Payment Batches"
+              parent="menu_payroll_operations"
+              action="action_payroll_payment_batch"
+              sequence="40"/>
+
+    <!-- 3. Lifecycle Adjustments Menu -->
+    <menuitem id="menu_payroll_lifecycle"
+              name="Lifecycle Adjustments"
+              parent="menu_payroll_root"
+              sequence="20"/>
+
+    <menuitem id="menu_hr_acting_assignment"
+              name="Acting Role Assignments"
+              parent="menu_payroll_lifecycle"
+              action="action_hr_acting_assignment"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_payroll_retroactive"
+              name="Retroactive Adjustments (Arrears/Recoveries)"
+              parent="menu_payroll_lifecycle"
+              action="action_hr_payroll_retroactive"
+              sequence="20"/>
+
+    <menuitem id="menu_hr_hardship_history"
+              name="Hardship Location Ledger"
+              parent="menu_payroll_lifecycle"
+              action="action_hr_hardship_allowance_history"
+              sequence="30"/>
+
+    <menuitem id="menu_hr_payroll_cutoff_override"
+              name="Post-Cutoff Overrides"
+              parent="menu_payroll_lifecycle"
+              action="action_hr_payroll_cutoff_override"
+              sequence="40"/>
+
+    <!-- 4. Governance & Diagnostics Menu -->
+    <menuitem id="menu_payroll_governance"
+              name="Audit &amp; Diagnostics"
+              parent="menu_payroll_root"
+              sequence="30"/>
+
+    <menuitem id="menu_hr_payroll_exception"
+              name="Pre-Flight Exceptions &amp; Variances"
+              parent="menu_payroll_governance"
+              action="action_hr_payroll_exception"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_payroll_audit_log"
+              name="Immutable Change Logs"
+              parent="menu_payroll_governance"
+              action="action_hr_payroll_audit_log"
+              sequence="20"/>
+
+    <!-- 5. Configuration Menu -->
+    <menuitem id="menu_payroll_configuration"
+              name="Configuration"
+              parent="menu_payroll_root"
+              sequence="50"
+              groups="payroll.group_payroll_manager"/>
+
+    <menuitem id="menu_hr_payroll_period"
+              name="Payroll Accounting Periods &amp; Cut-Off"
+              parent="menu_payroll_configuration"
+              action="action_hr_payroll_period"
+              sequence="10"/>
+
+    <menuitem id="menu_hr_payroll_structure"
+              name="Salary Structures"
+              parent="menu_payroll_configuration"
+              action="action_hr_payroll_structure"
+              sequence="20"/>
+
+    <menuitem id="menu_hr_salary_rule"
+              name="Salary Rules"
+              parent="menu_payroll_configuration"
+              action="action_hr_salary_rule"
+              sequence="30"/>
+
+    <menuitem id="menu_hr_salary_rule_category"
+              name="Salary Rule Categories"
+              parent="menu_payroll_configuration"
+              action="action_hr_salary_rule_category"
+              sequence="40"/>
+
+    <menuitem id="menu_hr_hardship_rate"
+              name="Hardship Allowance Tiers"
+              parent="menu_payroll_configuration"
+              action="action_hr_hardship_allowance_rate"
+              sequence="50"/>
+</odoo>

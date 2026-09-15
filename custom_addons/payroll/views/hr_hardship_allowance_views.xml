@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Hardship Rate Tier Views -->
+    <record id="view_hr_hardship_allowance_rate_tree" model="ir.ui.view">
+        <field name="name">hr.hardship.allowance.rate.list</field>
+        <field name="model">hr.hardship.allowance.rate</field>
+        <field name="arch" type="xml">
+            <list string="Hardship Allowance Tiers">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="tier_level"/>
+                <field name="rate_percentage"/>
+                <field name="tax_exempt" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_hardship_allowance_rate_form" model="ir.ui.view">
+        <field name="name">hr.hardship.allowance.rate.form</field>
+        <field name="model">hr.hardship.allowance.rate</field>
+        <field name="arch" type="xml">
+            <form string="Hardship Allowance Rate Specification">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Tier Name"/></h1>
+                        <h3><field name="code"/></h3>
+                    </div>
+                    <group>
+                        <group string="Rate Parameters">
+                            <field name="tier_level"/>
+                            <field name="rate_percentage"/>
+                        </group>
+                        <group string="Tax Treatment &amp; Status">
+                            <field name="tax_exempt"/>
+                            <field name="tax_exempt_limit" invisible="not tax_exempt"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Policy justification and geographical criteria..."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_hardship_allowance_rate" model="ir.actions.act_window">
+        <field name="name">Hardship Allowance Rates</field>
+        <field name="res_model">hr.hardship.allowance.rate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Hardship History Views -->
+    <record id="view_hr_hardship_allowance_history_tree" model="ir.ui.view">
+        <field name="name">hr.hardship.allowance.history.list</field>
+        <field name="model">hr.hardship.allowance.history</field>
+        <field name="arch" type="xml">
+            <list string="Hardship Allowance Audit Ledger">
+                <field name="effective_date"/>
+                <field name="employee_id"/>
+                <field name="branch_id"/>
+                <field name="hardship_rate_id"/>
+                <field name="rate_percentage"/>
+                <field name="initiator_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_hr_hardship_allowance_history" model="ir.actions.act_window">
+        <field name="name">Hardship Allowance History</field>
+        <field name="res_model">hr.hardship.allowance.history</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

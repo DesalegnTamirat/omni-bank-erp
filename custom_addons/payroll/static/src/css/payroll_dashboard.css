@@ -1,0 +1,60 @@
+/* Bunna Bank Enterprise Payroll Dashboard Styling */
+.o_payroll_dashboard {
+    background-color: #f8f9fa;
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.payroll-stat-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-left: 4px solid #6a1b9a;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.payroll-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.payroll-stat-card.card-gross {
+    border-left-color: #1976d2;
+}
+
+.payroll-stat-card.card-net {
+    border-left-color: #2e7d32;
+}
+
+.payroll-stat-card.card-tax {
+    border-left-color: #d32f2f;
+}
+
+.payroll-stat-card.card-pension {
+    border-left-color: #f57c00;
+}
+
+.stat-number {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #212529;
+    margin-top: 6px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.payroll-section-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    margin-top: 20px;
+}

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payroll_period_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.period.list</field>
+        <field name="model">hr.payroll.period</field>
+        <field name="arch" type="xml">
+            <list string="Payroll Periods">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="cutoff_date"/>
+                <field name="cutoff_locked" widget="boolean_toggle"/>
+                <field name="payslip_count"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'open'" decoration-warning="state == 'cutoff_locked'" decoration-muted="state == 'closed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_period_form" model="ir.ui.view">
+        <field name="name">hr.payroll.period.form</field>
+        <field name="model">hr.payroll.period</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Accounting Period">
+                <header>
+                    <button name="action_open" string="Open Period" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_lock_cutoff" string="Enforce Cut-Off Lock" type="object" class="btn-warning" invisible="state != 'open'"/>
+                    <button name="action_unlock_cutoff" string="Release Cut-Off Lock" type="object" class="btn-secondary" invisible="state != 'cutoff_locked'" groups="payroll.group_payroll_manager"/>
+                    <button name="action_close" string="Finalize &amp; Close Period" type="object" class="btn-success" invisible="state not in ['open', 'cutoff_locked']" groups="payroll.group_payroll_manager"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,open,cutoff_locked,closed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="e.g. September 2026 Payroll Cycle"/></h1>
+                        <h3><field name="code"/></h3>
+                    </div>
+                    <group>
+                        <group string="Period Boundaries">
+                            <field name="date_start"/>
+                            <field name="date_end"/>
+                        </group>
+                        <group string="Cut-Off Governance">
+                            <field name="cutoff_date"/>
+                            <field name="cutoff_locked"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group string="Notes &amp; Directives">
+                        <field name="notes" nolabel="1" placeholder="Add operational notes or cut-off guidelines..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_period" model="ir.actions.act_window">
+        <field name="name">Payroll Periods</field>
+        <field name="res_model">hr.payroll.period</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

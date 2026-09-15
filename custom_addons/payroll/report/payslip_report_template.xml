@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payslip_document">
+        <t t-call="web.external_layout">
+            <t t-set="o" t-value="o.with_context(lang=o.employee_id.user_id.lang or 'en_US')"/>
+            <div class="page" style="font-family: 'Segoe UI', Arial, sans-serif;">
+                <div class="row mb-4">
+                    <div class="col-8">
+                        <h2 style="color: #6a1b9a; font-weight: bold;">PAYSLIP / SALARY ADVICE</h2>
+                        <h5 class="text-muted"><t t-esc="o.name"/></h5>
+                    </div>
+                    <div class="col-4 text-end">
+                        <span class="badge rounded-pill bg-success p-2" t-if="o.state in ['done', 'paid']">CONFIRMED &amp; PAID</span>
+                        <span class="badge rounded-pill bg-warning p-2" t-else="">DRAFT / SIMULATED</span>
+                        <div class="mt-2 text-muted">Ref: <strong><t t-esc="o.number"/></strong></div>
+                    </div>
+                </div>
+
+                <!-- Employee Header Information Table -->
+                <table class="table table-sm table-bordered mb-4" style="font-size: 13px;">
+                    <tbody>
+                        <tr class="table-light">
+                            <td style="width: 25%;"><strong>Employee Name:</strong></td>
+                            <td style="width: 25%;"><t t-esc="o.employee_id.name"/></td>
+                            <td style="width: 25%;"><strong>Staff ID / Badge:</strong></td>
+                            <td style="width: 25%;"><t t-esc="o.employee_id.barcode or o.employee_id.id"/></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Job Position:</strong></td>
+                            <td><t t-esc="o.employee_id.job_id.name or 'N/A'"/></td>
+                            <td><strong>Department / Branch:</strong></td>
+                            <td><t t-esc="o.employee_id.department_id.name or 'Head Office'"/></td>
+                        </tr>
+                        <tr class="table-light">
+                            <td><strong>Pay Period:</strong></td>
+                            <td><t t-esc="o.date_from"/> to <t t-esc="o.date_to"/></td>
+                            <td><strong>Bank Account Number:</strong></td>
+                            <td><t t-esc="o.bank_account or o.employee_id.salary_account or 'N/A'"/></td>
+                        </tr>
+                        <tr>
+                            <td><strong>TIN Number:</strong></td>
+                            <td><t t-esc="o.employee_tin or o.employee_id.tin or 'N/A'"/></td>
+                            <td><strong>Operating Unit:</strong></td>
+                            <td><t t-esc="o.operating_unit_id.name or o.company_id.name"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Proration Sub-Period Slices (If applicable) -->
+                <t t-if="len(o.segment_ids) &gt; 1 or o.segment_ids[0].segment_type != 'standard'">
+                    <h6 style="color: #4a148c; font-weight: bold; border-bottom: 2px solid #ce93d8; padding-bottom: 4px;">
+                        Mid-Month Proration &amp; Lifecycle Breakdown (FR-PAY-002)
+                    </h6>
+                    <table class="table table-sm table-striped mb-4" style="font-size: 12px;">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Sub-Period Segment</th>
+                                <th>Category</th>
+                                <th>Date Range</th>
+                                <th class="text-center">Days / 30</th>
+                                <th class="text-end">Prorated Basic</th>
+                                <th class="text-end">Hardship Alw</th>
+                                <th class="text-end">Transport Alw</th>
+                                <th class="text-end">Segment Gross</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="o.segment_ids" t-as="seg">
+                                <td><t t-esc="seg.name"/></td>
+                                <td><span class="badge bg-info text-dark"><t t-esc="seg.segment_type"/></span></td>
+                                <td><t t-esc="seg.date_start"/> ~ <t t-esc="seg.date_end"/></td>
+                                <td class="text-center"><t t-esc="seg.days_count"/> / <t t-esc="seg.total_period_days"/></td>
+                                <td class="text-end">ETB <t t-esc="'%.2f' % seg.prorated_basic_salary"/></td>
+                                <td class="text-end">ETB <t t-esc="'%.2f' % seg.prorated_hardship_allowance"/></td>
+                                <td class="text-end">ETB <t t-esc="'%.2f' % seg.prorated_transport_allowance"/></td>
+                                <td class="text-end font-weight-bold">ETB <t t-esc="'%.2f' % seg.total_prorated_earnings"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </t>
+
+                <!-- Salary Lines: Earnings vs Deductions -->
+                <div class="row">
+                    <!-- Earnings Column -->
+                    <div class="col-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white py-1">
+                                <strong>EARNINGS &amp; ALLOWANCES</strong>
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm table-borderless mb-0" style="font-size: 12px;">
+                                    <tbody>
+                                        <t t-foreach="o.line_ids.filtered(lambda l: l.category_id.code in ['BASIC', 'ALW'] and l.appears_on_payslip and l.total &gt; 0)" t-as="line">
+                                            <tr style="border-bottom: 1px dashed #dee2e6;">
+                                                <td><t t-esc="line.name"/></td>
+                                                <td class="text-end">ETB <t t-esc="'%.2f' % line.total"/></td>
+                                            </tr>
+                                        </t>
+                                        <tr class="table-success font-weight-bold" style="border-top: 2px solid #28a745;">
+                                            <td><strong>TOTAL GROSS EARNINGS:</strong></td>
+                                            <td class="text-end"><strong>ETB <t t-esc="'%.2f' % o.gross_wage"/></strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Deductions Column -->
+                    <div class="col-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-danger text-white py-1">
+                                <strong>TAX &amp; DEDUCTIONS</strong>
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm table-borderless mb-0" style="font-size: 12px;">
+                                    <tbody>
+                                        <t t-foreach="o.line_ids.filtered(lambda l: l.category_id.code in ['STAT_DED', 'OTHER_DED'] and l.appears_on_payslip and l.total &gt; 0 and l.code != 'TAXABLE')" t-as="line">
+                                            <tr style="border-bottom: 1px dashed #dee2e6;">
+                                                <td><t t-esc="line.name"/></td>
+                                                <td class="text-end text-danger">- ETB <t t-esc="'%.2f' % line.total"/></td>
+                                            </tr>
+                                        </t>
+                                        <tr class="table-danger font-weight-bold" style="border-top: 2px solid #dc3545;">
+                                            <td><strong>TOTAL DEDUCTIONS:</strong></td>
+                                            <td class="text-end text-danger"><strong>- ETB <t t-esc="'%.2f' % (o.gross_wage - o.net_wage)"/></strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Net Pay Box -->
+                <div class="alert alert-primary p-3 my-3 text-center" style="background-color: #ede7f6; border: 2px solid #6a1b9a;">
+                    <h5 class="mb-1 text-muted">NET PAYABLE DISBURSEMENT</h5>
+                    <h2 class="mb-0" style="color: #4a148c; font-weight: bold;">
+                        ETB <t t-esc="'%.2f' % o.net_wage"/>
+                    </h2>
+                </div>
+
+                <!-- Employer Statutory Contributions -->
+                <div class="card mb-4" style="font-size: 11px;">
+                    <div class="card-body py-1 text-muted">
+                        <strong>Employer Contributions (Company Burden):</strong>
+                        Employer Pension 11%: ETB <t t-esc="'%.2f' % o.pension_er"/> | Total Pension (18% Pool): ETB <t t-esc="'%.2f' % (o.pension_ee + o.pension_er)"/>
+                    </div>
+                </div>
+
+                <!-- Signatures -->
+                <div class="row mt-5" style="font-size: 12px;">
+                    <div class="col-4 text-center">
+                        <div style="border-top: 1px solid #000; padding-top: 5px;">
+                            <strong>Prepared By</strong><br/>HR Accountant
+                        </div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div style="border-top: 1px solid #000; padding-top: 5px;">
+                            <strong>Verified By</strong><br/>Senior Payroll Controller
+                        </div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div style="border-top: 1px solid #000; padding-top: 5px;">
+                            <strong>Approved By</strong><br/>People Service &amp; Reward Manager
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_payslip">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="payroll.report_payslip_document" t-lang="o.employee_id.user_id.lang or 'en_US'"/>
+            </t>
+        </t>
+    </template>
+</odoo>

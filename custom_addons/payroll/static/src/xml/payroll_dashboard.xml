@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="payroll.PayrollDashboard">
+        <div class="o_payroll_dashboard">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-0" style="color: #4a148c; font-weight: 700;">Payroll Executive Dashboard</h2>
+                    <p class="text-muted mb-0">Overview of active wage runs, statutory tax liabilities, and pre-flight diagnostics.</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary me-2" t-on-click="openAllPayruns">
+                        <i class="fa fa-list me-1"/> View All Payruns
+                    </button>
+                    <button class="btn btn-outline-danger" t-on-click="openAllExceptions">
+                        <i class="fa fa-exclamation-triangle me-1"/> Exceptions (<t t-esc="state.unresolvedExceptions"/>)
+                    </button>
+                </div>
+            </div>
+
+            <!-- KPI Metric Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="payroll-stat-card card-gross">
+                        <div class="stat-label">Total Gross Wage Bill</div>
+                        <div class="stat-number">ETB <t t-esc="state.totalGross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"/></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="payroll-stat-card card-net">
+                        <div class="stat-label">Net Disbursement Total</div>
+                        <div class="stat-number text-success">ETB <t t-esc="state.totalNet.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"/></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="payroll-stat-card card-tax">
+                        <div class="stat-label">Personal Income Tax (MoR)</div>
+                        <div class="stat-number text-danger">ETB <t t-esc="state.totalTax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"/></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="payroll-stat-card card-pension">
+                        <div class="stat-label">Employee Pension (7%)</div>
+                        <div class="stat-number text-warning">ETB <t t-esc="state.totalPension.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})"/></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Payruns Table -->
+            <div class="payroll-section-card">
+                <h5 class="mb-3" style="font-weight: 600; color: #333;">Recent Payroll Processing Batches</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Batch Reference</th>
+                                <th>Batch Name</th>
+                                <th>Payslips</th>
+                                <th class="text-end">Gross (ETB)</th>
+                                <th class="text-end">Net (ETB)</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-if="state.recentPayruns.length === 0">
+                                <tr>
+                                    <td colspan="7" class="text-center py-4 text-muted">
+                                        No active payruns found. Click "View All Payruns" to create a new monthly batch.
+                                    </td>
+                                </tr>
+                            </t>
+                            <t t-foreach="state.recentPayruns" t-as="run" t-key="run.id">
+                                <tr>
+                                    <td><strong><t t-esc="run.number"/></strong></td>
+                                    <td><t t-esc="run.name"/></td>
+                                    <td><span class="badge bg-secondary"><t t-esc="run.payslip_count"/> staff</span></td>
+                                    <td class="text-end"><t t-esc="(run.total_gross || 0).toLocaleString('en-US', {minimumFractionDigits: 2})"/></td>
+                                    <td class="text-end font-weight-bold text-success"><t t-esc="(run.total_net || 0).toLocaleString('en-US', {minimumFractionDigits: 2})"/></td>
+                                    <td class="text-center"><span class="badge bg-info text-dark"><t t-esc="run.state"/></span></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary" t-on-click="() => this.openPayrun(run.id)">Open Batch</button>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

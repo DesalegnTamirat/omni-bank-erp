@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_payroll_retroactive_wizard_form" model="ir.ui.view">
+        <field name="name">payroll.retroactive.wizard.form</field>
+        <field name="model">payroll.retroactive.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Backdated Retroactive Adjustment">
+                <group>
+                    <group>
+                        <field name="employee_id" options="{'no_create': True}"/>
+                        <field name="reason"/>
+                    </group>
+                    <group>
+                        <field name="effective_date"/>
+                    </group>
+                </group>
+                <group string="Audit Notes &amp; Rationale">
+                    <field name="notes" nolabel="1" placeholder="Enter context and authorization reference..."/>
+                </group>
+                <footer>
+                    <button string="Compute Retroactive Adjustment" name="action_generate_retroactive" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_payroll_retroactive_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Retroactive Adjustment</field>
+        <field name="res_model">payroll.retroactive.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

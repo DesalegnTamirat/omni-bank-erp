@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payroll_summary_document">
+        <t t-call="web.external_layout">
+            <div class="page" style="font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;">
+                <div class="text-center mb-4">
+                    <h3 style="color: #4a148c; font-weight: bold;">MONTHLY PAYROLL SUMMARY REPORT</h3>
+                    <h5>Batch: <t t-esc="o.name"/> (<t t-esc="o.number"/>)</h5>
+                    <p class="text-muted">Period: <t t-esc="o.date_start"/> ~ <t t-esc="o.date_end"/> | Generated On: <t t-esc="datetime.datetime.now().strftime('%Y-%m-%d %H:%M')"/></p>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-3 p-2 text-center bg-light border">
+                        <strong>Total Staff:</strong> <t t-esc="o.payslip_count"/>
+                    </div>
+                    <div class="col-3 p-2 text-center bg-light border">
+                        <strong>Total Basic:</strong> ETB <t t-esc="'%.2f' % o.total_basic"/>
+                    </div>
+                    <div class="col-3 p-2 text-center bg-light border">
+                        <strong>Total Gross:</strong> ETB <t t-esc="'%.2f' % o.total_gross"/>
+                    </div>
+                    <div class="col-3 p-2 text-center bg-light border">
+                        <strong>Total Net:</strong> ETB <t t-esc="'%.2f' % o.total_net"/>
+                    </div>
+                </div>
+
+                <table class="table table-sm table-bordered table-striped mt-3">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Staff Name</th>
+                            <th>Job Title</th>
+                            <th>Branch / Unit</th>
+                            <th class="text-end">Basic</th>
+                            <th class="text-end">Hardship</th>
+                            <th class="text-end">Gross</th>
+                            <th class="text-end">Tax</th>
+                            <th class="text-end">Pension 7%</th>
+                            <th class="text-end">Net Pay</th>
+                            <th>Account No</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="o.slip_ids" t-as="slip">
+                            <td><t t-esc="slip_index + 1"/></td>
+                            <td><t t-esc="slip.employee_id.name"/></td>
+                            <td><t t-esc="slip.employee_id.job_id.name or '-'"/></td>
+                            <td><t t-esc="slip.employee_id.department_id.name or '-'"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.basic_wage"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.hardship_wage"/></td>
+                            <td class="text-end"><t t-esc="'%.2f' % slip.gross_wage"/></td>
+                            <td class="text-end text-danger"><t t-esc="'%.2f' % slip.income_tax"/></td>
+                            <td class="text-end text-danger"><t t-esc="'%.2f' % slip.pension_ee"/></td>
+                            <td class="text-end font-weight-bold"><t t-esc="'%.2f' % slip.net_wage"/></td>
+                            <td><t t-esc="slip.bank_account or '-'"/></td>
+                        </tr>
+                        <tr class="table-secondary font-weight-bold">
+                            <td colspan="4">GRAND TOTAL:</td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_basic"/></td>
+                            <td class="text-end">-</td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_gross"/></td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_tax"/></td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_pension_ee"/></td>
+                            <td class="text-end">ETB <t t-esc="'%.2f' % o.total_net"/></td>
+                            <td>-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_payroll_summary">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="o">
+                <t t-call="payroll.report_payroll_summary_document"/>
+            </t>
+        </t>
+    </template>
+</odoo>

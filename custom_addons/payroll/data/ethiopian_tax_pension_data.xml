@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Salary Rule Categories -->
+        <record id="cat_basic" model="hr.salary.rule.category">
+            <field name="name">Basic Salary</field>
+            <field name="code">BASIC</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="cat_alw" model="hr.salary.rule.category">
+            <field name="name">Allowances &amp; Benefits</field>
+            <field name="code">ALW</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="cat_gross" model="hr.salary.rule.category">
+            <field name="name">Gross Earnings</field>
+            <field name="code">GROSS</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="cat_stat_ded" model="hr.salary.rule.category">
+            <field name="name">Statutory Deductions (Tax &amp; Pension)</field>
+            <field name="code">STAT_DED</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="cat_other_ded" model="hr.salary.rule.category">
+            <field name="name">Voluntary &amp; Disciplinary Deductions</field>
+            <field name="code">OTHER_DED</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="cat_net" model="hr.salary.rule.category">
+            <field name="name">Net Salary</field>
+            <field name="code">NET</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="cat_comp_contrib" model="hr.salary.rule.category">
+            <field name="name">Employer Statutory Contributions</field>
+            <field name="code">COMP_CONTRIB</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <!-- Standard Bank Payroll Structure -->
+        <record id="structure_ethiopia_bank_standard" model="hr.payroll.structure">
+            <field name="name">Ethiopian Commercial Banking Standard Salary Structure</field>
+            <field name="code">ETH_BANK_STD</field>
+            <field name="note">Standard Ethiopian commercial bank salary structure incorporating statutory tax, pension, proration, location hardship, acting allowances, attendance and disciplinary integration.</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <!-- Salary Rules -->
+        <!-- 1. Base Salary Rule (With automated segment proration support) -->
+        <record id="rule_basic_salary" model="hr.salary.rule">
+            <field name="name">Basic Salary</field>
+            <field name="code">BASIC</field>
+            <field name="category_id" ref="cat_basic"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">10</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Compute basic salary from active segments or contract base wage
+if payslip.segment_ids:
+    result = sum(segment.prorated_basic_salary for segment in payslip.segment_ids)
+else:
+    result = contract.wage or contract.base_salary or employee.basic_salary or 0.0
+            </field>
+        </record>
+
+        <!-- 2. Hardship Allowance Rule (FR-PAY-007, 008) -->
+        <record id="rule_hardship_allowance" model="hr.salary.rule">
+            <field name="name">Hardship Allowance</field>
+            <field name="code">HARDSHIP</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">20</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Prorated hardship allowance across branches based on location codes and days
+if payslip.segment_ids:
+    result = sum(segment.prorated_hardship_allowance for segment in payslip.segment_ids)
+else:
+    result = payslip.get_hardship_allowance_amount()
+            </field>
+        </record>
+
+        <!-- 3. Acting Allowance Rule (FR-PAY-026, 027, 028: Month 1: 0%, M2-6: 100%, M7+: 0%) -->
+        <record id="rule_acting_allowance" model="hr.salary.rule">
+            <field name="name">Acting Allowance</field>
+            <field name="code">ACTING_ALW</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">25</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_acting_allowance_amount()
+            </field>
+        </record>
+
+        <!-- 4. Transportation Allowance -->
+        <record id="rule_transport_allowance" model="hr.salary.rule">
+            <field name="name">Transportation Allowance</field>
+            <field name="code">TRANS_ALW</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">30</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+if payslip.segment_ids:
+    result = sum(segment.prorated_transport_allowance for segment in payslip.segment_ids)
+else:
+    result = getattr(contract, 'transportation_allowance', 0.0) or 0.0
+            </field>
+        </record>
+
+        <!-- 5. Housing Allowance -->
+        <record id="rule_housing_allowance" model="hr.salary.rule">
+            <field name="name">Housing Allowance</field>
+            <field name="code">HOUSE_ALW</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">35</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+if payslip.segment_ids:
+    result = sum(segment.prorated_housing_allowance for segment in payslip.segment_ids)
+else:
+    result = getattr(contract, 'housing_allowance', 0.0) or 0.0
+            </field>
+        </record>
+
+        <!-- 6. Approved Overtime Earnings (Integrated from custom_hr_attendance) -->
+        <record id="rule_overtime" model="hr.salary.rule">
+            <field name="name">Overtime Earnings</field>
+            <field name="code">OT_EARN</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">40</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_approved_overtime_amount()
+            </field>
+        </record>
+
+        <!-- 7. Retroactive Arrears (Backdated promotions, increments) (FR-PAY-029) -->
+        <record id="rule_retroactive_arrears" model="hr.salary.rule">
+            <field name="name">Retroactive Salary Arrears</field>
+            <field name="code">RETRO_ARREARS</field>
+            <field name="category_id" ref="cat_alw"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">45</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_retroactive_arrears_amount()
+            </field>
+        </record>
+
+        <!-- 8. Gross Salary Computation -->
+        <record id="rule_gross_salary" model="hr.salary.rule">
+            <field name="name">Gross Earnings</field>
+            <field name="code">GROSS</field>
+            <field name="category_id" ref="cat_gross"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">50</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = categories.BASIC + categories.ALW
+            </field>
+        </record>
+
+        <!-- 9. Unauthorized Absence Deduction (Integrated from custom_hr_attendance) -->
+        <record id="rule_absence_deduction" model="hr.salary.rule">
+            <field name="name">Unauthorized Absence Deduction</field>
+            <field name="code">ABS_DED</field>
+            <field name="category_id" ref="cat_other_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">55</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_unauthorized_absence_deduction()
+            </field>
+        </record>
+
+        <!-- 10. Disciplinary Wage Cut / Penalty (Integrated from discipline_management) (FR-PAY-023, 024, 025) -->
+        <record id="rule_disciplinary_penalty" model="hr.salary.rule">
+            <field name="name">Disciplinary Salary Penalty Deduction</field>
+            <field name="code">DISC_PEN</field>
+            <field name="category_id" ref="cat_other_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">60</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_disciplinary_penalties_amount()
+            </field>
+        </record>
+
+        <!-- 11. Retroactive Recoveries (Overpayment adjustments) (FR-PAY-029) -->
+        <record id="rule_retroactive_recovery" model="hr.salary.rule">
+            <field name="name">Retroactive Overpayment Recovery</field>
+            <field name="code">RETRO_RECOVER</field>
+            <field name="category_id" ref="cat_other_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">65</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = payslip.get_retroactive_recovery_amount()
+            </field>
+        </record>
+
+        <!-- 12. Employee Statutory Pension Contribution (7% of Basic Wage) (FR-PAY-014) -->
+        <record id="rule_pension_employee" model="hr.salary.rule">
+            <field name="name">Employee Pension Contribution (7%)</field>
+            <field name="code">PENSION_EE</field>
+            <field name="category_id" ref="cat_stat_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">70</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# 7% of actual prorated Basic Salary
+result = (categories.BASIC) * 0.07
+            </field>
+        </record>
+
+        <!-- 13. Taxable Income Calculation (Gross minus tax exemptions) -->
+        <record id="rule_taxable_income" model="hr.salary.rule">
+            <field name="name">Taxable Gross Income</field>
+            <field name="code">TAXABLE</field>
+            <field name="category_id" ref="cat_stat_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">75</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# Taxable earnings after statutory exemptions (e.g. transport allowance up to legal limit)
+exempt_transport = min(categories.ALW, 2200.0) if hasattr(rules, 'TRANS_ALW') else 0.0
+gross_amt = categories.GROSS - categories.OTHER_DED
+taxable = gross_amt - exempt_transport
+result = max(0.0, taxable)
+            </field>
+        </record>
+
+        <!-- 14. Ethiopian Statutory Personal Income Tax (FR-PAY-010, 013, 021) -->
+        <record id="rule_income_tax" model="hr.salary.rule">
+            <field name="name">Personal Income Tax (Statutory Schedule)</field>
+            <field name="code">INCOME_TAX</field>
+            <field name="category_id" ref="cat_stat_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">80</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+taxable = rules.TAXABLE.total if hasattr(rules, 'TAXABLE') else max(0.0, categories.GROSS - categories.OTHER_DED)
+# Ethiopian Progressive Income Tax Brackets:
+# 0 - 600 ETB: 0% (Deductible: 0)
+# 601 - 1,650 ETB: 10% (Deductible: 60)
+# 1,651 - 3,200 ETB: 15% (Deductible: 142.50)
+# 3,201 - 5,250 ETB: 20% (Deductible: 302.50)
+# 5,251 - 7,800 ETB: 25% (Deductible: 565.00)
+# 7,801 - 10,900 ETB: 30% (Deductible: 955.00)
+# Over 10,900 ETB: 35% (Deductible: 1,500.00)
+if taxable &lt;= 600.0:
+    tax = 0.0
+elif taxable &lt;= 1650.0:
+    tax = (taxable * 0.10) - 60.0
+elif taxable &lt;= 3200.0:
+    tax = (taxable * 0.15) - 142.50
+elif taxable &lt;= 5250.0:
+    tax = (taxable * 0.20) - 302.50
+elif taxable &lt;= 7800.0:
+    tax = (taxable * 0.25) - 565.00
+elif taxable &lt;= 10900.0:
+    tax = (taxable * 0.30) - 955.00
+else:
+    tax = (taxable * 0.35) - 1500.0
+
+result = max(0.0, round(tax, 2))
+            </field>
+        </record>
+
+        <!-- 15. Other Voluntary / Loan Deductions -->
+        <record id="rule_cost_sharing_deduction" model="hr.salary.rule">
+            <field name="name">Cost Sharing Balance Deduction</field>
+            <field name="code">COST_SHARE_DED</field>
+            <field name="category_id" ref="cat_other_ded"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">85</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+result = getattr(contract, 'cost_sharing', 0.0) or 0.0
+            </field>
+        </record>
+
+        <!-- 16. Net Salary Rule (FR-PAY-002, 010) -->
+        <record id="rule_net_salary" model="hr.salary.rule">
+            <field name="name">Net Payable Salary</field>
+            <field name="code">NET</field>
+            <field name="category_id" ref="cat_net"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">100</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+total_earnings = categories.GROSS
+total_deductions = categories.STAT_DED + categories.OTHER_DED
+result = max(0.0, total_earnings - total_deductions)
+            </field>
+        </record>
+
+        <!-- 17. Employer Statutory Pension Contribution (11% of Basic Wage) -->
+        <record id="rule_pension_employer" model="hr.salary.rule">
+            <field name="name">Employer Pension Contribution (11%)</field>
+            <field name="code">PENSION_ER</field>
+            <field name="category_id" ref="cat_comp_contrib"/>
+            <field name="structure_id" ref="structure_ethiopia_bank_standard"/>
+            <field name="sequence">110</field>
+            <field name="amount_select">code</field>
+            <field name="amount_python_compute">
+# 11% employer statutory contribution
+result = (categories.BASIC) * 0.11
+            </field>
+        </record>
+    </data>
+</odoo>

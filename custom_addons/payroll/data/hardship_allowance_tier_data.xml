@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="hardship_tier_1" model="hr.hardship.allowance.rate">
+            <field name="name">Tier 1 - Extreme Remote / High Hardship (30%)</field>
+            <field name="code">TIER_1</field>
+            <field name="tier_level">tier_1</field>
+            <field name="rate_percentage">30.0</field>
+            <field name="description">Applicable to ultra-remote branches with severe climatic, geographical or infrastructural conditions.</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="hardship_tier_2" model="hr.hardship.allowance.rate">
+            <field name="name">Tier 2 - Moderate Hardship / Developing Outpost (20%)</field>
+            <field name="code">TIER_2</field>
+            <field name="tier_level">tier_2</field>
+            <field name="rate_percentage">20.0</field>
+            <field name="description">Applicable to remote zonal branch offices with limited infrastructure.</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="hardship_tier_3" model="hr.hardship.allowance.rate">
+            <field name="name">Tier 3 - Mild Hardship / Developing Town (10%)</field>
+            <field name="code">TIER_3</field>
+            <field name="tier_level">tier_3</field>
+            <field name="rate_percentage">10.0</field>
+            <field name="description">Applicable to developing regional district branches.</field>
+            <field name="active" eval="True"/>
+        </record>
+
+        <record id="hardship_tier_standard" model="hr.hardship.allowance.rate">
+            <field name="name">Standard / Metropolitan Zone (0%)</field>
+            <field name="code">TIER_STD</field>
+            <field name="tier_level">standard</field>
+            <field name="rate_percentage">0.0</field>
+            <field name="description">Standard municipal/head office locations without hardship rate.</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Action for Employee Payslip PDF -->
+    <record id="action_report_payslip" model="ir.actions.report">
+        <field name="name">Employee Payslip PDF</field>
+        <field name="model">hr.payslip</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_payslip</field>
+        <field name="report_file">payroll.report_payslip</field>
+        <field name="print_report_name">'Payslip - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_hr_payslip"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Action for Payrun Batch Summary Report -->
+    <record id="action_report_payroll_summary" model="ir.actions.report">
+        <field name="name">Monthly Payroll Summary Report</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_payroll_summary</field>
+        <field name="report_file">payroll.report_payroll_summary</field>
+        <field name="print_report_name">'Payroll_Summary - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_hr_payslip_run"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Action for Payrun Variance & Exception Report -->
+    <record id="action_report_payroll_variance" model="ir.actions.report">
+        <field name="name">Payroll Variance &amp; Exception Report</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_payroll_variance</field>
+        <field name="report_file">payroll.report_payroll_variance</field>
+        <field name="print_report_name">'Payroll_Variance - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_hr_payslip_run"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Action for Statutory Tax & Pension Report -->
+    <record id="action_report_statutory_tax_pension" model="ir.actions.report">
+        <field name="name">Statutory Tax &amp; Pension Schedule</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_statutory_tax_pension</field>
+        <field name="report_file">payroll.report_statutory_tax_pension</field>
+        <field name="print_report_name">'Statutory_Tax_Pension - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_hr_payslip_run"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

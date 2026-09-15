@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_payroll_simulation_wizard_form" model="ir.ui.view">
+        <field name="name">payroll.simulation.wizard.form</field>
+        <field name="model">payroll.simulation.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Payroll Financial Simulation">
+                <sheet>
+                    <div class="oe_title">
+                        <h2>Payroll Dry-Run Financial Simulation</h2>
+                    </div>
+                    <group>
+                        <group string="Simulation Parameters">
+                            <field name="period_id" options="{'no_create': True}"/>
+                            <field name="department_id" options="{'no_create': True}"/>
+                        </group>
+                        <group string="Lifecycle Inclusions">
+                            <field name="include_pending_promotions"/>
+                            <field name="include_pending_increments"/>
+                        </group>
+                    </group>
+                    <separator string="Projected Financial Impact" invisible="not is_simulated"/>
+                    <group invisible="not is_simulated">
+                        <group string="Gross &amp; Net Projections">
+                            <field name="projected_headcount"/>
+                            <field name="projected_basic_wage"/>
+                            <field name="projected_gross_cost"/>
+                            <field name="projected_net_payout"/>
+                        </group>
+                        <group string="Statutory &amp; Variance">
+                            <field name="projected_tax_liability"/>
+                            <field name="projected_pension_cost"/>
+                            <field name="variance_vs_previous_month"/>
+                            <field name="variance_pct"/>
+                        </group>
+                    </group>
+                    <field name="simulation_notes" nolabel="1" readonly="1" invisible="not is_simulated"/>
+                    <field name="is_simulated" invisible="1"/>
+                </sheet>
+                <footer>
+                    <button string="Run Simulation" name="action_run_simulation" type="object" class="btn-primary"/>
+                    <button string="Close" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_payroll_simulation_wizard" model="ir.actions.act_window">
+        <field name="name">Payroll Financial Simulation</field>
+        <field name="res_model">payroll.simulation.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

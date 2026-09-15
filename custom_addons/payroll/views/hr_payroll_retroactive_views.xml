@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_payroll_retroactive_tree" model="ir.ui.view">
+        <field name="name">hr.payroll.retroactive.list</field>
+        <field name="model">hr.payroll.retroactive</field>
+        <field name="arch" type="xml">
+            <list string="Retroactive Adjustments">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="reason"/>
+                <field name="effective_date"/>
+                <field name="total_arrears"/>
+                <field name="total_recoveries"/>
+                <field name="net_retroactive_impact" decoration-bf="1"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'computed'" decoration-success="state in ['approved', 'injected']" decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_hr_payroll_retroactive_form" model="ir.ui.view">
+        <field name="name">hr.payroll.retroactive.form</field>
+        <field name="model">hr.payroll.retroactive</field>
+        <field name="arch" type="xml">
+            <form string="Retroactive Salary Adjustment">
+                <header>
+                    <button name="action_compute_retroactive" string="Compute Historical Diff" type="object" class="btn-primary" invisible="state not in ['draft', 'computed']"/>
+                    <button name="action_approve" string="Approve Adjustment" type="object" class="btn-success" invisible="state != 'computed'" groups="payroll.group_payroll_verifier"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,computed,approved,injected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Adjustment Context">
+                            <field name="employee_id"/>
+                            <field name="reason"/>
+                            <field name="effective_date"/>
+                        </group>
+                        <group string="Financial Outcome">
+                            <field name="total_arrears" readonly="1"/>
+                            <field name="total_recoveries" readonly="1"/>
+                            <field name="net_retroactive_impact" readonly="1" decoration-bf="1"/>
+                            <field name="target_payslip_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Historical Locked Payslips Recalculation" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list>
+                                    <field name="historical_payslip_id"/>
+                                    <field name="period_name"/>
+                                    <field name="original_basic"/>
+                                    <field name="revised_basic"/>
+                                    <field name="original_net"/>
+                                    <field name="difference_amount" decoration-bf="1"/>
+                                    <field name="notes"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Audit Justification" name="notes">
+                            <field name="notes" placeholder="Enter background and official authorization references..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_hr_payroll_retroactive" model="ir.actions.act_window">
+        <field name="name">Retroactive Adjustments</field>
+        <field name="res_model">hr.payroll.retroactive</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>
