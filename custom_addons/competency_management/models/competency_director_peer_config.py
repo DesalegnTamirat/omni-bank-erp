@@ -66,30 +66,74 @@ class CompetencyDirectorPeerConfig(models.Model):
             else:
                 rec.coach_id = False
 
-    @api.depends('director_id', 'director_id.job_id', 'director_id.parent_id', 'director_id.coach_id', 'coach_id')
+    @api.model
+    def _get_grade_number(self, emp):
+        """Extract numeric grade level (1..17) from employee's assigned job grade or position."""
+        if not emp:
+            return 0
+        grade_rec = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+        if not grade_rec and emp.job_id:
+            grade_rec = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        if not grade_rec:
+            return 0
+
+        g_str = (getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'name', False) or getattr(grade_rec, 'code', False) or str(grade_rec)).lower().strip()
+
+        # Roman numerals map
+        tokens = g_str.replace('-', ' ').replace('_', ' ').split()
+        roman_map = {
+            'xvii': 17, 'xvi': 16, 'xv': 15, 'xiv': 14, 'xiii': 13, 'xii': 12, 'xi': 11,
+            'x': 10, 'ix': 9, 'viii': 8, 'vii': 7, 'vi': 6, 'v': 5, 'iv': 4, 'iii': 3, 'ii': 2, 'i': 1
+        }
+        for token in tokens:
+            if token in roman_map:
+                return roman_map[token]
+        if g_str in roman_map:
+            return roman_map[g_str]
+
+        import re
+        numbers = re.findall(r'\d+', g_str)
+        if numbers:
+            return int(numbers[0])
+
+        return 0
+
+    @api.model
+    def _is_director_or_chief(self, emp):
+        """Strictly classify as Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
+        if not emp or not emp.active:
+            return False
+        g_num = self._get_grade_number(emp)
+        if g_num in (16, 17):
+            return True
+        return False
+
+    @api.depends('director_id', 'grade_id', 'director_id.job_id', 'director_id.grade_id', 'director_id.job_grade')
     def _compute_candidate_peer_ids(self):
+        """Calculate pool of eligible peers for Directors (Grade 16) & Chiefs (Grade 17) matching the exception rule: Same Job Grade."""
         for rec in self:
             if not rec.director_id:
                 rec.candidate_peer_ids = self.env['hr.employee']
                 continue
 
             dir_emp = rec.director_id
-            coach = rec.coach_id
-            dir_job_id = dir_emp.job_id.id if dir_emp.job_id else False
+            dir_g_num = self._get_grade_number(dir_emp)
+            dir_grade_id = rec.grade_id.id if rec.grade_id else False
 
-            if coach:
-                domain = [
-                    ('id', '!=', dir_emp.id),
-                    '|', ('parent_id', '=', coach.id), ('coach_id', '=', coach.id),
-                ]
-                if dir_job_id:
-                    domain.append(('job_id', '!=', dir_job_id))
-                candidates = self.env['hr.employee'].search(domain)
+            domain = [('id', '!=', dir_emp.id), ('active', '=', True)]
+            all_emps = self.env['hr.employee'].search(domain)
+
+            if dir_g_num in (16, 17):
+                candidates = all_emps.filtered(lambda c: self._get_grade_number(c) == dir_g_num)
+            elif dir_grade_id:
+                candidates = all_emps.filtered(lambda c: (
+                    (getattr(c, 'grade_id', False) and c.grade_id.id == dir_grade_id) or
+                    (getattr(c, 'job_grade', False) and c.job_grade.id == dir_grade_id) or
+                    (c.job_id and getattr(c.job_id, 'grade_id', False) and c.job_id.grade_id.id == dir_grade_id) or
+                    (c.job_id and getattr(c.job_id, 'grade', False) and c.job_id.grade.id == dir_grade_id)
+                ))
             else:
-                domain = [('id', '!=', dir_emp.id)]
-                if dir_job_id:
-                    domain.append(('job_id', '!=', dir_job_id))
-                candidates = self.env['hr.employee'].search(domain, limit=100)
+                candidates = all_emps
 
             rec.candidate_peer_ids = candidates
 
@@ -106,27 +150,15 @@ class CompetencyDirectorPeerConfig(models.Model):
 
     @api.model
     def action_generate_director_records(self):
-        """Scan active hr.employee records strictly for Directors, Chiefs, VPs, Executives, and Leadership positions and create missing configuration records with empty peer lists, purging non-director entries."""
-        import re
-
-        pattern = re.compile(
-            r'\b(director|chief|vp|vice president|executive director|managing director|president|ceo|cfo|cio|cto|coo|head of)\b',
-            re.IGNORECASE
-        )
-        exclude_pattern = re.compile(
-            r'\b(assistant|secretary|driver|clerk|officer|analyst|technician|specialist|junior|team leader|customer service|branch manager|division|consultant|maintenance|engineer|counsel|associate|attendant|guard|cashier|accountant|janitor|representative|auditor|agent|inspector|coordinator)\b',
-            re.IGNORECASE
-        )
-
+        """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging Grade II, III, IV, etc. non-executive entries."""
         all_employees = self.env['hr.employee'].search([('active', '=', True)])
         director_emp_ids = set()
 
         for emp in all_employees:
-            job_name = emp.job_id.name or getattr(emp, 'job_title', '') or ''
-            if pattern.search(job_name) and not exclude_pattern.search(job_name):
+            if self._is_director_or_chief(emp):
                 director_emp_ids.add(emp.id)
 
-        # Purge non-director config records
+        # Purge non-director/non-chief config records (e.g. Grade II, III, IV, etc.)
         invalid_configs = self.search([('director_id', 'not in', list(director_emp_ids))])
         if invalid_configs:
             invalid_configs.unlink()
@@ -140,7 +172,7 @@ class CompetencyDirectorPeerConfig(models.Model):
                 existing_director_ids.add(emp_id)
                 created_count += 1
 
-        msg = _("Successfully updated Director Peer Configuration records. Created: %d, Total Active Directors: %d.") % (created_count, len(existing_director_ids))
+        msg = _("Successfully synchronized Director Peer Configuration. Created: %d, Total Active Directors (Grade 16) & Chiefs (Grade 17): %d. Non-executive records purged.") % (created_count, len(existing_director_ids))
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',

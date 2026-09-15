@@ -25,31 +25,31 @@ class HrEmployeeCompetency(models.Model):
         compute='_compute_latest_competency_assessment', store=True)
     latest_competency_gap_summary = fields.Text(
         string='Latest Competency Gap Summary',
-        compute='_compute_latest_competency_assessment',
+        compute='_compute_latest_competency_assessment', store=True,
         help="Summary of competency requirements, achieved levels, and gaps for Career Path and external analytics.")
 
-    @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.overall_score', 'competency_assessment_ids.evaluation_date')
+    @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):
         for emp in self:
             assessments = emp.competency_assessment_ids.filtered(
-                lambda a: a.state in ('approved', 'completed', 'locked') or not a.state
-            ).sorted(key=lambda a: (a.evaluation_date or fields.Date.today(), a.id), reverse=True)
+                lambda a: a.state in ('approved', 'completed', 'locked')
+            ).sorted(key=lambda a: (a.create_date or fields.Datetime.now(), a.id), reverse=True)
             if not assessments:
                 # Fallback to any assessment if none approved
-                assessments = emp.competency_assessment_ids.sorted(key=lambda a: (a.evaluation_date or fields.Date.today(), a.id), reverse=True)
+                assessments = emp.competency_assessment_ids.sorted(key=lambda a: (a.create_date or fields.Datetime.now(), a.id), reverse=True)
 
             latest = assessments[0] if assessments else False
             if latest:
                 emp.latest_competency_assessment_id = latest.id
-                emp.latest_competency_overall_score = getattr(latest, 'overall_score', 0.0) or 0.0
-                emp.latest_competency_assessment_date = getattr(latest, 'evaluation_date', False) or False
+                emp.latest_competency_overall_score = getattr(latest, 'average_gap', 0.0) or 0.0
+                emp.latest_competency_assessment_date = fields.Date.to_date(latest.create_date) if latest.create_date else False
 
                 lines_summary = []
                 for line in getattr(latest, 'line_ids', []):
                     comp_name = line.competency_id.name if line.competency_id else 'N/A'
-                    req_lvl = line.required_level_id.name if getattr(line, 'required_level_id', False) else 'N/A'
-                    ach_lvl = line.achieved_level_id.name if getattr(line, 'achieved_level_id', False) else 'N/A'
-                    gap = getattr(line, 'gap', 0.0) or 0.0
+                    req_lvl = line.required_level or 'N/A'
+                    ach_lvl = line.current_level or 'N/A'
+                    gap = getattr(line, 'gap', 0) or 0
                     lines_summary.append(f"- {comp_name}: Required={req_lvl}, Achieved={ach_lvl}, Gap={gap}")
                 emp.latest_competency_gap_summary = "\n".join(lines_summary) if lines_summary else "No line details available."
             else:

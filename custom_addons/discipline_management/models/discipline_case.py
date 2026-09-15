@@ -147,6 +147,29 @@ class DisciplineCase(models.Model):
             emp = rec.employee_id.sudo() if rec.employee_id else False
             rec.is_managerial = emp.is_managerial if emp else False
 
+    is_probationary_employee = fields.Boolean(
+        string='Is Probationary Employee',
+        compute='_compute_is_probationary_employee',
+        compute_sudo=True,
+        store=True,
+        readonly=True,
+        help="Indicates whether the employee is within their initial probationary period (relevant for onboarding and induction policy)."
+    )
+
+    @api.depends('employee_id')
+    def _compute_is_probationary_employee(self):
+        for rec in self:
+            emp = rec.employee_id.sudo() if rec.employee_id else False
+            if not emp:
+                rec.is_probationary_employee = False
+                continue
+            is_prob = False
+            if 'status' in emp._fields and emp.status == 'probation':
+                is_prob = True
+            elif getattr(emp, 'is_probationary', False):
+                is_prob = True
+            rec.is_probationary_employee = is_prob
+
     staff_category_display = fields.Char(string='Staff Category', compute='_compute_staff_category_display', store=True)
 
     def _default_initiator_type(self):
@@ -1054,6 +1077,8 @@ class DisciplineCase(models.Model):
                 write_vals['departure_date'] = rec.final_decision_date
             if 'departure_description' in emp._fields:
                 write_vals['departure_description'] = _('Dismissed under Disciplinary Case %s on %s.') % (rec.name, rec.final_decision_date)
+            if 'status' in emp._fields:
+                write_vals['status'] = 'terminated'
             emp.with_context(no_leave_resource_calendar_update=True).write(write_vals)
             if emp.user_id:
                 emp.user_id.sudo().write({'active': False})
@@ -1062,7 +1087,7 @@ class DisciplineCase(models.Model):
             rec._on_employee_dismissed(emp)
 
     def _on_employee_dismissed(self, employee):
-        """Extensible event hook for separation management module integration."""
+        """Extensible event hook for separation and recruitment blacklist pool integration."""
         Separation = self.env.get('hr.separation') or self.env.get('employee.separation')
         if Separation:
             Separation.sudo().create({
@@ -1071,6 +1096,22 @@ class DisciplineCase(models.Model):
                 'case_id': self.id,
                 'reason': _('Disciplinary dismissal under Case %s.') % self.name,
             })
+        BlacklistPool = self.env.get('blacklist.pool')
+        if BlacklistPool:
+            existing_bl = BlacklistPool.sudo().search([
+                '|', ('email', '=', employee.work_email),
+                ('candidate', '=', employee.name)
+            ], limit=1)
+            if not existing_bl:
+                BlacklistPool.sudo().create({
+                    'candidate': employee.name,
+                    'gender': (employee.gender or 'male').capitalize() if employee.gender in ('male', 'female') else 'Other',
+                    'email': employee.work_email or False,
+                    'phone': employee.mobile_phone or employee.work_phone or False,
+                    'national_id': getattr(employee, 'barcode', False) or False,
+                    'reason': _('Disciplinary Dismissal: Case %s. %s') % (self.name, self.offense_id.name if self.offense_id else ''),
+                    'blacklisted_date': self.final_decision_date or fields.Date.today(),
+                })
 
     def action_open_revocation_wizard(self):
         self.ensure_one()

@@ -239,6 +239,8 @@ class DisciplineSuspension(models.Model):
             rec.write({'state': 'active'})
             rec.employee_id.is_suspended = True
             rec.employee_id.suspension_type = rec.suspension_type
+            if 'status' in rec.employee_id._fields:
+                rec.employee_id.sudo().write({'status': 'suspended'})
             rec.case_id.message_post(
                 body=_('Suspension %s activated for employee %s (%s) from %s to %s.') % (rec.name, rec.employee_id.name, rec.suspension_type, rec.start_date, rec.end_date)
             )
@@ -252,6 +254,8 @@ class DisciplineSuspension(models.Model):
             rec.write({'state': 'completed'})
             rec.employee_id.is_suspended = False
             rec.employee_id.suspension_type = False
+            if 'status' in rec.employee_id._fields and rec.employee_id.status == 'suspended':
+                rec.employee_id.sudo().write({'status': 'active'})
             rec.case_id.message_post(body=_('Suspension completed. Employee %s reinstated to duty.') % rec.employee_id.name)
 
     def action_convert_to_dismissal(self):

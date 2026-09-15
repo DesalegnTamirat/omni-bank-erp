@@ -7,7 +7,7 @@ class HrJobCompetency(models.Model):
     _inherit = 'hr.job'
 
     competency_role_mapping_ids = fields.One2many(
-        'competency.role.mapping', 'job_id', string='Competency Role Mappings',
+        'competency.role.mapping', 'job_position_id', string='Competency Role Mappings',
         help="Competencies explicitly assigned to this job position.")
     required_competency_count = fields.Integer(
         string='Required Competencies Count', compute='_compute_required_competency_count',
@@ -28,7 +28,7 @@ class HrJobCompetency(models.Model):
         Mapping = self.env['competency.role.mapping']
         
         # 1. Search for position-specific mappings first (Job Position governs)
-        mappings = Mapping.search([('job_id', '=', self.id)])
+        mappings = Mapping.search([('job_position_id', '=', self.id)])
         governance_type = 'job_position'
 
         # 2. Fallback to Job Grade if position mappings are empty and grade_id is supplied
