@@ -432,6 +432,12 @@ class HrPayslip(models.Model):
                 'categories': BrowsableObject(self.env.cr, self.env.uid, self.env.user, categories_dict),
                 'inputs': inputs_dict,
                 'segments': payslip.segment_ids,
+                'hasattr': hasattr,
+                'getattr': getattr,
+                'min': min,
+                'max': max,
+                'round': round,
+                'sum': sum,
             }
 
             # 3. Retrieve all active rules ordered by sequence

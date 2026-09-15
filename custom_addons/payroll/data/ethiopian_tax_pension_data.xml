@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <data noupdate="0">
         <!-- Salary Rule Categories -->
         <record id="cat_basic" model="hr.salary.rule.category">
             <field name="name">Basic Salary</field>
@@ -233,10 +233,9 @@ result = (categories.BASIC) * 0.07
             <field name="sequence">75</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-# Taxable earnings after statutory exemptions (e.g. transport allowance up to legal limit)
-exempt_transport = min(categories.ALW, 2200.0) if hasattr(rules, 'TRANS_ALW') else 0.0
+# Taxable earnings after statutory deductions
 gross_amt = categories.GROSS - categories.OTHER_DED
-taxable = gross_amt - exempt_transport
+taxable = gross_amt
 result = max(0.0, taxable)
             </field>
         </record>
@@ -250,7 +249,7 @@ result = max(0.0, taxable)
             <field name="sequence">80</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-taxable = rules.TAXABLE.total if hasattr(rules, 'TAXABLE') else max(0.0, categories.GROSS - categories.OTHER_DED)
+taxable = rules.TAXABLE.total if rules.TAXABLE else max(0.0, categories.GROSS - categories.OTHER_DED)
 # Ethiopian Progressive Income Tax Brackets:
 # 0 - 600 ETB: 0% (Deductible: 0)
 # 601 - 1,650 ETB: 10% (Deductible: 60)
@@ -300,9 +299,11 @@ result = getattr(contract, 'cost_sharing', 0.0) or 0.0
             <field name="sequence">100</field>
             <field name="amount_select">code</field>
             <field name="amount_python_compute">
-total_earnings = categories.GROSS
-total_deductions = categories.STAT_DED + categories.OTHER_DED
-result = max(0.0, total_earnings - total_deductions)
+total_earnings = categories.BASIC + categories.ALW
+tax = rules.INCOME_TAX.total if rules.INCOME_TAX else 0.0
+pension = rules.PENSION_EE.total if rules.PENSION_EE else 0.0
+other_ded = categories.OTHER_DED
+result = max(0.0, total_earnings - tax - pension - other_ded)
             </field>
         </record>
 

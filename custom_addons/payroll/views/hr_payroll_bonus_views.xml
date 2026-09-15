@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree / List View: Bonus Campaign -->
+    <record id="view_payroll_bonus_campaign_tree" model="ir.ui.view">
+        <field name="name">payroll.bonus.campaign.tree</field>
+        <field name="model">payroll.bonus.campaign</field>
+        <field name="arch" type="xml">
+            <list string="Annual Performance Bonus Campaigns" decoration-info="state == 'computed'" decoration-warning="state == 'verified'" decoration-success="state in ('approved', 'paid')">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="fiscal_year"/>
+                <field name="declaration_date"/>
+                <field name="total_beneficiaries"/>
+                <field name="total_gross_bonus" sum="Total Gross Bonus"/>
+                <field name="total_tax_deduction" sum="Total Tax Withheld"/>
+                <field name="total_net_payable" sum="Total Net Bonus"/>
+                <field name="state" widget="badge"
+                       decoration-muted="state == 'draft'"
+                       decoration-info="state == 'computed'"
+                       decoration-warning="state == 'verified'"
+                       decoration-success="state in ('approved', 'paid')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Bonus Campaign -->
+    <record id="view_payroll_bonus_campaign_form" model="ir.ui.view">
+        <field name="name">payroll.bonus.campaign.form</field>
+        <field name="model">payroll.bonus.campaign</field>
+        <field name="arch" type="xml">
+            <form string="Annual Performance Bonus Campaign">
+                <header>
+                    <button name="action_compute_bonus_lines" string="Compute Bonus Schedules" type="object" class="oe_highlight" invisible="state not in ('draft', 'computed')"/>
+                    <button name="action_verify" string="Verify Campaign (Audit &amp; Finance)" type="object" class="oe_highlight" invisible="state != 'computed'" groups="payroll.group_payroll_verifier,payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_approve" string="Approve Bonus (Board / CEO)" type="object" class="btn-success" invisible="state != 'verified'" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_post_and_disburse" string="Post GL &amp; Disburse via CBS" type="object" class="btn-primary" invisible="state != 'approved'" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state in ('draft', 'paid', 'cancelled')" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,computed,verified,approved,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Bonus Campaign Reference"/>
+                        <h1><field name="name"/></h1>
+                        <label for="title" string="Bonus Campaign Title"/>
+                        <h2><field name="title" placeholder="e.g., FY 2024/2025 Annual Performance Bonus Run" readonly="state == 'paid'"/></h2>
+                    </div>
+
+                    <group>
+                        <group string="Fiscal Year &amp; Declaration Horizon">
+                            <field name="fiscal_year" readonly="state == 'paid'"/>
+                            <field name="fy_start_date" readonly="state == 'paid'"/>
+                            <field name="fy_end_date" readonly="state == 'paid'"/>
+                            <field name="declaration_date" readonly="state == 'paid'"/>
+                        </group>
+                        <group string="Eligibility &amp; Proration Controls">
+                            <field name="prorate_joiners" readonly="state == 'paid'"/>
+                            <field name="min_service_days" readonly="state == 'paid'"/>
+                            <field name="exclude_disciplined" readonly="state == 'paid'"/>
+                            <field name="department_ids" widget="many2many_tags" placeholder="Bank-Wide (All Departments)" readonly="state == 'paid'"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" placeholder="Bank-Wide (All Branches / Head Office)" readonly="state == 'paid'"/>
+                        </group>
+                    </group>
+
+                    <group string="PMS Performance Rating Multiplier Matrix (Months of Basic Salary)">
+                        <group>
+                            <field name="tier_above_150_months" readonly="state == 'paid'"/>
+                            <field name="tier_120_150_months" readonly="state == 'paid'"/>
+                            <field name="tier_100_120_months" readonly="state == 'paid'"/>
+                            <field name="tier_85_100_months" readonly="state == 'paid'"/>
+                        </group>
+                        <group>
+                            <field name="tier_75_85_months" readonly="state == 'paid'"/>
+                            <field name="tier_50_75_months" readonly="state == 'paid'"/>
+                            <field name="tier_below_50_months" readonly="state == 'paid'"/>
+                        </group>
+                    </group>
+
+                    <!-- Financial Summary -->
+                    <group string="Financial &amp; Statutory Summary" col="4">
+                        <field name="total_beneficiaries" readonly="1"/>
+                        <field name="total_tax_deduction" readonly="1"/>
+                        <field name="total_gross_bonus" readonly="1"/>
+                        <field name="total_net_payable" readonly="1"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Employee Bonus Schedules" name="bonus_lines">
+                            <field name="line_ids" readonly="state == 'paid'">
+                                <list editable="bottom" decoration-muted="not is_eligible" decoration-success="is_eligible and net_payable &gt; 0">
+                                    <field name="employee_id"/>
+                                    <field name="department_id" optional="show"/>
+                                    <field name="job_id" optional="show"/>
+                                    <field name="basic_salary"/>
+                                    <field name="pms_score"/>
+                                    <field name="tier_name" optional="show"/>
+                                    <field name="months_multiplier"/>
+                                    <field name="service_days" optional="show"/>
+                                    <field name="proration_factor" optional="show"/>
+                                    <field name="is_eligible"/>
+                                    <field name="ineligibility_reason" optional="hide"/>
+                                    <field name="gross_bonus"/>
+                                    <field name="tax_deduction"/>
+                                    <field name="net_payable"/>
+                                    <field name="bank_account" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Accounting &amp; GL Journal Integration" name="accounting">
+                            <group>
+                                <group string="General Ledger Posting">
+                                    <field name="move_ref" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="CBS Direct Credit Payment Batch" name="cbs_payment">
+                            <group>
+                                <field name="payment_batch_id" readonly="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Audit Hierarchy &amp; Notes" name="audit_notes">
+                            <group>
+                                <group string="Sign-Off Chain">
+                                    <field name="verified_by"/>
+                                    <field name="approved_by"/>
+                                    <field name="paid_by"/>
+                                </group>
+                                <group string="Policy &amp; Distribution Notes">
+                                    <field name="notes" placeholder="Enter board minute authorization, fiscal targets, and distribution guidance..." readonly="state == 'paid'"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View: Bonus Campaign -->
+    <record id="view_payroll_bonus_campaign_search" model="ir.ui.view">
+        <field name="name">payroll.bonus.campaign.search</field>
+        <field name="model">payroll.bonus.campaign</field>
+        <field name="arch" type="xml">
+            <search string="Search Bonus Campaigns">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="fiscal_year"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Computed" name="computed" domain="[('state', '=', 'computed')]"/>
+                <filter string="Verified" name="verified" domain="[('state', '=', 'verified')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Paid" name="paid" domain="[('state', '=', 'paid')]"/>
+                <filter string="Fiscal Year" name="group_fy" context="{'group_by': 'fiscal_year'}"/>
+                <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: Bonus Campaign -->
+    <record id="action_payroll_bonus_campaign" model="ir.actions.act_window">
+        <field name="name">Annual Performance Bonus</field>
+        <field name="res_model">payroll.bonus.campaign</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_payroll_bonus_campaign_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Initiate a new bank-wide Annual Performance Bonus Campaign!
+            </p>
+            <p>
+                Evaluate PMS rating score brackets, compute Ethiopian PIT withholding taxes,
+                post GL journal vouchers, and generate electronic CBS payment files for separate disbursement.
+            </p>
+        </field>
+    </record>
+</odoo>

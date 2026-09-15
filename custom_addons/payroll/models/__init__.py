@@ -24,3 +24,5 @@ from . import hr_payroll_audit_log
 from . import payroll_gl_integration
 from . import payroll_cbs_export
 from . import hr_employee_payroll_ext
+from . import hr_payroll_increment
+from . import hr_payroll_bonus

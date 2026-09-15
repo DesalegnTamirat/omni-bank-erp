@@ -105,7 +105,7 @@ class HrSalaryRule(models.Model):
                 return False
         elif self.condition_select == 'python':
             try:
-                safe_eval(self.condition_python, localdict, mode='exec', nocopy=True)
+                safe_eval(self.condition_python, localdict, mode='exec')
                 return bool(localdict.get('result', False))
             except Exception as e:
                 _logger.warning("Error evaluating python condition for rule %s: %s", self.code, str(e))
@@ -130,7 +130,7 @@ class HrSalaryRule(models.Model):
                 return 0.0, 1.0, 0.0
         elif self.amount_select == 'code':
             try:
-                safe_eval(self.amount_python_compute, localdict, mode='exec', nocopy=True)
+                safe_eval(self.amount_python_compute, localdict, mode='exec')
                 computed_amount = float(localdict.get('result', 0.0))
                 qty = float(localdict.get('result_qty', 1.0))
                 rate = float(localdict.get('result_rate', 100.0))

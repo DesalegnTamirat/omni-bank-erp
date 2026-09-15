@@ -835,9 +835,13 @@ class DisciplineCase(models.Model):
                 'Appeal Window Closed: The 10-calendar-day appeal submission window has expired. '
                 'Appeal deadline was %s.'
             ) % (self.appeal_deadline or 'N/A'))
-        existing_pending = self.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review'])
-        if existing_pending:
-            raise UserError(_('An appeal (%s) is already pending review for this case.') % existing_pending[0].name)
+        existing_first = self.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
+        if existing_first:
+            if any(a.state in ['draft', 'submitted', 'under_review'] for a in existing_first):
+                pending = existing_first.filtered(lambda a: a.state in ['draft', 'submitted', 'under_review'])[0]
+                raise UserError(_('An appeal (%s) is already in progress (%s) for this case.') % (pending.name, pending.state))
+            else:
+                raise UserError(_('A 1st Level Appeal (%s) has already been rendered for this case. Open that appeal record to view or submit an escalation.') % existing_first[0].name)
         return {
             'name': _('Submit Appeal for Case %s') % self.name,
             'type': 'ir.actions.act_window',
@@ -866,9 +870,13 @@ class DisciplineCase(models.Model):
             raise UserError(_('On-behalf appeals can only be lodged when the employee has been deactivated following a dismissal.'))
         if not self.is_appeal_window_open:
             raise UserError(_('Appeal Window Closed: The 10-calendar-day appeal submission window has expired.'))
-        existing_pending = self.appeal_ids.filtered(lambda a: a.state in ['submitted', 'under_review'])
-        if existing_pending:
-            raise UserError(_('An appeal (%s) is already pending review for this case.') % existing_pending[0].name)
+        existing_first = self.appeal_ids.filtered(lambda a: a.appeal_level == 'first')
+        if existing_first:
+            if any(a.state in ['draft', 'submitted', 'under_review'] for a in existing_first):
+                pending = existing_first.filtered(lambda a: a.state in ['draft', 'submitted', 'under_review'])[0]
+                raise UserError(_('An appeal (%s) is already in progress (%s) for this case.') % (pending.name, pending.state))
+            else:
+                raise UserError(_('A 1st Level Appeal (%s) has already been rendered for this case. Open that appeal record to view or submit an escalation.') % existing_first[0].name)
         return {
             'name': _('Lodge Appeal on Behalf of %s') % self.employee_id.name,
             'type': 'ir.actions.act_window',

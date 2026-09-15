@@ -48,6 +48,12 @@ class HrPayrollRetroactive(models.Model):
         string='Current Target Payslip',
         help="The active payslip into which the resulting arrears or recoveries will be injected."
     )
+    increment_campaign_id = fields.Many2one(
+        'payroll.increment.campaign',
+        string='Originating Increment Campaign',
+        ondelete='set null',
+        help="The annual salary increment campaign that triggered this retroactive adjustment."
+    )
     
     line_ids = fields.One2many(
         'hr.payroll.retroactive.line',

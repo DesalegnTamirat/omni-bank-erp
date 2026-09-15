@@ -47,4 +47,29 @@
         <field name="binding_model_id" ref="model_hr_payslip_run"/>
         <field name="binding_type">report</field>
     </record>
+
+    <!-- Action for Annual Salary Increment PDF -->
+    <record id="action_report_payroll_increment" model="ir.actions.report">
+        <field name="name">Annual Salary Increment Schedule PDF</field>
+        <field name="model">payroll.increment.campaign</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_payroll_increment</field>
+        <field name="report_file">payroll.report_payroll_increment</field>
+        <field name="print_report_name">'Increment_Schedule - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_payroll_increment_campaign"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Action for Annual Performance Bonus PDF -->
+    <record id="action_report_payroll_bonus" model="ir.actions.report">
+        <field name="name">Annual Performance Bonus Schedule PDF</field>
+        <field name="model">payroll.bonus.campaign</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">payroll.report_payroll_bonus</field>
+        <field name="report_file">payroll.report_payroll_bonus</field>
+        <field name="print_report_name">'Bonus_Schedule - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_payroll_bonus_campaign"/>
+        <field name="binding_type">report</field>
+    </record>
 </odoo>
+

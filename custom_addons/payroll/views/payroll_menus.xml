@@ -56,6 +56,18 @@
               action="action_hr_acting_assignment"
               sequence="10"/>
 
+    <menuitem id="menu_payroll_increment_campaign"
+              name="Annual Salary Increments (July 1)"
+              parent="menu_payroll_lifecycle"
+              action="action_payroll_increment_campaign"
+              sequence="15"/>
+
+    <menuitem id="menu_payroll_bonus_campaign"
+              name="Annual Performance Bonus"
+              parent="menu_payroll_lifecycle"
+              action="action_payroll_bonus_campaign"
+              sequence="16"/>
+
     <menuitem id="menu_hr_payroll_retroactive"
               name="Retroactive Adjustments (Arrears/Recoveries)"
               parent="menu_payroll_lifecycle"

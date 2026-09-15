@@ -331,3 +331,83 @@ Every critical payroll action is logged automatically with the timestamp, operat
 | `negative_net` | Deductions (disciplinary/absence/loans) exceed gross earnings. | Adjust deduction schedules or review penalty withholdings. |
 | `high_variance` | Net pay shifted by $> 25\%$ compared to prior month. | Verify if a promotion, backdated increment, or acting allowance was recently applied. |
 | `missing_contract` | Active employee has no confirmed contract version. | Create and confirm an active `hr.version` contract for the employee. |
+
+---
+
+## 10. Annual Salary Increment Campaign Management (Effective July 1)
+
+In Ethiopian commercial banking practices, annual salary increments are legally and contractually anchored to **July 1 (Hamle 1)**. When board approvals occur in subsequent months (e.g., September or October), the system automatically versions employee contracts and computes exact backdated retroactive arrears.
+
+### 1. Calculation Methodologies Supported
+1. **Flat Multiplier / Factor (`flat_multiplier`)**:
+   - Applies an approved salary multiplier or step factor (e.g., **1.5x standard basic step**) to all eligible staff.
+   - Alternatively supports a flat percentage rate (e.g., 10% across-the-board increase).
+2. **Grade Step Increment Matrix (`grade_step_cofactor`)**:
+   - Computes increments dynamically based on each employee's job grade step table (`hr.job.grade` step amounts) multiplied by an approved grade cofactor.
+3. **PMS Performance Rating Tier Matrix (`pms_performance`)**:
+   - Scales the increment according to individual annual performance appraisal scores (e.g., PMS $\ge$ 120 $\rightarrow$ 2.0x step, PMS 100–119 $\rightarrow$ 1.5x step, PMS 85–99 $\rightarrow$ 1.25x step, PMS 75–84 $\rightarrow$ 1.0x step, PMS 50–74 $\rightarrow$ 0.5x step, PMS $<$ 50 $\rightarrow$ 0.0x step).
+
+### 2. Business Rules & Eligibility Filters
+- **Mid-Year Joiner Proration**: Automatically calculates service months prior to July 1 ($\frac{\text{Service Months}}{12}$).
+- **Minimum Service Gate**: Staff with fewer than 3 months of service prior to July 1 receive 0% increment.
+- **Active Disciplinary Sanction Filter**: Employees with active/unresolved disciplinary records (`discipline.case`) are automatically excluded from the increment campaign.
+
+### 3. Dual-Mode Back-Increment Disbursement
+When approval is granted $N$ months after July 1:
+- **Mode A (Injected into Regular Monthly Payroll)**: Spawns verified `hr.payroll.retroactive` adjustment records. During the next regular payroll cycle, the salary rule `RETRO_ARREARS` automatically injects the accumulated arrears into the employee's monthly payslip.
+- **Mode B (Dedicated "Back Increment" CBS Direct Credit Batch)**: Automatically spawns a standalone CBS payment batch (`payroll.payment.batch`) enabling immediate, out-of-cycle direct credit bank transfer of backdated arrears.
+
+### 4. Step-by-Step Campaign Workflow
+1. Navigate to **Payroll $\rightarrow$ Lifecycle Adjustments $\rightarrow$ Annual Salary Increment**.
+2. Click **Create** and define Fiscal Year (e.g., `2025/2026`), Effective Date (`2025-07-01`), Approval Date, and Calculation Method.
+3. Click **Compute Increment Lines** to generate individual employee increment amounts, prorations, and retroactive arrears.
+4. Click **Verify Campaign** (Senior Compensation Controller).
+5. Click **Approve Campaign** (HR Director / Executive Management).
+6. Click **Apply & Disburse**:
+   - Employee contracts (`hr.version`) and master basic salaries are updated automatically.
+   - Arrears are either scheduled for monthly payroll injection or exported into a dedicated CBS batch.
+   - An immutable audit trail entry is generated in `hr.payroll.audit.log`.
+7. Click **Print PDF** to generate the executive increment campaign audit schedule.
+
+---
+
+## 11. Annual Performance Bonus Engine (Separate Payout — Option A)
+
+Commercial banks in Ethiopia pay annual performance bonuses to staff based on institutional profitability and individual Performance Management System (PMS) appraisal ratings. In accordance with banking standards, bonus campaigns are disbursed **separately from regular monthly payroll** via dedicated CBS batches and GL journal postings.
+
+### 1. PMS Rating Brackets & Multiplier Tiers
+Bonuses are evaluated as multiples of basic monthly salary across seven strict performance appraisal rating tiers:
+
+| PMS Score Bracket | Multiplier (Months of Basic Wage) | Performance Rating Level | Example (Basic 20,000 ETB) |
+| :--- | :--- | :--- | :--- |
+| **Above 150** | **3.50 Months** | Exceptional / Top Performer | $20,000 \times 3.50 = \text{ETB } 70,000$ |
+| **120 – 150** | **2.75 Months** | Outstanding Performance | $20,000 \times 2.75 = \text{ETB } 55,000$ |
+| **100 – 120** | **2.25 Months** | Exceeds Expectations | $20,000 \times 2.25 = \text{ETB } 45,000$ |
+| **85 – 100** | **2.00 Months** | Meets Expectations *(e.g. PMS 91)* | $20,000 \times 2.00 = \text{ETB } 40,000$ |
+| **75 – 85** | **1.25 Months** | Satisfactory Performance | $20,000 \times 1.25 = \text{ETB } 25,000$ |
+| **50 – 75** | **0.50 Months** | Marginal / Needs Improvement | $20,000 \times 0.50 = \text{ETB } 10,000$ |
+| **Below 50** | **0.00 Months** | Disqualified / Unsatisfactory | $20,000 \times 0.00 = \text{ETB } 0$ |
+
+### 2. Ethiopian Tax & Pension Statutory Math for Bonuses
+- **Personal Income Tax (PIT)**: Statutory progressive tax brackets apply to the full gross bonus amount. For example, on a gross bonus of 40,000 ETB (above 10,900 bracket), PIT is computed as $(40,000 \times 35\%) - 1,500 = \text{ETB } 12,500$.
+- **Pension Exemption**: In accordance with POESSA regulatory guidelines, annual performance bonuses are strictly **exempt from pension deductions** (0% Employee, 0% Employer).
+- **Net Bonus Payable**: Gross Bonus $-$ PIT Tax Withholding ($40,000 - 12,500 = \text{ETB } 27,500$).
+
+### 3. General Ledger (GL) Balanced Journal Entry
+Upon campaign disbursement, a balanced journal entry is posted automatically:
+- **Debit**: Staff Bonus Expense Account (`bonus_expense_account_id`) — Gross Bonus Total
+- **Credit**: PIT Tax Withholding Payable Account (`tax_payable_account_id`) — Total Tax Withheld
+- **Credit**: Net Bonus Bank Clearing Account (`payable_account_id`) — Total Net Disbursed
+
+### 4. Step-by-Step Bonus Campaign Workflow
+1. Navigate to **Payroll $\rightarrow$ Lifecycle Adjustments $\rightarrow$ Annual Performance Bonus**.
+2. Click **Create** and specify Fiscal Year (e.g., `2024/2025`), Evaluation Period, Declaration Date, and Tier Multipliers.
+3. Click **Compute Bonus Schedules** to evaluate each employee's PMS rating, prorated days worked, gross bonus, PIT tax deduction, and net payable amount.
+4. Click **Verify Schedule** (Finance & Compensation Review).
+5. Click **Approve Bonus** (Board / Executive Committee Authorization).
+6. Click **Post GL & Disburse CBS**:
+   - Posts the balanced GL voucher entry.
+   - Spawns the dedicated CBS Direct Credit Payment Batch (`payroll.payment.batch`).
+   - Generates the ready-to-transmit CBS CSV / TXT direct credit file.
+   - Logs immutable audit entries in `hr.payroll.audit.log`.
+7. Click **Print PDF** to generate the official executive bonus disbursement schedule.

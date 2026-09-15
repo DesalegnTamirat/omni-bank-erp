@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payroll_increment_document">
+        <t t-call="web.external_layout">
+            <div class="page" style="font-family: Arial, sans-serif; font-size: 11px;">
+                <div class="text-center mb-4">
+                    <h3 style="font-weight: bold; color: #1a365d;">BUNNA BANK S.C.</h3>
+                    <h4 style="font-weight: bold; color: #2b6cb0;">ANNUAL SALARY INCREMENT &amp; BACK-INCREMENT ARREARS SCHEDULE</h4>
+                    <p class="text-muted">
+                        <strong>Fiscal Year:</strong> <span t-field="doc.fiscal_year"/> | 
+                        <strong>Effective Date:</strong> <span t-field="doc.effective_date"/> | 
+                        <strong>Disbursement Mode:</strong> <span t-field="doc.disbursement_mode"/>
+                    </p>
+                </div>
+
+                <div class="row mb-3" style="background-color: #f7fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 4px;">
+                    <div class="col-3">
+                        <strong>Campaign Reference:</strong> <span t-field="doc.name"/><br/>
+                        <strong>Title:</strong> <span t-field="doc.title"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Calculation Method:</strong> <span t-field="doc.calculation_method"/><br/>
+                        <strong>Base Multiplier:</strong> <span t-field="doc.base_multiplier"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Eligible Beneficiaries:</strong> <span t-field="doc.total_beneficiaries"/><br/>
+                        <strong>Monthly Delta:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_monthly_increment)"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Back Arrears:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_retroactive_arrears)"/><br/>
+                        <strong>Annualized Budget:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_annualized_budget_impact)"/>
+                    </div>
+                </div>
+
+                <table class="table table-sm table-bordered table-striped" style="width: 100%;">
+                    <thead style="background-color: #2b6cb0; color: white;">
+                        <tr>
+                            <th style="width: 5%;">#</th>
+                            <th style="width: 20%;">Employee Name</th>
+                            <th style="width: 15%;">Department</th>
+                            <th style="width: 12%;">Grade / Position</th>
+                            <th class="text-right" style="width: 12%;">Current Basic</th>
+                            <th class="text-right" style="width: 10%;">Increment</th>
+                            <th class="text-right" style="width: 12%;">New Basic</th>
+                            <th class="text-center" style="width: 6%;">Mos</th>
+                            <th class="text-right" style="width: 8%;">Arrears</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-set="count" t-value="1"/>
+                        <tr t-foreach="doc.line_ids.filtered(lambda l: l.is_eligible)" t-as="line">
+                            <td><span t-esc="count"/></td>
+                            <td><strong><span t-field="line.employee_id.name"/></strong></td>
+                            <td><span t-field="line.department_id.name"/></td>
+                            <td><span t-field="line.grade_id.grade_name or line.job_id.name"/></td>
+                            <td class="text-right"><span t-esc="'{:,.2f}'.format(line.current_basic)"/></td>
+                            <td class="text-right" style="color: #2b6cb0;">+<span t-esc="'{:,.2f}'.format(line.increment_amount)"/></td>
+                            <td class="text-right" style="font-weight: bold;"><span t-esc="'{:,.2f}'.format(line.new_basic)"/></td>
+                            <td class="text-center"><span t-esc="line.retroactive_months"/></td>
+                            <td class="text-right" style="font-weight: bold; color: #276749;"><span t-esc="'{:,.2f}'.format(line.retroactive_arrears)"/></td>
+                            <t t-set="count" t-value="count + 1"/>
+                        </tr>
+                    </tbody>
+                    <tfoot style="background-color: #edf2f7; font-weight: bold;">
+                        <tr>
+                            <td colspan="4" class="text-right"><strong>GRAND TOTAL:</strong></td>
+                            <td class="text-right">ETB <span t-esc="'{:,.2f}'.format(doc.total_current_basic)"/></td>
+                            <td class="text-right">ETB <span t-esc="'{:,.2f}'.format(doc.total_monthly_increment)"/></td>
+                            <td class="text-right">ETB <span t-esc="'{:,.2f}'.format(doc.total_new_basic)"/></td>
+                            <td></td>
+                            <td class="text-right">ETB <span t-esc="'{:,.2f}'.format(doc.total_retroactive_arrears)"/></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="row mt-5" style="page-break-inside: avoid;">
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Prepared By (Compensation Officer)</strong>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Verified By (HR Director)</strong>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Approved By (VP / President)</strong>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_payroll_increment">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="payroll.report_payroll_increment_document" t-lang="doc.env.user.lang"/>
+            </t>
+        </t>
+    </template>
+</odoo>

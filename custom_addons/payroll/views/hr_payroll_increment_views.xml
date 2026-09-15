@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Tree / List View: Increment Campaign -->
+    <record id="view_payroll_increment_campaign_tree" model="ir.ui.view">
+        <field name="name">payroll.increment.campaign.tree</field>
+        <field name="model">payroll.increment.campaign</field>
+        <field name="arch" type="xml">
+            <list string="Annual Salary Increment Campaigns" decoration-info="state == 'computed'" decoration-warning="state == 'verified'" decoration-success="state in ('approved', 'applied')">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="fiscal_year"/>
+                <field name="effective_date"/>
+                <field name="calculation_method"/>
+                <field name="total_beneficiaries"/>
+                <field name="total_monthly_increment" sum="Total Monthly Delta"/>
+                <field name="total_retroactive_arrears" sum="Total Back-Increment Arrears"/>
+                <field name="disbursement_mode"/>
+                <field name="state" widget="badge"
+                       decoration-muted="state == 'draft'"
+                       decoration-info="state == 'computed'"
+                       decoration-warning="state == 'verified'"
+                       decoration-success="state in ('approved', 'applied')"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View: Increment Campaign -->
+    <record id="view_payroll_increment_campaign_form" model="ir.ui.view">
+        <field name="name">payroll.increment.campaign.form</field>
+        <field name="model">payroll.increment.campaign</field>
+        <field name="arch" type="xml">
+            <form string="Annual Salary Increment Campaign">
+                <header>
+                    <button name="action_compute_increment_lines" string="Compute Increment Schedules" type="object" class="oe_highlight" invisible="state not in ('draft', 'computed')"/>
+                    <button name="action_verify" string="Verify Campaign (Compensation Lead)" type="object" class="oe_highlight" invisible="state != 'computed'" groups="payroll.group_payroll_verifier,payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_approve" string="Approve (VP / Board)" type="object" class="btn-success" invisible="state != 'verified'" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_apply_and_disburse" string="Apply &amp; Version Contracts (Disburse)" type="object" class="btn-primary" invisible="state != 'approved'" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state in ('draft', 'applied', 'cancelled')" groups="payroll.group_payroll_manager,payroll.group_payroll_admin"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,computed,verified,approved,applied"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Campaign Reference"/>
+                        <h1><field name="name"/></h1>
+                        <label for="title" string="Campaign Title"/>
+                        <h2><field name="title" placeholder="e.g., FY 2025/2026 Annual Staff Salary Increment" readonly="state == 'applied'"/></h2>
+                    </div>
+
+                    <group>
+                        <group string="Timeline &amp; Effective Horizon">
+                            <field name="fiscal_year" readonly="state == 'applied'"/>
+                            <field name="effective_date" readonly="state == 'applied'"/>
+                            <field name="approval_date" readonly="state == 'applied'"/>
+                        </group>
+                        <group string="Calculation &amp; Scheme Parameters">
+                            <field name="calculation_method" readonly="state == 'applied'"/>
+                            <field name="base_multiplier" invisible="calculation_method not in ('flat_multiplier', 'grade_step_cofactor', 'pms_performance')" readonly="state == 'applied'"/>
+                            <field name="percentage_rate" invisible="calculation_method != 'flat_multiplier'" readonly="state == 'applied'"/>
+                            <field name="disbursement_mode" widget="radio" readonly="state == 'applied'"/>
+                        </group>
+                    </group>
+
+                    <group string="Eligibility &amp; Proration Governance">
+                        <group>
+                            <field name="prorate_joiners" readonly="state == 'applied'"/>
+                            <field name="min_service_months" readonly="state == 'applied'"/>
+                            <field name="exclude_disciplined" readonly="state == 'applied'"/>
+                        </group>
+                        <group>
+                            <field name="department_ids" widget="many2many_tags" placeholder="Bank-Wide (All Departments)" readonly="state == 'applied'"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" placeholder="Bank-Wide (All Branches / Head Office)" readonly="state == 'applied'"/>
+                        </group>
+                    </group>
+
+                    <!-- Financial Impact Summary Cards -->
+                    <group string="Enterprise Budget &amp; Arrears Summary" col="4">
+                        <field name="total_beneficiaries" readonly="1"/>
+                        <field name="total_monthly_increment" readonly="1"/>
+                        <field name="total_current_basic" readonly="1"/>
+                        <field name="total_retroactive_arrears" readonly="1"/>
+                        <field name="total_new_basic" readonly="1"/>
+                        <field name="total_annualized_budget_impact" readonly="1"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Employee Increment Schedules" name="increment_lines">
+                            <field name="line_ids" readonly="state == 'applied'">
+                                <list editable="bottom" decoration-muted="not is_eligible" decoration-success="is_eligible and increment_amount &gt; 0">
+                                    <field name="employee_id"/>
+                                    <field name="department_id" optional="show"/>
+                                    <field name="job_id" optional="show"/>
+                                    <field name="grade_id" optional="show"/>
+                                    <field name="current_basic"/>
+                                    <field name="pms_score" optional="show"/>
+                                    <field name="service_months" optional="show"/>
+                                    <field name="proration_factor" optional="show"/>
+                                    <field name="is_eligible"/>
+                                    <field name="ineligibility_reason" optional="hide"/>
+                                    <field name="increment_amount"/>
+                                    <field name="new_basic"/>
+                                    <field name="retroactive_months"/>
+                                    <field name="retroactive_arrears"/>
+                                    <field name="bank_account" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Downstream Integrations &amp; Disbursement Links" name="integrations">
+                            <group>
+                                <group string="Mode B: Separate Back-Increment Payment Batch">
+                                    <field name="payment_batch_id" readonly="1"/>
+                                </group>
+                                <group string="Mode A: Monthly Payroll Retroactive Batches">
+                                    <field name="retroactive_batch_ids" widget="many2many_tags" readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Sign-Off Audit &amp; Resolution Notes" name="audit_notes">
+                            <group>
+                                <group string="Approval Hierarchy">
+                                    <field name="verified_by"/>
+                                    <field name="approved_by"/>
+                                    <field name="applied_by"/>
+                                </group>
+                                <group string="Board Resolution &amp; Policy Notes">
+                                    <field name="notes" placeholder="Enter board minute reference, policy justification, and authorization details..." readonly="state == 'applied'"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View: Increment Campaign -->
+    <record id="view_payroll_increment_campaign_search" model="ir.ui.view">
+        <field name="name">payroll.increment.campaign.search</field>
+        <field name="model">payroll.increment.campaign</field>
+        <field name="arch" type="xml">
+            <search string="Search Increment Campaigns">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="fiscal_year"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <filter string="Computed" name="computed" domain="[('state', '=', 'computed')]"/>
+                <filter string="Verified" name="verified" domain="[('state', '=', 'verified')]"/>
+                <filter string="Approved" name="approved" domain="[('state', '=', 'approved')]"/>
+                <filter string="Applied" name="applied" domain="[('state', '=', 'applied')]"/>
+                <filter string="Fiscal Year" name="group_fy" context="{'group_by': 'fiscal_year'}"/>
+                <filter string="Calculation Scheme" name="group_calc" context="{'group_by': 'calculation_method'}"/>
+                <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action: Increment Campaign -->
+    <record id="action_payroll_increment_campaign" model="ir.actions.act_window">
+        <field name="name">Annual Salary Increments (July 1)</field>
+        <field name="res_model">payroll.increment.campaign</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_payroll_increment_campaign_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Initiate a new bank-wide Annual Salary Increment Campaign!
+            </p>
+            <p>
+                Configure effective date (July 1), computation factor (1.5x basic step), service proration,
+                and choose whether back-increment arrears are disbursed separately or integrated into regular payroll.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payroll_bonus_document">
+        <t t-call="web.external_layout">
+            <div class="page" style="font-family: Arial, sans-serif; font-size: 11px;">
+                <div class="text-center mb-4">
+                    <h3 style="font-weight: bold; color: #1a365d;">BUNNA BANK S.C.</h3>
+                    <h4 style="font-weight: bold; color: #7b142a;">ANNUAL PERFORMANCE BONUS DISTRIBUTION &amp; TAX WITHHOLDING SCHEDULE</h4>
+                    <p class="text-muted">
+                        <strong>Fiscal Year:</strong> <span t-field="doc.fiscal_year"/> | 
+                        <strong>Declaration Date:</strong> <span t-field="doc.declaration_date"/> | 
+                        <strong>Disbursement Mode:</strong> Separate Core Banking Payment Batch
+                    </p>
+                </div>
+
+                <div class="row mb-3" style="background-color: #fff5f5; border: 1px solid #fed7d7; padding: 10px; border-radius: 4px;">
+                    <div class="col-3">
+                        <strong>Bonus Reference:</strong> <span t-field="doc.name"/><br/>
+                        <strong>Title:</strong> <span t-field="doc.title"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Beneficiaries:</strong> <span t-field="doc.total_beneficiaries"/> Staff<br/>
+                        <strong>Pension Status:</strong> Statutory Exempt (0%)
+                    </div>
+                    <div class="col-3">
+                        <strong>Gross Bonus:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_gross_bonus)"/><br/>
+                        <strong>PIT Tax Withheld:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_tax_deduction)"/>
+                    </div>
+                    <div class="col-3">
+                        <strong>Total Net Payable:</strong> ETB <span t-esc="'{:,.2f}'.format(doc.total_net_payable)"/><br/>
+                        <strong>Payment Batch:</strong> <span t-field="doc.payment_batch_id.number or doc.name"/>
+                    </div>
+                </div>
+
+                <table class="table table-sm table-bordered table-striped" style="width: 100%;">
+                    <thead style="background-color: #7b142a; color: white;">
+                        <tr>
+                            <th style="width: 4%;">#</th>
+                            <th style="width: 20%;">Employee Name</th>
+                            <th style="width: 14%;">Department</th>
+                            <th class="text-right" style="width: 12%;">Basic Salary</th>
+                            <th class="text-center" style="width: 8%;">PMS Score</th>
+                            <th style="width: 14%;">PMS Tier</th>
+                            <th class="text-center" style="width: 6%;">Mult</th>
+                            <th class="text-right" style="width: 11%;">Gross Bonus</th>
+                            <th class="text-right" style="width: 11%;">PIT Tax</th>
+                            <th class="text-right" style="width: 12%;">Net Payable</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-set="count" t-value="1"/>
+                        <tr t-foreach="doc.line_ids.filtered(lambda l: l.is_eligible)" t-as="line">
+                            <td><span t-esc="count"/></td>
+                            <td><strong><span t-field="line.employee_id.name"/></strong></td>
+                            <td><span t-field="line.department_id.name"/></td>
+                            <td class="text-right"><span t-esc="'{:,.2f}'.format(line.basic_salary)"/></td>
+                            <td class="text-center"><strong><span t-esc="line.pms_score"/></strong></td>
+                            <td><span t-field="line.tier_name"/></td>
+                            <td class="text-center"><span t-esc="line.months_multiplier"/>x</td>
+                            <td class="text-right"><span t-esc="'{:,.2f}'.format(line.gross_bonus)"/></td>
+                            <td class="text-right" style="color: #c53030;"><span t-esc="'{:,.2f}'.format(line.tax_deduction)"/></td>
+                            <td class="text-right" style="font-weight: bold; color: #22543d;"><span t-esc="'{:,.2f}'.format(line.net_payable)"/></td>
+                            <t t-set="count" t-value="count + 1"/>
+                        </tr>
+                    </tbody>
+                    <tfoot style="background-color: #edf2f7; font-weight: bold;">
+                        <tr>
+                            <td colspan="7" class="text-right"><strong>GRAND TOTAL:</strong></td>
+                            <td class="text-right">ETB <span t-esc="'{:,.2f}'.format(doc.total_gross_bonus)"/></td>
+                            <td class="text-right" style="color: #c53030;">ETB <span t-esc="'{:,.2f}'.format(doc.total_tax_deduction)"/></td>
+                            <td class="text-right" style="color: #22543d;">ETB <span t-esc="'{:,.2f}'.format(doc.total_net_payable)"/></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="row mt-5" style="page-break-inside: avoid;">
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Prepared By (Payroll Lead)</strong>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Audited By (Chief Financial Officer)</strong>
+                    </div>
+                    <div class="col-4 text-center">
+                        <p>_________________________________</p>
+                        <strong>Approved By (Chief Executive Officer)</strong>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_payroll_bonus">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="payroll.report_payroll_bonus_document" t-lang="doc.env.user.lang"/>
+            </t>
+        </t>
+    </template>
+</odoo>

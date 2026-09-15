@@ -11,6 +11,13 @@ class HrEmployee(models.Model):
     """
     _inherit = 'hr.employee'
 
+    basic_salary = fields.Float(string='Basic Salary (ETB)', digits=(16, 2), tracking=True)
+    salary_account = fields.Char(string='Salary Bank Account', tracking=True)
+    bank_account_number = fields.Char(string='Bank Account Number', related='salary_account', readonly=False)
+    tin = fields.Char(string='TIN Number', tracking=True)
+    joining_date = fields.Date(string='Joining Date', tracking=True)
+    pms_score = fields.Float(string='PMS Rating Score', digits=(16, 2), tracking=True)
+
     payslip_ids = fields.One2many('hr.payslip', 'employee_id', string='Payslips')
     payslip_count = fields.Integer(string='Payslips Count', compute='_compute_payroll_metrics')
     

@@ -3,3 +3,4 @@
 
 from . import test_payroll_calculations
 from . import test_proration_and_acting
+from . import test_annual_increment_and_bonus

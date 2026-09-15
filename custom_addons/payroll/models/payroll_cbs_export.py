@@ -31,7 +31,9 @@ class PayrollPaymentBatch(models.Model):
         readonly=True,
         default=lambda self: self.env['ir.sequence'].next_by_code('payroll.payment.batch') or _('New')
     )
-    payrun_id = fields.Many2one('hr.payslip.run', string='Originating Payrun', required=True, tracking=True)
+    payrun_id = fields.Many2one('hr.payslip.run', string='Originating Payrun', required=False, tracking=True)
+    increment_campaign_id = fields.Many2one('payroll.increment.campaign', string='Originating Increment Campaign', ondelete='set null')
+    bonus_campaign_id = fields.Many2one('payroll.bonus.campaign', string='Originating Bonus Campaign', ondelete='set null')
     payment_date = fields.Date(string='Disbursement Value Date', required=True, default=fields.Date.context_today, tracking=True)
     
     export_format = fields.Selection([
