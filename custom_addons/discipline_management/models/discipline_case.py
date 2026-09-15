@@ -29,6 +29,7 @@ class DisciplineCase(models.Model):
         ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
+        ('exonerate', 'Exonerated / Overturned'),
     ], string='Applicable Punishment', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
 
     original_punishment_type = fields.Selection([
@@ -39,6 +40,7 @@ class DisciplineCase(models.Model):
         ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
+        ('exonerate', 'Exonerated / Overturned'),
     ], string='Original Standard Punishment', compute='_compute_punishment_details', store=True, readonly=True)
 
     original_penalty_percentage = fields.Float(string='Original Penalty Percentage (%)', compute='_compute_punishment_details', store=True, readonly=True)
@@ -52,6 +54,7 @@ class DisciplineCase(models.Model):
         ('first_warning_penalty', 'First Warning + Penalty'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
+        ('exonerate', 'Exonerated / Overturned'),
     ], string='Final Committee Decided Punishment', tracking=True)
 
     decided_penalty_percentage = fields.Float(string='Final Decided Penalty (%)', tracking=True)

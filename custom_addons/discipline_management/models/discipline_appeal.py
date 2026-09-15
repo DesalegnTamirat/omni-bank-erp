@@ -237,6 +237,11 @@ class DisciplineAppeal(models.Model):
         compute='_compute_is_appeal_reviewer_or_admin'
     )
 
+    can_user_review_current_stage = fields.Boolean(
+        string='Can User Review Current Stage',
+        compute='_compute_can_user_review_current_stage'
+    )
+
     is_appellant_employee = fields.Boolean(
         string='Is Appellant Employee',
         compute='_compute_is_appellant_employee'
@@ -255,6 +260,30 @@ class DisciplineAppeal(models.Model):
         )
         for rec in self:
             rec.is_appeal_reviewer_or_admin = is_reviewer
+
+    @api.depends('appeal_target_authority', 'appeal_level', 'case_origin_type')
+    def _compute_can_user_review_current_stage(self):
+        user = self.env.user
+        is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
+        is_ceo = user.has_group('discipline_management.group_discipline_ceo')
+        is_chief = user.has_group('discipline_management.group_discipline_chief') or user.has_group('discipline_management.group_discipline_cpco')
+        is_director = user.has_group('discipline_management.group_discipline_director')
+        is_pomd = user.has_group('discipline_management.group_discipline_pomd')
+
+        for rec in self:
+            target = rec.appeal_target_authority
+            can_review = False
+            if target == 'directorate':
+                can_review = is_director or is_admin
+            elif target == 'chief':
+                can_review = is_chief or is_admin
+            elif target == 'secretary':
+                can_review = is_pomd or is_admin
+            elif target == 'ceo':
+                can_review = is_ceo or is_admin
+            else:
+                can_review = is_admin
+            rec.can_user_review_current_stage = can_review
 
     @api.depends('case_id', 'case_id.employee_id', 'employee_id')
     def _compute_is_appellant_employee(self):
@@ -505,23 +534,16 @@ class DisciplineAppeal(models.Model):
                 rec.case_id.sudo().message_post(body=_('Appeal %s (%s) submitted against Case decision.') % (rec.name, rec.appeal_level))
 
     def write(self, vals):
-        # Decision outcome and revised action fields can only be modified by director, POMD, CPCO, CEO, or admin
+        # Decision outcome and revised action fields can only be modified by designated stage authority or admin
         outcome_fields = {
             'decision_outcome', 'revised_punishment_type', 'revised_penalty_percentage',
             'revised_fine_days', 'appeal_decision_notes', 'review_date'
         }
         if not self.env.su and any(f in vals for f in outcome_fields):
-            user = self.env.user
-            is_authorized = (
-                user.has_group('discipline_management.group_discipline_director') or
-                user.has_group('discipline_management.group_discipline_pomd') or
-                user.has_group('discipline_management.group_discipline_cpco') or
-                user.has_group('discipline_management.group_discipline_ceo') or
-                user.has_group('discipline_management.group_discipline_admin') or
-                user.has_group('base.group_system')
-            )
-            if not is_authorized:
-                raise UserError(_('Permission Denied: Decision outcome and revised action fields can only be modified by the Appeal Authority / Directorate Director or HR Administrator.'))
+            for rec in self:
+                if not rec.can_user_review_current_stage:
+                    target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                    raise UserError(_('Permission Denied: Decision outcome and revised action fields can only be modified by the designated appeal authority (%s) or HR Administrator.') % target_label)
 
         # Supporting document can only be uploaded / modified by the employee or POMD/Admin on behalf
         doc_fields = {'supporting_document', 'document_filename'}
@@ -547,6 +569,9 @@ class DisciplineAppeal(models.Model):
 
     def action_start_review(self):
         for rec in self:
+            if not rec.can_user_review_current_stage:
+                target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                raise UserError(_('Authority Restriction: You do not have the required authority role (%s) to start review for this appeal stage.') % target_label)
             rec.write({
                 'reviewer_id': self.env.user.id,
                 'state': 'under_review'
@@ -559,6 +584,9 @@ class DisciplineAppeal(models.Model):
     def action_render_decision(self):
         """Apply appeal decision and update original case outcome."""
         for rec in self:
+            if not rec.can_user_review_current_stage:
+                target_label = dict(self._fields['appeal_target_authority'].selection).get(rec.appeal_target_authority, rec.appeal_target_authority)
+                raise UserError(_('Authority Restriction: You do not have the required authority role (%s) to render decisions for this appeal stage.') % target_label)
             if not rec.decision_outcome:
                 raise UserError(_('Select an Appeal Decision Outcome before finalizing.'))
 

@@ -25,10 +25,10 @@
                         <button name="action_submit_appeal" string="Submit Appeal" type="object" class="btn-primary"
                                 invisible="state != 'draft'"/>
                         <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info"
-                                invisible="state != 'submitted'"
+                                invisible="state != 'submitted' or not can_user_review_current_stage"
                                 groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
                         <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success"
-                                invisible="state != 'under_review'"
+                                invisible="state != 'under_review' or not can_user_review_current_stage"
                                 groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
                         <button name="action_create_next_appeal" string="Submit Escalated Appeal" type="object" class="btn-warning"
                                 invisible="not can_submit_next_appeal"
@@ -40,6 +40,7 @@
                         <field name="can_submit_second_appeal" invisible="1"/>
                         <field name="next_appeal_button_label" invisible="1"/>
                         <field name="is_appeal_reviewer_or_admin" invisible="1"/>
+                        <field name="can_user_review_current_stage" invisible="1"/>
                         <field name="is_appellant_employee" invisible="1"/>
                         <group>
                             <group string="Appeal Information &amp; Stage">
@@ -81,14 +82,14 @@
                                         <field name="original_fine_days" readonly="1"/>
                                     </group>
                                     <group string="Revised Appeal Decision">
-                                        <field name="decision_outcome" readonly="state != 'under_review' or not is_appeal_reviewer_or_admin"/>
-                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not is_appeal_reviewer_or_admin"/>
-                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not is_appeal_reviewer_or_admin"/>
-                                        <field name="revised_fine_days" readonly="state != 'under_review' or not is_appeal_reviewer_or_admin"/>
+                                        <field name="decision_outcome" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_fine_days" readonly="state != 'under_review' or not can_user_review_current_stage"/>
                                     </group>
                                 </group>
                                 <group string="Decision Justification &amp; Rationale">
-                                    <field name="appeal_decision_notes" nolabel="1" readonly="state != 'under_review' or not is_appeal_reviewer_or_admin" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..."/>
+                                    <field name="appeal_decision_notes" nolabel="1" readonly="state != 'under_review' or not can_user_review_current_stage" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..."/>
                                 </group>
                             </page>
                         </notebook>
