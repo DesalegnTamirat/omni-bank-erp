@@ -70,6 +70,7 @@ class DisciplineSuspension(models.Model):
         ('extended', 'Extended'),
         ('completed', 'Completed / Reinstated'),
         ('converted_dismissal', 'Converted to Dismissal'),
+        ('revoked', 'Revoked / Exonerated'),
     ], string='Status', default='draft', required=True, tracking=True, index=True)
 
     days_remaining = fields.Integer(string='Days Remaining', compute='_compute_days_remaining')
@@ -99,14 +100,16 @@ class DisciplineSuspension(models.Model):
             else:
                 rec.days_remaining = 0
 
-    # Maximum Duration Enforcement (30 Working Days)
+    # Maximum Duration Enforcement (Configurable: Default 30 Working Days)
     @api.constrains('working_days_count', 'start_date', 'end_date')
     def _check_max_duration(self):
+        ICP = self.env['ir.config_parameter'].sudo()
+        max_days = int(ICP.get_param('discipline.max_suspension_days', 30))
         for rec in self:
             if rec.start_date and rec.end_date and rec.end_date < rec.start_date:
                 raise ValidationError(_('Suspension End Date cannot be earlier than Start Date.'))
-            if rec.working_days_count > 30:
-                raise ValidationError(_('Maximum Duration Violation: Discipline policy restricts maximum suspension duration to thirty (30) working days (%s working days calculated).') % rec.working_days_count)
+            if rec.working_days_count > max_days:
+                raise ValidationError(_('Maximum Duration Violation: Discipline policy restricts maximum suspension duration to %d working days (%s working days calculated).') % (max_days, rec.working_days_count))
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -141,8 +144,8 @@ class DisciplineSuspension(models.Model):
                     raise UserError(_('Authority Restriction: Non-managerial suspensions must be approved by People Operations Directorate (POMD).'))
 
             rec.write({'state': 'active'})
-            rec.employee_id.is_suspended = True
-            rec.employee_id.suspension_type = rec.suspension_type
+            rec.employee_id.sudo().is_suspended = True
+            rec.employee_id.sudo().suspension_type = rec.suspension_type
 
             # Deactivate employee ERP user account during active suspension
             if rec.employee_id.user_id:
@@ -159,8 +162,8 @@ class DisciplineSuspension(models.Model):
         """Reinstate employee and restore ERP user account."""
         for rec in self:
             rec.write({'state': 'completed'})
-            rec.employee_id.is_suspended = False
-            rec.employee_id.suspension_type = False
+            rec.employee_id.sudo().is_suspended = False
+            rec.employee_id.sudo().suspension_type = False
             
             # Reactivate ERP user account
             if rec.employee_id.user_id:
@@ -168,6 +171,16 @@ class DisciplineSuspension(models.Model):
                 rec.message_post(body=_('Employee ERP user account (%s) reactivated upon reinstatement.') % rec.employee_id.user_id.name)
 
             rec.case_id.message_post(body=_('Suspension completed. Employee %s reinstated to duty.') % rec.employee_id.name)
+
+    def action_revoke_exonerated(self):
+        """Revoke suspension upon employee exoneration by Audit Directorate / CEO endorsement."""
+        for rec in self:
+            rec.write({'state': 'revoked'})
+            rec.employee_id.sudo().is_suspended = False
+            rec.employee_id.sudo().suspension_type = False
+            if rec.employee_id.user_id:
+                rec.employee_id.user_id.sudo().write({'active': True})
+            rec.message_post(body=_('Suspension revoked following executive exoneration. Full salary backpay and active status restored.'))
 
     def action_convert_to_dismissal(self):
         """

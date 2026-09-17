@@ -16,11 +16,20 @@ class TestDisciplineManagement(TransactionCase):
         super().setUpClass()
 
         # Create Test Department
+        cls.operating_unit = cls.env['operating.unit'].search([], limit=1)
+        if not cls.operating_unit:
+            cls.operating_unit = cls.env['operating.unit'].create({
+                'name': 'Main Head Office',
+                'code': 'MHO'
+            })
+
         cls.department = cls.env['hr.department'].create({
             'name': 'Retail Banking Directorate',
+            'operating_unit_id': cls.operating_unit.id,
         })
 
         # Reference Security Groups
+        cls.group_internal = cls.env.ref('base.group_user')
         cls.group_officer = cls.env.ref('discipline_management.group_discipline_officer')
         cls.group_manager = cls.env.ref('discipline_management.group_discipline_manager')
         cls.group_director = cls.env.ref('discipline_management.group_discipline_director')
@@ -29,32 +38,32 @@ class TestDisciplineManagement(TransactionCase):
         cls.group_pomd = cls.env.ref('discipline_management.group_discipline_pomd')
         cls.group_legal = cls.env.ref('discipline_management.group_discipline_legal')
 
-        cls.user_manager = cls.env['res.users'].create({
+        cls.user_manager = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Branch Line Manager',
             'login': 'manager_user_test',
-            'email': 'manager@test.com',
-            'group_ids': [(6, 0, [cls.group_manager.id])],
+            'email': False,
+            'group_ids': [(6, 0, [cls.group_internal.id, cls.group_manager.id])],
         })
 
-        cls.user_director = cls.env['res.users'].create({
+        cls.user_director = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Retail Banking Director',
             'login': 'director_user_test',
-            'email': 'director@test.com',
-            'group_ids': [(6, 0, [cls.group_director.id])],
+            'email': False,
+            'group_ids': [(6, 0, [cls.group_internal.id, cls.group_director.id])],
         })
 
-        cls.user_cpco = cls.env['res.users'].create({
+        cls.user_cpco = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Chief People Officer',
             'login': 'cpco_user_test',
-            'email': 'cpco@test.com',
-            'group_ids': [(6, 0, [cls.group_cpco.id])],
+            'email': False,
+            'group_ids': [(6, 0, [cls.group_internal.id, cls.group_cpco.id])],
         })
 
-        cls.user_pomd = cls.env['res.users'].create({
+        cls.user_pomd = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'POMD Secretary User',
             'login': 'pomd_user_test',
-            'email': 'pomd@test.com',
-            'group_ids': [(6, 0, [cls.group_pomd.id])],
+            'email': False,
+            'group_ids': [(6, 0, [cls.group_internal.id, cls.group_pomd.id])],
         })
 
         # Set Department Manager
@@ -66,10 +75,10 @@ class TestDisciplineManagement(TransactionCase):
         cls.department.manager_id = cls.emp_director
 
         # Create Non-Managerial Employee
-        cls.user_emp_non_mgr = cls.env['res.users'].create({
+        cls.user_emp_non_mgr = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Test Clerk Non-Mgr',
             'login': 'clerk_test',
-            'email': 'clerk@test.com',
+            'email': False,
         })
         cls.emp_non_mgr = cls.env['hr.employee'].create({
             'name': 'Test Clerk Non-Mgr',
@@ -79,10 +88,10 @@ class TestDisciplineManagement(TransactionCase):
         })
 
         # Create Managerial Employee
-        cls.user_emp_mgr = cls.env['res.users'].create({
+        cls.user_emp_mgr = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True).create({
             'name': 'Test Assistant Branch Manager',
             'login': 'abm_test',
-            'email': 'abm@test.com',
+            'email': False,
         })
         cls.emp_mgr = cls.env['hr.employee'].create({
             'name': 'Test Assistant Branch Manager',
@@ -94,6 +103,7 @@ class TestDisciplineManagement(TransactionCase):
         # Create RMCD / Audit Employee
         cls.audit_department = cls.env['hr.department'].create({
             'name': 'Internal Audit Directorate',
+            'operating_unit_id': cls.operating_unit.id,
         })
         cls.emp_audit = cls.env['hr.employee'].create({
             'name': 'Senior Auditor Emp',
@@ -106,11 +116,11 @@ class TestDisciplineManagement(TransactionCase):
             'name': 'Operational Non-Compliance',
             'code': 'OP-01',
         })
+        cls.level_4 = cls.env['discipline.severity.level'].search([('code', '=', 'level_4')], limit=1)
         cls.offense = cls.env['discipline.offense'].create({
             'name': 'Unauthorized Cash Variance',
-            'code': 'OFF-001',
             'category_id': cls.category.id,
-            'severity_level': 'level_4',
+            'severity_level_id': cls.level_4.id if cls.level_4 else False,
         })
 
     def test_01_non_managerial_level_4_first_warning_enforcement(self):
@@ -191,7 +201,7 @@ class TestDisciplineManagement(TransactionCase):
             'offense_id': self.offense.id,
             'incident_date': date.today(),
             'description': 'Severe audit irregularity involving cash shortage.',
-            'initiator_type': 'head_office',
+            'initiator_type': 'audit',
             'severity_level': 'level_1',
         })
         case.action_submit()

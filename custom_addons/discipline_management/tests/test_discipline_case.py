@@ -68,34 +68,29 @@ class TestDisciplineCase(TransactionCase):
             'code': 'OP_MISCONDUCT',
         })
 
+        self.level_1 = self.env['discipline.severity.level'].search([('code', '=', 'level_1')], limit=1)
+        self.level_4 = self.env['discipline.severity.level'].search([('code', '=', 'level_4')], limit=1)
+        self.level_2 = self.env['discipline.severity.level'].search([('code', '=', 'level_2')], limit=1)
+
         # Level 1 Critical Offense (Dismissal)
         self.offense_level1 = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Fraud & Embezzlement',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_1',
-            'punishment_type': 'dismissal',
-            'penalty_percentage': 0.0,
-            'approval_authority': 'executive',
+            'severity_level_id': self.level_1.id if self.level_1 else False,
         })
 
         # Level 4 Moderate Offense (5% penalty)
         self.offense_level4 = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Unauthorized Absence',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_4',
-            'punishment_type': 'first_warning_penalty',
-            'penalty_percentage': 5.0,
-            'approval_authority': 'direct_manager',
+            'severity_level_id': self.level_4.id if self.level_4 else False,
         })
 
         # Demotion Offense
         self.offense_demotion = self.env['discipline.offense'].with_user(self.user_approver).create({
             'name': 'Serious Operational Failures',
             'category_id': self.offense_category.id,
-            'severity_level': 'level_2',
-            'punishment_type': 'demotion',
-            'penalty_percentage': 0.0,
-            'approval_authority': 'executive',
+            'severity_level_id': self.level_2.id if self.level_2 else False,
         })
 
     def test_01_duplicate_case_prevention(self):
@@ -122,6 +117,10 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
+            'initiator_type': 'director',
+            'case_action_track': 'committee_escalation',
+            'decided_punishment_type': 'first_warning_penalty',
             'incident_date': today,
             'description': 'Segregation test incident.',
             'initiator_id': self.user_initiator.id,
@@ -160,6 +159,8 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
+            'decided_punishment_type': 'first_warning_penalty',
             'incident_date': today - timedelta(days=20),
             'description': 'Appeal test incident.',
             'initiator_id': self.user_initiator.id,
@@ -171,6 +172,7 @@ class TestDisciplineCase(TransactionCase):
         case.with_user(self.user_approver).action_approve_and_enforce()
 
         case.final_decision_date = today - timedelta(days=15)
+        case.delivery_receipt_date = today - timedelta(days=15)
 
         with self.assertRaises(ValidationError):
             self.env['discipline.appeal'].create({
@@ -196,6 +198,8 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
+            'decided_punishment_type': 'first_warning_penalty',
             'incident_date': today,
             'description': 'Committee check incident.',
             'initiator_id': self.user_initiator.id,
@@ -227,6 +231,7 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
             'incident_date': today,
             'description': 'Suspension cron incident.',
         })
@@ -237,7 +242,7 @@ class TestDisciplineCase(TransactionCase):
             'end_date': today + timedelta(days=10),
             'reason': 'Investigation pending.',
         })
-        suspension.action_activate_suspension()
+        suspension.with_user(self.user_approver).action_activate_suspension()
 
         # Run monthly penalty cron
         self.env['discipline.suspension']._cron_process_monthly_suspension_penalties()
@@ -252,6 +257,8 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
+            'decided_punishment_type': 'first_warning_penalty',
             'incident_date': today,
             'description': 'Immutability test incident.',
             'initiator_id': self.user_initiator.id,
@@ -272,6 +279,8 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_demotion.id,
+            'severity_level_id': self.level_2.id if self.level_2 else False,
+            'decided_punishment_type': 'demotion',
             'incident_date': today,
             'description': 'Demotion test incident.',
             'initiator_id': self.user_initiator.id,
@@ -297,7 +306,9 @@ class TestDisciplineCase(TransactionCase):
                 'employee_id': self.employee.id,
                 'check_in': today - timedelta(days=5 - i * 2),
                 'check_out': today - timedelta(days=5 - i * 2, hours=-8),
+                'check_in_status': 'Late',
             })
+        self.env['hr.attendance']._cron_escalate_attendance_violations()
         
         sys_case = self.env['discipline.case'].search([
             ('employee_id', '=', self.employee.id),
@@ -311,6 +322,7 @@ class TestDisciplineCase(TransactionCase):
         case = self.env['discipline.case'].create({
             'employee_id': self.employee.id,
             'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
             'incident_date': today,
             'description': 'Payload test incident.',
         })
@@ -319,12 +331,122 @@ class TestDisciplineCase(TransactionCase):
             'employee_id': self.employee.id,
             'penalty_type': 'percentage',
             'penalty_percentage': 5.0,
+            'effective_date': today,
+            'notes': 'Direct Managerial Sanction',
+            'state': 'pending',
         })
         
-        payload = penalty.get_payroll_transmission_payload()
-        self.assertEqual(payload['employee_id'], self.employee.id)
-        self.assertIn('penalty_reference', payload)
+        # 1. API: pending deductions
+        pending_list = self.env['discipline.payroll.penalty'].get_pending_penalties(
+            employee_id=self.employee.id,
+            date_from=today - timedelta(days=5),
+            date_to=today + timedelta(days=5)
+        )
+        self.assertEqual(len(pending_list), 1)
+        self.assertEqual(pending_list[0]['penalty_percentage'], 5.0)
 
-        analytics = self.env['discipline.case'].get_discipline_analytics_payload()
-        self.assertIn('total_cases', analytics)
-        self.assertIn('cases_by_state', analytics)
+        # 2. API: case analytics payload
+        analytics_data = self.env['discipline.case'].get_discipline_analytics_payload()
+        self.assertIn('total_cases', analytics_data)
+        self.assertIn('cases_by_state', analytics_data)
+
+    def test_12_direct_coach_enforcement_and_appeal_window(self):
+        """Test direct coach enforcement workflow sets delivery date and opens 10-day appeal window."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level4.id,
+            'severity_level_id': self.level_4.id if self.level_4 else False,
+            'incident_date': today,
+            'case_action_track': 'direct_enforce',
+            'description': 'Minor lateness violation for direct enforcement.',
+        })
+        case.action_initiate()
+        self.assertEqual(case.state, 'initiated')
+        
+        # Direct enforcement by coach/admin
+        case.with_user(self.user_approver).action_approve_and_enforce()
+        self.assertEqual(case.state, 'enforced')
+        self.assertEqual(case.final_decision_date, today)
+        self.assertEqual(case.delivery_receipt_date, today)
+        self.assertTrue(case.appeal_deadline)
+        self.assertTrue(case.is_appeal_window_open)
+
+    def test_13_coach_cannot_directly_enforce_level_1(self):
+        """Test that direct coach enforcement raises UserError when attempting to dismiss employee directly."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'severity_level_id': self.level_1.id if self.level_1 else False,
+            'incident_date': today,
+            'case_action_track': 'direct_enforce',
+            'initiator_type': 'manager',
+            'description': 'Attempted direct dismissal by coach.',
+        })
+        case.action_initiate()
+        
+        # User without CEO/Admin authority attempting to enforce Level 1 should raise UserError
+        with self.assertRaises(UserError):
+            case.with_user(self.user_initiator).action_approve_and_enforce()
+
+    def test_14_executive_escalation_and_ceo_audit_referral(self):
+        """Test full executive escalation: Forward to Chief -> Forward to CEO -> Refer to Audit & Instruct Suspension."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'case_action_track': 'committee_escalation',
+            'initiator_type': 'director',
+            'description': 'Major critical fraud case for executive escalation.',
+        })
+        case.action_initiate()
+        case.action_submit_to_chief()
+        self.assertEqual(case.state, 'submitted_chief')
+
+        case.action_chief_escalate_to_ceo()
+        self.assertEqual(case.state, 'ceo_review')
+
+        # CEO action: Refer to Audit & Instruct Suspension
+        case.action_ceo_announce_audit_and_suspend()
+        self.assertEqual(case.state, 'investigating')
+        self.assertTrue(len(case.investigation_ids) > 0)
+        self.assertTrue(len(case.suspension_ids) > 0)
+
+    def test_15_audit_exoneration_and_ceo_endorsement(self):
+        """Test Audit investigation exoneration -> CEO endorsement closes case and revokes suspension."""
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'case_action_track': 'committee_escalation',
+            'state': 'investigating',
+            'description': 'Exoneration test case.',
+        })
+        suspension = self.env['discipline.suspension'].create({
+            'case_id': case.id,
+            'employee_id': self.employee.id,
+            'suspension_type': 'without_pay',
+            'start_date': today,
+            'end_date': today + timedelta(days=20),
+            'initiating_unit': 'directorate',
+            'reason': 'Precautionary suspension pending audit.',
+            'state': 'active',
+        })
+        investigation = self.env['discipline.investigation'].create({
+            'case_id': case.id,
+            'title': 'Exoneration Investigation',
+            'finding_outcome': 'exonerated',
+            'summary_findings': 'Full forensic audit confirms allegations were completely fabricated.',
+            'investigator_recommendation': 'Full exoneration and immediate reinstatement.',
+        })
+        investigation.action_announce_findings()
+        self.assertEqual(case.state, 'investigating')
+        self.assertTrue(case.has_exonerated_investigation)
+
+        # CEO endorses exoneration
+        case.action_ceo_endorse_exoneration()
+        self.assertEqual(case.state, 'closed')
+        self.assertEqual(suspension.state, 'revoked')

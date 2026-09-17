@@ -49,6 +49,7 @@ Key Features:
         'views/discipline_payroll_views.xml',
         'views/hr_employee_views.xml',
         'views/discipline_dashboard_views.xml',
+        'views/discipline_config_settings_views.xml',
         'wizards/discipline_revocation_wizard_views.xml',
         'report/discipline_report_templates.xml',
         'report/discipline_reports.xml',

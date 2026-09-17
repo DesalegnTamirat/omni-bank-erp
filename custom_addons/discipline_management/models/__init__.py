@@ -12,3 +12,4 @@ from . import discipline_payroll
 from . import hr_employee
 from . import hr_attendance
 from . import discipline_dashboard
+from . import discipline_config_settings

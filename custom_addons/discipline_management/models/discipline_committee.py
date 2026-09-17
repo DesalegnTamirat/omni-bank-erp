@@ -94,7 +94,8 @@ class DisciplineCommitteeMeeting(models.Model):
             
             # 1. Chairperson: Chief People and Culture Officer (CPCO)
             cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-            cpco_user = cpco_group.users[0] if cpco_group and cpco_group.users else self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
+            cpco_users = (cpco_group.all_user_ids or cpco_group.user_ids) if cpco_group else self.env['res.users']
+            cpco_user = cpco_users[0] if cpco_users else self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
             self.committee_chair_id = cpco_user or self.env.user
 
             # 2. Member: Director of Respective Office
@@ -105,12 +106,14 @@ class DisciplineCommitteeMeeting(models.Model):
 
             # 3. Member: Legal Director
             legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
-            legal_user = legal_group.users[0] if legal_group and legal_group.users else self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
+            legal_users = (legal_group.all_user_ids or legal_group.user_ids) if legal_group else self.env['res.users']
+            legal_user = legal_users[0] if legal_users else self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
             self.legal_director_id = legal_user or False
 
             # 4. Member & Secretary: People Operation Director
             pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-            pomd_user = pomd_group.users[0] if pomd_group and pomd_group.users else self.env['res.users'].search([('name', 'ilike', 'Operation')], limit=1)
+            pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
+            pomd_user = pomd_users[0] if pomd_users else self.env['res.users'].search([('name', 'ilike', 'Operation')], limit=1)
             self.pomd_secretary_id = pomd_user or self.env.user
 
             # Assemble full member set

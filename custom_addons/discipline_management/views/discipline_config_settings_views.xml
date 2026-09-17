@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="res_config_settings_view_form_discipline" model="ir.ui.view">
+            <field name="name">res.config.settings.view.form.discipline</field>
+            <field name="model">res.config.settings</field>
+            <field name="priority" eval="70"/>
+            <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//form" position="inside">
+                    <app data-string="Discipline" string="Discipline &amp; Governance" name="discipline_management" groups="discipline_management.group_discipline_admin">
+                        <block title="Disciplinary Governance &amp; SLA Settings" id="discipline_governance_settings">
+                            <setting id="discipline_sla_setting" string="Disciplinary SLA Resolution Target" help="Default resolution SLA in working days.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_sla_target_days" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_sla_target_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_appeal_setting" string="Appeal Submission Window" help="Working days allowed for employee appeal submission.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_appeal_window_days" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_appeal_window_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="discipline_suspension_setting" string="Precautionary Suspension Limit" help="Maximum duration in days for precautionary suspension.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="discipline_max_suspension_days" class="col-lg-4 o_light_label"/>
+                                        <field name="discipline_max_suspension_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                        </block>
+
+                        <block title="Attendance &amp; Absence Escalation Rules" id="discipline_attendance_rules">
+                            <setting id="absence_warning_setting" string="Consecutive Absence: Final Warning" help="Consecutive unexcused absence days triggering Level 2 Final Warning.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="absence_warning_consecutive_days" class="col-lg-5 o_light_label"/>
+                                        <field name="absence_warning_consecutive_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="absence_dismissal_setting" string="Consecutive Absence: Dismissal" help="Consecutive unexcused absence days triggering Critical Misconduct / Dismissal.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="absence_dismissal_consecutive_days" class="col-lg-5 o_light_label"/>
+                                        <field name="absence_dismissal_consecutive_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="force_checkout_setting" string="Forced Check-Out Threshold" help="Number of force check-out events within rolling window triggering minor discipline case.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="attendance_force_checkout_threshold" class="col-lg-5 o_light_label"/>
+                                        <field name="attendance_force_checkout_threshold" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="lateness_setting" string="Late Time Count Threshold" help="Number of late time occurrences within rolling window triggering minor discipline case.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="attendance_lateness_threshold" class="col-lg-5 o_light_label"/>
+                                        <field name="attendance_lateness_threshold" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                            <setting id="rolling_window_setting" string="Attendance Rolling Evaluation Window" help="Rolling period in days for threshold evaluations.">
+                                <div class="content-group">
+                                    <div class="row mt16">
+                                        <label for="attendance_rolling_days" class="col-lg-5 o_light_label"/>
+                                        <field name="attendance_rolling_days" class="col-lg-3"/>
+                                    </div>
+                                </div>
+                            </setting>
+                        </block>
+                    </app>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="action_discipline_config_settings" model="ir.actions.act_window">
+            <field name="name">Discipline Settings</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">res.config.settings</field>
+            <field name="view_mode">form</field>
+            <field name="target">current</field>
+            <field name="context">{'module' : 'discipline_management', 'bin_size': False}</field>
+        </record>
+    </data>
+</odoo>
