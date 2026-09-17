@@ -9,12 +9,6 @@ class CompetencyMatrixConfig(models.Model):
 
     name = fields.Char(string='Setting Title', default='Bunna Bank Competency Matrix Configuration', required=True)
     
-    proficiency_determinant = fields.Selection([
-        ('job_grade', 'By Job Grade (Grade-Based Guidelines)'),
-        ('job_position', 'By Job Position (Role-Based Guidelines)'),
-    ], string='Proficiency Level Determinant Mode', required=True, default='job_grade',
-       help="Select whether required competency proficiency levels are governed by Job Grade or Job Position.")
-
     # Global Configurable Technical Behavioral Indicators
     tech_indicator_level_1 = fields.Text(
         string='Level 1 (Basic) Technical Behavioral Indicator',
@@ -96,12 +90,12 @@ class CompetencyMatrixConfig(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        self.clear_caches()
+        self.env.registry.clear_cache()
         return records
 
     def write(self, vals):
         res = super().write(vals)
-        self.clear_caches()
+        self.env.registry.clear_cache()
         weight_fields = {'weight_self', 'weight_peer', 'weight_subordinate', 'weight_supervisor', 'weight_team'}
         if set(vals.keys()) & weight_fields:
             all_lines = self.env['competency.assessment.line'].sudo().search([])
@@ -123,7 +117,9 @@ class CompetencyMatrixConfig(models.Model):
         config_id = self._get_active_config_id()
         config = self.browse(config_id)
         if not config.exists():
-            self.clear_caches()
+            self.env.registry.clear_cache()
+            config_id = self._get_active_config_id()
+            config = self.browse(config_id)
             config_id = self._get_active_config_id()
             config = self.browse(config_id)
         if not config.grade_matrix_line_ids or not config.job_matrix_line_ids:

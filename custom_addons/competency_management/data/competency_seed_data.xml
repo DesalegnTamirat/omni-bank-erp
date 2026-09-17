@@ -7,93 +7,29 @@
             <field name="name">4-Point Proficiency Scale</field>
             <field name="code">4SCALE</field>
             <field name="max_rating">4</field>
-            <field name="description">Basic / Intermediate / Advanced / Expert rating scale with behavioral anchors.</field>
+            <field name="description">Standard 4-Level scale (Level 1 - Basic, Level 2 - Intermediate, Level 3 - Advanced, Level 4 - Expert)</field>
+            <field name="line_ids" eval="[
+                (0, 0, {'level': '1', 'name': 'Level 1 - Basic', 'sequence': 10}),
+                (0, 0, {'level': '2', 'name': 'Level 2 - Intermediate', 'sequence': 20}),
+                (0, 0, {'level': '3', 'name': 'Level 3 - Advanced', 'sequence': 30}),
+                (0, 0, {'level': '4', 'name': 'Level 4 - Expert', 'sequence': 40}),
+            ]"/>
         </record>
 
-        <!-- Core Competencies (5) — BRD Module 12 (execution mastery, professional authenticity,
-             ethical influence, collaboration, creativity) -->
-        <record id="comp_core_execution_mastery" model="competency.competency">
-            <field name="name">Execution Mastery</field>
-            <field name="code">CORE-01</field>
-            <field name="pillar">core</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
+        <!-- 5-point rating model -->
+        <record id="rating_model_5_scale" model="competency.rating.model">
+            <field name="name">5-Point Proficiency Scale</field>
+            <field name="code">5SCALE</field>
+            <field name="max_rating">5</field>
+            <field name="description">5-Level proficiency scale (Level 1, Level 2, Level 3, Level 4, Level 5)</field>
+            <field name="line_ids" eval="[
+                (0, 0, {'level': '1', 'name': 'Level 1', 'sequence': 10}),
+                (0, 0, {'level': '2', 'name': 'Level 2', 'sequence': 20}),
+                (0, 0, {'level': '3', 'name': 'Level 3', 'sequence': 30}),
+                (0, 0, {'level': '4', 'name': 'Level 4', 'sequence': 40}),
+                (0, 0, {'level': '5', 'name': 'Level 5', 'sequence': 50}),
+            ]"/>
         </record>
-        <record id="comp_core_professional_authenticity" model="competency.competency">
-            <field name="name">Professional Authenticity</field>
-            <field name="code">CORE-02</field>
-            <field name="pillar">core</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_core_ethical_influence" model="competency.competency">
-            <field name="name">Ethical Influence</field>
-            <field name="code">CORE-03</field>
-            <field name="pillar">core</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_core_collaboration" model="competency.competency">
-            <field name="name">Collaboration</field>
-            <field name="code">CORE-04</field>
-            <field name="pillar">core</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_core_creativity" model="competency.competency">
-            <field name="name">Creativity</field>
-            <field name="code">CORE-05</field>
-            <field name="pillar">core</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-
-        <!-- Leadership Competencies (6) — -->
-        <record id="comp_lead_strategy_management" model="competency.competency">
-            <field name="name">Strategy Management</field>
-            <field name="code">LEAD-01</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_lead_continuous_improvement" model="competency.competency">
-            <field name="name">Continuous Improvement</field>
-            <field name="code">LEAD-02</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_lead_prudential_decision" model="competency.competency">
-            <field name="name">Prudential Decision Making</field>
-            <field name="code">LEAD-03</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_lead_self_leadership" model="competency.competency">
-            <field name="name">Self-Leadership</field>
-            <field name="code">LEAD-04</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_lead_people_leadership" model="competency.competency">
-            <field name="name">People Leadership</field>
-            <field name="code">LEAD-05</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-        <record id="comp_lead_ambidextrous_leadership" model="competency.competency">
-            <field name="name">Ambidextrous Leadership</field>
-            <field name="code">LEAD-06</field>
-            <field name="pillar">leadership</field>
-            <field name="rating_model_id" ref="competency_management.rating_model_4_scale"/>
-
-        </record>
-
-        <!-- Automatically trigger seeding of matrix competencies, framework, clusters & role mappings -->
-        <function model="competency.competency" name="action_seed_matrix_data"/>
 
     </data>
 </odoo>

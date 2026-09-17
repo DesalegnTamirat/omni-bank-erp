@@ -54,6 +54,16 @@ class CompetencyRoleMapping(models.Model):
             else:
                 rec.grade_id = False
 
+    @api.model
+    def get_competencies_for_job_and_grade(self, job_id, grade_id=None):
+        """API helper method for Career Path, Recruitment, and external modules.
+        Returns mapped required competencies for a job position (or grade fallback).
+        """
+        job = self.env['hr.job'].browse(job_id) if isinstance(job_id, int) else job_id
+        if not job or not job.exists():
+            return []
+        return job.get_required_competencies(grade_id=grade_id)
+
     @api.depends('job_position_id', 'grade_id', 'is_operating_unit_specific', 'operating_unit_ids')
     def _compute_mapping_name(self):
         for rec in self:
@@ -67,12 +77,14 @@ class CompetencyRoleMapping(models.Model):
 
     @api.constrains('job_position_id', 'state', 'is_operating_unit_specific', 'operating_unit_ids')
     def _check_single_active_mapping_per_job(self):
-        """Allow multiple active mappings per Job Position if they target distinct Operating Units."""
+        """Allow multiple active mappings per Job Position if they target distinct Operating Units. Enforced when submitting for approval or approved."""
+        if self.env.context.get('skip_mapping_unique_check'):
+            return
         for rec in self:
-            if rec.job_position_id and rec.state in ('draft', 'under_approval', 'approved'):
+            if rec.job_position_id and rec.state in ('under_approval', 'approved'):
                 domain = [
                     ('job_position_id', '=', rec.job_position_id.id),
-                    ('state', 'in', ('draft', 'under_approval', 'approved')),
+                    ('state', '=', rec.state),
                     ('id', '!=', rec.id),
                     ('is_operating_unit_specific', '=', rec.is_operating_unit_specific),
                 ]
@@ -133,9 +145,11 @@ class CompetencyRoleMapping(models.Model):
                     added_count += 1
             
             if new_lines_vals:
-                created_lines = self.env['competency.role.mapping.line'].create(new_lines_vals)
+                created_lines = self.env['competency.role.mapping.line'].with_context(skip_mapping_unique_check=True).create(new_lines_vals)
                 for l in created_lines:
                     l._compute_matrix_proficiency()
+                    if not l.override_default and l.default_proficiency:
+                        l.required_proficiency = l.default_proficiency
                 rec.message_post(body=_("Populated %d new unique competency lines from selected clusters.") % added_count)
             else:
                 rec.message_post(body=_("All competencies from selected clusters are already mapped."))
@@ -229,6 +243,7 @@ class CompetencyRoleMapping(models.Model):
             'approved_by_id': False,
             'approval_date': False,
             'change_description': change_desc,
+            'line_ids': [(0, 0, line.copy_data()[0]) for line in self.line_ids],
         })
         return {
             'type': 'ir.actions.act_window',

@@ -18,8 +18,11 @@ def post_init_hook(env):
         'competency_management.menu_competency_config_categ': ['competency_management.group_competency_officer'],
         'competency_management.menu_competency_matrix_config': ['competency_management.group_competency_officer'],
         'competency_management.menu_competency_360_config': ['competency_management.group_competency_officer'],
+        'competency_management.menu_competency_director_peer_config': ['competency_management.group_competency_officer'],
         'competency_management.menu_competency_rating_models': ['competency_management.group_competency_officer'],
-        'competency_management.menu_trigger_matrix_seeding': ['competency_management.group_competency_admin'],
+        'competency_management.menu_competency_skills_test': ['competency_management.group_competency_supervisor'],
+        'competency_management.menu_competency_team_gap_dashboard': ['competency_management.group_competency_supervisor'],
+        'competency_management.menu_competency_dashboard_snapshot': ['competency_management.group_competency_supervisor'],
     }
     for xml_id, group_xml_ids in menu_map.items():
         try:
@@ -29,3 +32,10 @@ def post_init_hook(env):
                 menu.write({'group_ids': [(6, 0, groups)]})
         except Exception:
             pass
+
+    # Auto-seed all directorate positions into competency.director.peer.config with empty peers
+    try:
+        env['competency.director.peer.config'].action_generate_director_records()
+    except Exception:
+        pass
+

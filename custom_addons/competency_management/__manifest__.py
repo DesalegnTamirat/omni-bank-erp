@@ -1,29 +1,22 @@
 # -*- coding: utf-8 -*-
 {
     'name': "Competency Management System",
-    'summary': "Integrated Competency Framework: dictionary, role mapping, assessment, gap analysis and IDP.",
+    'summary': "Competency dictionary, job role mapping, 360 evaluations, and TNA gap analytics.",
     'version': '19.0.1.0.0',
     'category': 'Human Resources/Competency',
     'author': 'Desalegn & Abeza',
     'website': 'https://www.bunnabanksc.com',
     'license': 'LGPL-3',
     'description': """
-Competency Management System (Bunna Bank ERP HR Upgrade)
-========================================================
-Support module for the Employee Development System (EDS). Operationalizes the
-Bank's Integrated Competency Framework (Core / Leadership / Technical pillars,
-Basic / Intermediate / Advanced / Expert proficiency levels).
+Competency Management System
+============================
+Operationalizes organizational competency frameworks across job roles, multi-rater assessments, and gap analytics.
 
-Key Features:
-- Competency Framework & Dictionary administration with version control.
-- Competency Clusters bundling related competencies with required minimum proficiency.
-- Role-Competency Mapping (Job Position + Grade) with bulk clone-and-adapt wizard and coverage report.
-- Multi-Source Competency Assessment (self / supervisor / 360 anonymized feedback / skills test) with
-  achievement status (Exceeds/Meets/Below), gap priority, approval workflow and locking.
-- Team Competency Gap Dashboard & Industry/Internal Benchmarking Comparison reports.
-- Individual Development Plans (IDP) with activities, review checkpoints, and LMS course auto-recommendations.
-- Data Quality & Governance automated validator cron.
-- Integration API methods for Recruitment candidate screening (FR-COM-029), EDS (TNA input), and Employee Master smart buttons.
+Features:
+- Competency Dictionary & Role-Competency Mapping (Core, Leadership, Technical).
+- Multi-Source 360 Evaluations (Self, Peer, Subordinate, Supervisor).
+- Interactive Analytics Dashboard & Training Needs Analysis (TNA) Gap Reporting.
+- QWeb PDF & Excel Exports for competency matrices, individual profiles, and team gaps.
     """,
     'depends': [
         'base',
@@ -45,10 +38,13 @@ Key Features:
         'views/competency_assessment_views.xml',
         'views/competency_dashboard_views.xml',
         'views/competency_matrix_config_views.xml',
+        'views/competency_director_peer_config_views.xml',
         'views/competency_report_templates.xml',
-        'views/hr_employee_views.xml',
         'wizards/competency_role_mapping_clone_wizard_views.xml',
         'wizards/competency_report_wizard_views.xml',
+        'views/competency_dashboard_snapshot_views.xml',
+        'views/competency_skills_test_views.xml',
+        'views/competency_team_dashboard_views.xml',
         'views/competency_menus.xml',
     ],
     'assets': {

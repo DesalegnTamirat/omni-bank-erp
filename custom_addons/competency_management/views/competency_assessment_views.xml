@@ -88,12 +88,12 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- Assessment Tree -->
+        <!-- Assessment Tree (Readonly Reporting Overview for All Competency Assessments) -->
         <record id="view_competency_assessment_list" model="ir.ui.view">
             <field name="name">competency.assessment.list</field>
             <field name="model">competency.assessment</field>
             <field name="arch" type="xml">
-                <list>
+                <list create="false" edit="false" delete="false">
                     <field name="name"/>
                     <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
                     <field name="cycle_id"/>
@@ -168,13 +168,13 @@
                         <group string="Your Self-Rating &amp; Supporting Remarks" style="margin-top: 20px;">
                             <group>
                                 <field name="required_level" readonly="1"/>
-                                <field name="current_level" string="Select Current Proficiency Level" required="1" readonly="state != 'draft' or is_deadline_passed or is_primary_reporting_line"/>
+                                <field name="current_level" string="Select Current Proficiency Level" required="1" readonly="state != 'draft' or is_deadline_passed"/>
                                 <field name="gap" readonly="1"/>
                                 <field name="achievement_status" widget="badge" readonly="1"/>
                             </group>
                             <group>
-                                <field name="comments" placeholder="Enter remarks or justification for your rating..." readonly="state != 'draft' or is_deadline_passed or is_primary_reporting_line"/>
-                                <field name="evidence_attachment_ids" widget="many2many_binary" readonly="state != 'draft' or is_deadline_passed or is_primary_reporting_line"/>
+                                <field name="comments" placeholder="Enter remarks or justification for your rating..." readonly="state != 'draft' or is_deadline_passed"/>
+                                <field name="evidence_attachment_ids" widget="many2many_binary" readonly="state != 'draft' or is_deadline_passed"/>
                             </group>
                         </group>
                     </sheet>
@@ -182,12 +182,12 @@
             </field>
         </record>
 
-        <!-- Assessment Form -->
+        <!-- Assessment Form (Readonly Reporting & Detailed Data Display) -->
         <record id="view_competency_assessment_form" model="ir.ui.view">
             <field name="name">competency.assessment.form</field>
             <field name="model">competency.assessment</field>
             <field name="arch" type="xml">
-                <form>
+                <form create="false" edit="false" delete="false">
                     <header>
                         <button name="action_populate_competencies" string="Populate Competencies"
                                 type="object" class="oe_highlight" invisible="state != 'draft' or is_deadline_passed" icon="fa-list-ol"/>
@@ -231,43 +231,49 @@
                         </group>
                         <notebook>
                             <page string="Core Competencies" icon="fa-star">
-                                <field name="core_line_ids" readonly="state != 'draft' or is_locked or is_deadline_passed">
-                                    <list create="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                                <field name="core_line_ids" readonly="1">
+                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Core Competency"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="achievement_status" widget="badge" readonly="1"/>
+                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Leadership Competencies" icon="fa-users">
-                                <field name="leadership_line_ids" readonly="state != 'draft' or is_locked or is_deadline_passed">
-                                    <list create="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                                <field name="leadership_line_ids" readonly="1">
+                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Leadership Competency"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="achievement_status" widget="badge" readonly="1"/>
+                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Technical Competencies" icon="fa-cogs">
-                                <field name="technical_line_ids" readonly="state != 'draft' or is_locked or is_deadline_passed">
-                                    <list create="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                                <field name="technical_line_ids" readonly="1">
+                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Technical Competency"/>
                                         <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="current_level" readonly="1"/>
                                         <field name="gap" readonly="1"/>
-                                        <field name="comments" placeholder="Add remarks..." optional="show" readonly="parent.state != 'draft' or parent.is_locked or parent.is_deadline_passed"/>
+                                        <field name="achievement_status" widget="badge" readonly="1"/>
+                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes" readonly="state != 'draft' or is_locked or is_deadline_passed"/>
+                                <field name="notes" readonly="1"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -330,6 +336,93 @@
             <field name="domain">[('assessor_id', '=', uid)]</field>
             <field name="view_id" ref="view_competency_assessment_my_list"/>
             <field name="search_view_id" ref="competency_management.view_competency_assessment_search"/>
+        </record>
+
+        <!-- Dedicated Anonymized Employee Views for My Evaluations -->
+        <record id="view_my_competency_evaluation_line_list" model="ir.ui.view">
+            <field name="name">my.competency.evaluation.line.list</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <list string="My Competency Evaluation Results" create="false" edit="false" delete="false" default_order="cycle_id desc, id desc">
+                    <field name="cycle_id"/>
+                    <field name="employee_id" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="competency_id"/>
+                    <field name="functional_domain"/>
+                    <field name="pillar" widget="badge"/>
+                    <field name="self_rating" string="Self Rating"/>
+                    <field name="supervisor_avg" string="Supervisor Rating"/>
+                    <field name="weighted_current_level" string="Weighted Level"/>
+                    <field name="required_level"/>
+                    <field name="gap"/>
+                    <field name="tna_measure" widget="badge" decoration-danger="tna_measure == 'below'" decoration-success="tna_measure == 'meets'" decoration-info="tna_measure == 'exceeds'"/>
+                    <field name="state" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_my_competency_evaluation_line_form" model="ir.ui.view">
+            <field name="name">my.competency.evaluation.line.form</field>
+            <field name="model">competency.assessment.line</field>
+            <field name="arch" type="xml">
+                <form string="My Competency Evaluation Details" create="false" edit="false" delete="false">
+                    <sheet>
+                        <div class="oe_title" style="margin-bottom: 15px;">
+                            <h1 style="color: #541718;"><field name="competency_id" readonly="1"/></h1>
+                            <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
+                        </div>
+
+                        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #541718; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; width: 100%;">
+                            <div style="font-size: 11px; font-weight: 700; color: #726732; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                Competency Definition
+                            </div>
+                            <div style="font-size: 13.5px; color: #1d2b32; line-height: 1.6;">
+                                <field name="competency_definition" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <group string="Evaluation Scores &amp; Matrix Performance">
+                            <group string="Competency Ratings">
+                                <field name="self_rating" string="Self Rating" readonly="1"/>
+                                <field name="supervisor_avg" string="Supervisor Rating" readonly="1"/>
+                                <field name="weighted_current_level" string="Weighted Current Level" readonly="1"/>
+                            </group>
+                            <group string="Matrix Performance &amp; Gap">
+                                <field name="required_level" readonly="1"/>
+                                <field name="gap" readonly="1"/>
+                                <field name="tna_measure" widget="badge" readonly="1"/>
+                                <field name="achievement_status" widget="badge" readonly="1"/>
+                            </group>
+                        </group>
+
+                        <group string="Behavioral Guide Indicators">
+                            <field name="behavioral_guide_html" readonly="1" nolabel="1"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- My Competency Evaluation Results Action (Employee View) -->
+        <record id="action_my_competency_evaluations" model="ir.actions.act_window">
+            <field name="name">My Competency Evaluation Results</field>
+            <field name="res_model">competency.assessment.line</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid), ('is_primary_reporting_line', '=', True)]</field>
+            <field name="context">{'search_default_filter_primary_reporting': 1, 'create': False, 'edit': False, 'delete': False}</field>
+        </record>
+
+        <record id="act_my_evaluations_list" model="ir.actions.act_window.view">
+            <field name="sequence" eval="1"/>
+            <field name="view_mode">list</field>
+            <field name="view_id" ref="view_my_competency_evaluation_line_list"/>
+            <field name="act_window_id" ref="action_my_competency_evaluations"/>
+        </record>
+
+        <record id="act_my_evaluations_form" model="ir.actions.act_window.view">
+            <field name="sequence" eval="2"/>
+            <field name="view_mode">form</field>
+            <field name="view_id" ref="view_my_competency_evaluation_line_form"/>
+            <field name="act_window_id" ref="action_my_competency_evaluations"/>
         </record>
 
         <!-- Detailed Competency & TNA Analytics Views -->
@@ -473,30 +566,6 @@
                     </group>
                 </search>
             </field>
-        </record>
-
-        <!-- My Competency Evaluation Results Action (Employee View) -->
-        <record id="action_my_competency_evaluations" model="ir.actions.act_window">
-            <field name="name">My Competency Evaluation Results</field>
-            <field name="res_model">competency.assessment.line</field>
-            <field name="view_mode">list,form</field>
-            <field name="domain">[('employee_id.user_id', '=', uid), ('is_primary_reporting_line', '=', True)]</field>
-            <field name="context">{'search_default_filter_primary_reporting': 1, 'create': False, 'edit': False, 'delete': False}</field>
-            <field name="search_view_id" ref="view_competency_assessment_line_report_search"/>
-        </record>
-
-        <record id="act_my_evaluations_list" model="ir.actions.act_window.view">
-            <field name="sequence" eval="1"/>
-            <field name="view_mode">list</field>
-            <field name="view_id" ref="view_competency_assessment_line_report_list"/>
-            <field name="act_window_id" ref="action_my_competency_evaluations"/>
-        </record>
-
-        <record id="act_my_evaluations_form" model="ir.actions.act_window.view">
-            <field name="sequence" eval="2"/>
-            <field name="view_mode">form</field>
-            <field name="view_id" ref="view_competency_assessment_line_report_form"/>
-            <field name="act_window_id" ref="action_my_competency_evaluations"/>
         </record>
 
         <record id="action_competency_tna_analytics_report" model="ir.actions.act_window">

@@ -136,7 +136,7 @@ export class CompetencyDashboard extends Component {
                     labels: cdata.labels || ['Underqualified', 'Fit', 'Overqualified'],
                     datasets: [{
                         data: tnaValues,
-                        backgroundColor: cdata.colors || ['#541718', '#726732', '#c17540'],
+                        backgroundColor: cdata.colors || ['#541718', '#16a34a', '#c17540'],
                         borderWidth: 2,
                     }]
                 },
@@ -159,7 +159,7 @@ export class CompetencyDashboard extends Component {
                     labels: pdata.labels || ['Core Pillar', 'Leadership Pillar', 'Technical Pillar'],
                     datasets: pdata.datasets && pdata.datasets.length ? pdata.datasets : [
                         { label: 'Below Target', data: [0, 0, 0], backgroundColor: '#541718' },
-                        { label: 'Meets Target', data: [0, 0, 0], backgroundColor: '#726732' },
+                        { label: 'Meets Target', data: [0, 0, 0], backgroundColor: '#16a34a' },
                         { label: 'Exceeds Target', data: [0, 0, 0], backgroundColor: '#c17540' }
                     ]
                 },

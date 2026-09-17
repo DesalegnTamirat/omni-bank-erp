@@ -132,12 +132,40 @@ class CompetencyAssessmentCycle(models.Model):
         """Draft -> Open: Automatically generate 360-degree assessments (Self, Supervisor, Team, Peer, Subordinate) with random sampling caps."""
         self.with_context(force_write=True).write({'state': 'open'})
         for rec in self:
-            rec._generate_cycle_assessments_batch()
+            created_asms = rec._generate_cycle_assessments_batch()
+            rec._send_cycle_start_notifications(created_asms)
             rec.message_post(body=_('Assessment cycle %s opened and 360-degree evaluations generated. Deadline: %s.') % (rec.name, rec.assessment_deadline or 'Not set'))
         return True
 
+    def _send_cycle_start_notifications(self, assessments):
+        """Send notifications to all assigned raters/assessors when a cycle starts."""
+        self.ensure_one()
+        deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
+        assessor_map = {}
+        for asm in assessments:
+            if asm.assessor_id and asm.assessor_id.partner_id:
+                assessor_map.setdefault(asm.assessor_id, []).append(asm)
+
+        for assessor, asms in assessor_map.items():
+            partner = assessor.partner_id
+            msg_body = _(
+                "📋 <strong>Competency Assessment Cycle Started:</strong><br/>"
+                "The assessment cycle '<strong>%s</strong>' has started. You have <strong>%d</strong> assigned competency assessment(s) to fill.<br/>"
+                "Submission Deadline: <strong>%s</strong>.<br/>"
+                "Please log in and submit your evaluations before the deadline."
+            ) % (self.name, len(asms), deadline_str)
+            self.message_post(
+                body=msg_body,
+                partner_ids=[partner.id],
+                subtype_xmlid='mail.mt_comment'
+            )
+
     def _generate_cycle_assessments_batch(self):
-        """Generate pre-populated 360-degree assessments for all active employees for this cycle in lightning-fast O(N) bulk."""
+        """Generate pre-populated 360-degree assessments for all active employees for this cycle.
+        Uses evaluatee-centric quota sampling:
+        Every evaluatee gets min(eligible_pool_size, max_config_limit) peer and subordinate assessments.
+        Assessor workloads are balanced dynamically.
+        """
         self.ensure_one()
         import random
 
@@ -147,38 +175,30 @@ class CompetencyAssessmentCycle(models.Model):
 
         active_employees = self.env['hr.employee'].search([('active', '=', True)])
         
-        # Track created assessments to avoid duplicates (cycle_id, employee_id, assessor_id, assessment_type)
+        # Track created assessments to avoid duplicates: (cycle_id, employee_id, assessor_id, assessment_type)
         existing_pairs = set(
             self.env['competency.assessment'].search([('cycle_id', '=', self.id)]).mapped(
                 lambda a: (a.employee_id.id, a.assessor_id.id if a.assessor_id else False, a.assessment_type)
             )
         )
 
-        # Fast O(1) in-memory dict mapping for enterprise employee scale (3,800+ employees)
-        emp_map = {}
-        coach_to_reports = {}
-        for emp in active_employees:
-            emp_user = emp.user_id
-            if not emp_user:
-                continue
-            c_id = emp.coach_id.id if emp.coach_id else (emp.parent_id.id if emp.parent_id else False)
-            j_id = emp.job_id.id if emp.job_id else False
-            emp_map[emp.id] = {
-                'user_id': emp_user.id,
-                'coach_id': c_id,
-                'job_id': j_id,
-            }
-            if c_id:
-                coach_to_reports.setdefault(c_id, []).append(emp.id)
-
         assessments_to_create = []
         total_eligible_raters = 0
         total_sampled_raters = 0
 
-        for emp_id, info in emp_map.items():
-            u_id = info['user_id']
+        # Track assessor workloads to balance rater load across evaluatees
+        peer_assessor_workload = {}  # user_id -> count
+        sub_assessor_workload = {}   # user_id -> count
 
-            # 1. Self Assessment (mandatory)
+        # 1. Create Self, Supervisor, and Team assessments for all active employees
+        for emp in active_employees:
+            if not emp.user_id:
+                continue
+
+            emp_id = emp.id
+            u_id = emp.user_id.id
+
+            # Self Assessment (mandatory)
             pair_self = (emp_id, u_id, 'self')
             if pair_self not in existing_pairs:
                 assessments_to_create.append({
@@ -189,71 +209,100 @@ class CompetencyAssessmentCycle(models.Model):
                 })
                 existing_pairs.add(pair_self)
 
-            # 2. Supervisor Assessment
-            c_id = info['coach_id']
-            if c_id and c_id in emp_map and emp_map[c_id]['user_id']:
-                pair_sup = (c_id, u_id, 'supervisor')
+            # Supervisor Assessment (coach/parent assesses employee)
+            coach = getattr(emp, 'coach_id', False) or emp.parent_id
+            if coach and coach.user_id:
+                pair_sup = (emp_id, coach.user_id.id, 'supervisor')
                 if pair_sup not in existing_pairs:
                     assessments_to_create.append({
                         'cycle_id': self.id,
-                        'employee_id': c_id,
-                        'assessor_id': u_id,
+                        'employee_id': emp_id,
+                        'assessor_id': coach.user_id.id,
                         'assessment_type': 'supervisor',
                     })
                     existing_pairs.add(pair_sup)
 
-            # 3. Team Assessment (direct reports)
-            reports = coach_to_reports.get(emp_id, [])
-            for dr_id in reports:
-                pair_team = (dr_id, u_id, 'team')
-                if pair_team not in existing_pairs:
-                    assessments_to_create.append({
-                        'cycle_id': self.id,
-                        'employee_id': dr_id,
-                        'assessor_id': u_id,
-                        'assessment_type': 'team',
-                    })
-                    existing_pairs.add(pair_team)
+            # Team Assessment (direct reports assess manager)
+            direct_reports = active_employees.filtered(lambda r: (r.parent_id == emp or getattr(r, 'coach_id', False) == emp) and r.id != emp.id)
+            for dr in direct_reports:
+                if dr.user_id:
+                    pair_team = (emp_id, dr.user_id.id, 'team')
+                    if pair_team not in existing_pairs:
+                        assessments_to_create.append({
+                            'cycle_id': self.id,
+                            'employee_id': emp_id,
+                            'assessor_id': dr.user_id.id,
+                            'assessment_type': 'team',
+                        })
+                        existing_pairs.add(pair_team)
 
-            # 4 & 5. Peer & Subordinate Assessments
-            if c_id:
-                siblings = [s for s in coach_to_reports.get(c_id, []) if s != emp_id]
-                peers = [s for s in siblings if emp_map[s]['job_id'] == info['job_id']]
-                subs = [s for s in siblings if emp_map[s]['job_id'] != info['job_id']]
+        # 2. Evaluatee-Centric Sampling for Peer and Subordinate Assessments
+        for evaluatee in active_employees:
+            if not evaluatee.user_id:
+                continue
 
-                sampled_peers = random.sample(peers, min(len(peers), max_peers)) if peers else []
-                sampled_subs = random.sample(subs, min(len(subs), max_subs)) if subs else []
+            # --- PEER SAMPLING FOR EVALUATEE ---
+            eligible_peers = self.env['competency.assessment']._get_eligible_peers_for_emp(evaluatee)
+            valid_peer_candidates = eligible_peers.filtered(lambda p: p.id != evaluatee.id and p.user_id)
+            pool_size = len(valid_peer_candidates)
+            total_eligible_raters += pool_size
 
-                total_eligible_raters += len(peers) + len(subs)
-                total_sampled_raters += len(sampled_peers) + len(sampled_subs)
+            # Target quota for evaluatee: min(pool_size, max_peers)
+            target_peer_quota = min(pool_size, max_peers) if max_peers > 0 else pool_size
+            if target_peer_quota > 0 and valid_peer_candidates:
+                candidate_list = list(valid_peer_candidates)
+                random.shuffle(candidate_list)
+                candidate_list.sort(key=lambda c: peer_assessor_workload.get(c.user_id.id, 0))
 
-                for p_id in sampled_peers:
-                    pair_peer = (p_id, u_id, 'peer')
+                selected_peers = candidate_list[:target_peer_quota]
+                total_sampled_raters += len(selected_peers)
+
+                for peer in selected_peers:
+                    peer_u_id = peer.user_id.id
+                    pair_peer = (evaluatee.id, peer_u_id, 'peer')
                     if pair_peer not in existing_pairs:
                         assessments_to_create.append({
                             'cycle_id': self.id,
-                            'employee_id': p_id,
-                            'assessor_id': u_id,
+                            'employee_id': evaluatee.id,
+                            'assessor_id': peer_u_id,
                             'assessment_type': 'peer',
                         })
                         existing_pairs.add(pair_peer)
+                        peer_assessor_workload[peer_u_id] = peer_assessor_workload.get(peer_u_id, 0) + 1
 
-                for s_id in sampled_subs:
-                    pair_sub = (s_id, u_id, 'subordinate')
+            # --- SUBORDINATE SAMPLING FOR EVALUATEE ---
+            eligible_subs = self.env['competency.assessment']._get_eligible_subordinates_for_emp(evaluatee)
+            valid_sub_candidates = eligible_subs.filtered(lambda s: s.id != evaluatee.id and s.user_id)
+            sub_pool_size = len(valid_sub_candidates)
+            total_eligible_raters += sub_pool_size
+
+            target_sub_quota = min(sub_pool_size, max_subs) if max_subs > 0 else sub_pool_size
+            if target_sub_quota > 0 and valid_sub_candidates:
+                candidate_list = list(valid_sub_candidates)
+                random.shuffle(candidate_list)
+                candidate_list.sort(key=lambda c: sub_assessor_workload.get(c.user_id.id, 0))
+
+                selected_subs = candidate_list[:target_sub_quota]
+                total_sampled_raters += len(selected_subs)
+
+                for sub in selected_subs:
+                    sub_u_id = sub.user_id.id
+                    pair_sub = (evaluatee.id, sub_u_id, 'subordinate')
                     if pair_sub not in existing_pairs:
                         assessments_to_create.append({
                             'cycle_id': self.id,
-                            'employee_id': s_id,
-                            'assessor_id': u_id,
+                            'employee_id': evaluatee.id,
+                            'assessor_id': sub_u_id,
                             'assessment_type': 'subordinate',
                         })
                         existing_pairs.add(pair_sub)
+                        sub_assessor_workload[sub_u_id] = sub_assessor_workload.get(sub_u_id, 0) + 1
 
-        # Record auditable sampling log
+        # Audit trail
         self.sudo().write({
             'eligible_rater_count': total_eligible_raters,
             'selected_rater_count': total_sampled_raters,
-            'sampling_audit_log': f"360 Sampling Audit: Total Eligible Candidate Raters={total_eligible_raters}, Total Sampled Raters={total_sampled_raters}, Created Assessments={len(assessments_to_create)}",
+            'sampling_audit_log': f"360 Evaluatee-Centric Sampling Audit: Total Eligible Candidate Raters={total_eligible_raters}, Total Sampled Raters={total_sampled_raters}, Created Assessments={len(assessments_to_create)}",
         })
 
         if not assessments_to_create:
@@ -330,12 +379,211 @@ class CompetencyAssessment(models.Model):
         selection='_get_assessment_type_selection', string='Assessment Type',
         required=True, tracking=True)
 
+    @api.model
+    def _get_employee_ou_id(self, emp):
+        if not emp:
+            return False
+        if getattr(emp, 'default_operating_unit_id', False):
+            return emp.default_operating_unit_id.id
+        if emp.department_id and getattr(emp.department_id, 'operating_unit_id', False):
+            return emp.department_id.operating_unit_id.id
+        return False
+
+    @api.model
+    def _get_employee_grade_id(self, emp):
+        if not emp:
+            return False
+        job = emp.job_id
+        if job:
+            g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+            if g:
+                return g.id
+        g = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade_id', False)
+        return g.id if g else False
+
+    @api.model
+    def _get_grade_number(self, emp):
+        """Extract numeric grade level (1..17) from employee's assigned job grade or position."""
+        if not emp:
+            return 0
+        grade_rec = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+        if not grade_rec and emp.job_id:
+            grade_rec = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        if not grade_rec:
+            return 0
+
+        g_str = (getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'name', False) or getattr(grade_rec, 'code', False) or str(grade_rec)).lower().strip()
+
+        tokens = g_str.replace('-', ' ').replace('_', ' ').split()
+        roman_map = {
+            'xvii': 17, 'xvi': 16, 'xv': 15, 'xiv': 14, 'xiii': 13, 'xii': 12, 'xi': 11,
+            'x': 10, 'ix': 9, 'viii': 8, 'vii': 7, 'vi': 6, 'v': 5, 'iv': 4, 'iii': 3, 'ii': 2, 'i': 1
+        }
+        for token in tokens:
+            if token in roman_map:
+                return roman_map[token]
+        if g_str in roman_map:
+            return roman_map[g_str]
+
+        import re
+        numbers = re.findall(r'\d+', g_str)
+        if numbers:
+            return int(numbers[0])
+
+        return 0
+
+    @api.model
+    def _is_director_or_chief(self, emp):
+        """Strictly classify as Director (Grade 16) or Chief (Grade 17). Exclude Grade II, III, IV, etc."""
+        if not emp or not emp.active:
+            return False
+        g_num = self._get_grade_number(emp)
+        if g_num in (16, 17):
+            return True
+        return False
+
+    @api.model
+    def _is_branch_manager(self, emp):
+        if not emp or not emp.job_id:
+            return False
+        j_name = (emp.job_id.name or '').lower()
+        return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
+
+    @api.model
+    def _is_manager(self, emp):
+        if not emp:
+            return False
+        if self._is_director_or_chief(emp) or self._is_branch_manager(emp) or self._is_district_manager_emp(emp):
+            return True
+        j_name = (emp.job_id.name or '').lower() if emp.job_id else ''
+        return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor'])
+
+    @api.model
+    def _is_director_emp(self, emp):
+        return self._is_director_or_chief(emp)
+
+    @api.model
+    def _is_district_manager_emp(self, emp):
+        if not emp or not emp.job_id:
+            return False
+        job_name = emp.job_id.name or ''
+        return 'district manager' in job_name.lower() or ('district' in job_name.lower() and 'manager' in job_name.lower())
+
+    @api.model
+    def _get_eligible_peers_for_emp(self, emp):
+        """Get eligible peer candidates for employee emp based on category grid:
+        1. Directors and Chiefs (Exceptions):
+           - Configured via competency.director.peer.config OR 1. Same Job Grade (Coach, OU, Position unlisted -> open).
+        2. Branch Managers:
+           - 1. Same Coach, 2. Same Job Grade, 4. Same Job Position (OU unlisted -> open).
+        3. Managerial Positions HO & District Office:
+           - 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit (Job Position unlisted -> open).
+        4. Non Managerial Positions:
+           - 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position.
+        """
+        if not emp or not emp.active:
+            return self.env['hr.employee']
+
+        # 1. Directors & Chiefs Exception: Strictly manual assignment via competency.director.peer.config
+        if self._is_director_or_chief(emp):
+            peers = self.env['hr.employee']
+            config = self.env['competency.director.peer.config'].search([('director_id', '=', emp.id)], limit=1)
+            if config and config.peer_ids:
+                peers |= config.peer_ids.filtered(lambda p: p.active and p.id != emp.id)
+            other_configs = self.env['competency.director.peer.config'].search([('peer_ids', 'in', [emp.id])])
+            if other_configs:
+                peers |= other_configs.mapped('director_id').filtered(lambda d: d.active and d.id != emp.id)
+            # Returns manually assigned peers ONLY (no random auto-assignment if unassigned)
+            return peers
+
+        emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
+        emp_grade_id = self._get_employee_grade_id(emp)
+        emp_ou_id = self._get_employee_ou_id(emp)
+        emp_job_id = emp.job_id.id if emp.job_id else False
+
+        domain = [('id', '!=', emp.id), ('active', '=', True)]
+        if emp_coach:
+            domain += ['|', ('parent_id', '=', emp_coach.id), ('coach_id', '=', emp_coach.id)]
+
+        candidates = self.env['hr.employee'].search(domain)
+
+        # 2. Branch Manager: Same Coach, Same Grade, Same Position (OU unlisted -> open)
+        if self._is_branch_manager(emp):
+            matched = candidates.filtered(lambda c: (
+                (self._get_employee_grade_id(c) == emp_grade_id if emp_grade_id else True) and
+                (c.job_id.id == emp_job_id if (c.job_id and emp_job_id) else True)
+            ))
+        # 3. Managerial Positions HO & District Office: Same Coach, Same Grade, Same OU (Position unlisted -> open)
+        elif self._is_manager(emp):
+            matched = candidates.filtered(lambda c: (
+                (self._get_employee_grade_id(c) == emp_grade_id if emp_grade_id else True) and
+                (self._get_employee_ou_id(c) == emp_ou_id if (self._get_employee_ou_id(c) and emp_ou_id) else True)
+            ))
+        # 4. Non-Managerial Positions: Same Coach, Same Grade, Same OU, Same Position
+        else:
+            matched = candidates.filtered(lambda c: (
+                (self._get_employee_grade_id(c) == emp_grade_id if emp_grade_id else True) and
+                (self._get_employee_ou_id(c) == emp_ou_id if (self._get_employee_ou_id(c) and emp_ou_id) else True) and
+                (c.job_id.id == emp_job_id if (c.job_id and emp_job_id) else True)
+            ))
+
+        if not matched and candidates:
+            # Fallback if strict criteria returns 0: match same grade under coach
+            matched = candidates.filtered(lambda c: self._get_employee_grade_id(c) == emp_grade_id) or candidates
+
+        return matched
+
+    @api.model
+    def _get_eligible_subordinates_for_emp(self, emp):
+        """Get eligible subordinate candidates for employee emp:
+        1. Chiefs / Directors (Exceptions):
+           - 1. Same Coach, 2. Different Job Grade (OU & Job Position unlisted -> open).
+        2. Non Managerial & Managerial Positions:
+           - 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position.
+        """
+        if not emp or not emp.active:
+            return self.env['hr.employee']
+
+        emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
+        emp_grade_id = self._get_employee_grade_id(emp)
+        emp_ou_id = self._get_employee_ou_id(emp)
+        emp_job_id = emp.job_id.id if emp.job_id else False
+
+        domain = [('id', '!=', emp.id), ('active', '=', True)]
+        if emp_coach:
+            domain += ['|', ('parent_id', '=', emp_coach.id), ('coach_id', '=', emp_coach.id)]
+
+        candidates = self.env['hr.employee'].search(domain)
+
+        # 1. Chief / Director Subordinates Exception: Same Coach, Different Grade (OU & Job Position unlisted -> open)
+        if self._is_director_or_chief(emp):
+            matched = candidates.filtered(lambda c: (
+                self._get_employee_grade_id(c) != emp_grade_id if (self._get_employee_grade_id(c) and emp_grade_id) else True
+            ))
+        # 2. General Subordinates (Non-Manager & Manager): Same Coach, Different Grade, Same OU, Different Position
+        else:
+            matched = candidates.filtered(lambda c: (
+                (self._get_employee_grade_id(c) != emp_grade_id if (self._get_employee_grade_id(c) and emp_grade_id) else True) and
+                (self._get_employee_ou_id(c) == emp_ou_id if (self._get_employee_ou_id(c) and emp_ou_id) else True) and
+                (c.job_id.id != emp_job_id if (c.job_id and emp_job_id) else True)
+            ))
+
+        if not matched and candidates:
+            # Fallback if strict criteria returns 0: match candidates under same coach with different grade or position
+            matched = candidates.filtered(lambda c: c.job_id.id != emp_job_id) or candidates
+
+        # Include employee's coach as eligible candidate for subordinate assessment (assessing coach from employee perspective)
+        if emp_coach and emp_coach.id != emp.id:
+            matched |= emp_coach
+
+        return matched
+
     @api.onchange('assessment_type')
     def _onchange_assessment_type_set_employee_domain(self):
         """Rule 2: Restrict employee selection domain strictly based on chosen assessment type and auto-assign valid default."""
         user = self.env.user
         emp = user.employee_id
-        
+
         if self.assessment_type == 'self':
             if emp:
                 self.employee_id = emp.id
@@ -346,20 +594,20 @@ class CompetencyAssessment(models.Model):
             return {'domain': {'employee_id': [('id', '=', False)]}}
 
         if self.assessment_type == 'peer':
-            # Peer selection: same manager or same department (excluding self)
-            peers = self.env['hr.employee']
-            if emp.parent_id:
-                peers |= self.env['hr.employee'].search([('parent_id', '=', emp.parent_id.id), ('id', '!=', emp.id)])
-            if emp.department_id:
-                peers |= self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
-            if not peers:
-                peers = self.env['hr.employee'].search([('id', '!=', emp.id)], limit=50)
-            
+            peers = self._get_eligible_peers_for_emp(emp)
             self.employee_id = peers[0].id if peers else False
             return {'domain': {'employee_id': [('id', 'in', peers.ids)]}}
-            
+
+        elif self.assessment_type == 'subordinate':
+            subs = self._get_eligible_subordinates_for_emp(emp)
+            emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
+            if emp_coach and emp_coach in subs:
+                self.employee_id = emp_coach.id
+            else:
+                self.employee_id = subs[0].id if subs else False
+            return {'domain': {'employee_id': [('id', 'in', subs.ids)]}}
+
         elif self.assessment_type == 'supervisor':
-            # Supervisor selection: parent_id, coach_id, or department manager
             supervisors = self.env['hr.employee']
             if emp.parent_id:
                 supervisors |= emp.parent_id
@@ -369,7 +617,6 @@ class CompetencyAssessment(models.Model):
                 supervisors |= emp.department_id.manager_id
 
             if not supervisors and emp.department_id:
-                # Fallback to parent department manager
                 dept = emp.department_id.parent_id
                 while dept and not supervisors:
                     if dept.manager_id and dept.manager_id.id != emp.id:
@@ -377,7 +624,6 @@ class CompetencyAssessment(models.Model):
                     dept = dept.parent_id
 
             if not supervisors:
-                # Fallback to employees with manager/director in job title
                 supervisors = self.env['hr.employee'].search([
                     ('id', '!=', emp.id),
                     '|', ('job_id.name', 'ilike', 'manager'), ('job_id.name', 'ilike', 'director')
@@ -385,17 +631,17 @@ class CompetencyAssessment(models.Model):
 
             self.employee_id = supervisors[0].id if supervisors else False
             return {'domain': {'employee_id': [('id', 'in', supervisors.ids)]}}
-            
+
         elif self.assessment_type == 'team':
-            # Team selection: direct reports or subordinates
             subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)])
             if not subordinates and emp.department_id and emp.department_id.manager_id.id == emp.id:
                 subordinates = self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
-            
+
             self.employee_id = subordinates[0].id if subordinates else False
             return {'domain': {'employee_id': [('id', 'in', subordinates.ids)]}}
 
         return {'domain': {'employee_id': []}}
+
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
@@ -538,21 +784,11 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _get_matrix_required_level(self, pillar, grade=False, job=False, job_name=''):
-        """Determine required proficiency level (1..4) based on configured Competency Matrix settings."""
+        """Determine required proficiency level (1..4) checking Job Position exception matrix first, then falling back to Job Grade matrix baseline."""
         config = self.env['competency.matrix.config'].get_active_config()
         
-        # 1. Configured Determinant Mode Check
-        if config.proficiency_determinant == 'job_grade' and grade:
-            g_line = self.env['competency.grade.matrix'].search([
-                ('config_id', '=', config.id),
-                ('grade_id', '=', grade.id)
-            ], limit=1)
-            if g_line:
-                if pillar == 'core': return g_line.required_core_level
-                elif pillar == 'leadership': return g_line.required_leadership_level if g_line.required_leadership_level != '0' else '1'
-                else: return g_line.required_technical_level
-                
-        elif config.proficiency_determinant == 'job_position' and job:
+        # 1. Job Position Matrix Check (Exceptions Override)
+        if job:
             j_line = self.env['competency.job.matrix'].search([
                 ('config_id', '=', config.id),
                 ('job_id', '=', job.id)
@@ -561,6 +797,17 @@ class CompetencyAssessment(models.Model):
                 if pillar == 'core': return j_line.required_core_level
                 elif pillar == 'leadership': return j_line.required_leadership_level if j_line.required_leadership_level != '0' else '1'
                 else: return j_line.required_technical_level
+
+        # 2. Job Grade Matrix Check (Baseline Standard)
+        if grade:
+            g_line = self.env['competency.grade.matrix'].search([
+                ('config_id', '=', config.id),
+                ('grade_id', '=', grade.id)
+            ], limit=1)
+            if g_line:
+                if pillar == 'core': return g_line.required_core_level
+                elif pillar == 'leadership': return g_line.required_leadership_level if g_line.required_leadership_level != '0' else '1'
+                else: return g_line.required_technical_level
 
         # Fallback to standard guidelines
         g_name = (grade.grade_name or '').lower() if grade else ''
@@ -798,8 +1045,61 @@ class CompetencyAssessment(models.Model):
                     ) % (deadline_str, rec.cycle_id.name))
         return super(CompetencyAssessment, self).write(vals)
 
+    def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
+        """Ensure notification appears in ALL Odoo notification channels:
+        1. Top Header Clock Icon (mail.activity)
+        2. Top Header Speech Bubble Notifications tab (mail.notification with inbox type)
+        3. Direct Discuss Chat Channel popover / popup window (discuss.channel)
+        """
+        if not target_user:
+            return
+        rec_to_notify = target_rec or self
+        
+        # 1. Top Header Clock Icon (Activity Badge)
+        rec_to_notify.activity_schedule(
+            'mail.mail_activity_data_todo',
+            summary=summary,
+            note=note,
+            user_id=target_user.id,
+        )
+
+        # 2. Document Chatter Message & In-App Notification
+        if target_user.partner_id:
+            msg = rec_to_notify.message_post(
+                body=msg_text,
+                partner_ids=[target_user.partner_id.id],
+                subtype_xmlid='mail.mt_comment',
+            )
+            # Guarantee an unread in-app inbox notification entry
+            notif = self.env['mail.notification'].sudo().search([
+                ('mail_message_id', '=', msg.id),
+                ('res_partner_id', '=', target_user.partner_id.id),
+            ], limit=1)
+            if notif:
+                notif.write({'notification_type': 'inbox', 'is_read': False})
+            else:
+                self.env['mail.notification'].sudo().create({
+                    'mail_message_id': msg.id,
+                    'res_partner_id': target_user.partner_id.id,
+                    'notification_type': 'inbox',
+                    'notification_status': 'sent',
+                    'is_read': False,
+                })
+
+            # 3. Direct Discuss Chat Channel Popup / Window (OdooBot Direct Message)
+            try:
+                chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[target_user.partner_id.id])
+                if chat_channel:
+                    chat_channel.message_post(
+                        body=msg_text,
+                        message_type='comment',
+                        subtype_xmlid='mail.mt_comment',
+                    )
+            except Exception:
+                pass
+
     def action_submit(self):
-        """Draft -> Submitted with deadline checks, unrated checks, and employee confirmation notification (FR-COM-047)."""
+        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
         for rec in self:
             rec._check_submission_deadline()
             if not rec.line_ids:
@@ -814,13 +1114,64 @@ class CompetencyAssessment(models.Model):
             rec.line_ids._trigger_sibling_360_recompute()
             rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
-            if rec.employee_id and rec.employee_id.user_id:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Assessment Submitted: %s') % rec.name,
-                    note=_('Your competency assessment %s has been submitted successfully.') % rec.name,
-                    user_id=rec.employee_id.user_id.id,
+            # Targeted Notifications & Systray Activities on Submission
+            if rec.assessment_type == 'self':
+                # Confirmation activity for employee
+                if rec.employee_id and rec.employee_id.user_id:
+                    rec.activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Self-Assessment Submitted: %s') % rec.name,
+                        note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
+                        user_id=rec.employee_id.user_id.id,
+                    )
+
+                coach_emp = rec.employee_id.coach_id or rec.employee_id.parent_id
+                coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
+
+                sup_asm = False
+                if rec.cycle_id and rec.employee_id:
+                    sup_asm = self.env['competency.assessment'].search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('assessment_type', 'in', ('supervisor', 'team')),
+                    ], limit=1)
+                    if not coach_user and sup_asm and sup_asm.assessor_id:
+                        coach_user = sup_asm.assessor_id
+
+                if coach_user:
+                    msg_text = _("📥 Subordinate Employee <strong>%s</strong> has completed and submitted their Self-Assessment for cycle '<strong>%s</strong>'.") % (
+                        rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    summary_str = _('Subordinate Self-Assessment Submitted: %s') % rec.employee_id.name
+                    note_str = _('Employee %s has submitted their self-assessment for cycle %s. You may now evaluate.') % (
+                        rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    target_rec = sup_asm or rec
+                    rec._notify_user_inbox_and_activity(coach_user, summary_str, note_str, msg_text, target_rec=target_rec)
+
+            elif rec.assessment_type in ('supervisor', 'team'):
+                emp_user = rec.employee_id.user_id if (rec.employee_id and rec.employee_id.user_id) else False
+
+                self_asm = False
+                if rec.cycle_id and rec.employee_id:
+                    self_asm = self.env['competency.assessment'].search([
+                        ('cycle_id', '=', rec.cycle_id.id),
+                        ('employee_id', '=', rec.employee_id.id),
+                        ('assessment_type', '=', 'self'),
+                    ], limit=1)
+
+                coach_name = rec.assessor_id.name if rec.assessor_id else _("Supervisor/Coach")
+                msg_text = _("✅ Your supervisor/coach (<strong>%s</strong>) has completed and submitted your competency assessment for cycle '<strong>%s</strong>'.") % (
+                    coach_name, rec.cycle_id.name if rec.cycle_id else ''
                 )
+                summary_str = _('Supervisor Assessment Completed: %s') % coach_name
+                note_str = _('Your supervisor/coach (%s) has completed and submitted your competency assessment for cycle \'%s\'.') % (
+                    coach_name, rec.cycle_id.name if rec.cycle_id else ''
+                )
+
+                if emp_user:
+                    target_rec = self_asm or rec
+                    rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
@@ -1188,8 +1539,10 @@ class CompetencyAssessmentLine(models.Model):
     def create(self, vals_list):
         force_write = self.env.context.get('force_write')
         for vals in vals_list:
-            if not force_write and vals.get('assessment_id'):
+            if not force_write and not self.env.su and vals.get('assessment_id'):
                 asm = self.env['competency.assessment'].browse(vals['assessment_id'])
+                if asm.state == 'locked':
+                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % asm.name)
                 today = fields.Date.today()
                 dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
                 if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
@@ -1206,8 +1559,10 @@ class CompetencyAssessmentLine(models.Model):
     def write(self, vals):
         force_write = self.env.context.get('force_write')
         for line in self:
-            if not force_write and line.assessment_id:
+            if not force_write and not self.env.su and line.assessment_id:
                 asm = line.assessment_id
+                if asm.state == 'locked':
+                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % asm.name)
                 today = fields.Date.today()
                 dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
                 if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
@@ -1398,29 +1753,6 @@ class CompetencyAssessmentLine(models.Model):
          'This competency is already rated in the assessment!'),
     ]
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        lines = super().create(vals_list)
-        for line in lines:
-            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
-                if line.assessment_id.state == 'locked':
-                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % line.assessment_id.name)
-                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
-                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
-                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
-        return lines
-
-    def write(self, vals):
-        res = super().write(vals)
-        for line in self:
-            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
-                if line.assessment_id.state == 'locked':
-                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % line.assessment_id.name)
-                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
-                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
-                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
-        return res
-
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_locked(self):
         for line in self:
@@ -1434,6 +1766,8 @@ class CompetencyAssessmentLine(models.Model):
     def action_view_360_breakdown(self):
         """Action button to open the 360° Rater Score Breakdown pop-up modal wizard."""
         self.ensure_one()
+        if self.employee_id.user_id == self.env.user and not self.env.user.has_group('competency_management.group_competency_supervisor') and not self.env.su:
+            raise UserError(_("Individual multi-rater score breakdowns are restricted to Supervisors and HR Officers to maintain 360-degree feedback anonymity."))
         emp = self.employee_id
         cycle = self.cycle_id
         comp = self.competency_id

@@ -9,7 +9,6 @@
                 <list>
                     <field name="code"/>
                     <field name="name"/>
-                    <field name="min_proficiency"/>
                     <field name="active"/>
                 </list>
             </field>
@@ -27,7 +26,6 @@
                             <group>
                                 <field name="name"/>
                                 <field name="code"/>
-                                <field name="min_proficiency"/>
                             </group>
                             <group>
                                 <field name="active"/>
