@@ -1165,7 +1165,8 @@ class CompetencyAssessment(models.Model):
 
             # 3. Direct Discuss Chat Channel Popup / Window (OdooBot Direct Message)
             try:
-                chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(partners_to=[target_user.partner_id.id])
+                # Odoo 19 compatible: _get_or_create_chat takes a single partner_id int
+                chat_channel = self.env['discuss.channel'].sudo()._get_or_create_chat(target_user.partner_id.id)
                 if chat_channel:
                     chat_channel.message_post(
                         body=msg_text,
@@ -1433,7 +1434,7 @@ class CompetencyAssessmentLine(models.Model):
     cycle_id = fields.Many2one(related='assessment_id.cycle_id', string='Assessment Cycle', store=True, readonly=True, index=True)
     employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
-    operating_unit_id = fields.Many2one(related='assessment_id.employee_id.operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
+    operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
     job_id = fields.Many2one(related='assessment_id.job_id', string='Job Position', store=True, readonly=True, index=True)
     grade_id = fields.Many2one(related='assessment_id.employee_id.grade_id', string='Job Grade', store=True, readonly=True, index=True)
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
@@ -1477,24 +1478,27 @@ class CompetencyAssessmentLine(models.Model):
 
     @api.depends('competency_id')
     def _compute_level_indicators(self):
-        matrix_config = self.env['competency.matrix.config'].get_active_config()
+        try:
+            matrix_config = self.env['competency.matrix.config'].get_active_config()
+        except Exception:
+            matrix_config = None
         for rec in self:
             if rec.competency_id:
                 levels = self.env['competency.proficiency.level'].search([
                     ('competency_id', '=', rec.competency_id.id)
                 ])
                 l_map = {l.level: l.behavioral_indicators for l in levels if l.behavioral_indicators}
-                
-                l1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1') if rec.competency_id.pillar == 'technical' else 'Level 1 (Basic) behavioral indicators.')
-                l2 = l_map.get('2') or (getattr(matrix_config, 'tech_indicator_level_2') if rec.competency_id.pillar == 'technical' else 'Level 2 (Intermediate) behavioral indicators.')
-                l3 = l_map.get('3') or (getattr(matrix_config, 'tech_indicator_level_3') if rec.competency_id.pillar == 'technical' else 'Level 3 (Advanced) behavioral indicators.')
-                l4 = l_map.get('4') or (getattr(matrix_config, 'tech_indicator_level_4') if rec.competency_id.pillar == 'technical' else 'Level 4 (Expert) behavioral indicators.')
-                
+
+                l1 = l_map.get('1') or (getattr(matrix_config, 'tech_indicator_level_1', None) if (matrix_config and rec.competency_id.pillar == 'technical') else None) or 'Level 1 (Basic) behavioral indicators.'
+                l2 = l_map.get('2') or (getattr(matrix_config, 'tech_indicator_level_2', None) if (matrix_config and rec.competency_id.pillar == 'technical') else None) or 'Level 2 (Intermediate) behavioral indicators.'
+                l3 = l_map.get('3') or (getattr(matrix_config, 'tech_indicator_level_3', None) if (matrix_config and rec.competency_id.pillar == 'technical') else None) or 'Level 3 (Advanced) behavioral indicators.'
+                l4 = l_map.get('4') or (getattr(matrix_config, 'tech_indicator_level_4', None) if (matrix_config and rec.competency_id.pillar == 'technical') else None) or 'Level 4 (Expert) behavioral indicators.'
+
                 rec.indicator_level_1 = l1
                 rec.indicator_level_2 = l2
                 rec.indicator_level_3 = l3
                 rec.indicator_level_4 = l4
-                
+
                 rec.behavioral_guide_html = f"""
                 <div style="font-family: inherit; font-size: 13px; color: #1d2b32;">
                     <div style="margin-bottom: 8px; padding: 8px 12px; background-color: #f8f9fa; border-left: 4px solid #726732; border-radius: 4px;">

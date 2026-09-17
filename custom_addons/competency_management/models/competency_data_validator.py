@@ -2,10 +2,15 @@
 from odoo import api, fields, models, _
 
 
-class CompetencyDataValidator(models.AbstractModel):
-    """Data Quality Automation & Governance Validator for Competency Data."""
+class CompetencyDataValidator(models.Model):
+    """Data Quality Automation & Governance Validator for Competency Data.
+
+    Defined as a concrete Model with _auto=False (no database table) so that
+    ir.model registers this model and the cron XML can reference model_competency_data_validator.
+    """
     _name = 'competency.data.validator'
     _description = 'Competency Data Quality & Governance Validator'
+    _auto = False  # No DB table created — keeps it lightweight
 
     @api.model
     def _cron_validate_competency_data_quality(self):
