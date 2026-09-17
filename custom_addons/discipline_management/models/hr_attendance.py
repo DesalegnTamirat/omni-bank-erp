@@ -13,6 +13,8 @@ class HrAttendance(models.Model):
         store=True
     )
     suspension_notes = fields.Char(string='Suspension Attendance Note')
+    is_late = fields.Boolean(string='Late Check-In', default=False)
+    is_force_checkout = fields.Boolean(string='Force Check-Out', default=False)
 
     @api.depends('employee_id', 'check_in')
     def _compute_is_suspended_attendance(self):

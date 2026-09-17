@@ -218,6 +218,25 @@ class DisciplineCommitteeMeeting(models.Model):
                 ) % (rec.present_members_count, cast_votes))
 
             rec.write({'state': 'completed'})
+            
+            # Auto-populate the decided punishment on the case from committee recommendation
+            recom_to_punishment = {
+                'dismissal': 'dismissal',
+                'final_warning': 'final_warning_penalty',
+                'second_warning': 'second_warning_penalty',
+                'first_warning': 'first_warning_penalty',
+                'verbal_warning': 'verbal_warning',
+                'demotion': 'demotion',
+                'exonerate': 'exonerate',
+                'custom': 'custom',
+            }
+            if rec.case_id and rec.final_recommendation in recom_to_punishment:
+                punish_val = recom_to_punishment[rec.final_recommendation]
+                rec.case_id.with_context(force_write=True).write({
+                    'decided_punishment_type': punish_val,
+                    'punishment_type': punish_val,
+                })
+
             rec.case_id.message_post(
                 body=_(
                     'Disciplinary Committee Meeting %s completed. Quorum Validated. '

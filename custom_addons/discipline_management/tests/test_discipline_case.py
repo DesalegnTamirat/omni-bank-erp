@@ -299,14 +299,14 @@ class TestDisciplineCase(TransactionCase):
             self.assertTrue(self.contract.id)
 
     def test_10_attendance_discipline_threshold(self):
-        """Test auto-creation of draft discipline case when attendance lateness threshold is exceeded."""
+        """Test auto-creation of draft discipline case when attendance violation threshold is exceeded."""
         today = fields.Datetime.now()
         for i in range(3):
             self.env['hr.attendance'].with_context(skip_duplicate_check=True, tracking_disable=True).create({
                 'employee_id': self.employee.id,
                 'check_in': today - timedelta(days=5 - i * 2),
                 'check_out': today - timedelta(days=5 - i * 2, hours=-8),
-                'check_in_status': 'Late',
+                'is_force_checkout': True,
             })
         self.env['hr.attendance']._cron_escalate_attendance_violations()
         

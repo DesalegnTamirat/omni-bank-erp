@@ -768,9 +768,27 @@ class DisciplineCase(models.Model):
                 )
 
     def action_submit_for_approval(self):
+        recom_to_punishment = {
+            'dismissal': 'dismissal',
+            'final_warning': 'final_warning_penalty',
+            'second_warning': 'second_warning_penalty',
+            'first_warning': 'first_warning_penalty',
+            'verbal_warning': 'verbal_warning',
+            'demotion': 'demotion',
+            'exonerate': 'exonerate',
+            'custom': 'custom',
+        }
         for rec in self:
             if not rec.decided_punishment_type and not rec.punishment_type:
-                raise UserError(_('Please assign the Committee Decided Punishment before submitting for final executive approval.'))
+                completed_meeting = rec.committee_meeting_ids.filtered(lambda m: m.state == 'completed' and m.final_recommendation)
+                if completed_meeting:
+                    punish_val = recom_to_punishment.get(completed_meeting[-1].final_recommendation, completed_meeting[-1].final_recommendation)
+                    rec.with_context(force_write=True).write({
+                        'decided_punishment_type': punish_val,
+                        'punishment_type': punish_val,
+                    })
+                else:
+                    raise UserError(_('Please assign the Committee Decided Punishment before submitting for final executive approval.'))
             rec.with_context(force_write=True).write({'state': 'pending_approval', 'is_locked_for_committee': False})
             rec.message_post(body=_('Disciplinary case and decided punishment submitted for final executive approval.'))
 
