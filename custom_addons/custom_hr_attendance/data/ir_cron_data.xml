@@ -2,17 +2,18 @@
 <odoo>
     <data noupdate="0">
         <!--
-            Shift-Aware Auto Checkout Cron: runs continuously every 15 minutes.
-            Executes the native PostgreSQL stored function process_automated_force_checkouts()
-            to auto-checkout employees past their scheduled shift end.
+            Shift-Aware Auto Checkout Cron: runs once a day at midnight (21:00 UTC = 00:00 Midnight EAT).
+            Executes process_automated_force_checkouts() to auto-checkout employees whose shifts have ended.
+            Does NOT force checkout employees whose shifts are still active across midnight (e.g. Night Shifts).
         -->
         <record id="ir_cron_automatic_force_checkout" model="ir.cron">
-            <field name="name">Attendance: Shift-Aware Auto Checkout (Every 15 min)</field>
+            <field name="name">Attendance: Daily Midnight Auto Checkout</field>
             <field name="model_id" ref="hr_attendance.model_hr_attendance"/>
             <field name="state">code</field>
             <field name="code">model.cron_automatic_force_checkout()</field>
-            <field name="interval_number">15</field>
-            <field name="interval_type">minutes</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="nextcall">2026-01-01 21:00:00</field>
             <field name="active" eval="True"/>
         </record>
 

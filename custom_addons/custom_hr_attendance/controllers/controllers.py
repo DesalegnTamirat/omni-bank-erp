@@ -345,10 +345,14 @@ class BunnaMyAttendance(http.Controller):
             'name': 'Default Global Shift',
             'code': 'GLOBAL',
             'time_range': f"{start_str} - {end_str}",
+            'start_time': std_start,
+            'end_time': std_end,
             'start_time_str': start_str,
             'end_time_str': end_str,
             'is_night_shift': False,
             'has_lunch_break': True,
+            'lunch_out_time': std_lunch_start,
+            'lunch_duration': std_lunch_duration,
             'lunch_time_str': lunch_str,
             'is_custom_exception': False,
             'is_day_off': False,
@@ -575,6 +579,7 @@ class BunnaMyAttendance(http.Controller):
                 'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
             dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
             checkin_grace = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
+            checkin_buffer = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
 
             m_cutoff = m_start + checkin_grace + dead_time
             a_cutoff = a_start + dead_time
@@ -590,18 +595,29 @@ class BunnaMyAttendance(http.Controller):
                     m_status = 'active'
                     m_badge = "Active (Live)"
             else:
-                if enable_checkin_restriction and current_float > m_cutoff:
-                    m_status = 'absent'
-                    m_badge = "Window Closed (Missed)"
-                elif current_float >= m_end:
-                    m_status = 'absent'
-                    m_badge = "Absent (Missed)"
-                elif current_float >= (m_start - 0.50):
-                    m_status = 'ready'
-                    m_badge = "Ready to Check In"
+                if not enable_checkin_restriction:
+                    if current_float < (m_start - checkin_buffer):
+                        m_status = 'upcoming'
+                        m_badge = "Upcoming"
+                    elif current_float >= m_end:
+                        m_status = 'absent'
+                        m_badge = "Absent (Missed)"
+                    else:
+                        m_status = 'ready'
+                        m_badge = "Ready to Check In"
                 else:
-                    m_status = 'upcoming'
-                    m_badge = "Upcoming"
+                    if current_float < (m_start - checkin_buffer):
+                        m_status = 'upcoming'
+                        m_badge = "Upcoming"
+                    elif current_float <= m_cutoff:
+                        m_status = 'ready'
+                        m_badge = "Ready to Check In"
+                    elif current_float > m_cutoff and current_float < m_end:
+                        m_status = 'absent'
+                        m_badge = "Window Closed (Missed)"
+                    else:
+                        m_status = 'absent'
+                        m_badge = "Absent (Missed)"
 
             # Afternoon Session Check
             a_att = today_atts.filtered(lambda a: (a.shift_start_float and a.shift_start_float >= (m_end - 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour >= int(m_end)))
@@ -614,18 +630,29 @@ class BunnaMyAttendance(http.Controller):
                     a_status = 'active'
                     a_badge = "Active (Live)"
             else:
-                if enable_checkin_restriction and current_float > a_cutoff:
-                    a_status = 'absent'
-                    a_badge = "Window Closed (Missed)"
-                elif current_float >= a_end:
-                    a_status = 'absent'
-                    a_badge = "Absent (Missed)"
-                elif current_float >= (a_start - 0.25):
-                    a_status = 'ready'
-                    a_badge = "Ready to Check In"
+                if not enable_checkin_restriction:
+                    if current_float < (a_start - 0.25):
+                        a_status = 'upcoming'
+                        a_badge = "Upcoming"
+                    elif current_float >= a_end:
+                        a_status = 'absent'
+                        a_badge = "Absent (Missed)"
+                    else:
+                        a_status = 'ready'
+                        a_badge = "Ready to Check In"
                 else:
-                    a_status = 'upcoming'
-                    a_badge = "Upcoming"
+                    if current_float < (a_start - 0.25):
+                        a_status = 'upcoming'
+                        a_badge = "Upcoming"
+                    elif current_float <= a_cutoff:
+                        a_status = 'ready'
+                        a_badge = "Ready to Check In"
+                    elif current_float > a_cutoff and current_float < a_end:
+                        a_status = 'absent'
+                        a_badge = "Window Closed (Missed)"
+                    else:
+                        a_status = 'absent'
+                        a_badge = "Absent (Missed)"
 
             m_start_fmt = f"{int(m_start):02d}:{int(round((m_start % 1) * 60)):02d}"
             m_end_fmt = f"{int(m_end):02d}:{int(round((m_end % 1) * 60)):02d}"
