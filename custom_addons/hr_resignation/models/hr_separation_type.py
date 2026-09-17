@@ -83,8 +83,14 @@ class HrSeparationSeveranceRule(models.Model):
     separation_type_id = fields.Many2one(
         'hr.separation.type', string='Separation Type', required=True, ondelete='cascade'
     )
+    def _get_job_categories(self):
+        """ Dynamically fetches the selection options from hr.job """
+        if 'employee_category' in self.env['hr.job']._fields:
+            return self.env['hr.job']._fields['employee_category'].selection
+        return []
+
     employee_category = fields.Selection(
-        [('Managerial', 'Managerial'), ('Non Managerial', 'Non Managerial')],
+        selection='_get_job_categories',
         string='Job Category', required=True
     )
     min_service_years = fields.Float(
@@ -104,5 +110,5 @@ class HrSeparationSeveranceRule(models.Model):
     )
 
     _sql_constraints = [
-        ('category_uniq', 'unique(separation_type_id, job_category_id)', 'A job category can only have one rule per separation type.')
+        ('category_uniq', 'unique(separation_type_id, employee_category)', 'A job category can only have one rule per separation type.')
     ]

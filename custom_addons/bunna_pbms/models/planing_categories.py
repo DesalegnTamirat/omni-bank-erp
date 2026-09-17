@@ -1132,37 +1132,52 @@ class PbmsPlanCategoryLine(models.Model):
         [
             ("new", "New Position"),
             ("additional", "Additional Position"),
+            ("additional position", "Additional Position"),
         ],
         string="Position Type Code",
         compute="_compute_position_type_code",
         inverse="_inverse_position_type_code",
         store=True,
-        default="new",
     )
 
     @api.model
     def _default_position_type_id(self):
         return self.env["pbms.position.type"].search([("code", "=", "new")], limit=1)
 
-    @api.depends("position_type_id", "position_type_id.code")
+    @api.depends("position_type_id", "position_type_id.code", "position_type_id.is_new_position")
     def _compute_position_type_code(self):
         for line in self:
-            if line.position_type_id and line.position_type_id.code:
-                line.position_type = line.position_type_id.code
+            if line.position_type_id:
+                if line.position_type_id.is_new_position or line.position_type_id.code in ("new", "new_position"):
+                    line.position_type = "new"
+                else:
+                    line.position_type = "additional"
             elif not line.position_type:
                 line.position_type = "new"
 
     def _inverse_position_type_code(self):
         for line in self:
-            if line.position_type and (not line.position_type_id or line.position_type_id.code != line.position_type):
-                p_type = self.env["pbms.position.type"].search([("code", "=", line.position_type)], limit=1)
+            if line.position_type:
+                is_new = (line.position_type == "new")
+                if line.position_type_id and (line.position_type_id.is_new_position == is_new):
+                    continue
+                p_type = self.env["pbms.position.type"].search([
+                    ("is_new_position", "=", is_new)
+                ], limit=1)
+                if not p_type:
+                    p_type = self.env["pbms.position.type"].search([
+                        ("code", "=", "new" if is_new else "additional")
+                    ], limit=1)
                 if p_type:
                     line.position_type_id = p_type
 
     @api.onchange("position_type_id")
     def _onchange_position_type_id_sync(self):
         if self.position_type_id:
-            self.position_type = self.position_type_id.code
+            if self.position_type_id.is_new_position or self.position_type_id.code in ("new", "new_position"):
+                self.position_type = "new"
+            else:
+                self.position_type = "additional"
             if self.position_type_id.is_new_position or self.position_type == "new":
                 self.job_id = False
                 self.job_grade_id = False
@@ -2604,10 +2619,17 @@ class PbmsPlanCategoryLine(models.Model):
         ):
             return
         for line in self:
-            if line.plan_id and not line.plan_id._pbms_can_edit_plan_content():
-                raise AccessError(_(
-                    "you are already planned view from planning categories menu "
-                ))
+            if line.plan_id:
+                if line.plan_id.cycle_id and line.plan_id.cycle_id.state != "open":
+                    cycle_label = dict(line.plan_id.cycle_id._fields["state"].selection).get(line.plan_id.cycle_id.state, line.plan_id.cycle_id.state)
+                    raise AccessError(_(
+                        "Planning cycle '%s' is currently '%s' and is not open for unit input. "
+                        "You cannot modify plan data until the cycle is officially opened by SPPMD."
+                    ) % (line.plan_id.cycle_id.name, cycle_label))
+                if not line.plan_id._pbms_can_edit_plan_content():
+                    raise AccessError(_(
+                        "You do not have permission to edit this plan at its current workflow stage."
+                    ))
 
     @api.model
     def default_get(self, fields_list):
@@ -2694,6 +2716,12 @@ class PbmsPlanCategoryLine(models.Model):
             plan_id = vals.get("plan_id")
             if plan_id and not is_admin:
                 plan = Plan.browse(plan_id)
+                if plan.cycle_id and plan.cycle_id.state != "open":
+                    cycle_label = dict(plan.cycle_id._fields["state"].selection).get(plan.cycle_id.state, plan.cycle_id.state)
+                    raise AccessError(_(
+                        "Planning cycle '%s' is currently '%s' and is not open for unit input. "
+                        "You cannot add requirement lines until the cycle is officially opened by SPPMD."
+                    ) % (plan.cycle_id.name, cycle_label))
                 if plan and not plan._pbms_can_edit_plan_content():
                     raise AccessError(_(
                         "You cannot add requirement lines while the parent plan is view-only "
@@ -2954,7 +2982,7 @@ class PbmsPlanningCategory(models.Model):
     can_edit_sourcing_fields = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_add_lines = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
 
-    @api.depends("state", "org_unit_id", "org_unit_id.parent_unit", "org_unit_type", "category")
+    @api.depends("state", "org_unit_id", "org_unit_id.parent_unit", "org_unit_type", "category", "cycle_id", "cycle_id.state")
     def _compute_access_flags(self):
         user = self.env.user
         is_admin = user._pbms_is_sppmd_admin() or user.has_group("base.group_system")
@@ -3062,8 +3090,8 @@ class PbmsPlanningCategory(models.Model):
                 rec.can_add_lines = False
             elif user._pbms_is_sppmd_approver() and not is_admin:
                 rec.can_add_lines = False
-            elif rec.state in PBMS_BRANCH_EDITABLE_STATES and (rec._is_own_operating_unit_plan() or user._pbms_is_branch_user()):
-                rec.can_add_lines = True
+            elif rec.state in PBMS_BRANCH_EDITABLE_STATES and rec._is_own_operating_unit_plan():
+                rec.can_add_lines = bool(rec.cycle_id and rec.cycle_id.state == "open")
             else:
                 rec.can_add_lines = False
 
@@ -5612,7 +5640,32 @@ class PbmsPlanningCategory(models.Model):
 
         cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
         if not cycle:
-            cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
+            pending_cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
+            if pending_cycle:
+                state_label = dict(pending_cycle._fields['state'].selection).get(pending_cycle.state, pending_cycle.state)
+                return {
+                    'type': 'ir.actions.client',
+                    'tag': 'display_notification',
+                    'params': {
+                        'title': _('Planning Cycle Not Open for Input'),
+                        'message': _(
+                            "Planning cycle '%(name)s' is currently '%(state)s' and is not open for unit input. "
+                            "Branch users cannot input or submit plan data until SPPMD officially opens the cycle for unit input."
+                        ) % {'name': pending_cycle.name, 'state': state_label},
+                        'type': 'warning',
+                        'sticky': True,
+                    }
+                }
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('No Planning Cycle Open'),
+                    'message': _('There is currently no active planning cycle open for plan and budget input.'),
+                    'type': 'warning',
+                    'sticky': False,
+                }
+            }
 
         plan = False
         if org_unit and cycle:

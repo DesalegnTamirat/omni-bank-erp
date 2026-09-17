@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_hr_settlement_return_wizard_form" model="ir.ui.view">
+        <field name="name">hr.settlement.return.wizard.form</field>
+        <field name="model">hr.settlement.return.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Refuse Settlement">
+                <group>
+                    <field name="settlement_id" invisible="1"/>
+                    <field name="reason" string="Refusal Reason" placeholder="Please explain why this settlement is being refused..." required="1"/>
+                </group>
+                <footer>
+                    <button name="action_return_settlement" string="Refuse" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
+

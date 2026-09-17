@@ -51,8 +51,32 @@ class OperatingUnitJobPosition(models.Model):
     )
     approved_plan_count = fields.Integer(
         string='Approved Plan Count',
+        compute='_compute_approved_plan_count',
+        store=True,
+        readonly=False,
         default=0,
-        help="Approved manpower plan additions from PBMS.",
+        help="Approved manpower plan additions from PBMS (display_approved_annual_total).",
+    )
+    plan_fulfillment_promotion = fields.Integer(
+        string='Approved Promotion Plan',
+        compute='_compute_approved_plan_count',
+        store=True,
+        default=0,
+        help="Approved manpower additions earmarked for Promotion (fulfillment_promotion).",
+    )
+    plan_fulfillment_lateral = fields.Integer(
+        string='Approved Lateral/Transfer Plan',
+        compute='_compute_approved_plan_count',
+        store=True,
+        default=0,
+        help="Approved manpower additions earmarked for Lateral/Transfer (fulfillment_lateral).",
+    )
+    plan_fulfillment_external = fields.Integer(
+        string='Approved External Plan',
+        compute='_compute_approved_plan_count',
+        store=True,
+        default=0,
+        help="Approved manpower additions earmarked for External Vacancy (fulfillment_external).",
     )
     total_headcount = fields.Integer(
         string='Total Headcount',
@@ -94,6 +118,141 @@ class OperatingUnitJobPosition(models.Model):
         default=0,
         help="Number of resignations / terminations.",
     )
+    vacancy_count = fields.Integer(
+        string='Vacancies',
+        compute='_compute_vacancy_count',
+        help="Number of job vacancies created for this position and work unit.",
+    )
+
+    def _compute_vacancy_count(self):
+        if 'job.vacancy' not in self.env:
+            for rec in self:
+                rec.vacancy_count = 0
+            return
+        JobVacancy = self.env['job.vacancy']
+        for rec in self:
+            if rec.job_position_id and rec.operating_unit_id:
+                rec.vacancy_count = JobVacancy.search_count([
+                    ('job_position', '=', rec.job_position_id.id),
+                    ('operating_unit_id', '=', rec.operating_unit_id.id),
+                ])
+            else:
+                rec.vacancy_count = 0
+
+    def action_view_vacancies(self):
+        self.ensure_one()
+        return {
+            'name': _('Vacancies: %s') % (self.job_position_id.name or ''),
+            'type': 'ir.actions.act_window',
+            'res_model': 'job.vacancy',
+            'view_mode': 'list,form',
+            'target': 'current',
+            'domain': [
+                ('job_position', '=', self.job_position_id.id),
+                ('operating_unit_id', '=', self.operating_unit_id.id),
+            ],
+            'context': {
+                'default_job_position': self.job_position_id.id,
+                'default_operating_unit_id': self.operating_unit_id.id,
+            },
+        }
+
+    def action_create_vacancy(self):
+        self.ensure_one()
+        from datetime import timedelta
+
+        # Revalidate that approved plan is greater than 0
+        if self.approved_plan_count <= 0:
+            raise UserError(_(
+                "Cannot create vacancy: The approved manpower plan count for '%(job)s' at '%(unit)s' is %(plan)s. "
+                "The number of opening vacancies cannot exceed the approved plan count."
+            ) % {
+                'job': self.job_position_id.name or '',
+                'unit': self.operating_unit_id.name or '',
+                'plan': self.approved_plan_count,
+            })
+
+        # Check specific sourcing fulfillment
+        prom_plan = self.plan_fulfillment_promotion or 0
+        lat_plan = self.plan_fulfillment_lateral or 0
+        ext_plan = self.plan_fulfillment_external or 0
+        has_sourcing = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
+
+        # Determine movement type & sourcing based on fulfillment strategy:
+        # If approved plan is fulfillment_lateral and not promotion -> lateral transfer
+        if has_sourcing and lat_plan > 0 and prom_plan <= 0:
+            movement_type = 'lateral'
+            sourcing_type = 'internal'
+            recruitment_type = 'Internal'
+            target_openings_cap = lat_plan
+        elif has_sourcing and prom_plan > 0 and lat_plan <= 0:
+            movement_type = 'promotion'
+            sourcing_type = 'internal'
+            recruitment_type = 'Internal'
+            target_openings_cap = prom_plan
+        elif has_sourcing and prom_plan > 0 and lat_plan > 0:
+            movement_type = 'promotion'
+            sourcing_type = 'internal'
+            recruitment_type = 'Internal'
+            target_openings_cap = prom_plan
+        elif has_sourcing and ext_plan > 0:
+            movement_type = 'external'
+            sourcing_type = 'external'
+            recruitment_type = 'External'
+            target_openings_cap = ext_plan
+        else:
+            movement_type = 'promotion'
+            sourcing_type = 'internal'
+            recruitment_type = 'Internal'
+            target_openings_cap = self.approved_plan_count
+
+        # Calculate number of openings: strictly capped by target_openings_cap
+        if self.vacant_position_count > 0:
+            openings = min(self.vacant_position_count, target_openings_cap)
+        else:
+            openings = target_openings_cap
+        openings = max(1, min(openings, target_openings_cap))
+
+        grade_id = self.job_grade_id.id if self.job_grade_id else (
+            self.job_position_id.grade.id if getattr(self.job_position_id, 'grade', False) else False
+        )
+        responsible_id = self.env.user.employee_id.id if self.env.user.employee_id else False
+        today = fields.Date.context_today(self)
+
+        context = {
+            'default_job_position': self.job_position_id.id,
+            'default_operating_unit_id': self.operating_unit_id.id,
+            'default_job_grade': grade_id,
+            'default_no_of_vacancies': openings,
+            'default_type_of_employment': 'Permanent',
+            'default_sourcing_type': sourcing_type,
+            'default_recruitment_type': recruitment_type,
+            'default_internal_movement_type': movement_type,
+            'default_responsible': responsible_id,
+            'default_opening_date': today,
+            'default_last_date_to_apply': today + timedelta(days=3),
+            'default_vacancy_description': (
+                self.job_position_id.description or
+                _("Vacancy for %s at %s") % (self.job_position_id.name, self.operating_unit_id.name)
+            ),
+            'default_hiring_details': [(0, 0, {
+                'work_unit': self.operating_unit_id.id,
+                'responsible_employee': responsible_id,
+                'number_of_openings': openings,
+                'planned_positions': openings,
+                'status': 'In Progress',
+            })],
+        }
+
+        return {
+            'name': _('Create Job Vacancy'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'job.vacancy',
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
+            'context': context,
+        }
 
     @api.depends('job_position_id', 'job_position_id.grade')
     def _compute_job_grade(self):
@@ -122,6 +281,43 @@ class OperatingUnitJobPosition(models.Model):
             else:
                 rec.baseline_count = 0
 
+    @api.depends('operating_unit_id', 'job_position_id')
+    def _compute_approved_plan_count(self):
+        PlanLine = self.env['pbms.plan.category.line'] if 'pbms.plan.category.line' in self.env else None
+        Cycle = self.env['pbms.planning.cycle'] if 'pbms.planning.cycle' in self.env else None
+        for rec in self:
+            if PlanLine is not None and rec.operating_unit_id and rec.job_position_id:
+                cycle_domain = [
+                    ('line_type', '=', 'manpower'),
+                    ('org_unit_id', '=', rec.operating_unit_id.id),
+                    ('job_id', '=', rec.job_position_id.id),
+                ]
+                active_cycle = False
+                if Cycle is not None:
+                    active_cycle = Cycle.search([('active', '=', True)], order='id desc', limit=1)
+                if active_cycle:
+                    cycle_domain.append(('cycle_id', '=', active_cycle.id))
+
+                lines = PlanLine.search(cycle_domain)
+                if not lines and active_cycle:
+                    lines = PlanLine.search([
+                        ('line_type', '=', 'manpower'),
+                        ('org_unit_id', '=', rec.operating_unit_id.id),
+                        ('job_id', '=', rec.job_position_id.id),
+                    ])
+
+                rec.approved_plan_count = int(sum(lines.mapped('display_approved_annual_total')) or 0)
+                rec.plan_fulfillment_promotion = int(sum(lines.mapped('fulfillment_promotion')) or 0) if 'fulfillment_promotion' in PlanLine._fields else 0
+                lat = int(sum(lines.mapped('fulfillment_lateral')) or 0) if 'fulfillment_lateral' in PlanLine._fields else 0
+                trans = int(sum(lines.mapped('fulfillment_transfer')) or 0) if 'fulfillment_transfer' in PlanLine._fields else 0
+                rec.plan_fulfillment_lateral = lat + trans if (lat + trans) > 0 else 0
+                rec.plan_fulfillment_external = int(sum(lines.mapped('fulfillment_external')) or 0) if 'fulfillment_external' in PlanLine._fields else 0
+            else:
+                rec.approved_plan_count = 0
+                rec.plan_fulfillment_promotion = 0
+                rec.plan_fulfillment_lateral = 0
+                rec.plan_fulfillment_external = 0
+
     @api.depends('baseline_count', 'approved_plan_count')
     def _compute_total_headcount(self):
         for rec in self:
@@ -129,14 +325,18 @@ class OperatingUnitJobPosition(models.Model):
 
     @api.depends('operating_unit_id', 'job_position_id')
     def _compute_active_employee_count(self):
-        Employee = self.env['hr.employee']
         for rec in self:
             if rec.operating_unit_id and rec.job_position_id:
-                rec.active_employee_count = Employee.search_count([
-                    ('active', '=', True),
-                    ('job_position', '=', rec.job_position_id.id),
-                    ('operating_unit_ids', 'in', rec.operating_unit_id.id),
-                ])
+                # Active employees fetched from hr_version (operating_unit_id) or hr_employee (default_operating_unit_id), active status only
+                self.env.cr.execute("""
+                    SELECT COUNT(DISTINCT e.id)
+                    FROM hr_employee e
+                    LEFT JOIN hr_version v ON v.employee_id = e.id AND v.active = true
+                    WHERE e.active = true
+                      AND (e.job_position = %s OR v.job_id = %s)
+                      AND (v.operating_unit_id = %s OR e.default_operating_unit_id = %s)
+                """, (rec.job_position_id.id, rec.job_position_id.id, rec.operating_unit_id.id, rec.operating_unit_id.id))
+                rec.active_employee_count = self.env.cr.fetchone()[0] or 0
             else:
                 rec.active_employee_count = 0
 
@@ -146,8 +346,9 @@ class OperatingUnitJobPosition(models.Model):
             rec.vacant_position_count = (rec.total_headcount or 0) - (rec.active_employee_count or 0)
 
     def _recompute_all_counts(self):
-        """Helper: recompute baseline, active, total, and vacant counts for this recordset."""
+        """Helper: recompute baseline, active, approved plan, total, and vacant counts for this recordset."""
         self._compute_baseline_count()
+        self._compute_approved_plan_count()
         self._compute_active_employee_count()
         # total_headcount & vacant_position_count depend on the above, trigger them too
         self._compute_total_headcount()

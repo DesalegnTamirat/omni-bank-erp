@@ -49,9 +49,14 @@ class HrResignationSettlement(models.Model):
     _name = 'hr.resignation.settlement'
     _description = 'Resignation Final Settlement'
     _rec_name = 'employee_id'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     resignation_id = fields.Many2one('hr.resignation', ondelete='cascade')
     employee_id    = fields.Many2one('hr.employee', required=True)
+
+    # Tracks whether the POMD Officer has explicitly clicked "Process Settlement"
+    # Only when this is True does "Submit for Approval" become visible
+    is_processed = fields.Boolean(string='Is Processed', default=False, copy=False)
 
     # reads authorization from resignation submission
     settlement_authorized = fields.Boolean(
@@ -128,7 +133,7 @@ class HrResignationSettlement(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'), 
         ('waiting_approval', 'Waiting Approval'),
-        ('confirmed', 'Confirmed'), 
+        ('confirmed', 'Approved'), 
         ('paid', 'Paid')
     ], default='draft', tracking=True)
     notes = fields.Text(string='HR Notes')
@@ -144,7 +149,7 @@ class HrResignationSettlement(models.Model):
     paid_date = fields.Datetime(string='Date Paid', readonly=True)
 
     def _compute_is_hr_manager(self):
-        is_mgr = self.env.user.has_group('hr_resignation.group_resignation_hr_manager') or self.env.user.has_group('base.group_system')
+        is_mgr = self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
         for rec in self:
             rec.is_hr_manager = is_mgr
 
@@ -257,8 +262,8 @@ class HrResignationSettlement(models.Model):
             
             if sep_type and sep_type.pays_severance:
                 # Find matching rule for the employee's job category (Managerial / Non Managerial)
-                if 'employee_category' in emp.job_id._fields:
-                    job_category = emp.job_id.employee_category
+                if 'employee_category' in emp.job_position._fields:
+                    job_category = emp.job_position.employee_category
                     if job_category:
                         rule = sep_type.severance_rule_ids.filtered(lambda r: r.employee_category == job_category)
                         if rule:
@@ -295,14 +300,15 @@ class HrResignationSettlement(models.Model):
             subsequent_year_days = 10
             max_months = 12
             
-            if sep_type and sep_type.pays_severance and 'employee_category' in emp.job_id._fields:
-                job_category = emp.job_id.employee_category
-                if job_category and 'manager' in job_category.lower():
-                    first_year_days = 30
-                    subsequent_year_days = 15 # 1/2 of monthly salary
-                else:
-                    first_year_days = 30
-                    subsequent_year_days = 10 # 1/3 of monthly salary
+            # Fetch dynamic rules from the Separation Type configuration instead of hardcoding
+            if sep_type and sep_type.pays_severance and 'employee_category' in emp.job_position._fields:
+                job_category = emp.job_position.employee_category
+                if job_category:
+                    rule = sep_type.severance_rule_ids.filtered(lambda r: r.employee_category == job_category)
+                    if rule:
+                        first_year_days = rule[0].first_year_days
+                        subsequent_year_days = rule[0].subsequent_year_days
+                        max_months = rule[0].max_severance_months
             
             years = rec.service_years
             rec.years_for_severance = years
@@ -327,7 +333,12 @@ class HrResignationSettlement(models.Model):
                 rec.income_tax_leave = 0.0
                 continue
                 
-            total_days = (rec.resignation_id.total_accrued_leave or 0.0) + (rec.resignation_id.total_scheduled_leave or 0.0)
+            working_days = (rec.resignation_id.total_accrued_leave or 0.0) + (rec.resignation_id.total_scheduled_leave or 0.0)
+            
+            # Convert working days to calendar days using standard Ethiopian factor (1.3273)
+            # This ensures that when divided by 30 (calendar days), the rate is correct.
+            total_days = working_days * 1.3273
+            
             daily_rate = rec.basic_salary / 30.0
             rec.accrued_leave_pay = daily_rate * total_days
             
@@ -335,6 +346,8 @@ class HrResignationSettlement(models.Model):
             days_remaining = total_days
             total_tax = 0.0
             while days_remaining > 0:
+                if days_remaining < 0.001:
+                    break
                 chunk = min(30.0, days_remaining)
                 chunk_amount = daily_rate * chunk
                 total_tax += rec._calculate_tax_for_amount(chunk_amount)
@@ -383,50 +396,31 @@ class HrResignationSettlement(models.Model):
                     break
         return max(0.0, tax)
 
-    @api.depends('severance_amount', 'resignation_id.joined_date', 'resignation_id.release_date', 'basic_salary', 'resignation_id.job_category')
+    @api.depends('severance_amount', 'basic_salary')
     def _compute_income_tax_severance(self):
         for rec in self:
-            if rec.severance_amount <= 0:
+            if rec.severance_amount <= 0 or rec.basic_salary <= 0:
                 rec.income_tax_severance = 0.0
                 continue
                 
-            start_date = rec.resignation_id.joined_date
-            end_date = rec.resignation_id.release_date or fields.Date.today()
-            if not start_date or not end_date:
-                rec.income_tax_severance = rec._calculate_tax_for_amount(rec.severance_amount)
-                continue
-                
-            is_manager = False
-            if rec.resignation_id.job_category and 'manager' in rec.resignation_id.job_category.lower():
-                is_manager = True
-                
-            current_date = start_date
-            year = 1
+            daily_rate = rec.basic_salary / 30.0
+            total_days_awarded = rec.severance_amount / daily_rate
+            
+            # According to the Excel standard, Severance Tax is chunked by 30-day periods
+            # (equivalent to 1 month of salary) and taxed iteratively.
+            days_remaining = total_days_awarded
             total_tax = 0.0
             
-            while current_date < end_date:
-                next_date = current_date + relativedelta(years=1)
-                
-                if next_date > end_date:
-                    days = (end_date - current_date).days
-                    fraction = days / 365.0
-                    if year == 1:
-                        amt = rec.basic_salary * fraction
-                    else:
-                        multiplier = 0.5 if is_manager else (1.0/3.0)
-                        amt = rec.basic_salary * multiplier * fraction
-                    total_tax += rec._calculate_tax_for_amount(amt)
+            while days_remaining > 0:
+                # To prevent endless loops from float precision, round slightly
+                if days_remaining < 0.001:
                     break
-                else:
-                    if year == 1:
-                        amt = rec.basic_salary
-                    else:
-                        multiplier = 0.5 if is_manager else (1.0/3.0)
-                        amt = rec.basic_salary * multiplier
-                    total_tax += rec._calculate_tax_for_amount(amt)
-                    current_date = next_date
-                    year += 1
                     
+                chunk = min(30.0, days_remaining)
+                chunk_amount = daily_rate * chunk
+                total_tax += rec._calculate_tax_for_amount(chunk_amount)
+                days_remaining -= chunk
+                
             rec.income_tax_severance = total_tax
 
     @api.depends('line_ids.amount', 'line_ids.line_type', 'line_ids.is_taxable')
@@ -486,7 +480,7 @@ class HrResignationSettlement(models.Model):
             if rec.other_benefits:
                 lines.append((0, 0, {'name': 'Other Benefits', 'line_type': 'earning', 'is_taxable': True, 'amount': rec.other_benefits, 'resignation_id': rec.resignation_id.id}))
                 
-            rec.write({'line_ids': lines})
+            rec.write({'line_ids': lines, 'is_processed': True})
 
     @api.depends('pf_eligible', 'pf_ineligible_reason', 'severance_eligible', 'severance_ineligible_reason',
                  'service_years', 'has_disciplinary_case', 'employment_type', 'separation_reason', 'settlement_authorized')
@@ -571,18 +565,20 @@ class HrResignationSettlement(models.Model):
             if rec.outstanding_debt_deduction > 0 and not rec.settlement_authorized:
                 raise UserError(_('Cannot submit: Outstanding debts must be settled first.'))
 
-            if is_hr_manager:
-                # HR Manager can confirm directly without waiting for approval
-                rec.state = 'confirmed'
-                rec.processed_by_id = self.env.user.id
-                rec.processed_date = fields.Datetime.now()
-                rec.confirmed_by_id = self.env.user.id
-                rec.confirmed_date = fields.Datetime.now()
-            else:
-                # HR Officer submits for HR Manager approval
-                rec.state = 'waiting_approval'
-                rec.processed_by_id = self.env.user.id
-                rec.processed_date = fields.Datetime.now()
+            # Everyone (including managers) must submit it properly for a clean audit trail
+            rec.state = 'waiting_approval'
+            rec.processed_by_id = self.env.user.id
+            rec.processed_date = fields.Datetime.now()
+            
+            # Send notification to HR Manager
+            manager_group = self.env.ref('hr_resignation.group_resignation_hr_manager')
+            managers = manager_group.user_ids.filtered(lambda u: u.active)
+            for manager in managers:
+                rec.message_post(
+                    body=f"The settlement for {rec.employee_id.name} has been processed and submitted for your approval.",
+                    message_type='notification',
+                    partner_ids=[manager.partner_id.id]
+                )
 
     def action_approve_settlement(self):
         """Only HR Manager can approve a settlement that is waiting for approval."""
@@ -595,18 +591,53 @@ class HrResignationSettlement(models.Model):
             rec.state = 'confirmed'
             rec.confirmed_by_id = self.env.user.id
             rec.confirmed_date = fields.Datetime.now()
+            
+            # Notify the officer who processed it
+            if rec.processed_by_id:
+                rec.message_post(
+                    body=f"The settlement for {rec.employee_id.name} has been CONFIRMED by the HR Manager.",
+                    message_type='notification',
+                    partner_ids=[rec.processed_by_id.partner_id.id]
+                )
+
+    def action_open_return_wizard(self):
+        """Open the wizard to capture the return reason."""
+        self.ensure_one()
+        return {
+            'name': 'Return Settlement for Revision',
+            'type': 'ir.actions.act_window',
+            'res_model': 'hr.settlement.return.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_settlement_id': self.id},
+        }
+
+    def action_return_to_draft(self, reason):
+        """HR Manager sends settlement back to draft with a reason."""
+        for rec in self:
+            if rec.state != 'waiting_approval':
+                continue
+            
+            pomd_partner = rec.processed_by_id.partner_id.id if rec.processed_by_id else False
+            
+            rec.state = 'draft'
+            rec.is_processed = False
+            rec.processed_by_id = False
+            rec.processed_date = False
+            
+            # Post reason and notify POMD officer
+            msg = f"<b>Settlement Returned for Revision</b><br/><b>Reason:</b> {reason}"
+            partners = [pomd_partner] if pomd_partner else []
+            rec.message_post(body=msg, message_type='comment', partner_ids=partners)
 
     def action_mark_paid(self):
-        """HR Manager or HR Officer can mark a confirmed settlement as paid."""
-        is_hr = (
-            self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
-            or self.env.user.has_group('hr.group_hr_user')
-            or self.env.user.has_group('hr_resignation.group_pomd_officer')
-            or self.env.user.has_group('base.group_system')
+        """Only POMD/HR Officer can mark a confirmed settlement as paid. (Segregation of Duties)"""
+        is_officer = (
+            self.env.user.has_group('hr_resignation.group_pomd_officer')
         )
-        if not is_hr:
+        if not is_officer:
             raise UserError(_(
-                'Only an HR Officer or HR Manager can make the final payment.'
+                'Segregation of Duties: Only an HR/POMD Officer can execute the final payment, not the Approver.'
             ))
         for rec in self:
             if rec.state != 'confirmed':

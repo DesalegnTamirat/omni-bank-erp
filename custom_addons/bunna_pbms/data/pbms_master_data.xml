@@ -166,7 +166,7 @@
         <field name="code">WORKLOAD</field>
         <field name="sequence">50</field>
         <field name="requires_remarks">False</field>
-        <field name="description">Additional manpower to handle substantial growth in operational volume.</field>
+        <field name="description">Additional workforce.</field>
     </record>
 
     <record id="justification_bpr" model="pbms.justification.category">

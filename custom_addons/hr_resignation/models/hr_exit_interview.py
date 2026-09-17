@@ -113,6 +113,14 @@ class HrExitInterview(models.Model):
         ('done',  'Submitted'),
     ], default='draft', tracking=True)
 
+    can_edit = fields.Boolean(compute='_compute_can_edit')
+
+    @api.depends_context('uid')
+    def _compute_can_edit(self):
+        for rec in self:
+            is_employee = (rec.employee_id.user_id == self.env.user)
+            rec.can_edit = is_employee and rec.state == 'draft'
+
     @api.onchange('template_id')
     def _onchange_template_id(self):
         if self.template_id:

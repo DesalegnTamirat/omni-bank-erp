@@ -2,6 +2,7 @@
 import logging
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
+from odoo.addons.mail.tools.discuss import Store
 
 _logger = logging.getLogger(__name__)
 
@@ -156,6 +157,155 @@ class PbmsPlanningCycle(models.Model):
                     end=cycle.date_end
                 ))
 
+    def _to_local_date(self, dt):
+        """Convert a UTC Datetime to date for deadline comparisons."""
+        if not dt:
+            return False
+        try:
+            return fields.Datetime.context_timestamp(self, dt).date()
+        except Exception:
+            return dt.date()
+
+    @api.constrains("date_start", "date_end", "branch_deadline", "district_deadline", "head_office_deadline", "board_deadline")
+    def _check_submission_deadlines(self):
+        for cycle in self:
+            start = cycle.date_start
+            end = cycle.date_end
+
+            branch_dt = cycle.branch_deadline
+            dist_dt = cycle.district_deadline
+            ho_dt = cycle.head_office_deadline
+            board_dt = cycle.board_deadline
+
+            branch_d = cycle._to_local_date(branch_dt)
+            dist_d = cycle._to_local_date(dist_dt)
+            ho_d = cycle._to_local_date(ho_dt)
+            board_d = cycle._to_local_date(board_dt)
+
+            # 1. Branch Submission Deadline must be after Planning Cycle Start Date and on/before End Date
+            if branch_dt:
+                if start and branch_d < start:
+                    raise ValidationError(_(
+                        "Branch Submission Deadline (%(deadline)s) cannot be before the Planning Cycle Start Date (%(start)s). "
+                        "The branch input deadline must be after the planning cycle start date."
+                    ) % {
+                        "deadline": fields.Datetime.to_string(branch_dt),
+                        "start": fields.Date.to_string(start),
+                    })
+                if end and branch_d > end:
+                    raise ValidationError(_(
+                        "Branch Submission Deadline (%(deadline)s) cannot be after the Planning Cycle End Date (%(end)s)."
+                    ) % {
+                        "deadline": fields.Datetime.to_string(branch_dt),
+                        "end": fields.Date.to_string(end),
+                    })
+
+            # 2. District Endorsement Deadline must be after Branch Submission Deadline
+            if dist_dt:
+                if branch_dt and dist_dt <= branch_dt:
+                    raise ValidationError(_(
+                        "District Endorsement Deadline (%(dist)s) must be after the Branch Submission Deadline (%(branch)s)."
+                    ) % {
+                        "dist": fields.Datetime.to_string(dist_dt),
+                        "branch": fields.Datetime.to_string(branch_dt),
+                    })
+                if start and dist_d < start:
+                    raise ValidationError(_(
+                        "District Endorsement Deadline (%(dist)s) cannot be before the Planning Cycle Start Date (%(start)s)."
+                    ) % {
+                        "dist": fields.Datetime.to_string(dist_dt),
+                        "start": fields.Date.to_string(start),
+                    })
+                if end and dist_d > end:
+                    raise ValidationError(_(
+                        "District Endorsement Deadline (%(dist)s) cannot be after the Planning Cycle End Date (%(end)s)."
+                    ) % {
+                        "dist": fields.Datetime.to_string(dist_dt),
+                        "end": fields.Date.to_string(end),
+                    })
+
+            # 3. Head Office Review Deadline must be after District Endorsement Deadline
+            if ho_dt:
+                if dist_dt and ho_dt <= dist_dt:
+                    raise ValidationError(_(
+                        "Head Office Review Deadline (%(ho)s) must be after the District Endorsement Deadline (%(dist)s)."
+                    ) % {
+                        "ho": fields.Datetime.to_string(ho_dt),
+                        "dist": fields.Datetime.to_string(dist_dt),
+                    })
+                elif branch_dt and ho_dt <= branch_dt:
+                    raise ValidationError(_(
+                        "Head Office Review Deadline (%(ho)s) must be after the Branch Submission Deadline (%(branch)s)."
+                    ) % {
+                        "ho": fields.Datetime.to_string(ho_dt),
+                        "branch": fields.Datetime.to_string(branch_dt),
+                    })
+                if start and ho_d < start:
+                    raise ValidationError(_(
+                        "Head Office Review Deadline (%(ho)s) cannot be before the Planning Cycle Start Date (%(start)s)."
+                    ) % {
+                        "ho": fields.Datetime.to_string(ho_dt),
+                        "start": fields.Date.to_string(start),
+                    })
+                if end and ho_d > end:
+                    raise ValidationError(_(
+                        "Head Office Review Deadline (%(ho)s) cannot be after the Planning Cycle End Date (%(end)s)."
+                    ) % {
+                        "ho": fields.Datetime.to_string(ho_dt),
+                        "end": fields.Date.to_string(end),
+                    })
+
+            # 4. Board Approval Deadline must be after Head Office Review Deadline and on/before End Date
+            if board_dt:
+                if ho_dt and board_dt <= ho_dt:
+                    raise ValidationError(_(
+                        "Board Approval Deadline (%(board)s) must be after the Head Office Review Deadline (%(ho)s)."
+                    ) % {
+                        "board": fields.Datetime.to_string(board_dt),
+                        "ho": fields.Datetime.to_string(ho_dt),
+                    })
+                elif dist_dt and board_dt <= dist_dt:
+                    raise ValidationError(_(
+                        "Board Approval Deadline (%(board)s) must be after the District Endorsement Deadline (%(dist)s)."
+                    ) % {
+                        "board": fields.Datetime.to_string(board_dt),
+                        "dist": fields.Datetime.to_string(dist_dt),
+                    })
+                elif branch_dt and board_dt <= branch_dt:
+                    raise ValidationError(_(
+                        "Board Approval Deadline (%(board)s) must be after the Branch Submission Deadline (%(branch)s)."
+                    ) % {
+                        "board": fields.Datetime.to_string(board_dt),
+                        "branch": fields.Datetime.to_string(branch_dt),
+                    })
+                if start and board_d < start:
+                    raise ValidationError(_(
+                        "Board Approval Deadline (%(board)s) cannot be before the Planning Cycle Start Date (%(start)s)."
+                    ) % {
+                        "board": fields.Datetime.to_string(board_dt),
+                        "start": fields.Date.to_string(start),
+                    })
+                if end and board_d > end:
+                    raise ValidationError(_(
+                        "Board Approval Deadline (%(deadline)s) cannot be after the Planning Cycle End Date (%(end)s). "
+                        "The board approval deadline must be on or before the end date."
+                    ) % {
+                        "deadline": fields.Datetime.to_string(board_dt),
+                        "end": fields.Date.to_string(end),
+                    })
+
+    @api.onchange("date_start", "date_end", "branch_deadline", "district_deadline", "head_office_deadline", "board_deadline")
+    def _onchange_submission_deadlines(self):
+        try:
+            self._check_submission_deadlines()
+        except ValidationError as e:
+            return {
+                "warning": {
+                    "title": _("Invalid Deadline Sequence"),
+                    "message": str(e.args[0] if e.args else e),
+                }
+            }
+
     # =========================================================================
     # FR-WP-057: BUDGET YEAR STATUS NOTIFICATIONS
     # =========================================================================
@@ -173,21 +323,68 @@ class PbmsPlanningCycle(models.Model):
         except Exception:
             return self.env["res.users"].search([("active", "=", True)]).filtered(lambda u: u.has_group(group_xmlid))
 
-    def _get_all_planning_partners(self):
-        """Find all users involved in plan & budget preparation and review."""
-        partners = self.env["res.partner"]
+    def _get_all_planning_users(self):
+        """Find all active users across all Branches, Districts, and Head Offices,
+        as well as all PBMS planning role group members.
+        """
+        users = self.env["res.users"]
+
+        # 1. PBMS Role Groups (Branch Users, District Reviewers, HO Reviewers, Approvers, SPPMD Managers, etc.)
         group_xmlids = (
             "bunna_pbms.group_pbms_branch_user",
             "bunna_pbms.group_pbms_district_reviewer",
             "bunna_pbms.group_pbms_ho_reviewer",
             "bunna_pbms.group_pbms_approver",
             "bunna_pbms.group_pbms_manager",
+            "bunna_pbms.group_pbms_budget_hiring_committee",
+            "bunna_pbms.group_pbms_ceo",
+            "bunna_pbms.group_pbms_respective_chief",
+            "bunna_pbms.group_pbms_people_solutions",
+            "bunna_pbms.group_pbms_cpco",
+            "bunna_pbms.group_pbms_people_operations",
         )
         for g_xmlid in group_xmlids:
-            users = self._get_users_with_group(g_xmlid)
-            if users:
-                partners |= users.mapped("partner_id")
-        return partners
+            g_users = self._get_users_with_group(g_xmlid)
+            if g_users:
+                users |= g_users
+
+        # 2. Operating Units: All Branches, Districts, and Head Offices
+        if "operating.unit" in self.env:
+            target_ous = self.env["operating.unit"].search([
+                ("active", "=", True),
+                ("work_unit_type", "in", ("branch", "district", "district_office", "head_office")),
+            ])
+            for ou in target_ous:
+                if hasattr(ou, "user_ids") and ou.user_ids:
+                    users |= ou.user_ids.filtered(lambda u: u.active)
+                if hasattr(ou, "manager_id") and ou.manager_id and getattr(ou.manager_id, "user_id", False):
+                    if ou.manager_id.user_id.active:
+                        users |= ou.manager_id.user_id
+
+            if hasattr(self.env["res.users"], "assigned_operating_unit_ids"):
+                ou_assigned = self.env["res.users"].search([
+                    ("active", "=", True),
+                    ("assigned_operating_unit_ids", "in", target_ous.ids),
+                ])
+                if ou_assigned:
+                    users |= ou_assigned
+
+            if hasattr(self.env["res.users"], "default_operating_unit_id"):
+                ou_default = self.env["res.users"].search([
+                    ("active", "=", True),
+                    ("default_operating_unit_id", "in", target_ous.ids),
+                ])
+                if ou_default:
+                    users |= ou_default
+
+        root_user = self.env.ref("base.user_root", raise_if_not_found=False)
+        if root_user:
+            users -= root_user
+        return users.filtered(lambda u: u.active)
+
+    def _get_all_planning_partners(self):
+        """Find all users involved in plan & budget preparation and review across all branches, districts, and head offices."""
+        return self._get_all_planning_users().mapped("partner_id")
 
     def _notify_cycle_status_change(self, status_title, message):
         """FR-WP-057: Broadcast notification across ERP Inbox and Email when budget year opens/closes."""
@@ -227,7 +424,6 @@ class PbmsPlanningCycle(models.Model):
     def action_start_budget_call(self):
         """Start budget call - Button: 'Start Budget Call'"""
         self.ensure_one()
-        self.invalidate_model()
 
         if self.state == 'budget_call':
             return {
@@ -238,6 +434,7 @@ class PbmsPlanningCycle(models.Model):
                     'message': _('Budget call has already been started for cycle "%s".') % self.name,
                     'type': 'warning',
                     'sticky': False,
+                    'next': {'type': 'ir.actions.act_window_close'},
                 }
             }
 
@@ -267,25 +464,50 @@ class PbmsPlanningCycle(models.Model):
                 'message': _('Budget call started for "%s".') % self.name,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
             }
         }
 
     def action_open_for_input(self):
         self.write({"state": "open"})
-        deadline_info = _(
-            "<b>Submission Deadlines:</b><br/>"
-            "- Branch Submission: %s<br/>"
-            "- District Endorsement: %s<br/>"
-            "- Head Office Review: %s"
-        ) % (
-            self.branch_deadline or _("TBA"),
-            self.district_deadline or _("TBA"),
-            self.head_office_deadline or _("TBA"),
-        )
-        self._notify_cycle_status_change(
-            _("Budget Year Opened for Unit Input"),
-            _("Planning cycle '%s' is now open for plan and budget input.<br/>%s") % (self.name, deadline_info),
-        )
+        for cycle in self:
+            deadline_info = _(
+                "<b>Submission Deadlines:</b><br/>"
+                "- Branch Submission: %s<br/>"
+                "- District Endorsement: %s<br/>"
+                "- Head Office Review: %s<br/>"
+                "- Board Approval: %s"
+            ) % (
+                cycle.branch_deadline or _("TBA"),
+                cycle.district_deadline or _("TBA"),
+                cycle.head_office_deadline or _("TBA"),
+                cycle.board_deadline or _("TBA"),
+            )
+            cycle._notify_cycle_status_change(
+                _("Budget Year Opened for Unit Input"),
+                _("Planning cycle '%s' is now open for plan and budget input.<br/>%s") % (cycle.name, deadline_info),
+            )
+
+            # Schedule activities for all planning users across branches, districts, and head offices
+            todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+            if todo_type:
+                target_users = cycle._get_all_planning_users()
+                summary = _("Plan Submission Window Open: %s") % cycle.name
+                note = _(
+                    "Planning cycle <b>%s</b> is now open for plan and budget input.<br/>%s"
+                ) % (cycle.name, deadline_info)
+                deadline = (cycle.branch_deadline.date() if cycle.branch_deadline else cycle.date_end) or fields.Date.today()
+                for user in target_users:
+                    try:
+                        cycle.activity_schedule(
+                            activity_type_id=todo_type.id,
+                            summary=summary,
+                            note=note,
+                            user_id=user.id,
+                            date_deadline=deadline,
+                        )
+                    except Exception as e:
+                        _logger.warning("Could not schedule activity for user %s: %s", user.id, e)
 
     def action_start_consolidation(self):
         self.write({"state": "consolidation"})
@@ -317,7 +539,7 @@ class PbmsPlanningCycle(models.Model):
 
     def is_editable(self):
         self.ensure_one()
-        return self.state in ("budget_call", "open", "consolidation")
+        return self.state == "open"
 
     # ---------------------------------------------------------------
     # Notifications (BRD 8.2 "Notifications and Alerts")
@@ -389,3 +611,24 @@ class PbmsPlanningCycle(models.Model):
                 return unit.user_ids[0]
             return False
         return False
+
+    def _thread_to_store(self, store: Store, fields, *, request_list=None):
+        """Override to ensure regular users only see activities assigned to/created by themselves in Chatter.
+        SPPMD administrators / PBMS managers retain full visibility over all bank-wide activities.
+        """
+        is_admin = (
+            self.env.user._pbms_is_sppmd_admin()
+            or self.env.user._pbms_is_manager()
+            or self.env.is_admin()
+            or self.env.su
+        )
+        if request_list and "activities" in request_list and not is_admin:
+            req_list = [r for r in request_list if r != "activities"]
+            super()._thread_to_store(store, fields, request_list=req_list)
+            for cycle in self:
+                user_activities = cycle.activity_ids.filtered(
+                    lambda a: a.user_id == self.env.user or a.create_uid == self.env.user
+                )
+                store.add(cycle, {"activities": Store.Many(user_activities)}, as_thread=True)
+            return
+        super()._thread_to_store(store, fields, request_list=request_list)

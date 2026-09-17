@@ -98,12 +98,7 @@
     <record id="rule_plan_own_unit" model="ir.rule">
         <field name="name">PBMS Plan: own work unit(s) only</field>
         <field name="model_id" ref="model_pbms_planning_category"/>
-        <field name="domain_force">
-            ['|', '|',
-             ('org_unit_id', 'in', user.operating_unit_ids.ids),
-             ('create_uid', '=', user.id),
-             ('submitted_by', '=', user.id)]
-        </field>
+        <field name="domain_force">[('org_unit_id', 'in', user._pbms_operating_unit_ids())]</field>
         <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
     </record>
     <record id="rule_plan_district" model="ir.rule">
@@ -122,18 +117,18 @@
         <field name="name">PBMS Plan: category-specific functional review (Head Office Reviewer)</field>
         <field name="model_id" ref="model_pbms_planning_category"/>
         <field name="domain_force">
-            ['&amp;',
-                ('category', 'in', user._pbms_allowed_categories()),
-                '|',
-                    ('org_unit_type', '=', 'head_office'),
+            ['|',
+                '&amp;',
+                    ('category', '=', 'manpower'),
+                    ('state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                '&amp;',
+                    ('category', 'in', user._pbms_allowed_categories()),
                     '|',
-                        '&amp;',
-                            ('category', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
-                            ('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
+                        ('org_unit_type', '=', 'head_office'),
                         '|',
                             '&amp;',
-                                ('category', '=', 'manpower'),
-                                ('state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                                ('category', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
+                                ('org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
                             '&amp;',
                                 ('category', 'in', ('general_expense', 'fixed_asset')),
                                 ('state', 'in', ('district_approved', 'district_endorsed', 'committee_review', 'board_ceo_approval', 'ho_reviewed', 'approved'))]
@@ -199,11 +194,7 @@
     <record id="rule_consolidation_own_unit" model="ir.rule">
         <field name="name">PBMS Consolidation: own work unit(s) only</field>
         <field name="model_id" ref="model_pbms_consolidation_line"/>
-        <field name="domain_force">
-            ['|',
-             ('org_unit_id', 'in', user.operating_unit_ids.ids),
-             ('create_uid', '=', user.id)]
-        </field>
+        <field name="domain_force">[('org_unit_id', 'in', user._pbms_operating_unit_ids())]</field>
         <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
     </record>
     <record id="rule_consolidation_district" model="ir.rule">
@@ -272,11 +263,7 @@
     <record id="rule_plan_line_own_unit" model="ir.rule">
         <field name="name">PBMS Plan Line: own work unit(s) only</field>
         <field name="model_id" ref="model_pbms_plan_category_line"/>
-        <field name="domain_force">
-            ['|',
-             ('org_unit_id', 'in', user.operating_unit_ids.ids),
-             ('create_uid', '=', user.id)]
-        </field>
+        <field name="domain_force">[('org_unit_id', 'in', user._pbms_operating_unit_ids())]</field>
         <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
     </record>
     <record id="rule_plan_line_district" model="ir.rule">
@@ -295,18 +282,18 @@
         <field name="name">PBMS Plan Line: category-specific functional review (Head Office Reviewer)</field>
         <field name="model_id" ref="model_pbms_plan_category_line"/>
         <field name="domain_force">
-            ['&amp;',
-                ('line_type', 'in', user._pbms_allowed_categories()),
-                '|',
-                    ('plan_id.org_unit_type', '=', 'head_office'),
+            ['|',
+                '&amp;',
+                    ('line_type', '=', 'manpower'),
+                    ('plan_id.state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                '&amp;',
+                    ('line_type', 'in', user._pbms_allowed_categories()),
                     '|',
-                        '&amp;',
-                            ('line_type', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
-                            ('plan_id.org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
+                        ('plan_id.org_unit_type', '=', 'head_office'),
                         '|',
                             '&amp;',
-                                ('line_type', '=', 'manpower'),
-                                ('plan_id.state', 'in', ('ho_endorse', 'cpco_endorse', 'approved')),
+                                ('line_type', 'in', ('deposit', 'customer_base', 'fx', 'digital_banking')),
+                                ('plan_id.org_unit_type', 'in', ('district_office', 'head_office', 'regional_office')),
                             '&amp;',
                                 ('line_type', 'in', ('general_expense', 'fixed_asset')),
                                 ('plan_id.state', 'in', ('district_approved', 'district_endorsed', 'committee_review', 'board_ceo_approval', 'ho_reviewed', 'approved'))]
@@ -425,5 +412,32 @@
         <field name="model_id" ref="model_pbms_exceptional_workforce_request"/>
         <field name="domain_force">[(1, '=', 1)]</field>
         <field name="groups" eval="[(4, ref('group_pbms_manager'))]"/>
+    </record>
+
+    <!-- ========================================================= -->
+    <!-- PBMS PLANNING WORKSPACE RECORD RULES                      -->
+    <!-- ========================================================= -->
+    <record id="rule_workspace_own_unit" model="ir.rule">
+        <field name="name">PBMS Workspace: own work unit(s) only</field>
+        <field name="model_id" ref="model_pbms_planning_workspace"/>
+        <field name="domain_force">[('org_unit_id', 'in', user._pbms_operating_unit_ids())]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_branch_user'))]"/>
+    </record>
+    <record id="rule_workspace_district" model="ir.rule">
+        <field name="name">PBMS Workspace: district &amp; child operating units</field>
+        <field name="model_id" ref="model_pbms_planning_workspace"/>
+        <field name="domain_force">
+            ['&amp;', ('work_unit_type', '!=', 'head_office'),
+             '|',
+             ('org_unit_id', 'in', user.operating_unit_ids.ids),
+             ('org_unit_id.parent_unit', 'in', user.operating_unit_ids.ids)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_pbms_district_reviewer'))]"/>
+    </record>
+    <record id="rule_workspace_manager" model="ir.rule">
+        <field name="name">PBMS Workspace: bank-wide all units</field>
+        <field name="model_id" ref="model_pbms_planning_workspace"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_pbms_manager')), (4, ref('group_pbms_approver')), (4, ref('group_pbms_ho_reviewer')), (4, ref('group_pbms_ceo')), (4, ref('group_pbms_cpco')), (4, ref('group_pbms_budget_hiring_committee')), (4, ref('group_pbms_respective_chief')), (4, ref('group_pbms_people_solutions')), (4, ref('group_pbms_people_operations'))]"/>
     </record>
 </odoo>

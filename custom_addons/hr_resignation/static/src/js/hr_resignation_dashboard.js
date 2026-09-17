@@ -134,14 +134,17 @@ export class HrResignationDashboard extends Component {
             domain = [['state', '=', 'manager_approved']];
             name = "Manager Approved Requests";
         } else if (type === 'hr_approved') {
-            domain = [['state', 'in', ['hr_approved', 'last_day_recorded']]];
+            domain = [['state', 'in', ['hr_approved', 'release_date_set', 'handover_completed']]];
             name = "HR Approved Requests";
         } else if (type === 'clearing') {
             res_model = "hr.resignation";
-            domain = [['state', '=', 'exit_interviewed']];
+            domain = [['state', '=', 'clearance']];
             name = "Clearances In Progress";
+        } else if (type === 'cleared_awaiting_settlement') {
+            domain = [['state', '=', 'cleared']];
+            name = "Cleared (Awaiting Settlement)";
         } else if (type === 'completed') {
-            domain = [['state', 'in', ['cleared', 'settled', 'done']]];
+            domain = [['state', 'in', ['settled', 'done']]];
             name = "Completed Requests";
         } else if (type === 'overdue') {
             res_model = "hr.resignation.clearance";

@@ -11,6 +11,7 @@ JOB_VACANCY_TYPE_CODE_MAP = {
     'internal': 'INT',
     'promotion': 'INT',
     'lateral': 'LAT',
+    'transfer': 'LAT',
     'external': 'EXT',
 }
 
@@ -102,7 +103,8 @@ class JobVacancy(models.Model):
     internal_movement_type = fields.Selection(
         [
             ('promotion', 'Promotion'),
-            ('lateral', 'Lateral Transfer'),
+            ('lateral', 'Transfer'),
+            ('transfer', 'Transfer'),
             ('external', 'External Only'),
         ],
         string='Movement Type', default='promotion',
@@ -202,6 +204,61 @@ class JobVacancy(models.Model):
     )
 
     no_of_vacancies = fields.Integer(string="Number of Vacancies")
+    approved_plan_count = fields.Integer(
+        string='Approved Plan Headcount',
+        compute='_compute_approved_plan_count',
+        help="Approved manpower plan count for this position and work unit.",
+    )
+    plan_fulfillment_promotion = fields.Integer(
+        string='Approved Promotion Plan',
+        compute='_compute_approved_plan_count',
+        help="Approved manpower plan count earmarked for promotion.",
+    )
+    plan_fulfillment_lateral = fields.Integer(
+        string='Approved Lateral/Transfer Plan',
+        compute='_compute_approved_plan_count',
+        help="Approved manpower plan count earmarked for lateral transfer.",
+    )
+    plan_fulfillment_external = fields.Integer(
+        string='Approved External Plan',
+        compute='_compute_approved_plan_count',
+        help="Approved manpower plan count earmarked for external vacancy.",
+    )
+
+    @api.depends('job_position', 'operating_unit_id')
+    def _compute_approved_plan_count(self):
+        if 'operating.unit.job.position' not in self.env:
+            for rec in self:
+                rec.approved_plan_count = 0
+                rec.plan_fulfillment_promotion = 0
+                rec.plan_fulfillment_lateral = 0
+                rec.plan_fulfillment_external = 0
+            return
+        OUJobPosition = self.env['operating.unit.job.position']
+        for rec in self:
+            if rec.job_position and rec.operating_unit_id:
+                ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
+                job_id = rec.job_position._origin.id or rec.job_position.id
+                ou_job = OUJobPosition.search([
+                    ('operating_unit_id', '=', ou_id),
+                    ('job_position_id', '=', job_id),
+                ], limit=1)
+                if ou_job:
+                    rec.approved_plan_count = ou_job.approved_plan_count or 0
+                    rec.plan_fulfillment_promotion = ou_job.plan_fulfillment_promotion or 0
+                    rec.plan_fulfillment_lateral = ou_job.plan_fulfillment_lateral or 0
+                    rec.plan_fulfillment_external = ou_job.plan_fulfillment_external or 0
+                else:
+                    rec.approved_plan_count = 0
+                    rec.plan_fulfillment_promotion = 0
+                    rec.plan_fulfillment_lateral = 0
+                    rec.plan_fulfillment_external = 0
+            else:
+                rec.approved_plan_count = 0
+                rec.plan_fulfillment_promotion = 0
+                rec.plan_fulfillment_lateral = 0
+                rec.plan_fulfillment_external = 0
+
     operating_unit_id = fields.Many2one("operating.unit", string="Place Of Assignment", required=True, readonly=True)
     type_of_employment = fields.Selection(
         [('Permanent', 'Permanent'), ('Contractual', 'Contractual'), ("internship", "Internship")],
@@ -364,10 +421,12 @@ class JobVacancy(models.Model):
 
         # 1. From job.competencies_id (hr_competencies_info_job) or competencies_ids
         comp_rel = getattr(job, 'competencies_id', False) or getattr(job, 'competencies_ids', False)
+        seen_comp_ids = set()
         if comp_rel:
             for comp_line in comp_rel:
                 comp_obj = getattr(comp_line, 'competencies', False) or getattr(comp_line, 'competency_id', False)
-                if comp_obj:
+                if comp_obj and comp_obj.id not in seen_comp_ids:
+                    seen_comp_ids.add(comp_obj.id)
                     lines.append((0, 0, {
                         'competency_id': comp_obj.id,
                         'required_level': getattr(comp_line, 'required_level', 'intermediate') or 'intermediate',
@@ -387,11 +446,13 @@ class JobVacancy(models.Model):
             level_map = {'1': 'basic', '2': 'intermediate', '3': 'advanced', '4': 'expert'}
             if mapping and mapping.line_ids:
                 for line in mapping.line_ids:
-                    req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
-                    lines.append((0, 0, {
-                        'competency_id': line.competency_id.id,
-                        'required_level': req_lvl,
-                    }))
+                    if line.competency_id and line.competency_id.id not in seen_comp_ids:
+                        seen_comp_ids.add(line.competency_id.id)
+                        req_lvl = level_map.get(str(line.required_proficiency), 'intermediate')
+                        lines.append((0, 0, {
+                            'competency_id': line.competency_id.id,
+                            'required_level': req_lvl,
+                        }))
 
         # 3. From competency.competency directly
         if not lines:
@@ -404,10 +465,12 @@ class JobVacancy(models.Model):
                     ('status', '=', 'active')
                 ], limit=4)
             for comp in comps:
-                lines.append((0, 0, {
-                    'competency_id': comp.id,
-                    'required_level': 'intermediate',
-                }))
+                if comp.id not in seen_comp_ids:
+                    seen_comp_ids.add(comp.id)
+                    lines.append((0, 0, {
+                        'competency_id': comp.id,
+                        'required_level': 'intermediate',
+                    }))
         return lines
 
     @api.onchange('operating_unit_id', 'responsible', 'no_of_vacancies')
@@ -866,22 +929,11 @@ class JobVacancy(models.Model):
                 f"</div>"
             )
 
-        committee_group = self.env.ref('custom_recruitment.group_recruitment_approval_committee', raise_if_not_found=False)
         for m in members:
             # Handle res.users vs hr.employee safely
             user = m.employee_name if m.status == 'active' else (m.alternate_committee_member or m.employee_name)
             if not user:
                 continue
-
-            # Automatically ensure the committee member has group_recruitment_approval_committee so the menu appears under Employees
-            u_rec = False
-            if hasattr(user, '_name') and user._name == 'res.users':
-                u_rec = user
-            elif hasattr(user, 'user_id') and user.user_id:
-                u_rec = user.user_id
-
-            if u_rec and committee_group and u_rec.id not in getattr(committee_group, 'user_ids', committee_group.users).ids:
-                committee_group.sudo().write({'user_ids': [(4, u_rec.id)]})
 
             partner = False
             if hasattr(user, 'partner_id') and user.partner_id:
@@ -912,7 +964,7 @@ class JobVacancy(models.Model):
                     f"</ul>"
                     f"{summary_html}"
                     f"<p>Please review the minute and provide your digital signature."
-                    f"To sign: Go to Employees → Digital Selection Minutes, then add your signature only in your designated signature area.</p>"
+                    f"To sign: Go to Applications → Digital Selection Minute, then add your signature only in the designated signature area.</p>"
                 )
                 channel.message_post(body=Markup(message), message_type='comment', subtype_xmlid='mail.mt_comment')
             except Exception as e:
@@ -1131,6 +1183,260 @@ class JobVacancy(models.Model):
                 raise ValidationError(_(
                     "The following mandatory fields are missing for vacancy record: %s"
                 ) % ", ".join(missing))
+
+    @api.constrains('no_of_vacancies', 'job_position', 'operating_unit_id', 'internal_movement_type', 'sourcing_type', 'hiring_details')
+    def _check_no_of_vacancies_vs_approved_plan(self):
+        if 'operating.unit.job.position' not in self.env:
+            return
+        OUJobPosition = self.env['operating.unit.job.position']
+        for rec in self:
+            if not rec.job_position or not rec.operating_unit_id:
+                continue
+            ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
+            job_id = rec.job_position._origin.id or rec.job_position.id
+            ou_job = OUJobPosition.search([
+                ('operating_unit_id', '=', ou_id),
+                ('job_position_id', '=', job_id),
+            ], limit=1)
+            if not ou_job:
+                continue
+
+            plan_count = ou_job.approved_plan_count or 0
+            prom_plan = ou_job.plan_fulfillment_promotion or 0
+            lat_plan = ou_job.plan_fulfillment_lateral or 0
+            ext_plan = ou_job.plan_fulfillment_external or 0
+            has_breakdown = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
+
+            # Movement type and sourcing validation against PBMS fulfillment plan
+            m_type = rec.internal_movement_type or ('external' if rec.sourcing_type == 'external' else 'promotion')
+
+            if has_breakdown:
+                if m_type == 'promotion':
+                    if prom_plan <= 0:
+                        breakdown_desc = []
+                        if lat_plan > 0:
+                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
+                        if ext_plan > 0:
+                            breakdown_desc.append(_("External (%s)") % ext_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
+                        raise ValidationError(_(
+                            "Cannot create a Promotion vacancy for '%(job)s' at '%(unit)s'. "
+                            "There is no approved plan for Promotion (Approved Promotion Plan: 0). "
+                            "The approved plan is earmarked for %(earmarked)s."
+                        ) % {
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                            'earmarked': earmarked_str,
+                        })
+                    if rec.no_of_vacancies and rec.no_of_vacancies > prom_plan:
+                        raise ValidationError(_(
+                            "The number of opening vacancies (%(openings)s) cannot exceed the "
+                            "approved Promotion plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
+                        ) % {
+                            'openings': rec.no_of_vacancies,
+                            'plan': prom_plan,
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                        })
+                elif m_type in ('lateral', 'transfer'):
+                    if lat_plan <= 0:
+                        breakdown_desc = []
+                        if prom_plan > 0:
+                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
+                        if ext_plan > 0:
+                            breakdown_desc.append(_("External (%s)") % ext_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
+                        raise ValidationError(_(
+                            "Cannot create a Transfer/Lateral vacancy for '%(job)s' at '%(unit)s'. "
+                            "There is no approved plan for Transfer/Lateral (Approved Lateral/Transfer Plan: 0). "
+                            "The approved plan is earmarked for %(earmarked)s."
+                        ) % {
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                            'earmarked': earmarked_str,
+                        })
+                    if rec.no_of_vacancies and rec.no_of_vacancies > lat_plan:
+                        raise ValidationError(_(
+                            "The number of opening vacancies (%(openings)s) cannot exceed the "
+                            "approved Transfer/Lateral plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
+                        ) % {
+                            'openings': rec.no_of_vacancies,
+                            'plan': lat_plan,
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                        })
+                elif m_type == 'external' or rec.sourcing_type == 'external':
+                    if ext_plan <= 0:
+                        breakdown_desc = []
+                        if prom_plan > 0:
+                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
+                        if lat_plan > 0:
+                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("internal sourcing channels")
+                        raise ValidationError(_(
+                            "Cannot create an External vacancy for '%(job)s' at '%(unit)s'. "
+                            "There is no approved plan for External Vacancy (Approved External Plan: 0). "
+                            "The approved plan is earmarked for %(earmarked)s."
+                        ) % {
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                            'earmarked': earmarked_str,
+                        })
+                    if rec.no_of_vacancies and rec.no_of_vacancies > ext_plan:
+                        raise ValidationError(_(
+                            "The number of opening vacancies (%(openings)s) cannot exceed the "
+                            "approved External plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
+                        ) % {
+                            'openings': rec.no_of_vacancies,
+                            'plan': ext_plan,
+                            'job': rec.job_position.name,
+                            'unit': rec.operating_unit_id.name,
+                        })
+
+            if rec.no_of_vacancies and rec.no_of_vacancies > plan_count:
+                raise ValidationError(_(
+                    "The number of opening vacancies (%(openings)s) cannot exceed the "
+                    "approved plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
+                ) % {
+                    'openings': rec.no_of_vacancies,
+                    'plan': plan_count,
+                    'job': rec.job_position.name,
+                    'unit': rec.operating_unit_id.name,
+                })
+
+            if rec.hiring_details:
+                total_hiring_openings = sum(
+                    h.number_of_openings for h in rec.hiring_details
+                    if (h.work_unit._origin.id or h.work_unit.id) == ou_id
+                )
+                cap = plan_count
+                if has_breakdown:
+                    if m_type == 'promotion':
+                        cap = prom_plan
+                    elif m_type in ('lateral', 'transfer'):
+                        cap = lat_plan
+                    elif m_type == 'external' or rec.sourcing_type == 'external':
+                        cap = ext_plan
+                if total_hiring_openings > cap:
+                    raise ValidationError(_(
+                        "The total openings in hiring details (%(openings)s) cannot exceed the "
+                        "approved plan count (%(plan)s) for '%(job)s' at '%(unit)s'."
+                    ) % {
+                        'openings': total_hiring_openings,
+                        'plan': cap,
+                        'job': rec.job_position.name,
+                        'unit': rec.operating_unit_id.name,
+                    })
+
+    @api.onchange('no_of_vacancies', 'job_position', 'operating_unit_id', 'internal_movement_type', 'sourcing_type')
+    def _onchange_check_no_of_vacancies_plan(self):
+        if 'operating.unit.job.position' not in self.env:
+            return
+        OUJobPosition = self.env['operating.unit.job.position']
+        for rec in self:
+            if rec.job_position and rec.operating_unit_id:
+                ou_id = rec.operating_unit_id._origin.id or rec.operating_unit_id.id
+                job_id = rec.job_position._origin.id or rec.job_position.id
+                ou_job = OUJobPosition.search([
+                    ('operating_unit_id', '=', ou_id),
+                    ('job_position_id', '=', job_id),
+                ], limit=1)
+                if not ou_job:
+                    continue
+
+                plan_count = ou_job.approved_plan_count or 0
+                prom_plan = ou_job.plan_fulfillment_promotion or 0
+                lat_plan = ou_job.plan_fulfillment_lateral or 0
+                ext_plan = ou_job.plan_fulfillment_external or 0
+                has_breakdown = (prom_plan > 0 or lat_plan > 0 or ext_plan > 0)
+                m_type = rec.internal_movement_type or ('external' if rec.sourcing_type == 'external' else 'promotion')
+
+                # If movement type has not been explicitly switched yet, auto-select the available one
+                if has_breakdown and not self.env.context.get('default_internal_movement_type'):
+                    if lat_plan > 0 and prom_plan <= 0 and m_type == 'promotion':
+                        rec.internal_movement_type = 'lateral'
+                        m_type = 'lateral'
+                    elif prom_plan > 0 and lat_plan <= 0 and m_type in ('lateral', 'transfer'):
+                        rec.internal_movement_type = 'promotion'
+                        m_type = 'promotion'
+
+                if has_breakdown:
+                    if m_type == 'promotion' and prom_plan <= 0:
+                        breakdown_desc = []
+                        if lat_plan > 0:
+                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
+                        if ext_plan > 0:
+                            breakdown_desc.append(_("External (%s)") % ext_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
+                        return {
+                            'warning': {
+                                'title': _('No Approved Promotion Plan'),
+                                'message': _(
+                                    "The approved plan for Promotion is 0 for '%s' at '%s'. "
+                                    "The approved plan is earmarked for %s."
+                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
+                            }
+                        }
+                    elif m_type in ('lateral', 'transfer') and lat_plan <= 0:
+                        breakdown_desc = []
+                        if prom_plan > 0:
+                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
+                        if ext_plan > 0:
+                            breakdown_desc.append(_("External (%s)") % ext_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("other sourcing channels")
+                        return {
+                            'warning': {
+                                'title': _('No Approved Transfer/Lateral Plan'),
+                                'message': _(
+                                    "The approved plan for Transfer/Lateral is 0 for '%s' at '%s'. "
+                                    "The approved plan is earmarked for %s."
+                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
+                            }
+                        }
+                    elif (m_type == 'external' or rec.sourcing_type == 'external') and ext_plan <= 0:
+                        breakdown_desc = []
+                        if prom_plan > 0:
+                            breakdown_desc.append(_("Promotion (%s)") % prom_plan)
+                        if lat_plan > 0:
+                            breakdown_desc.append(_("Transfer (%s)") % lat_plan)
+                        earmarked_str = ", ".join(breakdown_desc) or _("internal sourcing channels")
+                        return {
+                            'warning': {
+                                'title': _('No Approved External Plan'),
+                                'message': _(
+                                    "The approved plan for External Vacancy is 0 for '%s' at '%s'. "
+                                    "The approved plan is earmarked for %s."
+                                ) % (rec.job_position.name, rec.operating_unit_id.name, earmarked_str)
+                            }
+                        }
+
+                    # Check exceeding movement type allocation
+                    cap = prom_plan if m_type == 'promotion' else (lat_plan if m_type in ('lateral', 'transfer') else ext_plan)
+                    if rec.no_of_vacancies and rec.no_of_vacancies > cap:
+                        return {
+                            'warning': {
+                                'title': _('Approved Plan Limit Exceeded'),
+                                'message': _(
+                                    "The entered vacancies (%s) exceeds the approved %s plan count (%s) for %s at %s."
+                                ) % (rec.no_of_vacancies, m_type.capitalize(), cap, rec.job_position.name, rec.operating_unit_id.name)
+                            }
+                        }
+
+                if rec.no_of_vacancies and rec.no_of_vacancies > plan_count:
+                    return {
+                        'warning': {
+                            'title': _('Approved Plan Limit Exceeded'),
+                            'message': _(
+                                "The entered vacancies (%s) exceeds the approved "
+                                "plan count (%s) for %s at %s."
+                            ) % (
+                                rec.no_of_vacancies,
+                                plan_count,
+                                rec.job_position.name,
+                                rec.operating_unit_id.name,
+                            )
+                        }
+                    }
 
     def _is_locked(self):
         """A vacancy is locked once it leaves Draft — matches the vacancy_status

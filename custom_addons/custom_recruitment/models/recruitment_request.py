@@ -4,11 +4,8 @@ from datetime import timedelta
 
 from xlwt.ExcelFormulaLexer import false_pattern
 
-import logging
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
-
-_logger = logging.getLogger(__name__)
 
 
 class RecruitmentRequest(models.Model):
@@ -684,8 +681,8 @@ class RecruitmentRequest(models.Model):
     # ---------------------------------------------------------------------
     # Security Helper Methods
     # ---------------------------------------------------------------------
-    def _check_hr_role_or_raise(self):
-        """Verify that the current user belongs to group_recruitment_manager / Recruitment Manager group."""
+    def _check_hr_role_or_raise(self, require_manager=False):
+        """Verify that the current user belongs to Recruitment Officer or Manager group."""
         user = self.env.user
         if user.id in (1, 2) or self.env.is_admin():
             return True
@@ -696,9 +693,23 @@ class RecruitmentRequest(models.Model):
             user.has_group("hr_recruitment.group_hr_recruitment_manager")
         )
 
-        if not has_manager_group:
+        if require_manager:
+            if not has_manager_group:
+                raise UserError(_(
+                    "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to approve recruitment requests."
+                ))
+            return True
+
+        has_hr_group = has_manager_group or (
+            user.has_group("custom_recruitment.group_recruitment_officer") or
+            user.has_group("hr.group_hr_user") or
+            user.has_group("hr.group_hr_manager") or
+            user.has_group("hr_recruitment.group_hr_recruitment_user")
+        )
+
+        if not has_hr_group:
             raise UserError(_(
-                "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to review, approve, or reject recruitment requests."
+                "Access Denied: Only members of the HR / Recruitment team are authorized to review or manage recruitment requests."
             ))
         return True
 
@@ -751,13 +762,13 @@ class RecruitmentRequest(models.Model):
         }
 
     def _check_segregation_of_duties(self, action_type):
-        """Enforces Segregation of Duties (SoD / Four-Eyes Principle):
-        1. Requester cannot Review or Approve their own request.
-        2. Reviewer cannot Approve the request (must be a distinct manager)."""
+        """Enforces Segregation of Duties (SoD):
+        1. Requester / Initiator cannot Review or Approve their own request.
+        2. Reviewer and Approver can be the same user (relaxed SoD between review and approval)."""
         self.ensure_one()
         current_uid = self.env.uid
 
-        # Requester check
+        # Requester check: Initiator cannot review or approve their own request
         is_requester = (
             (self.create_uid and self.create_uid.id == current_uid) or
             (self.requested_by and self.requested_by.user_id and self.requested_by.user_id.id == current_uid)
@@ -767,7 +778,7 @@ class RecruitmentRequest(models.Model):
             if is_requester and not self.env.su:
                 raise UserError(_(
                     "Segregation of Duties (SoD) Violation: The initiator/requester cannot review their own recruitment request. "
-                    "Verification must be performed by an independent HR Officer."
+                    "Verification must be performed by an independent HR Officer/Manager."
                 ))
 
         elif action_type == "approve":
@@ -775,15 +786,10 @@ class RecruitmentRequest(models.Model):
                 raise UserError(_(
                     "Segregation of Duties (SoD) Violation: The initiator/requester cannot approve their own recruitment request."
                 ))
-            if self.reviewed_by and self.reviewed_by.id == current_uid and not self.env.su:
-                raise UserError(_(
-                    "Segregation of Duties (SoD) Violation: The HR Reviewer (%(reviewer)s) cannot also approve this request. "
-                    "Approval must be completed by a separate authorized manager (Four-Eyes Principle)."
-                ) % {"reviewer": self.reviewed_by.name})
 
     def action_start_review(self):
         for rec in self:
-            rec._check_hr_role_or_raise()
+            rec._check_hr_role_or_raise(require_manager=False)
             rec._check_segregation_of_duties("review")
             rec.write({"state": "under_review", "reviewed_by": self.env.uid})
             rec.message_post(body=_("Request is now under HR review by %s.") % self.env.user.name)
@@ -796,7 +802,7 @@ class RecruitmentRequest(models.Model):
 
     def action_approve(self):
         for rec in self:
-            rec._check_hr_role_or_raise()
+            rec._check_hr_role_or_raise(require_manager=True)
             rec._check_segregation_of_duties("approve")
             # Re-run checks at approval time since other requests may have consumed headcount.
             rec._check_workforce_plan_or_raise()
@@ -815,7 +821,7 @@ class RecruitmentRequest(models.Model):
 
     def action_reject(self):
         for rec in self:
-            rec._check_hr_role_or_raise()
+            rec._check_hr_role_or_raise(require_manager=False)
             if not rec.rejection_reason:
                 raise UserError(_("Please enter a Rejection Reason before rejecting."))
             rec.write({"state": "rejected"})
@@ -844,7 +850,13 @@ class RecruitmentRequest(models.Model):
         for rec in self:
             if rec.state not in ("rejected", "cancelled"):
                 raise UserError(_("Only rejected or cancelled requests can be reset to Draft."))
-            rec.write({"state": "draft", "rejection_reason": False})
+            rec.write({
+                "state": "draft",
+                "rejection_reason": False,
+                "reviewed_by": False,
+                "approved_by": False,
+                "approved_on": False,
+            })
             rec.message_post(body=_("Request reset to Draft."))
 
         # Reload the form to reflect status change immediately
@@ -856,7 +868,7 @@ class RecruitmentRequest(models.Model):
     def action_create_vacancy(self):
         """Create a Job Vacancy directly from an approved request."""
         self.ensure_one()
-        self._check_hr_role_or_raise()
+        self._check_hr_role_or_raise(require_manager=False)
         if self.state != "approved":
             raise UserError(_("Only approved requests can be converted to a vacancy."))
         if self.vacancy_id:

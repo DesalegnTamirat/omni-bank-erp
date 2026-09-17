@@ -65,6 +65,22 @@ class ResUsers(models.Model):
 
     def _pbms_operating_unit_ids(self):
         self.ensure_one()
+        # Branch planner users: bound strictly to their default operating unit (branch) if set
+        if self._pbms_is_branch_user() and not (
+            self._pbms_is_district_reviewer()
+            or self._pbms_is_ho_reviewer()
+            or self._pbms_is_sppmd_admin()
+            or self._pbms_is_sppmd_approver()
+            or self.has_group("base.group_system")
+        ):
+            if hasattr(self, "default_operating_unit_id") and self.default_operating_unit_id:
+                return [self.default_operating_unit_id.id]
+            if hasattr(self, "assigned_operating_unit_ids") and self.assigned_operating_unit_ids:
+                return [self.assigned_operating_unit_ids[0].id]
+            if hasattr(self, "operating_unit_ids") and self.operating_unit_ids:
+                return self.operating_unit_ids.ids[:1]
+            return []
+
         unit_ids = set()
         if hasattr(self, "operating_unit_ids") and self.operating_unit_ids:
             unit_ids.update(self.operating_unit_ids.ids)
@@ -188,6 +204,8 @@ class ResUsers(models.Model):
             if ConfigModel is not None:
                 cats = ConfigModel.get_user_authorized_categories(self)
                 if cats:
+                    if "manpower" not in cats:
+                        cats.append("manpower")
                     return cats
 
             # 2. Fallback Heuristic matching
@@ -198,6 +216,7 @@ class ResUsers(models.Model):
             user_ous = [ou.name for ou in self.operating_unit_ids if ou.name]
             combined = f"{dept_name} {' '.join(emp_ous + emp_def_ou + user_ous)}".lower()
 
+            cats.add("manpower")
             if self.has_group("hr.group_hr_user") or self.has_group("hr.group_hr_manager") or any(w in combined for w in ("hr", "human", "manpower", "recruitment", "people")):
                 cats.add("manpower")
             if any(w in combined for w in ("retail", "operation", "deposit", "branch", "customer")):

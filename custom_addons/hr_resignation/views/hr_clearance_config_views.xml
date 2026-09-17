@@ -2,8 +2,17 @@
 <odoo>
 
     <!-- ═══════════════════════════════════════════════════════════════════════
-         CLEARANCE WORK UNIT TEMPLATE — Form View (CONFIGURATION)
-         ─ HR/POMD set this up once; rarely changes.
+         CLEARANCE WORK UNIT TEMPLATE CONFIGURATION VIEWS
+         
+         Purpose:
+         This file provides the UI for HR and POMD (People & Operations 
+         Management Division) to configure the master clearance steps required 
+         when an employee leaves the company.
+         
+         Key Features:
+         - Form view: Setup responsible users, SLA days, and checklist sub-items.
+         - Applicability: Restrict certain clearance tasks to specific separation types.
+         - List & Search: Manage the active clearance rules across the organization.
     ═══════════════════════════════════════════════════════════════════════ -->
 
     <record id="hr_clearance_template_view_form" model="ir.ui.view">
@@ -27,9 +36,7 @@
                                    string="Responsible User"
                                    domain="[('id', 'in', allowed_user_ids)]"
                                    options="{'no_open': True}"/>
-                            <field name="manager_user"
-                                   string="Manager User"
-                                   options="{'no_open': True}"/>
+
                         </group>
                         <group>
                             <field name="sdt_days"/>
@@ -37,18 +44,7 @@
                         </group>
                     </group>
 
-                    <!-- Applicability — Many2many tag picker -->
-                    <group string="Applicability">
-                        <field name="applicable_type_ids"
-                               nolabel="1"
-                               widget="many2many_tags"
-                               options="{'color_field': 'color', 'no_open': True}"
-                               placeholder="Leave empty to apply to ALL separation types..."/>
-                        <div class="text-muted small mt-1 col-12">
-                            Leave empty to apply to <strong>all</strong> separation types.
-                            Select one or more types to restrict this work unit to those scenarios only.
-                        </div>
-                    </group>
+
 
                     <notebook>
                         <page string="Checklist Items" name="checklist">
@@ -88,10 +84,7 @@
                 <field name="sequence" widget="handle"/>
                 <field name="work_unit_id" string="Operating Unit"/>
                 <field name="responsible_user" string="Responsible User"/>
-                <field name="applicable_type_ids"
-                       string="Applies To"
-                       widget="many2many_tags"
-                       optional="show"/>
+
                 <field name="is_mandatory" string="Mandatory"
                        widget="boolean"
                        decoration-danger="not is_mandatory"/>
@@ -112,7 +105,7 @@
             <search string="Search Work Units">
                 <field name="work_unit_id"/>
                 <field name="responsible_user" string="Responsible User"/>
-                <field name="applicable_type_ids" string="Applies To"/>
+
                 <filter name="filter_mandatory"
                         string="Mandatory Only"
                         domain="[('is_mandatory', '=', True)]"/>
@@ -133,9 +126,6 @@
                     <filter name="group_responsible"
                             string="Responsible User"
                             context="{'group_by': 'responsible_user'}"/>
-                    <filter name="group_category"
-                            string="Category"
-                            context="{'group_by': 'category_id'}"/>
                 </group>
             </search>
         </field>

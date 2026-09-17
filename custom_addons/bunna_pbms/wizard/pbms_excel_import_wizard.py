@@ -71,7 +71,7 @@ class PbmsExcelImportWizard(models.TransientModel):
         elif self.env.context.get("default_category"):
             res["format_type"] = self.env.context.get("default_category")
         elif not res.get("cycle_id"):
-            cycle = self.env["pbms.planning.cycle"].search([("state", "in", ("budget_call", "open"))], limit=1)
+            cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
             if cycle:
                 res["cycle_id"] = cycle.id
         return res
@@ -204,6 +204,12 @@ class PbmsExcelImportWizard(models.TransientModel):
         ws = wb.active
 
         plan = self._get_target_plan()
+        if not plan.cycle_id or plan.cycle_id.state != "open":
+            cycle_label = dict(plan.cycle_id._fields["state"].selection).get(plan.cycle_id.state, plan.cycle_id.state) if plan.cycle_id else _("Unknown")
+            raise UserError(_(
+                "Planning cycle '%s' is currently '%s' and is not open for unit input. "
+                "You cannot import plan data until the cycle is officially opened by SPPMD."
+            ) % (plan.cycle_id.name if plan.cycle_id else "", cycle_label))
 
         if self.import_mode == "replace":
             old_lines = plan.line_ids.filtered(lambda l: l.line_type == self.format_type)
@@ -391,9 +397,10 @@ class PbmsExcelImportWizard(models.TransientModel):
         job = self.env["hr.job"].search([("name", "=ilike", job_title)], limit=1)
 
         p_code = (
-            pos_type.code
-            if (pos_type and pos_type.code in ('new', 'additional', 'existing', 'replacement', 'transfer', 'upgrade'))
-            else ('new' if 'new' in pos_type_name.lower() else 'additional')
+            "new"
+            if ((pos_type and (pos_type.is_new_position or pos_type.code in ("new", "new_position")))
+                or ("new" in pos_type_name.lower()))
+            else "additional"
         )
 
         if p_code != "new" and not job:

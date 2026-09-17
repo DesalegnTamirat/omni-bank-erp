@@ -12,10 +12,11 @@ class HrResignationDashboard(models.AbstractModel):
         # Metrics
         total_requests = Resignation.search_count([])
         draft_requests = Resignation.search_count([('state', 'in', ['draft', 'submitted'])])
-        manager_reviewed = Resignation.search_count([('state', '=', 'manager_reviewed')])
-        hr_approved = Resignation.search_count([('state', 'in', ['hr_approved', 'last_day_recorded'])])
-        clearance_in_progress = Resignation.search_count([('state', '=', 'exit_interviewed')])
-        completed_requests = Resignation.search_count([('state', 'in', ['cleared', 'settled', 'done'])])
+        manager_reviewed = Resignation.search_count([('state', '=', 'submitted')]) # 'submitted' is waiting for HR, meaning manager already saw it if they needed to
+        hr_approved = Resignation.search_count([('state', 'in', ['hr_approved', 'release_date_set', 'handover_completed'])])
+        clearance_in_progress = Resignation.search_count([('state', '=', 'clearance')])
+        cleared_awaiting_settlement = Resignation.search_count([('state', '=', 'cleared')])
+        completed_requests = Resignation.search_count([('state', 'in', ['settled', 'done'])])
 
         Clearance = self.env['hr.resignation.clearance']
         overdue_clearances = Clearance.search_count([('is_overdue', '=', True), ('state', '=', 'pending')])
@@ -72,6 +73,7 @@ class HrResignationDashboard(models.AbstractModel):
                 'manager_reviewed': manager_reviewed,
                 'hr_approved': hr_approved,
                 'clearance_in_progress': clearance_in_progress,
+                'cleared_awaiting_settlement': cleared_awaiting_settlement,
                 'completed_requests': completed_requests,
                 'overdue_clearances': overdue_clearances,
             },

@@ -438,3 +438,25 @@ class InternalEligibleEmployees(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     select_flag = fields.Boolean(string="Select")
     internal_selected_id = fields.Many2one("internal.selected", string="Internal Selected Candidates for Recruitment")
+
+
+class InternalCandidatesV(models.Model):
+    _name = 'internal.candidates.v'
+    _table = 'internal_candidates_v'
+    _auto = False
+    _description = 'Internal Candidates View'
+
+    employee_id = fields.Many2one('hr.employee', string='Employee')
+    supervisory_experience = fields.Float(string='Supervisory Experience')
+    current_position = fields.Char(string='Current Position')
+    service_in_company = fields.Float(string='Service in Company')
+    employment_experience = fields.Float(string='Employment Experience')
+    total_experience = fields.Float(string='Total Experience')
+    educational_qualification = fields.Char(string='Educational Qualification')
+    name = fields.Char(string='Current Department')
+    last_promotion = fields.Float(string='Months since last Promotion')
+    pms_score = fields.Float(string='PMS Score')
+
+    def init(self):
+        pass
+

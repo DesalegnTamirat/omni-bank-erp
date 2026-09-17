@@ -8,22 +8,26 @@
             <form string="Final Settlement">
                 <header>
                     <field name="is_hr_manager" invisible="1"/>
-                    
-                    <!-- Button for HR Officer / POMD Officer -->
-                    <button string="Submit to HR Manager" type="object" name="action_confirm_settlement"
-                            class="oe_highlight" invisible="state != 'draft' or is_hr_manager"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer"/>
-                            
-                    <!-- Button for HR Manager -->
-                    <button string="Confirm" type="object" name="action_confirm_settlement"
-                            class="oe_highlight" invisible="state != 'draft' or not is_hr_manager"
-                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
-                    <button string="Confirm" type="object" name="action_approve_settlement"
+                    <field name="is_processed" invisible="1"/>
+
+                    <!-- Step 1: POMD clicks this FIRST. Hidden once already processed. -->
+                    <button string="Process Settlement" type="object" name="action_generate_lines"
+                            class="oe_highlight" invisible="state != 'draft' or is_processed"
+                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
+
+                    <!-- Step 2: Only appears AFTER Process Settlement has been clicked -->
+                    <button string="Submit for Approval" type="object" name="action_confirm_settlement"
+                            class="oe_highlight" invisible="state != 'draft' or not is_processed"
+                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
+                    <button string="Approve" type="object" name="action_approve_settlement"
                             class="oe_highlight" invisible="state != 'waiting_approval'"
-                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                            groups="hr_resignation.group_resignation_hr_manager"/>
+                    <button string="Refuse" type="object" name="action_open_return_wizard"
+                            class="btn-secondary" invisible="state != 'waiting_approval'"
+                            groups="hr_resignation.group_resignation_hr_manager"/>
                     <button string="Pay" type="object" name="action_mark_paid"
                             class="oe_highlight" invisible="state != 'confirmed'"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                            groups="hr_resignation.group_pomd_officer"/>
 
                     <field name="state" widget="statusbar" statusbar_visible="draft,waiting_approval,confirmed,paid"/>
                 </header>
@@ -81,14 +85,16 @@
                     <notebook>
                         <!-- Tab 1: Full Final Settlement -->
                         <page string="Full Final Settlement">
-                            <div class="mb-3">
-                            <button string="Generate Standard Lines" type="object" name="action_generate_lines"
-                                    class="btn-secondary" invisible="state == 'paid'"
-                                    groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+
+                            <!-- Placeholder shown BEFORE Process Settlement is clicked -->
+                            <div class="alert alert-warning text-center mt-4" role="alert" invisible="is_processed">
+                                <h4>Settlement Not Yet Processed</h4>
+                                <p>Click the <strong>"Process Settlement"</strong> button above to calculate the settlement amounts.</p>
                             </div>
-                            
-                            <field name="line_ids" nolabel="1" readonly="state == 'paid'">
-                                <list editable="bottom" create="1" edit="1" delete="1">
+
+                            <!-- Lines only visible AFTER Process Settlement is clicked -->
+                            <field name="line_ids" nolabel="1" readonly="state != 'draft'" invisible="not is_processed">
+                                <list editable="bottom">
                                     <control>
                                         <create name="add_line_control" string="Add a line"/>
                                     </control>
@@ -99,8 +105,9 @@
                                     <field name="notes" string="Notes"/>
                                 </list>
                             </field>
-                            
-                            <group class="mt-4" col="12">
+
+                            <!-- Totals only visible AFTER Process Settlement is clicked -->
+                            <group class="mt-4" col="12" invisible="not is_processed">
                                 <group colspan="8">
                                     <!-- Empty space on left -->
                                 </group>
@@ -130,8 +137,19 @@
                         </page>
                     </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>
 
+    <record id="action_hr_settlement" model="ir.actions.act_window">
+        <field name="name">Settlements</field>
+        <field name="res_model">hr.resignation.settlement</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No settlements found. Process a settlement from a cleared resignation.
+            </p>
+        </field>
+    </record>
 </odoo>

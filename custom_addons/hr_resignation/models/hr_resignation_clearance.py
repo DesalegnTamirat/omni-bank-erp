@@ -27,9 +27,8 @@ class HrResignationClearanceLineItem(models.Model):
         is_admin = self.env.user.has_group('base.group_system')
         for rec in self:
             is_responsible = (rec.clearance_line_id.responsible_user == self.env.user)
-            is_unit_manager = (rec.clearance_line_id.manager_user == self.env.user)
             # Responsible user can only clear if they also hold the Clearance Officer role
-            rec.can_clear = is_admin or is_unit_manager or (is_responsible and is_officer)
+            rec.can_clear = is_admin or (is_responsible and is_officer)
 
     done_by      = fields.Many2one('res.users', readonly=True)
     done_date    = fields.Datetime(readonly=True)
@@ -54,6 +53,8 @@ class HrResignationClearanceLineItem(models.Model):
 
     def action_toggle_done(self):
         for rec in self:
+            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+                raise UserError(_('You cannot mark tasks as cleared until the Release Date is set and Handover is completed.'))
             if rec.is_done:
                 rec.write({'is_done': False})
             else:
@@ -61,14 +62,18 @@ class HrResignationClearanceLineItem(models.Model):
 
     def action_mark_done(self):
         for rec in self:
+            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+                raise UserError(_('You cannot mark tasks as cleared until the Release Date is set and Handover is completed.'))
             if not rec.can_clear:
                 raise UserError(_('You are not authorized to clear this task. Only the assigned responsible user (with Clearance Officer role), the work unit manager, or Admin can clear tasks.'))
             rec.write({'is_done': True})
 
     def action_unmark_done(self):
         for rec in self:
+            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+                raise UserError(_('You cannot unmark tasks until the Release Date is set and Handover is completed.'))
             if not rec.can_clear:
-                raise UserError(_('You are not authorized to undo this task.'))
+                raise UserError(_('You are not authorized to unmark this task. Only the assigned responsible user, work unit manager, or Admin can unmark tasks.'))
             rec.write({'is_done': False})
 
 
@@ -130,21 +135,16 @@ class HrResignationClearance(models.Model):
     sequence         = fields.Integer(default=10)
     work_unit_id     = fields.Many2one(
         'operating.unit', required=True, string='Operating Unit')
-    category_id      = fields.Many2one(
-        'hr.clearance.category', string='Category', readonly=True)
     responsible_user = fields.Many2one(
         'res.users', required=True, string='Responsible User')
-    manager_user = fields.Many2one(
-        'res.users', string='Work Unit Manager')
+
     is_mandatory     = fields.Boolean(default=True)
 
     # ── State ─────────────────────────────────────────────────────────────────
     state = fields.Selection([
         ('waiting',  'Waiting'),
         ('pending',  'Pending'),
-        ('waiting_approval', 'Waiting Manager Approval'),
         ('cleared',  'Cleared'),
-        ('rejected', 'Rejected'),
     ], default='pending', required=True)
 
     notification_sent = fields.Boolean(
@@ -174,31 +174,15 @@ class HrResignationClearance(models.Model):
 
     @api.depends_context('uid')
     def _compute_can_approve(self):
-        is_admin = self.env.user.has_group('base.group_system')
+        is_hr = self.env.user.has_group('hr.group_hr_user')
         for rec in self:
-            is_unit_manager = (rec.manager_user and rec.manager_user.id == self.env.user.id)
-            is_direct_manager = (rec.resignation_id.manager_id and rec.resignation_id.manager_id.user_id.id == self.env.user.id)
-            rec.can_approve = is_admin or is_unit_manager or is_direct_manager
+            is_officer = (rec.responsible_user and rec.responsible_user.id == self.env.user.id)
+            rec.can_approve = is_hr or is_officer
 
     # ── Approval metadata ─────────────────────────────────────────────────────
     cleared_by   = fields.Many2one('res.users', readonly=True, string='Cleared By')
     cleared_date = fields.Datetime(readonly=True, string='Cleared On')
     notes        = fields.Text(string='Clearance Notes / Remarks')
-
-    # ── Rejection tracking (FR-SEP-027) ───────────────────────────────────────
-    rejection_reason = fields.Text(string='Rejection Reason', readonly=True)
-    rejected_by      = fields.Many2one('res.users', readonly=True, string='Rejected By')
-    rejected_date    = fields.Datetime(readonly=True, string='Rejected On')
-    resolution_notes = fields.Text(
-        string='Resolution Notes',
-        help='Required: describe how the rejection reason was resolved '
-             'before re-submitting for approval.')
-    resolved_by      = fields.Many2one('res.users', readonly=True, string='Resolved By')
-    resolved_date    = fields.Datetime(readonly=True, string='Resolved On')
-    is_resolved      = fields.Boolean(
-        compute='_compute_is_resolved', store=True,
-        string='Rejection Resolved',
-        help='True when a previously-rejected line has been re-cleared or overridden.')
 
     # ── Checklist sub-items ───────────────────────────────────────────────────
     item_ids           = fields.One2many(
@@ -228,10 +212,7 @@ class HrResignationClearance(models.Model):
     #  COMPUTES
     # ═══════════════════════════════════════════════════════════════════════════
 
-    @api.depends('state', 'rejection_reason')
-    def _compute_is_resolved(self):
-        for rec in self:
-            rec.is_resolved = rec.state == 'cleared'
+
 
     @api.depends('item_ids.is_done', 'item_ids.is_mandatory')
     def _compute_item_counts(self):
@@ -253,19 +234,14 @@ class HrResignationClearance(models.Model):
     #  WORKFLOW ACTIONS
     # ═══════════════════════════════════════════════════════════════════════════
 
-    def action_submit(self):
+    def action_clear(self):
+        """Mark clearance as cleared. Lean approach: Executed directly by the Clearance Officer."""
         for rec in self:
             rec._check_clearance_permission()
             if not rec.release_date:
-                raise UserError(_('Cannot submit clearance: Release Date has not been set by the Manager.'))
-            if rec.state not in ('pending', 'rejected'):
-                raise UserError(_(
-                    'Only lines in Pending or Rejected state can be submitted. '
-                    'Current state: %s') % rec._get_state_label())
-            if rec.state == 'rejected' and not rec.resolution_notes:
-                raise UserError(_(
-                    'Please enter Resolution Notes explaining how the '
-                    'rejection was resolved before re-submitting this line.'))
+                raise UserError(_('Cannot complete clearance: Release Date has not been set by the Manager.'))
+            if rec.state != 'pending':
+                raise UserError(_("Only pending tasks can be cleared. Current state: %s") % rec._get_state_label())
             if not rec.mandatory_items_ok:
                 pending_items = rec.item_ids.filtered(
                     lambda i: i.is_mandatory and not i.is_done).mapped('name')
@@ -273,42 +249,19 @@ class HrResignationClearance(models.Model):
                     'The following mandatory checklist items must be '
                     'completed first:\n• %s') % '\n• '.join(pending_items))
             
-            rec.state = 'waiting_approval'
-
-            if rec.manager_user:
-                activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-                if not activity_type:
-                    activity_type = self.env['mail.activity.type'].search([], limit=1)
-                if activity_type:
-                    self.env['mail.activity'].create({
-                        'res_model_id': self.env['ir.model']._get_id('hr.resignation.clearance'),
-                        'res_id': rec.id,
-                        'activity_type_id': activity_type.id,
-                        'summary': _('Approval Required: Clearance task %s') % (rec.work_unit_id.name or ''),
-                        'note': _('Please review and approve the clearance for %s.') % rec.employee_id.name,
-                        'user_id': rec.manager_user.id,
-                        'date_deadline': fields.Date.today(),
-                    })
-
-
-    def action_clear(self):
-        for rec in self:
-            rec._check_manager_permission()
-            if rec.state not in ('pending', 'waiting_approval', 'rejected'):
-                raise UserError(_("Only pending or waiting tasks can be approved. Current state: %s") % rec._get_state_label())
-            
             now  = fields.Datetime.now()
             vals = {
                 'state':        'cleared',
                 'cleared_by':   self.env.user.id,
                 'cleared_date': now,
             }
-            if rec.resolution_notes:
-                vals.update({
-                    'resolved_by':   self.env.user.id,
-                    'resolved_date': now,
-                })
             rec.write(vals)
+            
+            # Post a professional log to the chatter
+            rec.message_post(
+                body=_('Clearance completed successfully by %s.') % self.env.user.name,
+                message_type='notification'
+            )
             # Notify the responsible officer and HR group via Discuss popup
             # instead of posting to chatter.
             hr_group = self.env.ref('hr.group_hr_user', raise_if_not_found=False)
@@ -319,6 +272,9 @@ class HrResignationClearance(models.Model):
             emp_user = rec.resignation_id.employee_id.sudo().user_id
             if emp_user and emp_user.active:
                 notify_partners.add(emp_user.partner_id.id)
+            wu_manager = rec.work_unit_id.sudo().manager_id.user_id
+            if wu_manager and wu_manager.active:
+                notify_partners.add(wu_manager.partner_id.id)
             if notify_partners:
                 rec.resignation_id.message_notify(
                     partner_ids=list(notify_partners),
@@ -341,36 +297,11 @@ class HrResignationClearance(models.Model):
 
             rec.resignation_id._check_and_advance_cleared()
 
-    def action_reject(self):
-        self.ensure_one()
-        self._check_manager_permission()
-        if self.state != 'waiting_approval':
-            raise UserError(_(
-                'Only lines waiting for approval can be rejected. Current state: %s')
-                % self._get_state_label())
-        return {
-            'type':      'ir.actions.act_window',
-            'name':      _('Reject Clearance — %s') % self.work_unit_id.name,
-            'res_model': 'hr.clearance.reject.wizard',
-            'view_mode': 'form',
-            'target':    'new',
-            'context':   {'default_clearance_line_id': self.id},
-        }
+
 
     # ═══════════════════════════════════════════════════════════════════════════
     #  PERMISSION HELPERS
     # ═══════════════════════════════════════════════════════════════════════════
-
-    def _check_manager_permission(self):
-        self.ensure_one()
-        user           = self.env.user
-        is_admin       = user.has_group('base.group_system')
-        is_unit_manager = (self.manager_user == user)
-        if not (is_admin or is_unit_manager):
-            raise AccessError(_(
-                'Only the Work Unit Manager (%s) or an administrator '
-                'can approve or reject clearance line "%s".')
-                % (self.manager_user.name if self.manager_user else 'None', self.work_unit_id.name))
 
     def _check_clearance_permission(self):
         self.ensure_one()
@@ -463,18 +394,7 @@ class HrResignationClearance(models.Model):
                         'user_id':          rec.responsible_user.id,
                         'date_deadline':    rec.release_date or fields.Date.today(),
                     })
-                    if rec.manager_user and rec.manager_user != rec.responsible_user:
-                        self.env['mail.activity'].create({
-                            'res_model_id': self.env['ir.model']._get_id(
-                                'hr.resignation.clearance'),
-                            'res_id':           rec.id,
-                            'activity_type_id': activity_type.id,
-                            'summary':          _('FYI: Clearance task for %s') % (
-                                rec.work_unit_id.name or ''),
-                            'note':             _('FYI: ') + note_body,
-                            'user_id':          rec.manager_user.id,
-                            'date_deadline':    rec.release_date or fields.Date.today(),
-                        })
+
             except Exception:
                 # Never crash the clearance workflow due to notification failure.
                 pass
@@ -497,20 +417,21 @@ class HrResignationClearance(models.Model):
         for group_ref in ['hr_resignation.group_resignation_hr_manager', 'hr_resignation.group_hr_officer']:
             group = self.env.ref(group_ref, raise_if_not_found=False)
             if group:
-                for user in group.users:
+                for user in group.user_ids:
                     if user.active and user not in hr_users:
                         hr_users.append(user)
 
         for rec in overdue_lines:
             # 1. Notify the Work Unit Manager
-            if rec.manager_user and activity_type:
+            wu_manager = rec.work_unit_id.sudo().manager_id.user_id
+            if wu_manager and activity_type:
                 self.env['mail.activity'].create({
                     'res_model_id': self.env['ir.model']._get_id('hr.resignation.clearance'),
                     'res_id': rec.id,
                     'activity_type_id': activity_type.id,
                     'summary': _('ESCALATION: Overdue Clearance Task'),
                     'note': _('The clearance task for %s is overdue.') % (rec.work_unit_id.name or ''),
-                    'user_id': rec.manager_user.id,
+                    'user_id': wu_manager.id,
                     'date_deadline': fields.Date.today(),
                 })
             

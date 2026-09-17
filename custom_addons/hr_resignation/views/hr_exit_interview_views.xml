@@ -193,8 +193,9 @@
                     <button string="Submit Interview"
                             type="object" name="action_submit"
                             class="btn-primary"
-                            invisible="state != 'draft'"/>
+                            invisible="not can_edit"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,done"/>
+                    <field name="can_edit" invisible="1"/>
                 </header>
 
                 <sheet>
@@ -225,7 +226,7 @@
 
 
 
-                    <field name="line_ids" nolabel="1" readonly="state == 'done'">
+                    <field name="line_ids" nolabel="1" readonly="not can_edit">
                         <list create="0" delete="0">
                             <field name="sequence" widget="handle" invisible="1"/>
                             <field name="question_id" column_invisible="True"/>

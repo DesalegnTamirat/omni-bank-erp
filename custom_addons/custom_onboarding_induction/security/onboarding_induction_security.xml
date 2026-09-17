@@ -27,10 +27,10 @@
 
         <!-- Officer Group -->
         <record id="group_onboarding_induction_officer" model="res.groups">
-            <field name="name">HR Officer / PPDD Coordinator</field>
+            <field name="name">HR Officer </field>
             <field name="privilege_id" ref="onboarding_induction_privilege"/>
             <field name="sequence">20</field>
-            <field name="comment">HR Officers and PPDD Coordinators can manage induction and onboarding plans.</field>
+            <field name="comment">HR Officers  Coordinators can manage induction and onboarding plans.</field>
             <field name="implied_ids" eval="[(4, ref('group_onboarding_induction_user'))]"/>
         </record>
 

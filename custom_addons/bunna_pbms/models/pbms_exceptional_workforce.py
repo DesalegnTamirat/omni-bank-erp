@@ -120,11 +120,19 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         tracking=True,
         help="Sourcing method determined by People Solutions Directorate and above hierarchy.",
     )
-    justification = fields.Text(
+    justification_category_id = fields.Many2one(
+        "pbms.justification.category",
         string="Justification",
         required=True,
         tracking=True,
-        help="Detailed business justification for exceptional mid-year hiring.",
+        index=True,
+        help="Business justification category from the business justification table.",
+    )
+    justification = fields.Text(
+        string="Justification Remarks",
+        required=False,
+        tracking=True,
+        help="Optional detailed notes or justification remarks.",
     )
     supporting_doc_ids = fields.Many2many(
         "ir.attachment",
@@ -532,6 +540,9 @@ class PbmsExceptionalWorkforceRequest(models.Model):
         dept_name = self.department_id.name if self.department_id else "N/A"
         grade_name = (self.job_grade_id.display_name or self.job_grade_id.grade_name or self.job_grade_id.grade_code or "N/A") if self.job_grade_id else "N/A"
 
+        just_name = self.justification_category_id.name if self.justification_category_id else (self.justification or "N/A")
+        just_display = f"{self.justification_category_id.name}: {self.justification}" if (self.justification_category_id and self.justification) else just_name
+
         return (
             '<table style="width: 100%; border-collapse: collapse; margin: 16px 0; background-color: #FAFAFA; border-radius: 6px;">'
             f'<tr style="border-bottom: 1px solid #EEEEEE;">'
@@ -560,7 +571,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
             f'<td style="padding: 10px;">{emp_type_label} / {sourcing_label}</td></tr>'
             f'<tr style="border-bottom: 1px solid #EEEEEE;">'
             f'<td style="padding: 10px; font-weight: bold; color: #555555;">Business Justification:</td>'
-            f'<td style="padding: 10px; color: #333333;">{self.justification or "N/A"}</td></tr>'
+            f'<td style="padding: 10px; color: #333333;">{just_display}</td></tr>'
             f'{extra_rows}'
             '</table>'
         )
@@ -797,7 +808,7 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                 raise UserError(_("You can only submit requests in Draft or Returned stage."))
             if not rec.job_id:
                 raise ValidationError(_("Please specify the Position / Job Title before submitting."))
-            if not rec.justification:
+            if not rec.justification_category_id and not rec.justification:
                 raise ValidationError(_("Business Justification is required before submitting the exceptional request."))
 
             rec.with_context(bypass_workforce_lock=True).write({
@@ -1152,7 +1163,10 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                     "required_headcount": self.headcount,
                     "employment_type": self.employment_type,
                     "sourcing_type": self.sourcing_type,
-                    "justification": _("[Exceptional Request %s] %s") % (self.name, self.justification),
+                    "justification": _("[Exceptional Request %s] %s") % (
+                        self.name,
+                        (f"{self.justification_category_id.name}: {self.justification}" if self.justification else self.justification_category_id.name) if self.justification_category_id else (self.justification or "")
+                    ),
                     "requested_by": requested_by,
                     "state": "under_review",
                 }

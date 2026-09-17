@@ -66,60 +66,7 @@
         <field name="description">Fixed-term contract expires and is not renewed.</field>
     </record>
 
-    <!-- ════════════════════════════════════════════════════════════════
-         CLEARANCE CATEGORIES
-         One per functional area. Color index maps to Odoo's built-in
-         palette (0=grey, 1=red, 2=orange, 3=yellow, 4=light-blue,
-         5=dark-purple, 6=salmon, 7=medium-blue, 8=light-purple,
-         9=fushia, 10=green, 11=purple).
-    ════════════════════════════════════════════════════════════════ -->
 
-    <record id="clearance_category_finance" model="hr.clearance.category">
-        <field name="name">Finance</field>
-        <field name="sequence">10</field>
-        <field name="color">10</field>
-    </record>
 
-    <record id="clearance_category_it" model="hr.clearance.category">
-        <field name="name">Information Technology</field>
-        <field name="sequence">20</field>
-        <field name="color">4</field>
-    </record>
-
-    <record id="clearance_category_facilities" model="hr.clearance.category">
-        <field name="name">Facilities &amp; Administration</field>
-        <field name="sequence">30</field>
-        <field name="color">2</field>
-    </record>
-
-    <record id="clearance_category_hr" model="hr.clearance.category">
-        <field name="name">Human Resources</field>
-        <field name="sequence">40</field>
-        <field name="color">7</field>
-    </record>
-
-    <record id="clearance_category_legal" model="hr.clearance.category">
-        <field name="name">Legal &amp; Compliance</field>
-        <field name="sequence">50</field>
-        <field name="color">5</field>
-    </record>
-
-    <record id="clearance_category_fleet" model="hr.clearance.category">
-        <field name="name">Fleet &amp; Transport</field>
-        <field name="sequence">60</field>
-        <field name="color">6</field>
-    </record>
-
-    <record id="clearance_category_security" model="hr.clearance.category">
-        <field name="name">Security &amp; Access Control</field>
-        <field name="sequence">70</field>
-        <field name="color">1</field>
-    </record>
-
-    <record id="clearance_category_operations" model="hr.clearance.category">
-        <field name="name">Operations / Business Unit</field>
-        <field name="sequence">80</field>
-        <field name="color">8</field>
-    </record>
 
 </odoo>

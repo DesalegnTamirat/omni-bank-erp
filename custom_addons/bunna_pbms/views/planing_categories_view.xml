@@ -215,7 +215,7 @@
                 <filter string="Final Approved" name="filter_approved"
                         domain="[('state', '=', 'approved')]"/>
                 <filter string="Pending Review" name="pending"
-                        domain="[('state', 'in', ('submitted', 'district_approved', 'district_endorsed', 'chief_review', 'people_solutions_review', 'cpco_review', 'board_ceo_approval', 'committee_review', 'hr_fulfillment', 'ceo_approval', 'ho_reviewed', 'info_requested'))]"/>
+                        domain="[('state', 'in', ('submitted', 'district_approved', 'district_endorsed', 'chief_review', 'people_solutions_review', 'cpco_review', 'board_ceo_approval', 'committee_review', 'hr_fulfillment', 'ceo_approval', 'ho_reviewed', 'ho_endorse', 'cpco_endorse', 'info_requested'))]"/>
                 <filter string="Chief Review" name="filter_chief_review"
                         domain="[('state', 'in', ('chief_review', 'district_approved', 'district_endorsed')), ('category', '=', 'manpower')]"/>
                 <filter string="Budget Committee Review" name="filter_committee_review"
@@ -224,6 +224,10 @@
                         domain="[('state', '=', 'hr_fulfillment')]"/>
                 <filter string="CEO Approval" name="filter_ceo_approval"
                         domain="[('state', '=', 'ceo_approval')]"/>
+                <filter string="HO Endorsement" name="filter_ho_endorse"
+                        domain="[('state', '=', 'ho_endorse')]"/>
+                <filter string="CPCO Endorsement" name="filter_cpco_endorse"
+                        domain="[('state', '=', 'cpco_endorse')]"/>
                 <filter string="Draft / Returned" name="filter_draft_returned"
                         domain="[('state', 'in', ('draft', 'returned'))]"/>
                 <filter string="My Work Unit Plans" name="filter_my_unit"
@@ -390,7 +394,7 @@
                 <field name="hc_m12" string="Jun" column_invisible="line_type != 'manpower'" optional="show"/>
                 <field name="q4" sum="Q4 Total" string="Q4 (Apr-Jun)" class="fw-bold" column_invisible="line_type != 'manpower'" optional="show"/>
 
-                <field name="quantity" sum="Total Positions" string="Requested Headcount" class="fw-bold text-primary" column_invisible="line_type != 'manpower'"/>
+                <field name="quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Positions" string="Requested Headcount" class="fw-bold text-primary" column_invisible="line_type != 'manpower'"/>
                 <field name="total_establishment" sum="Total Establishment" string="Total Approved Establishment" class="fw-bold text-success" column_invisible="line_type != 'manpower'"/>
 
                 <!-- Monthly & Quarterly Targets for Other Planning Categories -->
@@ -773,14 +777,14 @@
                 <header>
                     <!-- Submitter / Branch actions -->
                     <button name="action_submit" type="object" string="Submit Plan" icon="fa-paper-plane"
-                            invisible="org_unit_type == 'head_office' or state not in ('draft', 'returned', 'info_requested')" class="btn-primary"/>
+                            invisible="org_unit_type == 'head_office' or state not in ('draft', 'returned', 'info_requested') or not is_cycle_open" class="btn-primary"/>
 
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" icon="fa-undo"
                             invisible="state not in ('submitted', 'returned', 'info_requested')" class="btn-secondary"/>
 
                     <button name="action_export_excel" type="object" string="Export to Excel" icon="fa-file-excel-o" class="btn btn-outline-secondary"/>
                     <button name="action_open_import_wizard" type="object" string="Import from Excel" icon="fa-upload" class="btn btn-outline-secondary"
-                            invisible="state not in ('draft', 'returned', 'info_requested')"/>
+                            invisible="state not in ('draft', 'returned', 'info_requested') or not is_cycle_open"/>
 
                     <!-- District Reviewer Action Buttons (Visible ONLY while pending district review - disappear after endorse) -->
                     <button name="action_district_approve" type="object" string="District Approve" icon="fa-check-circle"
@@ -915,6 +919,19 @@
                            statusbar_visible="draft,submitted,chief_review,people_solutions_review,cpco_review,committee_review,ceo_approval,ho_endorse,cpco_endorse,approved"/>
                 </header>
                 <sheet>
+                    <field name="is_cycle_open" invisible="1"/>
+                    <field name="cycle_state" invisible="1"/>
+                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="is_cycle_open">
+                        <i class="fa fa-exclamation-triangle fa-2x me-3 text-warning"/>
+                        <div>
+                            <h5 class="alert-heading mb-1 fw-bold">Planning Cycle Not Open for Unit Input</h5>
+                            <span>
+                                The planning cycle <strong><field name="cycle_id" readonly="1" options="{'no_open': True}"/></strong> is currently in 
+                                <strong><field name="cycle_state" readonly="1"/></strong> status. 
+                                Branch users cannot input, import, or submit plan targets until the cycle is officially opened for input by SPPMD.
+                            </span>
+                        </div>
+                    </div>
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" type="object" name="action_view_attached_branch_plans"
                                 icon="fa-building-o" invisible="org_unit_type != 'district_office'"
@@ -1629,7 +1646,7 @@
                                             <field name="vacant_count" string="Vacancies" readonly="1" optional="hide"/>
 
                                             <!-- Manpower Requirements (BB-APF-19) -->
-                                            <field name="quantity" sum="Qty" string="Qty" class="fw-bold text-primary" optional="show"/>
+                                             <field name="quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Qty" string="Qty" class="fw-bold text-primary" optional="show"/>
                                             <field name="date_needed" string="Date Needed" optional="show"/>
                                             <field name="justification_category_domain" column_invisible="1"/>
                                             <field name="justification_category_id" string="Reason for the Proposed" domain="justification_category_domain" optional="show"/>

@@ -1,16 +1,26 @@
-
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+import datetime
+from dateutil.relativedelta import relativedelta
 
 _CLEARANCE_DONE_STATES = ('cleared',)
 
 class HrResignation(models.Model):
+    """
+    HR Resignation Request
+    Manages the end-to-end workflow of an employee's separation from the company,
+    including request submission, manager  review, HR approval, clearance tasks,
+    exit interviews, and final settlement.
+    """
     _name = 'hr.resignation'
     _description = 'HR Resignation Request'
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     _rec_name = 'name'
     _order = 'id desc'
+
+    # A tuple of clearance states considered as 'completed'
+    _clearance_done_states = ('cleared',)
 
     # ── Identity ──────────────────────────────────────────────────────
     name = fields.Char(
@@ -63,7 +73,11 @@ class HrResignation(models.Model):
         readonly=True,
         help="It is going to be deducted or he has to pay his one month salary when he does not accept the notice period."
     )
-    release_date = fields.Date(string='Release Date', tracking=True)
+    release_date = fields.Date(
+        string='Actual Last Day',
+        tracking=True,
+        help='Can only be set by the employee\'s Manager or by HR — '
+             'never by the employee who filed the request.')
 
     @api.depends('notice_period_accepted', 'basic_salary')
     def _compute_liability(self):
@@ -89,7 +103,7 @@ class HrResignation(models.Model):
                 rec.total_scheduled_leave = 0.0
                 continue
             rec.department_id = emp.department_id
-            rec.job_id = emp.job_id
+            rec.job_id = emp.job_position
             rec.manager_id = emp.parent_id
             rec.operating_unit_id = emp.operating_unit_id if 'operating_unit_id' in emp._fields else False
             # Forcefully search for the active contract in hr.version to guarantee we find it
@@ -103,20 +117,16 @@ class HrResignation(models.Model):
             rec.basic_salary = contract.wage if contract else 0.0
 
             # Fetch job category (Managerial / Non Managerial) from the employee's job position
-            if 'employee_category' in emp.job_id._fields and emp.job_id.employee_category:
-                rec.job_category = dict(emp.job_id._fields['employee_category'].selection).get(emp.job_id.employee_category, emp.job_id.employee_category)
+            if 'employee_category' in emp.job_position._fields and emp.job_position.employee_category:
+                rec.job_category = dict(emp.job_position._fields['employee_category'].selection).get(emp.job_position.employee_category, emp.job_position.employee_category)
             else:
                 rec.job_category = ''
                 
             # Fetch leave balances from HR Leave Request Custom module
-            if 'hr.leave' in self.env:
-                active_emp = emp._origin if hasattr(emp, '_origin') and emp._origin else emp
-                balances = self.env['hr.leave']._get_leave_balances(active_emp)
-                rec.total_accrued_leave = balances.get('accrued', 0.0)
-                rec.total_scheduled_leave = balances.get('scheduled', 0.0)
-            else:
-                rec.total_accrued_leave = 0.0
-                rec.total_scheduled_leave = 0.0
+            active_emp = emp._origin if hasattr(emp, '_origin') and emp._origin else emp
+            balances = self.env['hr.leave']._get_leave_balances(active_emp)
+            rec.total_accrued_leave = balances.get('accrued', 0.0)
+            rec.total_scheduled_leave = balances.get('scheduled', 0.0)
 
     @api.depends('employee_id')
     def _compute_joined_date(self):
@@ -204,6 +214,7 @@ class HrResignation(models.Model):
         string='Expected Last Day')
     release_date = fields.Date(
         string='Actual Last Day',
+        tracking=True,
         help='Can only be set by the employee\'s Manager or by HR — '
              'never by the employee who filed the request.')
              
@@ -230,6 +241,7 @@ class HrResignation(models.Model):
         ('submitted', 'Submitted'),
         ('hr_approved', 'HR Approved'),
         ('release_date_set', 'Release Date Set'),
+        ('handover_completed', 'Handover Completed'),
         ('clearance', 'Clearance'),
         ('cleared', 'Cleared'),
         ('settled', 'Settled'),
@@ -262,9 +274,10 @@ class HrResignation(models.Model):
     def _compute_can_view_exit_interview(self):
         is_hr = self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
         is_admin = self.env.user.has_group('base.group_system')
+        is_pomd = self.env.user.has_group('hr_resignation.group_pomd_officer')
         for rec in self:
             is_employee = (rec.employee_id.user_id == self.env.user)
-            rec.can_view_exit_interview = is_hr or is_admin or is_employee
+            rec.can_view_exit_interview = is_hr or is_admin or is_pomd or is_employee
 
     show_release_date_to_employee = fields.Boolean(compute='_compute_show_release_date_to_employee')
 
@@ -273,8 +286,11 @@ class HrResignation(models.Model):
             is_hr = self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
             is_admin = self.env.user.has_group('base.group_system')
             is_manager = rec.manager_id and rec.manager_id.user_id == self.env.user
-            if rec.state in ('draft', 'submitted', 'manager_reviewed', 'hr_approved') and not (is_hr or is_admin or is_manager):
+            
+            if rec.state in ('draft', 'submitted', 'manager_reviewed'):
                 rec.show_release_date_to_employee = False
+            elif rec.state == 'hr_approved':
+                rec.show_release_date_to_employee = bool(is_hr or is_admin or is_manager)
             else:
                 rec.show_release_date_to_employee = True
 
@@ -311,6 +327,7 @@ class HrResignation(models.Model):
     settlement_total_earnings = fields.Float(related='settlement_id.total_earnings', readonly=True)
     settlement_total_deductions = fields.Float(related='settlement_id.total_deductions_taxes', readonly=True)
     settlement_net = fields.Float(related='settlement_id.net_payment', readonly=True)
+    settlement_state = fields.Selection(related='settlement_id.state', string='Settlement State')
 
     def action_generate_settlement_lines(self):
         for rec in self:
@@ -426,7 +443,7 @@ class HrResignation(models.Model):
     def _compute_clearance_progress(self):
         for rec in self:
             mandatory = rec.clearance_line_ids.filtered('is_mandatory')
-            done = mandatory.filtered(lambda l: l.state in _CLEARANCE_DONE_STATES)
+            done = mandatory.filtered(lambda l: l.state in rec._clearance_done_states)
             rejected = mandatory.filtered(lambda l: l.state == 'rejected')
             total = len(mandatory)
             n_done = len(done)
@@ -441,7 +458,7 @@ class HrResignation(models.Model):
         for rec in self:
             mandatory = rec.clearance_line_ids.filtered('is_mandatory')
             total = len(mandatory)
-            done = mandatory.filtered(lambda l: l.state in _CLEARANCE_DONE_STATES)
+            done = mandatory.filtered(lambda l: l.state in rec._clearance_done_states)
             rejected = mandatory.filtered(lambda l: l.state == 'rejected')
             rec.is_fully_cleared = (
                     total > 0
@@ -641,11 +658,13 @@ class HrResignation(models.Model):
 
             hr_group_ref = self.env.ref('hr.group_hr_user', raise_if_not_found=False)
             hr_manager_ref = self.env.ref('hr_resignation.group_resignation_hr_manager', raise_if_not_found=False)
+            pomd_ref = self.env.ref('hr_resignation.group_pomd_officer', raise_if_not_found=False)
             
             hr_users = hr_group_ref.sudo().user_ids.filtered(lambda u: u.active) if hr_group_ref else self.env['res.users']
             hr_managers = hr_manager_ref.sudo().user_ids.filtered(lambda u: u.active) if hr_manager_ref else self.env['res.users']
+            pomd_users = pomd_ref.sudo().user_ids.filtered(lambda u: u.active) if pomd_ref else self.env['res.users']
             
-            all_hr_users = (hr_users | hr_managers).mapped('partner_id').ids
+            all_hr_users = (hr_users | hr_managers | pomd_users).mapped('partner_id').ids
             if all_hr_users:
                 rec._send_notification(
                     partner_ids=all_hr_users,
@@ -814,20 +833,18 @@ class HrResignation(models.Model):
                     ) % (rec_name, emp_name),
                 )
 
-            # Notify clearance units that it is approved (but they can't act yet)
-            notified_partners = set()
-            for line in rec.clearance_line_ids:
-                officer = line.responsible_user.sudo()
-                if officer and officer.active and officer.partner_id.id not in notified_partners:
-                    notified_partners.add(officer.partner_id.id)
+            # Notify POMD officers
+            pomd_group = self.env.ref('hr_resignation.group_pomd_officer', raise_if_not_found=False)
+            if pomd_group:
+                pomd_partners = pomd_group.sudo().user_ids.mapped('partner_id').ids
+                if pomd_partners:
                     rec._send_notification(
-                        partner_ids=officer.partner_id.ids,
-                        subject=_('Clearance Alert: %s') % emp_name,
+                        partner_ids=pomd_partners,
+                        subject=_('Resignation Approved: %s') % emp_name,
                         body=_(
-                            'Dear %s,\n\n'
-                            'The resignation request for %s has been approved. '
-                            'You will be notified to begin clearance once the manager sets the Release Date.'
-                        ) % (officer.name, emp_name),
+                            'The resignation request for %s has been formally approved by HR. '
+                            'The direct manager is now prompted to set the Release Date.'
+                        ) % (emp_name),
                     )
 
     def action_set_release_date(self):
@@ -845,7 +862,7 @@ class HrResignation(models.Model):
             
             rec.state = 'release_date_set'
             
-            # Notify employee, HR Officers, HR Manager
+            # Notify employee, HR Officers, HR Manager, POMD Officers
             partners = []
             if rec.employee_id.user_id:
                 partners.append(rec.employee_id.user_id.partner_id.id)
@@ -853,6 +870,12 @@ class HrResignation(models.Model):
             hr_group_ref = self.env.ref('hr.group_hr_user', raise_if_not_found=False)
             if hr_group_ref:
                 partners.extend(hr_group_ref.sudo().user_ids.mapped('partner_id').ids)
+            hr_manager_ref = self.env.ref('hr_resignation.group_resignation_hr_manager', raise_if_not_found=False)
+            if hr_manager_ref:
+                partners.extend(hr_manager_ref.sudo().user_ids.mapped('partner_id').ids)
+            pomd_ref = self.env.ref('hr_resignation.group_pomd_officer', raise_if_not_found=False)
+            if pomd_ref:
+                partners.extend(pomd_ref.sudo().user_ids.mapped('partner_id').ids)
                 
             if partners:
                 rec._send_notification(
@@ -876,6 +899,11 @@ class HrResignation(models.Model):
         for rec in self:
             if rec.state != 'release_date_set':
                 raise UserError(_('Release Date must be set before handover.'))
+            
+            # Validation for exit interview
+            if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'done'):
+                raise UserError(_('The employee must complete the exit interview before handover tasks can be completed.'))
+                
             # Just require the text field to have something in it (strip HTML tags)
             from odoo.tools import html2plaintext
             if not rec.handover_notes or not html2plaintext(rec.handover_notes).strip():
@@ -945,8 +973,6 @@ class HrResignation(models.Model):
                 'employee_id': self.employee_id.id,
             })
             self.settlement_id = settlement
-            # Auto-generate the standard lines immediately so the table isn't empty!
-            settlement.action_generate_lines()
         return {
             'type': 'ir.actions.act_window',
             'res_model': 'hr.resignation.settlement',
@@ -954,6 +980,21 @@ class HrResignation(models.Model):
             'view_mode': 'form',
             'target': 'current',
         }
+
+    def action_settlement_submit(self):
+        for rec in self:
+            if rec.settlement_id:
+                rec.settlement_id.action_confirm_settlement()
+    
+    def action_settlement_approve(self):
+        for rec in self:
+            if rec.settlement_id:
+                rec.settlement_id.action_approve_settlement()
+
+    def action_settlement_pay(self):
+        for rec in self:
+            if rec.settlement_id:
+                rec.settlement_id.action_mark_paid()
 
     def action_confirm_settled(self):
         if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
@@ -1047,24 +1088,13 @@ class HrResignation(models.Model):
         created_lines = ClearLine
 
 
-        applicable_templates = templates.filtered(
-            lambda t: not t.applicable_type_ids or sep_type_rec in t.applicable_type_ids
-        )
-        if not applicable_templates:
-            raise UserError(_(
-                'No clearance work units apply to separation type "%s".\n'
-                'Check the Applicability configuration on each work unit template.')
-                            % (sep_type_rec.name or sep_type_rec.id))
-
-        for tmpl in applicable_templates.sorted(lambda t: t.sequence):
+        for tmpl in templates.sorted(lambda t: t.sequence):
             line = ClearLine.create({
                 'resignation_id': self.id,
                 'template_id': tmpl.id,
                 'sequence': tmpl.sequence,
                 'work_unit_id': tmpl.work_unit_id.id,
-                'category_id':      tmpl.category_id.id,
                 'responsible_user': tmpl.responsible_user.id,
-                'manager_user':     tmpl.manager_user.id if tmpl.manager_user else False,
                 'is_mandatory':     tmpl.is_mandatory,
                 'sdt_days':         tmpl.sdt_days,
                 'pending_since':    fields.Datetime.now(),
@@ -1090,9 +1120,8 @@ class HrResignation(models.Model):
 
 
     def _check_and_advance_cleared(self):
-
         for rec in self:
-            if rec.state != 'clearance':
+            if rec.state not in ('clearance', 'handover_completed'):
                 continue
             mandatory = rec.clearance_line_ids.filtered('is_mandatory')
             if not mandatory:
@@ -1101,7 +1130,25 @@ class HrResignation(models.Model):
                 lambda l: l.state not in _CLEARANCE_DONE_STATES)
             if unresolved:
                 return
-            rec.state = 'cleared'
+            
+            # If we just now advanced to cleared
+            if rec.state != 'cleared':
+                rec.state = 'cleared'
+                
+                # Notify POMD officers that clearance is done and settlement can begin
+                pomd_group = self.env.ref('hr_resignation.group_pomd_officer', raise_if_not_found=False)
+                if pomd_group:
+                    pomd_partners = pomd_group.sudo().user_ids.mapped('partner_id').ids
+                    if pomd_partners:
+                        rec._send_notification(
+                            partner_ids=pomd_partners,
+                            subject=_('Clearance Completed: %s') % rec.employee_id.name,
+                            body=_(
+                                'All mandatory clearance tasks for %s have been completed. '
+                                'The resignation is now in the "Cleared" state. '
+                                'You may now proceed to process their Final Settlement.'
+                            ) % (rec.employee_id.name),
+                        )
 
 
     def _trigger_access_revocation(self):
@@ -1113,20 +1160,52 @@ class HrResignation(models.Model):
 
 
     def _send_notification(self, partner_ids, subject, body):
-
         self.ensure_one()
         if not partner_ids:
             return
+        
+        # 1. Post to the record's chatter for history
+        from markupsafe import Markup
+        chatter_body = Markup(f"<b>{subject}</b><br/><br/>{body}")
+        
+        self.message_post(
+            body=chatter_body,
+            subject=subject,
+            partner_ids=partner_ids,
+            message_type='comment',
+            subtype_xmlid='mail.mt_comment',
+        )
+
+        # 2. Force a Direct Message (Chat Bubble) from the current user to each recipient
+        author_id = self.env.user.partner_id.id
+        
+        # Build a plain-text friendly body for Discuss (it auto-links URLs and handles newlines)
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        record_url = f"{base_url}/web#id={self.id}&model={self._name}&view_type=form"
+        discuss_body = Markup(f"<b>{subject}</b><br/><br/>{body}<br/><br/><a href='{record_url}'>Click here to view</a>")
+
         for partner_id in partner_ids:
-            # Create or get a direct chat channel with the user
-            channel_info = self.env['discuss.channel'].sudo()._get_or_create_chat([partner_id])
-            if channel_info and 'id' in channel_info:
-                channel = self.env['discuss.channel'].sudo().browse(channel_info['id'])
+            try:
+                # Need to fetch the chat channel between the sender (author_id) and the recipient (partner_id)
+                # Ensure the channel contains both partners
+                channel_partners = [partner_id]
+                if partner_id != author_id:
+                    channel_partners.append(author_id)
+                    
+                channel_info = self.env['discuss.channel'].sudo()._get_or_create_chat(channel_partners)
+                if isinstance(channel_info, dict) and 'id' in channel_info:
+                    channel = self.env['discuss.channel'].sudo().browse(channel_info['id'])
+                else:
+                    channel = channel_info
+                
                 channel.message_post(
-                    body=f"{subject}\n\n{body}",
+                    body=discuss_body,
                     message_type='comment',
-                    subtype_xmlid='mail.mt_comment'
+                    subtype_xmlid='mail.mt_comment',
+                    author_id=author_id
                 )
+            except Exception:
+                pass
 
 
     def action_hr_return(self):
@@ -1161,6 +1240,3 @@ class HrResignation(models.Model):
             rec.employee_id.sudo().write({'active': False})
             rec.message_post(body=_("Employee deactivated/archived automatically on their last working day (%s) by scheduler.") % rec.release_date)
         return True
-
-
-

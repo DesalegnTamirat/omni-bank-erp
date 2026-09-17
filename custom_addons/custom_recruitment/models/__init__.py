@@ -5,6 +5,7 @@ from . import applicant_shortlist
 from . import blacklist_pool
 from . import candidate_shortlist
 from . import internal_job_position
+from . import internal_recruitment
 from . import job_vacancy_competency
 from . import job_vacancy
 from . import recruitment_process_external

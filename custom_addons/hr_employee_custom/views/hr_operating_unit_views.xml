@@ -153,4 +153,121 @@
         <field name="view_mode">list,form</field>
     </record>
 
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT JOB POSITION — Form view
+    ════════════════════════════════════════════ -->
+    <record id="view_operating_unit_job_position_form" model="ir.ui.view">
+        <field name="name">operating.unit.job.position.form</field>
+        <field name="model">operating.unit.job.position</field>
+        <field name="arch" type="xml">
+            <form string="Job Position Establishment">
+                <header>
+                    <button name="action_create_vacancy"
+                            string="Create Vacancy"
+                            type="object"
+                            class="oe_highlight btn-primary"
+                            icon="fa-plus-circle"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_vacancies"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-briefcase">
+                            <field name="vacancy_count" widget="statinfo" string="Vacancies"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="job_position_id" class="oe_edit_only" string="Job Position"/>
+                        <h1>
+                            <field name="job_position_id" readonly="1"/>
+                        </h1>
+                        <h3>
+                            <field name="operating_unit_id" readonly="1" class="text-muted"/>
+                        </h3>
+                    </div>
+                    <group>
+                        <group string="Establishment &amp; Grade">
+                            <field name="job_grade_id" readonly="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Headcount &amp; Vacancy Status">
+                            <field name="baseline_count" readonly="1"/>
+                            <field name="approved_plan_count" readonly="1"/>
+                            <field name="plan_fulfillment_promotion" readonly="1"/>
+                            <field name="plan_fulfillment_lateral" readonly="1"/>
+                            <field name="plan_fulfillment_external" readonly="1"/>
+                            <field name="total_headcount" readonly="1" class="fw-bold"/>
+                            <field name="active_employee_count" readonly="1" class="fw-bold"/>
+                            <field name="vacant_position_count" readonly="1" class="fw-bold text-danger"/>
+                        </group>
+                    </group>
+                    <group string="Staff Movements / Lifecycle">
+                        <group>
+                            <field name="lateral_count" readonly="1"/>
+                            <field name="replacement_count" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="promotion_count" readonly="1"/>
+                            <field name="resignation_count" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT JOB POSITION — List view
+    ════════════════════════════════════════════ -->
+    <record id="view_operating_unit_job_position_list" model="ir.ui.view">
+        <field name="name">operating.unit.job.position.list</field>
+        <field name="model">operating.unit.job.position</field>
+        <field name="arch" type="xml">
+            <list string="Vacant Positions (Staffing Gaps)"
+                  decoration-danger="vacant_position_count &gt; 0"
+                  decoration-success="vacant_position_count == 0"
+                  decoration-info="vacant_position_count &lt; 0"
+                  decoration-muted="not active">
+                <field name="operating_unit_id" string="Work Unit"/>
+                <field name="job_position_id" string="Job Position"/>
+                <field name="job_grade_id" string="Job Grade" optional="show"/>
+                <field name="baseline_count" string="Baseline Count" optional="show"/>
+                <field name="approved_plan_count" string="Approved Plan Count" optional="show"/>
+                <field name="total_headcount" string="Total Headcount" class="fw-bold"/>
+                <field name="active_employee_count" string="Active Employees" class="fw-bold"/>
+                <field name="vacant_position_count" string="Vacant Positions" class="fw-bold text-danger"/>
+                <button name="action_create_vacancy"
+                        string="Create Vacancy"
+                        type="object"
+                        icon="fa-plus-circle"
+                        class="btn-primary btn-sm"/>
+                <field name="active" widget="boolean_toggle" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════
+         OPERATING UNIT JOB POSITION — Search view
+    ════════════════════════════════════════════ -->
+    <record id="view_operating_unit_job_position_search" model="ir.ui.view">
+        <field name="name">operating.unit.job.position.search</field>
+        <field name="model">operating.unit.job.position</field>
+        <field name="arch" type="xml">
+            <search string="Search Operating Unit Job Positions">
+                <field name="job_position_id" string="Job Position"/>
+                <field name="operating_unit_id" string="Work Unit"/>
+                <field name="job_grade_id" string="Job Grade"/>
+                <separator/>
+                <filter name="filter_vacant" string="Vacant Positions" domain="[('vacant_position_count', '&gt;', 0)]"/>
+                <filter name="filter_active" string="Active" domain="[('active', '=', True)]"/>
+                <filter name="filter_inactive" string="Archived" domain="[('active', '=', False)]"/>
+                <separator/>
+                <filter name="group_by_operating_unit" string="Work Unit" context="{'group_by': 'operating_unit_id'}"/>
+                <filter name="group_by_job_position" string="Job Position" context="{'group_by': 'job_position_id'}"/>
+                <filter name="group_by_job_grade" string="Job Grade" context="{'group_by': 'job_grade_id'}"/>
+            </search>
+        </field>
+    </record>
+
 </odoo>

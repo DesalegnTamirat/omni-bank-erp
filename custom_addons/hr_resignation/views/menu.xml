@@ -3,7 +3,7 @@
 
     <menuitem id="menu_hr_resignation_root"
               name="Resignation"
-              groups="hr_resignation.group_resignation_user"
+              groups="base.group_user"
               sequence="45"
               web_icon="hr_resignation,static/description/icon.png"/>
 
@@ -18,7 +18,7 @@
               name="My Resignation Request"
               parent="menu_hr_resignation_root"
               action="action_hr_resignation_my"
-              groups="hr_resignation.group_resignation_user"
+              groups="base.group_user"
               sequence="10"/>
 
     <!--

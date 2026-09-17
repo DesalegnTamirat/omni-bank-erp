@@ -114,9 +114,10 @@ class InternalJobPosition(models.Model):
                 FROM employee_vacancy_available eva
                 WHERE vacancy_id = p_id; 
                 
-                SELECT MIN(COALESCE(location_preference,0)) INTO min_loc_id 
+                SELECT MIN(location_preference) INTO min_loc_id 
                 FROM employee_vacancy_available eva
-                WHERE vacancy_id = p_id;
+                WHERE vacancy_id = p_id AND location_preference > 0;
+                IF min_loc_id IS NULL THEN min_loc_id := 0; END IF;
             
                 SELECT MAX(id) INTO max_vacancy_id 
                 FROM employee_vacancy_available 
@@ -156,10 +157,13 @@ class InternalJobPosition(models.Model):
                            he.mobile_phone,
                            he.department_id,
                            he.id AS emp_id,
+                           he.job_position AS current_position_id,
+                           he.job_grade AS current_grade_id,
+                           he.default_operating_unit_id AS current_workunit_id,
                            'normal' AS kanban_state,
                            COALESCE(hj.create_date, NOW()) AS create_date,
-                           he.create_uid,
-                           COALESCE(hj.write_uid, he.write_uid) AS write_uid,
+                           COALESCE(he.create_uid, era.create_uid, era.employee_user_id, 1) AS create_uid,
+                           COALESCE(hj.write_uid, he.write_uid, era.write_uid, era.employee_user_id, 1) AS write_uid,
                            he.write_date,
                            he_responsible.user_id AS user_id2,
                            he.birthday,
@@ -244,14 +248,16 @@ class InternalJobPosition(models.Model):
                         WHERE new_int_sel_cand = v_nirs_id AND emp_name = rec_h.emp_id
                     ) THEN
                         INSERT INTO new_internal_recruitment_selected_candidates (
-                            id, new_int_sel_cand, emp_name, emp_position, current_work_unit, pms_score,
-                            create_uid, create_date, write_uid, write_date, current_department, select_flag,
-                            preferred_location, active, selection_type
+                            id, new_int_sel_cand, emp_name, position_id, workunit_id,
+                            grade_id, emp_grade, vacancy_id, pms_score,
+                            create_uid, create_date, write_uid, write_date,
+                            select_flag, preferred_location, active, selection_type
                         ) VALUES (
                             NEXTVAL('new_internal_recruitment_selected_candidates_id_seq'), v_nirs_id,
-                            rec_h.emp_id, rec_h.employee_position, rec_h.employee_work_unit, rec_h.pms_score,
-                            rec_h.create_uid, (NOW()::TIMESTAMP(0)), rec_h.write_uid, (NOW()::TIMESTAMP(0)),
-                            rec_h.current_department, FALSE, combined_pref_location, TRUE, 'pending'
+                            rec_h.emp_id, rec_h.current_position_id, rec_h.current_workunit_id,
+                            rec_h.current_grade_id, rec_h.employee_grade, rec_h.vacancy_id, rec_h.pms_score,
+                            COALESCE(rec_h.create_uid, 1), (NOW()::TIMESTAMP(0)), COALESCE(rec_h.write_uid, 1), (NOW()::TIMESTAMP(0)),
+                            FALSE, combined_pref_location, TRUE, 'pending'
                         );
                     END IF;
 

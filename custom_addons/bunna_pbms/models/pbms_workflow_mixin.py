@@ -31,8 +31,27 @@ class PbmsWorkflowMixin(models.AbstractModel):
     cycle_id = fields.Many2one(
         "pbms.planning.cycle", required=True, index=True,
         default=lambda self: self.env["pbms.planning.cycle"].search(
-            [("state", "in", ("budget_call", "open"))], limit=1),
+            [("state", "=", "open")], limit=1),
     )
+    cycle_state = fields.Selection(
+        related="cycle_id.state",
+        string="Cycle Status",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+    is_cycle_open = fields.Boolean(
+        string="Cycle Open for Input",
+        compute="_compute_is_cycle_open",
+        store=True,
+        index=True,
+        help="True if the associated planning cycle is officially open for unit input.",
+    )
+
+    @api.depends("cycle_id.state")
+    def _compute_is_cycle_open(self):
+        for rec in self:
+            rec.is_cycle_open = bool(rec.cycle_id and rec.cycle_id.state == "open")
     org_unit_id = fields.Many2one(
         "operating.unit", string="Org Unit", required=True, index=True,
         default=lambda self: self.env.user.default_operating_unit_id,
@@ -544,9 +563,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
 
     def _check_editable(self):
         for line in self:
-            if not line.cycle_id.is_editable():
+            if not line.cycle_id or line.cycle_id.state != "open":
+                cycle_label = dict(line.cycle_id._fields["state"].selection).get(line.cycle_id.state, line.cycle_id.state) if line.cycle_id else _("Unknown")
                 raise UserError(_(
-                    "Planning cycle '%s' is not open for input.", line.cycle_id.name))
+                    "Planning cycle '%s' is not open for unit input (current status: %s). "
+                    "Branch users cannot input or submit plan data until the cycle is officially opened.",
+                    line.cycle_id.name if line.cycle_id else "",
+                    cycle_label
+                ))
 
     def _protected_write_fields(self):
         return []
@@ -561,11 +585,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
         user_units = user._pbms_operating_unit_ids()
         if self.org_unit_id.id in user_units:
             return True
-        if (self.create_uid and self.create_uid == user) or (self.submitted_by and self.submitted_by == user):
-            return True
         # If user has no operating units configured, allow editing their own draft plans
         if not user_units and self.state in PBMS_BRANCH_EDITABLE_STATES:
-            return True
+            if (self.create_uid and self.create_uid == user) or (self.submitted_by and self.submitted_by == user):
+                return True
         return False
 
     def _is_child_operating_unit_plan(self):
@@ -686,13 +709,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
 
         # Branch / Head Office User on own operating unit before submission (draft, returned, info_requested)
         if state in PBMS_BRANCH_EDITABLE_STATES:
-            if (
-                self._is_own_operating_unit_plan()
-                or not self.create_uid
-                or self.create_uid == user
-                or self.submitted_by == user
-                or user._pbms_is_branch_user()
-            ):
+            # Branch users cannot input or edit data unless the planning cycle is officially open!
+            if self.cycle_id and self.cycle_id.state != "open":
+                return False
+            if self._is_own_operating_unit_plan():
                 return True
 
         return False
@@ -705,24 +725,18 @@ class PbmsWorkflowMixin(models.AbstractModel):
             return True
 
         # Regular users can only delete their own draft plans before submission
-        return (
-            (self._is_own_operating_unit_plan() or self.create_uid == user or self.submitted_by == user)
-            and self.state == "draft"
-        )
+        return self._is_own_operating_unit_plan() and self.state == "draft"
 
     def _pbms_can_submit_plan(self):
         self.ensure_one()
         user = self.env.user
+        if self.cycle_id and self.cycle_id.state != "open":
+            return False
         if self.state not in PBMS_BRANCH_EDITABLE_STATES:
             return False
         if self.env.is_admin() or user._pbms_is_sppmd_admin() or self.env.su:
             return True
-        return (
-            self._is_own_operating_unit_plan()
-            or self.create_uid == user
-            or self.submitted_by == user
-            or user._pbms_is_branch_user()
-        )
+        return self._is_own_operating_unit_plan()
 
 
     def _pbms_can_district_review_plan(self):
@@ -775,7 +789,7 @@ class PbmsWorkflowMixin(models.AbstractModel):
             or (getattr(self, "category", False) == "manpower" and self.state in ("ceo_approval", "board_ceo_approval") and (self.env.user._pbms_is_ceo() or self.env.user._pbms_is_cpco()))
             or (getattr(self, "category", False) == "manpower" and self.state in ("chief_review", "district_approved", "district_endorsed") and self.env.user._pbms_is_respective_chief())
             or (getattr(self, "category", False) == "manpower" and self.state == "people_solutions_review" and self.env.user._pbms_is_people_solutions())
-            or (getattr(self, "category", False) == "manpower" and self.state in ("cpco_review", "hr_fulfillment") and (self.env.user._pbms_is_cpco() or self.env.user._pbms_is_people_solutions()))
+            or (getattr(self, "category", False) == "manpower" and self.state in ("cpco_review", "hr_fulfillment") and self.env.user._pbms_is_cpco())
             or (getattr(self, "category", False) == "manpower" and self.state == "ho_endorse" and self._pbms_can_ho_review_plan())
             or (getattr(self, "category", False) == "manpower" and self.state == "cpco_endorse" and self.env.user._pbms_is_cpco())
         )
@@ -801,6 +815,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 user = self.env.user
                 state_label = dict(record._fields["state"].selection).get(record.state, record.state) if "state" in record._fields else record.state
                 unit_name = record.org_unit_id.display_name if record.org_unit_id else _("another Operating Unit")
+
+                # 0. Planning Cycle not open for unit input
+                if record.cycle_id and record.cycle_id.state != "open":
+                    cycle_label = dict(record.cycle_id._fields["state"].selection).get(record.cycle_id.state, record.cycle_id.state)
+                    raise AccessError(_(
+                        "Planning cycle '%s' is currently '%s' and is not open for unit input. "
+                        "Branch users cannot input or modify plan data until the cycle is officially opened for input."
+                    ) % (record.cycle_id.name, cycle_label))
 
                 # 1. Operating Unit mismatch: User does not belong to this operating unit
                 if not record._is_own_operating_unit_plan() and not user._pbms_is_sppmd_admin() and not self.env.is_admin():
@@ -1098,7 +1120,9 @@ class PbmsWorkflowMixin(models.AbstractModel):
             if ConfigModel is not None and cat:
                 info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
                 if info.get("users"):
-                    reviewers |= info["users"]
+                    cfg_ho_users = info["users"].filtered(lambda u: u.has_group("bunna_pbms.group_pbms_ho_reviewer"))
+                    if cfg_ho_users:
+                        reviewers |= cfg_ho_users
             if not reviewers:
                 ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
                 dept_hr_reviewers = ho_reviewers.filtered(
@@ -2869,7 +2893,7 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 ))
 
             if not is_admin:
-                if not (line._is_own_operating_unit_plan() or line.create_uid == self.env.user or line.submitted_by == self.env.user or self.env.user._pbms_is_branch_user()):
+                if not line._is_own_operating_unit_plan():
                     raise AccessError(_("You can only reset plans for your own work unit."))
                 if line.state not in ("submitted", "returned", "info_requested"):
                     raise UserError(_("You can only reset plans that are pending review (Submitted) or returned for revision."))

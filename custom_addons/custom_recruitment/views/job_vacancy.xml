@@ -192,6 +192,9 @@
                             <field name="opening_date" readonly="vacancy_status != 'draft'"/>
                             <field name="vacancy_announced_on" readonly="vacancy_status != 'draft'"/>
                             <field name="no_of_vacancies" readonly="vacancy_status != 'draft'"/>
+                            <field name="approved_plan_count" readonly="1" string="Approved Plan"/>
+                            <field name="plan_fulfillment_promotion" readonly="1" string="Approved Promotion Plan" invisible="sourcing_type == 'external'"/>
+                            <field name="plan_fulfillment_lateral" readonly="1" string="Approved Transfer Plan" invisible="sourcing_type == 'external'"/>
                             <field name="last_date_to_apply" readonly="vacancy_status != 'draft'"/>
                             <field name="vacancy_description" readonly="vacancy_status != 'draft'"/>
                         </group>

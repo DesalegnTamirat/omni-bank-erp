@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- ═══════════════════════════════════════════════════════
-         LIST VIEW
-    ═══════════════════════════════════════════════════════ -->
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RESIGNATION REQUEST VIEWS
+         
+         Purpose:
+         This file provides the primary interface for the end-to-end employee 
+         separation workflow. 
+         
+         Key Features:
+         - Form view: Handles draft submissions, manager reviews, HR approvals, 
+                      clearances, exit interviews, and final settlements.
+         - Conditional rendering: Fields and buttons are dynamically shown/hidden 
+                      based on the request's state and the user's role (Employee, 
+                      Manager, HR, POMD).
+         - List view: Provides an overview of all active and historical requests.
+    ═══════════════════════════════════════════════════════════════════════ -->
     <record id="hr_resignation_view_list" model="ir.ui.view">
         <field name="name">hr.resignation.view.list</field>
         <field name="model">hr.resignation</field>
@@ -82,14 +94,6 @@
                             confirm="This will delete existing clearance lines and recreate them from the current template. Continue?"/>
 
                     <field name="settlement_id" invisible="1"/>
-                    
-                    <button string="Process Settlement" type="object" name="action_process_settlement"
-                            class="btn-primary" groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager"
-                            invisible="state != 'cleared' or settlement_id"/>
-                            
-                    <button string="View Settlement" type="object" name="action_process_settlement"
-                            class="btn-secondary" groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager"
-                            invisible="state != 'cleared' or not settlement_id"/>
 
 
                     <button string="Issue Certificate &amp; Deactivate Employee"
@@ -105,7 +109,7 @@
 
                     <field name="state" widget="statusbar" statusbar_visible="draft,submitted,hr_approved,release_date_set,clearance,cleared"/>
                 </header>
-                <sheet readonly="state != 'draft'">
+                <sheet>
                     <field name="is_allowed_to_see_warnings" invisible="1"/>
                     <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert" invisible="warning_disciplinary_count == 0 or is_allowed_to_see_warnings == False">
                         <div>
@@ -142,7 +146,7 @@
                     <!-- ═══════════════════════════════════════════════
                          Employee Details  /  Dates
                     ═══════════════════════════════════════════════ -->
-                    <group>
+                    <group readonly="state != 'draft'">
                         <group string="Employee Details">
                             <!-- HR: can select any employee while in draft. Employee: locked to self always -->
                             <field name="initiated_by" groups="hr.group_hr_user" readonly="state != 'draft'"/>
@@ -196,7 +200,7 @@
                         </group>
                     </group>
 
-                    <group>
+                    <group readonly="state != 'draft'">
                         <group>
                             <field name="resignation_type_id" string="Separation Type"
                                    options="{'no_open': True}"
@@ -205,7 +209,7 @@
                         </group>
                     </group>
 
-                    <group>
+                    <group readonly="state != 'draft'">
                         <field name="reason" string="Reason for Resignation"
                                readonly="state != 'draft'"
                                placeholder="Describe the reason for resignation..."/>
@@ -395,24 +399,11 @@
                                            optional="hide"/>
                                     <field name="cleared_date" readonly="1"
                                            optional="hide"/>
-                                    <!-- Rejection tracking (FR-SEP-027) -->
-                                    <field name="rejected_by" readonly="1"
-                                           optional="hide"/>
-                                    <field name="rejection_reason" readonly="1"
-                                           string="Rejection Reason"
-                                           optional="hide"/>
-                                    <field name="is_resolved" readonly="1"
-                                           string="Resolved" widget="boolean"
-                                           optional="hide"/>
                                     <field name="can_approve" column_invisible="1"/>
                                     <!-- Action buttons -->
-                                    <button string="Clear"
+                                    <button string="Mark as Cleared"
                                             type="object" name="action_clear"
                                             class="btn-sm btn-success"
-                                            invisible="state not in ('pending','rejected') or not can_approve"/>
-                                    <button string="Reject"
-                                            type="object" name="action_reject"
-                                            class="btn-sm btn-danger"
                                             invisible="state != 'pending' or not can_approve"/>
                                 </list>
                             </field>
@@ -420,12 +411,12 @@
 
                         <!-- EXIT INTERVIEW TAB -->
                         <page string="Exit Interview" name="exit_interview"
-                              invisible="state not in ('hr_approved','release_date_set','clearance','exit_interviewed','cleared','settled','done')">
+                              invisible="state not in ('hr_approved','release_date_set','clearance','exit_interviewed','cleared','settled','done') or not can_view_exit_interview">
                             <div class="mb-3">
                                 <button string="Open Exit Interview" type="object"
                                         name="action_complete_exit_interview"
                                         class="btn-primary"
-                                        invisible="exit_interview_state == 'done'"/>
+                                        invisible="exit_interview_state == 'done' or not can_view_exit_interview"/>
                                 <button string="View Exit Interview" type="object"
                                         name="action_complete_exit_interview"
                                         class="btn-secondary"
@@ -450,26 +441,40 @@
                         <page string="Full Final Settlement" name="settlement"
                               invisible="state not in ('cleared','settled','done')">
                             
-                            <div class="alert alert-info text-center" role="alert" invisible="not settlement_id">
-                                <p>The settlement lines and details have been moved to a dedicated form.</p>
-                                <button string="View Settlement Details" type="object"
-                                        name="action_process_settlement"
-                                        class="btn-primary mt-2"/>
+                            <!-- Before Settlement is Created -->
+                            <div class="alert alert-info text-center mt-4" role="alert" invisible="settlement_id">
+                                <h3>Clearance Completed</h3>
+                                <p>All clearance tasks are complete. You may now initiate the final settlement calculations.</p>
+                                <button string="Process Final Settlement" type="object" name="action_process_settlement"
+                                        class="btn-primary mt-2" icon="fa-calculator"
+                                        groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager"/>
                             </div>
                             
-                            <group class="mt-4" col="12" invisible="not settlement_id">
-                                <group colspan="8">
-                                    <!-- Empty space on left -->
+                            <!-- After Settlement is Created -->
+                            <div class="mt-4" invisible="not settlement_id">
+                                <div class="alert alert-success text-center" role="alert" invisible="settlement_state in ('confirmed', 'paid')">
+                                    <h3>Settlement is in Progress</h3>
+                                    <p>The settlement record has been created and is currently being processed.</p>
+                                    <button string="Open Settlement Details ➔" type="object" name="action_process_settlement"
+                                            class="btn-success mt-2" icon="fa-external-link"
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                </div>
+                                <div class="alert alert-info text-center" role="alert" invisible="settlement_state not in ('confirmed', 'paid')">
+                                    <h3>Settlement Completed</h3>
+                                    <p>The final settlement has been formally approved and finalized.</p>
+                                    <button string="View Settlement Details ➔" type="object" name="action_process_settlement"
+                                            class="btn-info mt-2" icon="fa-external-link"
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                </div>
+                                
+                                <group>
+                                    <group>
+                                        <field name="settlement_state" string="Current Status" readonly="1" widget="badge" decoration-info="settlement_state == 'draft'" decoration-warning="settlement_state == 'waiting_approval'" decoration-success="settlement_state in ('confirmed','paid')"/>
+                                    </group>
+                                    <group>
+                                        <field name="settlement_net" string="Net Payout Amount" readonly="1" class="fw-bold" invisible="settlement_state not in ('confirmed','paid')"/>
+                                    </group>
                                 </group>
-                                <group colspan="4" class="text-end">
-                                    <field name="settlement_taxable_gross" string="Taxable Gross:" readonly="1" class="text-info"/>
-                                    <field name="settlement_total_earnings" string="Total Earnings:" readonly="1"/>
-                                    <field name="settlement_total_deductions" string="Total Deductions &amp; Taxes:" readonly="1" class="text-danger"/>
-                                    <field name="settlement_net" string="Net Payment:" class="fs-3 fw-bold" readonly="1"/>
-                                </group>
-                            </group>
-                            <div invisible="settlement_id" class="alert alert-info" role="alert">
-                                Settlement not yet processed. Click "Process Settlement" button above.
                             </div>
                         </page>
                         

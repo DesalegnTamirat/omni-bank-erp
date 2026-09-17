@@ -14,6 +14,7 @@
     'depends': [
         'hr',
         'hr_employee_custom',
+        'hr_leave_request_custom',
         'mail',
     ],
     'data': [
@@ -33,6 +34,7 @@
         # ── 4. Wizards ────────────────────────────────────────────────────────
         'wizard/hr_resignation_reject_wizard_views.xml',
         'wizard/hr_clearance_reject_wizard_views.xml',
+        'wizard/hr_settlement_return_wizard_views.xml',
 
         # ── 5. Views ──────────────────────────────────────────────────────────
         'views/hr_tax_bracket_views.xml',
