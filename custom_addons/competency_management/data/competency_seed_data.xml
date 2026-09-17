@@ -31,5 +31,10 @@
             ]"/>
         </record>
 
+        <!-- Default Singleton Matrix Configuration -->
+        <record id="default_competency_matrix_config" model="competency.matrix.config">
+            <field name="name">Bunna Bank Competency Matrix Configuration</field>
+        </record>
+
     </data>
 </odoo>

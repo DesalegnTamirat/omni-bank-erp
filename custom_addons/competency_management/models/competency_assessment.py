@@ -390,29 +390,106 @@ class CompetencyAssessment(models.Model):
         return False
 
     @api.model
+    def _resolve_employee_grade(self, emp):
+        """Resolves the employee's assigned employee.grade record safely across hr_employee_custom variants."""
+        if not emp:
+            return self.env['employee.grade']
+
+        # 1. Direct job_grade on employee
+        grade = getattr(emp, 'job_grade', False)
+        if grade and getattr(grade, '_name', '') == 'employee.grade':
+            return grade
+
+        # 2. Active contract in hr.version
+        if 'hr.version' in self.env:
+            contract = self.env['hr.version'].search([
+                ('employee_id', '=', emp.id),
+                ('state', 'in', ['open', 'probation', 'draft'])
+            ], order='id desc', limit=1)
+            if contract and getattr(contract, 'job_grade', False):
+                g = contract.job_grade
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+
+        # 3. Operating Unit Job Position
+        if emp.job_id and 'operating.unit.job.position' in self.env:
+            ou_id = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+            if ou_id:
+                pos = self.env['operating.unit.job.position'].search([
+                    ('job_position_id', '=', emp.job_id.id),
+                    ('operating_unit_id', '=', ou_id.id)
+                ], limit=1)
+                if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                    return pos.job_grade_id
+            pos = self.env['operating.unit.job.position'].search([
+                ('job_position_id', '=', emp.job_id.id)
+            ], limit=1)
+            if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                return pos.job_grade_id
+
+        # 4. Check grade_id on employee (may be employee.grade or hr.employee.grade)
+        grade = getattr(emp, 'grade_id', False)
+        if grade:
+            if getattr(grade, '_name', '') == 'employee.grade':
+                return grade
+            code = getattr(grade, 'code', False) or getattr(grade, 'grade_code', False)
+            name = getattr(grade, 'name', False) or getattr(grade, 'grade_name', False)
+            if code:
+                found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                if found:
+                    return found
+            if name:
+                found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                if found:
+                    return found
+
+        # 5. Check job position
+        if emp.job_id:
+            g = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+            if g:
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+                code = getattr(g, 'code', False) or getattr(g, 'grade_code', False)
+                name = getattr(g, 'name', False) or getattr(g, 'grade_name', False)
+                if code:
+                    found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                    if found:
+                        return found
+                if name:
+                    found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                    if found:
+                        return found
+
+        return self.env['employee.grade']
+
+    @api.model
     def _get_employee_grade_id(self, emp):
         if not emp:
             return False
-        job = emp.job_id
-        if job:
-            g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
-            if g:
-                return g.id
-        g = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade_id', False)
-        return g.id if g else False
+        grade = self._resolve_employee_grade(emp)
+        return grade.id if grade else False
 
     @api.model
     def _get_grade_number(self, emp):
         """Extract numeric grade level (1..17) from employee's assigned job grade or position."""
         if not emp:
             return 0
-        grade_rec = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
-        if not grade_rec and emp.job_id:
-            grade_rec = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
-        if not grade_rec:
-            return 0
+        grade_rec = self._resolve_employee_grade(emp)
+        raw_str = ''
+        if grade_rec:
+            raw_str = getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'grade_code', False) or ''
+        if not raw_str:
+            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+            if raw:
+                raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
+        if not raw_str and emp.job_id:
+            raw = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+            if raw:
+                raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
 
-        g_str = (getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'name', False) or getattr(grade_rec, 'code', False) or str(grade_rec)).lower().strip()
+        g_str = str(raw_str).lower().strip()
+        if not g_str:
+            return 0
 
         tokens = g_str.replace('-', ' ').replace('_', ' ').split()
         roman_map = {
@@ -921,7 +998,7 @@ class CompetencyAssessment(models.Model):
                         })
             mapping_name_str = mapping.mapping_name
         else:
-            grade_rec = getattr(employee, 'grade_id', False) or getattr(employee, 'job_grade', False)
+            grade_rec = self._resolve_employee_grade(employee)
             j_name = job_pos.name if job_pos else ''
             j_lower = j_name.lower()
             is_managerial = any(k in j_lower for k in ['manager', 'director', 'chief', 'leader', 'head', 'supervisor', 'president', 'vp']) or getattr(employee, 'is_managerial', False)
@@ -1044,22 +1121,6 @@ class CompetencyAssessment(models.Model):
                         "This assessment is locked for editing and submissions are closed unless HR extends the deadline."
                     ) % (deadline_str, rec.cycle_id.name))
         return super(CompetencyAssessment, self).write(vals)
-
-    def action_submit(self):
-        """Draft -> Submitted with deadline checks, unrated checks, and bidirectional employee/coach notifications (FR-COM-047)."""
-        for rec in self:
-            rec._check_submission_deadline()
-            if not rec.line_ids:
-                raise UserError(_('Add at least one competency rating line before submitting.'))
-            unrated = rec.line_ids.filtered(lambda l: not l.current_level or l.current_level == '0')
-            if unrated:
-                unrated_names = ", ".join(unrated.mapped('competency_id.name')[:5])
-                raise ValidationError(_('Validation Error: Please rate all competencies before submitting! %d competency(ies) remaining unrated: %s%s') % (
-                    len(unrated), unrated_names, "..." if len(unrated) > 5 else ""
-                ))
-            rec.with_context(force_write=True).write({'state': 'submitted'})
-            rec.line_ids._trigger_sibling_360_recompute()
-            rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
     def _notify_user_inbox_and_activity(self, target_user, summary, note, msg_text, target_rec=None):
         """Ensure notification appears in ALL Odoo notification channels:
@@ -1555,8 +1616,10 @@ class CompetencyAssessmentLine(models.Model):
     def create(self, vals_list):
         force_write = self.env.context.get('force_write')
         for vals in vals_list:
-            if not force_write and vals.get('assessment_id'):
+            if not force_write and not self.env.su and vals.get('assessment_id'):
                 asm = self.env['competency.assessment'].browse(vals['assessment_id'])
+                if asm.state == 'locked':
+                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % asm.name)
                 today = fields.Date.today()
                 dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
                 if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
@@ -1573,8 +1636,10 @@ class CompetencyAssessmentLine(models.Model):
     def write(self, vals):
         force_write = self.env.context.get('force_write')
         for line in self:
-            if not force_write and line.assessment_id:
+            if not force_write and not self.env.su and line.assessment_id:
                 asm = line.assessment_id
+                if asm.state == 'locked':
+                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % asm.name)
                 today = fields.Date.today()
                 dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
                 if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft':
@@ -1764,29 +1829,6 @@ class CompetencyAssessmentLine(models.Model):
         ('assessment_competency_uniq', 'unique(assessment_id, competency_id)',
          'This competency is already rated in the assessment!'),
     ]
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        lines = super().create(vals_list)
-        for line in lines:
-            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
-                if line.assessment_id.state == 'locked':
-                    raise ValidationError(_("Cannot add rating lines to locked assessment %s.") % line.assessment_id.name)
-                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
-                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
-                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
-        return lines
-
-    def write(self, vals):
-        res = super().write(vals)
-        for line in self:
-            if line.assessment_id and not self.env.context.get('force_write') and not self.env.su:
-                if line.assessment_id.state == 'locked':
-                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % line.assessment_id.name)
-                if line.assessment_id.is_deadline_passed and line.assessment_id.state == 'draft':
-                    deadline_str = line.assessment_id.cycle_id.assessment_deadline.strftime('%b %d, %Y') if line.assessment_id.cycle_id and line.assessment_id.cycle_id.assessment_deadline else 'N/A'
-                    raise UserError(_("The submission deadline (%s) for cycle '%s' has passed. Rating lines are locked.") % (deadline_str, line.assessment_id.cycle_id.name))
-        return res
 
     @api.ondelete(at_uninstall=False)
     def _prevent_unlink_on_locked(self):

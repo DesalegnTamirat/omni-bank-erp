@@ -58,6 +58,12 @@
             action="action_competency_assessment"
             sequence="20"
             groups="competency_management.group_competency_supervisor" />
+        <menuitem id="menu_competency_skills_test"
+            name="Skills Tests &amp; Examinations"
+            parent="menu_competency_assessments_categ"
+            action="action_competency_skills_test"
+            sequence="25"
+            groups="competency_management.group_competency_supervisor" />
         <menuitem id="menu_competency_assessment_cycles"
             name="Assessment Cycles"
             parent="menu_competency_assessments_categ"
@@ -93,6 +99,20 @@
             sequence="10"
             groups="competency_management.group_competency_supervisor" />
 
+        <menuitem id="menu_competency_team_gap_dashboard"
+            name="Team Competency Gap Dashboard"
+            parent="menu_competency_reports_categ"
+            action="action_competency_team_gap_dashboard"
+            sequence="15"
+            groups="competency_management.group_competency_supervisor" />
+
+        <menuitem id="menu_competency_dashboard_snapshot"
+            name="Multi-Cycle Trend Snapshots"
+            parent="menu_competency_reports_categ"
+            action="action_competency_dashboard_snapshot"
+            sequence="20"
+            groups="competency_management.group_competency_supervisor" />
+
         <!-- 4. Configuration Category -->
         <menuitem id="menu_competency_config_categ"
             name="Configuration"
@@ -111,6 +131,12 @@
             parent="menu_competency_config_categ"
             action="action_competency_360_config"
             sequence="15"
+            groups="competency_management.group_competency_officer" />
+        <menuitem id="menu_competency_director_peer_config"
+            name="Director Peer Configuration"
+            parent="menu_competency_config_categ"
+            action="action_competency_director_peer_config"
+            sequence="18"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_rating_models"
             name="Rating Models"

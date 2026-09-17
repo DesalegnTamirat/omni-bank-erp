@@ -321,16 +321,18 @@ class CompetencyDashboard(models.TransientModel):
             'target': 'current',
         }
 
+    @api.model
     def action_open_matrix_config(self):
         """Action: Open Proficiency Matrix Settings configuration form."""
-        self.ensure_one()
         config = self.env['competency.matrix.config'].get_active_config()
+        view_id = self.env.ref('competency_management.view_competency_matrix_config_form').id
         return {
             'type': 'ir.actions.act_window',
-            'name': 'Competency Proficiency Matrix Configuration',
+            'name': _('Competency Proficiency Matrix Configuration'),
             'res_model': 'competency.matrix.config',
             'res_id': config.id,
             'view_mode': 'form',
+            'views': [(view_id, 'form')],
             'target': 'current',
         }
 

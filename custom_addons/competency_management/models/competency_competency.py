@@ -738,42 +738,6 @@ class Competency(models.Model):
                 })
             mapping_count += 1
 
-        # Seed default Job Position Matrix lines
-        for job in self.env['hr.job'].search([]):
-            j_line = self.env['competency.job.matrix'].search([
-                ('config_id', '=', matrix_config.id),
-                ('job_id', '=', job.id)
-            ], limit=1)
-            if not j_line:
-                core_l = self.env['competency.assessment']._get_matrix_required_level('core', job_name=job.name)
-                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', job_name=job.name)
-                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', job_name=job.name)
-                self.env['competency.job.matrix'].create({
-                    'config_id': matrix_config.id,
-                    'job_id': job.id,
-                    'required_core_level': core_l,
-                    'required_leadership_level': lead_l,
-                    'required_technical_level': tech_l,
-                })
-
-        # Seed default Job Grade Matrix lines
-        for grade in self.env['employee.grade'].search([]):
-            g_line = self.env['competency.grade.matrix'].search([
-                ('config_id', '=', matrix_config.id),
-                ('grade_id', '=', grade.id)
-            ], limit=1)
-            if not g_line:
-                core_l = self.env['competency.assessment']._get_matrix_required_level('core', grade=grade)
-                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', grade=grade)
-                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', grade=grade)
-                self.env['competency.grade.matrix'].create({
-                    'config_id': matrix_config.id,
-                    'grade_id': grade.id,
-                    'required_core_level': core_l,
-                    'required_leadership_level': lead_l,
-                    'required_technical_level': tech_l,
-                })
-
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',

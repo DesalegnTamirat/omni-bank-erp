@@ -39,12 +39,84 @@ class CompetencyDirectorPeerConfig(models.Model):
         help="Select peers for this Director. Restricted strictly to candidates sharing the same coach with a different position.")
     notes = fields.Text(string='Notes / Rationale')
 
-    @api.depends('director_id', 'director_id.grade_id', 'director_id.job_grade')
+    @api.model
+    def _resolve_employee_grade(self, emp):
+        """Resolves the employee's assigned employee.grade record safely across hr_employee_custom variants."""
+        if not emp:
+            return self.env['employee.grade']
+
+        # 1. Direct job_grade on employee
+        grade = getattr(emp, 'job_grade', False)
+        if grade and getattr(grade, '_name', '') == 'employee.grade':
+            return grade
+
+        # 2. Active contract in hr.version
+        if 'hr.version' in self.env:
+            contract = self.env['hr.version'].search([
+                ('employee_id', '=', emp.id),
+                ('state', 'in', ['open', 'probation', 'draft'])
+            ], order='id desc', limit=1)
+            if contract and getattr(contract, 'job_grade', False):
+                g = contract.job_grade
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+
+        # 3. Operating Unit Job Position
+        if emp.job_id and 'operating.unit.job.position' in self.env:
+            ou_id = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
+            if ou_id:
+                pos = self.env['operating.unit.job.position'].search([
+                    ('job_position_id', '=', emp.job_id.id),
+                    ('operating_unit_id', '=', ou_id.id)
+                ], limit=1)
+                if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                    return pos.job_grade_id
+            pos = self.env['operating.unit.job.position'].search([
+                ('job_position_id', '=', emp.job_id.id)
+            ], limit=1)
+            if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                return pos.job_grade_id
+
+        # 4. Check grade_id on employee (may be employee.grade or hr.employee.grade)
+        grade = getattr(emp, 'grade_id', False)
+        if grade:
+            if getattr(grade, '_name', '') == 'employee.grade':
+                return grade
+            code = getattr(grade, 'code', False) or getattr(grade, 'grade_code', False)
+            name = getattr(grade, 'name', False) or getattr(grade, 'grade_name', False)
+            if code:
+                found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                if found:
+                    return found
+            if name:
+                found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                if found:
+                    return found
+
+        # 5. Check job position
+        if emp.job_id:
+            g = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+            if g:
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+                code = getattr(g, 'code', False) or getattr(g, 'grade_code', False)
+                name = getattr(g, 'name', False) or getattr(g, 'grade_name', False)
+                if code:
+                    found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                    if found:
+                        return found
+                if name:
+                    found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                    if found:
+                        return found
+
+        return self.env['employee.grade']
+
+    @api.depends('director_id', 'director_id.grade_id', 'director_id.job_grade', 'director_id.job_id')
     def _compute_grade_id(self):
         for rec in self:
             if rec.director_id:
-                emp = rec.director_id
-                rec.grade_id = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+                rec.grade_id = self._resolve_employee_grade(rec.director_id)
             else:
                 rec.grade_id = False
 
@@ -71,13 +143,22 @@ class CompetencyDirectorPeerConfig(models.Model):
         """Extract numeric grade level (1..17) from employee's assigned job grade or position."""
         if not emp:
             return 0
-        grade_rec = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
-        if not grade_rec and emp.job_id:
-            grade_rec = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
-        if not grade_rec:
-            return 0
+        grade_rec = self._resolve_employee_grade(emp)
+        raw_str = ''
+        if grade_rec:
+            raw_str = getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'grade_code', False) or ''
+        if not raw_str:
+            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+            if raw:
+                raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
+        if not raw_str and emp.job_id:
+            raw = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+            if raw:
+                raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
 
-        g_str = (getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'name', False) or getattr(grade_rec, 'code', False) or str(grade_rec)).lower().strip()
+        g_str = str(raw_str).lower().strip()
+        if not g_str:
+            return 0
 
         # Roman numerals map
         tokens = g_str.replace('-', ' ').replace('_', ' ').split()
@@ -126,12 +207,7 @@ class CompetencyDirectorPeerConfig(models.Model):
             if dir_g_num in (16, 17):
                 candidates = all_emps.filtered(lambda c: self._get_grade_number(c) == dir_g_num)
             elif dir_grade_id:
-                candidates = all_emps.filtered(lambda c: (
-                    (getattr(c, 'grade_id', False) and c.grade_id.id == dir_grade_id) or
-                    (getattr(c, 'job_grade', False) and c.job_grade.id == dir_grade_id) or
-                    (c.job_id and getattr(c.job_id, 'grade_id', False) and c.job_id.grade_id.id == dir_grade_id) or
-                    (c.job_id and getattr(c.job_id, 'grade', False) and c.job_id.grade.id == dir_grade_id)
-                ))
+                candidates = all_emps.filtered(lambda c: self._resolve_employee_grade(c).id == dir_grade_id)
             else:
                 candidates = all_emps
 

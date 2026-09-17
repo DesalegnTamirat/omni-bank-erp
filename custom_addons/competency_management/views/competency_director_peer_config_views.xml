@@ -109,13 +109,5 @@
             </field>
         </record>
 
-        <!-- Director Peer Config Menu Item -->
-        <menuitem id="menu_competency_director_peer_config"
-            name="Director Peer Configuration"
-            parent="menu_competency_config_categ"
-            action="action_competency_director_peer_config"
-            sequence="18"
-            groups="competency_management.group_competency_officer"/>
-
     </data>
 </odoo>

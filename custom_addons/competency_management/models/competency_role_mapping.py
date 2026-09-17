@@ -45,14 +45,53 @@ class CompetencyRoleMapping(models.Model):
         'operating.unit', string='Specific Operating Units', tracking=True
     )
 
+    @api.model
+    def _resolve_job_grade(self, job):
+        """Resolves employee.grade for a job position via operating unit job position, active contracts, or matching."""
+        if not job:
+            return self.env['employee.grade']
+
+        # 1. Look up operating.unit.job.position
+        if 'operating.unit.job.position' in self.env:
+            pos = self.env['operating.unit.job.position'].search([
+                ('job_position_id', '=', job.id)
+            ], limit=1)
+            if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                return pos.job_grade_id
+
+        # 2. Look up active hr.version contract for this job
+        if 'hr.version' in self.env:
+            contract = self.env['hr.version'].search([
+                ('job_id', '=', job.id),
+                ('state', 'in', ['open', 'probation', 'draft'])
+            ], order='id desc', limit=1)
+            if contract and getattr(contract, 'job_grade', False):
+                g = contract.job_grade
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+
+        # 3. Direct attributes on job (with model safety check and code/name fallback)
+        g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+        if g:
+            if getattr(g, '_name', '') == 'employee.grade':
+                return g
+            code = getattr(g, 'code', False) or getattr(g, 'grade_code', False)
+            name = getattr(g, 'name', False) or getattr(g, 'grade_name', False)
+            if code:
+                found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                if found:
+                    return found
+            if name:
+                found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                if found:
+                    return found
+
+        return self.env['employee.grade']
+
     @api.depends('job_position_id')
     def _compute_grade_id(self):
         for rec in self:
-            if rec.job_position_id:
-                job = rec.job_position_id
-                rec.grade_id = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
-            else:
-                rec.grade_id = False
+            rec.grade_id = self._resolve_job_grade(rec.job_position_id)
 
     @api.model
     def get_competencies_for_job_and_grade(self, job_id, grade_id=None):

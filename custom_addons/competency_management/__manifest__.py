@@ -40,11 +40,12 @@ Features:
         'views/competency_matrix_config_views.xml',
         'views/competency_director_peer_config_views.xml',
         'views/competency_report_templates.xml',
-        'views/hr_employee_views.xml',
         'wizards/competency_role_mapping_clone_wizard_views.xml',
         'wizards/competency_report_wizard_views.xml',
+        'views/competency_dashboard_snapshot_views.xml',
+        'views/competency_skills_test_views.xml',
+        'views/competency_team_dashboard_views.xml',
         'views/competency_menus.xml',
-
     ],
     'assets': {
         'web.assets_backend': [

@@ -314,14 +314,13 @@ export class CompetencyDashboard extends Component {
         this.actionService.doAction(action);
     }
 
-    openMatrixConfig() {
-        this.actionService.doAction({
-            name: "Proficiency Matrix Configuration",
-            type: "ir.actions.act_window",
-            res_model: "competency.matrix.config",
-            views: [[false, "form"]],
-            res_id: 1,
-        });
+    async openMatrixConfig() {
+        const action = await this.orm.call(
+            "competency.dashboard",
+            "action_open_matrix_config",
+            []
+        );
+        this.actionService.doAction(action);
     }
 
     openAssessedEmployees() {
