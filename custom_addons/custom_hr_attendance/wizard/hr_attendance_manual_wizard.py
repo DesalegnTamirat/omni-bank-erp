@@ -485,12 +485,6 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'over_time_reason': self.justification or _('Manual Attendance Overtime'),
                     })
 
-                if self.work_date == today:
-                    self.employee_id.sudo().write({
-                        'attendance_state': 'checked_out',
-                        'last_attendance_id': open_att.id
-                    })
-
                 if hasattr(open_att, 'message_post'):
                     open_att.message_post(body=_('Manual check-out recorded by %s. Justification: %s') % (self.env.user.name, self.justification))
 
@@ -571,12 +565,6 @@ class HrAttendanceManualWizard(models.TransientModel):
                 }
 
                 att = self.env['hr.attendance'].sudo().with_context(skip_duplicate_check=True).create(vals)
-
-                if self.work_date == today:
-                    self.employee_id.sudo().write({
-                        'attendance_state': 'checked_in',
-                        'last_attendance_id': att.id
-                    })
 
                 if hasattr(att, 'message_post'):
                     att.message_post(body=_('Manual check-in created by %s. Justification: %s') % (self.env.user.name, self.justification))
@@ -693,12 +681,6 @@ class HrAttendanceManualWizard(models.TransientModel):
                             'over_time_reason': self.justification or _('Manual Attendance Overtime'),
                         })
 
-                    if self.work_date == today:
-                        self.employee_id.sudo().write({
-                            'attendance_state': 'checked_out',
-                            'last_attendance_id': att_afternoon.id
-                        })
-
                     if hasattr(att_afternoon, 'message_post'):
                         att_afternoon.message_post(body=_('Full day manual attendance created by %s. Justification: %s') % (self.env.user.name, self.justification))
 
@@ -786,12 +768,6 @@ class HrAttendanceManualWizard(models.TransientModel):
                         'start_time': session_end,
                         'end_time': effective_out,
                         'over_time_reason': self.justification or _('Manual Attendance Overtime'),
-                    })
-
-                if self.work_date == today:
-                    self.employee_id.sudo().write({
-                        'attendance_state': 'checked_out',
-                        'last_attendance_id': att.id
                     })
 
                 if hasattr(att, 'message_post'):

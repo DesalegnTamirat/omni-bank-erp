@@ -451,7 +451,6 @@ class HrEmployeePrivate(models.Model):
                             'check_out': utc_naive_dt,
                             'check_out_status': 'Early Check-out',
                         })
-                        self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
                         _logger.info("Early Morning Lunch Checkout for %s at %.2f", self.name, current_float)
                         return attendance
 
@@ -462,7 +461,6 @@ class HrEmployeePrivate(models.Model):
                         'check_out': lunch_checkout_utc,
                         'check_out_status': 'Normal',
                     })
-                    self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
                     _logger.info("Normal Morning Lunch Checkout for %s at %.2f (Check-out stamped: %s)", self.name, current_float, lunch_start)
                     return attendance
 
@@ -492,7 +490,6 @@ class HrEmployeePrivate(models.Model):
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
                         new_att = self.env['hr.attendance'].create(vals)
-                        self.write({'attendance_state': 'checked_in', 'last_attendance_id': new_att.id})
                         return new_att
                     elif current_float <= afternoon_late_cutoff or not enable_checkin_restriction:
                         # Late Afternoon Check-in (Zero Grace)
@@ -510,12 +507,10 @@ class HrEmployeePrivate(models.Model):
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
                         new_att = self.env['hr.attendance'].create(vals)
-                        self.write({'attendance_state': 'checked_in', 'last_attendance_id': new_att.id})
                         return new_att
                     else:
                         # Past Afternoon Cutoff:
-                        # Morning session was force-closed at lunch_start. Commit state cleanly without rollback.
-                        self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
+                        # Morning session was force-closed at lunch_start.
                         _logger.warning("Morning session Force Checkout committed for %s. Afternoon entry blocked (past cutoff %s).", self.name, _fmt(afternoon_late_cutoff))
                         return attendance
 
@@ -541,7 +536,6 @@ class HrEmployeePrivate(models.Model):
                 'check_out': utc_naive_dt,
                 'check_out_status': out_status,
             })
-            self.write({'attendance_state': 'checked_out', 'last_attendance_id': attendance.id})
             _logger.info("Check-Out recorded for %s at %.2f (Status: %s)", self.name, current_float, out_status)
             return attendance
 
@@ -593,6 +587,5 @@ class HrEmployeePrivate(models.Model):
                 vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
             _logger.info("Creating Check-in for %s: %s", self.name, vals)
             attendance = self.env['hr.attendance'].create(vals)
-            self.write({'attendance_state': 'checked_in', 'last_attendance_id': attendance.id})
             attendance._enqueue_attendance_side_effects()
             return attendance
