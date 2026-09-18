@@ -450,3 +450,69 @@ class TestDisciplineCase(TransactionCase):
         case.action_ceo_endorse_exoneration()
         self.assertEqual(case.state, 'closed')
         self.assertEqual(suspension.state, 'revoked')
+
+    def test_16_audit_full_5_stage_workflow(self):
+        """Test complete 5-stage Audit Investigation workflow: Draft -> Assigned -> Manager Review -> Director Signoff -> Announced."""
+        import base64
+        today = Date.today()
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'case_action_track': 'committee_escalation',
+            'state': 'investigating',
+            'description': 'Full audit workflow test case.',
+        })
+        inv = self.env['discipline.investigation'].create({
+            'case_id': case.id,
+            'title': 'Comprehensive Branch Audit',
+            'director_id': self.user_approver.id,
+            'audit_manager_id': self.user_reviewer.id,
+            'investigator_id': self.user_initiator.id,
+        })
+        self.assertEqual(inv.state, 'draft')
+
+        # 1. Assign investigation
+        inv.action_assign_investigation()
+        self.assertEqual(inv.state, 'assigned')
+
+        # 2. Submit for Manager review - must fail without report_file
+        inv.write({
+            'summary_findings': '<p>Established cash discrepancy of ETB 5,000.</p>',
+            'investigator_recommendation': '<p>Recommend Second Warning.</p>',
+            'applicable_policy': 'Cash Management Policy Section 3',
+            'finding_outcome': 'liable',
+            'financial_loss_amount': 5000.0,
+            'loss_resolution_status': 'resolved',
+        })
+        with self.assertRaises(UserError):
+            inv.action_submit_for_manager_review()
+
+        # Upload dummy PDF report
+        inv.write({
+            'report_file': base64.b64encode(b'PDF report content'),
+            'report_filename': 'audit_report.pdf',
+        })
+        inv.action_submit_for_manager_review()
+        self.assertEqual(inv.state, 'manager_review')
+        self.assertTrue(len(inv.liable_employee_ids) > 0)
+
+        # 3. Manager Quality Review - Return for revision
+        with self.assertRaises(UserError):
+            inv.action_manager_return()  # Missing notes
+        inv.write({'manager_review_notes': 'Please re-verify core banking log timestamps.'})
+        inv.action_manager_return()
+        self.assertEqual(inv.state, 'assigned')
+
+        # Re-submit and Manager Approve
+        inv.action_submit_for_manager_review()
+        inv.action_manager_approve()
+        self.assertEqual(inv.state, 'director_review')
+        self.assertEqual(inv.manager_signed_off_by_id.id, self.env.user.id)
+
+        # 4. Director Final Approval and Announcement
+        inv.action_director_approve_and_announce()
+        self.assertEqual(inv.state, 'approved')
+        self.assertEqual(inv.reviewed_by_id.id, self.env.user.id)
+        self.assertEqual(case.state, 'committee_review')
+        self.assertTrue(case.is_locked_for_committee)

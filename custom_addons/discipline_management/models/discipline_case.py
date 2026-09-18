@@ -310,7 +310,7 @@ class DisciplineCase(models.Model):
     def _compute_has_exonerated_investigation(self):
         for rec in self:
             rec.has_exonerated_investigation = any(
-                inv.state == 'submitted' and inv.finding_outcome == 'exonerated'
+                inv.state in ('submitted', 'approved') and inv.finding_outcome == 'exonerated'
                 for inv in rec.investigation_ids
             )
 
