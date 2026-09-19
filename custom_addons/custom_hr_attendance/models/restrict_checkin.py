@@ -2,7 +2,7 @@
 import datetime
 import pytz
 import logging
-from odoo import models, fields, api, _
+from odoo import models, fields, api, tools, _
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
@@ -22,6 +22,31 @@ def _fmt(f):
 
 class HrEmployeePrivate(models.Model):
     _inherit = 'hr.employee'
+
+    # ============================================================
+    # CONFIG PARAMETER CACHING (O(1) in RAM via @tools.ormcache)
+    # ============================================================
+    @api.model
+    @tools.ormcache()
+    def _get_attendance_config_params(self):
+        """ Cached dictionary of attendance regulation parameters to avoid DB reads on hot paths. """
+        params = self.env['ir.config_parameter'].sudo()
+        return {
+            'morning_time': float(params.get_param('hr_attendance.morning_time', 8.0)),
+            'exit_time': float(params.get_param('hr_attendance.exit_time', 17.0)),
+            'enable_saturday_halfday': params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1'),
+            'saturday_halfday_district': params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1'),
+            'saturday_exit_time': float(params.get_param('hr_attendance.saturday_exit_time', 12.0)),
+            'enable_lunch_break': params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1'),
+            'lunch_out_time': float(params.get_param('hr_attendance.lunch_out_time', 12.0)),
+            'lunch_duration': float(params.get_param('hr_attendance.lunch_duration', 1.0)),
+            'grace_time': float(params.get_param('hr_attendance.grace_time', 0.25)),
+            'dead_time': float(params.get_param('hr_attendance.dead_time', 0.333333)),
+            'min_work_hour': float(params.get_param('hr_attendance.min_work_hour', 4.0)),
+            'enable_checkin_gate': params.get_param('hr_attendance.enable_checkin_gate', 'False').lower() in ('true', '1'),
+            'enable_checkin_restriction': params.get_param('hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1'),
+            'enable_checkout_restriction': params.get_param('hr_attendance.enable_checkout_restriction', 'True').lower() in ('true', '1'),
+        }
 
     # ============================================================
     # UNIVERSAL SCHEDULE RESOLVER
@@ -46,15 +71,15 @@ class HrEmployeePrivate(models.Model):
         if not target_date:
             target_date = fields.Date.context_today(self)
 
-        params = self.env['ir.config_parameter'].sudo()
-        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
-        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
-        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
-        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
-        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        default_lunch_out = float(params.get_param('hr_attendance.lunch_out_time', 12.0))
-        default_lunch_dur = float(params.get_param('hr_attendance.lunch_duration', 1.0))
+        cfg = self._get_attendance_config_params()
+        default_morning_time = cfg['morning_time']
+        default_exit_time = cfg['exit_time']
+        enable_saturday = cfg['enable_saturday_halfday']
+        enable_district_saturday = cfg['saturday_halfday_district']
+        saturday_exit_time = cfg['saturday_exit_time']
+        enable_lunch = cfg['enable_lunch_break']
+        default_lunch_out = cfg['lunch_out_time']
+        default_lunch_dur = cfg['lunch_duration']
 
         is_saturday = (target_date.weekday() == 5) if target_date else False
 
@@ -220,6 +245,208 @@ class HrEmployeePrivate(models.Model):
             'shift_name': shift_title
         }
 
+    def _resolve_schedules_batch(self, date_from, date_to):
+        """
+        Batch resolves schedules for self (an hr.employee record) across date_from to date_to.
+        Returns a dict mapping date -> resolved schedule dict.
+        Fires only 3-4 bulk queries total for the entire date range instead of per-day queries.
+        """
+        self.ensure_one()
+        cfg = self._get_attendance_config_params()
+        default_morning_time = cfg['morning_time']
+        default_exit_time = cfg['exit_time']
+        enable_saturday = cfg['enable_saturday_halfday']
+        enable_district_saturday = cfg['saturday_halfday_district']
+        saturday_exit_time = cfg['saturday_exit_time']
+        enable_lunch = cfg['enable_lunch_break']
+        default_lunch_out = cfg['lunch_out_time']
+        default_lunch_dur = cfg['lunch_duration']
+
+        # 1. Batch fetch validated leaves
+        leaves = self.env['hr.leave'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('state', '=', 'validate'),
+            ('date_from', '<=', datetime.datetime.combine(date_to, datetime.time.max)),
+            ('date_to', '>=', datetime.datetime.combine(date_from, datetime.time.min)),
+        ])
+
+        # 2. Batch fetch active roster lines
+        roster_lines = self.env['job.position.roster.exception.line'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('roster_id.status', '=', 'active'),
+            ('roster_id.active', '=', True),
+            ('date', '>=', date_from),
+            ('date', '<=', date_to),
+        ], order='date asc')
+        roster_lines_by_date = {line.date: line for line in roster_lines}
+
+        # 3. Batch fetch static job position exception
+        job_exceptions = self.env['job.position.exception'].sudo().search([
+            ('employee_id', '=', self.id),
+            ('status', '=', 'active'),
+            ('active', '=', True),
+            ('start_date', '<=', date_to),
+            '|', ('end_date', '=', False), ('end_date', '>=', date_from)
+        ], order='start_date desc, id desc', limit=1)
+
+        # 4. Batch fetch location-based exception
+        location_exceptions = self.env['location.based.exception'].browse()
+        if self.default_operating_unit_id:
+            ou_ids = [self.default_operating_unit_id.id]
+            if hasattr(self.default_operating_unit_id, 'parent_unit') and self.default_operating_unit_id.parent_unit:
+                ou_ids.append(self.default_operating_unit_id.parent_unit.id)
+            location_exceptions = self.env['location.based.exception'].sudo().search([
+                '|', ('operating_unit_ids', 'in', ou_ids),
+                     ('operating_unit', 'in', ou_ids),
+                ('active', '=', True),
+                ('state', '=', 'active'),
+                ('start_date', '<=', date_to),
+                '|', ('end_date', '=', False), ('end_date', '>=', date_from)
+            ], limit=1)
+
+        result = {}
+        cur_date = date_from
+        while cur_date <= date_to:
+            is_saturday = (cur_date.weekday() == 5)
+            is_sunday = (cur_date.weekday() == 6)
+
+            # Check leave for cur_date
+            matching_leave = leaves.filtered(lambda l: l.date_from.date() <= cur_date <= l.date_to.date())
+            if matching_leave:
+                leave = matching_leave[0]
+                l_name = leave.holiday_status_id.name or _('Time Off')
+                if isinstance(l_name, dict):
+                    l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else _('Time Off')
+                is_half = bool(getattr(leave, 'request_unit_half', False) or getattr(leave, 'half_day', False) or (getattr(leave, 'number_of_days', 1.0) == 0.5))
+                half_period = getattr(leave, 'request_date_from_period', False) or getattr(leave, 'single_half_day_period', 'am')
+                if is_half:
+                    if half_period == 'am':
+                        result[cur_date] = {
+                            'shift_start': 13.0, 'shift_end': default_exit_time,
+                            'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                            'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                            'is_on_leave': False, 'is_half_day_leave': True,
+                            'leave_name': l_name, 'shift_name': f"Afternoon Shift (Morning on {l_name})"
+                        }
+                    else:
+                        result[cur_date] = {
+                            'shift_start': default_morning_time, 'shift_end': 12.0,
+                            'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                            'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': False,
+                            'is_on_leave': False, 'is_half_day_leave': True,
+                            'leave_name': l_name, 'shift_name': f"Morning Shift (Afternoon on {l_name})"
+                        }
+                else:
+                    result[cur_date] = {
+                        'shift_start': 0.0, 'shift_end': 0.0,
+                        'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                        'is_on_leave': True, 'leave_name': l_name,
+                        'shift_name': f"Approved Time Off ({l_name})"
+                    }
+                cur_date += datetime.timedelta(days=1)
+                continue
+
+            # Check roster line
+            line = roster_lines_by_date.get(cur_date)
+            if line:
+                if line.schedule_type == 'day_off':
+                    result[cur_date] = {
+                        'shift_start': 0.0, 'shift_end': 0.0, 'has_lunch': False,
+                        'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                        'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                        'shift_name': 'Scheduled Day Off'
+                    }
+                else:
+                    shift = line.shift_id
+                    if shift:
+                        has_l = bool(enable_lunch and shift.has_lunch_break and not shift.is_night_shift and not is_saturday)
+                        l_start = (shift.lunch_start_time or 12.0) if has_l else 0.0
+                        l_dur = (shift.lunch_duration or 1.0) if has_l else 0.0
+                        l_end = l_start + l_dur
+                        result[cur_date] = {
+                            'shift_start': shift.start_time, 'shift_end': shift.end_time,
+                            'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
+                            'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
+                            'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
+                            'shift_name': shift.name
+                        }
+                    else:
+                        result[cur_date] = self._resolve_employee_full_schedule(target_date=cur_date)
+                cur_date += datetime.timedelta(days=1)
+                continue
+
+            # Check static job exception
+            if job_exceptions and job_exceptions.shift_id and (job_exceptions.start_date <= cur_date and (not job_exceptions.end_date or job_exceptions.end_date >= cur_date)):
+                shift = job_exceptions.shift_id
+                has_l = bool(enable_lunch and shift.has_lunch_break and not shift.is_night_shift and not is_saturday)
+                l_start = (shift.lunch_start_time or 12.0) if has_l else 0.0
+                l_dur = (shift.lunch_duration or 1.0) if has_l else 0.0
+                l_end = l_start + l_dur
+                result[cur_date] = {
+                    'shift_start': shift.start_time, 'shift_end': shift.end_time,
+                    'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
+                    'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
+                    'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
+                    'shift_name': shift.name
+                }
+                cur_date += datetime.timedelta(days=1)
+                continue
+
+            # Check location exception
+            if location_exceptions and (location_exceptions.start_date <= cur_date and (not location_exceptions.end_date or location_exceptions.end_date >= cur_date)):
+                loc = location_exceptions
+                shift = loc.shift_id if hasattr(loc, 'shift_id') and loc.shift_id else False
+                is_night = shift.is_night_shift if shift else False
+                has_l = bool(enable_lunch and (shift.has_lunch_break if shift else loc.has_lunch_break) and not is_night and not is_saturday)
+                l_start = (shift.lunch_start_time or 12.0) if (shift and has_l) else (default_lunch_out if has_l else 0.0)
+                l_dur = (shift.lunch_duration or default_lunch_dur) if (shift and has_l) else (default_lunch_dur if has_l else 0.0)
+                l_end = l_start + l_dur
+                s_start = shift.start_time if shift else loc.start_time
+                s_end = shift.end_time if shift else loc.end_time
+                result[cur_date] = {
+                    'shift_start': s_start, 'shift_end': s_end,
+                    'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
+                    'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
+                    'is_night_shift': bool(is_night), 'is_day_off': False,
+                    'shift_name': (shift.name if shift else loc.name) or 'Location Shift'
+                }
+                cur_date += datetime.timedelta(days=1)
+                continue
+
+            # Default global schedule
+            if is_sunday:
+                result[cur_date] = {
+                    'shift_start': 0.0, 'shift_end': 0.0,
+                    'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                    'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                    'shift_name': 'Scheduled Day Off (Sunday)'
+                }
+            else:
+                s_end = default_exit_time
+                is_sat_half = False
+                if enable_saturday and is_saturday:
+                    ou = self.default_operating_unit_id
+                    unit_type = ou.work_unit_type if ou else False
+                    if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
+                        s_end = saturday_exit_time
+                        is_sat_half = True
+                has_l = bool(enable_lunch and not is_saturday)
+                l_start = default_lunch_out if has_l else 0.0
+                l_dur = default_lunch_dur if has_l else 0.0
+                l_end = l_start + l_dur
+                result[cur_date] = {
+                    'shift_start': default_morning_time, 'shift_end': s_end,
+                    'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
+                    'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
+                    'is_night_shift': False, 'is_day_off': False,
+                    'shift_name': 'Default Global Shift (Saturday Half Day)' if is_sat_half else 'Default Global Shift'
+                }
+
+            cur_date += datetime.timedelta(days=1)
+
+        return result
+
     def _get_employee_shift_info(self, target_date=None):
         """ Alias mapping to _resolve_employee_full_schedule for unified shift data across models and controllers """
         res = self._resolve_employee_full_schedule(target_date=target_date)
@@ -356,7 +583,7 @@ class HrEmployeePrivate(models.Model):
         normal_cutoff = shift_start + grace
         late_cutoff = shift_start + grace + dead_time
 
-        _logger.warning(
+        _logger.debug(
             "EVALUATING CHECKIN | Employee: %s | Current: %.4f | ShiftStart: %.4f | Grace: %.4f | DeadTime: %.4f | NormalCutoff: %.4f | LateCutoff: %.4f | Pass: %s",
             self.name, current_float, shift_start, grace, dead_time, normal_cutoff, late_cutoff, current_float <= late_cutoff or allow_late
         )
@@ -391,10 +618,8 @@ class HrEmployeePrivate(models.Model):
         return local_dt, current_float, local_dt.date()
 
     def _load_time_parameters(self):
-        morning_start = self._get_param_float('hr_attendance.morning_time', 8.0)
-        exit_time = self._get_param_float('hr_attendance.exit_time', 17.0)
-        dead_time = self._get_param_float('hr_attendance.dead_time', 0.33)
-        return morning_start, exit_time, dead_time
+        cfg = self._get_attendance_config_params()
+        return cfg['morning_time'], cfg['exit_time'], cfg['dead_time']
 
     def _get_predefined_attendance(self, today_date, current_float):
         predefined_late = self.env['attendance.preapproval'].search([
@@ -532,6 +757,13 @@ class HrEmployeePrivate(models.Model):
                     })
                     _logger.info("1-Click Force Checkout Morning Session for %s at %.2f", self.name, current_float)
 
+                    fast_att_env = self.env['hr.attendance'].with_context(
+                        tracking_disable=True,
+                        mail_create_nosubscribe=True,
+                        mail_create_nolog=True,
+                        mail_notrack=True
+                    )
+
                     if current_float <= afternoon_start:
                         # On-Time Afternoon Check-in (snapped to afternoon start)
                         afternoon_start_utc = self._float_to_utc_datetime(afternoon_start, local_dt)
@@ -546,7 +778,7 @@ class HrEmployeePrivate(models.Model):
                         }
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
-                        new_att = self.env['hr.attendance'].create(vals)
+                        new_att = fast_att_env.create(vals)
                         return new_att
                     elif current_float <= afternoon_late_cutoff or not enable_checkin_restriction:
                         # Late Afternoon Check-in (Zero Grace)
@@ -563,7 +795,7 @@ class HrEmployeePrivate(models.Model):
                         }
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
-                        new_att = self.env['hr.attendance'].create(vals)
+                        new_att = fast_att_env.create(vals)
                         return new_att
                     else:
                         # Past Afternoon Cutoff:
@@ -590,7 +822,7 @@ class HrEmployeePrivate(models.Model):
             if current_float < (target_shift_end - 0.05):
                 out_status = 'Early Check-out'
 
-            attendance.write({
+            attendance.with_context(tracking_disable=True, mail_notrack=True).write({
                 'check_out': utc_naive_dt,
                 'check_out_status': out_status,
             })
@@ -644,6 +876,12 @@ class HrEmployeePrivate(models.Model):
             if geo_information:
                 vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
             _logger.info("Creating Check-in for %s: %s", self.name, vals)
-            attendance = self.env['hr.attendance'].create(vals)
+            fast_att_env = self.env['hr.attendance'].with_context(
+                tracking_disable=True,
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                mail_notrack=True
+            )
+            attendance = fast_att_env.create(vals)
             attendance._enqueue_attendance_side_effects()
             return attendance

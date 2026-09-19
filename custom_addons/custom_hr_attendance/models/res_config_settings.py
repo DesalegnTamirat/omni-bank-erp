@@ -337,5 +337,7 @@ class ResConfigSettings(models.TransientModel):
         params.set_param('hr_attendance.enable_auto_absence', str(self.enable_auto_absence))
         params.set_param('hr_attendance.enable_ip_tracking', str(self.enable_ip_tracking))
         params.set_param('hr_attendance.enable_checkin_gate', str(self.enable_checkin_gate))
+        # Invalidate ORM parameter cache immediately
+        self.env['hr.employee'].clear_caches()
 
 

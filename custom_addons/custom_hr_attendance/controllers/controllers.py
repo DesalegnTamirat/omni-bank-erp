@@ -32,14 +32,18 @@ class BunnaMyAttendance(http.Controller):
         if not employee or not data:
             return data
 
-        data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
-        data['department_name'] = employee.department_id.name if employee.department_id else ""
-        data['shift_info'] = self._get_employee_shift_info(employee)
-
         today = fields.Date.context_today(request.env.user)
         # Week starts on Monday
         start_of_week = today - datetime.timedelta(days=today.weekday())
         end_of_week = start_of_week + datetime.timedelta(days=6)
+
+        # Batch resolve full weekly schedule in a single pass (3-4 bulk queries total)
+        week_schedules = employee._resolve_schedules_batch(start_of_week, end_of_week)
+        cfg = employee._get_attendance_config_params()
+
+        data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
+        data['department_name'] = employee.department_id.name if employee.department_id else ""
+        data['shift_info'] = week_schedules.get(today, employee._get_employee_shift_info(target_date=today))
 
         # Month calculation
         start_of_month = today.replace(day=1)
@@ -132,10 +136,10 @@ class BunnaMyAttendance(http.Controller):
             hours_int = int(hrs)
             mins_int = int(round((hrs - hours_int) * 60))
 
-            day_shift = self._get_employee_shift_info(employee, target_date=cur_date)
-            is_day_off = day_shift.get('is_day_off', False) if day_shift else False
-            is_on_leave = day_shift.get('is_on_leave', False) if day_shift else False
-            leave_name = day_shift.get('leave_name', 'Time Off') if day_shift else 'Time Off'
+            day_shift = week_schedules.get(cur_date, {})
+            is_day_off = day_shift.get('is_day_off', False)
+            is_on_leave = day_shift.get('is_on_leave', False)
+            leave_name = day_shift.get('leave_name', 'Time Off')
 
             pct = min(100, int((hrs / 9.0) * 100))
 
@@ -193,10 +197,9 @@ class BunnaMyAttendance(http.Controller):
 
             # Dynamic Shift Punctuality Check (Shift-Specific)
             check_in_date = check_in_local.date()
-            shift_info = self._get_employee_shift_info(employee, check_in_date)
+            shift_info = week_schedules.get(check_in_date) or employee._get_employee_shift_info(target_date=check_in_date)
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
-            grace_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.grace_time', '0.25'))
-            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', '0.333333'))
+            grace_time = cfg.get('grace_time', 0.25)
 
             check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
             data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > (shift_start + grace_time) else 'Normal')
@@ -209,7 +212,7 @@ class BunnaMyAttendance(http.Controller):
         # Dual-Session Status Breakdown for Today
         now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
         current_float = now_dt.hour + (now_dt.minute / 60.0) + (now_dt.second / 3600.0)
-        today_shift = self._get_employee_shift_info(employee, target_date=today)
+        today_shift = week_schedules.get(today) or employee._get_employee_shift_info(target_date=today)
         has_lunch = today_shift.get('has_lunch_break', False) if today_shift else False
 
         today_start_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)

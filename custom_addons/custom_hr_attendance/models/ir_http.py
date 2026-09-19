@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+import time
 import json
 import logging
 from odoo import models
@@ -58,25 +58,37 @@ class IrHttp(models.AbstractModel):
             if user.has_group('base.group_system') or not user.employee_id:
                 return super()._dispatch(endpoint)
 
-            # Check live DB state for the employee
+            # 1. Fast path: check session cache first with a 120s TTL
+            session = getattr(request, 'session', None)
+            now_ts = time.time()
+            if session:
+                cached_checked_in = session.get('attendance_checked_in')
+                last_check_ts = session.get('attendance_gate_checked_at', 0)
+                # If cached within 120s and checked in, bypass DB lookup completely (0 SQL queries)
+                if cached_checked_in is True and (now_ts - last_check_ts < 120):
+                    return super()._dispatch(endpoint)
+
+            # 2. Slow path: check live database state
             employee = user.employee_id
             if employee and employee.attendance_state == 'checked_in':
-                if request and hasattr(request, 'session'):
-                    request.session['attendance_checked_in'] = True
+                if session:
+                    session['attendance_checked_in'] = True
+                    session['attendance_gate_checked_at'] = now_ts
             else:
-                if request and hasattr(request, 'session'):
-                    request.session['attendance_checked_in'] = False
+                if session:
+                    session['attendance_checked_in'] = False
+                    session['attendance_gate_checked_at'] = now_ts
                 # Employee is not checked in — block access to restricted routes
                 return cls._attendance_gate_blocked_response()
         return super()._dispatch(endpoint)
 
     @classmethod
     def _attendance_gate_enabled(cls):
-        """Returns True if the attendance access gate feature is active."""
-        param = request.env['ir.config_parameter'].sudo().get_param(
-            'hr_attendance.enable_checkin_gate', 'False'
-        )
-        return param.lower() in ('true', '1')
+        """Returns True if the attendance access gate feature is active (read from RAM cache)."""
+        if not request or not request.env:
+            return False
+        cfg = request.env['hr.employee']._get_attendance_config_params()
+        return bool(cfg.get('enable_checkin_gate', False))
 
     @classmethod
     def _route_requires_gate(cls):
