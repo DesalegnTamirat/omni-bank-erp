@@ -20,7 +20,7 @@ class CompetencyDirectorPeerConfig(models.Model):
         domain="[('is_director_or_chief', '=', True), ('active', '=', True)]",
         index=True)
     job_id = fields.Many2one(
-        'hr.job', related='director_id.job_id', string='Job Position', store=True, readonly=True)
+        'hr.job', string='Job Position', compute='_compute_job_id', store=True, readonly=True)
     grade_id = fields.Many2one(
         'employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
     department_id = fields.Many2one(
@@ -41,10 +41,27 @@ class CompetencyDirectorPeerConfig(models.Model):
     notes = fields.Text(string='Notes / Rationale')
 
     @api.model
+    def _get_employee_job(self, emp):
+        """Safely fetch job position for an employee, supporting both standard job_id and custom job_position."""
+        if not emp:
+            return self.env['hr.job']
+        return emp.job_id or getattr(emp, 'job_position', self.env['hr.job'])
+
+    @api.depends('director_id', 'director_id.job_id')
+    def _compute_job_id(self):
+        for rec in self:
+            rec.job_id = self._get_employee_job(rec.director_id) if rec.director_id else False
+
+    @api.model
     def _resolve_employee_grade(self, emp):
         """Resolves the employee's assigned employee.grade record safely across hr_employee_custom variants."""
         if not emp:
             return self.env['employee.grade']
+
+        # 0. Direct grade on employee (hr_employee_custom: grade = fields.Many2one('employee.grade'))
+        grade = getattr(emp, 'grade', False)
+        if grade and getattr(grade, '_name', '') == 'employee.grade':
+            return grade
 
         # 1. Direct job_grade on employee
         grade = getattr(emp, 'job_grade', False)
@@ -63,17 +80,18 @@ class CompetencyDirectorPeerConfig(models.Model):
                     return g
 
         # 3. Operating Unit Job Position
-        if emp.job_id and 'operating.unit.job.position' in self.env:
+        job = self._get_employee_job(emp)
+        if job and 'operating.unit.job.position' in self.env:
             ou_id = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
             if ou_id:
                 pos = self.env['operating.unit.job.position'].search([
-                    ('job_position_id', '=', emp.job_id.id),
+                    ('job_position_id', '=', job.id),
                     ('operating_unit_id', '=', ou_id.id)
                 ], limit=1)
                 if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
                     return pos.job_grade_id
             pos = self.env['operating.unit.job.position'].search([
-                ('job_position_id', '=', emp.job_id.id)
+                ('job_position_id', '=', job.id)
             ], limit=1)
             if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
                 return pos.job_grade_id
@@ -95,8 +113,8 @@ class CompetencyDirectorPeerConfig(models.Model):
                     return found
 
         # 5. Check job position
-        if emp.job_id:
-            g = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        if job:
+            g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
             if g:
                 if getattr(g, '_name', '') == 'employee.grade':
                     return g
@@ -149,11 +167,12 @@ class CompetencyDirectorPeerConfig(models.Model):
         if grade_rec:
             raw_str = getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'grade_code', False) or ''
         if not raw_str:
-            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False) or getattr(emp, 'grade', False)
             if raw:
                 raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
-        if not raw_str and emp.job_id:
-            raw = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        job = self._get_employee_job(emp)
+        if not raw_str and job:
+            raw = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
             if raw:
                 raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
 

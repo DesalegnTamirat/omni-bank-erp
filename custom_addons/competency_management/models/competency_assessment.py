@@ -359,7 +359,25 @@ class CompetencyAssessment(models.Model):
         domain="[('state', '=', 'open')]", ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', required=True, tracking=True)
     department_id = fields.Many2one(related='employee_id.department_id', string='Department', store=True, readonly=True)
-    job_id = fields.Many2one(related='employee_id.job_id', string='Job Position', store=True, readonly=True)
+    job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_job_id', store=True, readonly=True)
+    grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
+
+    @api.model
+    def _get_employee_job(self, emp):
+        """Safely fetch job position for an employee, supporting both standard job_id and custom job_position."""
+        if not emp:
+            return self.env['hr.job']
+        return emp.job_id or getattr(emp, 'job_position', self.env['hr.job'])
+
+    @api.depends('employee_id', 'employee_id.job_id')
+    def _compute_job_id(self):
+        for rec in self:
+            rec.job_id = self._get_employee_job(rec.employee_id) if rec.employee_id else False
+
+    @api.depends('employee_id')
+    def _compute_grade_id(self):
+        for rec in self:
+            rec.grade_id = self._resolve_employee_grade(rec.employee_id) if rec.employee_id else False
 
     @api.model
     def _get_assessment_type_selection(self):
@@ -395,6 +413,11 @@ class CompetencyAssessment(models.Model):
         if not emp:
             return self.env['employee.grade']
 
+        # 0. Direct grade on employee (hr_employee_custom: grade = fields.Many2one('employee.grade'))
+        grade = getattr(emp, 'grade', False)
+        if grade and getattr(grade, '_name', '') == 'employee.grade':
+            return grade
+
         # 1. Direct job_grade on employee
         grade = getattr(emp, 'job_grade', False)
         if grade and getattr(grade, '_name', '') == 'employee.grade':
@@ -412,17 +435,18 @@ class CompetencyAssessment(models.Model):
                     return g
 
         # 3. Operating Unit Job Position
-        if emp.job_id and 'operating.unit.job.position' in self.env:
+        job = self._get_employee_job(emp)
+        if job and 'operating.unit.job.position' in self.env:
             ou_id = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
             if ou_id:
                 pos = self.env['operating.unit.job.position'].search([
-                    ('job_position_id', '=', emp.job_id.id),
+                    ('job_position_id', '=', job.id),
                     ('operating_unit_id', '=', ou_id.id)
                 ], limit=1)
                 if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
                     return pos.job_grade_id
             pos = self.env['operating.unit.job.position'].search([
-                ('job_position_id', '=', emp.job_id.id)
+                ('job_position_id', '=', job.id)
             ], limit=1)
             if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
                 return pos.job_grade_id
@@ -444,8 +468,8 @@ class CompetencyAssessment(models.Model):
                     return found
 
         # 5. Check job position
-        if emp.job_id:
-            g = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        if job:
+            g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
             if g:
                 if getattr(g, '_name', '') == 'employee.grade':
                     return g
@@ -479,11 +503,12 @@ class CompetencyAssessment(models.Model):
         if grade_rec:
             raw_str = getattr(grade_rec, 'grade_name', False) or getattr(grade_rec, 'grade_code', False) or ''
         if not raw_str:
-            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False)
+            raw = getattr(emp, 'grade_id', False) or getattr(emp, 'job_grade', False) or getattr(emp, 'grade', False)
             if raw:
                 raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
-        if not raw_str and emp.job_id:
-            raw = getattr(emp.job_id, 'grade', False) or getattr(emp.job_id, 'grade_id', False)
+        job = self._get_employee_job(emp)
+        if not raw_str and job:
+            raw = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
             if raw:
                 raw_str = getattr(raw, 'name', False) or getattr(raw, 'code', False) or getattr(raw, 'grade_name', False) or str(raw)
 
@@ -521,9 +546,10 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _is_branch_manager(self, emp):
-        if not emp or not emp.job_id:
+        job = self._get_employee_job(emp)
+        if not emp or not job:
             return False
-        j_name = (emp.job_id.name or '').lower()
+        j_name = (job.name or '').lower()
         return 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name or 'bm ' in j_name
 
     @api.model
@@ -532,7 +558,8 @@ class CompetencyAssessment(models.Model):
             return False
         if self._is_director_or_chief(emp) or self._is_branch_manager(emp) or self._is_district_manager_emp(emp):
             return True
-        j_name = (emp.job_id.name or '').lower() if emp.job_id else ''
+        job = self._get_employee_job(emp)
+        j_name = (job.name or '').lower() if job else ''
         return any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor'])
 
     @api.model
@@ -541,9 +568,10 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _is_district_manager_emp(self, emp):
-        if not emp or not emp.job_id:
+        job = self._get_employee_job(emp)
+        if not emp or not job:
             return False
-        job_name = emp.job_id.name or ''
+        job_name = job.name or ''
         return 'district manager' in job_name.lower() or ('district' in job_name.lower() and 'manager' in job_name.lower())
 
     @api.model
@@ -576,7 +604,8 @@ class CompetencyAssessment(models.Model):
         emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
         emp_grade_id = self._get_employee_grade_id(emp)
         emp_ou_id = self._get_employee_ou_id(emp)
-        emp_job_id = emp.job_id.id if emp.job_id else False
+        emp_job = self._get_employee_job(emp)
+        emp_job_id = emp_job.id if emp_job else False
 
         domain = [('id', '!=', emp.id), ('active', '=', True)]
         if emp_coach:
@@ -588,7 +617,7 @@ class CompetencyAssessment(models.Model):
         if self._is_branch_manager(emp):
             matched = candidates.filtered(lambda c: (
                 (self._get_employee_grade_id(c) == emp_grade_id if emp_grade_id else True) and
-                (c.job_id.id == emp_job_id if (c.job_id and emp_job_id) else True)
+                (self._get_employee_job(c).id == emp_job_id if (self._get_employee_job(c) and emp_job_id) else True)
             ))
         # 3. Managerial Positions HO & District Office: Same Coach, Same Grade, Same OU (Position unlisted -> open)
         elif self._is_manager(emp):
@@ -601,7 +630,7 @@ class CompetencyAssessment(models.Model):
             matched = candidates.filtered(lambda c: (
                 (self._get_employee_grade_id(c) == emp_grade_id if emp_grade_id else True) and
                 (self._get_employee_ou_id(c) == emp_ou_id if (self._get_employee_ou_id(c) and emp_ou_id) else True) and
-                (c.job_id.id == emp_job_id if (c.job_id and emp_job_id) else True)
+                (self._get_employee_job(c).id == emp_job_id if (self._get_employee_job(c) and emp_job_id) else True)
             ))
 
         if not matched and candidates:
@@ -624,7 +653,8 @@ class CompetencyAssessment(models.Model):
         emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
         emp_grade_id = self._get_employee_grade_id(emp)
         emp_ou_id = self._get_employee_ou_id(emp)
-        emp_job_id = emp.job_id.id if emp.job_id else False
+        emp_job = self._get_employee_job(emp)
+        emp_job_id = emp_job.id if emp_job else False
 
         domain = [('id', '!=', emp.id), ('active', '=', True)]
         if emp_coach:
@@ -642,12 +672,12 @@ class CompetencyAssessment(models.Model):
             matched = candidates.filtered(lambda c: (
                 (self._get_employee_grade_id(c) != emp_grade_id if (self._get_employee_grade_id(c) and emp_grade_id) else True) and
                 (self._get_employee_ou_id(c) == emp_ou_id if (self._get_employee_ou_id(c) and emp_ou_id) else True) and
-                (c.job_id.id != emp_job_id if (c.job_id and emp_job_id) else True)
+                (self._get_employee_job(c).id != emp_job_id if (self._get_employee_job(c) and emp_job_id) else True)
             ))
 
         if not matched and candidates:
             # Fallback if strict criteria returns 0: match candidates under same coach with different grade or position
-            matched = candidates.filtered(lambda c: c.job_id.id != emp_job_id) or candidates
+            matched = candidates.filtered(lambda c: self._get_employee_job(c).id != emp_job_id) or candidates
 
         # Include employee's coach as eligible candidate for subordinate assessment (assessing coach from employee perspective)
         if emp_coach and emp_coach.id != emp.id:
@@ -949,7 +979,7 @@ class CompetencyAssessment(models.Model):
         allowed_pillars = config.get_allowed_pillars_for_type(self.assessment_type or 'self')
 
         employee = self.employee_id
-        job_pos = employee.job_id or getattr(employee, 'job_position', False)
+        job_pos = self._get_employee_job(employee)
         mapping = False
         if job_pos:
             emp_ou = getattr(employee, 'default_operating_unit_id', False) or getattr(employee.department_id, 'operating_unit_id', False)
@@ -1435,8 +1465,17 @@ class CompetencyAssessmentLine(models.Model):
     employee_id = fields.Many2one(related='assessment_id.employee_id', string='Employee', store=True, readonly=True, index=True)
     department_id = fields.Many2one(related='assessment_id.department_id', string='Department', store=True, readonly=True, index=True)
     operating_unit_id = fields.Many2one(related='assessment_id.employee_id.default_operating_unit_id', string='Operating Unit', store=True, readonly=True, index=True)
-    job_id = fields.Many2one(related='assessment_id.job_id', string='Job Position', store=True, readonly=True, index=True)
-    grade_id = fields.Many2one(related='assessment_id.employee_id.grade_id', string='Job Grade', store=True, readonly=True, index=True)
+    job_id = fields.Many2one('hr.job', string='Job Position', compute='_compute_job_and_grade_id', store=True, readonly=True, index=True)
+    grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_job_and_grade_id', store=True, readonly=True, index=True)
+
+    @api.depends('assessment_id.job_id', 'assessment_id.grade_id', 'assessment_id.employee_id')
+    def _compute_job_and_grade_id(self):
+        asm_model = self.env['competency.assessment']
+        for line in self:
+            emp = line.assessment_id.employee_id if line.assessment_id else False
+            line.job_id = (line.assessment_id.job_id if line.assessment_id and line.assessment_id.job_id else asm_model._get_employee_job(emp)) if emp else False
+            line.grade_id = (line.assessment_id.grade_id if line.assessment_id and line.assessment_id.grade_id else asm_model._resolve_employee_grade(emp)) if emp else False
+
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
     is_deadline_passed = fields.Boolean(related='assessment_id.is_deadline_passed', string='Deadline Passed', readonly=True)
 

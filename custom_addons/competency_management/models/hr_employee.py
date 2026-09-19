@@ -46,7 +46,7 @@ class HrEmployeeCompetency(models.Model):
     def _compute_latest_competency_assessment(self):
         for emp in self:
             assessments = emp.competency_assessment_ids.filtered(
-                lambda a: a.state in ('approved', 'completed', 'locked')
+                lambda a: a.state in ('approved', 'locked')
             ).sorted(key=lambda a: (a.create_date or fields.Datetime.now(), a.id), reverse=True)
             if not assessments:
                 # Fallback to any assessment if none approved
@@ -84,6 +84,7 @@ class HrEmployeeCompetency(models.Model):
                 'assessment_id': False,
                 'evaluation_date': False,
                 'overall_score': 0.0,
+                'average_gap': 0.0,
                 'cycle_name': False,
                 'state': False,
                 'lines': [],
@@ -91,13 +92,14 @@ class HrEmployeeCompetency(models.Model):
 
         line_data = []
         for line in getattr(latest, 'line_ids', []):
+            comp = line.competency_id
             line_data.append({
-                'competency_id': line.competency_id.id if line.competency_id else False,
-                'competency_name': line.competency_id.name if line.competency_id else '',
-                'required_level_id': line.required_level_id.id if getattr(line, 'required_level_id', False) else False,
-                'required_level_name': line.required_level_id.name if getattr(line, 'required_level_id', False) else '',
-                'achieved_level_id': line.achieved_level_id.id if getattr(line, 'achieved_level_id', False) else False,
-                'achieved_level_name': line.achieved_level_id.name if getattr(line, 'achieved_level_id', False) else '',
+                'competency_id': comp.id if comp else False,
+                'competency_name': comp.name if comp else '',
+                'pillar': comp.pillar if comp else '',
+                'required_level': line.required_level or '1',
+                'current_level': line.current_level or '0',
+                'weighted_current_level': line.weighted_current_level or 0.0,
                 'gap': getattr(line, 'gap', 0.0) or 0.0,
             })
 
@@ -106,8 +108,9 @@ class HrEmployeeCompetency(models.Model):
             'employee_name': self.name,
             'has_assessment': True,
             'assessment_id': latest.id,
-            'evaluation_date': latest.evaluation_date or False,
-            'overall_score': getattr(latest, 'overall_score', 0.0) or 0.0,
+            'evaluation_date': fields.Date.to_date(latest.create_date) if latest.create_date else False,
+            'overall_score': getattr(latest, 'average_gap', 0.0) or 0.0,
+            'average_gap': getattr(latest, 'average_gap', 0.0) or 0.0,
             'cycle_name': latest.cycle_id.name if getattr(latest, 'cycle_id', False) else '',
             'state': latest.state or '',
             'lines': line_data,

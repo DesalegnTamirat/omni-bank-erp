@@ -55,14 +55,15 @@ class HrJobCompetency(models.Model):
                     continue
                 lvl_val = line.required_proficiency or '2'
                 selection_dict = dict(line._fields['required_proficiency'].selection) if 'required_proficiency' in line._fields else {}
+                cluster = self.env['competency.cluster'].search([('competency_ids', 'in', [comp.id])], limit=1)
                 result.append({
                     'mapping_id': m.id,
                     'line_id': line.id,
                     'competency_id': comp.id,
                     'competency_name': comp.name or '',
                     'competency_code': getattr(comp, 'code', '') or '',
-                    'cluster_id': comp.cluster_id.id if comp.cluster_id else False,
-                    'cluster_name': comp.cluster_id.name if comp.cluster_id else '',
+                    'cluster_id': cluster.id if cluster else False,
+                    'cluster_name': cluster.name if cluster else '',
                     'pillar': comp.pillar or '',
                     'required_proficiency': lvl_val,
                     'required_level_name': selection_dict.get(lvl_val, f"Level {lvl_val}"),

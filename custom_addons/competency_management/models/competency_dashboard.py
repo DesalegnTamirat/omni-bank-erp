@@ -264,7 +264,6 @@ class CompetencyDashboard(models.TransientModel):
         if user_ou_ids:
             ou_emp_domain = [
                 '|', ('default_operating_unit_id', 'in', user_ou_ids),
-                '|', ('operating_unit_id', 'in', user_ou_ids),
                 ('department_id.operating_unit_id', 'in', user_ou_ids)
             ]
             ou_employees = self.env['hr.employee'].sudo().search(ou_emp_domain)
@@ -305,7 +304,6 @@ class CompetencyDashboard(models.TransientModel):
                 ('active', '=', True),
                 ('parent_id', '=', False),
                 '|', ('default_operating_unit_id', 'in', user_ou_ids),
-                '|', ('operating_unit_id', 'in', user_ou_ids),
                 ('department_id.operating_unit_id', 'in', user_ou_ids)
             ]
         else:
