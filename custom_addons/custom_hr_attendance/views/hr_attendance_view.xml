@@ -46,7 +46,7 @@
                 <field name="check_in_status" widget="badge" 
                        decoration-success="check_in_status in ('Normal', 'On-Time', 'On Time', 'Acknowledged Check-In')" 
                        decoration-warning="check_in_status == 'Late'" 
-                       decoration-danger="check_in_status in ('Technical Failure', 'Window Closed (Missed)')" 
+                       decoration-danger="check_in_status in ('Very Late', 'Technical Failure', 'Window Closed (Missed)')" 
                        readonly="1"/>
                 <field name="late_time_hour" widget="float_time" invisible="late_time_hour &lt;= 0" readonly="1"/>
                 <field name="in_mode" widget="badge" readonly="1"/>

@@ -193,6 +193,26 @@ class HrAttendance(models.Model):
             else:
                 rec.lunch_break_hours = 0.0
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        # Fast-path tracking suppression context unless mail tracking is explicitly enabled
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_create_nosubscribe=True,
+                mail_create_nolog=True,
+                mail_notrack=True
+            )
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.context.get('enable_mail_tracking'):
+            self = self.with_context(
+                tracking_disable=True,
+                mail_notrack=True
+            )
+        return super().write(vals)
+
     @api.depends('check_in', 'check_out', 'lunch_break_hours')
     def _compute_worked_hours(self):
         """
@@ -201,14 +221,14 @@ class HrAttendance(models.Model):
         - Effective Check-Out = MIN(check_out, shift_end_time) (Late check-out or force checkout after shift end is excluded).
         - Worked Hours = MAX(0.0, Effective Check-Out - Effective Check-In - lunch_break_hours).
         """
-        params = self.env['ir.config_parameter'].sudo()
-        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
-        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
-        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
-        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
-        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+        cfg = self.env['hr.employee']._get_attendance_config_params()
+        default_morning_time = cfg.get('morning_time', 8.0)
+        default_exit_time = cfg.get('exit_time', 17.0)
+        enable_saturday = cfg.get('enable_saturday_halfday', True)
+        enable_district_saturday = cfg.get('saturday_halfday_district', True)
+        saturday_exit_time = cfg.get('saturday_exit_time', 12.0)
+        enable_lunch = cfg.get('enable_lunch_break', False)
+        default_lunch_duration = cfg.get('lunch_duration', 1.0) if enable_lunch else 0.0
 
         for rec in self:
             if not rec.check_in or not rec.check_out:
@@ -296,14 +316,14 @@ class HrAttendance(models.Model):
         """
         Expected Hours = Total Scheduled Shift Duration (Shift End - Shift Start - Lunch Duration)
         """
-        params = self.env['ir.config_parameter'].sudo()
-        default_morning_time = float(params.get_param('hr_attendance.morning_time', 8.0))
-        default_exit_time = float(params.get_param('hr_attendance.exit_time', 17.0))
-        enable_saturday = params.get_param('hr_attendance.enable_saturday_halfday', 'True').lower() in ('true', '1')
-        enable_district_saturday = params.get_param('hr_attendance.saturday_halfday_district', 'True').lower() in ('true', '1')
-        saturday_exit_time = float(params.get_param('hr_attendance.saturday_exit_time', 12.0))
-        enable_lunch = params.get_param('hr_attendance.enable_lunch_break', 'False').lower() in ('true', '1')
-        default_lunch_duration = float(params.get_param('hr_attendance.lunch_duration', 1.0)) if enable_lunch else 0.0
+        cfg = self.env['hr.employee']._get_attendance_config_params()
+        default_morning_time = cfg.get('morning_time', 8.0)
+        default_exit_time = cfg.get('exit_time', 17.0)
+        enable_saturday = cfg.get('enable_saturday_halfday', True)
+        enable_district_saturday = cfg.get('saturday_halfday_district', True)
+        saturday_exit_time = cfg.get('saturday_exit_time', 12.0)
+        enable_lunch = cfg.get('enable_lunch_break', False)
+        default_lunch_duration = cfg.get('lunch_duration', 1.0) if enable_lunch else 0.0
 
         for rec in self:
             emp = rec.employee_id

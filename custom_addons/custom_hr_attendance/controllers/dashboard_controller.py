@@ -89,9 +89,9 @@ class AttendanceDashboardController(http.Controller):
             sql = """
                 SELECT 
                     COUNT(CASE WHEN check_in_status IN ('Normal', 'On-Time', 'On Time') OR check_in_status IS NULL THEN 1 END) AS present_cnt,
-                    COUNT(CASE WHEN check_in_status = 'Late' THEN 1 END) AS late_cnt,
+                    COUNT(CASE WHEN check_in_status IN ('Late', 'Very Late') THEN 1 END) AS late_cnt,
                     COUNT(CASE WHEN check_in_status LIKE '%%Rest%%' THEN 1 END) AS leave_cnt,
-                    COALESCE(SUM(CASE WHEN check_in_status = 'Late' THEN late_time_hour ELSE 0 END), 0.0) AS late_hours
+                    COALESCE(SUM(CASE WHEN check_in_status IN ('Late', 'Very Late') THEN late_time_hour ELSE 0 END), 0.0) AS late_hours
                 FROM hr_attendance
                 WHERE check_in >= %s AND check_in <= %s
             """
@@ -122,7 +122,7 @@ class AttendanceDashboardController(http.Controller):
         late_attendances = request.env['hr.attendance'].sudo().search([
             ('check_in', '>=', range_start),
             ('check_in', '<=', range_end),
-            ('check_in_status', '=', 'Late')
+            ('check_in_status', 'in', ['Late', 'Very Late'])
         ])
 
         emp_late_map = {}
@@ -289,8 +289,8 @@ class AttendanceDashboardController(http.Controller):
             ], order='check_in desc')
 
             latest_att = atts[0] if atts else False
-            late_cnt = sum(1 for a in atts if a.check_in_status == 'Late')
-            late_hours = sum(a.late_time_hour or 0.0 for a in atts if a.check_in_status == 'Late')
+            late_cnt = sum(1 for a in atts if a.check_in_status in ('Late', 'Very Late'))
+            late_hours = sum(a.late_time_hour or 0.0 for a in atts if a.check_in_status in ('Late', 'Very Late'))
 
             check_in_str = '-'
             st_label = 'Absent / Missing'
@@ -299,8 +299,8 @@ class AttendanceDashboardController(http.Controller):
             if latest_att:
                 dt_in = pytz.utc.localize(latest_att.check_in).astimezone(local_tz)
                 check_in_str = dt_in.strftime('%b %d, %I:%M %p')
-                if latest_att.check_in_status == 'Late':
-                    st_label = f"Late ({self._format_float_hours(latest_att.late_time_hour or 0.0)})"
+                if latest_att.check_in_status in ('Late', 'Very Late'):
+                    st_label = f"{latest_att.check_in_status} ({self._format_float_hours(latest_att.late_time_hour or 0.0)})"
                     badge_class = 'bg-warning text-dark'
                 elif 'Rest' in (latest_att.check_in_status or ''):
                     st_label = latest_att.check_in_status
@@ -350,7 +350,7 @@ class AttendanceDashboardController(http.Controller):
 
         # Card 2: Cumulative Late Hours & Punctuality Rating Pill
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
-        period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
+        period_late_count = sum(1 for att in range_atts if att.check_in_status in ('Late', 'Very Late'))
         period_leave_count = sum(1 for att in range_atts if 'Rest' in (att.check_in_status or ''))
         period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
 

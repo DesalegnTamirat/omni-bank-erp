@@ -445,7 +445,7 @@ class HrAttendanceDashboardService(models.Model):
             cr.execute("""
                 SELECT
                     COUNT(DISTINCT employee_id),
-                    COUNT(DISTINCT employee_id) FILTER (WHERE check_in_status = 'Late')
+                    COUNT(DISTINCT employee_id) FILTER (WHERE check_in_status IN ('Late', 'Very Late'))
                 FROM hr_attendance
                 WHERE check_in >= %s AND check_in <= %s
                   AND employee_id = ANY(%s)
@@ -454,7 +454,7 @@ class HrAttendanceDashboardService(models.Model):
             cr.execute("""
                 SELECT
                     COUNT(DISTINCT employee_id),
-                    COUNT(DISTINCT employee_id) FILTER (WHERE check_in_status = 'Late')
+                    COUNT(DISTINCT employee_id) FILTER (WHERE check_in_status IN ('Late', 'Very Late'))
                 FROM hr_attendance
                 WHERE check_in >= %s AND check_in <= %s
             """, (start_utc, end_utc))
@@ -701,7 +701,7 @@ class HrAttendanceDashboardService(models.Model):
 
         # Card 2: Cumulative Late Hours & Punctuality Rating
         period_late_hours_float = sum(att.late_time_hour or 0.0 for att in range_atts)
-        period_late_count = sum(1 for att in range_atts if att.check_in_status == 'Late')
+        period_late_count = sum(1 for att in range_atts if att.check_in_status in ('Late', 'Very Late'))
         period_normal_count = sum(1 for att in range_atts if (att.check_in_status in ('Normal', 'On-Time', 'On Time') or not att.check_in_status))
         total_sessions = len(range_atts)
         punctuality_score = round(((total_sessions - period_late_count) / max(1, total_sessions)) * 100, 1) if total_sessions > 0 else 100.0

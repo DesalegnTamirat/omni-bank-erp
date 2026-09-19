@@ -28,6 +28,7 @@ from . import attendance_payroll_payload
 # Rolling violation counters
 from . import hr_employee_discipline_profile
 from . import hr_employee_counters
+from . import discipline_case_attendance
 # ERP access gate: session-cached check-in enforcement (feature-flagged, OFF by default)
 from . import ir_http
 from . import hr_attendance_notification_log

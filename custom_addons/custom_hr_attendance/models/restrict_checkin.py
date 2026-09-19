@@ -510,7 +510,7 @@ class HrEmployeePrivate(models.Model):
 
             if current_float < lunch_midpoint:
                 # Morning Session
-                if current_float >= morning_e:
+                if current_float >= morning_e and enable_checkin_restriction and not is_manager:
                     raise UserError(_(
                         "Check-in is not allowed during lunch break.\n\n"
                         "Morning shift ended at %s. Afternoon check-in opens at %s."
@@ -527,31 +527,39 @@ class HrEmployeePrivate(models.Model):
                 ) % (_fmt(morning_s), _fmt(morning_e), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
             else:
                 # Afternoon Session
+                if current_float < afternoon_buffer_start and enable_checkin_restriction and not is_manager:
+                    raise UserError(_(
+                        "Check-in is not allowed during lunch break.\n\n"
+                        "You are too early for the Afternoon shift (%s - %s).\n"
+                        "Check-in window opens at %s (15 min buffer)."
+                    ) % (_fmt(afternoon_s), _fmt(afternoon_e), _fmt(afternoon_buffer_start)))
+
                 if current_float >= afternoon_buffer_start or not enable_checkin_restriction or is_manager:
                     _logger.info("Using Afternoon Shift Session: %.2f - %.2f", afternoon_s, afternoon_e)
                     return afternoon_s, afternoon_e
                 raise UserError(_(
-                    "Check-in is not allowed during lunch break.\n\n"
-                    "You are too early for the Afternoon shift (%s - %s).\n"
-                    "Check-in window opens at %s (15 min buffer)."
-                ) % (_fmt(afternoon_s), _fmt(afternoon_e), _fmt(afternoon_buffer_start)))
+                    "Check-in is not allowed yet.\n\n"
+                    "You are too early for the Afternoon shift (%s - %s)."
+                ) % (_fmt(afternoon_s), _fmt(afternoon_e)))
         else:
             # Single Continuous Shift (e.g. Saturday Half Day, regular continuous shift, location shift)
             if sched['is_night_shift']:
                 earliest_checkin = sched['shift_start'] - checkin_buffer
                 if current_float >= sched['shift_end'] and current_float < earliest_checkin:
-                    raise UserError(_(
-                        "Check-in is not allowed.\n\n"
-                        "Your scheduled shift ended at %s."
-                    ) % _fmt(sched['shift_end']))
+                    if enable_checkin_restriction and not is_manager:
+                        raise UserError(_(
+                            "Check-in is not allowed.\n\n"
+                            "Your scheduled shift ended at %s."
+                        ) % _fmt(sched['shift_end']))
                 if current_float >= earliest_checkin or current_float <= sched['shift_end'] or not enable_checkin_restriction or is_manager:
                     return sched['shift_start'], sched['shift_end']
             else:
                 if current_float >= sched['shift_end']:
-                    raise UserError(_(
-                        "Check-in is not allowed.\n\n"
-                        "Your scheduled shift ended at %s."
-                    ) % _fmt(sched['shift_end']))
+                    if enable_checkin_restriction and not is_manager:
+                        raise UserError(_(
+                            "Check-in is not allowed.\n\n"
+                            "Your scheduled shift ended at %s."
+                        ) % _fmt(sched['shift_end']))
 
                 earliest_checkin = sched['shift_start'] - checkin_buffer
                 if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
@@ -584,8 +592,8 @@ class HrEmployeePrivate(models.Model):
         late_cutoff = shift_start + grace + dead_time
 
         _logger.debug(
-            "EVALUATING CHECKIN | Employee: %s | Current: %.4f | ShiftStart: %.4f | Grace: %.4f | DeadTime: %.4f | NormalCutoff: %.4f | LateCutoff: %.4f | Pass: %s",
-            self.name, current_float, shift_start, grace, dead_time, normal_cutoff, late_cutoff, current_float <= late_cutoff or allow_late
+            "EVALUATING CHECKIN | Employee: %s | Current: %.4f | ShiftStart: %.4f | Grace: %.4f | DeadTime: %.4f | NormalCutoff: %.4f | LateCutoff: %.4f",
+            self.name, current_float, shift_start, grace, dead_time, normal_cutoff, late_cutoff
         )
 
         if predefined_late and current_float <= predefined_late.end_time:
@@ -594,12 +602,22 @@ class HrEmployeePrivate(models.Model):
         elif current_float <= normal_cutoff:
             status = 'Normal'
             late_time = 0.0
-        elif current_float <= late_cutoff or allow_late:
+        elif current_float <= late_cutoff:
             status = 'Late'
             late_time = max(0.0, round(current_float - shift_start, 4))
         else:
-            _logger.warning("Check-in rejected for %s: Current (%.4f) > Cutoff (%.4f)", self.name, current_float, late_cutoff)
-            raise UserError(_("Check-in is not allowed. You are past the allowed late threshold."))
+            # Past dead-time cutoff
+            enable_checkin_restriction = self.env['ir.config_parameter'].sudo().get_param(
+                'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
+            if enable_checkin_restriction and not is_manager and not allow_late:
+                raise UserError(_(
+                    "Check-in is not allowed.\n\n"
+                    "Late arrival cutoff was %s (Dead time: %d min).\n"
+                    "Please contact your manager for manual attendance registration."
+                ) % (_fmt(late_cutoff), int(round(dead_time * 60))))
+            status = 'Very Late'
+            late_time = max(0.0, round(current_float - shift_start, 4))
+            _logger.info("Check-in marked Very Late for %s: Current (%.4f) > Cutoff (%.4f)", self.name, current_float, late_cutoff)
 
         return status, late_time, 0.0, pre_defined_lateness_hours
 
@@ -702,6 +720,13 @@ class HrEmployeePrivate(models.Model):
         enable_checkout_restriction = self.env['ir.config_parameter'].sudo().get_param(
             'hr_attendance.enable_checkout_restriction', 'True').lower() in ('true', '1')
 
+        is_manager = (
+            self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or 
+            self.env.user.has_group('hr_attendance.group_hr_attendance_user') or 
+            self.env.is_superuser() or
+            (self.user_id and self.user_id.id == self.env.uid and (self.user_id.has_group('hr_attendance.group_hr_attendance_manager') or self.user_id.has_group('hr_attendance.group_hr_attendance_user')))
+        )
+
         # ----------------------------------------------------
         # SCENARIO 1: EMPLOYEE HAS AN OPEN ATTENDANCE RECORD
         # ----------------------------------------------------
@@ -711,8 +736,7 @@ class HrEmployeePrivate(models.Model):
             # Check if this open attendance is a Morning Session of a lunch-split shift
             is_morning_session = sched['has_lunch'] and (
                 (attendance.shift_end_float and attendance.shift_end_float <= (sched['lunch_start'] + 0.1)) or
-                (attendance.check_in and fields.Datetime.context_timestamp(self, attendance.check_in).hour < int(sched['lunch_start'])) or
-                (current_float < sched['lunch_end'])
+                (attendance.check_in and fields.Datetime.context_timestamp(self, attendance.check_in).hour < int(sched['lunch_start']))
             )
             if is_morning_session:
                 lunch_start = sched['lunch_start']
@@ -722,7 +746,7 @@ class HrEmployeePrivate(models.Model):
 
                 if current_float < (lunch_start - 0.05):
                     # Trying to check out BEFORE lunch starts (e.g. 11:30 AM before 12:00 PM)
-                    if enable_checkout_restriction:
+                    if enable_checkout_restriction and not is_manager and not predefined_early_exit:
                         raise UserError(_(
                             "Check-out is not allowed yet.\n\n"
                             "You cannot check out before your scheduled lunch time (%s)."
@@ -779,8 +803,9 @@ class HrEmployeePrivate(models.Model):
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
                         new_att = fast_att_env.create(vals)
+                        new_att._enqueue_attendance_side_effects()
                         return new_att
-                    elif current_float <= afternoon_late_cutoff or not enable_checkin_restriction:
+                    elif current_float <= afternoon_late_cutoff:
                         # Late Afternoon Check-in (Zero Grace)
                         late_hrs = max(0.0, round(current_float - afternoon_start, 4))
                         vals = {
@@ -796,27 +821,38 @@ class HrEmployeePrivate(models.Model):
                         if geo_information:
                             vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
                         new_att = fast_att_env.create(vals)
+                        new_att._enqueue_attendance_side_effects()
                         return new_att
                     else:
-                        # Past Afternoon Cutoff:
-                        # Morning session was force-closed at lunch_start.
-                        _logger.warning("Morning session Force Checkout committed for %s. Afternoon entry blocked (past cutoff %s).", self.name, _fmt(afternoon_late_cutoff))
-                        return attendance
+                        # Very Late Afternoon Check-in (Zero Grace)
+                        late_hrs = max(0.0, round(current_float - afternoon_start, 4))
+                        vals = {
+                            'employee_id': self.id,
+                            'check_in': utc_naive_dt,
+                            'actual_check_in': utc_naive_dt,
+                            'in_mode': self.env.context.get('attendance_mode', 'kiosk'),
+                            'check_in_status': 'Very Late',
+                            'late_time_hour': late_hrs,
+                            'shift_start_float': afternoon_start,
+                            'shift_end_float': sched['shift_end'],
+                        }
+                        if geo_information:
+                            vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
+                        new_att = fast_att_env.create(vals)
+                        new_att._enqueue_attendance_side_effects()
+                        return new_att
 
             # Regular Shift-End Check-Out (Afternoon or Full-Day / Saturday)
             # Use dynamic schedule shift_end to immediately reflect updated settings or Saturday half-day
             target_shift_end = sched['shift_end'] if (not sched.get('has_lunch') or not attendance.shift_end_float) else attendance.shift_end_float
             target_shift_end_utc = self._float_to_utc_datetime(target_shift_end, local_dt)
 
-            if enable_checkout_restriction and current_float < (target_shift_end - 0.05):
-                if predefined_early_exit:
-                    pass
-                else:
-                    raise UserError(_(
-                        "Check-out is not allowed yet.\n\n"
-                        "Your scheduled shift ends at %s.\n"
-                        "You cannot check out before shift end."
-                    ) % _fmt(target_shift_end))
+            if enable_checkout_restriction and not is_manager and not predefined_early_exit and current_float < (target_shift_end - 0.05):
+                raise UserError(_(
+                    "Check-out is not allowed yet.\n\n"
+                    "Your scheduled shift ends at %s.\n"
+                    "You cannot check out before shift end."
+                ) % _fmt(target_shift_end))
 
             out_status = 'Normal'
             if current_float < (target_shift_end - 0.05):
@@ -834,30 +870,18 @@ class HrEmployeePrivate(models.Model):
         # ----------------------------------------------------
         else:
             shift_start, shift_end = self._select_applicable_shift(
-                current_float, morning_start, exit_time, target_date=today_date
+                current_float, morning_start, exit_time, target_date=today_date, is_manager=is_manager
             )
             shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
             shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt)
 
-            is_manager = (
-                self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or 
-                self.env.user.has_group('hr_attendance.group_hr_attendance_user') or 
-                self.env.is_superuser() or
-                (self.user_id and self.user_id.id == self.env.uid and (self.user_id.has_group('hr_attendance.group_hr_attendance_manager') or self.user_id.has_group('hr_attendance.group_hr_attendance_user')))
-            )
-
             is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= sched['lunch_midpoint'])
 
-            if enable_checkin_restriction:
-                status, late_time, ot, pre_late = self._evaluate_checkin_status(
-                    current_float, shift_start, dead_time, predefined_late, is_manager=is_manager, is_afternoon=is_afternoon_checkin
-                )
-                checkin_dt = utc_naive_dt if status in ('Late', 'Pre-Defined Lateness') else shift_start_utc
-            else:
-                status, late_time, ot, pre_late = self._evaluate_checkin_status(
-                    current_float, shift_start, dead_time, predefined_late, is_manager=is_manager, allow_late=True, is_afternoon=is_afternoon_checkin
-                )
-                checkin_dt = utc_naive_dt if status in ('Late', 'Pre-Defined Lateness') else shift_start_utc
+            status, late_time, ot, pre_late = self._evaluate_checkin_status(
+                current_float, shift_start, dead_time, predefined_late,
+                is_manager=is_manager, allow_late=not enable_checkin_restriction, is_afternoon=is_afternoon_checkin
+            )
+            checkin_dt = utc_naive_dt if status in ('Late', 'Very Late', 'Pre-Defined Lateness') else shift_start_utc
 
             in_mode_val = 'predefined' if pre_late > 0 else self.env.context.get('attendance_mode', 'kiosk')
             vals = {

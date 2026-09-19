@@ -458,7 +458,7 @@
                                         <td t-esc="log.check_out"/>
                                         <td t-esc="log.worked_hours"/>
                                         <td>
-                                            <span t-attf-class="badge #{log.check_in_status === 'Late' ? 'bg-warning text-dark' : 'bg-success'}" t-esc="log.check_in_status"/>
+                                            <span t-attf-class="badge #{log.check_in_status === 'Late' || log.check_in_status === 'Very Late' ? 'bg-warning text-dark' : 'bg-success'}" t-esc="log.check_in_status"/>
                                         </td>
                                     </tr>
                                 </tbody>

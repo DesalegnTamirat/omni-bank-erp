@@ -54,11 +54,11 @@ class HrAttendanceNotificationLog(models.Model):
             reference_date = fields.Date.context_today(self)
         try:
             with self.env.cr.savepoint():
-                self.create({
+                self.sudo().create({
                     'employee_id': employee_id,
                     'notif_type': notif_type,
                     'reference_date': reference_date,
                 })
             return True
-        except Exception:
+        except Exception as e:
             return False
