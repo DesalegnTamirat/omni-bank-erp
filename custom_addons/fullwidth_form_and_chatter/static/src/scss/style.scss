@@ -1,0 +1,1 @@
+.o_form_renderer:has(.o_form_sheet_bg):has(.o-mail-ChatterContainer) { display: block !important; .o_form_sheet_bg { min-width: 100%; } .o-mail-ChatterContainer, .o-mail-Form-chatter { &.o-aside { width: 100%; padding: map-get($spacers, 2); } } }

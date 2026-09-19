@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from odoo import api, fields, models, _
+from odoo import api, fields, models, tools, _
 from odoo.exceptions import ValidationError
 
 from .planing_categories import WORK_UNIT_TYPES
@@ -561,17 +561,20 @@ class PbmsPlanningConfig(models.Model):
 
         return list(cats)
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        records = super().create(vals_list)
-        records._sync_committee_and_ceo_roles()
-        return records
 
-    def write(self, vals):
-        res = super().write(vals)
-        if "budget_hiring_committee_user_ids" in vals or "ceo_user_id" in vals:
-            self._sync_committee_and_ceo_roles()
-        return res
+    def action_save(self):
+        """Explicit save action for Planning Configuration."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Configuration Saved"),
+                "message": _("Planning configuration has been saved successfully."),
+                "type": "success",
+                "sticky": False,
+            },
+        }
 
     def _sync_committee_and_ceo_roles(self):
         grp_comm = self.env.ref("bunna_pbms.group_pbms_budget_hiring_committee", raise_if_not_found=False)
@@ -742,42 +745,59 @@ class PbmsPlanningConfig(models.Model):
                     vals["fx_source_type_ids"] = [(6, 0, self._default_fx_source_types())]
                 new_rec = super(PbmsPlanningConfig, self).create([vals])
                 created_records |= new_rec
+        created_records._sync_reviewer_groups()
+        created_records._sync_committee_and_ceo_roles()
+        self.env.registry.clear_cache()
         return created_records
 
-    @api.model
-    def get_config_for_unit(self, org_unit):
-        """Retrieve planning configuration for a specific operating unit or fallback to its work unit type."""
-        if not org_unit:
-            return False
-        ou_id = org_unit.id if isinstance(org_unit, models.Model) else org_unit
-        ou_rec = self.env["operating.unit"].browse(ou_id) if isinstance(ou_id, int) else org_unit
+    def _sync_reviewer_groups(self):
+        ho_group = self.env.ref("bunna_pbms.group_pbms_ho_reviewer", raise_if_not_found=False)
+        branch_group = self.env.ref("bunna_pbms.group_pbms_branch_user", raise_if_not_found=False)
+        if not ho_group:
+            return
+        all_rev_users = self.mapped("expense_reviewer_user_ids") | self.mapped("fixed_asset_reviewer_user_ids") | self.mapped("manpower_reviewer_user_ids")
+        for u in all_rev_users:
+            if not u.has_group("bunna_pbms.group_pbms_ho_reviewer"):
+                u.sudo().write({"group_ids": [(4, ho_group.id)]})
+            if branch_group and not u.has_group("bunna_pbms.group_pbms_branch_user"):
+                u.sudo().write({"group_ids": [(4, branch_group.id)]})
+
+    def write(self, vals):
+        self.env.registry.clear_cache()
+        res = super(PbmsPlanningConfig, self).write(vals)
+        reviewer_keys = {"expense_reviewer_user_ids", "fixed_asset_reviewer_user_ids", "manpower_reviewer_user_ids"}
+        if reviewer_keys & set(vals.keys()):
+            self._sync_reviewer_groups()
+        if "budget_hiring_committee_user_ids" in vals or "ceo_user_id" in vals:
+            self._sync_committee_and_ceo_roles()
+        return res
+
+    def unlink(self):
+        self.env.registry.clear_cache()
+        return super(PbmsPlanningConfig, self).unlink()
+
+    @tools.ormcache("ou_id")
+    def _get_config_id_for_unit(self, ou_id):
+        ou_rec = self.env["operating.unit"].browse(ou_id)
         if not ou_rec or not ou_rec.exists():
             return False
-
-        # 1. Specific operating unit override
         config = self.search([
             ("config_type", "=", "operating_unit"),
             ("org_unit_id", "=", ou_rec.id),
         ], limit=1)
         if config:
-            return config
-
-        # 2. Work unit type default
+            return config.id
         if ou_rec.work_unit_type:
-            return self.get_config_for_type(ou_rec.work_unit_type)
+            return self._get_config_id_for_type(ou_rec.work_unit_type)
         return False
 
-    @api.model
-    def get_config_for_type(self, work_unit_type):
-        """Retrieve or create default planning configuration for a work unit type."""
-        if not work_unit_type:
-            return False
+    @tools.ormcache("work_unit_type")
+    def _get_config_id_for_type(self, work_unit_type):
         config = self.search([
             ("config_type", "=", "work_unit_type"),
             ("work_unit_type", "=", work_unit_type),
         ], limit=1)
         if not config:
-            # Check without config_type filter for backward compatibility
             config = self.search([
                 ("work_unit_type", "=", work_unit_type),
                 ("org_unit_id", "=", False),
@@ -787,7 +807,24 @@ class PbmsPlanningConfig(models.Model):
                 "config_type": "work_unit_type",
                 "work_unit_type": work_unit_type,
             })
-        return config
+        return config.id if config else False
+
+    @api.model
+    def get_config_for_unit(self, org_unit):
+        """Retrieve planning configuration for a specific operating unit or fallback to its work unit type."""
+        if not org_unit:
+            return False
+        ou_id = org_unit.id if isinstance(org_unit, models.Model) else org_unit
+        cfg_id = self._get_config_id_for_unit(ou_id)
+        return self.browse(cfg_id) if cfg_id else False
+
+    @api.model
+    def get_config_for_type(self, work_unit_type):
+        """Retrieve or create default planning configuration for a work unit type."""
+        if not work_unit_type:
+            return False
+        cfg_id = self._get_config_id_for_type(work_unit_type)
+        return self.browse(cfg_id) if cfg_id else False
 
     @api.model
     def is_category_enabled(self, category, org_unit):
@@ -801,7 +838,6 @@ class PbmsPlanningConfig(models.Model):
         if not ou_rec or not ou_rec.exists():
             return True
 
-        # Toggle field name map
         toggle_map = {
             "deposit": "enable_deposit",
             "customer_base": "enable_customer_base",
@@ -814,29 +850,18 @@ class PbmsPlanningConfig(models.Model):
         }
         toggle_field = toggle_map.get(category, f"enable_{category}")
 
-        # Check if there is an OU specific config
-        specific_config = self.search([
-            ("config_type", "=", "operating_unit"),
-            ("org_unit_id", "=", ou_rec.id),
-        ], limit=1)
-        if specific_config:
-            return bool(getattr(specific_config, toggle_field, True))
-
-        # Check work unit type default config
-        if not ou_rec.work_unit_type:
-            return True
-        type_config = self.get_config_for_type(ou_rec.work_unit_type)
-        if not type_config:
+        config = self.get_config_for_unit(ou_rec)
+        if not config:
             return True
 
-        if not getattr(type_config, toggle_field, True):
+        if not getattr(config, toggle_field, True):
             return False
 
         # Check if this operating unit is explicitly excluded for this category
         cat_key = "expense" if category == "general_expense" else category
         excluded_field = f"{cat_key}_excluded_org_unit_ids"
-        if hasattr(type_config, excluded_field):
-            excluded_units = getattr(type_config, excluded_field)
+        if hasattr(config, excluded_field):
+            excluded_units = getattr(config, excluded_field)
             if ou_rec.id in excluded_units.ids:
                 return False
 
@@ -1015,6 +1040,7 @@ class PbmsPlanningWorkspace(models.Model):
         "pbms.planning.cycle",
         string="Planning Cycle",
         required=True,
+        ondelete="cascade",
         default=lambda self: self._default_cycle(),
     )
     org_unit_id = fields.Many2one(
@@ -1047,8 +1073,6 @@ class PbmsPlanningWorkspace(models.Model):
     @api.model
     def _default_cycle(self):
         cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
-        if not cycle:
-            cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
         return cycle.id if cycle else False
 
     @api.model
@@ -1075,18 +1099,16 @@ class PbmsPlanningWorkspace(models.Model):
     @api.model
     def _find_workspace(self):
         """Reuse the workspace of the current cycle + work unit if present."""
-        domain = []
         cycle_id = self._default_cycle()
+        if not cycle_id:
+            return False
+        domain = [("cycle_id", "=", cycle_id)]
         org_unit_id = self._default_org_unit()
-        if cycle_id:
-            domain.append(("cycle_id", "=", cycle_id))
         if org_unit_id:
             domain.append(("org_unit_id", "=", org_unit_id))
         workspace = self.search(domain, limit=1)
         if not workspace:
-            vals = {}
-            if cycle_id:
-                vals["cycle_id"] = cycle_id
+            vals = {"cycle_id": cycle_id}
             if org_unit_id:
                 vals["org_unit_id"] = org_unit_id
             workspace = self.create(vals)
@@ -1096,6 +1118,19 @@ class PbmsPlanningWorkspace(models.Model):
     def action_get_user_workspace(self):
         """Action launched from the Planning menu to open the user's tabbed workspace."""
         workspace = self._find_workspace()
+        if not workspace:
+            pending_cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
+            state_label = dict(pending_cycle._fields['state'].selection).get(pending_cycle.state, pending_cycle.state) if pending_cycle else ""
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Planning Cycle Not Open'),
+                    'message': _("Planning cycle '%s' is currently '%s' and is not open for unit input.") % (pending_cycle.name if pending_cycle else "", state_label),
+                    'type': 'warning',
+                    'sticky': True,
+                }
+            }
         return {
             "type": "ir.actions.act_window",
             "name": _("Planning Workspace"),

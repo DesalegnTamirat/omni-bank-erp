@@ -61,12 +61,53 @@ class AssessmentWeightProfile(models.Model):
         for vals in vals_list:
             if vals.get("notes") and "BR-AMS" in vals["notes"]:
                 vals["notes"] = vals["notes"].replace(" ", "").replace(" ", "").strip()
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        if not self.env.context.get('skip_profile_sync'):
+            records._sync_to_vacancies()
+        return records
 
     def write(self, vals):
         if vals.get("notes") and "BR-AMS" in vals["notes"]:
             vals["notes"] = vals["notes"].replace(" ", "").replace("", "").strip()
-        return super().write(vals)
+        res = super().write(vals)
+        if not self.env.context.get('skip_profile_sync'):
+            self._sync_to_vacancies()
+        return res
+
+    def _sync_to_vacancies(self):
+        if "job.vacancy" not in self.env or self.env.context.get('skip_profile_sync'):
+            return
+        for profile in self:
+            cand_domain = [('sourcing_type', 'in', ['internal', 'both'])] if profile.candidate_type == 'internal' else [('sourcing_type', '=', 'external')]
+            if profile.role_level == 'managerial':
+                role_domain = [('employee_category', '=', 'Managerial')]
+            elif profile.role_level == 'junior':
+                role_domain = [('employee_category', '!=', 'Managerial'), ('job_level', '=', 'junior')]
+            elif profile.role_level == 'non_managerial':
+                role_domain = [('employee_category', '!=', 'Managerial'), ('job_level', '!=', 'junior')]
+            else:
+                role_domain = []
+
+            vacancies = self.env['job.vacancy'].sudo().search(cand_domain + role_domain + [('vacancy_status', 'in', ['draft', 'published', 'evaluate'])])
+            if not vacancies:
+                continue
+
+            pms_w, exam_w, int_w = 0.0, 0.0, 0.0
+            for line in profile.line_ids:
+                if line.component == "pms":
+                    pms_w = line.weight_percentage
+                elif line.component == "exam":
+                    exam_w = line.weight_percentage
+                elif line.component == "interview":
+                    int_w = line.weight_percentage
+
+            has_exam = exam_w > 0
+            vacancies.with_context(skip_profile_sync=True).sudo().write({
+                'pms_weight': pms_w,
+                'written_weight': exam_w,
+                'interview_weight': int_w,
+                'has_written_exam': has_exam,
+            })
 
     @api.constrains("line_ids", "total_weight")
     def _check_total_weight(self):
@@ -138,6 +179,26 @@ class AssessmentWeightProfileLine(models.Model):
         default=50.0,
         help="Floor requirement. Score below this disqualifies candidate."
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        if not self.env.context.get('skip_profile_sync'):
+            records.mapped('profile_id')._sync_to_vacancies()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if not self.env.context.get('skip_profile_sync'):
+            self.mapped('profile_id')._sync_to_vacancies()
+        return res
+
+    def unlink(self):
+        profiles = self.mapped('profile_id')
+        res = super().unlink()
+        if not self.env.context.get('skip_profile_sync'):
+            profiles._sync_to_vacancies()
+        return res
 
     @api.constrains("weight_percentage")
     def _check_weight_percentage(self):

@@ -5,10 +5,10 @@
         <field name="name">pbms.planning.config.list</field>
         <field name="model">pbms.planning.config</field>
         <field name="arch" type="xml">
-            <list string="Planning Configurations">
-                <field name="config_type"/>
-                <field name="work_unit_type" optional="show"/>
-                <field name="org_unit_id" optional="show"/>
+            <list string="Planning Configurations" editable="bottom" open_form_view="True">
+                <field name="config_type" readonly="id"/>
+                <field name="work_unit_type" optional="show" readonly="id"/>
+                <field name="org_unit_id" optional="show" readonly="id"/>
                 <field name="currency_id" optional="hide"/>
                 <field name="enable_deposit" widget="boolean_toggle"/>
                 <field name="enable_customer_base" widget="boolean_toggle"/>
@@ -27,6 +27,9 @@
         <field name="model">pbms.planning.config</field>
         <field name="arch" type="xml">
             <form string="Planning Configuration">
+                <header>
+                    <button name="action_save" string="Save" type="object" class="btn-primary" icon="fa-save"/>
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <label for="config_type" class="oe_edit_only" string="Configuration Scope"/>
@@ -46,10 +49,10 @@
                         <page string="Eligible Planning Categories" name="page_categories">
                             <group string="Financial &amp; Core Mobilization">
                                 <group>
-                                    <field name="enable_deposit" widget="boolean_toggle"/>
-                                    <field name="enable_customer_base" widget="boolean_toggle"/>
-                                    <field name="enable_fx" widget="boolean_toggle"/>
-                                    <field name="enable_digital_banking" widget="boolean_toggle"/>
+                                    <field name="enable_deposit" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_customer_base" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_fx" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_digital_banking" widget="boolean_toggle" options="{'autosave': False}"/>
                                 </group>
                                 <group string="Measurement Types">
                                     <field name="deposit_measurement_type" invisible="not enable_deposit"/>
@@ -60,9 +63,9 @@
                             </group>
                             <group string="Budgets &amp; Resources">
                                 <group>
-                                    <field name="enable_expense" widget="boolean_toggle"/>
-                                    <field name="enable_manpower" widget="boolean_toggle"/>
-                                    <field name="enable_fixed_asset" widget="boolean_toggle"/>
+                                    <field name="enable_expense" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_manpower" widget="boolean_toggle" options="{'autosave': False}"/>
+                                    <field name="enable_fixed_asset" widget="boolean_toggle" options="{'autosave': False}"/>
                                 </group>
                                 <group string="Measurement Types">
                                     <field name="expense_measurement_type" invisible="not enable_expense"/>

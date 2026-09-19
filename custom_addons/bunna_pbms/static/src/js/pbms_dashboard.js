@@ -46,6 +46,9 @@ const STAGE_LABELS = {
     ho_reviewed: "Head Office Reviewed",
     approved: "Approved",
     closed: "Closed",
+    in_review: "In Review",
+    in_review_or_submitted: "In Review / Submitted",
+    returned_rejected: "Revision / Rejected",
 };
 
 // Stage colors based on Bunna Bank 6 official colors
@@ -68,6 +71,8 @@ const STAGE_COLORS = {
     approved: { bg: BUNNA.forestGreen, light: '#EDF3E8' },
     closed: { bg: BUNNA.primarySlate, light: '#EAEFF2' },
     in_review: { bg: BUNNA.bronzeOlive, light: '#F6F4EB' },
+    in_review_or_submitted: { bg: BUNNA.bronzeOlive, light: '#F6F4EB' },
+    returned_rejected: { bg: BUNNA.primaryMaroon, light: '#F6EBEB' },
 };
 
 // Chart colors based on Bunna Bank 6 official colors
@@ -121,6 +126,12 @@ const MODEL_CONFIG = {
     },
 };
 
+const IN_REVIEW_STAGES = [
+    'district_approved', 'district_endorsed', 'chief_review',
+    'people_solutions_review', 'cpco_review', 'committee_review',
+    'ceo_approval', 'ho_endorse', 'cpco_endorse', 'ho_reviewed'
+];
+
 // Map stages to their filter domains
 const STAGE_DOMAINS = {
     draft: [['state', '=', 'draft']],
@@ -140,7 +151,9 @@ const STAGE_DOMAINS = {
     ho_reviewed: [['state', '=', 'ho_reviewed']],
     approved: [['state', '=', 'approved']],
     closed: [['state', '=', 'closed']],
-    in_review: [['state', 'in', ['district_approved', 'district_endorsed', 'chief_review', 'people_solutions_review', 'cpco_review', 'committee_review', 'ceo_approval', 'ho_endorse', 'cpco_endorse', 'ho_reviewed']]],
+    in_review: [['state', 'in', IN_REVIEW_STAGES]],
+    in_review_or_submitted: [['state', 'in', ['submitted', ...IN_REVIEW_STAGES]]],
+    returned_rejected: [['state', 'in', ['returned', 'rejected', 'info_requested']]],
 };
 
 // Plan types for dropdown (category ids of the unified pbms.planning.category)
@@ -175,7 +188,7 @@ export class PbmsDashboard extends Component {
             submission: [],
             kpi: [],
             currentPage: 1,
-            itemsPerPage: 6,
+            itemsPerPage: 12,
             chartsLoaded: false,
         });
 
@@ -198,10 +211,12 @@ export class PbmsDashboard extends Component {
         };
 
         onWillStart(async () => {
-            const cycles = await this.orm.call("pbms.dashboard", "get_cycles", []);
-            this.state.cycles = cycles;
-            this.state.cycleId = cycles.length ? cycles[0].id : false;
-            await this.loadData();
+            const data = await this.orm.call("pbms.dashboard", "get_dashboard_data", [this.state.cycleId || false]);
+            this.state.cycles = data.cycles || [];
+            this.state.cycleId = data.active_cycle_id || (data.cycles.length ? data.cycles[0].id : false);
+            this.state.submission = data.submission || [];
+            this.state.kpi = data.kpi || [];
+            this.state.loading = false;
         });
 
         onMounted(() => {
@@ -217,12 +232,12 @@ export class PbmsDashboard extends Component {
     async loadData() {
         this.state.loading = true;
         this.state.currentPage = 1;
-        const [submission, kpi] = await Promise.all([
-            this.orm.call("pbms.dashboard", "get_submission_status", [this.state.cycleId]),
-            this.orm.call("pbms.dashboard", "get_kpi_summary", [this.state.cycleId]),
-        ]);
-        this.state.submission = submission;
-        this.state.kpi = kpi;
+        const data = await this.orm.call("pbms.dashboard", "get_dashboard_data", [this.state.cycleId]);
+        if (data.cycles && (!this.state.cycles || !this.state.cycles.length)) {
+            this.state.cycles = data.cycles;
+        }
+        this.state.submission = data.submission || [];
+        this.state.kpi = data.kpi || [];
         this.state.loading = false;
 
         setTimeout(() => this.initCharts(), 300);
@@ -431,6 +446,13 @@ export class PbmsDashboard extends Component {
             domain.push(...STAGE_DOMAINS[stage]);
         }
 
+        const actionContext = {
+            'default_cycle_id': this.state.cycleId,
+        };
+        if (modelName && modelName !== 'all') {
+            actionContext['default_category'] = modelName;
+        }
+
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "pbms.planning.category",
@@ -438,31 +460,43 @@ export class PbmsDashboard extends Component {
             views: [[false, viewType], [false, "list"], [false, "form"]],
             target: "current",
             domain: domain,
-            context: {
-                'default_cycle_id': this.state.cycleId,
-            }
+            context: actionContext,
         });
     }
 
-    openKPIView(sourceModel = null, stage = null) {
+    openKPIView(stage = null) {
         const domain = [];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', this.state.cycleId]);
         }
-        if (sourceModel) {
-            domain.push(['source_model', '=', sourceModel]);
+        if (this.state.selectedModel && this.state.selectedModel !== 'all') {
+            domain.push(['category', '=', this.state.selectedModel]);
         }
-        if (stage) {
-            domain.push(['state', '=', stage]);
+        if (stage && STAGE_DOMAINS[stage]) {
+            domain.push(...STAGE_DOMAINS[stage]);
         }
+
+        const actionContext = {
+            'default_cycle_id': this.state.cycleId,
+        };
+        if (this.state.selectedModel && this.state.selectedModel !== 'all') {
+            actionContext['default_category'] = this.state.selectedModel;
+        }
+
+        let stageName = "All Submissions";
+        if (stage === 'draft') stageName = "Draft Plans";
+        else if (stage === 'in_review_or_submitted') stageName = "In Review / Submitted Plans";
+        else if (stage === 'approved') stageName = "Approved Plans";
+        else if (stage && STAGE_LABELS[stage]) stageName = `${STAGE_LABELS[stage]} Plans`;
 
         this.action.doAction({
             type: "ir.actions.act_window",
-            res_model: "pbms.consolidation.line",
-            name: "Consolidation View",
-            views: [[false, "list"], [false, "pivot"], [false, "graph"]],
+            res_model: "pbms.planning.category",
+            name: stageName,
+            views: [[false, "list"], [false, "kanban"], [false, "form"]],
             target: "current",
             domain: domain,
+            context: actionContext,
         });
     }
 
@@ -478,6 +512,13 @@ export class PbmsDashboard extends Component {
             domain.push(...STAGE_DOMAINS[stage]);
         }
 
+        const actionContext = {
+            'default_cycle_id': this.state.cycleId,
+        };
+        if (modelName && modelName !== 'all') {
+            actionContext['default_category'] = modelName;
+        }
+
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: "pbms.planning.category",
@@ -485,6 +526,7 @@ export class PbmsDashboard extends Component {
             views: [[false, "list"], [false, "form"]],
             target: "current",
             domain: domain,
+            context: actionContext,
         });
     }
 

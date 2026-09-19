@@ -228,20 +228,39 @@ class HrEmployee(models.Model):
         domain="['|', ('company_id', '=', False), ('company_id', '=', company_id)]",
     )
 
-    @api.depends('parent_id')
+    @api.onchange('parent_id')
+    def _onchange_parent_id_sync_hierarchy(self):
+        val = self.parent_id
+        self.coach_id = val
+        self.planning_parent_id = val
+
+    @api.onchange('coach_id')
+    def _onchange_coach_id_sync_hierarchy(self):
+        val = self.coach_id
+        self.parent_id = val
+        self.planning_parent_id = val
+
+    @api.onchange('planning_parent_id')
+    def _onchange_planning_parent_id_sync_hierarchy(self):
+        val = self.planning_parent_id
+        self.parent_id = val
+        self.coach_id = val
+
+    @api.depends('parent_id', 'coach_id')
     def _compute_planning_parent(self):
         for employee in self:
-            manager = employee.parent_id
-            previous_manager = employee._origin.parent_id
-
-            if manager and (
-                    employee.planning_parent_id == previous_manager
-                    or not employee.planning_parent_id
-            ):
-                employee.planning_parent_id = manager
-
-            elif not employee.planning_parent_id:
+            if employee.parent_id:
+                employee.planning_parent_id = employee.parent_id
+                employee.coach_id = employee.parent_id
+            elif employee.coach_id:
+                employee.planning_parent_id = employee.coach_id
+                employee.parent_id = employee.coach_id
+            elif employee.planning_parent_id:
+                employee.parent_id = employee.planning_parent_id
+                employee.coach_id = employee.planning_parent_id
+            else:
                 employee.planning_parent_id = False
+                employee.coach_id = False
 
     # ------------------------------------------------------------------
     # Related record lines (One2many)
@@ -277,8 +296,21 @@ class HrEmployee(models.Model):
     # ------------------------------------------------------------------
     # Recruitment Criteria Synchronization
     # ------------------------------------------------------------------
+    def _sync_hierarchy_vals(self, vals):
+        if 'parent_id' in vals and vals['parent_id']:
+            vals['coach_id'] = vals['parent_id']
+            vals['planning_parent_id'] = vals['parent_id']
+        elif 'planning_parent_id' in vals and vals['planning_parent_id']:
+            vals['parent_id'] = vals['planning_parent_id']
+            vals['coach_id'] = vals['planning_parent_id']
+        elif 'coach_id' in vals and vals['coach_id']:
+            vals['parent_id'] = vals['coach_id']
+            vals['planning_parent_id'] = vals['coach_id']
+
     @api.model_create_multi
     def create(self, vals_list):
+        for vals in vals_list:
+            self._sync_hierarchy_vals(vals)
         if self.env.context.get('in_sync_criteria_from_job'):
             return super().create(vals_list)
         employees = super().create(vals_list)
@@ -286,6 +318,7 @@ class HrEmployee(models.Model):
         return employees
 
     def write(self, vals):
+        self._sync_hierarchy_vals(vals)
         if self.env.context.get('in_sync_criteria_from_job'):
             return super().write(vals)
         res = super().write(vals)

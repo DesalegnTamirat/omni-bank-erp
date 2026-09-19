@@ -224,7 +224,7 @@ class HrAttendance(models.Model):
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
-                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                    if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
                         shift_end = saturday_exit_time
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
@@ -311,7 +311,7 @@ class HrAttendance(models.Model):
                 if enable_saturday and check_in_local and check_in_local.weekday() == 5:
                     ou = emp.default_operating_unit_id if emp else None
                     unit_type = ou.work_unit_type if ou else False
-                    if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+                    if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
                         shift_end = saturday_exit_time
 
             # Calculate shift lunch duration

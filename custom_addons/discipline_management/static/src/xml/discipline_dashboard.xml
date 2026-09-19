@@ -26,8 +26,8 @@
                             <line x1="34" y1="25" x2="30" y2="28" stroke="white" stroke-width="1.5"/>
                             <defs>
                                 <linearGradient id="shieldGrad" x1="8" y1="4" x2="40" y2="44" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#541718"/>
-                                    <stop offset="100%" stop-color="#425727"/>
+                                    <stop offset="0%" stop-color="#1e3a8a"/>
+                                    <stop offset="100%" stop-color="#1e40af"/>
                                 </linearGradient>
                             </defs>
                         </svg>
@@ -50,7 +50,7 @@
             </div>
 
             <!-- Critical Alert Banner (SLA Breached) -->
-            <div t-if="state.stats.sla_breached &gt; 0" class="disc-alert-banner" t-on-click="openSlaBreached">
+            <div t-if="state.stats.sla_breached > 0" class="disc-alert-banner" t-on-click="openSlaBreached">
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                 <span><strong><t t-esc="state.stats.sla_breached"/> SLA Breach Alert(s)</strong> — Immediate attention required for overdue disciplinary cases. Click to review.</span>
                 <svg class="disc-alert-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
@@ -113,10 +113,10 @@
                         <div class="disc-kpi-label">SLA Breached</div>
                         <div class="disc-kpi-sub">Overdue resolution</div>
                     </div>
-                    <div class="disc-kpi-trend disc-kpi-trend-alert" t-if="state.stats.sla_breached &gt; 0">
+                    <div class="disc-kpi-trend disc-kpi-trend-alert" t-if="state.stats.sla_breached > 0">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                     </div>
-                    <div class="disc-kpi-trend" t-else="1">
+                    <div class="disc-kpi-trend" t-else="">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
                     </div>
                 </div>
@@ -230,7 +230,7 @@
                                                 <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/></svg>
                                                 Breached
                                             </span>
-                                            <span t-else="1" class="disc-sla-ok">
+                                            <span t-else="" class="disc-sla-ok">
                                                 <t t-esc="c.sla_deadline or '—'"/>
                                             </span>
                                         </td>
@@ -375,32 +375,32 @@
                         <div class="disc-summary-stats">
                             <div class="disc-sum-row">
                                 <span class="disc-sum-label">
-                                     <span class="disc-sum-dot" style="background: #dc2626;"></span>
-                                     Level 1 (Dismissal)
-                                 </span>
-                                 <span class="disc-sum-val"><t t-esc="state.stats.level1_cases"/></span>
-                             </div>
-                             <div class="disc-sum-row">
-                                 <span class="disc-sum-label">
-                                     <span class="disc-sum-dot" style="background: #c17540;"></span>
-                                     Total Active
-                                 </span>
-                                 <span class="disc-sum-val"><t t-esc="state.stats.active_cases"/></span>
-                             </div>
-                             <div class="disc-sum-row">
-                                 <span class="disc-sum-label">
-                                     <span class="disc-sum-dot" style="background: #726732;"></span>
-                                     Pending Approval
-                                 </span>
-                                 <span class="disc-sum-val"><t t-esc="state.stats.pending_approval"/></span>
-                             </div>
-                             <div class="disc-sum-row">
-                                 <span class="disc-sum-label">
-                                     <span class="disc-sum-dot" style="background: #425727;"></span>
-                                     Revoked Cases
-                                 </span>
-                                 <span class="disc-sum-val"><t t-esc="state.stats.revoked_cases"/></span>
-                             </div>
+                                    <span class="disc-sum-dot" style="background: #ef4444;"></span>
+                                    Level 1 (Dismissal)
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.level1_cases"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #3b82f6;"></span>
+                                    Total Active
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.active_cases"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #8b5cf6;"></span>
+                                    Pending Approval
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.pending_approval"/></span>
+                            </div>
+                            <div class="disc-sum-row">
+                                <span class="disc-sum-label">
+                                    <span class="disc-sum-dot" style="background: #10b981;"></span>
+                                    Revoked Cases
+                                </span>
+                                <span class="disc-sum-val"><t t-esc="state.stats.revoked_cases"/></span>
+                            </div>
                         </div>
                     </div>
                 </div>

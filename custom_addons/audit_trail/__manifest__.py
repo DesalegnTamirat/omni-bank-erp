@@ -23,8 +23,18 @@
         'data/audit_rule_data.xml',
         'views/audit_log_views.xml',
         'views/audit_rule_views.xml',
+        'views/audit_dashboard_views.xml',
         'views/audit_menu.xml',
+
     ],
+
+     'assets': {
+        'web.assets_backend': [
+            'audit_trail/static/src/js/audit_dashboard.js',
+            'audit_trail/static/src/xml/audit_dashboard.xml',
+        ],
+     },
+
     'installable': True,
     'auto_install': False,
     'license': 'LGPL-3',

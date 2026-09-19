@@ -444,22 +444,6 @@
                         </div>
                     </div>
                     <div class="settings-toggle-row">
-                        <div class="settings-toggle-label">Saturday Half-Day (Head Office)</div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="s_saturday"
-                                   t-att-checked="state.settings.enable_saturday_halfday"
-                                   t-on-change="onToggleSaturdayHalfday"/>
-                        </div>
-                    </div>
-                    <div class="settings-toggle-row" t-if="state.settings.enable_saturday_halfday">
-                        <div class="settings-toggle-label">Saturday Half-Day (District Offices)</div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="s_saturday_district"
-                                   t-att-checked="state.settings.saturday_halfday_district"
-                                   t-on-change="onToggleSaturdayDistrict"/>
-                        </div>
-                    </div>
-                    <div class="settings-toggle-row">
                         <div class="settings-toggle-label">Lunch Break Flow</div>
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="s_lunch"
@@ -474,6 +458,29 @@
                                    t-att-checked="state.settings.enable_checkin_gate"
                                    t-on-change="onToggleCheckinGate"/>
                         </div>
+                    </div>
+                </div>
+
+                <!-- SHIFT TIME SCHEDULES -->
+                <div class="settings-section mb-4">
+                    <div class="settings-section-title">Shift Time Schedules</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Morning Start Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.morning_time_str"
+                               t-on-input="onInputMorningTime"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Shift Exit Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.exit_time_str"
+                               t-on-input="onInputExitTime"/>
+                    </div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Saturday Exit Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.saturday_exit_time_str"
+                               t-on-input="onInputSaturdayExitTime"/>
                     </div>
                 </div>
 
@@ -503,6 +510,12 @@
                 <!-- LUNCH BREAK PARAMETERS (CONDITIONAL) -->
                 <div t-if="state.settings.enable_lunch_break" class="settings-section mb-4">
                     <div class="settings-section-title">Lunch Break Policy</div>
+                    <div class="settings-input-row">
+                        <label class="settings-input-label">Lunch Start Time</label>
+                        <input type="text" class="settings-input" placeholder="HH:MM"
+                               t-att-value="state.settings.lunch_out_time_str"
+                               t-on-input="onInputLunchOutTime"/>
+                    </div>
                     <div class="settings-input-row">
                         <label class="settings-input-label">Lunch Duration</label>
                         <input type="text" class="settings-input" placeholder="HH:MM"

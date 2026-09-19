@@ -31,11 +31,40 @@ class PbmsWorkflowMixin(models.AbstractModel):
     cycle_id = fields.Many2one(
         "pbms.planning.cycle", required=True, index=True,
         default=lambda self: self.env["pbms.planning.cycle"].search(
-            [("state", "in", ("budget_call", "open"))], limit=1),
+            [("state", "=", "open")], limit=1),
     )
+    cycle_state = fields.Selection(
+        related="cycle_id.state",
+        string="Cycle Status",
+        store=True,
+        readonly=True,
+        index=True,
+    )
+    is_cycle_open = fields.Boolean(
+        string="Cycle Open for Input",
+        compute="_compute_is_cycle_open",
+        store=True,
+        index=True,
+        help="True if the associated planning cycle is officially open for unit input.",
+    )
+
+    @api.depends("cycle_id.state")
+    def _compute_is_cycle_open(self):
+        for rec in self:
+            rec.is_cycle_open = bool(rec.cycle_id and rec.cycle_id.state == "open")
+    @api.model
+    def _default_org_unit_id(self):
+        user = self.env.user
+        if hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
+            return user.default_operating_unit_id
+        ou_ids = user._pbms_operating_unit_ids() if hasattr(user, "_pbms_operating_unit_ids") else []
+        if ou_ids:
+            return ou_ids[0]
+        return False
+
     org_unit_id = fields.Many2one(
         "operating.unit", string="Org Unit", required=True, index=True,
-        default=lambda self: self.env.user.default_operating_unit_id,
+        default=_default_org_unit_id,
         help="Branch / District Office / Head Office work unit, from the "
              "Bank's HR org structure (hr_employee_custom).",
     )
@@ -544,9 +573,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
 
     def _check_editable(self):
         for line in self:
-            if not line.cycle_id.is_editable():
+            if not line.cycle_id or line.cycle_id.state != "open":
+                cycle_label = dict(line.cycle_id._fields["state"].selection).get(line.cycle_id.state, line.cycle_id.state) if line.cycle_id else _("Unknown")
                 raise UserError(_(
-                    "Planning cycle '%s' is not open for input.", line.cycle_id.name))
+                    "Planning cycle '%s' is not open for unit input (current status: %s). "
+                    "Branch users cannot input or submit plan data until the cycle is officially opened.",
+                    line.cycle_id.name if line.cycle_id else "",
+                    cycle_label
+                ))
 
     def _protected_write_fields(self):
         return []
@@ -561,11 +595,40 @@ class PbmsWorkflowMixin(models.AbstractModel):
         user_units = user._pbms_operating_unit_ids()
         if self.org_unit_id.id in user_units:
             return True
-        if (self.create_uid and self.create_uid == user) or (self.submitted_by and self.submitted_by == user):
-            return True
         # If user has no operating units configured, allow editing their own draft plans
         if not user_units and self.state in PBMS_BRANCH_EDITABLE_STATES:
-            return True
+            if (self.create_uid and self.create_uid == user) or (self.submitted_by and self.submitted_by == user):
+                return True
+        return False
+
+    def _is_people_solutions_plan(self):
+        """Check if this workforce plan belongs to or was initiated by People Solutions Directorate."""
+        self.ensure_one()
+        user = self.env.user
+
+        # 1. Operating unit matches People Solutions / HR
+        if self.org_unit_id:
+            ou_name = (self.org_unit_id.name or "").lower()
+            if ou_name in ("hr", "people solutions", "people solutions directorate", "human resources", "people & culture"):
+                return True
+            if "people" in ou_name and "solution" in ou_name:
+                return True
+            ps_users = self._get_users_with_group("bunna_pbms.group_pbms_people_solutions")
+            mgr_users = self._get_users_with_group("bunna_pbms.group_pbms_manager")
+            direct_ps_users = ps_users - mgr_users
+            if any(u in direct_ps_users for u in self.org_unit_id.user_ids):
+                return True
+
+        # 2. Submitter is directly in People Solutions group (and not manager/admin)
+        if user.has_group("bunna_pbms.group_pbms_people_solutions"):
+            if not user.has_group("bunna_pbms.group_pbms_manager") and not user._is_admin():
+                return True
+
+        # 3. Creator is in People Solutions group (and not manager/admin)
+        if self.create_uid and self.create_uid.has_group("bunna_pbms.group_pbms_people_solutions"):
+            if not self.create_uid.has_group("bunna_pbms.group_pbms_manager") and not self.create_uid._is_admin():
+                return True
+
         return False
 
     def _is_child_operating_unit_plan(self):
@@ -579,7 +642,13 @@ class PbmsWorkflowMixin(models.AbstractModel):
             # If district reviewer has no explicit operating units configured, allow reviewing child branches
             if user._pbms_is_district_reviewer() and self.org_unit_id.work_unit_type in ("branch", "sub_branch", "service_center"):
                 return True
+            if user.has_group("bunna_pbms.group_pbms_respective_chief"):
+                return bool(self.org_unit_id and self.org_unit_id.id in user._pbms_child_operating_unit_ids())
             return False
+
+        # Respective Chief scoping is strictly BY MANAGER, not by parent operating unit!
+        if user.has_group("bunna_pbms.group_pbms_respective_chief") and not user.has_group("bunna_pbms.group_pbms_district_reviewer"):
+            return bool(self.org_unit_id and self.org_unit_id.id in user._pbms_child_operating_unit_ids())
 
         # 1. Direct parent check
         if self.org_unit_id.parent_unit and self.org_unit_id.parent_unit.id in user_unit_ids:
@@ -606,6 +675,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 if any(ou == district for ou in user_ous):
                     return True
 
+        # 5. Descendant check via _pbms_child_operating_unit_ids()
+        if hasattr(user, "_pbms_child_operating_unit_ids") and self.org_unit_id.id in user._pbms_child_operating_unit_ids():
+            return True
+
         return False
 
     def _pbms_can_edit_plan_content(self):
@@ -622,6 +695,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
         if state in ("approved", "rejected"):
             return False
 
+        # Once approved by CEO, workforce plan records and lines are strictly frozen (read-only)
+        if getattr(self, "category", False) == "manpower" and state in ("ho_endorse", "cpco_endorse"):
+            return False
+
         # SPPMD Administrator / System Administrator can edit any non-finalized plan across all units
         if user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su:
             return True
@@ -632,6 +709,12 @@ class PbmsWorkflowMixin(models.AbstractModel):
             and self.org_unit_type == "head_office"
             and state in ("ho_reviewed", "submitted", "info_requested")
         ):
+            return True
+
+        # Own operating unit plan before submission (branch, head office, or reviewer editing own unit's draft plan)
+        if self._is_own_operating_unit_plan() and state in PBMS_BRANCH_EDITABLE_STATES:
+            if self.cycle_id and self.cycle_id.state != "open":
+                return False
             return True
 
         # Head Office Functional Reviewer during HO review stage on authorized category plans
@@ -649,9 +732,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
                     if state in ("submitted", "info_requested"):
                         return True
 
-        # Respective Chief during chief_review stage on Manpower plans (can reduce headcount)
+        # Respective Chief during chief_review stage on Manpower plans (can reduce headcount on child units)
         if getattr(self, "category", False) == "manpower" and state == "chief_review":
-            if user._pbms_is_respective_chief() or user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su:
+            if user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su:
+                return True
+            if user._pbms_is_respective_chief() and (
+                self._is_child_operating_unit_plan()
+                or (self.org_unit_id and self.org_unit_id.id in user._pbms_child_operating_unit_ids())
+            ):
                 return True
 
         # People Solutions Directorate during people_solutions_review stage on Manpower plans
@@ -686,13 +774,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
 
         # Branch / Head Office User on own operating unit before submission (draft, returned, info_requested)
         if state in PBMS_BRANCH_EDITABLE_STATES:
-            if (
-                self._is_own_operating_unit_plan()
-                or not self.create_uid
-                or self.create_uid == user
-                or self.submitted_by == user
-                or user._pbms_is_branch_user()
-            ):
+            # Branch users cannot input or edit data unless the planning cycle is officially open!
+            if self.cycle_id and self.cycle_id.state != "open":
+                return False
+            if self._is_own_operating_unit_plan():
                 return True
 
         return False
@@ -705,24 +790,18 @@ class PbmsWorkflowMixin(models.AbstractModel):
             return True
 
         # Regular users can only delete their own draft plans before submission
-        return (
-            (self._is_own_operating_unit_plan() or self.create_uid == user or self.submitted_by == user)
-            and self.state == "draft"
-        )
+        return self._is_own_operating_unit_plan() and self.state == "draft"
 
     def _pbms_can_submit_plan(self):
         self.ensure_one()
         user = self.env.user
+        if self.cycle_id and self.cycle_id.state != "open":
+            return False
         if self.state not in PBMS_BRANCH_EDITABLE_STATES:
             return False
         if self.env.is_admin() or user._pbms_is_sppmd_admin() or self.env.su:
             return True
-        return (
-            self._is_own_operating_unit_plan()
-            or self.create_uid == user
-            or self.submitted_by == user
-            or user._pbms_is_branch_user()
-        )
+        return self._is_own_operating_unit_plan()
 
 
     def _pbms_can_district_review_plan(self):
@@ -740,18 +819,39 @@ class PbmsWorkflowMixin(models.AbstractModel):
         user = self.env.user
         if user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su:
             return self.state in (PBMS_HO_REVIEW_STATES | {"hr_fulfillment", "ho_endorse"})
-        if not user._pbms_is_ho_reviewer():
-            return False
+
         cat = getattr(self, "category", False)
-        if cat == "manpower" and self.state == "ho_endorse":
-            return True
-        if cat and cat not in user._pbms_allowed_categories():
+        # Check if user is designated reviewer for this category and plan in Planning Config
+        is_designated = False
+        ConfigModel = self.env.get("pbms.planning.config")
+        if ConfigModel is not None and cat:
+            info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
+            if user in info.get("users", self.env["res.users"]):
+                is_designated = True
+            elif info.get("ou") and info["ou"].id in user._pbms_operating_unit_ids():
+                is_designated = True
+            elif info.get("dept") and user.employee_id and user.employee_id.department_id and user.employee_id.department_id.id == info["dept"].id:
+                is_designated = True
+
+        if not (user._pbms_is_ho_reviewer() or is_designated):
             return False
-        # Branch plans for general expense and fixed asset must be approved by district first
-        if self.org_unit_type != "head_office" and cat in ("general_expense", "fixed_asset"):
+
+        if cat == "manpower":
+            if self.state == "ho_endorse":
+                return True
+            if self.org_unit_type == "head_office" and self.state in PBMS_DISTRICT_REVIEW_STATES:
+                return self._is_own_operating_unit_plan() or self._is_child_operating_unit_plan() or user._pbms_is_sppmd_admin()
+            return False
+
+        if cat and cat not in user._pbms_allowed_categories() and not is_designated:
+            return False
+
+        # Branch plans for general expense and fixed asset must be approved by district first (unless reviewed directly by designated reviewer)
+        if self.org_unit_type not in ("head_office", "district_office") and cat in ("general_expense", "fixed_asset") and not is_designated:
             if self.state not in ("district_approved", "district_endorsed", "committee_review", "board_ceo_approval", "ho_reviewed", "approved"):
                 return False
-        if self.state not in (PBMS_HO_REVIEW_STATES | {"hr_fulfillment", "ho_endorse"}):
+
+        if self.state not in (PBMS_HO_REVIEW_STATES | {"hr_fulfillment", "ho_endorse", "ho_reviewed"}):
             return False
         return True
 
@@ -773,9 +873,17 @@ class PbmsWorkflowMixin(models.AbstractModel):
             or self._pbms_can_sppmd_review_plan()
             or (getattr(self, "category", False) in ("manpower", "general_expense", "fixed_asset") and self.state == "committee_review" and self.env.user._pbms_is_budget_hiring_committee())
             or (getattr(self, "category", False) == "manpower" and self.state in ("ceo_approval", "board_ceo_approval") and (self.env.user._pbms_is_ceo() or self.env.user._pbms_is_cpco()))
-            or (getattr(self, "category", False) == "manpower" and self.state in ("chief_review", "district_approved", "district_endorsed") and self.env.user._pbms_is_respective_chief())
+            or (
+                getattr(self, "category", False) == "manpower"
+                and self.state in ("chief_review", "district_approved", "district_endorsed")
+                and self.env.user._pbms_is_respective_chief()
+                and (
+                    self._is_child_operating_unit_plan()
+                    or (self.org_unit_id and self.org_unit_id.id in self.env.user._pbms_child_operating_unit_ids())
+                )
+            )
             or (getattr(self, "category", False) == "manpower" and self.state == "people_solutions_review" and self.env.user._pbms_is_people_solutions())
-            or (getattr(self, "category", False) == "manpower" and self.state in ("cpco_review", "hr_fulfillment") and (self.env.user._pbms_is_cpco() or self.env.user._pbms_is_people_solutions()))
+            or (getattr(self, "category", False) == "manpower" and self.state in ("cpco_review", "hr_fulfillment") and self.env.user._pbms_is_cpco())
             or (getattr(self, "category", False) == "manpower" and self.state == "ho_endorse" and self._pbms_can_ho_review_plan())
             or (getattr(self, "category", False) == "manpower" and self.state == "cpco_endorse" and self.env.user._pbms_is_cpco())
         )
@@ -801,6 +909,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 user = self.env.user
                 state_label = dict(record._fields["state"].selection).get(record.state, record.state) if "state" in record._fields else record.state
                 unit_name = record.org_unit_id.display_name if record.org_unit_id else _("another Operating Unit")
+
+                # 0. Planning Cycle not open for unit input
+                if record.cycle_id and record.cycle_id.state != "open":
+                    cycle_label = dict(record.cycle_id._fields["state"].selection).get(record.cycle_id.state, record.cycle_id.state)
+                    raise AccessError(_(
+                        "Planning cycle '%s' is currently '%s' and is not open for unit input. "
+                        "Branch users cannot input or modify plan data until the cycle is officially opened for input."
+                    ) % (record.cycle_id.name, cycle_label))
 
                 # 1. Operating Unit mismatch: User does not belong to this operating unit
                 if not record._is_own_operating_unit_plan() and not user._pbms_is_sppmd_admin() and not self.env.is_admin():
@@ -946,6 +1062,39 @@ class PbmsWorkflowMixin(models.AbstractModel):
         reviewers = self.env["res.users"]
 
         if stage == "submitted":
+            cat = getattr(self, "category", False)
+            if cat in ("general_expense", "fixed_asset"):
+                ConfigModel = self.env.get("pbms.planning.config")
+                ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
+                if ConfigModel is not None:
+                    info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
+                    if info.get("users"):
+                        reviewers |= info["users"]
+                    ou_rec = info.get("operating_unit") or info.get("ou")
+                    if ou_rec:
+                        reviewers |= ho_reviewers.filtered(lambda u: ou_rec.id in u._pbms_operating_unit_ids())
+                    dept_rec = info.get("department") or info.get("dept")
+                    if dept_rec:
+                        reviewers |= ho_reviewers.filtered(lambda u: u.employee_id and u.employee_id.department_id and u.employee_id.department_id.id == dept_rec.id)
+                if not reviewers:
+                    if cat == "general_expense":
+                        reviewers |= ho_reviewers.filtered(
+                            lambda u: (
+                                (u.employee_id and u.employee_id.department_id and any(w in (u.employee_id.department_id.name or "").lower() for w in ("finance", "account", "budget", "cost")))
+                                or any(w in (ou.name or "").lower() for ou in u.operating_unit_ids for w in ("finance", "account", "budget", "cost"))
+                            )
+                        )
+                    elif cat == "fixed_asset":
+                        reviewers |= ho_reviewers.filtered(
+                            lambda u: (
+                                (u.employee_id and u.employee_id.department_id and any(w in (u.employee_id.department_id.name or "").lower() for w in ("property", "procurement", "facility", "admin", "asset")))
+                                or any(w in (ou.name or "").lower() for ou in u.operating_unit_ids for w in ("property", "procurement", "facility", "admin", "asset"))
+                            )
+                        )
+                if not reviewers:
+                    reviewers |= ho_reviewers
+                return reviewers
+
             if self.org_unit_type in ("branch", "sub_branch", "service_center", "other") or (self.org_unit_type != "head_office" and self.org_unit_type != "district_office"):
                 # Find District Reviewers for this branch's district
                 district = self.district_id or self._find_district_ancestor(self.org_unit_id)
@@ -961,18 +1110,55 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 if not reviewers:
                     reviewers |= dist_users
             else:
-                # District Office or HO branch submits directly to Head Office Reviewers for this category
                 cat = getattr(self, "category", False)
-                ConfigModel = self.env.get("pbms.planning.config")
-                if ConfigModel is not None and cat:
-                    info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
-                    if info.get("users"):
-                        reviewers |= info["users"]
-                    if info.get("ou"):
-                        ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
-                        reviewers |= ho_reviewers.filtered(lambda u: info["ou"].id in u._pbms_operating_unit_ids())
-                if not reviewers:
-                    reviewers |= self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
+                if self.org_unit_type == "head_office" and cat == "manpower":
+                    # Head Office department workforce plan is reviewed by Head Office Department Director
+                    ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
+                    if self.org_unit_id:
+                        reviewers |= ho_reviewers.filtered(lambda u: self.org_unit_id.id in u._pbms_operating_unit_ids())
+                    if not reviewers:
+                        dept_mgr = self._get_unit_manager_user(self.org_unit_id)
+                        if dept_mgr:
+                            reviewers |= dept_mgr
+                        else:
+                            reviewers |= ho_reviewers
+                elif self.org_unit_type == "district_office" and cat == "manpower":
+                    # District Office's own workforce plan is reviewed by District Director
+                    dist_users = self._get_users_with_group("bunna_pbms.group_pbms_district_reviewer")
+                    if self.org_unit_id:
+                        reviewers |= dist_users.filtered(lambda u: self.org_unit_id.id in u._pbms_operating_unit_ids())
+                    if not reviewers:
+                        reviewers |= dist_users
+                else:
+                    # District Office or Head Office department submits General Expense, Fixed Asset, etc.
+                    # Route to assigned Functional Reviewers for this category
+                    ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
+                    ConfigModel = self.env.get("pbms.planning.config")
+                    if ConfigModel is not None and cat:
+                        info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
+                        if info.get("users"):
+                            reviewers |= info["users"]
+                        if info.get("ou"):
+                            reviewers |= ho_reviewers.filtered(lambda u: info["ou"].id in u._pbms_operating_unit_ids())
+                        if info.get("dept"):
+                            reviewers |= ho_reviewers.filtered(lambda u: u.employee_id and u.employee_id.department_id and u.employee_id.department_id.id == info["dept"].id)
+                    if not reviewers:
+                        if cat == "general_expense":
+                            reviewers |= ho_reviewers.filtered(
+                                lambda u: (
+                                    (u.employee_id and u.employee_id.department_id and any(w in (u.employee_id.department_id.name or "").lower() for w in ("finance", "account", "budget", "cost")))
+                                    or any(w in (ou.name or "").lower() for ou in u.operating_unit_ids for w in ("finance", "account", "budget", "cost"))
+                                )
+                            )
+                        elif cat == "fixed_asset":
+                            reviewers |= ho_reviewers.filtered(
+                                lambda u: (
+                                    (u.employee_id and u.employee_id.department_id and any(w in (u.employee_id.department_id.name or "").lower() for w in ("property", "procurement", "facility", "admin", "asset")))
+                                    or any(w in (ou.name or "").lower() for ou in u.operating_unit_ids for w in ("property", "procurement", "facility", "admin", "asset"))
+                                )
+                            )
+                    if not reviewers:
+                        reviewers |= ho_reviewers
 
         elif stage in ("district_approved", "district_endorsed"):
             ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
@@ -1098,7 +1284,9 @@ class PbmsWorkflowMixin(models.AbstractModel):
             if ConfigModel is not None and cat:
                 info = ConfigModel.sudo().get_category_review_info(cat, self.org_unit_id)
                 if info.get("users"):
-                    reviewers |= info["users"]
+                    cfg_ho_users = info["users"].filtered(lambda u: u.has_group("bunna_pbms.group_pbms_ho_reviewer"))
+                    if cfg_ho_users:
+                        reviewers |= cfg_ho_users
             if not reviewers:
                 ho_reviewers = self._get_users_with_group("bunna_pbms.group_pbms_ho_reviewer")
                 dept_hr_reviewers = ho_reviewers.filtered(
@@ -1117,7 +1305,13 @@ class PbmsWorkflowMixin(models.AbstractModel):
     def _get_hr_recruitment_partners(self):
         """Return partners responsible for HR Recruitment & Talent Acquisition."""
         partners = self.env["res.partner"]
-        for g_xmlid in ("hr.group_hr_user", "hr.group_hr_manager", "bunna_pbms.group_pbms_ho_reviewer"):
+        for g_xmlid in (
+            "bunna_pbms.group_pbms_people_solutions",
+            "bunna_pbms.group_pbms_people_operations",
+            "hr.group_hr_user",
+            "hr.group_hr_manager",
+            "bunna_pbms.group_pbms_ho_reviewer",
+        ):
             users = self._get_users_with_group(g_xmlid)
             if users:
                 partners |= users.mapped("partner_id")
@@ -1130,46 +1324,19 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 partners |= rec.submitted_by.partner_id
         return partners
 
+    def _send_inbox_notification(self, users_or_partners, subject, body):
+        """Send direct in-app inbox notification into Discuss [Notifications] tab (chat bubble)."""
+        from .pbms_access import send_pbms_inbox_notification
+        for rec in self:
+            send_pbms_inbox_notification(self.env, rec, users_or_partners, subject, body)
+
     def _schedule_pbms_activity(self, users, summary, note, date_deadline=False):
-        """Create actionable To-Do / Review activity for assigned users in ERP inbox."""
+        """Send notification to assigned users in ERP Discuss inbox."""
         if not users:
             return
-        act_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
-        if not act_type:
-            act_type = self.env["mail.activity.type"].search([], limit=1)
-        if not act_type:
-            return
+        from .pbms_access import send_pbms_inbox_notification
         for record in self:
-            for user in users:
-                existing = self.env["mail.activity"].search([
-                    ("res_model", "=", record._name),
-                    ("res_id", "=", record.id),
-                    ("user_id", "=", user.id),
-                    ("activity_type_id", "=", act_type.id),
-                ], limit=1)
-                if not existing:
-                    try:
-                        if hasattr(record, "activity_schedule"):
-                            record.with_context(mail_activity_quick_update=True).activity_schedule(
-                                activity_type_id=act_type.id,
-                                summary=summary,
-                                note=note,
-                                user_id=user.id,
-                                date_deadline=date_deadline or fields.Date.today(),
-                            )
-                        else:
-                            self.env["mail.activity"].with_context(mail_activity_quick_update=True).sudo().create({
-                                "res_model": record._name,
-                                "res_id": record.id,
-                                "res_model_id": self.env["ir.model"]._get_id(record._name),
-                                "activity_type_id": act_type.id,
-                                "summary": summary,
-                                "note": note,
-                                "user_id": user.id,
-                                "date_deadline": date_deadline or fields.Date.today(),
-                            })
-                    except Exception as e:
-                        _logger.warning("Could not schedule PBMS activity for user %s: %s", user.id, e)
+            send_pbms_inbox_notification(self.env, record, users, summary, note)
 
     def _clear_pbms_activities(self, feedback=False):
         """Mark existing pending activities on this record as completed."""
@@ -1362,6 +1529,14 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 "level_label": _("People Solutions Directorate"),
             }
         elif old_state == "people_solutions_review":
+            if self._is_people_solutions_plan():
+                return {
+                    "target_state": "draft",
+                    "target_level": "planner",
+                    "assigned_users": self.create_uid or self.submitted_by or self.env.user,
+                    "partner_ids": (self.create_uid or self.submitted_by or self.env.user).mapped("partner_id"),
+                    "level_label": _("Work Unit Submitter"),
+                }
             chief_reviewers = self._get_stage_reviewers("chief_review")
             return {
                 "target_state": "chief_review",
@@ -1569,12 +1744,16 @@ class PbmsWorkflowMixin(models.AbstractModel):
                     f"</tr>"
                 )
 
-            unit_name = line.org_unit_id.display_name if line.org_unit_id else ""
+            # Clean up unit name to avoid raw model repr like [hr.report.code(2,)]
+            unit_name = line.org_unit_id.name or (line.org_unit_id.display_name if line.org_unit_id else "")
+            import re
+            unit_clean = re.sub(r"\[hr\.report\.code\(\d+,\)\]\s*", "", unit_name).strip()
+            unit_display = unit_clean or unit_name
             cycle_name = line.cycle_id.name if line.cycle_id else ""
 
             msg = (
                 f"<b>Recruitment Commencement Authorized</b><br/>"
-                f"Final executive approval granted for Workforce Plan of <b>{unit_name}</b> ({cycle_name}). "
+                f"Final executive approval granted for Workforce Plan of <b>{unit_display}</b> ({cycle_name}). "
                 f"Recruitment and onboarding activities may now commence for the following approved positions and sourcing allocations:<br/><br/>"
                 f"<table style='width:100%; border-collapse:collapse; font-size:13px;'>"
                 f"<tr style='background-color:#EDF3E8; color:#541718; font-weight:bold; border:1px solid #C8DCB8;'>"
@@ -1597,13 +1776,23 @@ class PbmsWorkflowMixin(models.AbstractModel):
             line.message_post(body=Markup(msg), message_type="notification", subtype_xmlid="mail.mt_note")
             line._send_pbms_mail_template("bunna_pbms.mail_template_recruitment_commencement", partner_ids=hr_partners.ids)
 
-            hr_users = self.env["res.users"]
-            for g_xmlid in ("hr.group_hr_user", "hr.group_hr_manager", "bunna_pbms.group_pbms_ho_reviewer"):
-                hr_users |= self._get_users_with_group(g_xmlid)
-            if hr_users:
+            # People Solutions Directorate is the opener of recruitment for approved plans
+            ps_users = self._get_users_with_group("bunna_pbms.group_pbms_people_solutions")
+            po_users = self._get_users_with_group("bunna_pbms.group_pbms_people_operations")
+            target_users = ps_users | po_users
+            if not target_users:
+                for g_xmlid in ("hr.group_hr_manager", "hr.group_hr_user", "bunna_pbms.group_pbms_ho_reviewer"):
+                    target_users |= self._get_users_with_group(g_xmlid)
+
+            # Exclude current user (CPCO endorser/approver) so they don't notify themselves
+            filtered_users = target_users.filtered(lambda u: u.id != self.env.uid and u.active)
+            if not filtered_users:
+                filtered_users = target_users.filtered(lambda u: u.active)
+
+            if filtered_users:
                 line._schedule_pbms_activity(
-                    users=hr_users[:3],
-                    summary=_("Commence Recruitment: %s") % (line.org_unit_id.display_name if line.org_unit_id else ""),
+                    users=filtered_users,
+                    summary=_("Commence Recruitment: %s") % unit_display,
                     note=_("Workforce Plan approved. Please initiate candidate sourcing and recruitment per approved schedule."),
                 )
 
@@ -1748,19 +1937,40 @@ class PbmsWorkflowMixin(models.AbstractModel):
         if all_lines and hasattr(all_lines, "_snapshot_proposed_targets"):
             all_lines.with_context(bypass_plan_lock=True)._snapshot_proposed_targets()
 
-        # 2. Batch update state of plans (Head Office plans go directly to ho_reviewed for Final Approver)
+        # 2. Batch update state of plans
         old_states = {p.id: p.state for p in all_plans}
         for line in all_plans:
-            if line.org_unit_type == "head_office":
+            target_cat = getattr(line, "category", False)
+            if target_cat == "manpower" and line._is_people_solutions_plan():
+                # For People Solutions Directorate workforce plan: submitted directly to People Solutions Review
                 line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
-                    "state": "ho_reviewed",
-                    "ho_reviewer_id": self.env.uid,
-                    "ho_review_date": fields.Datetime.now(),
-                    "submitted_by": line.submitted_by.id if line.submitted_by else self.env.uid,
-                    "submitted_date": line.submitted_date or fields.Datetime.now(),
+                    "state": "people_solutions_review",
+                    "submitted_by": self.env.uid,
+                    "submitted_date": fields.Datetime.now(),
                 })
-                line._log_audit_action("ho_review", old_states.get(line.id, "draft"), "ho_reviewed", _("Reviewed and submitted to SPPMD Final Approver."))
-                line._notify_pending_approval("ho_reviewed", _("Head Office Reviewed (Ready for Final Approval)"))
+                line._log_audit_action("submit", old_states.get(line.id, "draft"), "people_solutions_review", _("Workforce plan submitted directly to People Solutions Review."))
+                line._notify_pending_approval("people_solutions_review", _("People Solutions Directorate Review"))
+            elif target_cat == "manpower" and line.org_unit_type == "head_office":
+                # For other Head Office workforce plans: no district review needed, submitted directly to Respective Chief
+                line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
+                    "state": "chief_review",
+                    "submitted_by": self.env.uid,
+                    "submitted_date": fields.Datetime.now(),
+                })
+                line._log_audit_action("submit", old_states.get(line.id, "draft"), "chief_review", _("Workforce plan submitted directly to Respective Chief."))
+                line._notify_pending_approval("chief_review", _("Respective Chief Review"))
+            elif target_cat in ("general_expense", "fixed_asset") and (
+                line.org_unit_type == "head_office"
+                or self.env.user.has_group("bunna_pbms.group_pbms_ho_reviewer")
+            ):
+                # For Head Office general expense and fixed asset plans: no district review, submitted directly to Budget Hiring Committee Review
+                line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
+                    "state": "committee_review",
+                    "submitted_by": self.env.uid,
+                    "submitted_date": fields.Datetime.now(),
+                })
+                line._log_audit_action("submit", old_states.get(line.id, "draft"), "committee_review", _("%s submitted directly to Budget Hiring Committee Review.") % (line.plan_category_title or _("Plan")))
+                line._notify_pending_approval("committee_review", _("Budget Hiring Committee Review"))
             else:
                 line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
                     "state": "submitted",
@@ -1769,9 +1979,8 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 })
                 line._log_audit_action("submit", old_states.get(line.id, "draft"), "submitted", _("%s submitted for review.") % (line.plan_category_title or _("Plan")))
 
-        # 3. Dispatch dynamic submission notification for each active branch category plan
-        branch_plans = all_plans.filtered(lambda p: p.org_unit_type != "head_office")
-        for plan in branch_plans:
+        # 3. Dispatch dynamic submission notification for each active category plan that entered 'submitted'
+        for plan in all_plans.filtered(lambda p: p.state == "submitted"):
             has_data = (
                 bool(plan.line_ids)
                 or bool(plan._get_category_lines(plan.category) if hasattr(plan, "_get_category_lines") else False)
@@ -2004,9 +2213,9 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 raise UserError(_("This action is only applicable to General Expense and Fixed Asset categories."))
             if not (line._pbms_can_ho_review_plan() or self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
                 raise AccessError(_("Only authorized Head Office Functional Reviewers or Administrators can submit to the Review Committee."))
-            if line.org_unit_type != "head_office" and line.state not in ("district_approved", "district_endorsed"):
+            if line.org_unit_type not in ("head_office", "district_office") and line.state not in ("district_approved", "district_endorsed", "submitted"):
                 raise UserError(_("Branch plans must be approved by the District Reviewer before submitting to the Review Committee."))
-            if line.state not in ("district_approved", "district_endorsed", "submitted", "draft", "returned", "info_requested"):
+            if line.state not in ("district_approved", "district_endorsed", "submitted", "draft", "returned", "info_requested", "ho_reviewed"):
                 continue
 
             # Snapshot proposed targets so requested figures are preserved
@@ -2266,6 +2475,20 @@ class PbmsWorkflowMixin(models.AbstractModel):
             if line.state != "ho_endorse":
                 continue
 
+            mp_lines = line.line_ids.filtered(lambda l: l.line_type == "manpower")
+            for ml in mp_lines:
+                target = int(ml.annual_total or ml.quantity or 0)
+                tot_sourced = int((ml.fulfillment_promotion or 0) + (ml.fulfillment_transfer or 0) + (ml.fulfillment_lateral or 0) + (ml.fulfillment_external or 0))
+                if target != tot_sourced:
+                    ml._auto_balance_manpower_sourcing()
+                    target = int(ml.annual_total or ml.quantity or 0)
+                ml.sudo().with_context(bypass_plan_lock=True).write({
+                    "approved_annual_total": target,
+                })
+
+            if hasattr(line, "_compute_category_summaries"):
+                line._compute_category_summaries()
+
             old_state = line.state
             now = fields.Datetime.now()
             line.sudo().with_context(bypass_plan_lock=True).write({
@@ -2279,7 +2502,7 @@ class PbmsWorkflowMixin(models.AbstractModel):
             line._notify_pending_approval("cpco_endorse", _("CPCO Final Endorsement"))
 
     def action_cpco_endorse_to_solutions(self):
-        """CPCO verifies plan (view-only) and endorses to People Solutions Directorate.
+        """CPCO verifies and endorses to People Solutions Directorate.
         Final approved state: establishment updated & annual vacancies auto-initiated."""
         all_plans = self._get_workflow_sibling_plans()
         for line in all_plans:
@@ -2289,6 +2512,20 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 raise AccessError(_("Only CPCO (Chief of People & Culture Office) or Administrators can endorse workforce plans at this stage."))
             if line.state != "cpco_endorse":
                 continue
+
+            mp_lines = line.line_ids.filtered(lambda l: l.line_type == "manpower")
+            for ml in mp_lines:
+                target = int(ml.annual_total or ml.quantity or 0)
+                tot_sourced = int((ml.fulfillment_promotion or 0) + (ml.fulfillment_transfer or 0) + (ml.fulfillment_lateral or 0) + (ml.fulfillment_external or 0))
+                if target != tot_sourced:
+                    ml._auto_balance_manpower_sourcing()
+                    target = int(ml.annual_total or ml.quantity or 0)
+                ml.sudo().with_context(bypass_plan_lock=True).write({
+                    "approved_annual_total": target,
+                })
+
+            if hasattr(line, "_compute_category_summaries"):
+                line._compute_category_summaries()
 
             old_state = line.state
             now = fields.Datetime.now()
@@ -2303,7 +2540,6 @@ class PbmsWorkflowMixin(models.AbstractModel):
             line_ctx._log_audit_action("cpco_endorse_solutions", old_state, "approved", line.cpco_comment or _("Endorsed by CPCO to People Solutions Directorate. Plan is fully approved."))
             line_ctx._update_approved_workforce_establishment()
             line_ctx._auto_initiate_annual_workforce_vacancies()
-            line_ctx._notify_recruitment_commencement()
             line_ctx._notify_approved(_("Workforce Plan"), is_final=True)
 
     def action_ceo_reject(self, comment=False):
@@ -2337,7 +2573,17 @@ class PbmsWorkflowMixin(models.AbstractModel):
         for line in all_plans:
             if getattr(line, "category", False) != "manpower" and not line.line_ids.filtered(lambda l: l.line_type == "manpower"):
                 raise UserError(_("This action is only applicable to the Manpower Planning Category."))
-            if not (line._pbms_can_district_review_plan() or self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
+            can_review = (
+                line._pbms_can_district_review_plan()
+                or (
+                    line.org_unit_type == "head_office"
+                    and line._pbms_can_ho_review_plan()
+                )
+                or self.env.user._pbms_is_sppmd_admin()
+                or self.env.is_admin()
+                or self.env.su
+            )
+            if not can_review:
                 raise AccessError(_("Only District Directors, Department Directors, or Administrators can review and escalate workforce plans at this stage."))
             if line.state not in ("submitted", "draft", "returned", "info_requested"):
                 continue
@@ -2348,7 +2594,8 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 "district_reviewer_id": self.env.uid,
                 "district_review_date": fields.Datetime.now(),
             })
-            line._log_audit_action("district_approve_workforce", old_state, "chief_review", line.district_comment or _("Reviewed by District/Department Director and escalated to Respective Chief."))
+            msg = line.district_comment or (_("Reviewed by Department Director and escalated to Respective Chief.") if line.org_unit_type == "head_office" else _("Reviewed by District Director and escalated to Respective Chief."))
+            line._log_audit_action("district_approve_workforce", old_state, "chief_review", msg)
             line._notify_pending_approval("chief_review", _("Respective Chief Review"))
 
     def action_chief_approve_escalate(self):
@@ -2359,6 +2606,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 raise UserError(_("This action is only applicable to the Manpower Planning Category."))
             if not (self.env.user._pbms_is_respective_chief() or self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
                 raise AccessError(_("Only Respective Chiefs or Administrators can approve and escalate workforce plans at this stage."))
+            if not (self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
+                is_child = line._is_child_operating_unit_plan() or (line.org_unit_id and line.org_unit_id.id in self.env.user._pbms_child_operating_unit_ids())
+                if not is_child:
+                    raise AccessError(_("You can only approve and escalate workforce plans for your own child work units."))
             if line.state not in ("chief_review", "district_approved", "district_endorsed"):
                 continue
 
@@ -2382,6 +2633,10 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 raise UserError(_("This action is only applicable to the Manpower Planning Category."))
             if not (self.env.user._pbms_is_respective_chief() or self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
                 raise AccessError(_("Only Respective Chiefs or Administrators can reject workforce plans at this stage."))
+            if not (self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
+                is_child = line._is_child_operating_unit_plan() or (line.org_unit_id and line.org_unit_id.id in self.env.user._pbms_child_operating_unit_ids())
+                if not is_child:
+                    raise AccessError(_("You can only reject workforce plans for your own child work units."))
             if line.state not in ("chief_review", "district_approved", "district_endorsed"):
                 continue
 
@@ -2598,19 +2853,15 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 users = plan._get_users_with_group("bunna_pbms.group_pbms_people_operations")
                 if not users:
                     users = plan._get_users_with_group("bunna_pbms.group_pbms_manager")
-                for u in users:
-                    plan.activity_schedule(
-                        activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
-                        summary=_("Annual Plan Vacancy Action: %s (%s)") % (ml.job_id.name, qty),
-                        note=_(
-                            "Annual Workforce Plan %s approved by CEO / Board.<br/>"
-                            "• Position: %s<br/>"
-                            "• Headcount: %s<br/>"
-                            "• Work Unit: %s<br/>"
-                            "Please initiate recruitment / vacancy posting per approved annual plan."
-                        ) % (getattr(plan, "request_number", plan.display_name), ml.job_id.name, qty, plan.org_unit_id.display_name),
-                        user_id=u.id,
-                    )
+                summary = _("Annual Plan Vacancy Action: %s (%s)") % (ml.job_id.name, qty)
+                note = _(
+                    "Annual Workforce Plan %s approved by CEO / Board.<br/>"
+                    "• Position: %s<br/>"
+                    "• Headcount: %s<br/>"
+                    "• Work Unit: %s<br/>"
+                    "Please initiate recruitment / vacancy posting per approved annual plan."
+                ) % (getattr(plan, "request_number", plan.display_name), ml.job_id.name, qty, plan.org_unit_id.display_name)
+                plan._send_inbox_notification(users, summary, note)
 
             if created_count > 0:
                 plan.message_post(
@@ -2869,7 +3120,7 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 ))
 
             if not is_admin:
-                if not (line._is_own_operating_unit_plan() or line.create_uid == self.env.user or line.submitted_by == self.env.user or self.env.user._pbms_is_branch_user()):
+                if not line._is_own_operating_unit_plan():
                     raise AccessError(_("You can only reset plans for your own work unit."))
                 if line.state not in ("submitted", "returned", "info_requested"):
                     raise UserError(_("You can only reset plans that are pending review (Submitted) or returned for revision."))

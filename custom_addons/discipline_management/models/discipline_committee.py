@@ -13,23 +13,18 @@ class DisciplineCommitteeMeeting(models.Model):
     case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Affected Employee', related='case_id.employee_id', store=True, readonly=True)
     meeting_date = fields.Datetime(string='Scheduled Meeting Time', required=True, tracking=True)
-    meeting_end_time = fields.Datetime(string='Scheduled Meeting End Time', tracking=True)
     location = fields.Char(string='Meeting Room / Location', default='Main HR Conference Room')
 
-    committee_chair_id = fields.Many2one('res.users', string='Committee Chair (CPCO)', required=True, tracking=True)
-    respective_director_id = fields.Many2one('res.users', string='Director of Respective Office', tracking=True)
-    legal_director_id = fields.Many2one('res.users', string='Legal Director', tracking=True)
-    pomd_secretary_id = fields.Many2one('res.users', string='People Operation Director (Secretary)', tracking=True)
-    meeting_link = fields.Char(string='Virtual Meeting Link / Room')
+    committee_chair_id = fields.Many2one('res.users', string='Committee Chair', required=True, tracking=True)
     member_ids = fields.Many2many('res.users', 'discipline_committee_members_rel', 'meeting_id', 'user_id', string='Committee Members', required=True)
 
-    # Quorum Requirements
+    # Quorum Requirements (FR-DIS-020)
     total_expected_members = fields.Integer(string='Total Expected Members', compute='_compute_quorum', store=True)
-    present_members_count = fields.Integer(string='Members Present Count', required=True, default=4, tracking=True)
+    present_members_count = fields.Integer(string='Members Present Count', required=True, default=0, tracking=True)
     required_quorum_percentage = fields.Float(string='Required Quorum (%)', default=50.0, required=True, help='Minimum percentage of members present required for valid decision')
     is_quorum_met = fields.Boolean(string='Quorum Validated', compute='_compute_quorum', store=True, tracking=True)
 
-    # Minutes & Decision Capture
+    # Minutes & Decision Capture (FR-DIS-018 & FR-DIS-019)
     agenda = fields.Text(string='Meeting Agenda')
     meeting_minutes = fields.Text(string='Official Meeting Minutes', tracking=True)
     final_recommendation = fields.Selection([
@@ -38,7 +33,6 @@ class DisciplineCommitteeMeeting(models.Model):
         ('second_warning', 'Recommend Second Written Warning'),
         ('first_warning', 'Recommend First Written Warning'),
         ('verbal_warning', 'Recommend Verbal Warning'),
-        ('demotion', 'Recommend Demotion'),
         ('exonerate', 'Exonerate Employee / Case Dismissed'),
         ('further_investigation', 'Require Further Investigation'),
     ], string='Committee Recommendation', tracking=True)
@@ -51,23 +45,10 @@ class DisciplineCommitteeMeeting(models.Model):
     state = fields.Selection([
         ('draft', 'Scheduled'),
         ('in_progress', 'Meeting In Progress'),
-        # Director must review agenda before voting is opened
-        ('director_review', 'Pending Director Review Sign-off'),
-        ('voting', 'Voting in Progress'),
         ('minutes_recorded', 'Minutes & Votes Captured'),
         ('completed', 'Finalized & Submitted'),
         ('cancelled', 'Cancelled'),
     ], string='Status', default='draft', required=True, tracking=True)
-
-    # Sequential sign-off tracking
-    director_signed_off = fields.Boolean(
-        string='Immediate Director Sign-off Completed',
-        default=False,
-        tracking=True,
-        help='Immediate Director of employee under investigation must sign first to initiate final review.'
-    )
-    director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
-    director_signoff_by_id = fields.Many2one('res.users', string='Signed Off By (Director)', tracking=True)
 
     @api.depends('member_ids', 'present_members_count', 'required_quorum_percentage')
     def _compute_quorum(self):
@@ -86,50 +67,6 @@ class DisciplineCommitteeMeeting(models.Model):
             rec.against_count = len(rec.vote_ids.filtered(lambda v: v.vote == 'against'))
             rec.abstain_count = len(rec.vote_ids.filtered(lambda v: v.vote == 'abstain'))
 
-    @api.onchange('case_id')
-    def _onchange_case_id_populate_committee(self):
-        """Auto-populate mandatory committee roles (Chair, Director, Legal, Secretary)."""
-        if self.case_id and self.case_id.employee_id:
-            emp = self.case_id.employee_id
-            
-            # 1. Chairperson: Chief People and Culture Officer (CPCO)
-            cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-            cpco_users = (cpco_group.all_user_ids or cpco_group.user_ids) if cpco_group else self.env['res.users']
-            cpco_user = cpco_users[0] if cpco_users else self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
-            self.committee_chair_id = cpco_user or self.env.user
-
-            # 2. Member: Director of Respective Office
-            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
-                self.respective_director_id = emp.department_id.manager_id.user_id
-            else:
-                self.respective_director_id = False
-
-            # 3. Member: Legal Director
-            legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
-            legal_users = (legal_group.all_user_ids or legal_group.user_ids) if legal_group else self.env['res.users']
-            legal_user = legal_users[0] if legal_users else self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
-            self.legal_director_id = legal_user or False
-
-            # 4. Member & Secretary: People Operation Director
-            pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-            pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
-            pomd_user = pomd_users[0] if pomd_users else self.env['res.users'].search([('name', 'ilike', 'Operation')], limit=1)
-            self.pomd_secretary_id = pomd_user or self.env.user
-
-            # Assemble full member set
-            members = set()
-            if self.committee_chair_id:
-                members.add(self.committee_chair_id.id)
-            if self.respective_director_id:
-                members.add(self.respective_director_id.id)
-            if self.legal_director_id:
-                members.add(self.legal_director_id.id)
-            if self.pomd_secretary_id:
-                members.add(self.pomd_secretary_id.id)
-            
-            self.member_ids = [(6, 0, list(members))]
-            self.present_members_count = len(members)
-
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -138,7 +75,7 @@ class DisciplineCommitteeMeeting(models.Model):
         return super().create(vals_list)
 
     def action_schedule_and_notify(self):
-        """Schedule meeting and notify members & employee."""
+        """FR-DIS-016 & FR-DIS-017: Schedule meeting and notify members & employee."""
         for rec in self:
             rec.write({'state': 'in_progress'})
             # Post message and send notification to committee members and employee
@@ -152,97 +89,26 @@ class DisciplineCommitteeMeeting(models.Model):
                 subtype_xmlid='mail.mt_comment'
             )
 
-    def action_request_director_review(self):
-        """Send case packet to Department Director for sign-off before voting."""
-        for rec in self:
-            if rec.state != 'in_progress':
-                raise UserError(_('Meeting must be In Progress before requesting director review.'))
-            rec.write({'state': 'director_review'})
-            rec.case_id.message_post(
-                body=_('Committee meeting %s: Agenda submitted for Director sign-off prior to voting.') % rec.name
-            )
-
-    def action_director_signoff(self):
-        """Department Director approves; voting can now commence."""
-        for rec in self:
-            if rec.state != 'director_review':
-                raise UserError(_('This action is only valid when pending Director Review.'))
-            rec.write({
-                'state': 'voting',
-                'director_signed_off': True,
-                'director_signoff_date': fields.Date.context_today(self),
-                'director_signoff_by_id': self.env.user.id,
-            })
-            rec.case_id.message_post(
-                body=_('Director sign-off confirmed by %s on %s. Voting is now open.') % (
-                    self.env.user.name, fields.Date.context_today(self)
-                )
-            )
-
     def action_record_minutes_and_votes(self):
         for rec in self:
-            if rec.state not in ['voting', 'in_progress']:
-                raise UserError(_('Voting must be in progress before recording minutes.'))
-            if not rec.director_signed_off and rec.state == 'voting':
-                # Allowed — this is just recording
-                pass
             if not rec.meeting_minutes:
                 raise UserError(_('Official Meeting Minutes must be recorded before proceeding.'))
             rec.write({'state': 'minutes_recorded'})
 
     def action_finalize_meeting(self):
-        """Quorum Validation +sequential sign-off check before final decision."""
+        """FR-DIS-020: Quorum Validation before final decision can be completed."""
         for rec in self:
-            # Director must have signed off before finalisation
-            if not rec.director_signed_off:
-                raise UserError(_(
-                    'Sequential Sign-off Required: Department Director must sign off on the agenda '
-                    'before the committee meeting can be finalized .'
-                ))
-
             if not rec.is_quorum_met:
                 raise ValidationError(_(
-                    'Quorum Validation Error: Meeting cannot be finalized. Quorum requirement not met '
-                    '(%s present out of %s members; %s%% required).'
+                    'Quorum Validation Error: Meeting cannot be finalized. Quorum requirement not met (%s present out of %s members; %s%% required).'
                 ) % (rec.present_members_count, rec.total_expected_members, rec.required_quorum_percentage))
             
             if not rec.final_recommendation:
                 raise UserError(_('A final committee recommendation must be selected.'))
 
-            # Ensure all present members have cast a vote
-            cast_votes = len(rec.vote_ids)
-            if cast_votes < rec.present_members_count:
-                raise UserError(_(
-                    'Incomplete Votes: %d member(s) present but only %d vote(s) recorded. '
-                    'All present members must cast a vote before finalizing.'
-                ) % (rec.present_members_count, cast_votes))
-
             rec.write({'state': 'completed'})
-            
-            # Auto-populate the decided punishment on the case from committee recommendation
-            recom_to_punishment = {
-                'dismissal': 'dismissal',
-                'final_warning': 'final_warning_penalty',
-                'second_warning': 'second_warning_penalty',
-                'first_warning': 'first_warning_penalty',
-                'verbal_warning': 'verbal_warning',
-                'demotion': 'demotion',
-                'exonerate': 'exonerate',
-                'custom': 'custom',
-            }
-            if rec.case_id and rec.final_recommendation in recom_to_punishment:
-                punish_val = recom_to_punishment[rec.final_recommendation]
-                rec.case_id.with_context(force_write=True).write({
-                    'decided_punishment_type': punish_val,
-                    'punishment_type': punish_val,
-                })
-
             rec.case_id.message_post(
-                body=_(
-                    'Disciplinary Committee Meeting %s completed. Quorum Validated. '
-                    'Director sign-off: %s. Recommendation: %s. Votes — For: %d | Against: %d | Abstain: %d.'
-                ) % (rec.name, rec.director_signoff_date, rec.final_recommendation,
-                     rec.in_favor_count, rec.against_count, rec.abstain_count)
+                body=_('Disciplinary Committee Meeting %s completed. Quorum Validated. Recommendation: %s.') % (rec.name, rec.final_recommendation)
             )
 
 

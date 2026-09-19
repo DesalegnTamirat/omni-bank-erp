@@ -75,41 +75,33 @@
                                     <thead style="background-color: #f2f2f2;">
                                         <tr>
                                             <th>Punishment Type</th>
-                                            <th>Penalty Rate / Days</th>
+                                            <th>Salary Penalty (%)</th>
                                             <th>Initiator</th>
-                                            <th>Enforced By</th>
+                                            <th>Reviewer</th>
+                                            <th>Final Approver</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
                                             <td><span t-field="doc.punishment_type"/></td>
-                                            <td>
-                                                <t t-if="doc.fine_days &gt; 0">
-                                                    <span t-field="doc.fine_days"/> Day(s) Wage Deduction
-                                                </t>
-                                                <t t-elif="doc.penalty_percentage &gt; 0">
-                                                    <span t-field="doc.penalty_percentage"/> % Salary Deduction
-                                                </t>
-                                                <t t-else="">
-                                                    Recorded Warning (0% Penalty)
-                                                </t>
-                                            </td>
+                                            <td><span t-field="doc.penalty_percentage"/> %</td>
                                             <td><span t-field="doc.initiator_id.name"/></td>
+                                            <td><span t-field="doc.reviewer_id.name"/></td>
                                             <td><span t-field="doc.approver_id.name"/></td>
                                         </tr>
                                     </tbody>
                                 </table>
-                                <t t-if="doc.penalty_percentage &gt; 0 or doc.fine_days &gt; 0">
+                                <t t-if="doc.penalty_percentage &gt; 0">
                                     <p class="text-danger" style="font-weight: bold;">
-                                        Note: The financial deduction penalty will be automatically scheduled and applied via the Payroll module starting from the effective pay period.
+                                        Note: A salary deduction penalty of <span t-field="doc.penalty_percentage"/>% will be automatically applied via Payroll starting from effective date.
                                     </p>
                                 </t>
                             </div>
 
-                            <!-- Appeal Notice -->
+                            <!-- Appeal Notice (FR-DIS-031) -->
                             <div class="mb-4" style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 4px;">
                                 <h6 style="color: #856404; font-weight: bold; margin-bottom: 5px;">
-                                    3. NOTICE OF APPEAL RIGHTS 
+                                    3. NOTICE OF APPEAL RIGHTS (FR-DIS-031)
                                 </h6>
                                 <p style="color: #856404; margin-bottom: 0; font-size: 12px;">
                                     Per Bunna Bank HR Disciplinary Policy, you have the right to submit a formal appeal against this decision within 

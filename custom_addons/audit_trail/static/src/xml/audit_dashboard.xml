@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+<t t-name="audit_trail.AuditDashboard">
+  <div style="padding:1.5rem 2rem;background:#f8f9fa;min-height:100%;">
+
+    <!-- loading spinner -->
+    <div t-if="state.loading" style="text-align:center;padding:4rem;">
+      <i class="fa fa-spinner fa-spin fa-2x text-muted"/>
+      <p class="text-muted mt-2">Loading audit data...</p>
+    </div>
+
+    <t t-else="">
+
+      <!-- ── Header ── -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:8px;">
+        <div>
+          <h4 style="margin:0;font-weight:600;color:#1a1a2e;">Audit Trail</h4>
+          <small style="color:#6c757d;">Live data from audit.log</small>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <div class="btn-group btn-group-sm" role="group">
+            <button t-on-click="() => this.setFilter('today')"
+                    t-attf-class="btn {{ state.dateFilter === 'today' ? 'btn-primary' : 'btn-outline-secondary' }}">
+              Today
+            </button>
+            <button t-on-click="() => this.setFilter('yesterday')"
+                    t-attf-class="btn {{ state.dateFilter === 'yesterday' ? 'btn-primary' : 'btn-outline-secondary' }}">
+              Yesterday
+            </button>
+            <button t-on-click="() => this.setFilter('week')"
+                    t-attf-class="btn {{ state.dateFilter === 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">
+              This Week
+            </button>
+            <button t-on-click="() => this.setFilter('month')"
+                    t-attf-class="btn {{ state.dateFilter === 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">
+              This Month
+            </button>
+            <button t-on-click="() => this.setFilter('all')"
+                    t-attf-class="btn {{ state.dateFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary' }}">
+              All
+            </button>
+          </div>
+          <button class="btn btn-secondary btn-sm" t-on-click="loadData">
+            <i class="fa fa-refresh me-1"/>Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Metric cards ── -->
+      <div class="row g-3 mb-4">
+
+        <!-- Total -->
+        <div class="col-lg-3 col-md-6">
+          <div t-on-click="() => this.openLogs([], 'All Audit Logs')"
+               style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;border-left:4px solid #6c757d;transition:box-shadow .2s;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#6c757d;font-weight:600;">Total Logs</span>
+              <div style="width:32px;height:32px;border-radius:8px;background:#f1f3f5;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-database" style="color:#6c757d;font-size:13px;"/>
+              </div>
+            </div>
+            <div style="font-size:2rem;font-weight:700;color:#1a1a2e;line-height:1;" t-esc="state.total.toLocaleString()"/>
+            <div style="font-size:12px;color:#adb5bd;margin-top:4px;">click to view all</div>
+          </div>
+        </div>
+
+        <!-- Creates -->
+        <div class="col-lg-3 col-md-6">
+          <div t-on-click="() => this.openLogs([[`operation`,`=`,`create`]], 'Create Logs')"
+               style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;border-left:4px solid #3B6D11;transition:box-shadow .2s;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#3B6D11;font-weight:600;">Creates</span>
+              <div style="width:32px;height:32px;border-radius:8px;background:#EAF3DE;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-plus-circle" style="color:#3B6D11;font-size:13px;"/>
+              </div>
+            </div>
+            <div style="font-size:2rem;font-weight:700;color:#27500A;line-height:1;" t-esc="state.creates.toLocaleString()"/>
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#3B6D11;margin-bottom:3px;">
+                <span><t t-esc="state.createPct"/>% of total</span>
+              </div>
+              <div style="background:#EAF3DE;border-radius:4px;height:4px;">
+                <div t-attf-style="width:#{state.createPct}%;background:#3B6D11;height:4px;border-radius:4px;transition:width .4s;"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Updates -->
+        <div class="col-lg-3 col-md-6">
+          <div t-on-click="() => this.openLogs([[`operation`,`=`,`write`]], 'Update Logs')"
+               style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;border-left:4px solid #185FA5;transition:box-shadow .2s;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#185FA5;font-weight:600;">Updates</span>
+              <div style="width:32px;height:32px;border-radius:8px;background:#E6F1FB;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-pencil" style="color:#185FA5;font-size:13px;"/>
+              </div>
+            </div>
+            <div style="font-size:2rem;font-weight:700;color:#0C447C;line-height:1;" t-esc="state.writes.toLocaleString()"/>
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#185FA5;margin-bottom:3px;">
+                <span><t t-esc="state.writePct"/>% of total</span>
+              </div>
+              <div style="background:#E6F1FB;border-radius:4px;height:4px;">
+                <div t-attf-style="width:#{state.writePct}%;background:#185FA5;height:4px;border-radius:4px;transition:width .4s;"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deletes -->
+        <div class="col-lg-3 col-md-6">
+          <div t-on-click="() => this.openLogs([[`operation`,`=`,`unlink`]], 'Delete Logs')"
+               style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer;border-left:4px solid #A32D2D;transition:box-shadow .2s;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#A32D2D;font-weight:600;">Deletes</span>
+              <div style="width:32px;height:32px;border-radius:8px;background:#FCEBEB;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-trash" style="color:#A32D2D;font-size:13px;"/>
+              </div>
+            </div>
+            <div style="font-size:2rem;font-weight:700;color:#791F1F;line-height:1;" t-esc="state.unlinks.toLocaleString()"/>
+            <div style="margin-top:8px;">
+              <div style="display:flex;justify-content:space-between;font-size:11px;color:#A32D2D;margin-bottom:3px;">
+                <span><t t-esc="state.unlinkPct"/>% of total</span>
+              </div>
+              <div style="background:#FCEBEB;border-radius:4px;height:4px;">
+                <div t-attf-style="width:#{state.unlinkPct}%;background:#A32D2D;height:4px;border-radius:4px;transition:width .4s;"/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Bottom row ── -->
+      <div class="row g-3">
+
+        <!-- By module -->
+        <div class="col-lg-4">
+          <div style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);height:100%;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;">
+              <div style="width:28px;height:28px;border-radius:7px;background:#E6F1FB;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-th-large" style="color:#185FA5;font-size:12px;"/>
+              </div>
+              <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#495057;">By Module</span>
+            </div>
+            <div t-if="!state.byModule.length" class="text-muted" style="font-size:13px;text-align:center;padding:1rem 0;">
+              No data yet
+            </div>
+            <t t-foreach="state.byModule" t-as="m" t-key="m.module">
+              <div style="margin-bottom:14px;cursor:pointer;"
+                   t-on-click="() => this.openLogs([[`module`,`=`,m.module]], m.module + ' Logs')">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                  <span style="font-size:13px;font-weight:500;color:#343a40;" t-esc="m.module || '(none)'"/>
+                  <span style="font-size:12px;color:#6c757d;background:#f1f3f5;padding:1px 7px;border-radius:10px;" t-esc="m.module_count.toLocaleString()"/>
+                </div>
+                <div style="background:#e9ecef;border-radius:6px;height:6px;">
+                  <div t-attf-style="width:#{m._pct}%;background:linear-gradient(90deg,#185FA5,#4A90D9);height:6px;border-radius:6px;transition:width .4s;"/>
+                </div>
+              </div>
+            </t>
+          </div>
+        </div>
+
+        <!-- By user -->
+        <div class="col-lg-4">
+          <div style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);height:100%;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;">
+              <div style="width:28px;height:28px;border-radius:7px;background:#ede9fb;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-users" style="color:#534AB7;font-size:12px;"/>
+              </div>
+              <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#495057;">Top Users</span>
+            </div>
+            <div t-if="!state.byUser.length" class="text-muted" style="font-size:13px;text-align:center;padding:1rem 0;">
+              No data yet
+            </div>
+            <t t-foreach="state.byUser" t-as="u" t-key="u.user_id[0]">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#534AB7,#7B74D4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;">
+                  <t t-esc="u._initials"/>
+                </div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <span style="font-size:13px;font-weight:500;color:#343a40;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" t-esc="u.user_id[1] || '—'"/>
+                    <span style="font-size:12px;color:#6c757d;flex-shrink:0;margin-left:8px;" t-esc="u.user_id_count"/>
+                  </div>
+                  <div style="background:#e9ecef;border-radius:6px;height:5px;">
+                    <div t-attf-style="width:#{u._pct}%;background:linear-gradient(90deg,#534AB7,#8B80E0);height:5px;border-radius:6px;"/>
+                  </div>
+                </div>
+              </div>
+            </t>
+          </div>
+        </div>
+
+        <!-- Operation split -->
+        <div class="col-lg-4">
+          <div style="background:#fff;border-radius:12px;padding:1.25rem 1.5rem;box-shadow:0 1px 4px rgba(0,0,0,.08);height:100%;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;">
+              <div style="width:28px;height:28px;border-radius:7px;background:#fff3cd;display:flex;align-items:center;justify-content:center;">
+                <i class="fa fa-pie-chart" style="color:#856404;font-size:12px;"/>
+              </div>
+              <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#495057;">Operation Split</span>
+            </div>
+
+            <!-- Create -->
+            <div style="margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#3B6D11;"/>
+                  <span style="font-size:13px;color:#343a40;">Creates</span>
+                </div>
+                <span style="font-size:13px;font-weight:600;color:#27500A;"><t t-esc="state.creates.toLocaleString()"/> <span style="font-weight:400;color:#6c757d;font-size:11px;">(<t t-esc="state.createPct"/>%)</span></span>
+              </div>
+              <div style="background:#EAF3DE;border-radius:6px;height:8px;">
+                <div t-attf-style="width:#{state.createPct}%;background:linear-gradient(90deg,#3B6D11,#6aab22);height:8px;border-radius:6px;transition:width .4s;"/>
+              </div>
+            </div>
+
+            <!-- Write -->
+            <div style="margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#185FA5;"/>
+                  <span style="font-size:13px;color:#343a40;">Updates</span>
+                </div>
+                <span style="font-size:13px;font-weight:600;color:#0C447C;"><t t-esc="state.writes.toLocaleString()"/> <span style="font-weight:400;color:#6c757d;font-size:11px;">(<t t-esc="state.writePct"/>%)</span></span>
+              </div>
+              <div style="background:#E6F1FB;border-radius:6px;height:8px;">
+                <div t-attf-style="width:#{state.writePct}%;background:linear-gradient(90deg,#185FA5,#4A90D9);height:8px;border-radius:6px;transition:width .4s;"/>
+              </div>
+            </div>
+
+            <!-- Delete -->
+            <div style="margin-bottom:8px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="width:8px;height:8px;border-radius:50%;background:#A32D2D;"/>
+                  <span style="font-size:13px;color:#343a40;">Deletes</span>
+                </div>
+                <span style="font-size:13px;font-weight:600;color:#791F1F;"><t t-esc="state.unlinks.toLocaleString()"/> <span style="font-weight:400;color:#6c757d;font-size:11px;">(<t t-esc="state.unlinkPct"/>%)</span></span>
+              </div>
+              <div style="background:#FCEBEB;border-radius:6px;height:8px;">
+                <div t-attf-style="width:#{state.unlinkPct}%;background:linear-gradient(90deg,#A32D2D,#d94f4f);height:8px;border-radius:6px;transition:width .4s;"/>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </t>
+  </div>
+</t>
+
+</templates>

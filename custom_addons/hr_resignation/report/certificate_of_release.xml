@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <record id="action_report_certificate_of_release" model="ir.actions.report">
+        <field name="name">Certificate of Release</field>
+        <field name="model">hr.resignation</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_resignation.report_certificate_of_release</field>
+        <field name="report_file">hr_resignation.report_certificate_of_release</field>
+        <field name="binding_model_id" ref="model_hr_resignation"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_certificate_of_release">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.basic_layout">
+                    <div class="page" style="padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 13px;">
+
+                        <!-- Certificate Outer Border Container -->
+                        <div style="border: 3px double #800020; padding: 35px; background-color: #ffffff; min-height: 880px; box-sizing: border-box; position: relative;">
+
+                            <!-- Header Section / Bank Branding -->
+                            <table style="width: 100%; border-bottom: 2px solid #800020; padding-bottom: 15px; margin-bottom: 25px;">
+                                <tr>
+                                    <td style="width: 25%; vertical-align: middle;">
+                                        <t t-if="doc.employee_id.company_id.logo">
+                                            <img t-att-src="image_data_uri(doc.employee_id.company_id.logo)" style="max-height: 75px; max-width: 170px;" alt="Logo"/>
+                                        </t>
+                                    </td>
+                                    <td style="width: 75%; text-align: right; vertical-align: middle;">
+                                        <h2 style="margin: 0; color: #800020; font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                                            BUNNA BANK S.C.
+                                        </h2>
+                                        <p style="margin: 3px 0 0 0; color: #555555; font-size: 12px; font-weight: 500;">
+                                            Human Resources Management Directorate
+                                        </p>
+                                        <p style="margin: 2px 0 0 0; color: #777777; font-size: 11px;">
+                                            Separation &amp; Clearance Unit
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Document Metadata -->
+                            <table style="width: 100%; margin-bottom: 30px; font-size: 12px;">
+                                <tr>
+                                    <td style="width: 50%; text-align: left;">
+                                        <strong>Ref No:</strong> <span style="color: #333333;"><t t-out="doc.name"/></span>
+                                    </td>
+                                    <td style="width: 50%; text-align: right;">
+                                        <strong>Date:</strong> <span style="color: #333333;"><t t-out="str(doc.release_date or doc.expected_last_day or '')"/></span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Certificate Title -->
+                            <div style="text-align: center; margin-bottom: 35px;">
+                                <h1 style="margin: 0; font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #800020; text-decoration: underline;">
+                                    CERTIFICATE OF RELEASE
+                                </h1>
+                                <p style="margin-top: 15px; font-size: 14px; font-weight: bold; text-transform: uppercase; color: #444444;">
+                                    TO WHOM IT MAY CONCERN
+                                </p>
+                            </div>
+
+                            <!-- Certificate Body Content -->
+                            <div style="line-height: 2.0; font-size: 14px; text-align: justify; margin-bottom: 40px; color: #2c2c2c;">
+                                <p>
+                                    This is to officially certify that 
+                                    <strong style="color: #000000; font-size: 15px;"><t t-out="doc.employee_id.name or ''"/></strong>,
+                                    <t t-if="doc.job_id">
+                                        who served as <strong><t t-out="doc.job_id.name"/></strong>
+                                    </t>
+                                    <t t-if="doc.department_id">
+                                        in the <strong><t t-out="doc.department_id.name"/></strong> Department
+                                    </t>,
+                                    has formally completed all employment separation procedures and has been released from 
+                                    <strong>Bunna Bank S.C.</strong> effective 
+                                    <strong><t t-out="str(doc.release_date or doc.expected_last_day or '')"/></strong>.
+                                </p>
+                                <p>
+                                    <strong>Separation Type:</strong> 
+                                    <span>
+                                        <t t-out="doc.resignation_type_id.name or ''"/>
+                                    </span>
+                                </p>
+                                <p>
+                                    All mandatory inter-departmental clearances, asset handovers, and final financial settlements 
+                                    have been fully satisfied and verified by the Human Resources Management Directorate.
+                                </p>
+                                <p>
+                                    We acknowledge and appreciate the services rendered during the employee's period of employment 
+                                    and wish continued success in all future endeavors.
+                                </p>
+                            </div>
+
+                            <!-- Signatures Section -->
+                            <table style="width: 100%; margin-top: 50px; font-size: 12px; page-break-inside: avoid;">
+                                <tr>
+                                    <td style="width: 50%; vertical-align: top; text-align: left;">
+                                        <p style="margin: 0; font-weight: bold; color: #800020; text-transform: uppercase;">
+                                            For &amp; On Behalf of Bunna Bank S.C.
+                                        </p>
+                                        <div style="height: 50px;"></div>
+                                        <p style="margin: 0; border-top: 1px dashed #666666; width: 220px; padding-top: 4px;">
+                                            <strong>Authorized HR Officer / Manager</strong>
+                                        </p>
+                                        <p style="margin: 3px 0 0 0; color: #555555;">Human Resources Management</p>
+                                        <p style="margin: 3px 0 0 0; color: #555555;">Official Stamp &amp; Seal</p>
+                                    </td>
+                                    <td style="width: 50%; vertical-align: top; text-align: right;">
+                                        <p style="margin: 0; font-weight: bold; color: #800020; text-transform: uppercase;">
+                                            Employee Acknowledgement
+                                        </p>
+                                        <div style="height: 50px;"></div>
+                                        <div style="display: inline-block; text-align: left;">
+                                            <p style="margin: 0; border-top: 1px dashed #666666; width: 220px; padding-top: 4px;">
+                                                <strong>Signature:</strong> ______________________
+                                            </p>
+                                            <p style="margin: 3px 0 0 0; color: #555555;">Name: <t t-out="doc.employee_id.name or ''"/></p>
+                                            <p style="margin: 3px 0 0 0; color: #555555;">Date: ________________________</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Document Footer -->
+                            <div style="position: absolute; bottom: 20px; left: 35px; right: 35px; text-align: center; border-top: 1px solid #e0e0e0; padding-top: 10px; font-size: 10px; color: #888888;">
+                                <p style="margin: 0;">This document is an official Certificate of Release issued by Bunna Bank S.C. | Ref: <t t-out="doc.name"/></p>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

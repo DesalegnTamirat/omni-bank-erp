@@ -27,7 +27,7 @@
                             type="object"
                             class="btn-primary"
                             icon="fa-paper-plane"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_exam'"/>
+                            invisible="vacancy_status != 'published' or recruitment_step != 'notify_exam' or not has_written_exam"/>
 
                     <!-- 4. Fetch Written Exam -->
                     <button name="action_fetch_exam_score"
@@ -35,7 +35,7 @@
                             type="object"
                             class="btn-primary"
                             icon="fa-download"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_exam'"/>
+                            invisible="vacancy_status != 'published' or recruitment_step != 'fetch_exam' or not has_written_exam"/>
 
                     <!-- 5. Notify Panel -->
                     <button name="action_notify_interview_panel"
@@ -60,6 +60,14 @@
                             class="btn-primary"
                             icon="fa-download"
                             invisible="vacancy_status != 'published' or recruitment_step != 'fetch_interview'"/>
+
+                    <!-- 7.5 Request Supervisor Recommendation (Transfer Matrix) -->
+                    <button name="action_request_supervisor_recommendation"
+                            string="Request Supervisor Recommendation"
+                            type="object"
+                            class="btn-primary"
+                            icon="fa-envelope"
+                            invisible="vacancy_status != 'published' or transfer_eval_mode != 'transfer_matrix_only' or shortlist_done == False"/>
 
                     <!-- 8. Compute and Rank -->
                     <button name="action_compute_and_rank"
@@ -170,6 +178,7 @@
                             <field name="job_position" readonly="vacancy_status != 'draft'"/>
                             <field name="job_grade" readonly="vacancy_status != 'draft'"/>
                             <field name="employee_category" string="Job Category" readonly="vacancy_status != 'draft'"/>
+                            <field name="has_written_exam" widget="boolean_toggle" readonly="vacancy_status != 'draft'"/>
                             <field name="job_level" invisible="employee_category != 'Non Managerial'"
                                    required="employee_category == 'Non Managerial' and sourcing_type in ('external', 'both')"
                                    readonly="vacancy_status != 'draft'"/>
@@ -178,6 +187,9 @@
                             <!-- INTERNAL ONLY: movement type -->
                             <field name="internal_movement_type" string="Movement Type"
                                    invisible="sourcing_type not in ['internal', 'both']"
+                                   readonly="vacancy_status != 'draft'"/>
+                            <field name="transfer_eval_mode" string="Transfer Evaluation Mode"
+                                   invisible="sourcing_type not in ['internal', 'both'] or internal_movement_type not in ['transfer', 'lateral']"
                                    readonly="vacancy_status != 'draft'"/>
                             <!-- EXTERNAL ONLY: source channel -->
                             <field name="source_channel" string="Source Channel"
@@ -192,6 +204,9 @@
                             <field name="opening_date" readonly="vacancy_status != 'draft'"/>
                             <field name="vacancy_announced_on" readonly="vacancy_status != 'draft'"/>
                             <field name="no_of_vacancies" readonly="vacancy_status != 'draft'"/>
+                            <field name="approved_plan_count" readonly="1" string="Approved Plan"/>
+                            <field name="plan_fulfillment_promotion" readonly="1" string="Approved Promotion Plan" invisible="sourcing_type == 'external'"/>
+                            <field name="plan_fulfillment_lateral" readonly="1" string="Approved Transfer Plan" invisible="sourcing_type == 'external'"/>
                             <field name="last_date_to_apply" readonly="vacancy_status != 'draft'"/>
                             <field name="vacancy_description" readonly="vacancy_status != 'draft'"/>
                         </group>
@@ -201,19 +216,26 @@
                     <group invisible="vacancy_status == 'draft'">
                         <group string="Evaluation Weights">
                             <field name="pms_weight" widget="float" readonly="scores_computed == True"/>
-                            <field name="written_weight" widget="float" readonly="scores_computed == True"/>
-                            <field name="interview_weight" widget="float" readonly="scores_computed == True"/>
+                            <field name="written_weight" widget="float" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam or (internal_movement_type in ['transfer', 'lateral'] and transfer_eval_mode in ['interview_only', 'transfer_matrix_only'])"/>
+                            <field name="interview_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type in ['transfer', 'lateral'] and transfer_eval_mode == 'transfer_matrix_only'"/>
+                            
+                            <!-- Transfer Matrix Criteria Weights — visible only when Pure Transfer Matrix is selected -->
+                            <field name="app_date_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
+                            <field name="experience_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
+                            <field name="location_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
+                            <field name="recommendation_weight" widget="float" readonly="scores_computed == True" invisible="internal_movement_type not in ['transfer', 'lateral'] or transfer_eval_mode != 'transfer_matrix_only'"/>
+
                             <field name="exam_candidate_summary"
                                    placeholder="Write summary about exams &amp; selected candidates for Approval Committee..."
                                    invisible="recruitment_step != 'notify_committee'"/>
                         </group>
-                        <group string="Exam &amp; Interview Schedules">
-                            <field name="written_exam_date" widget="datetime" readonly="scores_computed == True"/>
-                            <field name="exam_location" readonly="scores_computed == True"/>
-                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'"/>
-                            <field name="interview_date" widget="datetime" readonly="scores_computed == True"/>
-                            <field name="interview_location" readonly="scores_computed == True"/>
-                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'"/>
+                        <group string="Exam &amp; Interview Schedules" invisible="transfer_eval_mode == 'transfer_matrix_only' and not has_written_exam">
+                            <field name="written_exam_date" widget="datetime" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam"/>
+                            <field name="exam_location" readonly="scores_computed == True or not has_written_exam" invisible="not has_written_exam"/>
+                            <field name="exam_scheduled" widget="badge" decoration-success="exam_scheduled == 'Yes'" decoration-muted="exam_scheduled == 'No'" invisible="not has_written_exam"/>
+                            <field name="interview_date" widget="datetime" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
+                            <field name="interview_location" readonly="scores_computed == True" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
+                            <field name="interview_scheduled" widget="badge" decoration-success="interview_scheduled == 'Yes'" decoration-muted="interview_scheduled == 'No'" invisible="transfer_eval_mode == 'transfer_matrix_only'"/>
                         </group>
                     </group>
 
@@ -338,8 +360,9 @@
                                     <field name="current_department" readonly="parent.scores_computed == True"/>
                                     <field name="preferred_location" readonly="parent.scores_computed == True"/>
                                     <field name="pms_score" readonly="parent.scores_computed == True"/>
-                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True"/>
-                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True"/>
+                                    <field name="written_exam_score" readonly="parent.exam_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode in ['interview_only', 'transfer_matrix_only']"/>
+                                    <field name="interview_score" readonly="parent.interview_scores_fetched == True or parent.scores_computed == True" column_invisible="parent.transfer_eval_mode == 'transfer_matrix_only'"/>
+                                    <field name="supervisor_recommendation_score" string="Supervisor Rec Score" optional="show" column_invisible="parent.transfer_eval_mode != 'transfer_matrix_only'"/>
                                     <field name="weighted_score" readonly="1" class="fw-bold"/>
                                     <field name="rank" readonly="1"/>
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
@@ -373,7 +396,7 @@
                             </field>
                         </page>
 
-                        <page string="Panel Members" name="panel_members" invisible="vacancy_status == 'draft'">
+                        <page string="Panel Members" name="panel_members" invisible="vacancy_status == 'draft' or transfer_eval_mode == 'transfer_matrix_only'">
                             <field name="new_int_rec_panel" invisible="sourcing_type == 'external'" context="{'parent_operating_unit_id': operating_unit_id, 'default_vacancy_id': id}">
                                 <list string="Panel Members" editable="bottom" delete="0">
                                     <field name="eligible_employee_ids" column_invisible="1"/>

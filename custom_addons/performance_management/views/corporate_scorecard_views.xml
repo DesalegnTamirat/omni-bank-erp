@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Window Action -->
+    <record id="action_corporate_scorecard" model="ir.actions.act_window">
+        <field name="name">Corporate Score Card</field>
+        <field name="res_model">corporate.scorecard</field>
+        <field name="view_mode">list,form,kanban</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first Corporate ScoreCard planning period!
+            </p>
+            <p>
+                Corporate ScoreCards help define strategic objectives,
+                measures, and targets for performance planning.
+            </p>
+        </field>
+    </record>
+
+    <!-- List View for Corporate Scorecard -->
+    <record id="view_corporate_scorecard_list" model="ir.ui.view">
+        <field name="name">corporate.scorecard.list</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <list string="Corporate Score Cards">
+                <field name="employee_id"/>
+                <field name="name" string="Planning Name"/>
+                <field name="fiscal_year_id" string="Fiscal Year"/>
+                <field name="appraisal_period_id"/>
+                <field name="date_start" string="Start Date"/>
+                <field name="date_end" string="End Date"/>
+                <field name="total_weight" string="Total Weight %"/>
+                <field name="state" string="Status" widget="badge"/>
+                <field name="company_id" string="Company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form View for Corporate Scorecard -->
+    <record id="view_corporate_scorecard_form" model="ir.ui.view">
+        <field name="name">corporate.scorecard.form</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <form string="Corporate Score Card">
+                <header>
+                    <button name="action_notify" string="Notify" type="object"
+                            invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_accept" string="Accept" type="object"
+                            invisible="state != 'notified'" class="btn-primary"/>
+                    <button name="action_reject" string="Reject" type="object"
+                            invisible="state != 'notified'" class="btn-danger"/>
+<!--                    <button name="action_start_appraisal" string="Start Appraisal" type="object"-->
+<!--                            invisible="state != 'accepted'" class="btn-success"/>-->
+<!--                    <button name="action_complete" string="Complete" type="object"-->
+<!--                            invisible="state != 'appraisal_started'" class ='btn-success'/>-->
+                    <button name="action_reset_draft" string="Reset to Draft" type="object"
+                            invisible="state not in ('notified', 'accepted', 'rejected')"
+                            class="btn-secondary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,notified,accepted,appraisal_started,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="e.g Corporate Scorecard Plan 2025/26" string="Planning Name"/>
+                        </h1>
+                    </div>
+                    <group name="main_data" string="Planning Information">
+                        <group name="left_group" string="Details">
+                            <field name="fiscal_year_id" string="Fiscal Year" options="{'no_create': True}"/>
+                            <field name="company_id" string="Company" options="{'no_create': True}"/>
+                            <field name="employee_id" options="{'no_create': True}"/>
+                        </group>
+                        <group name="right_group" string="Period">
+                            <field name="appraisal_period_id"/>
+                            <field name="date_start" string="Start Date" required="1"/>
+                            <field name="date_end" string="End Date" required="1"/>
+                            <field name="total_weight" string="Total Weight %" widget="progressbar" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Strategic Objectives and Measures" name="scorecard_lines">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+<!--                                    <field name="period_name" invisible="1"/>-->
+                                    <field name="perspective_id" string="Perspective" options="{'no_create':True}"/>
+                                    <field name="objective_id" string="Strategic Objective" options="{'no_create':True}"/>
+                                    <field name="measure_id" string="Performance Measure" options="{'no_create':True}"/>
+                                    <field name="weight" string="Weight %" sum="Total Weight"/>
+                                    <field name="baseline" string="Baseline"/>
+                                    <field name="target_type" string="Target Type"/>
+                                    <field name="period_code" column_invisible="1"/>
+                                    <field name="q1_target" string="Q1 Target" readonly="period_code != 'Q1'"/>
+                                    <field name="h1_target" string=" H1 Target" readonly="period_code != 'H1'"/>
+                                    <field name="q3_target" string="Q3 Target" readonly="period_code != 'Q3'"/>
+                                    <field name="h2_target" string="H2 Target" readonly="period_code != 'H2'"/>
+                                    <field name="annual_target" string="Annual Target"/>
+                                    <field name="target_description" string="Target Description"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <group>
+                                            <field name="perspective_id" string="Perspective" required="1"/>
+                                            <field name="objective_id" string="Strategic Objective" required="1"/>
+                                            <field name="measure_id" string="Performance Measure" required="1"/>
+                                        </group>
+                                        <group>
+                                            <field name="weight" string="Weight (%)"/>
+                                            <field name="baseline" string="Baseline"/>
+                                            <field name="target_type" string="Target Type"/>
+                                        </group>
+                                    </group>
+                                    <group string="Targets">
+                                        <group>
+                                            <field name="q1_target" string="Q1 Target"/>
+                                            <field name="h1_target" string="H1 Target"/>
+                                        </group>
+                                        <group>
+                                            <field name="q3_target" string="Q3 Target"/>
+                                            <field name="h2_target" string="H2 Target"/>
+                                        </group>
+                                    </group>
+                                    <group>
+                                        <field name="annual_target" string="Annual Target"/>
+                                        <field name="target_description" string="Target Description"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_corporate_scorecard_search" model="ir.ui.view">
+        <field name="name">corporate.scorecard.search</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <search string="Search Score Cards">
+                <field name="name" string="Planning Name" filter_domain="[('name','ilike',self)]"/>
+                <field name="fiscal_year_id" string="Fiscal Year"/>
+                <field name="company_id" string="Company"/>
+                <field name="state" string="Status"/>
+                <separator/>
+                <filter name="draft" string="Draft" domain="[('state','=','draft')]"/>
+                <filter name="accepted" string="Accepted" domain="[('state','=','accepted')]"/>
+                <filter name="appraisal_started" string="Appraisal Started" domain="[('state','=','appraisal_started')]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_by_state" string="Status" context="{'group_by':'state'}"/>
+                    <filter name="group_by_fiscal_year" string="Fiscal Year" context="{'group_by':'fiscal_year_id'}"/>
+                    <filter name="group_by_company" string="Company" context="{'group_by':'company_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Kanban View -->
+    <record id="view_corporate_scorecard_kanban" model="ir.ui.view">
+        <field name="name">corporate.scorecard.kanban</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="name"/>
+                <field name="state"/>
+                <field name="fiscal_year_id"/>
+                <field name="appraisal_period_id"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="total_weight"/>
+                <field name="company_id"/>
+                <field name="employee_image_128"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="card-body rounded-3 shadow-sm mb-1" style="border-left: 5px solid #1d2b32; padding: 12px 14px;">
+                            <div class="d-flex">
+                                <div class="o_kanban_image me-3">
+                                    <field name="employee_image_128" widget="image"
+                                           class="rounded-circle"
+                                           options="{'img_style': 'width: 40px; height: 40px; object-fit: cover;'}"/>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <strong class="o_kanban_record_title" style="font-size: 14px;">
+                                            <field name="name"/>
+                                        </strong>
+                                        <field name="state" widget="badge"
+                                               decoration-info="state == 'draft'"
+                                               decoration-warning="state == 'notified'"
+                                               decoration-success="state in ('accepted', 'completed')"
+                                               decoration-danger="state == 'rejected'"/>
+                                    </div>
+                                    <div class="text-muted small mt-2">
+                                        <field name="fiscal_year_id"/>
+                                        <span t-if="record.fiscal_year_id.value and record.appraisal_period_id.value"> — </span>
+                                        <field name="appraisal_period_id"/>
+                                    </div>
+                                    <div class="text-muted small" t-if="record.company_id.value">
+                                        <i class="fa fa-building me-1"/>
+                                        <field name="company_id"/>
+                                    </div>
+                                    <div class="text-muted small" t-if="record.date_start.value">
+                                        <i class="fa fa-calendar me-1"/>
+                                        <field name="date_start"/> to <field name="date_end"/>
+                                    </div>
+                                    <div class="mt-2">
+                                        <span class="badge rounded-pill"
+                                              t-attf-style="background-color:{{record.total_weight.value == 100 and '#425727' or '#c17540'}}; color:#fff; font-weight: 500;">
+                                            <i class="fa fa-percent me-1"/>
+                                            <field name="total_weight"/>% Total Weight
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- Pivot View -->
+    <record id="view_corporate_scorecard_pivot" model="ir.ui.view">
+        <field name="name">corporate.scorecard.pivot</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <pivot string="Score Card Analysis">
+                <field name="fiscal_year_id" type="row"/>
+                <field name="company_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="total_weight" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <!-- Graph View -->
+    <record id="view_corporate_scorecard_graph" model="ir.ui.view">
+        <field name="name">corporate.scorecard.graph</field>
+        <field name="model">corporate.scorecard</field>
+        <field name="arch" type="xml">
+            <graph string="Score Card Trends">
+                <field name="fiscal_year_id" type="row"/>
+                <field name="company_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="total_weight" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+</odoo>

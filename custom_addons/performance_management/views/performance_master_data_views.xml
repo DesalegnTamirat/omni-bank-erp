@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Perspective -->
+    <record id="view_performance_perspective_list" model="ir.ui.view">
+        <field name="name">performance.perspective.list</field>
+        <field name="model">performance.perspective</field>
+        <field name="arch" type="xml">
+            <list string="Perspectives" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_performance_perspective" model="ir.actions.act_window">
+        <field name="name">Perspectives</field>
+        <field name="res_model">performance.perspective</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Strategic Objective -->
+<!--    <record id="view_performance_objective_list" model="ir.ui.view">-->
+<!--        <field name="name">performance.objective.list</field>-->
+<!--        <field name="model">performance.objective</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <list string="Performance Objectives"> &lt;!&ndash;editable="bottom"> &ndash;&gt;-->
+<!--                <field name="perspective_id"/>-->
+<!--                <field name="name"/>-->
+<!--                <field name="tier1"/>-->
+<!--                <field name="active"/>-->
+<!--            </list>-->
+<!--        </field>-->
+<!--    </record>-->
+
+
+
+<!--    <record id="view_performance_objective_form" model="ir.ui.view">-->
+<!--        <field name="name">performance.objective.form</field>-->
+<!--        <field name="model">performance.objective</field>-->
+<!--        <field name="arch" type="xml">-->
+<!--            <form string="Performance Objective">-->
+<!--                <sheet>-->
+<!--                    <div class="oe_title">-->
+<!--                        <label for="name"/>-->
+<!--                        <h1>-->
+<!--                            <field name="name" placeholder="e.g. Increase Revenue"/>-->
+<!--                        </h1>-->
+<!--                    </div>-->
+<!--                    <group name="main_info" string="General">-->
+<!--                        <group>-->
+<!--                            <field name="perspective_id" options="{'no_create': True}"/>-->
+<!--                            <field name="tier1"/>-->
+<!--                        </group>-->
+<!--                        <group>-->
+<!--                            <field name="active"/>-->
+<!--                        </group>-->
+<!--                    </group>-->
+<!--                    <notebook>-->
+<!--                        <page string="Measures (KPIs)" name="measures_page">-->
+<!--                            <field name="measure_ids" nolabel="1">-->
+<!--                                <list editable="bottom">-->
+<!--                                    <field name="name"/>-->
+<!--                                    <field name="target_type"/>-->
+<!--                                    <field name="weight" string="Weight %" sum="Total Weight" required="1"/>-->
+<!--                                </list>-->
+<!--                            </field>-->
+<!--                        </page>-->
+<!--                    </notebook>-->
+<!--                </sheet>-->
+<!--            </form>-->
+<!--        </field>-->
+<!--    </record>-->
+<!--    <record id="view_performance_objective_search" model="ir.ui.view">-->
+<!--            <field name="name">performance.objective.search</field>-->
+<!--            <field name="model">performance.objective</field>-->
+<!--            <field name="arch" type="xml">-->
+<!--                <search>-->
+<!--                    <field name="name"/>-->
+<!--                    <field name="perspective_id"/>-->
+
+<!--                    <filter string="Group by Perspective"-->
+<!--                            name="group_by_perspective"-->
+<!--                            context="{'group_by': 'perspective_id'}"/>-->
+<!--                </search>-->
+<!--            </field>-->
+<!--    </record>-->
+
+<!--    <record id="action_performance_objective" model="ir.actions.act_window">-->
+<!--        <field name="name">Strategic Objectives</field>-->
+<!--        <field name="res_model">performance.objective</field>-->
+<!--        <field name="view_mode">list,form</field>-->
+<!--        <field name="search_view_id" ref="view_performance_objective_search"/>-->
+<!--    </record>-->
+
+<!--    <record id="view_performance_tier2_objective_list" model="ir.ui.view">-->
+<!--    <field name="name">performance.tier2.objective.list</field>-->
+<!--    <field name="model">performance.tier2.objective</field>-->
+<!--    <field name="arch" type="xml">-->
+<!--        <list string="Tier2 Objectives">-->
+<!--            <field name="operating_unit_id"/>-->
+<!--            <field name="perspective_id"/>-->
+<!--            <field name="name"/>-->
+<!--            <field name="measure_ids" widget="many2many_tags" readonly="1"/>-->
+<!--        </list>-->
+<!--    </field>-->
+<!--</record>-->
+
+<!--<record id="view_performance_tier2_objective_form" model="ir.ui.view">-->
+<!--    <field name="name">performance.tier2.objective.form</field>-->
+<!--    <field name="model">performance.tier2.objective</field>-->
+<!--    <field name="arch" type="xml">-->
+<!--        <form string="Tier2 Strategic Objective">-->
+<!--            <sheet>-->
+<!--                <div class="oe_title">-->
+<!--                    <label for="name"/>-->
+<!--                    <h1>-->
+<!--                        <field name="name"/>-->
+<!--                    </h1>-->
+<!--                </div>-->
+<!--                <group>-->
+<!--                    <group>-->
+<!--                        <field name="parent_measure_id" options="{'no_create': True}"/>-->
+<!--                        <field name="perspective_id" readonly="1"/>-->
+<!--                    </group>-->
+<!--                    <group>-->
+<!--                        <field name="operating_unit_id"/>-->
+<!--                        <field name="active"/>-->
+<!--                    </group>-->
+<!--                </group>-->
+<!--                <notebook>-->
+<!--                    <page string="Measures (KPIs)" name="measures_page">-->
+<!--                        <field name="measure_ids" nolabel="1">-->
+<!--                                <list editable="bottom">-->
+<!--                                    <field name="name"/>-->
+<!--                                    <field name="target_type"/>-->
+<!--                                    <field name="weight" string="Weight %" sum="Total Weight" required="1"/>-->
+
+<!--                                </list>-->
+<!--                                <form string="Tier2 Measure">-->
+<!--                                    <div class="oe_button_box" name="button_box">-->
+<!--                                        <button name="action_view_tier3_objectives" type="object" class="oe_stat_button" icon="fa-sitemap">-->
+<!--                                            <field name="tier3_objective_count" widget="statinfo" string="Job Positions"/>-->
+<!--                                        </button>-->
+<!--                                    </div>-->
+<!--                                    <group>-->
+<!--                                        <field name="name" required="1"/>-->
+<!--                                        <field name="weight" required="1"/>-->
+<!--                                    </group>-->
+<!--                                </form>-->
+<!--                        </field>-->
+<!--                        <field name="measure_ids" nolabel="1">-->
+<!--                            <list editable="bottom">-->
+<!--                              <field name="name"/>-->
+<!--                              <field name="weight" string="Weight %" sum="Total Weight" required="1"/>-->
+<!--                            </list>-->
+<!--                        </field>-->
+<!--                    </page>-->
+<!--                </notebook>-->
+<!--            </sheet>-->
+<!--        </form>-->
+<!--    </field>-->
+<!--</record>-->
+
+<!--<record id="action_performance_tier2_objective" model="ir.actions.act_window">-->
+<!--    <field name="name">Tier2 Objectives</field>-->
+<!--    <field name="res_model">performance.tier2.objective</field>-->
+<!--    <field name="view_mode">list,form</field>-->
+<!--</record>-->
+
+<!--<record id="view_performance_tier3_objective_list" model="ir.ui.view">-->
+<!--    <field name="name">performance.tier3.objective.list</field>-->
+<!--    <field name="model">performance.tier3.objective</field>-->
+<!--    <field name="arch" type="xml">-->
+<!--        <list string="Tier3 Objectives">-->
+<!--            <field name="job_position"/>-->
+<!--            <field name="operating_unit_id"/>-->
+<!--            <field name="perspective_id"/>-->
+<!--            <field name="name"/>-->
+<!--            <field name="measure_ids" widget="many2many_tags" readonly="1"/>-->
+<!--        </list>-->
+<!--    </field>-->
+<!--</record>-->
+
+<!--<record id="view_performance_tier3_objective_form" model="ir.ui.view">-->
+<!--    <field name="name">performance.tier3.objective.form</field>-->
+<!--    <field name="model">performance.tier3.objective</field>-->
+<!--    <field name="arch" type="xml">-->
+<!--        <form string="Tier3 Strategic Objective">-->
+<!--            <sheet>-->
+<!--                <div class="oe_title">-->
+<!--                    <label for="name"/>-->
+<!--                    <h1>-->
+<!--                        <field name="name"/>-->
+<!--                    </h1>-->
+<!--                </div>-->
+<!--                <group>-->
+<!--                    <group>-->
+<!--                        <field name="parent_measure_id" options="{'no_create': True}"/>-->
+<!--                        <field name="job_position" options="{'no_create': True}"/>-->
+<!--                    </group>-->
+<!--                    <group>-->
+<!--                        <field name="operating_unit_id" readonly="1"/>-->
+<!--                        <field name="perspective_id" readonly="1"/>-->
+<!--                        <field name="active"/>-->
+<!--                    </group>-->
+<!--                </group>-->
+<!--                <notebook>-->
+<!--                    <page string="Measures (KPIs)" name="measures_page">-->
+<!--                        <field name="measure_ids" nolabel="1">-->
+<!--                            <list editable="bottom">-->
+<!--                                <field name="name"/>-->
+<!--                                <field name="weight" string="Weight %" sum="Total Weight" required="1"/>-->
+<!--                            </list>-->
+<!--                        </field>-->
+<!--                    </page>-->
+<!--                </notebook>-->
+<!--            </sheet>-->
+<!--        </form>-->
+<!--    </field>-->
+<!--</record>-->
+
+<!--<record id="action_performance_tier3_objective" model="ir.actions.act_window">-->
+<!--    <field name="name">Tier3 Objectives</field>-->
+<!--    <field name="res_model">performance.tier3.objective</field>-->
+<!--    <field name="view_mode">list,form</field>-->
+<!--</record>-->
+    <!-- Fiscal Year -->
+    <record id="view_performance_fiscal_year_list" model="ir.ui.view">
+        <field name="name">performance.fiscal.year.list</field>
+        <field name="model">performance.fiscal.year</field>
+        <field name="arch" type="xml">
+        <list string="Fiscal Years">
+            <field name="name"/>
+            <field name="date_start"/>
+            <field name="date_end"/>
+        </list>
+    </field>
+    </record>
+
+    <!-- Form View for Fiscal Year -->
+    <record id="view_fiscal_year_form" model="ir.ui.view">
+        <field name="name">fiscal.year.form</field>
+        <field name="model">performance.fiscal.year</field>
+        <field name="arch" type="xml">
+           <form string="Fiscal Year">
+              <sheet>
+                  <group name="main_data" string=" Fiscal Year Information">
+                        <group name="left_group" string="Details">
+                            <field name="name" string="Fiscal Year" />
+                            <field name="company_id" string="Company"/>
+                            <field name="active" string="Active"/>
+                        </group>
+                        <group name="right_group" string="Period">
+                            <field name="date_start" string="Start Date" required="1"/>
+                            <field name="date_end" string="End Date" required="1"/>
+
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Fiscal Year" name="fiscal_year_lines">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="appraisal_period"/>
+                                    <field name="date_start"/>
+                                    <field name="date_end"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                 </sheet>
+           </form>
+        </field>
+
+    </record>
+
+     <record id="action_performance_fiscal_year" model="ir.actions.act_window">
+        <field name="name">Fiscal Years</field>
+        <field name="res_model">performance.fiscal.year</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="view_performance_pms_ranking_list" model="ir.ui.view">
+        <field name="name">pms.ranking.list</field>
+        <field name="model">pms.ranking</field>
+        <field name="arch" type="xml">
+            <list string="Pms Ranking" editable="bottom">
+                <field name="score_from"/>
+                <field name="score_to"/>
+                <field name="ranking" widget="badge"
+                       decoration-success="ranking == 'outstanding'"
+                       decoration-info="ranking == 'excellent'"
+                       decoration-warning="ranking == 'satisfactory'"
+                       decoration-danger="ranking == 'unsatisfactory'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_performance_pms_ranking" model="ir.actions.act_window">
+        <field name="name">PMS Ranking</field>
+        <field name="res_model">pms.ranking</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Performance Measure -->
+    <record id="view_performance_measure_list" model="ir.ui.view">
+        <field name="name">performance.measure.list</field>
+        <field name="model">performance.measure</field>
+        <field name="arch" type="xml">
+            <list string="Performance Measures">
+                <field name="objective_id"/>
+                <field name="perspective_id"/>
+                <field name="name"/>
+                <field name="kpi"/>
+                <field name="weight" string="Weight %" sum="Total Weight"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_performance_measure_form" model="ir.ui.view">
+        <field name="name">performance.measure.form</field>
+        <field name="model">performance.measure</field>
+        <field name="arch" type="xml">
+            <form string="Performance Measure">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. Amount of total revenue generated"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="objective_id" options="{'no_create': True}"/>
+                            <field name="perspective_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="weight" widget="percentage"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_performance_measure_search" model="ir.ui.view">
+        <field name="name">performance.measure.search</field>
+        <field name="model">performance.measure</field>
+        <field name="arch" type="xml">
+            <search string="Search Performance Measures">
+                <field name="name"/>
+                <field name="objective_id"/>
+                <field name="perspective_id"/>
+                <group name="group_by">
+                    <filter string="Perspective" name="group_perspective" context="{'group_by': 'perspective_id'}"/>
+                    <filter string="Strategic Objective" name="group_objective" context="{'group_by': 'objective_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_performance_measure" model="ir.actions.act_window">
+        <field name="name">Performance Measures</field>
+        <field name="res_model">performance.measure</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_performance_measure_search"/>
+    </record>
+
+   <record id="view_appraisal_period_list" model="ir.ui.view">
+        <field name="name">appraisal.period.list</field>
+        <field name="model">appraisal.period</field>
+        <field name="arch" type="xml">
+        <list string="Appraisal Periods" editable="bottom">
+            <field name="name"/>
+            <field name="code"/>
+            <field name="active"/>
+        </list>
+    </field>
+    </record>
+    <record id="view_appraisal_period_form" model="ir.ui.view">
+        <field name="name">appraisal.period.form</field>
+        <field name="model">appraisal.period</field>
+        <field name="arch" type="xml">
+            <form string="Appraisal Period">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1>
+                            <field name="name" placeholder="e.g. First Quarter"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <field name="code"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_appraisal_period" model="ir.actions.act_window">
+        <field name="name">Appraisal Periods</field>
+        <field name="res_model">appraisal.period</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Menus Performance Configuration -->
+    <!-- Scorecard Configurations-->
+    <menuitem id="menu_scorecard_config"
+              name="Score Card Configurations"
+              parent="menu_configuration"
+              sequence="10"/>
+    <menuitem id="menu_config_appraisal_period"
+              name="Appraisal Period"
+              parent="menu_scorecard_config"
+              action= "action_appraisal_period"
+              sequence="20"/>
+    <menuitem id="menu_config_fiscal_year"
+              name="Fiscal Years"
+              parent="menu_scorecard_config"
+              action="action_performance_fiscal_year"
+              sequence="30"/>
+
+    <menuitem id="menu_config_perspective"
+              name="Perspectives"
+              parent="menu_scorecard_config"
+              action="action_performance_perspective"
+              sequence="40"/>
+
+    <menuitem id="menu_config_strategic_objective"
+              name="Strategic Objectives"
+              parent="menu_scorecard_config"
+              action="action_performance_objective"
+              sequence="50"/>
+    <menuitem id="menu_performance_measure"
+              name="Performance Measure"
+              parent="menu_scorecard_config"
+              action="action_performance_measure"
+              sequence="60"/>
+    <menuitem id="menu_tier3_job_objective"
+          name="Job Position Measures"
+          parent="menu_scorecard_config"
+          action="action_performance_job_objective"
+          sequence="70"/>
+    <menuitem id="menu_job_measure_bulk"
+          name="Job KPI Bulk Entry"
+          parent="menu_configuration"
+          action="action_performance_job_measure_bulk"
+          sequence="80"/>
+    <!-- Appraisal Configurations-->
+    <menuitem id="menu_appraisal_config"
+              name="Appraisal Configurations"
+              parent="menu_configuration"
+              sequence="10"/>
+    <menuitem id="menu_config_pms_ranking"
+              name="PMS Ranking"
+              parent= "menu_appraisal_config"
+              action="action_performance_pms_ranking"
+              sequence="20"/>
+
+<!--    <menuitem id="menu_performance_tier2_objectives"-->
+<!--              name="Performance Tier2 Objectives"-->
+<!--              parent="menu_configuration"-->
+<!--              action="action_performance_tier2_objective"-->
+<!--              sequence="60"/>-->
+<!--    <menuitem id="menu_config_tier3_objective"-->
+<!--              name="Tier3 Objectives"-->
+<!--              parent="menu_configuration"-->
+<!--              action="action_performance_tier3_objective"-->
+<!--              sequence="70"/>-->
+</odoo>

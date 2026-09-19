@@ -114,6 +114,7 @@
 
                             <field name="requested_by" />
                             <field name="operating_unit_id"/>
+                            <field name="work_unit_type" readonly="1"/>
 
                             <field name="workforce_plan_id"
                                    invisible="request_type != 'planned'"

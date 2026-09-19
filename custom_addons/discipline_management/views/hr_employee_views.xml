@@ -9,46 +9,50 @@
 
                 <!-- Smart Button -->
                 <xpath expr="//div[@name='button_box']" position="inside">
-                    <button name="action_view_discipline_cases" type="object" class="oe_stat_button" icon="fa-gavel" groups="discipline_management.group_discipline_user">
+                    <button name="action_view_discipline_cases" type="object" class="oe_stat_button" icon="fa-gavel">
                         <field name="discipline_case_count" widget="statinfo" string="Discipline Cases"/>
                     </button>
                 </xpath>
 
-                <!-- Ribbons -->
-                <xpath expr="//sheet" position="inside">
-                    <widget name="web_ribbon" title="Disciplinary Warning" bg_color="bg-warning" invisible="not active_disciplinary_action"/>
-                    <widget name="web_ribbon" title="Suspended" bg_color="bg-danger" invisible="not is_suspended"/>
+                <!-- Header / Flags -->
+                <xpath expr="//sheet" position="before">
+                    <div class="alert alert-warning text-center mb-0" role="alert" invisible="not active_disciplinary_action">
+                        <strong>DISCIPLINARY NOTICE:</strong> This employee currently has an active disciplinary warning record.
+                    </div>
+                    <div class="alert alert-danger text-center mb-0" role="alert" invisible="not is_suspended">
+                        <strong>ACTIVE SUSPENSION:</strong> This employee is currently under active disciplinary suspension (<field name="suspension_type"/>).
+                    </div>
                 </xpath>
 
-                <!-- Disciplinary History Tab -->
-                <xpath expr="//notebook" position="inside">
-                    <page string="Disciplinary Record" groups="discipline_management.group_discipline_user">
-                        <group>
-                            <group string="Disciplinary Summary Status">
-                                <field name="active_disciplinary_action" readonly="1"/>
-                                <field name="disciplinary_warning_count" readonly="1"/>
-                                <field name="last_disciplinary_date" readonly="1"/>
-                            </group>
-                            <group string="Suspension Status">
-                                <field name="is_suspended" readonly="1"/>
-                                <field name="suspension_type" readonly="1"/>
-                            </group>
-                        </group>
-                        <group string="Complete Disciplinary History">
-                            <field name="discipline_case_ids" readonly="1">
-                                <list>
-                                    <field name="name"/>
-                                    <field name="offense_id"/>
-                                    <field name="severity_level"/>
-                                    <field name="incident_date"/>
-                                    <field name="final_decision_date"/>
-                                    <field name="penalty_percentage"/>
-                                    <field name="state" widget="badge"/>
-                                </list>
-                            </field>
-                        </group>
-                    </page>
-                </xpath>
+                <!-- Disciplinary History Tab (placed after HR Settings, before Awards Received & the dot dropdown menu) -->
+<!--                <xpath expr="//page[@name='hr_settings']" position="after">-->
+<!--                    <page string="Disciplinary Record" name="disciplinary_record" groups="discipline_management.group_discipline_user">-->
+<!--                        <group>-->
+<!--                            <group string="Disciplinary Summary Status">-->
+<!--                                <field name="active_disciplinary_action" readonly="1"/>-->
+<!--                                <field name="disciplinary_warning_count" readonly="1"/>-->
+<!--                                <field name="last_disciplinary_date" readonly="1"/>-->
+<!--                            </group>-->
+<!--                            <group string="Suspension Status">-->
+<!--                                <field name="is_suspended" readonly="1"/>-->
+<!--                                <field name="suspension_type" readonly="1"/>-->
+<!--                            </group>-->
+<!--                        </group>-->
+<!--                        <group string="Complete Disciplinary History">-->
+<!--                            <field name="discipline_case_ids" readonly="1">-->
+<!--                                <list>-->
+<!--                                    <field name="name"/>-->
+<!--                                    <field name="offense_id"/>-->
+<!--                                    <field name="severity_level"/>-->
+<!--                                    <field name="incident_date"/>-->
+<!--                                    <field name="final_decision_date"/>-->
+<!--                                    <field name="penalty_percentage"/>-->
+<!--                                    <field name="state" widget="badge"/>-->
+<!--                                </list>-->
+<!--                            </field>-->
+<!--                        </group>-->
+<!--                    </page>-->
+<!--                </xpath>-->
 
             </field>
         </record>

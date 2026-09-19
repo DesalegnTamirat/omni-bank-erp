@@ -11,5 +11,16 @@
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
         </record>
+
+        <!-- Scheduled cron job for Escalating Overdue Clearances -->
+        <record id="ir_cron_overdue_clearances" model="ir.cron">
+            <field name="name">HR Resignation: Escalate Overdue Clearances</field>
+            <field name="model_id" ref="model_hr_resignation_clearance"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_check_overdue_clearances()</field>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+        </record>
     </data>
 </odoo>

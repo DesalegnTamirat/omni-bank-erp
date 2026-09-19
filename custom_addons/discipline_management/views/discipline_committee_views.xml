@@ -10,7 +10,6 @@
                     <field name="case_id"/>
                     <field name="employee_id"/>
                     <field name="meeting_date"/>
-                    <field name="meeting_end_time"/>
                     <field name="committee_chair_id"/>
                     <field name="is_quorum_met" widget="boolean"/>
                     <field name="final_recommendation"/>
@@ -25,25 +24,10 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight"
-                                invisible="state != 'draft'"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
-                        <!-- Sequential sign-off flow -->
-                        <button name="action_request_director_review" string="Request Director Sign-off" type="object" class="btn-info"
-                                invisible="state != 'in_progress'"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
-                                help="Submit agenda to Department Director for sign-off before voting."/>
-                        <button name="action_director_signoff" string="Director: Approve &amp; Open Voting" type="object" class="btn-warning"
-                                invisible="state != 'director_review'"
-                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_admin"
-                                help="Director confirms review and opens voting for committee members."/>
-                        <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info"
-                                invisible="state not in ('voting', 'in_progress')"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"/>
-                        <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success"
-                                invisible="state != 'minutes_recorded'"
-                                groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"/>
-                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,director_review,voting,minutes_recorded,completed"/>
+                        <button name="action_schedule_and_notify" string="Schedule &amp; Notify Participants" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_record_minutes_and_votes" string="Record Minutes &amp; Votes" type="object" class="btn-info" invisible="state != 'in_progress'"/>
+                        <button name="action_finalize_meeting" string="Finalize &amp; Validate Quorum" type="object" class="btn-success" invisible="state != 'minutes_recorded'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,minutes_recorded,completed"/>
                     </header>
                     <sheet>
                         <widget name="web_ribbon" title="Quorum Met" bg_color="text-bg-success" invisible="not is_quorum_met"/>
@@ -52,31 +36,20 @@
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
-                        
+                        <group>
                             <group string="Meeting Schedule &amp; Case">
                                 <field name="case_id"/>
                                 <field name="employee_id"/>
                                 <field name="meeting_date"/>
-                                <field name="meeting_end_time"/>
                                 <field name="location"/>
-                                <field name="meeting_link"/>
                             </group>
-                        <group>
-                            <group string="Designated Committee Roles">
+                            <group string="Committee &amp; Quorum">
                                 <field name="committee_chair_id"/>
-                                <field name="respective_director_id"/>
-                                <field name="legal_director_id"/>
-                                <field name="pomd_secretary_id"/>
                                 <field name="member_ids" widget="many2many_tags"/>
-                            </group>
-                            <group string="Quorum &amp; Sequential Sign-off">
                                 <field name="total_expected_members"/>
                                 <field name="present_members_count"/>
                                 <field name="required_quorum_percentage"/>
                                 <field name="is_quorum_met" widget="boolean"/>
-                                <field name="director_signed_off" widget="boolean"/>
-                                <field name="director_signoff_by_id" readonly="1"/>
-                                <field name="director_signoff_date" readonly="1"/>
                             </group>
                         </group>
                         <notebook>

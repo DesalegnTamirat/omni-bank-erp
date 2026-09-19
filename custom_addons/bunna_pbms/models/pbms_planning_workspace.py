@@ -92,7 +92,9 @@ class PbmsPlanningConfig(models.Model):
     def _get_user_work_unit_type(self):
         user = self.env.user
         org_unit = False
-        if hasattr(user, "assigned_operating_unit_ids") and user.assigned_operating_unit_ids:
+        if hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
+            org_unit = user.default_operating_unit_id
+        elif hasattr(user, "assigned_operating_unit_ids") and user.assigned_operating_unit_ids:
             org_unit = user.assigned_operating_unit_ids[0]
         else:
             org_unit = self.env["operating.unit"].search([], limit=1)
@@ -151,6 +153,7 @@ class PbmsPlanningWorkspace(models.Model):
         "pbms.planning.cycle",
         string="Planning Cycle",
         required=True,
+        ondelete="cascade",
         default=lambda self: self._default_cycle(),
     )
     org_unit_id = fields.Many2one(
@@ -183,13 +186,13 @@ class PbmsPlanningWorkspace(models.Model):
     @api.model
     def _default_cycle(self):
         cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
-        if not cycle:
-            cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
         return cycle.id if cycle else False
 
     @api.model
     def _default_org_unit(self):
         user = self.env.user
+        if hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
+            return user.default_operating_unit_id.id
         if hasattr(user, "assigned_operating_unit_ids") and user.assigned_operating_unit_ids:
             return user.assigned_operating_unit_ids[0].id
         unit = self.env["operating.unit"].search([], limit=1)
@@ -213,18 +216,16 @@ class PbmsPlanningWorkspace(models.Model):
     @api.model
     def _find_workspace(self):
         """Reuse the workspace of the current cycle + work unit if present."""
-        domain = []
         cycle_id = self._default_cycle()
+        if not cycle_id:
+            return False
+        domain = [("cycle_id", "=", cycle_id)]
         org_unit_id = self._default_org_unit()
-        if cycle_id:
-            domain.append(("cycle_id", "=", cycle_id))
         if org_unit_id:
             domain.append(("org_unit_id", "=", org_unit_id))
         workspace = self.search(domain, limit=1)
         if not workspace:
-            vals = {}
-            if cycle_id:
-                vals["cycle_id"] = cycle_id
+            vals = {"cycle_id": cycle_id}
             if org_unit_id:
                 vals["org_unit_id"] = org_unit_id
             workspace = self.create(vals)
@@ -234,6 +235,19 @@ class PbmsPlanningWorkspace(models.Model):
     def action_get_user_workspace(self):
         """Action launched from the Planning menu to open the user's tabbed workspace."""
         workspace = self._find_workspace()
+        if not workspace:
+            pending_cycle = self.env["pbms.planning.cycle"].search([], order="date_start desc", limit=1)
+            state_label = dict(pending_cycle._fields['state'].selection).get(pending_cycle.state, pending_cycle.state) if pending_cycle else ""
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Planning Cycle Not Open'),
+                    'message': _("Planning cycle '%s' is currently '%s' and is not open for unit input.") % (pending_cycle.name if pending_cycle else "", state_label),
+                    'type': 'warning',
+                    'sticky': True,
+                }
+            }
         return {
             "type": "ir.actions.act_window",
             "name": _("Planning Workspace"),

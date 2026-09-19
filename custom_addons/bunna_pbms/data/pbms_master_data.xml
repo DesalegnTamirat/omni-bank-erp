@@ -166,7 +166,7 @@
         <field name="code">WORKLOAD</field>
         <field name="sequence">50</field>
         <field name="requires_remarks">False</field>
-        <field name="description">Additional manpower to handle substantial growth in operational volume.</field>
+        <field name="description">Additional workforce.</field>
     </record>
 
     <record id="justification_bpr" model="pbms.justification.category">
@@ -254,6 +254,11 @@
         <field name="prefix">EWR/%(year)s/</field>
         <field name="padding">4</field>
         <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Clear currency symbol so amounts format without 'Br' prefix -->
+    <record id="base.ETB" model="res.currency">
+        <field name="symbol"></field>
     </record>
 
 </odoo>

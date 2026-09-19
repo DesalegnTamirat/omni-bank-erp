@@ -26,338 +26,7 @@ class BunnaMyAttendance(http.Controller):
     def _get_employee_shift_info(self, employee, target_date=None):
         if not employee:
             return None
-
-        env = employee.env
-        if not target_date:
-            target_date = fields.Date.context_today(request.env.user)
-
-        today_date = fields.Date.context_today(request.env.user)
-
-        # Tier 0: Approved Time Off / Leave (hr.leave)
-        leave = env['hr.leave'].sudo().search([
-            ('employee_id', '=', employee.id),
-            ('state', '=', 'validate'),
-            ('date_from', '<=', datetime.datetime.combine(target_date, datetime.time.max)),
-            ('date_to', '>=', datetime.datetime.combine(target_date, datetime.time.min)),
-        ], limit=1)
-
-        if leave:
-            l_name = leave.holiday_status_id.name or 'Time Off'
-            if isinstance(l_name, dict):
-                l_name = l_name.get('en_US', list(l_name.values())[0]) if l_name else 'Time Off'
-            is_half = bool(getattr(leave, 'request_unit_half', False) or getattr(leave, 'half_day', False) or (getattr(leave, 'number_of_days', 1.0) == 0.5))
-            half_period = getattr(leave, 'request_date_from_period', False) or getattr(leave, 'single_half_day_period', 'am')
-            s_d = getattr(leave, 'request_date_from', False) or getattr(leave, 'leave_start_date', False) or (leave.date_from.date() if leave.date_from else target_date)
-            e_d = getattr(leave, 'request_date_to', False) or getattr(leave, 'leave_end_date', False) or (leave.date_to.date() if leave.date_to else target_date)
-            date_range_str = f"{s_d.strftime('%b %d')} - {e_d.strftime('%b %d')}" if s_d != e_d else s_d.strftime('%b %d')
-            dur = getattr(leave, 'number_of_days', 1.0)
-
-            if is_half:
-                if half_period == 'am':
-                    return {
-                        'name': f"Approved Time Off - {l_name} (Morning)",
-                        'code': 'LEAVE_HALF_AM',
-                        'time_range': 'Afternoon Shift (13:00 - 17:00)',
-                        'start_time': 13.0,
-                        'end_time': 17.0,
-                        'start_time_str': '01:00 PM',
-                        'end_time_str': '05:00 PM',
-                        'is_night_shift': False,
-                        'has_lunch_break': False,
-                        'lunch_time_str': 'No Lunch Break',
-                        'is_custom_exception': True,
-                        'is_day_off': False,
-                        'is_on_leave': True,
-                        'is_half_day_leave': True,
-                        'leave_name': l_name,
-                        'leave_date_range': date_range_str,
-                        'leave_duration': f"{dur:.1f} Day(s)",
-                        'source_label': f"Approved Leave ({l_name})"
-                    }
-                else:
-                    return {
-                        'name': f"Approved Time Off - {l_name} (Afternoon)",
-                        'code': 'LEAVE_HALF_PM',
-                        'time_range': 'Morning Shift (08:00 - 12:00)',
-                        'start_time': 8.0,
-                        'end_time': 12.0,
-                        'start_time_str': '08:00 AM',
-                        'end_time_str': '12:00 PM',
-                        'is_night_shift': False,
-                        'has_lunch_break': False,
-                        'lunch_time_str': 'No Lunch Break',
-                        'is_custom_exception': True,
-                        'is_day_off': False,
-                        'is_on_leave': True,
-                        'is_half_day_leave': True,
-                        'leave_name': l_name,
-                        'leave_date_range': date_range_str,
-                        'leave_duration': f"{dur:.1f} Day(s)",
-                        'source_label': f"Approved Leave ({l_name})"
-                    }
-            else:
-                return {
-                    'name': f"Approved Time Off - {l_name}",
-                    'code': 'LEAVE',
-                    'time_range': f"Excused All Day ({date_range_str})",
-                    'start_time': 0.0,
-                    'end_time': 0.0,
-                    'start_time_str': '--:--',
-                    'end_time_str': '--:--',
-                    'is_night_shift': False,
-                    'has_lunch_break': False,
-                    'lunch_time_str': 'No Lunch Break',
-                    'is_custom_exception': True,
-                    'is_day_off': True,
-                    'is_on_leave': True,
-                    'leave_name': l_name,
-                    'leave_date_range': date_range_str,
-                    'leave_duration': f"{dur:.1f} Day(s)",
-                    'source_label': 'Approved Time Off'
-                }
-
-        # Tier 1: Check active Roster Exception (job.position.roster.exception)
-        roster = env['job.position.roster.exception'].sudo().search([
-            ('employee_id', '=', employee.id),
-            ('status', '=', 'active'),
-            ('active', '=', True),
-            ('start_date', '<=', target_date),
-            ('end_date', '>=', target_date)
-        ], order='start_date desc, id desc', limit=1)
-
-        if roster:
-            line = roster.line_ids.filtered(lambda l: l.date == target_date)
-            if line:
-                line = line[0]
-                if line.schedule_type == 'day_off':
-                    return {
-                        'name': 'Scheduled Day Off',
-                        'code': 'DAY_OFF',
-                        'time_range': 'No mandatory shift today',
-                        'start_time_str': 'Day Off',
-                        'end_time_str': 'Day Off',
-                        'is_night_shift': False,
-                        'has_lunch_break': False,
-                        'lunch_time_str': 'No Lunch Break',
-                        'is_custom_exception': True,
-                        'is_day_off': True,
-                        'source_label': 'Roster Exception (Day Off)'
-                    }
-                shift = line.shift_id
-                if shift:
-                    start_str = self._float_to_time_str(shift.start_time)
-                    end_str = self._float_to_time_str(shift.end_time)
-                    lunch_str = "No Lunch Break"
-                    if shift.has_lunch_break:
-                        l_start = self._float_to_time_str(shift.lunch_start_time)
-                        l_end_float = shift.lunch_start_time + shift.lunch_duration
-                        l_end = self._float_to_time_str(l_end_float)
-                        lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
-
-                    return {
-                        'name': shift.name,
-                        'code': shift.code or '',
-                        'time_range': shift.time_range or f"{start_str} - {end_str}",
-                        'start_time': shift.start_time,
-                        'end_time': shift.end_time,
-                        'start_time_str': start_str,
-                        'end_time_str': end_str,
-                        'is_night_shift': shift.is_night_shift,
-                        'has_lunch_break': shift.has_lunch_break,
-                        'lunch_out_time': shift.lunch_start_time if shift.has_lunch_break else 0.0,
-                        'lunch_duration': shift.lunch_duration if shift.has_lunch_break else 0.0,
-                        'lunch_time_str': lunch_str,
-                        'is_custom_exception': True,
-                        'is_day_off': False,
-                        'source_label': 'Roster Exception'
-                    }
-
-        # Tier 2: Search for active Static Job Position Exception (job.position.exception)
-        active_exception = env['job.position.exception'].sudo().search([
-            ('employee_id', '=', employee.id),
-            ('status', '=', 'active'),
-            ('active', '=', True),
-            ('start_date', '<=', target_date),
-            '|', ('end_date', '=', False), ('end_date', '>=', target_date)
-        ], order='start_date desc, id desc', limit=1)
-
-        if active_exception and active_exception.shift_id:
-            is_sunday = (target_date.weekday() == 6)
-            is_explicit_day_off = (active_exception.day_off == target_date)
-            if is_sunday or is_explicit_day_off:
-                return {
-                    'name': 'Scheduled Day Off',
-                    'code': 'DAY_OFF',
-                    'time_range': 'No mandatory shift today',
-                    'start_time': 0.0,
-                    'end_time': 0.0,
-                    'start_time_str': 'Day Off',
-                    'end_time_str': 'Day Off',
-                    'is_night_shift': False,
-                    'has_lunch_break': False,
-                    'lunch_out_time': 0.0,
-                    'lunch_duration': 0.0,
-                    'lunch_time_str': 'No Lunch Break',
-                    'is_custom_exception': True,
-                    'is_day_off': True,
-                    'source_label': 'Assigned Shift Exception (Day Off)'
-                }
-
-            shift = active_exception.shift_id
-            start_str = self._float_to_time_str(shift.start_time)
-            end_str = self._float_to_time_str(shift.end_time)
-            
-            lunch_str = "No Lunch Break"
-            if shift.has_lunch_break:
-                l_start = self._float_to_time_str(shift.lunch_start_time)
-                l_end_float = shift.lunch_start_time + shift.lunch_duration
-                l_end = self._float_to_time_str(l_end_float)
-                lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
-
-            return {
-                'name': shift.name,
-                'code': shift.code or '',
-                'time_range': shift.time_range or f"{start_str} - {end_str}",
-                'start_time': shift.start_time,
-                'end_time': shift.end_time,
-                'start_time_str': start_str,
-                'end_time_str': end_str,
-                'is_night_shift': shift.is_night_shift,
-                'has_lunch_break': shift.has_lunch_break,
-                'lunch_out_time': shift.lunch_start_time if shift.has_lunch_break else 0.0,
-                'lunch_duration': shift.lunch_duration if shift.has_lunch_break else 0.0,
-                'lunch_time_str': lunch_str,
-                'is_custom_exception': True,
-                'is_day_off': False,
-                'source_label': 'Assigned Shift Exception'
-            }
-
-        # Tier 3: Search for active Location Based Exception (location.based.exception)
-        if employee.default_operating_unit_id:
-            ou_ids = [employee.default_operating_unit_id.id]
-            if hasattr(employee.default_operating_unit_id, 'parent_unit') and employee.default_operating_unit_id.parent_unit:
-                ou_ids.append(employee.default_operating_unit_id.parent_unit.id)
-
-            loc_ex = env['location.based.exception'].sudo().search([
-                '|', ('operating_unit_ids', 'in', ou_ids),
-                     ('operating_unit', 'in', ou_ids),
-                ('active', '=', True),
-                ('state', '=', 'active'),
-                ('start_date', '<=', target_date),
-                '|', ('end_date', '=', False), ('end_date', '>=', target_date)
-            ], order='start_date desc, id desc', limit=1)
-
-            if loc_ex:
-                shift = loc_ex.shift_id
-                if shift:
-                    start_str = self._float_to_time_str(shift.start_time)
-                    end_str = self._float_to_time_str(shift.end_time)
-                    lunch_str = "No Lunch Break"
-                    if shift.has_lunch_break:
-                        l_start = self._float_to_time_str(shift.lunch_start_time)
-                        l_end_float = shift.lunch_start_time + shift.lunch_duration
-                        l_end = self._float_to_time_str(l_end_float)
-                        lunch_str = f"{l_start} - {l_end} ({shift.lunch_duration:.1f}h)"
-
-                    return {
-                        'name': loc_ex.schedule_name or shift.name,
-                        'code': shift.code or 'LOC_EX',
-                        'time_range': shift.time_range or f"{start_str} - {end_str}",
-                        'start_time': shift.start_time,
-                        'end_time': shift.end_time,
-                        'start_time_str': start_str,
-                        'end_time_str': end_str,
-                        'is_night_shift': shift.is_night_shift,
-                        'has_lunch_break': shift.has_lunch_break,
-                        'lunch_out_time': shift.lunch_start_time if shift.has_lunch_break else 0.0,
-                        'lunch_duration': shift.lunch_duration if shift.has_lunch_break else 0.0,
-                        'lunch_time_str': lunch_str,
-                        'is_custom_exception': True,
-                        'is_day_off': False,
-                        'source_label': 'Location Based Exception'
-                    }
-                elif loc_ex.start_time and loc_ex.end_time:
-                    start_str = self._float_to_time_str(loc_ex.start_time)
-                    end_str = self._float_to_time_str(loc_ex.end_time)
-                    return {
-                        'name': loc_ex.schedule_name or 'Location Based Exception',
-                        'code': 'LOC_EX',
-                        'time_range': f"{start_str} - {end_str}",
-                        'start_time': loc_ex.start_time,
-                        'end_time': loc_ex.end_time,
-                        'start_time_str': start_str,
-                        'end_time_str': end_str,
-                        'is_night_shift': False,
-                        'has_lunch_break': False,
-                        'lunch_out_time': 0.0,
-                        'lunch_duration': 0.0,
-                        'lunch_time_str': 'No Lunch Break',
-                        'is_custom_exception': True,
-                        'is_day_off': False,
-                        'source_label': 'Location Based Exception'
-                    }
-
-
-        # Tier 4: Fallback to Default Global Shift (Sunday is default Day Off)
-        if target_date.weekday() == 6:
-            return {
-                'name': 'Default Global Shift (Day Off)',
-                'code': 'GLOBAL_OFF',
-                'time_range': 'No mandatory shift today',
-                'start_time_str': 'Day Off',
-                'end_time_str': 'Day Off',
-                'is_night_shift': False,
-                'has_lunch_break': False,
-                'lunch_time_str': 'No Lunch Break',
-                'is_custom_exception': False,
-                'is_day_off': True,
-                'source_label': 'Default Global Shift (Sunday Off)'
-            }
-
-        params = env['ir.config_parameter'].sudo()
-        try:
-            std_start = float(params.get_param('custom_hr_attendance.standard_shift_start', '8.0'))
-        except Exception:
-            std_start = 8.0
-
-        try:
-            std_end = float(params.get_param('custom_hr_attendance.standard_shift_end', '17.0'))
-        except Exception:
-            std_end = 17.0
-
-        try:
-            std_lunch_start = float(params.get_param('custom_hr_attendance.standard_lunch_start', '12.0'))
-        except Exception:
-            std_lunch_start = 12.0
-
-        try:
-            std_lunch_duration = float(params.get_param('custom_hr_attendance.standard_lunch_duration', '1.0'))
-        except Exception:
-            std_lunch_duration = 1.0
-
-        start_str = self._float_to_time_str(std_start)
-        end_str = self._float_to_time_str(std_end)
-        l_start = self._float_to_time_str(std_lunch_start)
-        l_end = self._float_to_time_str(std_lunch_start + std_lunch_duration)
-        lunch_str = f"{l_start} - {l_end} ({std_lunch_duration:.1f}h)"
-
-        return {
-            'name': 'Default Global Shift',
-            'code': 'GLOBAL',
-            'time_range': f"{start_str} - {end_str}",
-            'start_time': std_start,
-            'end_time': std_end,
-            'start_time_str': start_str,
-            'end_time_str': end_str,
-            'is_night_shift': False,
-            'has_lunch_break': True,
-            'lunch_out_time': std_lunch_start,
-            'lunch_duration': std_lunch_duration,
-            'lunch_time_str': lunch_str,
-            'is_custom_exception': False,
-            'is_day_off': False,
-            'source_label': 'Default Global Shift'
-        }
+        return employee._get_employee_shift_info(target_date=target_date)
 
     def _enrich_attendance_data(self, employee, data):
         if not employee or not data:
@@ -673,6 +342,65 @@ class BunnaMyAttendance(http.Controller):
                     'time_range': f"{a_start_fmt} - {a_end_fmt}",
                     'status': a_status,
                     'badge': a_badge
+                }
+            ]
+        elif not today_shift.get('is_day_off'):
+            # Single Session (e.g. Saturday Half Day or Continuous Shift)
+            s_start = today_shift.get('start_time', 8.0)
+            s_end = today_shift.get('end_time', 12.0)
+            enable_checkin_restriction = request.env['ir.config_parameter'].sudo().get_param(
+                'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
+            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
+            checkin_grace = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
+            checkin_buffer = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
+            s_cutoff = s_start + checkin_grace + dead_time
+
+            if open_att:
+                s_status = 'active'
+                s_badge = "Active (Live)"
+            elif today_atts:
+                latest = today_atts[-1]
+                if latest.check_out:
+                    s_status = 'completed'
+                    s_badge = f"Completed ({latest.worked_hours:.2f}h)"
+                else:
+                    s_status = 'active'
+                    s_badge = "Active (Live)"
+            else:
+                if not enable_checkin_restriction:
+                    if current_float < (s_start - checkin_buffer):
+                        s_status = 'upcoming'
+                        s_badge = "Upcoming"
+                    elif current_float >= s_end:
+                        s_status = 'absent'
+                        s_badge = "Absent (Missed)"
+                    else:
+                        s_status = 'ready'
+                        s_badge = "Ready to Check In"
+                else:
+                    if current_float < (s_start - checkin_buffer):
+                        s_status = 'upcoming'
+                        s_badge = "Upcoming"
+                    elif current_float <= s_cutoff:
+                        s_status = 'ready'
+                        s_badge = "Ready to Check In"
+                    elif current_float > s_cutoff and current_float < s_end:
+                        s_status = 'absent'
+                        s_badge = "Window Closed (Missed)"
+                    else:
+                        s_status = 'absent'
+                        s_badge = "Absent (Missed)"
+
+            s_name = 'Saturday Half Day' if (today and today.weekday() == 5) else (today_shift.get('name') or 'Scheduled Shift')
+            s_start_fmt = f"{int(s_start):02d}:{int(round((s_start % 1) * 60)):02d}"
+            s_end_fmt = f"{int(s_end):02d}:{int(round((s_end % 1) * 60)):02d}"
+            sessions_info = [
+                {
+                    'session_name': s_name,
+                    'icon': 'fa-clock-o',
+                    'time_range': f"{s_start_fmt} - {s_end_fmt}",
+                    'status': s_status,
+                    'badge': s_badge
                 }
             ]
         data['today_sessions'] = sessions_info

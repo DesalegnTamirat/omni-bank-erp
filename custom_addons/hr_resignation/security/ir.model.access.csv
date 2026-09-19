@@ -1,4 +1,86 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hr_resignation_user,access.hr.resignation,hr_resignation.model_hr_resignation,base.group_user,1,1,1,0
-access_hr_employee_user,access.hr.employee,hr.model_hr_employee,base.group_user,1,1,1,0
-access_hr_version_user,access.hr.version,hr.model_hr_version,base.group_user,1,1,1,0
+access_hr_resignation_user,hr.resignation user,hr_resignation.model_hr_resignation,base.group_user,1,1,1,0
+access_hr_resignation_manager,hr.resignation manager,hr_resignation.model_hr_resignation,hr_resignation.group_resignation_manager,1,1,0,0
+access_hr_resignation_clearance_officer,hr.resignation clearance_officer,hr_resignation.model_hr_resignation,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_resignation_pomd,hr.resignation pomd,hr_resignation.model_hr_resignation,hr_resignation.group_pomd_officer,1,1,1,0
+access_hr_resignation_hr_manager,hr.resignation hr_manager,hr_resignation.model_hr_resignation,hr_resignation.group_resignation_hr_manager,1,1,1,1
+access_hr_resignation_hr,hr.resignation hr,hr_resignation.model_hr_resignation,hr.group_hr_user,1,1,1,1
+
+access_hr_separation_type_user,hr.separation.type user,hr_resignation.model_hr_separation_type,base.group_user,1,0,0,0
+access_hr_separation_type_manager,hr.separation.type manager,hr_resignation.model_hr_separation_type,hr_resignation.group_resignation_manager,1,0,0,0
+access_hr_separation_type_officer,hr.separation.type officer,hr_resignation.model_hr_separation_type,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_separation_type_pomd,hr.separation.type pomd,hr_resignation.model_hr_separation_type,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_separation_type_hr,hr.separation.type hr,hr_resignation.model_hr_separation_type,hr.group_hr_user,1,1,1,1
+
+
+access_hr_clearance_template_user,hr.clearance.template user,hr_resignation.model_hr_resignation_clearance_template,base.group_user,1,0,0,0
+access_hr_clearance_template_officer,hr.clearance.template officer,hr_resignation.model_hr_resignation_clearance_template,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_clearance_template_pomd,hr.clearance.template pomd,hr_resignation.model_hr_resignation_clearance_template,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_clearance_template_hr,hr.clearance.template hr,hr_resignation.model_hr_resignation_clearance_template,hr.group_hr_user,1,1,1,1
+
+access_hr_clearance_template_item_user,hr.clearance.template.item user,hr_resignation.model_hr_clearance_template_item,base.group_user,1,0,0,0
+access_hr_clearance_template_item_officer,hr.clearance.template.item officer,hr_resignation.model_hr_clearance_template_item,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_clearance_template_item_pomd,hr.clearance.template.item pomd,hr_resignation.model_hr_clearance_template_item,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_clearance_template_item_hr,hr.clearance.template.item hr,hr_resignation.model_hr_clearance_template_item,hr.group_hr_user,1,1,1,1
+
+access_hr_clearance_line_user,hr.clearance.line user,hr_resignation.model_hr_resignation_clearance,base.group_user,1,1,0,0
+access_hr_clearance_line_manager,hr.clearance.line manager,hr_resignation.model_hr_resignation_clearance,hr_resignation.group_resignation_manager,1,0,0,0
+access_hr_clearance_line_officer,hr.clearance.line officer,hr_resignation.model_hr_resignation_clearance,hr_resignation.group_clearance_officer,1,1,0,0
+access_hr_clearance_line_pomd,hr.clearance.line pomd,hr_resignation.model_hr_resignation_clearance,hr_resignation.group_pomd_officer,1,1,1,0
+access_hr_clearance_line_hr,hr.clearance.line hr,hr_resignation.model_hr_resignation_clearance,hr.group_hr_user,1,1,1,1
+
+access_hr_clearance_line_item_user,hr.clearance.line.item user,hr_resignation.model_hr_resignation_clearance_line_item,base.group_user,1,0,0,0
+access_hr_clearance_line_item_manager,hr.clearance.line.item manager,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_resignation_manager,1,0,0,0
+access_hr_clearance_line_item_officer,hr.clearance.line.item officer,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_clearance_officer,1,1,0,0
+access_hr_clearance_line_item_pomd,hr.clearance.line.item pomd,hr_resignation.model_hr_resignation_clearance_line_item,hr_resignation.group_pomd_officer,1,1,1,0
+access_hr_clearance_line_item_hr,hr.clearance.line.item hr,hr_resignation.model_hr_resignation_clearance_line_item,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_interview_user,hr.exit.interview user,hr_resignation.model_hr_exit_interview,base.group_user,1,1,1,0
+access_hr_exit_interview_manager,hr.exit.interview manager,hr_resignation.model_hr_exit_interview,hr_resignation.group_resignation_manager,0,0,0,0
+access_hr_exit_interview_officer,hr.exit.interview officer,hr_resignation.model_hr_exit_interview,hr_resignation.group_clearance_officer,0,0,0,0
+access_hr_exit_interview_pomd,hr.exit.interview pomd,hr_resignation.model_hr_exit_interview,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_exit_interview_hr,hr.exit.interview hr,hr_resignation.model_hr_exit_interview,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_interview_template_user,hr.exit.interview.template user,hr_resignation.model_hr_exit_interview_template,base.group_user,1,0,0,0
+access_hr_exit_interview_template_officer,hr.exit.interview.template officer,hr_resignation.model_hr_exit_interview_template,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_exit_interview_template_pomd,hr.exit.interview.template pomd,hr_resignation.model_hr_exit_interview_template,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_exit_interview_template_hr,hr.exit.interview.template hr,hr_resignation.model_hr_exit_interview_template,hr.group_hr_user,1,1,1,1
+
+access_hr_settlement_user,hr.settlement user,hr_resignation.model_hr_resignation_settlement,base.group_user,1,0,0,0
+access_hr_settlement_pomd,hr.settlement pomd,hr_resignation.model_hr_resignation_settlement,hr_resignation.group_pomd_officer,1,1,1,0
+access_hr_settlement_hr,hr.settlement hr,hr_resignation.model_hr_resignation_settlement,hr_resignation.group_resignation_hr_manager,1,1,1,1
+
+access_hr_reject_wizard_user,hr.reject.wizard user,hr_resignation.model_hr_resignation_reject_wizard,base.group_user,1,1,1,1
+access_hr_clearance_reject_wizard_officer,hr.clearance.reject.wizard officer,hr_resignation.model_hr_clearance_reject_wizard,hr_resignation.group_clearance_officer,1,1,1,1
+access_hr_clearance_reject_wizard_pomd,hr.clearance.reject.wizard pomd,hr_resignation.model_hr_clearance_reject_wizard,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_clearance_reject_wizard,hr.clearance.reject.wizard,model_hr_clearance_reject_wizard,hr_resignation.group_resignation_hr_manager,1,1,1,1
+access_hr_settlement_return_wizard,hr.settlement.return.wizard,model_hr_settlement_return_wizard,hr_resignation.group_resignation_hr_manager,1,1,1,1
+access_hr_clearance_reject_wizard_hr,hr.clearance.reject.wizard hr,hr_resignation.model_hr_clearance_reject_wizard,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_interview_question_user,hr.exit.interview.question user,hr_resignation.model_hr_exit_interview_question,base.group_user,1,0,0,0
+access_hr_exit_interview_question_officer,hr.exit.interview.question officer,hr_resignation.model_hr_exit_interview_question,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_exit_interview_question_pomd,hr.exit.interview.question pomd,hr_resignation.model_hr_exit_interview_question,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_exit_interview_question_hr,hr.exit.interview.question hr,hr_resignation.model_hr_exit_interview_question,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_interview_line_user,hr.exit.interview.line user,hr_resignation.model_hr_exit_interview_line,base.group_user,1,1,1,0
+access_hr_exit_interview_line_manager,hr.exit.interview.line manager,hr_resignation.model_hr_exit_interview_line,hr_resignation.group_resignation_manager,1,1,0,0
+access_hr_exit_interview_line_officer,hr.exit.interview.line officer,hr_resignation.model_hr_exit_interview_line,hr_resignation.group_clearance_officer,1,1,0,0
+access_hr_exit_interview_line_pomd,hr.exit.interview.line pomd,hr_resignation.model_hr_exit_interview_line,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_exit_interview_line_hr,hr.exit.interview.line hr,hr_resignation.model_hr_exit_interview_line,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_interview_question_option_user,hr.exit.interview.question.option user,hr_resignation.model_hr_exit_interview_question_option,base.group_user,1,0,0,0
+access_hr_exit_interview_question_option_officer,hr.exit.interview.question.option officer,hr_resignation.model_hr_exit_interview_question_option,hr_resignation.group_clearance_officer,1,0,0,0
+access_hr_exit_interview_question_option_pomd,hr.exit.interview.question.option pomd,hr_resignation.model_hr_exit_interview_question_option,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_exit_interview_question_option_hr,hr.exit.interview.question.option hr,hr_resignation.model_hr_exit_interview_question_option,hr.group_hr_user,1,1,1,1
+
+access_hr_exit_analytics_pomd,hr.exit.analytics pomd,hr_resignation.model_hr_exit_analytics,hr_resignation.group_pomd_officer,1,0,0,0
+access_hr_exit_analytics_hr,hr.exit.analytics hr,hr_resignation.model_hr_exit_analytics,hr.group_hr_user,1,0,0,0
+
+access_hr_settlement_line_user,hr.resignation.settlement.line user,model_hr_resignation_settlement_line,base.group_user,1,1,1,1
+access_hr_settlement_line_manager,hr.resignation.settlement.line manager,model_hr_resignation_settlement_line,hr_resignation.group_resignation_manager,1,1,1,1
+access_hr_settlement_line_officer,hr.resignation.settlement.line officer,model_hr_resignation_settlement_line,hr_resignation.group_clearance_officer,1,1,1,1
+access_hr_settlement_line_pomd,hr.resignation.settlement.line pomd,model_hr_resignation_settlement_line,hr_resignation.group_pomd_officer,1,1,1,1
+access_hr_settlement_line_hr,hr.resignation.settlement.line hr,model_hr_resignation_settlement_line,hr.group_hr_user,1,1,1,1
+access_hr_separation_severance_rule_user,hr.separation.severance.rule user,hr_resignation.model_hr_separation_severance_rule,base.group_user,1,0,0,0
+access_hr_separation_severance_rule_hr,hr.separation.severance.rule hr,hr_resignation.model_hr_separation_severance_rule,hr.group_hr_user,1,1,1,1
+access_hr_resignation_tax_bracket,hr.resignation.tax.bracket,model_hr_resignation_tax_bracket,base.group_user,1,1,1,1

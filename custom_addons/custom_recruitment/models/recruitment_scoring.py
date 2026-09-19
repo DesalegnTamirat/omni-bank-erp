@@ -462,7 +462,7 @@ class RecruitmentCandidateScore(models.Model):
             if rec.recruitment_type == "internal":
                 if rec.active_disciplinary_status == 'last_written_warning':
                     reasons.append(_("Active Last Written Warning / Severe Disciplinary Record (Severity Level 1/2)"))
-                elif getattr(rec.vacancy_id, 'internal_movement_type', False) == 'lateral' and rec.active_disciplinary_status != 'none':
+                elif getattr(rec.vacancy_id, 'internal_movement_type', False) in ('lateral', 'transfer') and rec.active_disciplinary_status != 'none':
                     reasons.append(_("Active Disciplinary Warning blocks Transfer Eligibility (FR-REC-022.2)"))
                 raw_final_score = (
                         (rec.pms_score * rec.pms_weight / 100.0) +
@@ -793,21 +793,6 @@ class RecruitmentApplicationWindow(models.Model):
             else:
                 rec.deadline = False
 
-    closing_date = fields.Date(
-        string='Closing Date',
-        help='BRD FR-REC-019: Vacancy auto-closes at this date. '
-             'Applications after this date are rejected unless '
-             'HR grants late inclusion with justification.'
-    )
-
-    @api.depends('closing_date')
-    def _compute_is_closed_from_date(self):
-        today = fields.Date.today()
-        for rec in self:
-            if rec.closing_date and rec.closing_date < today:
-                if not rec.is_closed:
-                    rec.is_closed = True
-
     def check_application_allowed(self, application_date=None):
         """BRD FR-REC-019: Reject applications after deadline unless HR granted late inclusion."""
         self.ensure_one()
@@ -816,17 +801,7 @@ class RecruitmentApplicationWindow(models.Model):
             return False
         if self.deadline and today > self.deadline and not self.late_inclusion_allowed:
             return False
-        if self.closing_date and today > self.closing_date and not self.late_inclusion_allowed:
-            return False
         return True
-
-    def check_application_allowed_ext(self, application_date=None):
-        self.ensure_one()
-        today = application_date or fields.Date.today()
-        if self.closing_date and today > self.closing_date:
-            if not self.late_inclusion_allowed:
-                return False, _("Application window closed on %s.") % self.closing_date
-        return True, _("Application accepted.")
 
     @api.model
     def _cron_close_expired_windows(self):

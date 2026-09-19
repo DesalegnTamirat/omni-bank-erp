@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Clearance Configuration Seed Data
+    ───────────────────────────────────
+    Provides:
+      1. hr.separation.type          — separation type records replacing the
+                                       old hardcoded Selection field values
+      2. hr.clearance.category       — functional groupings for work units
+
+    These records carry noupdate="1" so manual admin edits survive upgrades.
+-->
+<odoo noupdate="1">
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SEPARATION TYPES
+         These replace the old hard-coded Selection field on hr.resignation.
+         The `code` field is the stable technical key used in Python logic.
+         Do NOT change the `code` once in use.
+    ════════════════════════════════════════════════════════════════ -->
+
+    <record id="sep_type_voluntary" model="hr.separation.type">
+        <field name="name">Voluntary Resignation</field>
+        <field name="code">voluntary</field>
+        <field name="sequence">10</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee voluntarily initiates their own resignation.</field>
+    </record>
+
+    <record id="sep_type_retirement_age" model="hr.separation.type">
+        <field name="name">Age-Related Retirement</field>
+        <field name="code">retirement_age</field>
+        <field name="sequence">20</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee retires upon reaching the mandatory retirement age.</field>
+    </record>
+
+    <record id="sep_type_medical" model="hr.separation.type">
+        <field name="name">Medical Retirement</field>
+        <field name="code">medical</field>
+        <field name="sequence">30</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Employee retires due to a medical condition or permanent disability.</field>
+    </record>
+
+    <record id="sep_type_probation_termination" model="hr.separation.type">
+        <field name="name">Probation Termination</field>
+        <field name="code">probation_termination</field>
+        <field name="sequence">40</field>
+        <field name="is_company_terminated">True</field>
+        <field name="description">Employment ended during the probation period by the company.</field>
+    </record>
+
+    <record id="sep_type_termination" model="hr.separation.type">
+        <field name="name">Termination / Dismissal</field>
+        <field name="code">termination</field>
+        <field name="sequence">50</field>
+        <field name="is_company_terminated">True</field>
+        <field name="description">Company-initiated termination or disciplinary dismissal. Excluded from PF eligibility (FR-15).</field>
+    </record>
+
+    <record id="sep_type_contract_end" model="hr.separation.type">
+        <field name="name">Contract End / Non-Renewal</field>
+        <field name="code">contract_end</field>
+        <field name="sequence">60</field>
+        <field name="is_company_terminated">False</field>
+        <field name="description">Fixed-term contract expires and is not renewed.</field>
+    </record>
+
+
+
+
+</odoo>

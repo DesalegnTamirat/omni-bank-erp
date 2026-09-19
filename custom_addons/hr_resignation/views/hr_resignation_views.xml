@@ -1,177 +1,580 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
 
-    <!-- LIST VIEW -->
-    <record id="hr_resignation_view_tree" model="ir.ui.view">
-        <field name="name">hr.resignation.view.tree</field>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RESIGNATION REQUEST VIEWS
+         
+         Purpose:
+         This file provides the primary interface for the end-to-end employee 
+         separation workflow. 
+         
+         Key Features:
+         - Form view: Handles draft submissions, manager reviews, HR approvals, 
+                      clearances, exit interviews, and final settlements.
+         - Conditional rendering: Fields and buttons are dynamically shown/hidden 
+                      based on the request's state and the user's role (Employee, 
+                      Manager, HR, POMD).
+         - List view: Provides an overview of all active and historical requests.
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <record id="hr_resignation_view_list" model="ir.ui.view">
+        <field name="name">hr.resignation.view.list</field>
         <field name="model">hr.resignation</field>
-        <field name="priority" eval="8"/>
         <field name="arch" type="xml">
-            <list string="Employee Resignation">
-                <field name="employee_id" options="{'no_open': True}" class="fw-bold"/>
-                <field name="department_id" options="{'no_open': True}" class="fw-bold"/>
-                <field name="employee_contract" class="fw-bold"/>
-                <field name="joined_date" readonly="1" class="fw-bold"/>
-                <field name="resignation_applied_date" class="fw-bold"/>
-                <field name="expected_revealing_date" class="fw-bold"/>
-                <field name="resignation_type" class="fw-bold"/>
-                <field name="notice_period" class="fw-bold"/>
+            <list string="Resignation Requests"
+                  decoration-danger="state in ('manager_rejected','hr_rejected')"
+                  decoration-success="state == 'done'"
+                  decoration-muted="state == 'draft'">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="initiated_by" widget="badge"
+                       decoration-info="initiated_by == 'employee'"
+                       decoration-danger="initiated_by == 'company'"/>
+                <field name="resignation_type_id" string="Separation Type"/>
+                <field name="application_date"/>
+                <field name="expected_last_day"/>
+                <field name="release_date"/>
+                <field name="clearance_progress"/>
                 <field name="state" widget="badge"
-                       decoration-info="state == 'draft'"
-                       decoration-warning="state == 'confirm'"
-                       decoration-success="state == 'approved'"
-                       decoration-danger="state == 'rejected'"/>
+                       decoration-info="state in ('draft','submitted')"
+                       decoration-warning="state in ('manager_reviewed','hr_approved','last_day_recorded','exit_interviewed')"
+                       decoration-success="state in ('cleared','settled','done')"
+                       decoration-danger="state in ('manager_rejected','hr_rejected')"/>
             </list>
         </field>
     </record>
 
-    <!-- FORM VIEW -->
+    <!-- ═══════════════════════════════════════════════════════
+         FORM VIEW
+    ═══════════════════════════════════════════════════════ -->
     <record id="hr_resignation_view_form" model="ir.ui.view">
         <field name="name">hr.resignation.view.form</field>
         <field name="model">hr.resignation</field>
-        <field name="priority" eval="8"/>
         <field name="arch" type="xml">
-            <form string="Employee Resignation">
-
+            <form string="Resignation Request" duplicate="false" delete="false">
                 <header>
-                    <button string="Save" type="object" name="action_save_notify"
+                    <button string="Submit Request" type="object" name="action_submit"
                             class="btn-primary" invisible="state != 'draft'"/>
-                    <button string="Confirm" type="object" name="action_confirm_resignation"
-                            class="oe_highlight" invisible="state != 'draft'"/>
-                    <button string="Approve" type="object" name="action_approve_resignation"
-                            groups="hr.group_hr_user" class="oe_highlight"
-                            invisible="state != 'confirm'"/>
-                    <button string="Reject" type="object" name="action_reject"
-                            groups="hr.group_hr_user" invisible="state != 'confirm'"/>
 
-                    <field name="state" widget="statusbar"
-                           statusbar_visible="draft,confirm,approved,rejected"/>
+                    <button string="Approve" type="object" name="action_hr_approve"
+                            class="btn-success" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state != 'submitted'"/>
+                            
+                    <button string="Return to Employee" type="object" name="action_hr_return"
+                            class="btn-warning" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state != 'submitted'"/>
+                            
+                    <button string="Revoke" type="object" name="action_hr_revoke"
+                            class="btn-danger" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state != 'submitted'"/>
+
+                    <button string="Set Release Date" type="object" name="action_set_release_date"
+                            class="btn-primary"
+                            invisible="state != 'hr_approved' or not is_current_manager"/>
+                            
+                    <button string="Complete Handover" type="object" name="action_complete_handover"
+                            class="btn-primary"
+                            invisible="state != 'release_date_set' or not is_current_manager"/>
+                            
+                    <field name="exit_interview_state" invisible="1"/>
+                    <field name="can_view_exit_interview" invisible="1"/>
+                            
+                    <button string="Waive Exit Interview" type="object" name="action_waive_exit_interview"
+                            class="btn-secondary" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state not in ('hr_approved', 'release_date_set', 'clearance') or exit_interview_waived or exit_interview_state == 'done'"/>
+
+                    <button string="Mark as Cleared" type="object"
+                            name="action_complete_clearance"
+                            class="btn-success" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state != 'clearance' or not is_fully_cleared"/>
+
+                    <button string="Regenerate Clearance Lines" type="object"
+                            name="action_regenerate_clearance_lines"
+                            class="btn-secondary" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state not in ('hr_approved', 'release_date_set', 'clearance') or clearance_count != 0"
+                            confirm="This will delete existing clearance lines and recreate them from the current template. Continue?"/>
+
+                    <field name="settlement_id" invisible="1"/>
+
+
+                    <button string="Issue Certificate &amp; Deactivate Employee"
+                            type="object" name="action_issue_certificate"
+                            class="btn-primary" groups="hr_resignation.group_resignation_hr_manager"
+                            invisible="state != 'settled'"
+                            confirm="This will deactivate the employee and issue the Certificate of Release. Continue?"/>
+
+                    <button string="Print / Download Certificate of Release"
+                            type="object" name="action_download_certificate"
+                            class="btn-primary" icon="fa-print"
+                            invisible="state != 'done'"/>
+
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,hr_approved,release_date_set,clearance,cleared"/>
                 </header>
-
                 <sheet>
-
-                    <div class="oe_title">
-                        <h1><field name="name" readonly="1" class="fw-bold"/></h1>
+                    <field name="is_allowed_to_see_warnings" invisible="1"/>
+                    <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert" invisible="warning_disciplinary_count == 0 or is_allowed_to_see_warnings == False">
+                        <div>
+                            <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_disciplinary_count" class="fw-bold"/> active disciplinary case(s). Please review before POMD approval.
+                        </div>
+                        <button type="object" name="action_open_disciplinary_cases" class="btn btn-sm btn-danger" string="View Cases"/>
+                    </div>
+                    <div class="alert alert-danger" role="alert" invisible="warning_investigation_count == 0 or is_allowed_to_see_warnings == False">
+                        <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_investigation_count" class="fw-bold"/> ongoing investigation(s). Must be finalized before POMD approval.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="warning_commitment_count == 0 or is_allowed_to_see_warnings == False">
+                        <i class="fa fa-exclamation-triangle me-2"></i> Employee has <field name="warning_commitment_count" class="fw-bold"/> active training/education commitment(s) to settle.
+                    </div>
+                    <div class="alert alert-warning" role="alert" invisible="not warning_probation_status or is_allowed_to_see_warnings == False">
+                        <i class="fa fa-exclamation-triangle me-2"></i> Employee is currently on probation.
+                    </div>
+                    <field name="is_current_manager" invisible="1"/>
+                    <field name="exit_interview_waived" invisible="1"/>
+                    <!-- All fields are read-only for managers viewing team records.
+                         Only the employee (own record, draft state) and HR/POMD can edit. -->
+                    <div class="oe_button_box" name="button_box">
                     </div>
 
-                    <group>
-                        <group>
-                            <label for="initiated_by" class="fw-bold"/>
-                            <field name="initiated_by" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-                        </group>
-                        <group/>
-                    </group>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
 
-                    <group>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="state not in ('manager_rejected','hr_rejected')">
+                        <strong>Rejected:</strong>
+                        <field name="rejection_reason" nolabel="1"/>
+                    </div>
+
+                    <!-- ═══════════════════════════════════════════════
+                         Employee Details  /  Dates
+                    ═══════════════════════════════════════════════ -->
+                    <group readonly="state != 'draft'">
                         <group string="Employee Details">
-                            <label for="employee_id" class="fw-bold"/>
-                            <field name="employee_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="job_grade" class="fw-bold"/>
-                            <field name="job_grade" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-
-                            <label for="job_category" class="fw-bold"/>
-                            <field name="job_category" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-
-                            <label for="job_id" string="Job Position" class="fw-bold"/>
-                            <field name="job_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="operating_unit_id" class="fw-bold"/>
-                            <field name="operating_unit_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="department_id" class="fw-bold"/>
-                            <field name="department_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="manager_id" class="fw-bold"/>
-                            <field name="manager_id" readonly="state != 'draft'" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="contract_id" class="fw-bold"/>
-                            <field name="contract_id" readonly="1" options="{'no_open': True}" nolabel="1" class="fw-bold"/>
-
-                            <label for="employee_contract" class="fw-bold"/>
-                            <field name="employee_contract" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
+                            <!-- HR: can select any employee while in draft. Employee: locked to self always -->
+                            <field name="initiated_by" groups="hr.group_hr_user" readonly="state != 'draft'"/>
+                            <field name="initiated_by" readonly="1" groups="!hr.group_hr_user"/>
+                            <field name="employee_id" options="{'no_open': True}"
+                                   groups="hr.group_hr_user" readonly="state != 'draft'"/>
+                            <!-- Employee can only see their own record, field is readonly -->
+                            <field name="employee_id" options="{'no_open': True}"
+                                   readonly="1" groups="!hr.group_hr_user"/>
+                               <field name="department_id" force_save="1" readonly="1"/>
+                               <field name="job_id" string="Job Position" force_save="1"/>
+                            <field name="job_category" string="Job Category"/>
+                            <field name="basic_salary" string="Basic Salary"/>
+                            <field name="total_accrued_leave" string="Total Accrued Leave"/>
+                            <field name="total_scheduled_leave" string="Total Scheduled Leave"/>
+                            <field name="rssa" string="RSSA"/>
+                               <field name="manager_id" options="{'no_open': True}" force_save="1" readonly="1"/>
+                               <field name="operating_unit_id" force_save="1" readonly="1"/>
                         </group>
+                        <group string="Dates">
+                            <field name="joined_date" string="Join Date" readonly="1"/>
+                            <field name="application_date" string="Resignation Applied Date" readonly="1"/>
+                            <field name="notice_period" invisible="1"/>
+                            <field name="notice_period_accepted"
+                                   string="Notice Period"
+                                   invisible="notice_period == 0"
+                                   readonly="state != 'draft'"/>
+                            <field name="liability" string="Liability" invisible="notice_period_accepted != 'no' or notice_period == 0" decoration-danger="1" class="fw-bold text-danger"/>
+                            <field name="expected_last_day" readonly="1"/>
+                            <field name="show_release_date_to_employee" invisible="1"/>
+                            <field name="release_date" string="Release Date"
+                                   invisible="not show_release_date_to_employee"
+                                   readonly="state != 'hr_approved'"/>
+                            <field name="release_date_justification"
+                                   invisible="not release_date or release_date == expected_last_day"
+                                   readonly="state != 'hr_approved'"
+                                   placeholder="Mandatory: justify why the release date differs from the expected date..."/>
+                            <!-- Notice period override (FR-SEP-011) -->
+                            <field name="notice_override_justification"
+                                   groups="hr_resignation.group_pomd_officer"
+                                   invisible="not release_date or release_date >= expected_last_day"
+                                   placeholder="Mandatory: justify why the notice period is being waived…"/>
+                            <field name="notice_override_by"
+                                   readonly="1"
+                                   invisible="not notice_override_by"
+                                   groups="hr.group_hr_user"/>
+                            <field name="notice_override_date"
+                                   readonly="1"
+                                   invisible="not notice_override_date"
+                                   groups="hr.group_hr_user"/>
+                        </group>
+                    </group>
 
-                        <group string="Dates &amp; Notice Period">
-                            <label for="joined_date" class="fw-bold"/>
-                            <field name="joined_date" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-
-                            <label for="expected_revealing_date" class="fw-bold"/>
-                            <field name="expected_revealing_date"
-                                   required="1"
+                    <group readonly="state != 'draft'">
+                        <group>
+                            <field name="resignation_type_id" string="Separation Type"
+                                   options="{'no_open': True}"
                                    readonly="state != 'draft'"
-                                   nolabel="1" class="fw-bold"/>
-
-                            <label for="resignation_applied_date" class="fw-bold"/>
-                            <field name="resignation_applied_date" readonly="1" nolabel="1" class="fw-bold"/>
-
-                            <label for="notice_period" class="fw-bold"/>
-                            <field name="notice_period" readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-
-                            <label for="resign_confirm_date" class="fw-bold"
-                                   invisible="not resign_confirm_date"/>
-                            <field name="resign_confirm_date" readonly="1"
-                                   invisible="not resign_confirm_date" nolabel="1" class="fw-bold"/>
+                                   style="max-width: 350px;"/>
                         </group>
                     </group>
 
-                    <group string="Resignation Details">
-                        <label for="resignation_type" class="fw-bold"/>
-                        <field name="resignation_type" groups="hr.group_hr_user"
-                               readonly="state != 'draft'" nolabel="1" class="fw-bold"/>
-
-                        <label for="reason" class="fw-bold"/>
-                        <field name="reason"
-                               required="1"
+                    <group readonly="state != 'draft'">
+                        <field name="reason" string="Reason for Resignation"
                                readonly="state != 'draft'"
-                               nolabel="1" class="fw-bold"/>
+                               placeholder="Describe the reason for resignation..."/>
                     </group>
 
+                    <!-- ═══════════════════════════════════════════════
+                         SECTION 1: Payment Request Declaration
+                    ═══════════════════════════════════════════════ -->
+                    <div class="o_horizontal_separator mt-4 mb-1">
+                        <span class="fw-bold text-uppercase">Payment Request Declaration</span>
+                    </div>
+                    <p class="text-muted mb-3" style="font-size:0.88em;">
+                        Select all separation payments you are requesting. At least one must be selected.
+                    </p>
+
+                    <div class="row mb-3 px-1">
+                        <div class="col-6">
+                            <div class="d-flex align-items-center mb-2" style="gap:8px;"  >
+                                <field name="payment_request_leave_pay" nolabel="1" widget="boolean" readonly="state != 'draft'"/>
+                                <span style="font-size:0.95em; color:#212529;">Accrued leave pay</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" style="gap:8px;">
+                                <field name="payment_request_unpaid_salary" nolabel="1" widget="boolean" readonly="state != 'draft'"/>
+                                <span style="font-size:0.95em; color:#212529;">Remaining salary</span>
+                            </div>
+                            <div class="d-flex align-items-center mb-2" style="gap:8px;">
+                                <field name="payment_request_severance" nolabel="1" widget="boolean" readonly="state != 'draft'"/>
+                                <span style="font-size:0.95em; color:#212529;">Severance pay</span>
+                            </div>
+
+                               <div class="d-flex align-items-center mb-2" style="gap:8px;">
+                                <field name="payment_request_pf" nolabel="1" widget="boolean" readonly="state != 'draft'"/>
+                                <span style="font-size:0.95em; color:#212529;">PF</span>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+
+                    <!-- ═══════════════════════════════════════════════
+                         SECTION 2: Debt Settlement Authorization
+                    ═══════════════════════════════════════════════ -->
+                    <div class="o_horizontal_separator mt-2 mb-1">
+                        <span class="fw-bold text-uppercase">Debt Settlement Authorization</span>
+                    </div>
+                    <p class="text-muted mb-3" style="font-size:0.88em;">
+                        By authorizing below, you allow the Bank to apply your separation payments
+                        toward any outstanding obligations (staff loans, RSSA, guarantees, advances,
+                        credit facilities, or other debts) before releasing any remaining balance to you.
+                    </p>
+
+
+
+                    <div class="d-flex align-items-start mt-1 mb-4 p-3"
+                         style="border:1px solid #ffc107; border-radius:6px; background:#fffbf0;">
+                        <field name="debt_settlement_authorized"
+                               nolabel="1" widget="boolean"
+                               readonly="state != 'draft'"
+                               style="margin-top:2px; flex-shrink:0;"/>
+                        <div class="ms-3">
+                            <div class="fw-semibold" style="color:#212529;">
+                                I authorize the Bank to apply my separation payments toward
+                                settlement of any outstanding obligations listed above before
+                                releasing any remaining balance to me.
+                            </div>
+                            <div class="text-muted mt-1" style="font-size:0.82em;">
+                                This includes staff loans, RSSA, guarantees, advances,
+                                credit facilities, and any other debts owed to the Bank.
+                            </div>
+                            <div class="text-success fw-semibold mt-2" style="font-size:0.88em;"
+                                 invisible="not debt_settlement_authorized">
+                                <i class="fa fa-check-circle me-1"/>
+                                Authorization confirmed.
+                            </div>
+                        </div>
+                    </div>
+
+                    <notebook>
+                        <!-- HANDOVER TAB — visible once submitted, filled by manager before forwarding to POMD -->
+                        <page string="Manager Handover" name="handover"
+                              invisible="not show_handover_tab">
+
+                            <field name="show_handover_tab" invisible="1"/>
+                            <field name="can_edit_handover" invisible="1"/>
+
+                            <!-- Info banner shown to manager for handover -->
+                            <div class="alert alert-info mb-3" role="alert"
+                                 invisible="not can_edit_handover or state == 'clearance'">
+                                <i class="fa fa-info-circle me-2"/>
+                                <strong>Action required:</strong>
+                                Fill in the handover details below — who takes over,
+                                by when, and what needs to be handed over.
+                                The "Complete Handover" button will require this to be completed.
+                            </div>
+
+                            <!-- Read-only banner once past manager step -->
+                            <div class="alert alert-success mb-3" role="alert"
+                                 invisible="state in ('hr_approved', 'release_date_set')">
+                                <i class="fa fa-check-circle me-2"/>
+                                Handover notes recorded by supervisor.
+                            </div>
+
+                            <div class="mt-3">
+                                <h4 class="mb-3" style="font-size: 14px; font-weight: 600; color: #495057;">
+                                    Handover Instructions
+                                </h4>
+                                <field name="handover_notes"
+                                       nolabel="1"
+                                       widget="text"
+                                       placeholder="Write handover notes here...&#10;&#10;Include:&#10;- Pending tasks and deadlines&#10;- Ongoing projects and status&#10;- System access / credentials to revoke&#10;- Key contacts and responsibilities&#10;- Important notes for the successor"
+                                       style="min-height: 400px; font-size: 14px; line-height: 1.7; padding: 16px; border: 1px solid #ced4da; border-radius: 6px; width: 100%; resize: vertical; background: #fff;"
+                                       readonly="not can_edit_handover"/>
+                            </div>
+
+                        </page>
+
+                        <!-- CLEARANCE TAB -->
+                        <page string="Separation check list" name="clearance"
+                              invisible="state not in ('hr_approved','clearance','last_day_recorded','exit_interviewed','cleared','settled','done')">
+
+                            <!-- Progress header bar -->
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-auto">
+                                    <span class="fw-bold me-2">Clearance Progress:</span>
+                                    <field name="clearance_progress" readonly="1"
+                                           class="badge text-bg-primary fs-6"/>
+                                </div>
+                                <div class="col-auto">
+                                    <field name="is_fully_cleared" readonly="1"
+                                           widget="boolean"
+                                           class="d-none"/>
+                                    <span invisible="not is_fully_cleared"
+                                          class="badge text-bg-success">
+                                        ✓ All Mandatory Clearances Complete
+                                    </span>
+                                    <span invisible="is_fully_cleared"
+                                          class="badge text-bg-warning">
+                                        Clearance In Progress
+                                    </span>
+                                </div>
+                                <div class="col-auto ms-auto">
+                                    <button string="Regenerate Lines"
+                                            type="object"
+                                            name="action_regenerate_clearance_lines"
+                                            class="btn-sm btn-outline-secondary"
+                                            icon="fa-refresh"
+                                            groups="hr.group_hr_user"
+                                            invisible="state in ('cleared','settled','done')"
+                                            confirm="This will delete ALL existing clearance lines and recreate them from the current template. Any recorded approvals will be lost. Continue?"/>
+                                </div>
+                            </div>
+
+                            <!-- FR-SEP-027: Unresolved rejections banner -->
+                            <div class="alert alert-danger" role="alert"
+                                 invisible="clearance_rejected_count == 0">
+                                <strong>
+                                    <i class="fa fa-exclamation-circle me-1"/>
+                                    <field name="clearance_rejected_count"
+                                           readonly="1" class="d-inline"/> mandatory line(s) rejected.
+                                </strong>
+                                Case cannot be closed until all rejections are resolved
+                                and re-approved (FR-SEP-027).
+                            </div>
+
+
+                            <!-- Clearance lines list -->
+                            <field name="clearance_line_ids" nolabel="1">
+                                <list class="o_hr_clearance_list"
+                                      create="false" delete="false"
+                                      decoration-danger="state == 'rejected'"
+                                      decoration-success="state == 'cleared'"
+                                      decoration-warning="state == 'pending'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="work_unit_id" readonly="1" string="Operating Unit"/>
+                                    <field name="responsible_user" readonly="1" string="Responsible User"/>
+                                    <field name="is_mandatory" readonly="1"
+                                           string="Mandatory" widget="boolean"/>
+                                    <field name="items_progress"
+                                           string="Checklist Progress"/>
+                                    <field name="state" widget="badge" string="Status"
+                                           decoration-warning="state == 'pending'"
+                                           decoration-danger="state == 'rejected'"
+                                           decoration-success="state == 'cleared'"/>
+
+                                    <field name="cleared_by" readonly="1"
+                                           optional="hide"/>
+                                    <field name="cleared_date" readonly="1"
+                                           optional="hide"/>
+                                    <field name="can_approve" column_invisible="1"/>
+                                    <!-- Action buttons -->
+                                    <button string="Mark as Cleared"
+                                            type="object" name="action_clear"
+                                            class="btn-sm btn-success"
+                                            invisible="state != 'pending' or not can_approve"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!-- EXIT INTERVIEW TAB -->
+                        <page string="Exit Interview" name="exit_interview"
+                              invisible="state not in ('hr_approved','release_date_set','clearance','exit_interviewed','cleared','settled','done') or not can_view_exit_interview">
+                            <div class="mb-3">
+                                <button string="Open Exit Interview" type="object"
+                                        name="action_complete_exit_interview"
+                                        class="btn-primary"
+                                        invisible="exit_interview_state == 'done' or not can_view_exit_interview"/>
+                                <button string="View Exit Interview" type="object"
+                                        name="action_complete_exit_interview"
+                                        class="btn-secondary"
+                                        invisible="exit_interview_state != 'done' or not can_view_exit_interview"/>
+                            </div>
+                            <group invisible="not exit_interview_id">
+                                <group string="Interview Details">
+                                    <field name="exit_interview_date" readonly="1" string="Interview Date"/>
+                                </group>
+                            </group>
+                            <div invisible="not exit_interview_id" class="alert alert-success mt-2" role="alert">
+                                <i class="fa fa-check-circle me-2"/>
+                                Exit interview completed. Click the button above to view the full questionnaire and answers.
+                            </div>
+                            <div invisible="exit_interview_id" class="alert alert-info" role="alert">
+                                <i class="fa fa-info-circle me-2"/>
+                                Exit interview not yet completed. Click "Open Exit Interview" above to start.
+                            </div>
+                        </page>
+
+                        <!-- SETTLEMENT TAB (Mockup matched) -->
+                        <page string="Full Final Settlement" name="settlement"
+                              invisible="state not in ('cleared','settled','done')">
+                            
+                            <!-- Before Settlement is Created -->
+                            <div class="alert alert-info text-center mt-4" role="alert" invisible="settlement_id">
+                                <h3>Clearance Completed</h3>
+                                <p>All clearance tasks are complete. You may now initiate the final settlement calculations.</p>
+                                <button string="Process Final Settlement" type="object" name="action_process_settlement"
+                                        class="btn-primary mt-2" icon="fa-calculator"
+                                        groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager"/>
+                            </div>
+                            
+                            <!-- After Settlement is Created -->
+                            <div class="mt-4" invisible="not settlement_id">
+                                <div class="alert alert-success text-center" role="alert" invisible="settlement_state in ('confirmed', 'paid')">
+                                    <h3>Settlement is in Progress</h3>
+                                    <p>The settlement record has been created and is currently being processed.</p>
+                                    <button string="Open Settlement Details ➔" type="object" name="action_process_settlement"
+                                            class="btn-success mt-2" icon="fa-external-link"
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                </div>
+                                <div class="alert alert-info text-center" role="alert" invisible="settlement_state not in ('confirmed', 'paid')">
+                                    <h3>Settlement Completed</h3>
+                                    <p>The final settlement has been formally approved and finalized.</p>
+                                    <button string="View Settlement Details ➔" type="object" name="action_process_settlement"
+                                            class="btn-info mt-2" icon="fa-external-link"
+                                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
+                                </div>
+                                
+                                <group>
+                                    <group>
+                                        <field name="settlement_state" string="Current Status" readonly="1" widget="badge" decoration-info="settlement_state == 'draft'" decoration-warning="settlement_state == 'waiting_approval'" decoration-success="settlement_state in ('confirmed','paid')"/>
+                                    </group>
+                                    <group>
+                                        <field name="settlement_net" string="Net Payout Amount" readonly="1" class="fw-bold" invisible="settlement_state not in ('confirmed','paid')"/>
+                                    </group>
+                                </group>
+                            </div>
+                        </page>
+                        
+                        <!-- AUDIT INFORMATION TAB -->
+                        <page string="Audit Information" name="audit_info" invisible="not cleared_by_id">
+                            <group>
+                                <group string="Clearance Audit">
+                                    <field name="cleared_by_id"/>
+                                    <field name="cleared_date"/>
+                                </group>
+                            </group>
+                        </page>
+
+                    </notebook>
                 </sheet>
-
                 <chatter/>
-
             </form>
         </field>
     </record>
 
-    <!-- ACTIONS -->
-    <record id="hr_resignation_action" model="ir.actions.act_window">
-        <field name="name">Employee Resignation</field>
-        <field name="res_model">hr.resignation</field>
-        <field name="view_mode">list,form</field>
-        <field name="domain">[('state', 'in', ('draft','confirm','rejected'))]</field>
-        <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">
-                Create a new resignation request
-            </p>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RESIGNATION — Pivot and Graph Views (Component 8: Separation Summary)
+    ═══════════════════════════════════════════════════════════════════════ -->
+    <record id="hr_resignation_view_pivot" model="ir.ui.view">
+        <field name="name">hr.resignation.pivot</field>
+        <field name="model">hr.resignation</field>
+        <field name="arch" type="xml">
+            <pivot string="Resignations Analysis" sample="1">
+                <field name="department_id" type="row"/>
+                <field name="state" type="col"/>
+                <field name="resignation_type_id" type="col"/>
+            </pivot>
         </field>
     </record>
 
-    <record id="hr_resignation_approved_action" model="ir.actions.act_window">
-        <field name="name">Approved Resignation</field>
-        <field name="res_model">hr.resignation</field>
-        <field name="view_mode">list,form</field>
-        <field name="domain">[('state', '=', 'approved')]</field>
+    <record id="hr_resignation_view_graph" model="ir.ui.view">
+        <field name="name">hr.resignation.graph</field>
+        <field name="model">hr.resignation</field>
+        <field name="arch" type="xml">
+            <graph string="Resignations Analysis" sample="1">
+                <field name="department_id"/>
+                <field name="state"/>
+            </graph>
+        </field>
     </record>
 
-    <!-- MENUS -->
-    <menuitem id="hr_resignation_menu_root"
-              name="Resignation"
-              groups="base.group_user"
-              sequence="21"/>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         RESIGNATION — Window Actions   ═══════════════════════════════════════════════════════ -->
+    <record id="action_hr_resignation_my" model="ir.actions.act_window">
+        <field name="name">My Resignation Request</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+    </record>
 
-    <menuitem id="hr_resignation_menu_request"
-              parent="hr_resignation_menu_root"
-              name="Resignation Request"
-              action="hr_resignation_action"
-              groups="base.group_user"
-              sequence="4"/>
+    <!--
+        Clearance Officer view: shows hr.resignation.clearance lines directly
+        where the logged-in user is the responsible user.
+        This is more reliable than going through the parent hr.resignation
+        because it directly matches the runtime clearance line assignment,
+        regardless of when the template was last updated.
+    -->
+    <record id="action_hr_resignation_clearance_tasks" model="ir.actions.act_window">
+        <field name="name">My Clearance Tasks</field>
+        <field name="res_model">hr.resignation.clearance</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('responsible_user', '=', uid), ('state', 'in', ['pending', 'rejected'])]</field>
+        <field name="context">{'search_default_responsible_user': uid}</field>
+    </record>
 
-    <menuitem id="hr_resignation_menu_approved_request"
-              parent="hr_resignation_menu_root"
-              name="Approved Resignation"
-              action="hr_resignation_approved_action"
-              groups="hr.group_hr_user"
-              sequence="5"/>
+    <!--
+        Team view for managers: domain filters to only direct reports
+        of the currently logged-in user via manager_id.user_id = uid.
+        This works for both group_resignation_manager and hr.group_hr_manager
+        users without needing a separate record rule per group.
+    -->
+    <record id="action_hr_resignation_team" model="ir.actions.act_window">        <field name="name">My Team's Resignations</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('manager_id.user_id', '=', uid)]</field>
+    </record>
+
+    <record id="action_hr_resignation_all" model="ir.actions.act_window">
+        <field name="name">All Resignation Requests</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+    </record>
+
+    <record id="action_hr_resignation_pending" model="ir.actions.act_window">
+        <field name="name">Pending Approvals</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', 'in', ('submitted','manager_reviewed'))]</field>
+    </record>
+
+    <record id="action_hr_resignation_approved" model="ir.actions.act_window">
+        <field name="name">Approved Resignations</field>
+        <field name="res_model">hr.resignation</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('state', 'in', ('hr_approved','last_day_recorded','exit_interviewed','cleared','settled','done'))]</field>
+    </record>
+
 </odoo>

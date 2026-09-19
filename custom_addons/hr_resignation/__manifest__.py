@@ -1,48 +1,71 @@
 # -*- coding: utf-8 -*-
-#############################################################################
-#    A part of Open HRMS Project <https://www.openhrms.com>
-#
-#    Cybrosys Technologies Pvt. Ltd.
-#
-#    Copyright (C) 2025-TODAY Cybrosys Technologies(<https://www.cybrosys.com>)
-#    Author: Cybrosys Techno Solutions(<https://www.cybrosys.com>)
-#
-#    You can modify it under the terms of the GNU LESSER
-#    GENERAL PUBLIC LICENSE (LGPL v3), Version 3.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU LESSER GENERAL PUBLIC LICENSE (LGPL v3) for more details.
-#
-#    You should have received a copy of the GNU LESSER GENERAL PUBLIC LICENSE
-#    (LGPL v3) along with this program.
-#    If not, see <http://www.gnu.org/licenses/>.
-#
-#############################################################################
 {
-    'name': 'HR Resignation',
-    'version': '19.0.1.1.0',
+    'name':     'HR Resignation',
+    'version':  '19.0.6.0.0',
     'category': 'Human Resources',
-    'summary': 'Manages the resignation process of the employees',
-    'description': """This module helps to create and approve/reject employee
-     resignation requests""",
-    'author': 'Cybrosys Techno solutions,Open HRMS',
-    'company': 'Cybrosys Techno Solutions',
-    'maintainer': 'Cybrosys Techno Solutions',
-    'website': 'https://www.openhrms.com',
-    'depends': ['hr_employee_custom','hr'],
+    'summary':  (
+        'End-to-end separation workflow: request → manager → POMD/HR → '
+        'configurable digital clearance → settlement → certificate. '
+        'Supports voluntary resignation, retirement, medical, probation '
+        'termination, and employer-initiated separation.'
+    ),
+    'author':   'Bunna Bank',
+    'license':  'LGPL-3',
+    'depends': [
+        'hr',
+        'hr_employee_custom',
+        'hr_leave_request_custom',
+        'mail',
+    ],
     'data': [
+        # ── 1. Security groups ────────────────────────────────────────────────
         'security/hr_resignation_security.xml',
         'security/ir.model.access.csv',
+
+        # ── 2. Sequences & cron ───────────────────────────────────────────────
         'data/ir_sequence_data.xml',
         'data/ir_cron_data.xml',
+
+        # ── 3. Seed / configuration data ──────────────────────────────────────
+        'data/clearance_config_data.xml',
+        'data/exit_interview_data.xml',
+        'data/hr_tax_bracket_data.xml',
+
+        # ── 4. Wizards ────────────────────────────────────────────────────────
+        'wizard/hr_resignation_reject_wizard_views.xml',
+        'wizard/hr_clearance_reject_wizard_views.xml',
+        'wizard/hr_settlement_return_wizard_views.xml',
+
+        # ── 5. Views ──────────────────────────────────────────────────────────
+        'views/hr_tax_bracket_views.xml',
         'views/hr_resignation_views.xml',
+        'views/hr_resignation_dashboard_views.xml',
+        'views/hr_separation_type_views.xml',
+        'views/hr_clearance_config_views.xml',
+        'views/hr_resignation_clearance_views.xml',
+        'views/hr_exit_interview_views.xml',
+        'views/hr_exit_interview_portal_templates.xml',
+        'views/hr_exit_analytics_views.xml',
+        'views/hr_settlement_views.xml',
+
+
+        # ── 6. Report ─────────────────────────────────────────────────────────
+        'report/certificate_of_release.xml',
+        'report/settlement_statement.xml',
+
+        # ── 7. Menu ───────────────────────────────────────────────────────────
+        'views/menu.xml',
+        'views/exit_interview_dashboard_views.xml',
     ],
-    'live_test_url': 'https://youtu.be/BorJthxY_VI',
-    'images': ['static/description/banner.jpg'],
-    'license': 'LGPL-3',
+    'assets': {
+        'web.assets_backend': [
+            'hr_resignation/static/src/css/hr_resignation_dashboard.css',
+            'hr_resignation/static/src/js/hr_resignation_dashboard.js',
+            'hr_resignation/static/src/xml/hr_resignation_dashboard.xml',
+            'hr_resignation/static/src/js/exit_interview_dashboard.js',
+            'hr_resignation/static/src/xml/exit_interview_dashboard.xml',
+        ],
+    },
     'installable': True,
-    'auto_install': False,
     'application': True,
 }

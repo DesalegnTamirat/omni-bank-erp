@@ -428,6 +428,15 @@ class Job(models.Model):
     # hr_policy_id = fields.One2many("hr.job.policies", "hr_job_id", string="Hr Policies")
     user_id = fields.Many2one('res.users', "Responsible", tracking=True, default=lambda self: self.env.uid)
 
+    @api.constrains('competencies_id')
+    def _check_unique_competencies(self):
+        for job in self:
+            comp_ids = [c.competencies.id for c in job.competencies_id if c.competencies]
+            if len(comp_ids) != len(set(comp_ids)):
+                raise ValidationError(_(
+                    "Duplicate competencies found on Job Position '%s'. Each competency can only be added once."
+                ) % job.name)
+
     @api.onchange('position_id')
     def _onchange_position_id_sync_grades(self):
         """Automatically populate Eligible Grades when Eligible Positions are added or selected."""
@@ -518,6 +527,43 @@ class EligibleGrades(models.Model):
     job_grade = fields.Many2one("employee.grade", string="Job Grade")
     status = fields.Boolean(string="Status", default=True)
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        for rec in records:
+            rec._sync_positions_from_grade()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'job_grade' in vals or 'employee_id' in vals:
+            for rec in self:
+                rec._sync_positions_from_grade()
+        return res
+
+    def _sync_positions_from_grade(self):
+        self.ensure_one()
+        if self.employee_id and self.job_grade:
+            # Find all active job positions that belong to this grade
+            matching_jobs = self.env['hr.job'].search([
+                ('grade', '=', self.job_grade.id),
+                ('id', '!=', self.employee_id.id),
+            ])
+            existing_positions = self.env['employee.recruitment.position'].search([
+                ('employee_id', '=', self.employee_id.id),
+            ]).mapped('position.id')
+
+            to_create = []
+            for job in matching_jobs:
+                if job.id not in existing_positions:
+                    to_create.append({
+                        'employee_id': self.employee_id.id,
+                        'position': job.id,
+                        'status': True,
+                    })
+            if to_create:
+                self.env['employee.recruitment.position'].create(to_create)
+
 
 class EligiblePositions(models.Model):
     _name = "employee.recruitment.position"
@@ -527,35 +573,6 @@ class EligiblePositions(models.Model):
 
     position = fields.Many2one("hr.job", string="Position")
     status = fields.Boolean(string="Status", default=True)
-
-    @api.model_create_multi
-    def create(self, vals_list):
-        records = super().create(vals_list)
-        for rec in records:
-            rec._sync_grade_to_job()
-        return records
-
-    def write(self, vals):
-        res = super().write(vals)
-        if 'position' in vals or 'employee_id' in vals:
-            for rec in self:
-                rec._sync_grade_to_job()
-        return res
-
-    def _sync_grade_to_job(self):
-        self.ensure_one()
-        if self.employee_id and self.position and self.position.grade:
-            grade_id = self.position.grade.id
-            existing = self.env['employee.recruitment.grade'].search([
-                ('employee_id', '=', self.employee_id.id),
-                ('job_grade', '=', grade_id),
-            ], limit=1)
-            if not existing:
-                self.env['employee.recruitment.grade'].create({
-                    'employee_id': self.employee_id.id,
-                    'job_grade': grade_id,
-                    'status': True,
-                })
 
 
 class hr_recruitment_stage2(models.Model):
@@ -610,19 +627,24 @@ class competencies_multi_record_job(models.Model):
     _rec_name = "competencies"
 
     def _auto_init(self):
+        res = super()._auto_init()
         self.env.cr.execute("""
-            DO $$ 
-            BEGIN 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'hr_competencies_info_job') 
-                   AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'recruitment_competency') THEN
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'hr_competencies_info_job' AND column_name = 'competencies'
+        """)
+        if self.env.cr.fetchone():
+            self.env.cr.execute("""
+                SELECT 1 FROM information_schema.tables 
+                WHERE table_name = 'competency_competency'
+            """)
+            if self.env.cr.fetchone():
+                self.env.cr.execute("""
                     UPDATE hr_competencies_info_job 
                     SET competencies = NULL 
                     WHERE competencies IS NOT NULL 
-                      AND competencies NOT IN (SELECT id FROM recruitment_competency);
-                END IF;
-            END $$;
-        """)
-        return super()._auto_init()
+                      AND competencies NOT IN (SELECT id FROM competency_competency)
+                """)
+        return res
 
     job_id = fields.Many2one('hr.job', string="Job Position", help='Select corresponding Job Position')
     applicant_id = fields.Many2one('hr.applicant', string="Applicant", help='Select corresponding Applicant')
@@ -631,6 +653,50 @@ class competencies_multi_record_job(models.Model):
     requirement = fields.Char(string="Requirement")
     response = fields.Char(string="Response")
     smart_search = fields.Selection([('yes', 'Y'), ('no', 'N')], string='Smart Search', default='yes')
+
+    @api.constrains('job_id', 'competencies')
+    def _check_unique_job_competency(self):
+        for rec in self:
+            if rec.job_id and rec.competencies:
+                duplicates = self.search([
+                    ('id', '!=', rec.id),
+                    ('job_id', '=', rec.job_id.id),
+                    ('competencies', '=', rec.competencies.id)
+                ], limit=1)
+                if duplicates:
+                    comp_name = getattr(rec.competencies, 'display_name', False) or getattr(rec.competencies, 'name', False) or getattr(rec.competencies, 'competency', False) or str(rec.competencies.id)
+                    raise ValidationError(_(
+                        "The competency '%s' is already assigned to Job Position '%s'. Duplicate competencies are not allowed."
+                    ) % (comp_name, rec.job_id.name))
+
+    @api.constrains('employee_id', 'competencies')
+    def _check_unique_employee_competency(self):
+        for rec in self:
+            if rec.employee_id and rec.competencies:
+                duplicates = self.search([
+                    ('id', '!=', rec.id),
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('competencies', '=', rec.competencies.id)
+                ], limit=1)
+                if duplicates:
+                    comp_name = getattr(rec.competencies, 'display_name', False) or getattr(rec.competencies, 'name', False) or getattr(rec.competencies, 'competency', False) or str(rec.competencies.id)
+                    raise ValidationError(_(
+                        "The competency '%s' is already assigned to Employee '%s'. Duplicate competencies are not allowed."
+                    ) % (comp_name, rec.employee_id.name))
+
+    @api.constrains('applicant_id', 'competencies')
+    def _check_unique_applicant_competency(self):
+        for rec in self:
+            if rec.applicant_id and rec.competencies:
+                duplicates = self.search([
+                    ('id', '!=', rec.id),
+                    ('applicant_id', '=', rec.applicant_id.id),
+                    ('competencies', '=', rec.competencies.id)
+                ], limit=1)
+                if duplicates:
+                    raise ValidationError(_(
+                        "The competency '%s' is already assigned to this applicant. Duplicate competencies are not allowed."
+                    ) % (rec.competencies.display_name or rec.competencies.name))
 
 
 class hr_department_job(models.Model):

@@ -61,7 +61,8 @@ dependency, so they were intentionally left in place.
         'competency_management',
         'hr_recruitment_skills',
         'hr_holidays',
-        'custom_planning',
+        'bunna_pbms',
+
     ],
     'data': [
         'security/recruitment_security_groups.xml',

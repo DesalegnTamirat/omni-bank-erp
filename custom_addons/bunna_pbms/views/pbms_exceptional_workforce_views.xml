@@ -121,7 +121,7 @@
                 <field name="department_id" optional="show"/>
                 <field name="job_id"/>
                 <field name="job_grade_id" optional="show"/>
-                <field name="headcount" sum="Total Headcount"/>
+                <field name="headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Headcount"/>
                 <field name="employment_type"/>
                 <field name="sourcing_type" optional="show"
                        groups="bunna_pbms.group_pbms_people_solutions,bunna_pbms.group_pbms_cpco,bunna_pbms.group_pbms_ceo,bunna_pbms.group_pbms_manager,base.group_system"/>
@@ -284,7 +284,15 @@
                     </group>
 
                     <group string="Business Justification &amp; Supporting Documents">
-                        <field name="justification" readonly="not can_edit" placeholder="Explain the mid-year operational need, critical gap, or business justification..."/>
+                        <field name="justification_category_id"
+                               string="Justification"
+                               options="{'no_create': True, 'no_open': True}"
+                               readonly="not can_edit"
+                               placeholder="Select Business Justification..."/>
+                        <field name="justification"
+                               string="Remarks / Details"
+                               readonly="not can_edit"
+                               placeholder="Optional additional justification remarks or details..."/>
                         <field name="supporting_doc_ids" widget="many2many_binary" readonly="not can_edit"/>
                     </group>
 

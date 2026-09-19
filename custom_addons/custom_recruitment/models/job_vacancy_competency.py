@@ -51,6 +51,21 @@ class JobVacancyCompetency(models.Model):
     ], string='Required Level', required=True, default='intermediate')
     notes = fields.Text(string='Notes')
 
+    @api.constrains('vacancy_id', 'competency_id')
+    def _check_unique_vacancy_competency(self):
+        for rec in self:
+            if rec.vacancy_id and rec.competency_id and rec.active:
+                dup = self.search([
+                    ('id', '!=', rec.id),
+                    ('vacancy_id', '=', rec.vacancy_id.id),
+                    ('competency_id', '=', rec.competency_id.id),
+                    ('active', '=', True),
+                ], limit=1)
+                if dup:
+                    raise ValidationError(_(
+                        "The competency '%s' is already added to this Vacancy. Duplicate competencies are not allowed."
+                    ) % (rec.competency_id.display_name or rec.competency_id.name))
+
     # ── Archiving (soft-delete) ──────────────────────────────────────────────
     def unlink(self):
         self.write({'active': False})

@@ -20,12 +20,13 @@ class TransferAssessmentRecord(models.Model):
 
     name = fields.Char(string="Assessment Reference", readonly=True, default=lambda self: _("New"))
     
-    # Linked Transfer Request & Employee
+    # Linked Transfer Request, Vacancy & Employee
     transfer_request_id = fields.Many2one("employee.transfer.request", string="Transfer Request", tracking=True, index=True)
+    vacancy_id = fields.Many2one("job.vacancy", string="Vacancy", tracking=True, index=True)
     employee_id = fields.Many2one("hr.employee", string="Applicant Employee", required=True, tracking=True, index=True)
     employee_code = fields.Char(related="employee_id.barcode", string="Employee ID", readonly=True)
     
-    target_job_id = fields.Many2one("hr.job", string="Target Position", required=True, tracking=True)
+    target_job_id = fields.Many2one("hr.job", string="Target Position", required=False, tracking=True)
     target_branch_id = fields.Char(string="Requested Branch / Location")
 
     # Assessment Mode
@@ -110,13 +111,37 @@ class TransferAssessmentRecord(models.Model):
                 2
             )
 
+    def write(self, vals):
+        res = super().write(vals)
+        if 'recommendation_score' in vals or 'state' in vals:
+            self._sync_to_vacancy_candidate_line()
+        return res
+
+    def _sync_to_vacancy_candidate_line(self):
+        """Sync supervisor recommendation score to candidate lines in recruitment module."""
+        for rec in self:
+            if not rec.employee_id:
+                continue
+            cand_model = self.env.get('new.internal.recruitment.selected.candidates')
+            if cand_model is None:
+                continue
+            lines = cand_model.search([('emp_name', '=', rec.employee_id.id)])
+            for line in lines:
+                v_id = line.new_int_sel_cand.vacancy_id if line.new_int_sel_cand else False
+                if rec.vacancy_id and v_id and v_id == rec.vacancy_id.id:
+                    line.write({'supervisor_recommendation_score': rec.recommendation_score})
+                elif not rec.vacancy_id:
+                    line.write({'supervisor_recommendation_score': rec.recommendation_score})
+
     def action_evaluate(self):
         for rec in self:
             rec.state = "evaluated"
+            rec._sync_to_vacancy_candidate_line()
 
     def action_approve_transfer_assessment(self):
         for rec in self:
             rec.state = "approved"
+            rec._sync_to_vacancy_candidate_line()
             # Push score to Recruitment Module transfer ranking
             if rec.transfer_request_id and hasattr(rec.transfer_request_id, "score"):
                 rec.transfer_request_id.score = rec.total_transfer_score

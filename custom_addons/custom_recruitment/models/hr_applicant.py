@@ -305,26 +305,8 @@ class HrApplicantCustom(models.Model):
     guarantor_form_filename = fields.Char(string='Guarantor Document Filename')
 
     rejection_reason = fields.Text(string='Rejection Reason')
+    offer_letter_sent = fields.Boolean(string='Offer Letter Sent', default=False)
     contract_created_new = fields.Boolean(string='Contract Created', default=False)
-    employment_letter_id = fields.Many2one(
-        'recruitment.employment.letter',
-        string='Employment Letter',
-        readonly=True,
-        copy=False,
-        help="Official appointment / employment letter generated for external hire."
-    )
-    employment_letter_state = fields.Selection(
-        related='employment_letter_id.state',
-        string='Employment Letter Status',
-        readonly=True,
-        store=True
-    )
-    pre_employment_cleared = fields.Boolean(
-        string='Pre-Employment Prerequisites Cleared',
-        compute='_compute_pre_employment_cleared',
-        store=True,
-        help="Automatically True when Offer is Accepted, Police Clearance is Verified, and Medical is Cleared."
-    )
 
     active_leave_status = fields.Char(
         string="Leave Status", compute="_compute_applicant_leave_status", store=False,
@@ -674,7 +656,7 @@ class HrApplicantCustom(models.Model):
         for rec in self:
             if rec.app_reference:
                 rec.application_type = (
-                    'Internal' if rec.app_reference.internal_movement_type in ('internal', 'promotion', 'lateral')
+                    'Internal' if rec.app_reference.internal_movement_type in ('internal', 'promotion', 'lateral', 'transfer')
                     else 'External'
                 )
 
@@ -716,11 +698,6 @@ class HrApplicantCustom(models.Model):
                 if not (rec.medical_certificate or rec.medical_cleared):
                     missing_checks.append(_("• Medical Certificate: Medical Fitness / Examination Certificate must be uploaded or verified"))
 
-                # 4. Mandatory Employment Letter check
-                has_letter = bool(rec.employment_letter_id and rec.employment_letter_id.state != 'cancelled')
-                if not has_letter:
-                    missing_checks.append(_("• Official Employment Letter: Must be generated before creating Employee record."))
-
                 if missing_checks:
                     raise UserError(_(
                         "Mandatory Pre-Employment Verification Incomplete!\n\n"
@@ -728,172 +705,6 @@ class HrApplicantCustom(models.Model):
                         "%s\n\n"
                         "Please update the 'Pre-Employment Verification & Clearance' section on this application before proceeding."
                     ) % (rec.partner_name or rec.name or 'this applicant', "\n".join(missing_checks)))
-
-    @api.depends(
-        'application_type', 'job_offer_status',
-        'forensic_cleared', 'forensic_certificate',
-        'medical_cleared', 'medical_certificate'
-    )
-    def _compute_pre_employment_cleared(self):
-        for rec in self:
-            if rec.application_type == 'Internal':
-                rec.pre_employment_cleared = True
-            else:
-                offer_ok = (rec.job_offer_status == 'accepted')
-                if not offer_ok and 'recruitment.offer.letter' in self.env:
-                    accepted_offer = self.env['recruitment.offer.letter'].search([
-                        '|', ('applicant_id', '=', rec.id),
-                        ('candidate_email', '=ilike', (rec.email_from or '').strip()),
-                        ('state', '=', 'accepted')
-                    ], limit=1)
-                    if accepted_offer:
-                        offer_ok = True
-                forensic_ok = bool(rec.forensic_cleared or rec.forensic_certificate)
-                medical_ok = bool(rec.medical_cleared or rec.medical_certificate)
-                rec.pre_employment_cleared = bool(offer_ok and forensic_ok and medical_ok)
-
-    def _ensure_employment_letter(self):
-        """Ensures that an employment letter exists for this external applicant, creating it if needed."""
-        self.ensure_one()
-        if self.application_type == 'Internal':
-            raise UserError(_("Employment letters are only generated for external applicants."))
-
-        if not self.pre_employment_cleared:
-            missing = []
-            offer_ok = (self.job_offer_status == 'accepted')
-            if not offer_ok and 'recruitment.offer.letter' in self.env:
-                offer_ok = bool(self.env['recruitment.offer.letter'].search([
-                    '|', ('applicant_id', '=', self.id),
-                    ('candidate_email', '=ilike', (self.email_from or '').strip()),
-                    ('state', '=', 'accepted')
-                ], limit=1))
-            if not offer_ok:
-                missing.append(_("• Formal Offer Letter accepted by candidate"))
-            if not (self.forensic_cleared or self.forensic_certificate):
-                missing.append(_("• Police / Forensic Clearance certificate verified"))
-            if not (self.medical_cleared or self.medical_certificate):
-                missing.append(_("• Medical Fitness Examination certificate cleared"))
-
-            raise UserError(_(
-                "Cannot generate Employment Letter!\n\n"
-                "All pre-employment verification checkpoints must be cleared first:\n\n%s"
-            ) % ("\n".join(missing) if missing else _("Pre-employment verification incomplete.")))
-
-        if self.employment_letter_id:
-            return self.employment_letter_id
-
-        # Resolve candidate title (Ato/W/ro/W/t)
-        title = 'Ato'
-        gender = (self.gender or '').lower()
-        if gender in ['female', 'f']:
-            title = 'W/t'
-
-        # Resolve vacancy & candidate
-        vac = False
-        if self.app_reference:
-            vac = self.app_reference
-        elif self.vacancy_reference:
-            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
-
-        cand_rec = self.env['external.recruitment.selected.candidates'].search([
-            ('applicant_name', '=', self.id)
-        ], limit=1)
-
-        # Resolve Grade
-        grade_rec = self._resolve_applicant_job_grade()
-        grade_name = grade_rec.grade_name if grade_rec else (getattr(self, 'emp_grade', False) or '')
-
-        # Resolve Job Title
-        job_title = self.job_id.name if self.job_id else (self.name or _('Officer'))
-
-        # Resolve Work Unit
-        work_unit = self.preferred_location or ''
-        if not work_unit and vac:
-            if hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                work_unit = vac.operating_unit_id.name
-            elif hasattr(vac, 'hiring_details') and vac.hiring_details:
-                for hd in vac.hiring_details:
-                    if hd.work_unit and hd.work_unit.name:
-                        work_unit = hd.work_unit.name
-                        break
-        if not work_unit:
-            work_unit = _('Head Office')
-
-        # Resolve Salary
-        salary = self.salary_proposed or self.expected_salary or 0.0
-        if 'recruitment.offer.letter' in self.env:
-            offer = self.env['recruitment.offer.letter'].search([
-                '|', ('applicant_id', '=', self.id),
-                ('candidate_email', '=ilike', (self.email_from or '').strip())
-            ], order='id desc', limit=1)
-            if offer and offer.salary_figure > 0:
-                salary = offer.salary_figure
-
-        # Resolve Managerial vs Non-Managerial: 70 days for managerial, 60 days for non-managerial
-        is_mgr = bool(vac and vac.employee_category == 'Managerial')
-        prob_days = 70 if is_mgr else 60
-
-        letter_vals = {
-            'applicant_id': self.id,
-            'vacancy_id': vac.id if vac else False,
-            'candidate_id': cand_rec.id if cand_rec else False,
-            'candidate_title': title,
-            'candidate_name': self.partner_name or self.name or '',
-            'candidate_email': (self.email_from or '').strip(),
-            'candidate_address': self.current_working_location or _('Addis Ababa'),
-            'letter_date': fields.Date.today(),
-            'effective_date': self.date_of_availability or fields.Date.today(),
-            'job_id': self.job_id.id if self.job_id else False,
-            'job_position_name': job_title,
-            'job_grade_name': grade_name,
-            'work_unit_name': work_unit,
-            'monthly_salary': salary,
-            'is_managerial': is_mgr,
-            'probation_days': prob_days,
-            'state': 'draft',
-        }
-        new_letter = self.env['recruitment.employment.letter'].create(letter_vals)
-        self.employment_letter_id = new_letter.id
-        return new_letter
-
-    def action_generate_employment_letter(self):
-        """Generates or opens the official Employment Letter for an external candidate."""
-        self.ensure_one()
-        letter = self._ensure_employment_letter()
-        return {
-            'name': _('Employment Letter'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'recruitment.employment.letter',
-            'res_id': letter.id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
-
-    def action_print_employment_letter(self):
-        """Prints the Employment Letter PDF directly from the applicant record."""
-        self.ensure_one()
-        letter = self._ensure_employment_letter()
-        return letter.action_print_employment_letter()
-
-    def action_send_employment_letter(self):
-        """Dispatches the Employment Letter with PDF attachment to candidate email registered during ATS."""
-        self.ensure_one()
-        letter = self._ensure_employment_letter()
-        return letter.action_send_letter()
-
-    def action_view_employment_letter(self):
-        """Opens the linked employment letter."""
-        self.ensure_one()
-        if not self.employment_letter_id:
-            raise UserError(_("No Employment Letter has been generated yet."))
-        return {
-            'name': _('Employment Letter'),
-            'type': 'ir.actions.act_window',
-            'res_model': 'recruitment.employment.letter',
-            'res_id': self.employment_letter_id.id,
-            'view_mode': 'form',
-            'target': 'current',
-        }
 
     # ── Resolve Job Grade & Operating Unit for New Employee ────────────────
     def _resolve_applicant_job_grade(self):
@@ -1118,7 +929,7 @@ class HrApplicantCustom(models.Model):
 
         # 4. Competencies Tab (Image 1 Sub-tab 3)
         if cand and (cand.skill_ids or cand.certification_ids):
-            if hasattr(employee, 'competencies_id') and not employee.competencies_id and 'recruitment.competency' in self.env:
+            if hasattr(employee, 'competencies_id') and not employee.competencies_id:
                 skills_list = []
                 for sk in cand.skill_ids:
                     skills_list.append((sk.name, sk.level or 'intermediate'))
@@ -1126,24 +937,37 @@ class HrApplicantCustom(models.Model):
                     skills_list.append((cert.name, 'expert'))
 
                 comp_vals = []
-                comp_fields = self.env['recruitment.competency']._fields
-                for s_name, s_lvl in skills_list:
-                    c_rec = False
-                    if 'competencies' in comp_fields:
-                        c_rec = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', s_name)], limit=1)
-                        if not c_rec and s_name:
-                            c_rec = self.env['recruitment.competency'].sudo().create({'competencies': s_name})
-                    elif 'name' in comp_fields:
-                        c_rec = self.env['recruitment.competency'].sudo().search([('name', '=ilike', s_name)], limit=1)
-                        if not c_rec and s_name:
-                            c_rec = self.env['recruitment.competency'].sudo().create({'name': s_name})
+                seen_comps = set()
+                if 'competency.competency' in self.env:
+                    for s_name, s_lvl in skills_list:
+                        c_rec = self.env['competency.competency'].sudo().search([('name', '=ilike', s_name)], limit=1)
+                        if c_rec and c_rec.id not in seen_comps:
+                            seen_comps.add(c_rec.id)
+                            comp_vals.append((0, 0, {
+                                'competencies': c_rec.id,
+                                'requirement': 100.0,
+                                'response': 100.0,
+                            }))
+                elif 'recruitment.competency' in self.env:
+                    comp_fields = self.env['recruitment.competency']._fields
+                    for s_name, s_lvl in skills_list:
+                        c_rec = False
+                        if 'competencies' in comp_fields:
+                            c_rec = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', s_name)], limit=1)
+                            if not c_rec and s_name:
+                                c_rec = self.env['recruitment.competency'].sudo().create({'competencies': s_name})
+                        elif 'name' in comp_fields:
+                            c_rec = self.env['recruitment.competency'].sudo().search([('name', '=ilike', s_name)], limit=1)
+                            if not c_rec and s_name:
+                                c_rec = self.env['recruitment.competency'].sudo().create({'name': s_name})
 
-                    if c_rec:
-                        comp_vals.append((0, 0, {
-                            'competencies': c_rec.id,
-                            'requirement': 100.0,
-                            'response': 100.0,
-                        }))
+                        if c_rec and c_rec.id not in seen_comps:
+                            seen_comps.add(c_rec.id)
+                            comp_vals.append((0, 0, {
+                                'competencies': c_rec.id,
+                                'requirement': 100.0,
+                                'response': 100.0,
+                            }))
                 if comp_vals:
                     employee.sudo().write({'competencies_id': comp_vals})
 
@@ -1161,11 +985,6 @@ class HrApplicantCustom(models.Model):
             emp = applicant.employee_id
             if emp:
                 applicant._populate_employee_from_applicant_and_profile(emp)
-                if applicant.employment_letter_id:
-                    applicant.employment_letter_id.sudo().write({
-                        'employee_id': emp.id,
-                        'id_no': emp.identification_id or emp.barcode or str(emp.id)
-                    })
 
                 if grade_rec:
                     emp_write = {}
@@ -1555,38 +1374,61 @@ class HrApplicantCustom(models.Model):
                 if crt.name:
                     skills_certs.append((crt.name, 'Certified'))
 
-            if skills_certs and 'recruitment.competency' in self.env:
-                existing_comp_map = {}
+            if skills_certs:
+                existing_comp_ids = set()
+                existing_comp_names = {}
                 for c in app.competencies_id:
-                    comp_name = (getattr(c.competencies, 'competencies', False) or getattr(c.competencies, 'name', '') or '').strip().lower()
-                    if comp_name:
-                        existing_comp_map[comp_name] = c
+                    if c.competencies:
+                        existing_comp_ids.add(c.competencies.id)
+                        name_str = (getattr(c.competencies, 'name', False) or getattr(c.competencies, 'competencies', False) or '').strip().lower()
+                        if name_str:
+                            existing_comp_names[name_str] = c
 
                 new_comp_lines = []
-                for name, resp in skills_certs:
-                    rec_comp = False
-                    comp_fields = self.env['recruitment.competency']._fields
-                    if 'competencies' in comp_fields:
-                        rec_comp = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', name)], limit=1)
-                        if not rec_comp and name:
-                            rec_comp = self.env['recruitment.competency'].sudo().create({'competencies': name})
-                    elif 'name' in comp_fields:
-                        rec_comp = self.env['recruitment.competency'].sudo().search([('name', '=ilike', name)], limit=1)
-                        if not rec_comp and name:
-                            rec_comp = self.env['recruitment.competency'].sudo().create({'name': name})
-
-                    if rec_comp:
-                        c_name = (getattr(rec_comp, 'competencies', False) or getattr(rec_comp, 'name', '') or '').strip().lower()
-                        if c_name in existing_comp_map:
-                            existing_c = existing_comp_map[c_name]
+                if 'competency.competency' in self.env:
+                    for name, resp in skills_certs:
+                        c_name = (name or '').strip().lower()
+                        if c_name in existing_comp_names:
+                            existing_c = existing_comp_names[c_name]
                             if not existing_c.response:
                                 existing_c.sudo().write({'response': resp})
                         else:
-                            new_comp_lines.append((0, 0, {
-                                'competencies': rec_comp.id,
-                                'requirement': 'Required',
-                                'response': resp,
-                            }))
+                            comp_rec = self.env['competency.competency'].sudo().search([('name', '=ilike', name)], limit=1)
+                            if comp_rec and comp_rec.id not in existing_comp_ids:
+                                existing_comp_ids.add(comp_rec.id)
+                                existing_comp_names[c_name] = True
+                                new_comp_lines.append((0, 0, {
+                                    'competencies': comp_rec.id,
+                                    'requirement': 'Required',
+                                    'response': resp,
+                                }))
+                elif 'recruitment.competency' in self.env:
+                    comp_fields = self.env['recruitment.competency']._fields
+                    for name, resp in skills_certs:
+                        rec_comp = False
+                        if 'competencies' in comp_fields:
+                            rec_comp = self.env['recruitment.competency'].sudo().search([('competencies', '=ilike', name)], limit=1)
+                            if not rec_comp and name:
+                                rec_comp = self.env['recruitment.competency'].sudo().create({'competencies': name})
+                        elif 'name' in comp_fields:
+                            rec_comp = self.env['recruitment.competency'].sudo().search([('name', '=ilike', name)], limit=1)
+                            if not rec_comp and name:
+                                rec_comp = self.env['recruitment.competency'].sudo().create({'name': name})
+
+                        if rec_comp:
+                            c_name = (getattr(rec_comp, 'competencies', False) or getattr(rec_comp, 'name', '') or '').strip().lower()
+                            if c_name in existing_comp_names:
+                                existing_c = existing_comp_names[c_name]
+                                if not existing_c.response:
+                                    existing_c.sudo().write({'response': resp})
+                            elif rec_comp.id not in existing_comp_ids:
+                                existing_comp_ids.add(rec_comp.id)
+                                existing_comp_names[c_name] = True
+                                new_comp_lines.append((0, 0, {
+                                    'competencies': rec_comp.id,
+                                    'requirement': 'Required',
+                                    'response': resp,
+                                }))
                 if new_comp_lines:
                     app.sudo().write({'competencies_id': new_comp_lines})
 

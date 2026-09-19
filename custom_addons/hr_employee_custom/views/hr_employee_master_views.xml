@@ -415,7 +415,7 @@
                         <page string="Competencies">
                             <field name="competencies_id">
                                 <list editable="bottom">
-                                    <field name="competencies"/>
+                                    <field name="competencies" options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
                                     <field name="requirement"/>
                                     <field name="response"/>
                                 </list>
@@ -588,7 +588,7 @@
                                 </group>
                                 <group>
                                     <field name="parent_id"/>
-                                    <field name="coach_id"/>
+                                    <field name="coach_id" invisible="1"/>
                                     <field name="planning_parent_id"/>
                                     <field name="hr_officer_id"/>
                                     <field name="validation_state" widget="badge"
@@ -674,7 +674,7 @@
                             <page string="Competencies">
                                 <field name="competencies_id">
                                     <list editable="bottom">
-                                        <field name="competencies" string="Competency" options="{'no_open': True}"/>
+                                        <field name="competencies" string="Competency" options="{'no_open': True, 'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
                                         <field name="requirement" string="Requirement"/>
                                         <field name="response" string="Response"/>
                                     </list>
@@ -1146,7 +1146,7 @@
                         <group>
                             <group>
                                 <field name="job_id"/>
-                                <field name="competencies"/>
+                                <field name="competencies" options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
                                 <field name="response"/>
                             </group>
                             <group>

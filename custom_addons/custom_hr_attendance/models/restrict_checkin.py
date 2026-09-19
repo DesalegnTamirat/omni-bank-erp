@@ -188,33 +188,64 @@ class HrEmployeePrivate(models.Model):
             }
 
         # 4. Default global schedule
+        if target_date and target_date.weekday() == 6:
+            return {
+                'shift_start': 0.0, 'shift_end': 0.0,
+                'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
+                'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
+                'shift_name': 'Scheduled Day Off (Sunday)'
+            }
+
         s_end = default_exit_time
+        is_sat_half = False
         if enable_saturday and is_saturday:
             ou = self.default_operating_unit_id
             unit_type = ou.work_unit_type if ou else False
-            if unit_type == 'head_office' or (unit_type == 'district' and enable_district_saturday):
+            if unit_type in ('head_office', 'head_offices', 'ho') or (unit_type in ('district', 'district_office', 'regional_office') and enable_district_saturday) or not ou:
                 s_end = saturday_exit_time
+                is_sat_half = True
 
         has_l = bool(enable_lunch and not is_saturday)
         l_start = default_lunch_out if has_l else 0.0
         l_dur = default_lunch_dur if has_l else 0.0
         l_end = l_start + l_dur
 
+        shift_title = 'Default Global Shift (Saturday Half Day)' if is_sat_half else 'Default Global Shift'
+
         return {
             'shift_start': default_morning_time, 'shift_end': s_end,
             'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
             'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
             'is_night_shift': False, 'is_day_off': False,
-            'shift_name': 'Default Global Shift'
+            'shift_name': shift_title
         }
 
     def _get_employee_shift_info(self, target_date=None):
-        """ Alias mapping to _resolve_employee_full_schedule for backward compatibility across models """
+        """ Alias mapping to _resolve_employee_full_schedule for unified shift data across models and controllers """
         res = self._resolve_employee_full_schedule(target_date=target_date)
-        res['start_time'] = res.get('shift_start', 8.0)
-        res['end_time'] = res.get('shift_end', 17.0)
-        res['lunch_out_time'] = res.get('lunch_start', 12.0)
-        res['has_lunch_break'] = res.get('has_lunch', False)
+        s_start = res.get('shift_start', 8.0)
+        s_end = res.get('shift_end', 17.0)
+        l_start = res.get('lunch_start', 12.0)
+        l_dur = res.get('lunch_duration', 1.0)
+        has_l = res.get('has_lunch', False)
+
+        start_str = _fmt(s_start)
+        end_str = _fmt(s_end)
+        l_start_str = _fmt(l_start)
+        l_end_str = _fmt(l_start + l_dur)
+        lunch_str = f"{l_start_str} - {l_end_str} ({l_dur:.1f}h)" if has_l else "No Lunch Break"
+
+        res['name'] = res.get('shift_name', 'Default Global Shift')
+        res['start_time'] = s_start
+        res['end_time'] = s_end
+        res['start_time_str'] = start_str
+        res['end_time_str'] = end_str
+        res['time_range'] = f"{start_str} - {end_str}" if not res.get('is_day_off') else "No mandatory shift today"
+        res['lunch_out_time'] = l_start if has_l else 0.0
+        res['lunch_duration'] = l_dur if has_l else 0.0
+        res['has_lunch_break'] = has_l
+        res['lunch_time_str'] = lunch_str
+        res['is_custom_exception'] = res.get('is_custom_exception', False)
         return res
 
     # ============================================================
@@ -244,8 +275,20 @@ class HrEmployeePrivate(models.Model):
             lunch_midpoint = sched['lunch_midpoint']
             afternoon_buffer_start = afternoon_s - 0.25  # Fixed 15 min buffer before afternoon start
 
+            if current_float >= afternoon_e:
+                raise UserError(_(
+                    "Check-in is not allowed.\n\n"
+                    "Your scheduled shift ended at %s."
+                ) % _fmt(afternoon_e))
+
             if current_float < lunch_midpoint:
                 # Morning Session
+                if current_float >= morning_e:
+                    raise UserError(_(
+                        "Check-in is not allowed during lunch break.\n\n"
+                        "Morning shift ended at %s. Afternoon check-in opens at %s."
+                    ) % (_fmt(morning_e), _fmt(afternoon_buffer_start)))
+
                 earliest_checkin = morning_s - checkin_buffer
                 if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
                     _logger.info("Using Morning Shift Session: %.2f - %.2f", morning_s, morning_e)
@@ -266,12 +309,24 @@ class HrEmployeePrivate(models.Model):
                     "Check-in window opens at %s (15 min buffer)."
                 ) % (_fmt(afternoon_s), _fmt(afternoon_e), _fmt(afternoon_buffer_start)))
         else:
-            # Single Continuous Shift
-            earliest_checkin = sched['shift_start'] - checkin_buffer
+            # Single Continuous Shift (e.g. Saturday Half Day, regular continuous shift, location shift)
             if sched['is_night_shift']:
+                earliest_checkin = sched['shift_start'] - checkin_buffer
+                if current_float >= sched['shift_end'] and current_float < earliest_checkin:
+                    raise UserError(_(
+                        "Check-in is not allowed.\n\n"
+                        "Your scheduled shift ended at %s."
+                    ) % _fmt(sched['shift_end']))
                 if current_float >= earliest_checkin or current_float <= sched['shift_end'] or not enable_checkin_restriction or is_manager:
                     return sched['shift_start'], sched['shift_end']
             else:
+                if current_float >= sched['shift_end']:
+                    raise UserError(_(
+                        "Check-in is not allowed.\n\n"
+                        "Your scheduled shift ended at %s."
+                    ) % _fmt(sched['shift_end']))
+
+                earliest_checkin = sched['shift_start'] - checkin_buffer
                 if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
                     return sched['shift_start'], sched['shift_end']
 
@@ -514,8 +569,9 @@ class HrEmployeePrivate(models.Model):
                         _logger.warning("Morning session Force Checkout committed for %s. Afternoon entry blocked (past cutoff %s).", self.name, _fmt(afternoon_late_cutoff))
                         return attendance
 
-            # Regular Shift-End Check-Out (Afternoon or Full-Day)
-            target_shift_end = attendance.shift_end_float or sched['shift_end']
+            # Regular Shift-End Check-Out (Afternoon or Full-Day / Saturday)
+            # Use dynamic schedule shift_end to immediately reflect updated settings or Saturday half-day
+            target_shift_end = sched['shift_end'] if (not sched.get('has_lunch') or not attendance.shift_end_float) else attendance.shift_end_float
             target_shift_end_utc = self._float_to_utc_datetime(target_shift_end, local_dt)
 
             if enable_checkout_restriction and current_float < (target_shift_end - 0.05):

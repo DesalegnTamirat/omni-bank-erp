@@ -2,13 +2,19 @@
 <odoo>
     <data>
 
-        <!-- Root Menu (Landing Page & Main Action) -->
+        <!-- Root Menu -->
         <menuitem id="menu_discipline_root"
-                  name="Discipline &amp; Governance"
-                  action="action_discipline_dashboard"
+                  name="Discipline Management"
                   web_icon="discipline_management,static/description/icon.png"
                   groups="discipline_management.group_discipline_user"
                   sequence="75"/>
+
+        <!-- Dashboard Menu (Landing Page) -->
+        <menuitem id="menu_discipline_dashboard"
+                  name="Dashboard"
+                  parent="menu_discipline_root"
+                  action="action_discipline_dashboard"
+                  sequence="1"/>
 
         <!-- Main Operations Submenus -->
         <menuitem id="menu_discipline_cases"
@@ -21,21 +27,18 @@
                   name="Investigations"
                   parent="menu_discipline_root"
                   action="action_discipline_investigation"
-                  groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"
                   sequence="20"/>
 
         <menuitem id="menu_discipline_committees"
                   name="Committee Meetings"
                   parent="menu_discipline_root"
                   action="action_discipline_committee_meeting"
-                  groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_director,discipline_management.group_discipline_legal,discipline_management.group_discipline_admin"
                   sequence="30"/>
 
         <menuitem id="menu_discipline_suspensions"
                   name="Suspensions"
                   parent="menu_discipline_root"
                   action="action_discipline_suspension"
-                  groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_cpco,discipline_management.group_discipline_admin"
                   sequence="40"/>
 
         <menuitem id="menu_discipline_appeals"
@@ -48,29 +51,15 @@
                   name="Payroll Deductions"
                   parent="menu_discipline_root"
                   action="action_discipline_payroll_penalty"
-                  groups="discipline_management.group_discipline_officer,discipline_management.group_discipline_admin"
+                  groups="discipline_management.group_discipline_officer"
                   sequence="60"/>
 
         <!-- Configuration Menu -->
         <menuitem id="menu_discipline_config"
                   name="Configuration"
                   parent="menu_discipline_root"
-                  groups="discipline_management.group_discipline_admin"
-                  sequence="100"/>
-
-        <menuitem id="menu_discipline_settings"
-                  name="Settings"
-                  parent="menu_discipline_config"
-                  action="action_discipline_config_settings"
-                  groups="discipline_management.group_discipline_admin"
-                  sequence="1"/>
-
-        <menuitem id="menu_discipline_severity_levels"
-                  name="Severity Levels"
-                  parent="menu_discipline_config"
-                  action="action_discipline_severity_level"
                   groups="discipline_management.group_discipline_officer"
-                  sequence="5"/>
+                  sequence="100"/>
 
         <menuitem id="menu_discipline_offenses"
                   name="Offense Rules &amp; Penalties"

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CLEARANCE WORK UNIT TEMPLATE CONFIGURATION VIEWS
+         
+         Purpose:
+         This file provides the UI for HR and POMD (People & Operations 
+         Management Division) to configure the master clearance steps required 
+         when an employee leaves the company.
+         
+         Key Features:
+         - Form view: Setup responsible users, SLA days, and checklist sub-items.
+         - Applicability: Restrict certain clearance tasks to specific separation types.
+         - List & Search: Manage the active clearance rules across the organization.
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_template_view_form" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.template.form</field>
+        <field name="model">hr.resignation.clearance.template</field>
+        <field name="arch" type="xml">
+            <form string="Clearance Work Unit">
+                <sheet>
+                    <widget name="web_ribbon" title="Archived"
+                            bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
+
+                    <group>
+                        <group>
+                            <field name="work_unit_id"
+                                   string="Operating Unit"
+                                   options="{'no_open': True}"
+                                   placeholder="Select an operating unit..."/>
+                            <field name="allowed_user_ids" invisible="1"/>
+                            <field name="responsible_user"
+                                   string="Responsible User"
+                                   domain="[('id', 'in', allowed_user_ids)]"
+                                   options="{'no_open': True}"/>
+
+                        </group>
+                        <group>
+                            <field name="sdt_days"/>
+                            <field name="is_mandatory" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+
+
+
+                    <notebook>
+                        <page string="Checklist Items" name="checklist">
+                            <p class="text-muted small mb-2">
+                                Define sub-tasks that must be completed before
+                                this work unit can be marked Cleared.
+                            </p>
+                            <field name="checklist_item_ids" nolabel="1">
+                                <list editable="bottom" string="Checklist Items" delete="false">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name" string="Task"
+                                           placeholder="e.g. Return company laptop"/>
+                                    <field name="is_mandatory" string="Mandatory"
+                                           widget="boolean_toggle"/>
+                                    <field name="note" string="Description"
+                                           placeholder="Optional details or instructions..."/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CLEARANCE WORK UNIT TEMPLATE — List View
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_template_view_list" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.template.list</field>
+        <field name="model">hr.resignation.clearance.template</field>
+        <field name="arch" type="xml">
+            <list string="Clearance Work Units"
+                  decoration-muted="not active"
+                  decoration-warning="not is_mandatory">
+                <field name="sequence" widget="handle"/>
+                <field name="work_unit_id" string="Operating Unit"/>
+                <field name="responsible_user" string="Responsible User"/>
+
+                <field name="is_mandatory" string="Mandatory"
+                       widget="boolean"
+                       decoration-danger="not is_mandatory"/>
+                <field name="checklist_count" string="# Tasks" optional="show"/>
+                <field name="active" widget="boolean" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CLEARANCE WORK UNIT TEMPLATE — Search View
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="hr_clearance_template_view_search" model="ir.ui.view">
+        <field name="name">hr.resignation.clearance.template.search</field>
+        <field name="model">hr.resignation.clearance.template</field>
+        <field name="arch" type="xml">
+            <search string="Search Work Units">
+                <field name="work_unit_id"/>
+                <field name="responsible_user" string="Responsible User"/>
+
+                <filter name="filter_mandatory"
+                        string="Mandatory Only"
+                        domain="[('is_mandatory', '=', True)]"/>
+                <filter name="filter_optional"
+                        string="Optional Only"
+                        domain="[('is_mandatory', '=', False)]"/>
+                <separator/>
+                <filter name="filter_active"
+                        string="Active"
+                        domain="[('active', '=', True)]"/>
+                <filter name="filter_archived"
+                        string="Archived"
+                        domain="[('active', '=', False)]"/>
+                <group name="group_by">
+                    <filter name="group_mandatory"
+                            string="Mandatory / Optional"
+                            context="{'group_by': 'is_mandatory'}"/>
+                    <filter name="group_responsible"
+                            string="Responsible User"
+                            context="{'group_by': 'responsible_user'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         CLEARANCE WORK UNIT TEMPLATE — Window Action
+    ═══════════════════════════════════════════════════════════════════════ -->
+
+    <record id="action_clearance_template" model="ir.actions.act_window">
+        <field name="name">Clearance Work Units</field>
+        <field name="res_model">hr.resignation.clearance.template</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="hr_clearance_template_view_search"/>
+        <field name="context">{'search_default_filter_active': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No clearance work units configured yet.
+            </p>
+            <p>
+                Add each work unit that must sign off on employee separations.
+                Mandatory work units block the Certificate of Release until
+                all have provided digital approval.
+            </p>
+        </field>
+    </record>
+
+</odoo>

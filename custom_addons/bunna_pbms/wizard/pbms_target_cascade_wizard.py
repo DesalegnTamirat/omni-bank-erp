@@ -165,6 +165,11 @@ class PbmsTargetCascadeWizard(models.TransientModel):
 
         if plan_id:
             plan = self.env["pbms.planning.category"].browse(plan_id)
+            if plan.is_targets_cascaded:
+                raise UserError(_(
+                    "Targets for '%s' have already been cascaded to subordinate units. "
+                    "Re-cascading is prevented to eliminate duplicate target allocations."
+                ) % plan.display_name)
             category = plan.category or res.get("category", "deposit")
             if plan.org_unit_type == "district_office" and not self.env.context.get("default_cascade_level"):
                 cascade_level = "district_to_branch"
@@ -452,6 +457,11 @@ class PbmsTargetCascadeWizard(models.TransientModel):
     def action_apply_cascade(self):
         """Apply the cascaded targets to each recipient operating unit's plan."""
         self.ensure_one()
+        if self.plan_id.is_targets_cascaded:
+            raise UserError(_(
+                "Targets for '%s' have already been cascaded to subordinate units. "
+                "Re-cascading is prevented to eliminate duplicate target allocations."
+            ) % self.plan_id.display_name)
         if not self.line_ids:
             raise UserError(_("No recipient work units found to cascade targets to."))
 
@@ -810,6 +820,9 @@ class PbmsTargetCascadeWizard(models.TransientModel):
                         })
                     except Exception:
                         pass
+
+        # Mark source plan as cascaded to prevent double cascading and update UI button
+        self.plan_id.write({"is_targets_cascaded": True})
 
         cascade_level_label = _("Districts") if self.cascade_level == "ho_to_district" else _("Branches")
         return {

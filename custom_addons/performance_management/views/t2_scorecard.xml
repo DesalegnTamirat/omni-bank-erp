@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ===================================================== -->
+    <!-- Tree View -->
+    <!-- ===================================================== -->
+    <record id="view_t2_scorecard_list" model="ir.ui.view">
+        <field name="name">t2.scorecard.list</field>
+        <field name="model">t2.scorecard</field>
+        <field name="arch" type="xml">
+            <list string="Tier 2 Scorecards">
+                <field name="employee_id"/>
+                <field name="planning_name"/>
+                <field name="appraisal_period_id"/>
+                <field name="company_id"/>
+                <field name="operating_unit_id"/>
+                <field name="department_id"/>
+                <field name="manager_id"/>
+                <field name="total_weight"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ===================================================== -->
+    <!-- Form View -->
+    <!-- ===================================================== -->
+
+    <record id="view_t2_scorecard_form" model="ir.ui.view">
+        <field name="name">t2.scorecard.form</field>
+        <field name="model">t2.scorecard</field>
+        <field name="arch" type="xml">
+
+            <form string="Tier 2 Score Card">
+
+                <header>
+
+                    <button name="action_notify"
+                            string="Notify Employee"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'draft'"/>
+
+                    <button name="action_accept"
+                            string="Accept"
+                            type="object"
+                            class="btn-success"
+                            invisible="state != 'notified'"/>
+
+                    <button name="action_reject"
+                            string="Reject"
+                            type="object"
+                            class="btn-danger"
+                            invisible="state != 'notified'"/>
+
+                    <button name="action_confirm"
+                            string="Confirm"
+                            type="object"
+                            class="btn-primary"
+                            invisible="state != 'accepted'"/>
+
+                    <button name="action_reset_draft"
+                            string="Reset to Draft"
+                            type="object"
+                            invisible="state == 'draft'"/>
+
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="draft,notified,accepted,rejected,confirmed"/>
+
+                </header>
+
+                <sheet>
+
+                    <field name="appraisal_period_code" invisible="1"/>
+                    <div class="alert d-flex align-items-center mb-3 period-banner-h1"
+                         style="color:#fff; border:none;"
+                         invisible="appraisal_period_code != 'H1'">
+                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
+                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                    </div>
+                    <div class="alert d-flex align-items-center mb-3 period-banner-h2"
+                         style="color:#fff; border:none;"
+                         invisible="appraisal_period_code != 'H2'">
+                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
+                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                    </div>
+                    <div class="alert d-flex align-items-center mb-3 period-banner-default"
+                         style="color:#fff; border:none;"
+                         invisible="appraisal_period_code in ('H1', 'H2') or not appraisal_period_code">
+                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
+                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                    </div>
+
+
+                    <field name="employee_image_128" widget="image" class="oe_avatar"
+                           options="{'preview_image': 'employee_image_128'}"/>
+
+                    <group>
+
+                        <group>
+
+                            <field name="planning_name"/>
+
+                            <field name="employee_id"/>
+
+                            <field name="company_id"/>
+
+                            <field name="operating_unit_id"/>
+
+                            <field name="department_id"/>
+
+                            <field name="accepted_by"/>
+
+                        </group>
+
+                        <group>
+
+                            <field name="start_date"/>
+
+                            <field name="end_date"/>
+
+                            <field name="manager_id"/>
+
+                            <field name="job_id"/>
+
+                            <field name="total_weight" widget="progressbar" readonly="1"/>
+
+                        </group>
+
+                    </group>
+
+
+                    <notebook>
+
+                        <page string="Score Card Plan Details">
+
+                            <field name="line_ids">
+
+                                <list editable="bottom">
+
+                                    <field name="measure_id"/>
+
+                                    <field name="perspective_id"/>
+
+                                    <field name="objective_id"/>
+
+                                    <field name="weight"/>
+
+                                    <field name="target_type"/>
+
+                                    <field name="baseline"/>
+
+                                    <field name="q1_target"/>
+
+                                    <field name="h1_target"/>
+
+                                    <field name="q3_target"/>
+
+                                    <field name="h2_target"/>
+
+                                    <field name="annual_target"/>
+
+                                </list>
+
+                            </field>
+
+                        </page>
+
+                    </notebook>
+
+                </sheet>
+
+            </form>
+
+        </field>
+    </record>
+
+    <record id="view_t2_scorecard_line_form" model="ir.ui.view">
+        <field name="name">t2.scorecard.line.form</field>
+        <field name="model">t2.scorecard.line</field>
+        <field name="arch" type="xml">
+            <form string="Scorecard Detail">
+
+                <group>
+
+                    <field name="measure_id"/>
+                    <field name="perspective_id"/>
+                    <field name="objective_id"/>
+                    <field name="weight"/>
+                    <field name="target_type"/>
+                    <field name="baseline"/>
+                    <field name="q1_target"/>
+                    <field name="h1_target"/>
+                    <field name="q3_target"/>
+                    <field name="h2_target"/>
+                    <field name="annual_target"/>
+
+                </group>
+
+            </form>
+        </field>
+    </record>
+
+    <!-- ===================================================== -->
+    <!-- Kanban View -->
+    <!-- ===================================================== -->
+    <record id="view_t2_scorecard_kanban" model="ir.ui.view">
+        <field name="name">t2.scorecard.kanban</field>
+        <field name="model">t2.scorecard</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_mobile">
+                <field name="employee_id"/>
+                <field name="job_id"/>
+                <field name="operating_unit_id"/>
+                <field name="department_id"/>
+                <field name="planning_name"/>
+                <field name="appraisal_period_id"/>
+                <field name="appraisal_period_code"/>
+                <field name="start_date"/>
+                <field name="end_date"/>
+                <field name="total_weight"/>
+                <field name="state"/>
+                <field name="employee_image_128"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="rounded-3 shadow-sm mb-1" style="overflow:hidden; border-left: 5px solid #1d2b32;">
+                            <div class="px-3 py-1 text-white small fw-bold period-banner-default"
+                                 t-att-class="record.appraisal_period_code.value == 'H1' and 'px-3 py-1 text-white small fw-bold period-banner-h1' or record.appraisal_period_code.value == 'H2' and 'px-3 py-1 text-white small fw-bold period-banner-h2' or 'px-3 py-1 text-white small fw-bold period-banner-default'"
+                                 t-if="record.appraisal_period_id.value">
+                                <i class="fa fa-calendar-check-o me-1"/>
+                                <field name="appraisal_period_id"/>
+                            </div>
+                            <div class="card-body" style="padding: 12px 14px;">
+                                <div class="d-flex">
+                                    <div class="o_kanban_image me-3">
+                                        <field name="employee_image_128" widget="image"
+                                               class="rounded-circle"
+                                               options="{'img_style': 'width: 40px; height: 40px; object-fit: cover;'}"/>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <strong class="o_kanban_record_title" style="font-size: 14px;">
+                                                <field name="employee_id"/>
+                                            </strong>
+                                            <field name="state" widget="badge"
+                                                   decoration-info="state == 'draft'"
+                                                   decoration-warning="state == 'notified'"
+                                                   decoration-success="state in ('accepted', 'confirmed')"
+                                                   decoration-danger="state == 'rejected'"/>
+                                        </div>
+                                        <div class="text-muted small fw-bold mt-2">
+                                            <field name="planning_name"/>
+                                        </div>
+                                        <div class="text-muted small" t-if="record.job_id.value">
+                                            <i class="fa fa-briefcase me-1"/>
+                                            <field name="job_id"/>
+                                        </div>
+                                        <div class="text-muted small" t-if="record.operating_unit_id.value">
+                                            <i class="fa fa-sitemap me-1"/>
+                                            <field name="operating_unit_id"/>
+                                        </div>
+                                        <div class="text-muted small" t-if="record.department_id.value">
+                                            <i class="fa fa-building me-1"/>
+                                            <field name="department_id"/>
+                                        </div>
+                                        <div class="text-muted small" t-if="record.start_date.value">
+                                            <i class="fa fa-calendar me-1"/>
+                                            <field name="start_date"/> - <field name="end_date"/>
+                                        </div>
+                                        <div class="mt-2">
+                                            <span class="badge rounded-pill"
+                                                  t-attf-style="background-color:{{record.total_weight.value == 100 and '#2e7d32' or '#c62828'}}; color:#fff; font-weight: 500;">
+                                                <i class="fa fa-percent me-1"/>
+                                                <field name="total_weight"/>% Total Weight
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ===================================================== -->
+    <!-- Action -->
+    <!-- ===================================================== -->
+
+    <record id="action_t2_scorecard" model="ir.actions.act_window">
+        <field name="name">Tier 2 Scorecards</field>
+        <field name="res_model">t2.scorecard</field>
+        <field name="view_mode">kanban,list,form</field>
+    </record>
+
+</odoo>

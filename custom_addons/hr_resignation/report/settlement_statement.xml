@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Report Action -->
+    <record id="action_report_settlement_statement" model="ir.actions.report">
+        <field name="name">Settlement Statement</field>
+        <field name="model">hr.resignation.settlement</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hr_resignation.report_settlement_statement</field>
+        <field name="report_file">hr_resignation.report_settlement_statement</field>
+        <field name="binding_model_id" ref="model_hr_resignation_settlement"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- QWeb Template -->
+    <template id="report_settlement_statement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.basic_layout">
+                    <div class="page" style="padding: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333333; font-size: 13px;">
+                        
+                        <!-- Header Section -->
+                        <table style="width: 100%; border-bottom: 2px solid #800020; padding-bottom: 10px; margin-bottom: 20px;">
+                            <tr>
+                                <td style="width: 30%; vertical-align: middle;">
+                                    <t t-if="doc.employee_id.company_id.logo">
+                                        <img t-att-src="image_data_uri(doc.employee_id.company_id.logo)" style="max-height: 70px;" alt="Logo"/>
+                                    </t>
+                                </td>
+                                <td style="width: 70%; text-align: right; vertical-align: middle;">
+                                    <h2 style="margin: 0; color: #800020; font-size: 20px; font-weight: bold; text-transform: uppercase;">
+                                        BUNNA BANK S.C.
+                                    </h2>
+                                    <p style="margin: 3px 0 0 0; color: #555555; font-size: 12px; font-weight: bold;">
+                                        Human Resources Management Directorate
+                                    </p>
+                                    <p style="margin: 2px 0 0 0; color: #777777; font-size: 11px;">
+                                        Employee Final Settlement Statement
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Statement Title -->
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; font-size: 16px; font-weight: bold; text-transform: uppercase; color: #800020; letter-spacing: 1px;">
+                                FINAL SEPARATION SETTLEMENT STATEMENT
+                            </h3>
+                        </div>
+
+                        <!-- Employee Details -->
+                        <table style="width: 100%; margin-bottom: 25px; border-collapse: collapse; font-size: 12px;">
+                            <tr>
+                                <td style="width: 20%; padding: 5px 0; font-weight: bold; color: #666666;">Employee Name:</td>
+                                <td style="width: 30%; padding: 5px 0; border-bottom: 1px solid #e0e0e0; font-weight: bold;"><t t-out="doc.employee_id.name"/></td>
+                                <td style="width: 5%;">&amp;nbsp;</td>
+                                <td style="width: 20%; padding: 5px 0; font-weight: bold; color: #666666;">Employee ID:</td>
+                                <td style="width: 25%; padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.employee_id.identification_id or doc.employee_id.barcode or 'N/A'"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Job Position:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.employee_id.job_id.name or 'N/A'"/></td>
+                                <td>&amp;nbsp;</td>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Department:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.employee_id.department_id.name or 'N/A'"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Date Joined:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.employee_id.start_date"/></td>
+                                <td>&amp;nbsp;</td>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Resignation Requested:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.resignation_id.application_date"/></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Separation Reason:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="doc.separation_reason or doc.resignation_id.resignation_type_id.name"/></td>
+                                <td>&amp;nbsp;</td>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Last Working Day:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0; font-weight: bold; color: #800020;">
+                                    <t t-out="doc.resignation_id.release_date or doc.resignation_id.expected_last_day"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">Service Years (Total):</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="'%.2f' % (doc.service_years or 0.0)"/> Years</td>
+                                <td>&amp;nbsp;</td>
+                                <td style="padding: 5px 0; font-weight: bold; color: #666666;">PF Service Period:</td>
+                                <td style="padding: 5px 0; border-bottom: 1px solid #e0e0e0;"><t t-out="'%.2f' % (doc.pf_service_years or 0.0)"/> Years</td>
+                            </tr>
+                        </table>
+
+                        <!-- Entitlements & Benefits Table -->
+                        <h4 style="margin: 15px 0 8px 0; color: #800020; border-bottom: 1px solid #800020; padding-bottom: 3px;">1. Entitlements &amp; Benefits</h4>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+                            <thead>
+                                <tr style="background-color: #f9f9f9; border-bottom: 2px solid #dddddd;">
+                                    <th style="text-align: left; padding: 8px; width: 60%;">Description</th>
+                                    <th style="text-align: left; padding: 8px; width: 15%;">Status</th>
+                                    <th style="text-align: right; padding: 8px; width: 25%;">Amount (ETB)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Provident Fund Benefit (CBS Staged Account)</td>
+                                    <td style="padding: 8px;">
+                                        <t t-if="doc.pf_eligible">Eligible</t>
+                                        <t t-else="">Not Eligible</t>
+                                    </td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.pf_amount or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Severance Pay</td>
+                                    <td style="padding: 8px;">
+                                        <t t-if="doc.severance_eligible">Eligible</t>
+                                        <t t-else="">Not Eligible</t>
+                                    </td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.severance_amount or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Accrued Unutilized Leave Pay</td>
+                                    <td style="padding: 8px;"><t t-out="doc.unutilized_leave_days or 0.0"/> Days</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.leave_payout or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Remaining Salary (Prorated)</td>
+                                    <td style="padding: 8px;">Completed</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.remaining_salary or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Other Separation Benefits</td>
+                                    <td style="padding: 8px;">Calculated</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.other_benefits or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="background-color: #f2f2f2; font-weight: bold; border-top: 2px solid #cccccc; border-bottom: 2px solid #cccccc;">
+                                    <td colspan="2" style="padding: 8px; text-align: left;">Gross Entitlement Total:</td>
+                                    <td style="padding: 8px; text-align: right; color: #800020;">
+                                        <t t-out="'{:,.2f}'.format(doc.total_payment or 0.0)"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Deductions Table -->
+                        <h4 style="margin: 15px 0 8px 0; color: #800020; border-bottom: 1px solid #800020; padding-bottom: 3px;">2. Deductions &amp; Liabilities Offset</h4>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 12px;">
+                            <thead>
+                                <tr style="background-color: #f9f9f9; border-bottom: 2px solid #dddddd;">
+                                    <th style="text-align: left; padding: 8px; width: 60%;">Description</th>
+                                    <th style="text-align: left; padding: 8px; width: 15%;">Authorization</th>
+                                    <th style="text-align: right; padding: 8px; width: 25%;">Amount (ETB)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Outstanding Staff Loans, RSSA &amp; Guarantees Deductions</td>
+                                    <td style="padding: 8px;">
+                                        <t t-if="doc.settlement_authorized">Authorized</t>
+                                        <t t-else="">Not Authorized</t>
+                                    </td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.outstanding_debt_deduction or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Income Tax Deduction</td>
+                                    <td style="padding: 8px;">Applicable</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.income_tax_deduction or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #eeeeee;">
+                                    <td style="padding: 8px; font-weight: bold;">Pension Deduction</td>
+                                    <td style="padding: 8px;">Applicable</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-out="'{:,.2f}'.format(doc.pension_deduction or 0.0)"/>
+                                    </td>
+                                </tr>
+                                <tr style="background-color: #f2f2f2; font-weight: bold; border-top: 2px solid #cccccc; border-bottom: 2px solid #cccccc;">
+                                    <td colspan="2" style="padding: 8px; text-align: left;">Total Deductions:</td>
+                                    <td style="padding: 8px; text-align: right;">
+                                        <t t-set="total_deductions" t-value="(doc.outstanding_debt_deduction if doc.settlement_authorized else 0.0) + (doc.income_tax_deduction or 0.0) + (doc.pension_deduction or 0.0)"/>
+                                        <t t-out="'{:,.2f}'.format(total_deductions)"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Net Payable Summary -->
+                        <div style="background-color: #800020; color: #ffffff; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 4px; overflow: hidden; margin-bottom: 40px;">
+                            <div style="float: left; width: 60%; text-align: left;">
+                                NET PAYABLE AMOUNT TO EMPLOYEE:
+                            </div>
+                            <div style="float: right; width: 40%; text-align: right; font-size: 16px;">
+                                ETB <t t-out="'{:,.2f}'.format(doc.net_payment or 0.0)"/>
+                            </div>
+                        </div>
+
+                        <!-- Signatures Area -->
+                        <table style="width: 100%; margin-top: 40px; font-size: 11px; page-break-inside: avoid; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 30%; vertical-align: top; text-align: left; padding-right: 15px;">
+                                    <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #666666;">Prepared By (HR Officer):</p>
+                                    <div style="height: 45px; border-bottom: 1px dashed #999999;"></div>
+                                    <p style="margin: 4px 0 0 0;">Signature &amp; Date</p>
+                                    <p style="margin: 2px 0 0 0; color: #888888;">Separation &amp; Clearance Unit</p>
+                                </td>
+                                <td style="width: 35%; vertical-align: top; text-align: left; padding-right: 15px; padding-left: 15px;">
+                                    <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #666666;">Approved By (POMD Director):</p>
+                                    <div style="height: 45px; border-bottom: 1px dashed #999999;"></div>
+                                    <p style="margin: 4px 0 0 0;">Signature, Date &amp; Stamp</p>
+                                    <p style="margin: 2px 0 0 0; color: #888888;">POMD Management</p>
+                                </td>
+                                <td style="width: 35%; vertical-align: top; text-align: right; padding-left: 15px;">
+                                    <p style="margin: 0; font-weight: bold; text-transform: uppercase; color: #666666; text-align: left;">Employee Acknowledgment:</p>
+                                    <div style="height: 45px; border-bottom: 1px dashed #999999; text-align: left; padding-top: 35px;">
+                                        I hereby accept the above settlement statement as correct.
+                                    </div>
+                                    <p style="margin: 4px 0 0 0; text-align: left;">Signature &amp; Date</p>
+                                    <p style="margin: 2px 0 0 0; color: #888888; text-align: left;">Name: <t t-out="doc.employee_id.name"/></p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Footer -->
+                        <div style="margin-top: 50px; border-top: 1px solid #e0e0e0; padding-top: 8px; text-align: center; font-size: 9px; color: #999999;">
+                            This settlement is computed based on Odoo ERP separation modules and verified records. | Bank Copy
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

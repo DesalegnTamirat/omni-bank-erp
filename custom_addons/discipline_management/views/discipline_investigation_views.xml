@@ -5,21 +5,13 @@
             <field name="name">discipline.investigation.list</field>
             <field name="model">discipline.investigation</field>
             <field name="arch" type="xml">
-                <list decoration-info="state == 'draft'"
-                      decoration-warning="state in ('assigned', 'manager_review', 'director_review')"
-                      decoration-success="state == 'approved'">
+                <list>
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
                     <field name="investigator_id"/>
-                    <field name="finding_outcome"/>
-                    <field name="financial_loss_amount"/>
                     <field name="investigation_date"/>
-                    <field name="state" widget="badge"
-                           decoration-info="state == 'draft'"
-                           decoration-warning="state in ('assigned', 'manager_review')"
-                           decoration-primary="state == 'director_review'"
-                           decoration-success="state == 'approved'"/>
+                    <field name="state"/>
                 </list>
             </field>
         </record>
@@ -30,129 +22,38 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <!-- Stage 1: Assignment -->
-                        <button name="action_assign_investigation" string="Assign / Start Investigation" type="object" class="oe_highlight"
-                                invisible="state != 'draft'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-                        
-                        <!-- Stage 2: Officer Submission for Quality Review -->
-                        <button name="action_submit_for_manager_review" string="Submit for Manager Review" type="object" class="oe_highlight"
-                                invisible="state != 'assigned'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-                        
-                        <!-- Stage 3: Manager QA Endorsement / Return -->
-                        <button name="action_manager_approve" string="Endorse to Director" type="object" class="btn-success"
-                                invisible="state != 'manager_review'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-                        <button name="action_manager_return" string="Return to Officer for Revision" type="object" class="btn-secondary"
-                                invisible="state != 'manager_review'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-                        
-                        <!-- Stage 4: Director Final Sign-off & Announcement -->
-                        <button name="action_director_approve_and_announce" string="Approve &amp; Announce Findings" type="object" class="oe_highlight"
-                                invisible="state != 'director_review'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-                        <button name="action_director_return" string="Director Return for Revision" type="object" class="btn-secondary"
-                                invisible="state != 'director_review'"
-                                groups="discipline_management.group_discipline_auditor,discipline_management.group_discipline_admin"/>
-
-                        <field name="state" widget="statusbar" statusbar_visible="draft,assigned,manager_review,director_review,approved"/>
+                        <button name="action_submit_findings" string="Submit Findings" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_accept_findings" string="Accept Findings" type="object" class="btn-success" invisible="state != 'submitted'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved"/>
                     </header>
                     <sheet>
                         <group>
                             <group string="Case Reference">
-                                <field name="name" readonly="1"/>
-                                <field name="title" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="case_id" readonly="1"/>
-                                <field name="employee_id" readonly="1"/>
-                                <field name="finding_outcome" widget="radio" options="{'horizontal': true}" readonly="state in ('manager_review', 'director_review', 'approved')"/>
+                                <field name="name"/>
+                                <field name="case_id"/>
+                                <field name="employee_id"/>
                             </group>
-                            <group string="Audit Team &amp; Financial Loss Details">
-                                <field name="director_id" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="audit_manager_id" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="investigator_id" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="target_completion_date" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="investigation_date" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="financial_loss_amount" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="loss_resolution_status" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                <field name="offense_id" readonly="1"/>
+                            <group string="Investigator Details">
+                                <field name="investigator_id"/>
+                                <field name="investigation_date"/>
                             </group>
                         </group>
                         <notebook>
-                            <!-- Tab 1: Findings & Scope -->
-                            <page string="Findings &amp; Scope">
-                                <group string="Executive Summary &amp; Mandate">
-                                    <field name="introduction" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Describe the background, mandate, initiation circumstances, and commencement of investigation..."/>
-                                </group>
-                                <group string="Scope &amp; Audit Methodology">
-                                    <field name="scope_limitations" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Specify boundaries, timeframes, systems/branches audited, constraints faced during investigation..."/>
-                                </group>
-                                <group string="Factual Audit Findings (Facts Established)">
-                                    <field name="summary_findings" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Detail all facts established during the investigation, timelines, and audit evidence..."/>
-                                </group>
-                                <group string="Audit Recommendations &amp; Proposed Actions">
-                                    <field name="investigator_recommendation" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Investigator recommended action, disciplinary sanction, and system control improvements..."/>
+                            <page string="Findings &amp; Recommendations">
+                                <group>
+                                    <field name="summary_findings" placeholder="Detail investigation findings..."/>
+                                    <field name="witness_statements" placeholder="Enter witness statements and notes..."/>
+                                    <field name="investigator_recommendation" placeholder="Investigator recommended action..."/>
                                 </group>
                             </page>
-
-                            <!-- Tab 2: Policy & Liable Personnel -->
-                            <page string="Policy &amp; Liable Personnel">
-                                <group string="Applicable Policy Articles Violated">
-                                    <field name="applicable_policy" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="e.g. HR Policy Section 4.2 – Cash Handling Violations"/>
-                                    <field name="policy_clause" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                    <field name="policy_violation_references" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Detail specific policy articles, procedural codes, and circular clauses violated..."/>
-                                </group>
-                                <group string="Liable Personnel Matrix">
-                                    <field name="liable_employee_ids" readonly="state in ('manager_review', 'director_review', 'approved')">
-                                        <list editable="bottom">
-                                            <field name="employee_id"/>
-                                            <field name="role_in_incident"/>
-                                            <field name="degree_of_liability"/>
-                                            <field name="recommended_action"/>
-                                        </list>
-                                    </field>
-                                </group>
-                            </page>
-
-                            <!-- Tab 3: Evidence & Supervisory Sign-off -->
-                            <page string="Evidence &amp; Supervisory Sign-off">
-                                <group string="Witness Statements &amp; Interrogation Records">
-                                    <field name="witness_statements" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Enter witness statements, suspect interrogations, and interview notes..."/>
-                                    <field name="evidence_description" widget="html" readonly="state in ('manager_review', 'director_review', 'approved')"
-                                           placeholder="Physical and digital evidence collected, chain of custody, core banking logs, CCTV references..."/>
-                                </group>
-                                <group string="Investigation Documents &amp; Attachments">
-                                    <group>
-                                        <field name="report_file" filename="report_filename" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                        <field name="report_filename" invisible="1"/>
-                                        <field name="statement_file" filename="statement_filename" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                        <field name="statement_filename" invisible="1"/>
-                                    </group>
-                                    <group>
-                                        <field name="evidence_file" filename="evidence_filename" readonly="state in ('manager_review', 'director_review', 'approved')"/>
-                                        <field name="evidence_filename" invisible="1"/>
-                                    </group>
-                                </group>
-                                <group string="Supervisory Quality Review &amp; Approvals">
-                                    <group string="Audit Manager Quality Review">
-                                        <field name="manager_signed_off_by_id" readonly="1"/>
-                                        <field name="manager_review_date" readonly="1"/>
-                                        <field name="manager_review_notes" readonly="state in ('director_review', 'approved')"
-                                               placeholder="Manager QA review remarks, endorsement justification, or revision directives..."/>
-                                    </group>
-                                    <group string="Audit Director Final Sign-off">
-                                        <field name="reviewed_by_id" readonly="1"/>
-                                        <field name="director_signoff_date" readonly="1"/>
-                                        <field name="director_review_notes" readonly="state == 'approved'"
-                                               placeholder="Director approval remarks prior to announcement..."/>
-                                    </group>
+                            <page string="Evidence Attachments">
+                                <group>
+                                    <field name="report_file" filename="report_filename"/>
+                                    <field name="report_filename" invisible="1"/>
+                                    <field name="evidence_file" filename="evidence_filename"/>
+                                    <field name="evidence_filename" invisible="1"/>
+                                    <field name="statement_file" filename="statement_filename"/>
+                                    <field name="statement_filename" invisible="1"/>
                                 </group>
                             </page>
                         </notebook>
@@ -169,4 +70,3 @@
         </record>
     </data>
 </odoo>
-

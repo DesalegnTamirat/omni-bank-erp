@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Keep the template creation in noupdate="1" to avoid overwriting user edits to the default template name/active status -->
+    <data noupdate="1">
+        <record id="default_exit_interview_template" model="hr.exit.interview.template">
+            <field name="name">Standard Exit Interview</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+
+    <!-- Always load/update default questions for the standard template -->
+    <data>
+        <!-- Section A: Reason for Leaving -->
+        <record id="q1" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">1</field>
+            <field name="section">SECTION A: Reason for Leaving</field>
+            <field name="name">What is the MAIN reason you are leaving? (select all that apply)</field>
+            <field name="question_type">checkbox</field>
+        </record>
+        <record id="q1_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Better pay elsewhere</field></record>
+        <record id="q1_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Better career growth</field></record>
+        <record id="q1_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Relationship with manager/Supervisor</field></record>
+        <record id="q1_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Workload /Work stress</field></record>
+        <record id="q1_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Work-life balance</field></record>
+        <record id="q1_o6" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Relationship with peer/Team dynamics</field></record>
+        <record id="q1_o7" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Lack of recognition or feedback</field></record>
+        <record id="q1_o8" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Role dissatisfaction</field></record>
+        <record id="q1_o9" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Company Culture/ Values misalignment</field></record>
+        <record id="q1_o10" model="hr.exit.interview.question.option"><field name="question_id" ref="q1"/><field name="name">Other</field></record>
+
+        <record id="q2" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">2</field>
+            <field name="section">SECTION A: Reason for Leaving</field>
+            <field name="name">Did you raise any concerns with your manager or HR prior to deciding to leave?</field>
+            <field name="question_type">boolean</field>
+        </record>
+
+        <record id="q3" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">3</field>
+            <field name="section">SECTION A: Reason for Leaving</field>
+            <field name="name">Is there anything the company could have done differently to retain you?</field>
+            <field name="question_type">text</field>
+        </record>
+
+        <!-- Section B -->
+        <record id="q4" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">4</field>
+            <field name="section">SECTION B: JOB ROLE &amp; RESPONSIBILITIES</field>
+            <field name="name">Were your job responsibilities clearly defined when you joined?</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q4_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q4"/><field name="sequence">1</field><field name="name">Yes</field></record>
+        <record id="q4_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q4"/><field name="sequence">2</field><field name="name">No</field></record>
+        <record id="q4_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q4"/><field name="sequence">3</field><field name="name">Somewhat</field></record>
+
+        <record id="q5" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">5</field>
+            <field name="section">SECTION B: JOB ROLE &amp; RESPONSIBILITIES</field>
+            <field name="name">Was your workload reasonable and manageable?</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q5_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q5"/><field name="sequence">1</field><field name="name">Always</field></record>
+        <record id="q5_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q5"/><field name="sequence">2</field><field name="name">Usually</field></record>
+        <record id="q5_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q5"/><field name="sequence">3</field><field name="name">Sometimes</field></record>
+        <record id="q5_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q5"/><field name="sequence">4</field><field name="name">Rarely</field></record>
+        <record id="q5_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q5"/><field name="sequence">5</field><field name="name">Never</field></record>
+
+        <record id="q6" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">6</field>
+            <field name="section">SECTION B: JOB ROLE &amp; RESPONSIBILITIES</field>
+            <field name="name">Did you feel adequately trained and equipped with the tools/resources to succeed?</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q6_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q6"/><field name="sequence">1</field><field name="name">Yes</field></record>
+        <record id="q6_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q6"/><field name="sequence">2</field><field name="name">No</field></record>
+        <record id="q6_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q6"/><field name="sequence">3</field><field name="name">Partially</field></record>
+
+        <!-- Section C -->
+        <record id="q7" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">7</field>
+            <field name="section">SECTION C: MANAGEMENT &amp; SUPERVISION</field>
+            <field name="name">How would you describe your relationship with your direct manager?</field>
+            <field name="question_type">rating</field>
+        </record>
+
+        <record id="q8" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">8</field>
+            <field name="section">SECTION C: MANAGEMENT &amp; SUPERVISION</field>
+            <field name="name">My performance was evaluated fairly</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q8_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q8"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q8_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q8"/><field name="name">2 - Disagree</field></record>
+        <record id="q8_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q8"/><field name="name">3 - Neutral</field></record>
+        <record id="q8_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q8"/><field name="name">4 - Agree</field></record>
+        <record id="q8_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q8"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q9" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">9</field>
+            <field name="section">SECTION C: MANAGEMENT &amp; SUPERVISION</field>
+            <field name="name">My manager supported me to do my job well</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q9_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q9"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q9_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q9"/><field name="name">2 - Disagree</field></record>
+        <record id="q9_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q9"/><field name="name">3 - Neutral</field></record>
+        <record id="q9_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q9"/><field name="name">4 - Agree</field></record>
+        <record id="q9_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q9"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q10" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">10</field>
+            <field name="section">SECTION C: MANAGEMENT &amp; SUPERVISION</field>
+            <field name="name">What should your manager improve?</field>
+            <field name="question_type">text</field>
+        </record>
+
+        <!-- Section D -->
+        <record id="q11" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">11</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">I experienced RESPECT at work</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q11_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q11"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q11_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q11"/><field name="name">2 - Disagree</field></record>
+        <record id="q11_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q11"/><field name="name">3 - Neutral</field></record>
+        <record id="q11_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q11"/><field name="name">4 - Agree</field></record>
+        <record id="q11_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q11"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q12" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">12</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">There was good COLLABORATION between teams</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q12_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q12"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q12_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q12"/><field name="name">2 - Disagree</field></record>
+        <record id="q12_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q12"/><field name="name">3 - Neutral</field></record>
+        <record id="q12_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q12"/><field name="name">4 - Agree</field></record>
+        <record id="q12_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q12"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q13" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">13</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">The bank acted RESPONSIBLY toward me as an employee.</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q13_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q13"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q13_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q13"/><field name="name">2 - Disagree</field></record>
+        <record id="q13_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q13"/><field name="name">3 - Neutral</field></record>
+        <record id="q13_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q13"/><field name="name">4 - Agree</field></record>
+        <record id="q13_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q13"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q14" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">14</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">High performance (WINNING) was supported</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q14_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q14"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q14_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q14"/><field name="name">2 - Disagree</field></record>
+        <record id="q14_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q14"/><field name="name">3 - Neutral</field></record>
+        <record id="q14_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q14"/><field name="name">4 - Agree</field></record>
+        <record id="q14_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q14"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q15" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">15</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">I was encouraged to INNOVATE</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q15_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q15"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q15_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q15"/><field name="name">2 - Disagree</field></record>
+        <record id="q15_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q15"/><field name="name">3 - Neutral</field></record>
+        <record id="q15_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q15"/><field name="name">4 - Agree</field></record>
+        <record id="q15_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q15"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q16" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">16</field>
+            <field name="section">SECTION D: COMPANY CULTURE &amp; WORK ENVIRONMENT</field>
+            <field name="name">What cultural or work-environment issues affected your experience?</field>
+            <field name="question_type">text</field>
+        </record>
+
+        <!-- Section E -->
+        <record id="q17" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">17</field>
+            <field name="section">SECTION E: Pay and Recognition</field>
+            <field name="name">My pay was fair compared to similar roles outside the bank</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q17_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q17"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q17_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q17"/><field name="name">2 - Disagree</field></record>
+        <record id="q17_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q17"/><field name="name">3 - Neutral</field></record>
+        <record id="q17_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q17"/><field name="name">4 - Agree</field></record>
+        <record id="q17_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q17"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q18" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">18</field>
+            <field name="section">SECTION E: Pay and Recognition</field>
+            <field name="name">My efforts were recognized and appreciated</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q18_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q18"/><field name="name">1 - Strongly Disagree</field></record>
+        <record id="q18_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q18"/><field name="name">2 - Disagree</field></record>
+        <record id="q18_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q18"/><field name="name">3 - Neutral</field></record>
+        <record id="q18_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q18"/><field name="name">4 - Agree</field></record>
+        <record id="q18_o5" model="hr.exit.interview.question.option"><field name="question_id" ref="q18"/><field name="name">5 - Strongly Agree</field></record>
+
+        <record id="q19" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">19</field>
+            <field name="section">SECTION E: Pay and Recognition</field>
+            <field name="name">What should the bank improve regarding pay or recognition?</field>
+            <field name="question_type">text</field>
+        </record>
+
+        <record id="q20" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">20</field>
+            <field name="section">SECTION E: Pay and Recognition</field>
+            <field name="name">Which sector will you be joining next?</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q20_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q20"/><field name="name">Banking Industry</field></record>
+        <record id="q20_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q20"/><field name="name">Financial Sector (Non-Bank)</field></record>
+        <record id="q20_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q20"/><field name="name">Private Sector (Other Industry)</field></record>
+        <record id="q20_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q20"/><field name="name">Own Business/ Entrepreneurship</field></record>
+
+        <record id="q21" model="hr.exit.interview.question">
+            <field name="template_id" ref="default_exit_interview_template"/>
+            <field name="sequence">21</field>
+            <field name="section">SECTION E: Pay and Recognition</field>
+            <field name="name">Would you recommend Bunna Bank as a good place to work?</field>
+            <field name="question_type">custom</field>
+        </record>
+        <record id="q21_o1" model="hr.exit.interview.question.option"><field name="question_id" ref="q21"/><field name="name">Highly recommend</field></record>
+        <record id="q21_o2" model="hr.exit.interview.question.option"><field name="question_id" ref="q21"/><field name="name">Recommend</field></record>
+        <record id="q21_o3" model="hr.exit.interview.question.option"><field name="question_id" ref="q21"/><field name="name">Neutral / Not sure</field></record>
+        <record id="q21_o4" model="hr.exit.interview.question.option"><field name="question_id" ref="q21"/><field name="name">Would not recommend</field></record>
+    </data>
+</odoo>
