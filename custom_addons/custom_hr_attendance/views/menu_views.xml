@@ -82,10 +82,11 @@
         <!-- ====================================================
          5. Manager Menu (Accessible by Managers only)
               └─ Attendances                             (hr_attendance list)
-              └─ Employees                               (hr.employee list)
               └─ Generate Employee Attendance Report Wizard (wizard)
-              └─ Daily Employee Attendance Detail        (daily attendance details view)
               └─ Manual Attendance Entry                 (manual entry wizard)
+              └─ Daily Employee Attendance Report        (daily attendance details view)
+              └─ Acknowledged Attendance Report          (acknowledged attendances)
+              └─ Batch Attendance Report                 (batch attendance requests)
          ==================================================== -->
         <menuitem
                 id="hr_attendance.menu_hr_attendance_view_attendances_management"
@@ -103,32 +104,36 @@
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
                 sequence="10" />
 
-        <!-- 5.2 Employees (Deactivated to prevent non-HR users from viewing employee lists) -->
-        <!-- <record id="menu_manager_employees" model="ir.ui.menu">
-                <field name="active" eval="False" />
-        </record> -->
-
-        <!-- 5.3 Generate Employee Attendance Report Wizard -->
+        <!-- 5.2 Generate Employee Attendance Report Wizard -->
         <menuitem
                 id="menu_manager_generate_attendance_report"
                 name="Generate Employee Attendance Report Wizard"
                 parent="hr_attendance.menu_hr_attendance_view_attendances_management"
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
                 action="action_manager_daily_attendance_wizard"
-                sequence="30" />
+                sequence="20" />
 
-        <!-- 5.4 Daily Employee Attendance Detail -->
+        <!-- 5.3 Manual Attendance Entry (Placed under Generate Employee Attendance Report Wizard) -->
+        <menuitem
+                id="menu_manual_attendance_wizard"
+                name="Manual Attendance Entry"
+                parent="hr_attendance.menu_hr_attendance_view_attendances_management"
+                action="action_hr_attendance_manual_wizard"
+                sequence="30"
+                groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
+
+        <!-- 5.4 Daily Employee Attendance Report (Renamed from Daily Employee Attendance Detail) -->
         <menuitem
                 id="menu_manager_attendance_details"
-                name="Daily Employee Attendance Detail"
+                name="Daily Employee Attendance Report"
                 action="generated_employee_attendance_details_action"
                 parent="hr_attendance.menu_hr_attendance_view_attendances_management"
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager"
                 sequence="40" />
 
-        <!-- 5.5 Acknowledged Attendances (Manager List) -->
+        <!-- 5.5 Acknowledged Attendance Report (Renamed from Acknowledged Attendances) -->
         <record id="action_manager_acknowledged_attendances" model="ir.actions.act_window">
-            <field name="name">Acknowledged Attendances</field>
+            <field name="name">Acknowledged Attendance Report</field>
             <field name="res_model">hr.attendance</field>
             <field name="view_mode">list,form</field>
             <field name="domain">['|', ('is_acknowledged', '=', True), ('in_mode', '=', 'acknowledged')]</field>
@@ -145,28 +150,19 @@
 
         <menuitem
                 id="menu_manager_acknowledged_attendances"
-                name="Acknowledged Attendances"
+                name="Acknowledged Attendance Report"
                 parent="hr_attendance.menu_hr_attendance_view_attendances_management"
                 action="action_manager_acknowledged_attendances"
-                sequence="45"
-                groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
-
-        <!-- 5.6 Manual Attendance Entry Wizard -->
-        <menuitem
-                id="menu_manual_attendance_wizard"
-                name="Manual Attendance Entry"
-                parent="hr_attendance.menu_hr_attendance_view_attendances_management"
-                action="action_hr_attendance_manual_wizard"
                 sequence="50"
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
 
-        <!-- 5.7 Batch Attendance Requests (Coach Approval) -->
+        <!-- 5.6 Batch Attendance Report (Renamed from Batch Attendance Requests) -->
         <menuitem
                 id="menu_batch_attendance_requests"
-                name="Batch Attendance Requests"
+                name="Batch Attendance Report"
                 parent="hr_attendance.menu_hr_attendance_view_attendances_management"
                 action="action_hr_attendance_batch_request"
-                sequence="55"
+                sequence="60"
                 groups="hr_attendance.group_hr_attendance_user,custom_hr_attendance.group_hr_attendance_job_position_user,custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
 
         <!-- ====================================================
@@ -225,14 +221,14 @@
                 sequence="50"
                 groups="custom_hr_attendance.group_hr_attendance_job_position_user,hr_attendance.group_hr_attendance_manager" />
 
-        <!-- 6.7 Over Time Report -->
-        <menuitem
+        <!-- 6.7 Over Time Report (Hidden per requirement - unhide when needed) -->
+        <!-- <menuitem
                 id="menu_overtime_report"
                 name="Over Time Report"
                 parent="hr_attendance.menu_hr_attendance_reporting"
                 action="action_overtime_report"
                 sequence="60"
-                groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
+                groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" /> -->
 
         <!-- 6.8 Force Checkout History -->
         <menuitem
@@ -304,13 +300,12 @@
                 sequence="35"
                 groups="hr_attendance.group_hr_attendance_manager" />
 
-
-
-        <menuitem id="menu_over_time"
+        <!-- Over Time Configuration (Hidden per requirement - unhide when needed) -->
+        <!-- <menuitem id="menu_over_time"
                 name="Over Time"
                 parent="menu_bunna_attendance_configuration"
                 action="action_over_time"
                 sequence="30"
-                groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" />
+                groups="custom_hr_attendance.group_hr_attendance_it_driver_user,hr_attendance.group_hr_attendance_manager" /> -->
 
 </odoo>

@@ -23,7 +23,6 @@ class GenerateDetailEmployeeAttendanceReport(models.TransientModel):
         ('attendance_preapproval', 'PreDefined Attendance'),
         ('acknowledged_attendance', 'Acknowledged Attendance'),
         ('job_position_exception', 'Job Position Exception'),
-        ('over_time', 'Over Time'),
     ], required=True, default='attendance_summary')
 
     @api.constrains('date_from', 'date_to')
