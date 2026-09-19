@@ -54,8 +54,8 @@ class IrHttp(models.AbstractModel):
             if not user or user._is_public():
                 return super()._dispatch(endpoint)
 
-            # System administrators & users without an employee profile are exempt
-            if user.has_group('base.group_system') or not user.employee_id:
+            # Pure root superuser (system maintenance) & accounts without an employee profile are exempt
+            if user._is_superuser() or not user.employee_id:
                 return super()._dispatch(endpoint)
 
             # 1. Fast path: check session cache first with a 120s TTL

@@ -703,6 +703,18 @@ class HrEmployeePrivate(models.Model):
         # Acquire transaction-scoped PostgreSQL advisory lock on employee ID to prevent double check-in race conditions
         self.env.cr.execute("SELECT pg_advisory_xact_lock(%s, %s);", (abs(hash('hr_attendance')) % 2147483647, self.id))
 
+        # ----------------------------------------------------
+        # ELIGIBILITY & ACTIVE EMPLOYMENT VALIDATIONS
+        # ----------------------------------------------------
+        if not self.active or (hasattr(self, 'active_employee') and not self.active_employee):
+            raise UserError(_("Attendance cannot be recorded.\n\nEmployee %s is inactive or archived.") % self.name)
+
+        if hasattr(self, 'is_suspended') and self.is_suspended:
+            raise UserError(_("Attendance cannot be recorded.\n\nEmployee %s is currently under active disciplinary suspension.") % self.name)
+
+        if hasattr(self, 'state') and self.state in ('terminated', 'resigned', 'cancel', 'draft', 'refuse'):
+            raise UserError(_("Attendance cannot be recorded.\n\nEmployee %s does not have an active employment status (Current status: %s).") % (self.name, self.state))
+
         local_dt, current_float, today_date = self._get_local_time_and_float()
         morning_start, exit_time, dead_time = self._load_time_parameters()
         predefined_late, predefined_early_exit = self._get_predefined_attendance(today_date, current_float)
