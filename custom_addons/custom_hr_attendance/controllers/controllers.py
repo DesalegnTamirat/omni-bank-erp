@@ -195,9 +195,11 @@ class BunnaMyAttendance(http.Controller):
             check_in_date = check_in_local.date()
             shift_info = self._get_employee_shift_info(employee, check_in_date)
             shift_start = shift_info.get('start_time', 8.0) if shift_info else 8.0
+            grace_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.grace_time', '0.25'))
+            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', '0.333333'))
 
             check_in_float = check_in_local.hour + (check_in_local.minute / 60.0)
-            data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > (shift_start + dead_time) else 'Normal')
+            data['check_in_status'] = open_att.check_in_status or ('Late' if check_in_float > (shift_start + grace_time) else 'Normal')
         else:
             data['attendance_state'] = 'checked_out'
             data['check_in_raw'] = False

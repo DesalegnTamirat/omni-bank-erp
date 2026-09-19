@@ -75,8 +75,8 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
 
         # Execute stored procedure to populate generate_employee_attendance_details table
         self.env.cr.execute(
-            "SELECT generate_daily_employee_attendance_detail_report(%s, %s, %s)",
-            (self.date_from, self.date_to, 'daily_detail')
+            "SELECT generate_daily_employee_attendance_detail_report(%s, %s, %s, %s)",
+            (self.date_from, self.date_to, 'daily_detail', self.env.uid)
         )
 
         return {
@@ -85,6 +85,7 @@ class ManagerDailyAttendanceWizard(models.TransientModel):
             'res_model': 'generate.employee.attendance.details',
             'view_mode': 'list,search',
             'views': [(self.env.ref('custom_hr_attendance.view_daily_employee_attendance_detail_tree').id, 'list')],
+            'domain': [('create_uid', '=', self.env.uid)],
             'target': 'current',
         }
 

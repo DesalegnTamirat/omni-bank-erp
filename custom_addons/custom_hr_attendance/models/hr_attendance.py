@@ -35,20 +35,38 @@ class HrAttendance(models.Model):
     def _auto_init(self):
         res = super()._auto_init()
         # High-Speed Performance Indexes for 6,000 Concurrent Check-Ins
-        # 1. Partial Index for Open Attendance Sessions (Fast Checkout Resolution <= 0.1 ms)
+        # 1. Unique constraint & partial index: strictly at most one open attendance session per employee
+        self.env.cr.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS hr_attendance_one_open_per_emp 
+            ON hr_attendance (employee_id) 
+            WHERE (check_out IS NULL);
+        """)
+        # 2. Partial Index for Open Attendance Sessions with check_in
         self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS hr_attendance_open_session_fast_idx 
             ON hr_attendance (employee_id, check_in) 
             WHERE (check_out IS NULL);
         """)
-        # 2. Composite Index for Daily Lateness Dashboard Queries
+        # 3. Composite Index for Daily Lateness Dashboard Queries
         self.env.cr.execute("""
             CREATE INDEX IF NOT EXISTS hr_attendance_daily_lateness_fast_idx 
             ON hr_attendance (date, employee_id, check_in_status);
         """)
-        # 3. Drop Redundant Duplicate Index on check_in_status
+        # 4. Composite index for date-range queries on attendance per employee
         self.env.cr.execute("""
-            DROP INDEX IF EXISTS hr_attendance_checkin_status_idx;
+            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
+            ON hr_attendance (employee_id, check_in);
+        """)
+        # 5. Index on check_in_status
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
+            ON hr_attendance (check_in_status);
+        """)
+        # 6. Partial index on is_force_checkout for reporting queries
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
+            ON hr_attendance (employee_id)
+            WHERE is_force_checkout = TRUE;
         """)
         return res
 
@@ -963,37 +981,6 @@ class HrAttendance(models.Model):
                     })
 
 
-    # ============================================================
-    # DATABASE INDEXES — called once on module install / upgrade
-    # Partial and composite indexes for O(1) hot-path queries at
-    # 6,000+ concurrent check-ins without row-lock contention.
-    # ============================================================
-    def _auto_init(self):
-        res = super()._auto_init()
-        # Partial index: open attendance records (WHERE check_out IS NULL).
-        # Used by every check-out lookup — avoid full-table scans.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_open_idx
-            ON hr_attendance (employee_id)
-            WHERE check_out IS NULL;
-        """)
-        # Composite index for date-range queries on attendance per employee.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_employee_checkin_idx
-            ON hr_attendance (employee_id, check_in);
-        """)
-        # Index on check_in_status for discipline counter queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_checkin_status_idx
-            ON hr_attendance (check_in_status);
-        """)
-        # Partial index on is_force_checkout for discipline and reporting queries.
-        self.env.cr.execute("""
-            CREATE INDEX IF NOT EXISTS hr_attendance_force_checkout_idx
-            ON hr_attendance (employee_id)
-            WHERE is_force_checkout = TRUE;
-        """)
-        return res
 
     # ============================================================
     # ATTENDANCE SIDE EFFECTS — HOT-PATH BRIDGE
@@ -1107,41 +1094,61 @@ class HrAttendance(models.Model):
             RETURNS void AS $$
             DECLARE
                 p_date DATE := (NOW() AT TIME ZONE 'Africa/Addis_Ababa')::date - INTERVAL '1 day';
+                v_isodow INTEGER := EXTRACT(ISODOW FROM p_date);
             BEGIN
+                -- 1. IDENTIFY FULL-DAY ABSENCES & RECORD APPROPRIATE PAYROLL PAYLOAD
                 INSERT INTO attendance_payroll_payload (
                     employee_id, effective_date, hours, payload_type, state, display_name, create_uid, write_uid, create_date, write_date
                 )
                 SELECT 
-                    emp.id AS employee_id, p_date AS effective_date, 8.0 AS hours, 'absence' AS payload_type, 'draft' AS state,
-                    'Absence Deduction - ' || emp.name || ' (' || p_date::text || ')' AS display_name,
+                    emp.id AS employee_id,
+                    p_date AS effective_date,
+                    CASE 
+                        WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL) THEN 4.0
+                        ELSE 8.0
+                    END AS hours,
+                    'absence' AS payload_type,
+                    'draft' AS state,
+                    CASE 
+                        WHEN v_isodow = 6 AND (ou.work_unit_type IN ('head_office', 'district_office') OR ou.work_unit_type IS NULL)
+                            THEN 'Saturday Half-Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+                        ELSE 'Full Day Absence - ' || emp.name || ' (' || p_date::text || ')'
+                    END AS display_name,
                     1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
                 FROM hr_employee emp
+                LEFT JOIN operating_unit ou ON ou.id = emp.default_operating_unit_id
                 WHERE emp.active = TRUE
+                  -- No attendance record at all on this date
                   AND NOT EXISTS (
                       SELECT 1 FROM hr_attendance att
                       WHERE att.employee_id = emp.id
                         AND (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
                         AND (att.active = TRUE OR att.active IS NULL)
                   )
+                  -- No validated full-day leave
                   AND NOT EXISTS (
                       SELECT 1 FROM hr_leave l
                       WHERE l.employee_id = emp.id
                         AND l.state = 'validate'
                         AND l.date_from::date <= p_date
                         AND l.date_to::date >= p_date
+                        AND (l.request_unit_half IS NOT TRUE AND COALESCE(l.number_of_days, 1.0) >= 1.0)
                   )
+                  -- No already created absence payload for this date
                   AND NOT EXISTS (
                       SELECT 1 FROM attendance_payroll_payload app
                       WHERE app.employee_id = emp.id
                         AND app.effective_date = p_date
                         AND app.payload_type = 'absence'
                   )
+                  -- Not a scheduled day off on roster
                   AND NOT EXISTS (
                       SELECT 1 FROM job_position_roster_exception_line rl
                       JOIN job_position_roster_exception r ON rl.roster_id = r.id
                       WHERE rl.employee_id = emp.id
                         AND r.active = TRUE AND r.status = 'active' AND rl.date = p_date AND rl.schedule_type = 'day_off'
                   )
+                  -- Not a scheduled day off on job position exception
                   AND NOT EXISTS (
                       SELECT 1 FROM job_position_exception jpe
                       WHERE jpe.employee_id = emp.id AND jpe.active = TRUE AND jpe.status = 'active'
@@ -1149,10 +1156,11 @@ class HrAttendance(models.Model):
                             SELECT 1 FROM job_position_roster_exception r2
                             WHERE r2.employee_id = emp.id AND r2.active = TRUE AND r2.status = 'active' AND r2.start_date <= p_date AND r2.end_date >= p_date
                         )
-                        AND (EXTRACT(ISODOW FROM p_date) = 7 OR jpe.day_off = p_date)
+                        AND (v_isodow = 7 OR jpe.day_off = p_date)
                   )
+                  -- Sunday is default off unless explicitly rostered
                   AND NOT (
-                      EXTRACT(ISODOW FROM p_date) = 7
+                      v_isodow = 7
                       AND NOT EXISTS (
                           SELECT 1 FROM job_position_roster_exception r3 WHERE r3.employee_id = emp.id AND r3.active = TRUE AND r3.status = 'active' AND r3.start_date <= p_date AND r3.end_date >= p_date
                       )
@@ -1160,6 +1168,54 @@ class HrAttendance(models.Model):
                           SELECT 1 FROM job_position_exception jpe2 WHERE jpe2.employee_id = emp.id AND jpe2.active = TRUE AND jpe2.status = 'active'
                       )
                   );
+
+                -- 2. IDENTIFY PARTIAL ABSENCES (MISSING HALF-DAY SESSION ON WEEKDAYS)
+                IF v_isodow BETWEEN 1 AND 5 THEN
+                    INSERT INTO attendance_payroll_payload (
+                        employee_id, effective_date, hours, payload_type, state, display_name, create_uid, write_uid, create_date, write_date
+                    )
+                    SELECT 
+                        emp.id AS employee_id,
+                        p_date AS effective_date,
+                        4.0 AS hours,
+                        'absence' AS payload_type,
+                        'draft' AS state,
+                        'Half Day Absence (Missing Session) - ' || emp.name || ' (' || p_date::text || ')',
+                        1 AS create_uid, 1 AS write_uid, NOW() AS create_date, NOW() AS write_date
+                    FROM hr_employee emp
+                    JOIN (
+                        SELECT 
+                            att.employee_id,
+                            COUNT(att.id) AS session_count,
+                            COALESCE(SUM(att.worked_hours), 0.0) AS total_worked
+                        FROM hr_attendance att
+                        WHERE (att.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')::date = p_date
+                          AND (att.active = TRUE OR att.active IS NULL)
+                        GROUP BY att.employee_id
+                    ) att_summary ON att_summary.employee_id = emp.id
+                    WHERE emp.active = TRUE
+                      AND att_summary.session_count = 1
+                      AND att_summary.total_worked <= 4.5
+                      AND NOT EXISTS (
+                          SELECT 1 FROM hr_leave l
+                          WHERE l.employee_id = emp.id
+                            AND l.state = 'validate'
+                            AND l.date_from::date <= p_date
+                            AND l.date_to::date >= p_date
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM attendance_payroll_payload app
+                          WHERE app.employee_id = emp.id
+                            AND app.effective_date = p_date
+                            AND app.payload_type = 'absence'
+                      )
+                      AND NOT EXISTS (
+                          SELECT 1 FROM job_position_roster_exception_line rl
+                          JOIN job_position_roster_exception r ON rl.roster_id = r.id
+                          WHERE rl.employee_id = emp.id
+                            AND r.active = TRUE AND r.status = 'active' AND rl.date = p_date AND rl.schedule_type = 'day_off'
+                      );
+                END IF;
             END;
             $$ LANGUAGE plpgsql;
         """)

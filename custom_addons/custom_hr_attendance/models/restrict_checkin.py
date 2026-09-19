@@ -457,6 +457,8 @@ class HrEmployeePrivate(models.Model):
         """ Universal Check in / Check out action wrapper for Bunna Bank rules. """
         self.ensure_one()
         _logger.info("=== ATTENDANCE ACTION TRIGGERED FOR %s ===", self.name)
+        # Acquire transaction-scoped PostgreSQL advisory lock on employee ID to prevent double check-in race conditions
+        self.env.cr.execute("SELECT pg_advisory_xact_lock(%s, %s);", (abs(hash('hr_attendance')) % 2147483647, self.id))
 
         local_dt, current_float, today_date = self._get_local_time_and_float()
         morning_start, exit_time, dead_time = self._load_time_parameters()
