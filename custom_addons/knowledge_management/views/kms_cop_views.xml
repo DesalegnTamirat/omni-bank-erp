@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- COP KANBAN VIEW                                           -->
+        <!-- ========================================================= -->
+        <record id="view_kms_cop_kanban" model="ir.ui.view">
+            <field name="name">kms.cop.kanban</field>
+            <field name="model">kms.cop</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="category_id"/>
+                    <field name="lead_id"/>
+                    <field name="member_count"/>
+                    <field name="session_count"/>
+                    <field name="lesson_count"/>
+                    <field name="discussion_count"/>
+                    <field name="is_member"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary"><t t-esc="record.code.value"/></span>
+                                    <span t-if="record.is_member.raw_value" class="badge bg-success"><i class="fa fa-check me-1"/>Joined</span>
+                                </div>
+                                <div class="fw-bold fs-5 text-dark mb-1"><t t-esc="record.name.value"/></div>
+                                <div class="text-muted small mb-3">
+                                    <i class="fa fa-user-circle me-1 text-primary"/> Lead: <t t-esc="record.lead_id.value"/>
+                                </div>
+                                <div class="row text-center py-2 bg-light rounded g-1 border">
+                                    <div class="col-3">
+                                        <div class="fw-bold fs-6"><t t-esc="record.member_count.value"/></div>
+                                        <div class="text-muted small" style="font-size: 10px;">Members</div>
+                                    </div>
+                                    <div class="col-3 border-start">
+                                        <div class="fw-bold fs-6"><t t-esc="record.discussion_count.value"/></div>
+                                        <div class="text-muted small" style="font-size: 10px;">Discussions</div>
+                                    </div>
+                                    <div class="col-3 border-start">
+                                        <div class="fw-bold fs-6"><t t-esc="record.session_count.value"/></div>
+                                        <div class="text-muted small" style="font-size: 10px;">Sessions</div>
+                                    </div>
+                                    <div class="col-3 border-start">
+                                        <div class="fw-bold fs-6"><t t-esc="record.lesson_count.value"/></div>
+                                        <div class="text-muted small" style="font-size: 10px;">Lessons</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- COP FORM VIEW                                             -->
+        <!-- ========================================================= -->
+        <record id="view_kms_cop_form" model="ir.ui.view">
+            <field name="name">kms.cop.form</field>
+            <field name="model">kms.cop</field>
+            <field name="arch" type="xml">
+                <form string="Community of Practice">
+                    <header>
+                        <button name="action_join" string="Join Community" type="object" class="btn-primary" invisible="is_member"/>
+                        <button name="action_leave" string="Leave Community" type="object" class="btn-outline-danger" invisible="not is_member"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_discussions" type="object" class="oe_stat_button" icon="fa-comments">
+                                <field name="discussion_count" string="Discussions" widget="statinfo"/>
+                            </button>
+                            <button name="action_view_sessions" type="object" class="oe_stat_button" icon="fa-microphone">
+                                <field name="session_count" string="Sessions" widget="statinfo"/>
+                            </button>
+                            <button name="action_view_lessons" type="object" class="oe_stat_button" icon="fa-lightbulb-o">
+                                <field name="lesson_count" string="Lessons" widget="statinfo"/>
+                            </button>
+                        </div>
+
+                        <div class="oe_title">
+                            <label for="code" string="Community Code"/>
+                            <h2><field name="code" placeholder="e.g. COP-RISK"/></h2>
+                            <label for="name" string="Community Name"/>
+                            <h1><field name="name" placeholder="e.g. Credit Risk &amp; Lending Excellence CoP"/></h1>
+                        </div>
+
+                        <group>
+                            <group string="Leadership &amp; Structure">
+                                <field name="lead_id" widget="many2one_avatar_employee"/>
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="meeting_cadence"/>
+                                <field name="is_member" invisible="1"/>
+                            </group>
+                            <group string="Moderation Team">
+                                <field name="moderator_ids" widget="many2many_tags_avatar"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Mission &amp; Charter">
+                                <field name="description" placeholder="Define the core domain, purpose, and charter of this community of practice..."/>
+                            </page>
+                            <page string="Operating Guidelines &amp; Norms">
+                                <field name="meeting_guidelines" placeholder="Collaboration guidelines, scheduled meeting details, presentation criteria..."/>
+                            </page>
+                            <page string="Community Members">
+                                <field name="member_ids">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="job_id"/>
+                                        <field name="department_id"/>
+                                        <field name="default_operating_unit_id" string="Branch / Unit"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_kms_cop_all" model="ir.actions.act_window">
+            <field name="name">Communities of Practice (CoP)</field>
+            <field name="res_model">kms.cop</field>
+            <field name="view_mode">kanban,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Communities of Practice (CoP) Spaces
+                </p>
+                <p>
+                    Join functional communities to share banking domain knowledge, collaborate on challenges, and attend knowledge exchange sessions.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

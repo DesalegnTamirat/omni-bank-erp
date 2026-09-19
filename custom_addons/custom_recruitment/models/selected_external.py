@@ -487,8 +487,20 @@ class ExternalRecruitmentSelected(models.Model):
         }
 
     def notify_interview_panel(self):
-        if not self.exam_scores_fetched:
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        has_exam = True
+        if vac and hasattr(vac, 'has_written_exam'):
+            has_exam = vac.has_written_exam
+
+        if has_exam and not self.exam_scores_fetched:
             raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before notifying the interview panel."))
+        if not self.ext_rec_panel or not any(line.emp_name for line in self.ext_rec_panel):
+            raise UserError(_('No panel members have been added. Please add at least one panel member before notifying the interview panel.'))
         if not self.interview_date:
             raise UserError(_('Please specify the Interview Date before notifying the panel.'))
         pos_title = self._get_position_title()
@@ -561,15 +573,20 @@ class ExternalRecruitmentSelected(models.Model):
         }
 
     def notify_interview(self):
-        if not self.exam_scores_fetched:
-            raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
-        if not self.panel_notified:
-            raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
         vac = False
         if self.vacancy_id:
             vac = self.env['job.vacancy'].browse(self.vacancy_id)
         elif self.vacancy_reference:
             vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        has_exam = True
+        if vac and hasattr(vac, 'has_written_exam'):
+            has_exam = vac.has_written_exam
+
+        if has_exam and not self.exam_scores_fetched:
+            raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
+        if not self.panel_notified:
+            raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
 
         # Pull interview schedule from linked vacancy if missing on this record
         if not self.interview_date and vac and vac.exists():
@@ -783,14 +800,26 @@ class ExternalRecruitmentSelected(models.Model):
     def _get_external_weights(self):
         """
         Fetches Written Exam and Interview weight percentages directly from the 
-        Assessment module Weight Profiles (assessment.weight.profile).
+        Vacancy form, auto-populated from Assessment module Weight Profiles (assessment.weight.profile).
         """
         self.ensure_one()
+        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
+        if not vac and self.vacancy_reference:
+            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        if vac and (vac.written_weight or vac.interview_weight):
+            exam_w = vac.written_weight if getattr(vac, 'has_written_exam', True) else 0.0
+            int_w = vac.interview_weight
+            total = exam_w + int_w
+            if total > 0 and abs(total - 100.0) > 0.01:
+                int_w = 100.0
+                exam_w = 0.0
+            return (exam_w, int_w)
+
         exam_w, int_w = (60.0, 40.0)
 
         if "assessment.weight.profile" in self.env:
-            role_lvl = "non_managerial"
-            vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
+            role_lvl = "managerial" if (vac and vac.employee_category == 'Managerial') else "non_managerial"
             if vac and getattr(vac, "interview_type", False):
                 role_lvl = vac.interview_type
 
@@ -802,6 +831,9 @@ class ExternalRecruitmentSelected(models.Model):
                         exam_w = line.weight_percentage
                     elif line.component == "interview":
                         int_w = line.weight_percentage
+
+        if vac and hasattr(vac, 'has_written_exam') and not vac.has_written_exam:
+            exam_w, int_w = 0.0, 100.0
 
         return (exam_w, int_w)
 
@@ -827,6 +859,16 @@ class ExternalRecruitmentSelected(models.Model):
             exam_weight_pct = exam_w / 100.0
             interview_weight_pct = int_w / 100.0
 
+            vac = False
+            if rec.vacancy_id:
+                vac = self.env['job.vacancy'].browse(rec.vacancy_id)
+            elif rec.vacancy_reference:
+                vac = self.env['job.vacancy'].search([('reference', '=', rec.vacancy_reference)], limit=1)
+
+            has_exam = True
+            if vac and hasattr(vac, 'has_written_exam'):
+                has_exam = vac.has_written_exam
+
             for app in rec.ext_rec_sel:
                 exam = app.written_exam_score or 0.0
                 interview = app.interview_score or 0.0
@@ -835,7 +877,7 @@ class ExternalRecruitmentSelected(models.Model):
                 # 50% Disqualification Gate (FR-REC rules)
                 disqualified = False
                 reasons = []
-                if exam < 50.0:
+                if has_exam and exam < 50.0:
                     disqualified = True
                     reasons.append(_("Written Exam score %.1f%% < 50%%") % exam)
                 if interview < 50.0:

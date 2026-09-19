@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- EXPERT DIRECTORY KANBAN VIEW                              -->
+        <!-- ========================================================= -->
+        <record id="view_kms_expert_kanban" model="ir.ui.view">
+            <field name="name">kms.expert.kanban</field>
+            <field name="model">kms.expert</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="employee_id"/>
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="primary_domain"/>
+                    <field name="availability_status"/>
+                    <field name="endorsement_count"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-primary"><t t-esc="record.primary_domain.value"/></span>
+                                    <span t-if="record.availability_status.raw_value == 'available'" class="badge bg-success">Available</span>
+                                    <span t-else="" class="badge bg-secondary"><t t-esc="record.availability_status.value"/></span>
+                                </div>
+                                <div class="d-flex align-items-center mb-2">
+                                    <field name="employee_id" widget="image" options="{'preview_image': 'avatar_128', 'size': [50, 50]}" class="rounded-circle border me-3"/>
+                                    <div>
+                                        <div class="fw-bold fs-6 text-dark"><t t-esc="record.employee_id.value"/></div>
+                                        <div class="text-muted small"><t t-esc="record.job_id.value"/></div>
+                                        <div class="text-muted small"><t t-esc="record.department_id.value"/></div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="fa fa-thumbs-up me-1 text-primary"/> <t t-esc="record.endorsement_count.value"/> Endorsements
+                                    </span>
+                                    <button name="action_endorse" type="object" class="btn btn-sm btn-outline-primary">
+                                        <i class="fa fa-check me-1"/>Endorse
+                                    </button>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- EXPERT DIRECTORY LIST VIEW                                -->
+        <!-- ========================================================= -->
+        <record id="view_kms_expert_list" model="ir.ui.view">
+            <field name="name">kms.expert.list</field>
+            <field name="model">kms.expert</field>
+            <field name="arch" type="xml">
+                <list string="Subject Matter Experts">
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="primary_domain" widget="badge"/>
+                    <field name="years_experience" string="Experience (Yrs)"/>
+                    <field name="endorsement_count" string="Endorsements"/>
+                    <field name="availability_status" widget="badge" decoration-success="availability_status == 'available'" decoration-warning="availability_status == 'busy'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- EXPERT DIRECTORY FORM VIEW                                -->
+        <!-- ========================================================= -->
+        <record id="view_kms_expert_form" model="ir.ui.view">
+            <field name="name">kms.expert.form</field>
+            <field name="model">kms.expert</field>
+            <field name="arch" type="xml">
+                <form string="Subject Matter Expert Profile">
+                    <header>
+                        <button name="action_endorse" string="Endorse Expert (+1)" type="object" class="btn-primary" icon="fa-thumbs-up"/>
+                        <field name="availability_status" widget="statusbar" clickable="1"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" icon="fa-thumbs-up">
+                                <field name="endorsement_count" string="Endorsements" widget="statinfo"/>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="employee_id" string="Bank Staff Member"/>
+                            <h1><field name="employee_id" options="{'no_create': True}"/></h1>
+                            <div class="text-muted fs-6">
+                                <field name="job_id" class="me-2"/> | <field name="department_id" class="ms-2 me-2"/> | <field name="operating_unit_id" class="ms-2"/>
+                            </div>
+                        </div>
+                        <group>
+                            <group string="Domain &amp; Specialization">
+                                <field name="primary_domain"/>
+                                <field name="years_experience"/>
+                                <field name="certifications_held" placeholder="e.g. CAMS, PMP, CFA Level II, Core Banking Architect..."/>
+                            </group>
+                            <group string="Advisory &amp; Contact">
+                                <field name="preferred_contact_channel"/>
+                                <field name="competency_ids" widget="many2many_tags" placeholder="Linked Competencies (from Dictionary)"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Expertise Summary &amp; Experience">
+                                <field name="expertise_summary" placeholder="Detailed description of background, specialized operational knowledge, and key projects..."/>
+                            </page>
+                            <page string="Endorsements Received">
+                                <field name="endorsement_ids" readonly="1">
+                                    <list>
+                                        <field name="endorser_id" widget="many2one_avatar_employee"/>
+                                        <field name="comment"/>
+                                        <field name="create_date" string="Date"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- EXPERT DIRECTORY SEARCH VIEW                              -->
+        <!-- ========================================================= -->
+        <record id="view_kms_expert_search" model="ir.ui.view">
+            <field name="name">kms.expert.search</field>
+            <field name="model">kms.expert</field>
+            <field name="arch" type="xml">
+                <search string="Search Experts">
+                    <field name="employee_id"/>
+                    <field name="job_id"/>
+                    <field name="department_id"/>
+                    <field name="primary_domain"/>
+                    <field name="competency_ids"/>
+                    <filter name="filter_available" string="Available Experts" domain="[('availability_status', '=', 'available')]"/>
+                    <separator/>
+                    <group>
+                        <filter name="group_domain" string="Primary Domain" context="{'group_by': 'primary_domain'}"/>
+                        <filter name="group_department" string="Department" context="{'group_by': 'department_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_kms_expert_all" model="ir.actions.act_window">
+            <field name="name">Expert &amp; Skill Directory</field>
+            <field name="res_model">kms.expert</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="search_view_id" ref="view_kms_expert_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Bank-Wide Subject Matter Expert Directory
+                </p>
+                <p>
+                    Find internal experts, view domain specializations and competency frameworks, and request peer knowledge consultations.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

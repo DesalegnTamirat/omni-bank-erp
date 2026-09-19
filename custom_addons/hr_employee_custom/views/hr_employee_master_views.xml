@@ -437,15 +437,15 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Vacancies">
-                            <field name="hr_new_department_ids">
-                                <list editable="bottom">
-                                    <field name="work_unit" required="1"/>
-                                    <field name="number_of_vacancies"/>
-                                    <field name="response"/>
-                                </list>
-                            </field>
-                        </page>
+<!--                        <page string="Vacancies">-->
+<!--                            <field name="hr_new_department_ids">-->
+<!--                                <list editable="bottom">-->
+<!--                                    <field name="work_unit" required="1"/>-->
+<!--                                    <field name="number_of_vacancies"/>-->
+<!--                                    <field name="response"/>-->
+<!--                                </list>-->
+<!--                            </field>-->
+<!--                        </page>-->
                         <page string="HR Policies">
                             <group>
                                 <group>
@@ -588,7 +588,7 @@
                                 </group>
                                 <group>
                                     <field name="parent_id"/>
-                                    <field name="coach_id"/>
+                                    <field name="coach_id" invisible="1"/>
                                     <field name="planning_parent_id"/>
                                     <field name="hr_officer_id"/>
                                     <field name="validation_state" widget="badge"

@@ -17,9 +17,12 @@ Custom module to measure employee and work unit performance.
         'hr_employee_custom',
     ],
     'data': [
+        'security/performance_security.xml',
         'security/ir.model.access.csv',
         'views/corporate_scorecard_views.xml',
         'views/populate_corporate_scorecard_wizard_views.xml',
+        'views/corporate_appraisal_views.xml',
+        'views/populate_corporate_appraisal_wizard.xml',
         'views/performance_objective_views.xml',
         'views/performance_job_objective.xml',
         'views/performance_job_measure_bulk_views.xml',
@@ -28,9 +31,15 @@ Custom module to measure employee and work unit performance.
         'views/t2_scorecard.xml',
         'views/t3_scorecard.xml',
         'views/populate_t3_scorecard_wizard_views.xml',
+        'views/t2_appraisal_views.xml',
+        'views/populate_t2_appraisal_wizard_views.xml',
+        'views/t3_appraisal_views.xml',
+        'views/populate_t3_appraisal_wizard_views.xml',
+        'views/performance_rejection_wizard_views.xml',
         'views/performance_menus.xml',
         'views/performance_master_data_views.xml',
         'data/performance_perspective_data.xml',
+        'data/pms_ranking_data.xml',
     ],
     'assets': {
         'web.assets_backend': [

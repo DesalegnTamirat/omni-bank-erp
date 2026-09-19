@@ -256,4 +256,9 @@
         <field name="company_id" eval="False"/>
     </record>
 
+    <!-- Clear currency symbol so amounts format without 'Br' prefix -->
+    <record id="base.ETB" model="res.currency">
+        <field name="symbol"></field>
+    </record>
+
 </odoo>

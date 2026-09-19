@@ -76,6 +76,11 @@ class OperatingUnit(models.Model):
     region = fields.Char(string="Region")
     department = fields.Many2one('hr.department', string='Department')
 
+    @api.onchange('parent_unit')
+    def _onchange_parent_unit_sync_department(self):
+        if self.parent_unit and getattr(self.parent_unit, 'department', False) and not self.department:
+            self.department = self.parent_unit.department
+
     def _compute_display_name(self):
         for ou in self:
             name = ou.name

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lms_learning_path_list" model="ir.ui.view">
+            <field name="name">lms.learning.path.list</field>
+            <field name="model">lms.learning.path</field>
+            <field name="arch" type="xml">
+                <list string="Structured Learning Paths">
+                    <field name="code"/>
+                    <field name="name" string="Learning Path"/>
+                    <field name="category_id"/>
+                    <field name="total_courses" string="Courses"/>
+                    <field name="estimated_duration_hours" string="Duration (Hrs)"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_learning_path_kanban" model="ir.ui.view">
+            <field name="name">lms.learning.path.kanban</field>
+            <field name="model">lms.learning.path</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="category_id"/>
+                    <field name="total_courses"/>
+                    <field name="estimated_duration_hours"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary"><t t-esc="record.code.value"/></span>
+                                    <span class="badge bg-primary"><t t-esc="record.category_id.value"/></span>
+                                </div>
+                                <div class="fw-bold fs-5 text-dark mb-2"><t t-esc="record.name.value"/></div>
+                                <div class="d-flex justify-content-between align-items-center text-muted small pt-2 border-top">
+                                    <span><i class="fa fa-book me-1"/> <t t-esc="record.total_courses.value"/> Curriculum Courses</span>
+                                    <span><i class="fa fa-clock-o me-1"/> <t t-esc="record.estimated_duration_hours.value"/> Hours</span>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="view_lms_learning_path_form" model="ir.ui.view">
+            <field name="name">lms.learning.path.form</field>
+            <field name="model">lms.learning.path</field>
+            <field name="arch" type="xml">
+                <form string="Structured Learning Path">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="code" string="Pathway Reference Code"/>
+                            <h2><field name="code" placeholder="e.g. PATH-BR-MGR"/></h2>
+                            <label for="name" string="Learning Path Title"/>
+                            <h1><field name="name" placeholder="e.g. Branch Manager Professional Certification Path"/></h1>
+                        </div>
+                        <group>
+                            <group string="Categorization &amp; Audience">
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="target_job_ids" widget="many2many_tags" placeholder="Target Roles"/>
+                                <field name="target_department_ids" widget="many2many_tags" placeholder="Target Departments"/>
+                            </group>
+                            <group string="Metrics">
+                                <field name="total_courses" readonly="1"/>
+                                <field name="estimated_duration_hours" readonly="1"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Pathway Curriculum Overview">
+                            <field name="description"/>
+                        </group>
+                        <notebook>
+                            <page string="Curriculum Stages &amp; Branched Prerequisites (FR-LMS-002)">
+                                <field name="path_course_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="course_id" options="{'no_create': True}"/>
+                                        <field name="is_optional_branch" widget="boolean_toggle" string="Optional / Elective"/>
+                                        <field name="branch_group_code" string="Elective Group" placeholder="e.g. GROUP_A"/>
+                                        <field name="prerequisite_course_ids" widget="many2many_tags" string="Branched Prerequisites"/>
+                                        <field name="stage_notes" string="Stage Guidance"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_lms_learning_path_all" model="ir.actions.act_window">
+            <field name="name">Learning Paths</field>
+            <field name="res_model">lms.learning.path</field>
+            <field name="view_mode">kanban,list,form</field>
+        </record>
+
+    </data>
+</odoo>

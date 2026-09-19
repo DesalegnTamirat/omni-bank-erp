@@ -19,7 +19,7 @@
                         <widget name="web_ribbon" title="Director Configuration" bg_color="bg-info"/>
                         <div class="oe_title">
                             <h1>
-                                <field name="director_id" placeholder="Select Director..."/>
+                                <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" placeholder="Select Director or Chief..."/>
                             </h1>
                         </div>
                         <group>
@@ -59,7 +59,7 @@
                                 class="btn-primary"
                                 groups="competency_management.group_competency_admin"/>
                     </header>
-                    <field name="director_id"/>
+                    <field name="director_id" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]"/>
                     <field name="job_id"/>
                     <field name="grade_id"/>
                     <field name="department_id"/>
@@ -93,7 +93,7 @@
 
 
 
-        <!-- Director Peer Config Action -->
+        <!-- Director Peer Config Window Action -->
         <record id="action_competency_director_peer_config" model="ir.actions.act_window">
             <field name="name">Director Peer Configuration</field>
             <field name="res_model">competency.director.peer.config</field>
@@ -106,6 +106,16 @@
                 <p>
                     Click "Generate Director Records" to auto-discover all Directors in the bank, then assign peers sharing the Director's coach.
                 </p>
+            </field>
+        </record>
+
+        <!-- Server Action for Menu: Auto-populate and open Director Peer Configuration -->
+        <record id="action_competency_director_peer_config_server" model="ir.actions.server">
+            <field name="name">Director Peer Configuration</field>
+            <field name="model_id" ref="model_competency_director_peer_config"/>
+            <field name="state">code</field>
+            <field name="code">
+                action = model.action_open_director_peer_config()
             </field>
         </record>
 

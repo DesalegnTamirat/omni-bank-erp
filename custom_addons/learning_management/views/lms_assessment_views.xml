@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- ASSESSMENTS LIST & FORM                                   -->
+        <!-- ========================================================= -->
+        <record id="view_lms_assessment_list" model="ir.ui.view">
+            <field name="name">lms.assessment.list</field>
+            <field name="model">lms.assessment</field>
+            <field name="arch" type="xml">
+                <list string="Course Assessments">
+                    <field name="code"/>
+                    <field name="name" string="Assessment Title"/>
+                    <field name="course_id"/>
+                    <field name="assessment_type" widget="badge"/>
+                    <field name="duration_minutes" string="Time Limit (Min)"/>
+                    <field name="pass_score_percentage" string="Pass %"/>
+                    <field name="max_attempts" string="Max Attempts"/>
+                    <field name="use_random_pool" string="Randomized"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_assessment_form" model="ir.ui.view">
+            <field name="name">lms.assessment.form</field>
+            <field name="model">lms.assessment</field>
+            <field name="arch" type="xml">
+                <form string="Course Assessment">
+                    <header>
+                        <button name="action_start_exam" string="Launch Candidate Exam Session" type="object" class="btn-primary"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="code" string="Assessment Reference"/>
+                            <h2><field name="code" readonly="1"/></h2>
+                            <label for="name" string="Assessment Title"/>
+                            <h1><field name="name" placeholder="e.g. Anti-Money Laundering Post-Training Final Examination"/></h1>
+                        </div>
+                        <group>
+                            <group string="Configuration &amp; Gates (FR-LMS-012)">
+                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="assessment_type"/>
+                                <field name="pass_score_percentage"/>
+                            </group>
+                            <group string="Timing &amp; Attempt Caps (FR-LMS-014, 016)">
+                                <field name="is_timed"/>
+                                <field name="duration_minutes" invisible="not is_timed"/>
+                                <field name="max_attempts"/>
+                                <field name="cooldown_hours"/>
+                            </group>
+                        </group>
+                        <group string="Question Sourcing &amp; Randomization (FR-LMS-015)">
+                            <group>
+                                <field name="use_random_pool"/>
+                                <field name="questions_per_session" invisible="not use_random_pool"/>
+                                <field name="pool_ids" widget="many2many_tags" invisible="not use_random_pool"/>
+                            </group>
+                            <group>
+                                <field name="shuffle_questions"/>
+                                <field name="shuffle_answers"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Instructions &amp; Guidelines">
+                                <field name="instructions" placeholder="Enter instructions shown to candidates prior to starting this exam..."/>
+                            </page>
+                            <page string="Fixed Questions Bank" invisible="use_random_pool">
+                                <field name="fixed_question_ids">
+                                    <list>
+                                        <field name="name"/>
+                                        <field name="question_type" widget="badge"/>
+                                        <field name="points" string="Points"/>
+                                        <field name="difficulty" widget="badge"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- QUESTION POOLS & QUESTIONS                                -->
+        <!-- ========================================================= -->
+        <record id="view_lms_question_pool_list" model="ir.ui.view">
+            <field name="name">lms.question.pool.list</field>
+            <field name="model">lms.question.pool</field>
+            <field name="arch" type="xml">
+                <list string="Question Pools">
+                    <field name="code"/>
+                    <field name="name"/>
+                    <field name="question_count" string="Total Questions"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_question_list" model="ir.ui.view">
+            <field name="name">lms.question.list</field>
+            <field name="model">lms.question</field>
+            <field name="arch" type="xml">
+                <list string="Exam Questions">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name" string="Question Summary"/>
+                    <field name="pool_id"/>
+                    <field name="question_type" widget="badge"/>
+                    <field name="difficulty" widget="badge"/>
+                    <field name="points" string="Points"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_question_form" model="ir.ui.view">
+            <field name="name">lms.question.form</field>
+            <field name="model">lms.question</field>
+            <field name="arch" type="xml">
+                <form string="Exam Question">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Question Summary / Title"/>
+                            <h1><field name="name" placeholder="e.g. Mandatory threshold for CTR reporting"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="pool_id" options="{'no_create': True}"/>
+                                <field name="question_type"/>
+                                <field name="points"/>
+                                <field name="difficulty"/>
+                            </group>
+                        </group>
+                        <group string="Question Text">
+                            <field name="question_text"/>
+                        </group>
+                        <notebook>
+                            <page string="Answer Options &amp; Correct Answer">
+                                <field name="answer_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="answer_text" string="Answer Option"/>
+                                        <field name="is_correct" widget="boolean_toggle" string="Correct Answer"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Explanation &amp; Feedback (Post-Grading)">
+                                <field name="explanation" placeholder="Provide instructional feedback explaining the correct rationale to the learner..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- CANDIDATE EXAM SESSIONS (FR-LMS-014, 017)                 -->
+        <!-- ========================================================= -->
+        <record id="view_lms_exam_session_list" model="ir.ui.view">
+            <field name="name">lms.exam.session.list</field>
+            <field name="model">lms.exam.session</field>
+            <field name="arch" type="xml">
+                <list string="Candidate Exam Attempts" decoration-success="state == 'passed'" decoration-danger="state == 'failed'" decoration-info="state == 'in_progress'">
+                    <field name="name"/>
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="assessment_id"/>
+                    <field name="attempt_number" string="Attempt #"/>
+                    <field name="start_time"/>
+                    <field name="score_percentage" string="Score (%)"/>
+                    <field name="is_passed" widget="boolean_toggle" string="Passed"/>
+                    <field name="state" widget="badge" decoration-success="state == 'passed'" decoration-danger="state == 'failed'" decoration-info="state == 'in_progress'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_exam_session_form" model="ir.ui.view">
+            <field name="name">lms.exam.session.form</field>
+            <field name="model">lms.exam.session</field>
+            <field name="arch" type="xml">
+                <form string="Candidate Exam Attempt">
+                    <header>
+                        <button name="action_submit_and_grade" string="Submit Exam &amp; Auto-Grade" type="object" class="btn-primary" invisible="state != 'in_progress'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="in_progress,submitted,passed,failed"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Passed" bg_color="text-bg-success" invisible="state != 'passed'"/>
+                        <widget name="web_ribbon" title="Failed" bg_color="text-bg-danger" invisible="state != 'failed'"/>
+
+                        <div class="oe_title">
+                            <label for="name" string="Attempt Reference"/>
+                            <h1><field name="name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="Candidate &amp; Assessment">
+                                <field name="employee_id" widget="many2one_avatar_employee"/>
+                                <field name="assessment_id" readonly="1"/>
+                                <field name="attempt_number" readonly="1"/>
+                            </group>
+                            <group string="Results &amp; Auto-Grading (FR-LMS-017)">
+                                <field name="score_points" readonly="1"/>
+                                <field name="max_points" readonly="1"/>
+                                <field name="score_percentage" readonly="1" widget="progressbar"/>
+                                <field name="is_passed" readonly="1"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Candidate Answers">
+                                <field name="line_ids">
+                                    <list editable="bottom" create="0" delete="0">
+                                        <field name="question_id" string="Question" readonly="1"/>
+                                        <field name="selected_answer_ids" widget="many2many_tags" string="Candidate Selection"/>
+                                        <field name="is_correct" string="Correct" readonly="1"/>
+                                        <field name="points_earned" string="Score Earned" readonly="1"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Actions -->
+        <record id="action_lms_assessment_all" model="ir.actions.act_window">
+            <field name="name">Course Assessments</field>
+            <field name="res_model">lms.assessment</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_lms_question_all" model="ir.actions.act_window">
+            <field name="name">Question Bank</field>
+            <field name="res_model">lms.question</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_lms_pool_all" model="ir.actions.act_window">
+            <field name="name">Question Pools</field>
+            <field name="res_model">lms.question.pool</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_lms_session_all" model="ir.actions.act_window">
+            <field name="name">Candidate Exam Sessions</field>
+            <field name="res_model">lms.exam.session</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

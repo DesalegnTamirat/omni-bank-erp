@@ -305,7 +305,7 @@ class EligibleEmployees(models.Model):
                               WHERE he.id = %s"""
 
             self.env.cr.execute(query, (record.emp_name.id,))
-            res = self.env.cr.dictfetchone
+            res = self.env.cr.dictfetchone()
 
             if res:
                 record.update({

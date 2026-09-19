@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- LMS COURSE LIST VIEW                                      -->
+        <!-- ========================================================= -->
+        <record id="view_lms_course_list" model="ir.ui.view">
+            <field name="name">lms.course.list</field>
+            <field name="model">lms.course</field>
+            <field name="arch" type="xml">
+                <list string="Training Courses" decoration-info="state == 'draft'" decoration-warning="state == 'review'" decoration-success="state == 'published'" decoration-muted="state == 'archived'">
+                    <field name="sequence" widget="handle"/>
+                    <field name="code"/>
+                    <field name="name" string="Course Title"/>
+                    <field name="category_id"/>
+                    <field name="is_mandatory" widget="boolean_toggle" string="Mandatory"/>
+                    <field name="total_lessons" string="Lessons"/>
+                    <field name="total_duration_minutes" string="Duration (Min)"/>
+                    <field name="pass_score_percentage" string="Pass Mark (%)"/>
+                    <field name="total_enrolled" string="Enrolled"/>
+                    <field name="total_completed" string="Completed"/>
+                    <field name="completion_rate" widget="progressbar" string="Completion %"/>
+                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'review'" decoration-success="state == 'published'" decoration-muted="state == 'archived'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LMS COURSE KANBAN VIEW                                    -->
+        <!-- ========================================================= -->
+        <record id="view_lms_course_kanban" model="ir.ui.view">
+            <field name="name">lms.course.kanban</field>
+            <field name="model">lms.course</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="category_id"/>
+                    <field name="is_mandatory"/>
+                    <field name="total_lessons"/>
+                    <field name="total_duration_minutes"/>
+                    <field name="total_enrolled"/>
+                    <field name="total_completed"/>
+                    <field name="completion_rate"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary"><t t-esc="record.code.value"/></span>
+                                    <span t-if="record.is_mandatory.raw_value" class="badge bg-danger">Mandatory</span>
+                                    <span t-else="" class="badge bg-info">Elective</span>
+                                </div>
+                                <div class="fw-bold fs-5 text-dark mb-1"><t t-esc="record.name.value"/></div>
+                                <div class="text-muted small mb-2">
+                                    <i class="fa fa-folder me-1 text-warning"/> <t t-esc="record.category_id.value"/> | 
+                                    <i class="fa fa-play-circle ms-1 me-1 text-primary"/> <t t-esc="record.total_lessons.value"/> Lessons (<t t-esc="record.total_duration_minutes.value"/> min)
+                                </div>
+                                <div class="my-2">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>Completion Rate</span>
+                                        <span class="fw-bold"><t t-esc="record.total_completed.value"/> / <t t-esc="record.total_enrolled.value"/> (<t t-esc="record.completion_rate.value"/>%)</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-success" role="progressbar" t-attf-style="width: #{record.completion_rate.raw_value}%;"/>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <span class="badge bg-light text-dark border">Pass: <t t-esc="record.pass_score_percentage.value or '70'"/>%</span>
+                                    <span class="badge bg-primary"><t t-esc="record.state.value"/></span>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LMS COURSE FORM VIEW                                      -->
+        <!-- ========================================================= -->
+        <record id="view_lms_course_form" model="ir.ui.view">
+            <field name="name">lms.course.form</field>
+            <field name="model">lms.course</field>
+            <field name="arch" type="xml">
+                <form string="Training Course">
+                    <header>
+                        <button name="action_submit_for_review" string="Submit for Approval" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_publish" string="Approve &amp; Publish" type="object" class="btn-success" invisible="state != 'review'" groups="learning_management.group_lms_manager,learning_management.group_lms_admin"/>
+                        <button name="action_return_draft" string="Return to Draft" type="object" class="btn-secondary" invisible="state != 'review'" groups="learning_management.group_lms_manager"/>
+                        <button name="action_create_new_version" string="Initiate Version Update" type="object" class="btn-outline-primary" invisible="state != 'published'" groups="learning_management.group_lms_instructor,learning_management.group_lms_manager"/>
+                        <button name="action_archive" string="Archive Course" type="object" class="btn-outline-danger" invisible="state != 'published'" groups="learning_management.group_lms_manager"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,review,published,archived"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <widget name="web_ribbon" title="Published" bg_color="text-bg-success" invisible="state != 'published'"/>
+
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_enrollments" type="object" class="oe_stat_button" icon="fa-users">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value"><field name="total_enrolled"/></span>
+                                    <span class="o_stat_text">Learners</span>
+                                </div>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-check-circle">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value"><field name="total_completed"/></span>
+                                    <span class="o_stat_text">Completed</span>
+                                </div>
+                            </button>
+                        </div>
+
+                        <field name="cover_image" widget="image" class="oe_avatar" options="{'preview_image': 'cover_image', 'size': [90, 90]}"/>
+
+                        <div class="oe_title">
+                            <label for="code" string="Course Code"/>
+                            <h2><field name="code" readonly="1"/></h2>
+                            <label for="name" string="Course Title"/>
+                            <h1><field name="name" placeholder="e.g. Anti-Money Laundering &amp; CFT Compliance Masterclass"/></h1>
+                        </div>
+
+                        <group>
+                            <group string="Classification &amp; Structure">
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="instructor_id" widget="many2one_avatar_employee"/>
+                                <field name="is_mandatory"/>
+                                <field name="estimated_duration_hours"/>
+                                <field name="version"/>
+                            </group>
+                            <group string="Target Audience &amp; Competencies">
+                                <field name="target_department_ids" widget="many2many_tags" placeholder="All Departments (Blank)"/>
+                                <field name="target_job_ids" widget="many2many_tags" placeholder="All Roles (Blank)"/>
+                                <field name="target_grade_ids" widget="many2many_tags" placeholder="All Grades (Blank)"/>
+                                <field name="competency_ids" widget="many2many_tags" placeholder="Competencies Developed"/>
+                            </group>
+                        </group>
+
+                        <group string="Examination &amp; Certification Policies (FR-LMS-012, FR-LMS-018)">
+                            <group>
+                                <field name="pass_score_percentage"/>
+                                <field name="has_pre_assessment"/>
+                                <field name="pre_assessment_id" invisible="not has_pre_assessment"/>
+                                <field name="has_post_assessment"/>
+                                <field name="post_assessment_id" invisible="not has_post_assessment"/>
+                            </group>
+                            <group>
+                                <field name="issue_certificate"/>
+                                <field name="certificate_template_id" invisible="not issue_certificate"/>
+                                <field name="certificate_validity_months" invisible="not issue_certificate"/>
+                                <field name="active" invisible="1"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Curriculum &amp; Lessons (FR-LMS-004 to FR-LMS-009)">
+                                <field name="lesson_ids">
+                                    <list>
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name" string="Lesson Title"/>
+                                        <field name="section_id"/>
+                                        <field name="lesson_type" widget="badge"/>
+                                        <field name="duration_minutes" string="Duration (Min)"/>
+                                        <field name="is_mandatory" widget="boolean_toggle"/>
+                                        <field name="prevent_fast_forward" widget="boolean_toggle" string="Anti-Skip"/>
+                                        <field name="min_watch_percentage" string="Req %"/>
+                                    </list>
+                                    <form string="Course Lesson">
+                                        <sheet>
+                                            <div class="oe_title">
+                                                <label for="name" string="Lesson Title"/>
+                                                <h1><field name="name" placeholder="e.g. Module 1: Recognizing Red-Flag Transactions"/></h1>
+                                            </div>
+                                            <group>
+                                                <group string="Format &amp; Section">
+                                                    <field name="section_id"/>
+                                                    <field name="lesson_type"/>
+                                                    <field name="is_mandatory"/>
+                                                    <field name="duration_minutes"/>
+                                                </group>
+                                                <group string="Anti-Cheat &amp; Learning Controls (FR-LMS-007, 008)">
+                                                    <field name="prevent_fast_forward" invisible="lesson_type != 'video'"/>
+                                                    <field name="min_watch_percentage" invisible="lesson_type != 'video'"/>
+                                                    <field name="video_duration_seconds" invisible="lesson_type != 'video'"/>
+                                                </group>
+                                            </group>
+
+                                            <!-- Video Source Option (File vs URL) -->
+                                            <group string="Internal Video Hosting (FR-LMS-004)" invisible="lesson_type != 'video'">
+                                                <field name="video_source_type"/>
+                                                <field name="video_file" filename="video_filename" invisible="video_source_type != 'file'"/>
+                                                <field name="video_filename" invisible="1"/>
+                                                <field name="video_url" invisible="video_source_type != 'url'" placeholder="https://media.bunnabanksc.com/videos/module1.mp4"/>
+                                            </group>
+
+                                            <!-- Document Option -->
+                                            <group string="Document / Slide Material" invisible="lesson_type != 'document'">
+                                                <field name="document_file" filename="document_filename"/>
+                                                <field name="document_filename" invisible="1"/>
+                                            </group>
+
+                                            <!-- Text Option -->
+                                            <group string="Reading Article" invisible="lesson_type != 'text'">
+                                                <field name="html_content" placeholder="Type or paste the lesson content..."/>
+                                            </group>
+
+                                            <!-- Quiz Option -->
+                                            <group string="Linked Assessment" invisible="lesson_type != 'quiz'">
+                                                <field name="assessment_id"/>
+                                            </group>
+                                        </sheet>
+                                    </form>
+                                </field>
+                            </page>
+
+                            <page string="Curriculum Sections / Modules">
+                                <field name="section_ids">
+                                    <list editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="name" string="Section / Chapter Name"/>
+                                        <field name="description" string="Summary"/>
+                                    </list>
+                                </field>
+                            </page>
+
+                            <page string="Description &amp; Learning Outcomes">
+                                <group string="Overview">
+                                    <field name="description"/>
+                                </group>
+                                <group string="Learning Objectives">
+                                    <field name="learning_objectives"/>
+                                </group>
+                            </page>
+
+                            <page string="Revision Changelog (FR-LMS-011)">
+                                <field name="revision_notes" placeholder="Detailed notes on what changed in this version..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LMS COURSE SEARCH VIEW                                    -->
+        <!-- ========================================================= -->
+        <record id="view_lms_course_search" model="ir.ui.view">
+            <field name="name">lms.course.search</field>
+            <field name="model">lms.course</field>
+            <field name="arch" type="xml">
+                <search string="Search Courses">
+                    <field name="name" string="Course Title / Code" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                    <field name="category_id"/>
+                    <field name="instructor_id"/>
+                    <field name="competency_ids"/>
+                    <filter name="filter_published" string="Published &amp; Active" domain="[('state', '=', 'published')]"/>
+                    <filter name="filter_mandatory" string="Mandatory Courses" domain="[('is_mandatory', '=', True)]"/>
+                    <filter name="filter_review" string="Awaiting Approval" domain="[('state', '=', 'review')]"/>
+                    <separator/>
+                    <group>
+                        <filter name="group_category" string="Category" domain="[]" context="{'group_by': 'category_id'}"/>
+                        <filter name="group_state" string="Status" domain="[]" context="{'group_by': 'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_lms_course_all" model="ir.actions.act_window">
+            <field name="name">Course Management</field>
+            <field name="res_model">lms.course</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="search_view_id" ref="view_lms_course_search"/>
+            <field name="context">{'search_default_filter_published': 1}</field>
+        </record>
+
+        <record id="action_lms_course_pending" model="ir.actions.act_window">
+            <field name="name">Courses Awaiting Approval</field>
+            <field name="res_model">lms.course</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('state', '=', 'review')]</field>
+        </record>
+
+    </data>
+</odoo>

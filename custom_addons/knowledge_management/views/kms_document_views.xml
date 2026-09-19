@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- KMS DOCUMENT LIST VIEW                                    -->
+        <!-- ========================================================= -->
+        <record id="view_kms_document_list" model="ir.ui.view">
+            <field name="name">kms.document.list</field>
+            <field name="model">kms.document</field>
+            <field name="arch" type="xml">
+                <list string="Governed Documents" decoration-info="state == 'draft'" decoration-warning="state == 'review'" decoration-success="state == 'approved'" decoration-muted="state == 'archived'">
+                    <field name="code" string="Reference"/>
+                    <field name="name" string="Document Title"/>
+                    <field name="doc_type_id"/>
+                    <field name="category_id"/>
+                    <field name="classification_id" widget="badge" decoration-success="classification_id == %(kms_class_public)d" decoration-info="classification_id == %(kms_class_internal)d" decoration-warning="classification_id == %(kms_class_confidential)d" decoration-danger="classification_id == %(kms_class_strictly_confidential)d"/>
+                    <field name="department_id" optional="show"/>
+                    <field name="operating_unit_id" optional="hide"/>
+                    <field name="version"/>
+                    <field name="owner_id" widget="many2one_avatar_employee"/>
+                    <field name="effective_date" optional="show"/>
+                    <field name="view_count" string="Views" optional="show"/>
+                    <field name="download_count" string="Downloads" optional="show"/>
+                    <field name="is_view_only" string="View-Only" optional="hide"/>
+                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'review'" decoration-success="state == 'approved'" decoration-muted="state == 'archived'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- KMS DOCUMENT KANBAN VIEW                                  -->
+        <!-- ========================================================= -->
+        <record id="view_kms_document_kanban" model="ir.ui.view">
+            <field name="name">kms.document.kanban</field>
+            <field name="model">kms.document</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="doc_type_id"/>
+                    <field name="category_id"/>
+                    <field name="classification_id"/>
+                    <field name="version"/>
+                    <field name="state"/>
+                    <field name="owner_id"/>
+                    <field name="view_count"/>
+                    <field name="download_count"/>
+                    <field name="is_view_only"/>
+                    <templates>
+                        <t t-name="card">
+                            <div t-attf-class="oe_kanban_global_click p-3 rounded shadow-sm border mb-2 bg-white">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-secondary text-white fw-bold"><t t-esc="record.code.value"/></span>
+                                    <span class="badge bg-primary"><t t-esc="record.state.value"/></span>
+                                </div>
+                                <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.name.value"/></div>
+                                <div class="text-muted small mb-2">
+                                    <i class="fa fa-folder me-1 text-warning"/> <t t-esc="record.category_id.value"/> | 
+                                    <i class="fa fa-file-text-o ms-1 me-1"/> <t t-esc="record.doc_type_id.value"/>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <div class="small text-muted">
+                                        <i class="fa fa-eye me-1"/> <t t-esc="record.view_count.value"/>
+                                        <i class="fa fa-download ms-2 me-1"/> <t t-esc="record.download_count.value"/>
+                                        <span t-if="record.is_view_only.raw_value" class="badge bg-danger ms-2">View-Only</span>
+                                    </div>
+                                    <span class="badge bg-light text-dark border">v<t t-esc="record.version.value"/></span>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- KMS DOCUMENT FORM VIEW                                    -->
+        <!-- ========================================================= -->
+        <record id="view_kms_document_form" model="ir.ui.view">
+            <field name="name">kms.document.form</field>
+            <field name="model">kms.document</field>
+            <field name="arch" type="xml">
+                <form string="Governed Document">
+                    <header>
+                        <button name="action_submit_for_review" string="Submit for Review" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_approve" string="Approve &amp; Publish" type="object" class="btn-success" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
+                        <button name="action_reject" string="Return to Draft" type="object" class="btn-secondary" invisible="state != 'review'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
+                        <button name="action_create_new_version" string="Initiate Revision (New Version)" type="object" class="btn-outline-primary" invisible="state != 'approved'" groups="knowledge_management.group_kms_contributor,knowledge_management.group_kms_manager"/>
+                        <button name="action_download_watermarked" string="Download Watermarked PDF" type="object" class="btn-info" invisible="not file_data or is_view_only"/>
+                        <button name="action_archive" string="Archive / Supersede" type="object" class="btn-outline-danger" invisible="state != 'approved'" groups="knowledge_management.group_kms_manager"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,review,approved,archived"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <widget name="web_ribbon" title="Approved" bg_color="text-bg-success" invisible="state != 'approved'"/>
+
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_versions" type="object" class="oe_stat_button" icon="fa-history">
+                                <field name="version" string="Version" widget="statinfo"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-eye">
+                                <field name="view_count" string="Views" widget="statinfo"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-download">
+                                <field name="download_count" string="Downloads" widget="statinfo"/>
+                            </button>
+                        </div>
+
+                        <div class="oe_title">
+                            <label for="code" string="Document Code"/>
+                            <h1><field name="code" readonly="1"/></h1>
+                            <label for="name" string="Document Title"/>
+                            <h2><field name="name" placeholder="e.g. Credit Underwriting Policy &amp; Procedures Manual"/></h2>
+                        </div>
+
+                        <group>
+                            <group string="Taxonomy &amp; Classification">
+                                <field name="doc_type_id" options="{'no_create': True}"/>
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="classification_id" options="{'no_create': True}"/>
+                                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            </group>
+                            <group string="Scoping &amp; Governance">
+                                <field name="department_id" placeholder="Bank-Wide Applicability (Leave Empty)"/>
+                                <field name="operating_unit_id" placeholder="All Operating Units / Branches"/>
+                                <field name="owner_id" widget="many2one_avatar_employee"/>
+                                <field name="reviewer_id" widget="many2one_avatar_employee"/>
+                                <field name="approver_id" widget="many2one_avatar_employee"/>
+                            </group>
+                        </group>
+
+                        <group>
+                            <group string="Lifecycle &amp; Dates">
+                                <field name="version"/>
+                                <field name="effective_date"/>
+                                <field name="review_due_date"/>
+                                <field name="date_approved" invisible="not date_approved"/>
+                            </group>
+                            <group string="Security &amp; Download Protection (FR-KMS-014 to 018)">
+                                <field name="is_view_only"/>
+                                <field name="require_watermark"/>
+                                <field name="allowed_download_group_ids" widget="many2many_tags" invisible="is_view_only" placeholder="All Authorized Roles"/>
+                                <field name="active" invisible="1"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Document File &amp; Overview">
+                                <group>
+                                    <field name="file_data" filename="file_name" widget="binary"/>
+                                    <field name="file_name" invisible="1"/>
+                                    <field name="file_size" string="Size (Bytes)" readonly="1"/>
+                                    <field name="mimetype" readonly="1"/>
+                                </group>
+                                <group string="Executive Summary &amp; Scope">
+                                    <field name="summary" placeholder="Provide a concise executive overview of this policy or procedure..."/>
+                                </group>
+                                <group string="Searchable Content Text">
+                                    <field name="content_text" placeholder="Paste or extract document text to enable deep full-text indexing across this document..."/>
+                                </group>
+                            </page>
+                            <page string="Version History &amp; Changelog">
+                                <group string="Current Revision Notes">
+                                    <field name="change_summary" placeholder="Summary of changes introduced in this version..."/>
+                                </group>
+                                <field name="version_ids" readonly="1">
+                                    <list>
+                                        <field name="version_number"/>
+                                        <field name="effective_date"/>
+                                        <field name="change_summary"/>
+                                        <field name="approved_by_id"/>
+                                        <field name="create_date" string="Archived Date"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Activity Audit Records (FR-KMS-022)">
+                                <field name="audit_log_ids" readonly="1">
+                                    <list>
+                                        <field name="create_date" string="Timestamp"/>
+                                        <field name="user_id"/>
+                                        <field name="employee_id"/>
+                                        <field name="action" widget="badge"/>
+                                        <field name="details"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- KMS DOCUMENT SEARCH VIEW                                  -->
+        <!-- ========================================================= -->
+        <record id="view_kms_document_search" model="ir.ui.view">
+            <field name="name">kms.document.search</field>
+            <field name="model">kms.document</field>
+            <field name="arch" type="xml">
+                <search string="Search Governed Documents">
+                    <field name="name" string="Document Title / Code" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
+                    <field name="category_id"/>
+                    <field name="doc_type_id"/>
+                    <field name="classification_id"/>
+                    <field name="department_id"/>
+                    <field name="tag_ids"/>
+                    <field name="content_text" string="Full Text Content"/>
+
+                    <filter name="filter_approved" string="Approved &amp; Active" domain="[('state', '=', 'approved')]"/>
+                    <filter name="filter_review" string="Under Review" domain="[('state', '=', 'review')]"/>
+                    <filter name="filter_draft" string="Draft Documents" domain="[('state', '=', 'draft')]"/>
+                    <separator/>
+                    <filter name="filter_my_docs" string="My Authored Documents" domain="[('owner_id.user_id', '=', uid)]"/>
+                    <filter name="filter_view_only" string="View-Only Documents" domain="[('is_view_only', '=', True)]"/>
+                    <separator/>
+                    <filter name="filter_archived" string="Archived" domain="[('active', '=', False)]"/>
+
+                    <separator/>
+                    <group>
+                        <filter name="group_category" string="Category" context="{'group_by': 'category_id'}"/>
+                        <filter name="group_doc_type" string="Document Type" context="{'group_by': 'doc_type_id'}"/>
+                        <filter name="group_classification" string="Security Classification" context="{'group_by': 'classification_id'}"/>
+                        <filter name="group_department" string="Department" context="{'group_by': 'department_id'}"/>
+                        <filter name="group_state" string="Status" context="{'group_by': 'state'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_kms_document_all" model="ir.actions.act_window">
+            <field name="name">Governed Documents Repository</field>
+            <field name="res_model">kms.document</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="search_view_id" ref="view_kms_document_search"/>
+            <field name="context">{'search_default_filter_approved': 1}</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Centralized Governed Document Repository
+                </p>
+                <p>
+                    Store, manage, version, and distribute approved Bunna Bank policies, SOPs, manuals, and regulatory directives.
+                </p>
+            </field>
+        </record>
+
+        <record id="action_kms_document_pending_review" model="ir.actions.act_window">
+            <field name="name">Documents Awaiting Review</field>
+            <field name="res_model">kms.document</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('state', '=', 'review')]</field>
+        </record>
+
+    </data>
+</odoo>

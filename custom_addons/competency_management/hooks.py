@@ -105,3 +105,9 @@ def post_init_hook(env):
         env['competency.matrix.config'].get_active_config()
     except Exception:
         pass
+
+    # ── 5. Auto-populate Director Peer Configuration for Directors & Chiefs ──
+    try:
+        env['competency.director.peer.config'].action_generate_director_records()
+    except Exception:
+        pass

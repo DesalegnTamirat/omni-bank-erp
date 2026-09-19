@@ -28,6 +28,20 @@ class HrEmployeeCompetency(models.Model):
         compute='_compute_latest_competency_assessment', store=True,
         help="Summary of competency requirements, achieved levels, and gaps for Career Path and external analytics.")
 
+    is_director_or_chief = fields.Boolean(
+        string='Is Director or Chief',
+        compute='_compute_is_director_or_chief',
+        store=True,
+        index=True,
+        help="Designates whether the employee holds Grade XVI (Director) or Grade XVII (Chief)."
+    )
+
+    @api.depends('job_grade', 'grade_id', 'job_id', 'active')
+    def _compute_is_director_or_chief(self):
+        peer_config_model = self.env['competency.director.peer.config']
+        for emp in self:
+            emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp)
+
     @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):
         for emp in self:

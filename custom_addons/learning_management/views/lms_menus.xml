@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Root Menu: Learning Management -->
+        <menuitem id="menu_lms_root"
+                  name="Learning Management"
+                  web_icon="learning_management,static/description/icon.png"
+                  sequence="66"
+                  groups="learning_management.group_lms_learner"/>
+
+        <!-- 1. My Learning (Learner Self-Service) -->
+        <menuitem id="menu_lms_my_learning"
+                  name="My Learning"
+                  parent="menu_lms_root"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_my_courses"
+                  name="Assigned Courses"
+                  parent="menu_lms_my_learning"
+                  action="action_lms_my_enrollments"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_course_catalog"
+                  name="Course Catalog"
+                  parent="menu_lms_my_learning"
+                  action="action_lms_course_all"
+                  sequence="20"/>
+
+        <menuitem id="menu_lms_my_history_sub"
+                  name="Completed &amp; History"
+                  parent="menu_lms_my_learning"
+                  action="action_lms_my_history"
+                  sequence="30"/>
+
+        <!-- 2. Course Administration -->
+        <menuitem id="menu_lms_course_admin"
+                  name="Course Administration"
+                  parent="menu_lms_root"
+                  sequence="20"
+                  groups="learning_management.group_lms_instructor,learning_management.group_lms_manager"/>
+
+        <menuitem id="menu_lms_all_courses"
+                  name="All Courses"
+                  parent="menu_lms_course_admin"
+                  action="action_lms_course_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_pending_courses"
+                  name="Awaiting Approval"
+                  parent="menu_lms_course_admin"
+                  action="action_lms_course_pending"
+                  sequence="20"
+                  groups="learning_management.group_lms_manager"/>
+
+        <menuitem id="menu_lms_paths"
+                  name="Learning Paths"
+                  parent="menu_lms_course_admin"
+                  action="action_lms_learning_path_all"
+                  sequence="30"/>
+
+        <menuitem id="menu_lms_assignments"
+                  name="Assignment Campaigns"
+                  parent="menu_lms_course_admin"
+                  action="action_lms_assignment_all"
+                  sequence="40"
+                  groups="learning_management.group_lms_manager"/>
+
+        <!-- 3. Assessments & Exams -->
+        <menuitem id="menu_lms_exams_root"
+                  name="Assessments &amp; Quizzes"
+                  parent="menu_lms_root"
+                  sequence="30"
+                  groups="learning_management.group_lms_instructor,learning_management.group_lms_manager"/>
+
+        <menuitem id="menu_lms_assessments"
+                  name="Assessments"
+                  parent="menu_lms_exams_root"
+                  action="action_lms_assessment_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_questions"
+                  name="Question Bank"
+                  parent="menu_lms_exams_root"
+                  action="action_lms_question_all"
+                  sequence="20"/>
+
+        <menuitem id="menu_lms_pools"
+                  name="Question Pools"
+                  parent="menu_lms_exams_root"
+                  action="action_lms_pool_all"
+                  sequence="30"/>
+
+        <menuitem id="menu_lms_candidate_sessions"
+                  name="Candidate Exam Sessions"
+                  parent="menu_lms_exams_root"
+                  action="action_lms_session_all"
+                  sequence="40"/>
+
+        <!-- 4. Certifications -->
+        <menuitem id="menu_lms_cert_root"
+                  name="Certifications"
+                  parent="menu_lms_root"
+                  sequence="40"/>
+
+        <menuitem id="menu_lms_certificates"
+                  name="Issued Certificates"
+                  parent="menu_lms_cert_root"
+                  action="action_lms_certificate_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_cert_templates"
+                  name="Certificate Templates"
+                  parent="menu_lms_cert_root"
+                  action="action_lms_cert_template_all"
+                  sequence="20"
+                  groups="learning_management.group_lms_manager"/>
+
+        <!-- 5. Enrollments & Tracking -->
+        <menuitem id="menu_lms_tracking_root"
+                  name="Learner Tracking"
+                  parent="menu_lms_root"
+                  sequence="50"
+                  groups="learning_management.group_lms_manager"/>
+
+        <menuitem id="menu_lms_all_enrollments"
+                  name="All Enrollments"
+                  parent="menu_lms_tracking_root"
+                  action="action_lms_enrollment_all"
+                  sequence="10"/>
+
+        <!-- 6. Analytics & Compliance -->
+        <menuitem id="menu_lms_analytics_root"
+                  name="Compliance &amp; Analytics"
+                  parent="menu_lms_root"
+                  sequence="60"
+                  groups="learning_management.group_lms_manager"/>
+
+        <menuitem id="menu_lms_compliance_matrix"
+                  name="Branch Compliance Matrix"
+                  parent="menu_lms_analytics_root"
+                  action="action_lms_compliance_matrix"
+                  sequence="10"/>
+
+        <!-- 7. Recognition & Gamification -->
+        <menuitem id="menu_lms_recognition_root"
+                  name="Recognition"
+                  parent="menu_lms_root"
+                  sequence="70"/>
+
+        <menuitem id="menu_lms_monthly_scorer"
+                  name="Best Scorer of the Month"
+                  parent="menu_lms_recognition_root"
+                  action="action_lms_monthly_scorer"
+                  sequence="10"/>
+
+        <menuitem id="menu_lms_points_ledger"
+                  name="Learning Points Ledger"
+                  parent="menu_lms_recognition_root"
+                  action="action_lms_points_ledger"
+                  sequence="20"
+                  groups="learning_management.group_lms_manager"/>
+
+        <!-- 8. Configuration -->
+        <menuitem id="menu_lms_config"
+                  name="Configuration"
+                  parent="menu_lms_root"
+                  sequence="90"
+                  groups="learning_management.group_lms_admin"/>
+
+        <menuitem id="menu_lms_config_category"
+                  name="Course Categories"
+                  parent="menu_lms_config"
+                  action="action_lms_category"
+                  sequence="10"/>
+
+    </data>
+</odoo>

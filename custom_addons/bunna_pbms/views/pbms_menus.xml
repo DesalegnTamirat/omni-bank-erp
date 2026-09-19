@@ -34,7 +34,10 @@
         <field name="parent_id" ref="menu_pbms_planning"/>
         <field name="action" ref="action_pbms_planning_request_server"/>
         <field name="sequence">20</field>
-        <field name="group_ids" eval="[(6, 0, [ref('bunna_pbms.group_pbms_branch_user')])]"/>
+        <field name="group_ids" eval="[(6, 0, [
+            ref('bunna_pbms.group_pbms_branch_user'),
+            ref('bunna_pbms.group_pbms_ho_reviewer'),
+        ])]"/>
     </record>
 
     <record id="menu_pbms_exceptional_workforce" model="ir.ui.menu">

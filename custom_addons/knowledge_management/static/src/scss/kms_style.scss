@@ -1,0 +1,29 @@
+/* Bunna Bank Knowledge Management System (KMS) Styles */
+/* Primary Brand Color: #541718 Deep Maroon | Secondary: #1d2b32 Navy | Accents: #c17540 Orange, #726732 Olive */
+
+.o_kms_badge_maroon {
+    background-color: #541718 !important;
+    color: #ffffff !important;
+}
+
+.o_kms_badge_navy {
+    background-color: #1d2b32 !important;
+    color: #ffffff !important;
+}
+
+.o_kms_badge_orange {
+    background-color: #c17540 !important;
+    color: #ffffff !important;
+}
+
+.o_kms_card {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(29, 43, 50, 0.08);
+    }
+}

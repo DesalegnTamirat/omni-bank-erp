@@ -18,7 +18,11 @@
                 <field name="job_id"/>
                 <field name="manager_id"/>
                 <field name="total_weight"/>
-                <field name="state"/>
+                <field name="state" widget="badge"
+                       decoration-info="state == 'draft'"
+                       decoration-warning="state == 'notified'"
+                       decoration-success="state in ('accepted', 'confirmed')"
+                       decoration-danger="state == 'rejected'"/>
             </list>
         </field>
     </record>
@@ -37,132 +41,237 @@
                 <header>
 
                     <button name="action_notify"
-                            string="Notify Employee"
+                            string="Notify"
                             type="object"
+                            icon="fa-paper-plane"
                             class="btn-primary"
-                            invisible="state != 'draft'"/>
+                            groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
+                            invisible="state not in ('draft', 'rejected') or is_current_employee or (not is_current_manager and not is_hr_role and not is_admin_role)"/>
 
                     <button name="action_accept"
                             string="Accept"
                             type="object"
+                            icon="fa-check"
                             class="btn-success"
-                            invisible="state != 'notified'"/>
+                            invisible="state != 'notified' or not is_current_employee"/>
 
                     <button name="action_reject"
                             string="Reject"
                             type="object"
+                            icon="fa-times"
                             class="btn-danger"
-                            invisible="state != 'notified'"/>
+                            invisible="state != 'notified' or not is_current_employee"/>
 
                     <button name="action_confirm"
                             string="Confirm"
                             type="object"
+                            icon="fa-lock"
                             class="btn-primary"
-                            invisible="state != 'accepted'"/>
+                            groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
+                            invisible="state != 'accepted' or is_current_employee or (not is_current_manager and not is_hr_role and not is_admin_role)"/>
 
+                    <!-- Reset to draft for Manager before confirmation -->
                     <button name="action_reset_draft"
                             string="Reset to Draft"
                             type="object"
-                            invisible="state == 'draft'"/>
+                            icon="fa-undo"
+                            class="btn-secondary"
+                            groups="performance_management.group_performance_manager,performance_management.group_performance_hr,performance_management.group_performance_admin"
+                            invisible="state in ('draft', 'confirmed', 'appraisal_started') or is_current_employee or (not is_current_manager and not is_hr_role and not is_admin_role)"/>
+
+                    <!-- Reset to draft for HR Role / Admin after confirmation -->
+                    <button name="action_reset_draft"
+                            string="Reset to Draft"
+                            type="object"
+                            icon="fa-undo"
+                            class="btn-warning"
+                            groups="performance_management.group_performance_hr,performance_management.group_performance_admin"
+                            invisible="state not in ('confirmed', 'appraisal_started') or is_current_employee or (not is_hr_role and not is_admin_role)"/>
 
                     <field name="state"
                            widget="statusbar"
-                           statusbar_visible="draft,notified,accepted,rejected,confirmed"/>
+                           statusbar_visible="draft,notified,accepted,confirmed,appraisal_started"/>
 
                 </header>
 
                 <sheet>
 
+                    <field name="is_current_employee" invisible="1"/>
+                    <field name="is_current_manager" invisible="1"/>
+                    <field name="is_planning_role" invisible="1"/>
+                    <field name="is_hr_role" invisible="1"/>
+                    <field name="is_admin_role" invisible="1"/>
                     <field name="appraisal_period_code" invisible="1"/>
+                    <field name="rejection_reason" invisible="1"/>
 
-                    <div class="alert d-flex align-items-center mb-3 period-banner-h1"
-                         style="color:#fff; border:none;"
+                    <!-- Rejection Alert Banner -->
+                    <div class="alert alert-danger d-flex align-items-center mb-3 shadow-sm"
+                         style="border-left: 5px solid #541718; background-color: #fbf0f0; color: #541718; border-radius: 6px;"
+                         role="alert"
+                         invisible="state != 'rejected' or not rejection_reason">
+                        <i class="fa fa-exclamation-circle fa-2x me-3" style="color: #541718;"/>
+                        <div>
+                            <span class="badge" style="background-color: #541718; color: #fff; font-size: 11px;">REJECTED BY EMPLOYEE</span>
+                            <div class="mt-1" style="font-size: 13.5px;">
+                                <strong>Reason: </strong>
+                                <field name="rejection_reason" readonly="1" class="d-inline fw-semibold"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Period Banner with Integrated Avatar -->
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 rounded-3 shadow-sm period-banner-h1"
                          invisible="appraisal_period_code != 'H1'">
-                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
-                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                        <div class="d-flex align-items-center">
+                            <i class="fa fa-calendar-check-o fa-2x me-3 text-white"/>
+                            <div>
+                                <div class="banner-period-label">Scorecard Period</div>
+                                <div class="banner-period-val"><field name="appraisal_period_id" readonly="1"/></div>
+                            </div>
+                        </div>
+                        <div class="text-center text-white px-3 flex-grow-1">
+                            <div class="fw-bold fs-5 text-truncate"><field name="planning_name" readonly="1"/></div>
+                            <div class="small mt-1 d-flex align-items-center justify-content-center gap-2 banner-period-label">
+                                <i class="fa fa-calendar"/>
+                                <span>Period: <field name="start_date" readonly="1"/> – <field name="end_date" readonly="1"/></span>
+                                <span>•</span>
+                                <span>Fiscal Year: <field name="fiscal_year_id" readonly="1"/></span>
+                            </div>
+                        </div>
+                        <div class="period-banner-avatar">
+                            <field name="employee_image_128" widget="image" options="{'size': [56, 56]}"/>
+                        </div>
                     </div>
-                    <div class="alert d-flex align-items-center mb-3 period-banner-h2"
-                         style="color:#fff; border:none;"
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 rounded-3 shadow-sm period-banner-h2"
                          invisible="appraisal_period_code != 'H2'">
-                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
-                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                        <div class="d-flex align-items-center">
+                            <i class="fa fa-calendar-check-o fa-2x me-3 text-white"/>
+                            <div>
+                                <div class="banner-period-label">Scorecard Period</div>
+                                <div class="banner-period-val"><field name="appraisal_period_id" readonly="1"/></div>
+                            </div>
+                        </div>
+                        <div class="text-center text-white px-3 flex-grow-1">
+                            <div class="fw-bold fs-5 text-truncate"><field name="planning_name" readonly="1"/></div>
+                            <div class="small mt-1 d-flex align-items-center justify-content-center gap-2 banner-period-label">
+                                <i class="fa fa-calendar"/>
+                                <span>Period: <field name="start_date" readonly="1"/> – <field name="end_date" readonly="1"/></span>
+                                <span>•</span>
+                                <span>Fiscal Year: <field name="fiscal_year_id" readonly="1"/></span>
+                            </div>
+                        </div>
+                        <div class="period-banner-avatar">
+                            <field name="employee_image_128" widget="image" options="{'size': [56, 56]}"/>
+                        </div>
                     </div>
-                    <div class="alert d-flex align-items-center mb-3 period-banner-default"
-                         style="color:#fff; border:none;"
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 rounded-3 shadow-sm period-banner-default"
                          invisible="appraisal_period_code in ('H1', 'H2') or not appraisal_period_code">
-                        <i class="fa fa-calendar-check-o me-2" style="font-size: 16px;"/>
-                        <strong><field name="appraisal_period_id" readonly="1"/></strong>
+                        <div class="d-flex align-items-center">
+                            <i class="fa fa-calendar-check-o fa-2x me-3 text-white"/>
+                            <div>
+                                <div class="banner-period-label">Scorecard Period</div>
+                                <div class="banner-period-val"><field name="appraisal_period_id" readonly="1"/></div>
+                            </div>
+                        </div>
+                        <div class="text-center text-white px-3 flex-grow-1">
+                            <div class="fw-bold fs-5 text-truncate"><field name="planning_name" readonly="1"/></div>
+                            <div class="small mt-1 d-flex align-items-center justify-content-center gap-2 banner-period-label">
+                                <i class="fa fa-calendar"/>
+                                <span>Period: <field name="start_date" readonly="1"/> – <field name="end_date" readonly="1"/></span>
+                                <span>•</span>
+                                <span>Fiscal Year: <field name="fiscal_year_id" readonly="1"/></span>
+                            </div>
+                        </div>
+                        <div class="period-banner-avatar">
+                            <field name="employee_image_128" widget="image" options="{'size': [56, 56]}"/>
+                        </div>
                     </div>
 
-                    <field name="employee_image_128" widget="image" class="oe_avatar"
-                           options="{'preview_image': 'employee_image_128'}"/>
+                    <!-- Detail Cards -->
+                    <div class="row g-3 mb-3">
+                        <!-- Employee Information Card -->
+                        <div class="col-lg-6">
+                            <div class="card h-100 shadow-sm border-0" style="border: 1px solid #e2e8f0 !important; border-radius: 8px; overflow: hidden;">
+                                <div class="card-header py-2 px-3 d-flex align-items-center" style="background-color: #f8f9fa; border-bottom: 2px solid #425727;">
+                                    <i class="fa fa-user-circle me-2" style="color: #425727; font-size: 15px;"/>
+                                    <span style="color: #1d2b32; font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Employee Information</span>
+                                </div>
+                                <div class="card-body p-3">
+                                    <group class="m-0 p-0">
+                                        <field name="planning_name" string="Planning Name" readonly="1"/>
+                                        <field name="employee_id" options="{'no_create': True, 'no_open': True}" readonly="state not in ('draft', 'rejected') or is_current_employee or (not is_hr_role and not is_admin_role)"/>
+                                        <field name="company_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="operating_unit_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="department_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="accepted_by" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
 
-                    <group>
-
-                        <group>
-
-                            <field name="planning_name"/>
-
-                            <field name="employee_id"/>
-
-                            <field name="company_id"/>
-
-                            <field name="operating_unit_id"/>
-
-                            <field name="department_id"/>
-
-                            <field name="accepted_by"/>
-
-                        </group>
-
-                        <group>
-
-                            <field name="start_date"/>
-
-                            <field name="end_date"/>
-
-                            <field name="manager_id"/>
-
-                            <field name="job_id"/>
-
-                            <field name="total_weight" widget="progressbar" readonly="1"/>
-
-                        </group>
-
-                    </group>
-
+                        <!-- Scorecard Planning and Targets Card -->
+                        <div class="col-lg-6">
+                            <div class="card h-100 shadow-sm border-0" style="border: 1px solid #e2e8f0 !important; border-radius: 8px; overflow: hidden;">
+                                <div class="card-header py-2 px-3 d-flex align-items-center" style="background-color: #f8f9fa; border-bottom: 2px solid #541718;">
+                                    <i class="fa fa-sliders me-2" style="color: #541718; font-size: 15px;"/>
+                                    <span style="color: #1d2b32; font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Scorecard Planning and Targets</span>
+                                </div>
+                                <div class="card-body p-3">
+                                    <group class="m-0 p-0">
+                                        <field name="fiscal_year_id" string="Fiscal Year" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
+                                        <field name="appraisal_period_id" string="Appraisal Period" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
+                                        <field name="start_date" string="Period Start Date" readonly="1"/>
+                                        <field name="end_date" string="Period End Date" readonly="1"/>
+                                        <field name="manager_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft' or is_current_employee"/>
+                                        <field name="job_id" readonly="1" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="total_weight" widget="progressbar" readonly="1"/>
+                                    </group>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <notebook>
 
                         <page string="Score Card Plan Details">
 
-                            <field name="line_ids">
+                            <field name="line_ids" readonly="state != 'draft' or is_current_employee">
 
                                 <list editable="bottom">
 
-                                    <field name="perspective_id"/>
+                                    <field name="perspective_name" column_invisible="1"/>
+                                    <field name="state" column_invisible="1"/>
 
-                                    <field name="parent_objective_id"/>
+                                    <field name="perspective_id" string="Perspective" widget="badge"
+                                           decoration-success="perspective_name == 'Financial'"
+                                           decoration-warning="perspective_name == 'Stakeholder'"
+                                           decoration-info="perspective_name == 'Internal Process'"
+                                           options="{'no_create': True, 'no_open': True}"
+                                           readonly="state != 'draft'"/>
 
-                                    <field name="job_objective_id"/>
+                                    <field name="parent_objective_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
 
-                                    <field name="job_measure_id"/>
+                                    <field name="job_objective_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
 
-                                    <field name="weight"/>
+                                    <field name="job_measure_id" options="{'no_create': True, 'no_open': True}" readonly="state != 'draft'"/>
 
-                                    <field name="target_type"/>
+                                    <field name="weight" sum="Total Weight" readonly="state != 'draft'"/>
 
-                                    <field name="baseline"/>
+                                    <field name="target_type" readonly="state != 'draft'"/>
 
-                                    <field name="q1_target"/>
+                                    <field name="baseline" readonly="state != 'draft'"/>
 
-                                    <field name="h1_target"/>
+                                    <field name="period_code" column_invisible="1"/>
 
-                                    <field name="q3_target"/>
+                                    <field name="q1_target" string="Q1 Target" readonly="state != 'draft' or period_code != 'Q1'"/>
 
-                                    <field name="h2_target"/>
+                                    <field name="h1_target" string="H1 Target" readonly="state != 'draft' or period_code != 'H1'"/>
 
-                                    <field name="annual_target"/>
+                                    <field name="q3_target" string="Q3 Target" readonly="state != 'draft' or period_code != 'Q3'"/>
+
+                                    <field name="h2_target" string="H2 Target" readonly="state != 'draft' or period_code != 'H2'"/>
+
+                                    <field name="annual_target" string="Annual Target" readonly="state != 'draft' or period_code not in ('ANNUAL', 'annual')"/>
 
                                 </list>
 
@@ -173,6 +282,8 @@
                     </notebook>
 
                 </sheet>
+
+                <chatter/>
 
             </form>
 
@@ -220,6 +331,7 @@
                 <field name="department_id"/>
                 <field name="planning_name"/>
                 <field name="appraisal_period_id"/>
+                <field name="appraisal_period_code"/>
                 <field name="start_date"/>
                 <field name="end_date"/>
                 <field name="total_weight"/>
@@ -227,8 +339,10 @@
                 <field name="employee_image_128"/>
                 <templates>
                     <t t-name="card">
-                        <div class="rounded-3 shadow-sm mb-1" style="overflow:hidden; border-left: 5px solid #1d2b32;">
-                            <div class="px-3 py-1 text-white small fw-bold" style="background-color:#1d2b32;" t-if="record.appraisal_period_id.value">
+                        <div class="rounded-3 shadow-sm mb-1 o_scorecard_kanban_card">
+                            <div class="px-3 py-1 text-white small fw-bold period-banner-default"
+                                 t-att-class="record.appraisal_period_code.value == 'H1' and 'px-3 py-1 text-white small fw-bold period-banner-h1' or record.appraisal_period_code.value == 'H2' and 'px-3 py-1 text-white small fw-bold period-banner-h2' or 'px-3 py-1 text-white small fw-bold period-banner-default'"
+                                 t-if="record.appraisal_period_id.value">
                                 <i class="fa fa-calendar-check-o me-1"/>
                                 <field name="appraisal_period_id"/>
                             </div>
@@ -236,8 +350,8 @@
                                 <div class="d-flex">
                                     <div class="o_kanban_image me-3">
                                         <field name="employee_image_128" widget="image"
-                                               class="rounded-circle"
-                                               options="{'img_style': 'width: 40px; height: 40px; object-fit: cover;'}"/>
+                                                class="rounded-circle"
+                                                options="{'img_style': 'width: 40px; height: 40px; object-fit: cover;'}"/>
                                     </div>
                                     <div class="flex-grow-1">
                                         <div class="d-flex justify-content-between align-items-start">
@@ -260,6 +374,10 @@
                                         <div class="text-muted small" t-if="record.operating_unit_id.value">
                                             <i class="fa fa-sitemap me-1"/>
                                             <field name="operating_unit_id"/>
+                                        </div>
+                                        <div class="text-muted small" t-if="record.department_id.value">
+                                            <i class="fa fa-building me-1"/>
+                                            <field name="department_id"/>
                                         </div>
                                         <div class="text-muted small" t-if="record.start_date.value">
                                             <i class="fa fa-calendar me-1"/>

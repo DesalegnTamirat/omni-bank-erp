@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Root Menu: Knowledge Management -->
+        <menuitem id="menu_kms_root"
+                  name="Knowledge Management"
+                  web_icon="knowledge_management,static/description/icon.png"
+                  sequence="65"
+                  groups="knowledge_management.group_kms_employee"/>
+
+        <!-- 1. Governed Repository Menu -->
+        <menuitem id="menu_kms_repository"
+                  name="Document Repository"
+                  parent="menu_kms_root"
+                  sequence="10"/>
+
+        <menuitem id="menu_kms_document_all"
+                  name="All Policies &amp; SOPs"
+                  parent="menu_kms_repository"
+                  action="action_kms_document_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_kms_document_pending"
+                  name="Pending Review"
+                  parent="menu_kms_repository"
+                  action="action_kms_document_pending_review"
+                  sequence="20"
+                  groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
+
+        <!-- 2. Digital Library Menu -->
+        <menuitem id="menu_kms_library"
+                  name="Digital Library"
+                  parent="menu_kms_root"
+                  action="action_kms_digital_library_all"
+                  sequence="20"/>
+
+        <!-- 3. Tacit Knowledge & CoP Menu -->
+        <menuitem id="menu_kms_tacit_root"
+                  name="Tacit Knowledge &amp; CoP"
+                  parent="menu_kms_root"
+                  sequence="30"/>
+
+        <menuitem id="menu_kms_cop"
+                  name="Communities of Practice"
+                  parent="menu_kms_tacit_root"
+                  action="action_kms_cop_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_kms_sessions"
+                  name="Knowledge Capture Sessions"
+                  parent="menu_kms_tacit_root"
+                  action="action_kms_session_all"
+                  sequence="20"/>
+
+        <menuitem id="menu_kms_lessons"
+                  name="Lessons Learned"
+                  parent="menu_kms_tacit_root"
+                  action="action_kms_lesson_all"
+                  sequence="30"/>
+
+        <menuitem id="menu_kms_mentoring"
+                  name="Mentoring &amp; Handover"
+                  parent="menu_kms_tacit_root"
+                  action="action_kms_mentoring_all"
+                  sequence="40"/>
+
+        <!-- 4. Expert Directory Menu -->
+        <menuitem id="menu_kms_expert"
+                  name="Expert Directory"
+                  parent="menu_kms_root"
+                  action="action_kms_expert_all"
+                  sequence="40"/>
+
+        <!-- 5. Q&A Forum Menu -->
+        <menuitem id="menu_kms_forum"
+                  name="Q&amp;A Forum"
+                  parent="menu_kms_root"
+                  action="action_kms_forum_topic_all"
+                  sequence="50"/>
+
+        <!-- 6. Recognition & Gamification Menu -->
+        <menuitem id="menu_kms_recognition_root"
+                  name="Recognition"
+                  parent="menu_kms_root"
+                  sequence="60"/>
+
+        <menuitem id="menu_kms_monthly_recognition"
+                  name="Best Contributor of the Month"
+                  parent="menu_kms_recognition_root"
+                  action="action_kms_recognition_all"
+                  sequence="10"/>
+
+        <menuitem id="menu_kms_points_ledger"
+                  name="Points Ledger"
+                  parent="menu_kms_recognition_root"
+                  action="action_kms_points_ledger"
+                  sequence="20"
+                  groups="knowledge_management.group_kms_manager"/>
+
+        <!-- 7. Audit & Compliance Menu -->
+        <menuitem id="menu_kms_audit_root"
+                  name="Compliance Audit"
+                  parent="menu_kms_root"
+                  sequence="70"
+                  groups="knowledge_management.group_kms_manager,knowledge_management.group_kms_auditor"/>
+
+        <menuitem id="menu_kms_audit_logs"
+                  name="Activity Audit Trail"
+                  parent="menu_kms_audit_root"
+                  action="action_kms_audit_log_all"
+                  sequence="10"/>
+
+        <!-- 8. Configuration Menu -->
+        <menuitem id="menu_kms_config"
+                  name="Configuration"
+                  parent="menu_kms_root"
+                  sequence="90"
+                  groups="knowledge_management.group_kms_manager"/>
+
+        <menuitem id="menu_kms_config_category"
+                  name="Categories Taxonomy"
+                  parent="menu_kms_config"
+                  action="action_kms_category"
+                  sequence="10"/>
+
+        <menuitem id="menu_kms_config_doc_type"
+                  name="Document Types"
+                  parent="menu_kms_config"
+                  action="action_kms_doc_type"
+                  sequence="20"/>
+
+        <menuitem id="menu_kms_config_classification"
+                  name="Security Classifications"
+                  parent="menu_kms_config"
+                  action="action_kms_classification"
+                  sequence="30"/>
+
+        <menuitem id="menu_kms_config_tags"
+                  name="Tags Vocabulary"
+                  parent="menu_kms_config"
+                  action="action_kms_tag"
+                  sequence="40"/>
+
+    </data>
+</odoo>

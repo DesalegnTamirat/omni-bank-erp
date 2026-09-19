@@ -3,6 +3,7 @@ import logging
 from odoo import api, fields, models, _
 from odoo.exceptions import ValidationError
 from odoo.addons.mail.tools.discuss import Store
+from .pbms_access import send_pbms_inbox_notification
 
 _logger = logging.getLogger(__name__)
 
@@ -103,19 +104,17 @@ class PbmsPlanningCycle(models.Model):
         ) % (self.name, self.workforce_window_start, self.workforce_window_end)
 
         self.message_post(body=note, subject=summary)
-        for user in target_users:
-            self.activity_schedule(
-                activity_type_id=self.env.ref("mail.mail_activity_data_todo").id,
-                summary=summary,
-                note=note,
-                user_id=user.id,
-                date_deadline=self.workforce_window_end,
-            )
+        self._send_inbox_notification(target_users, summary, note)
 
         self.write({
             "workforce_window_notified": True,
             "workforce_window_notified_date": fields.Datetime.now(),
         })
+
+    def _send_inbox_notification(self, users_or_partners, subject, body):
+        """Send direct in-app inbox notification into Discuss [Notifications] tab (chat bubble)."""
+        for cycle in self:
+            send_pbms_inbox_notification(self.env, cycle, users_or_partners, subject, body)
 
     company_id = fields.Many2one(
         "res.company", default=lambda self: self.env.company, required=True,
@@ -404,12 +403,7 @@ class PbmsPlanningCycle(models.Model):
                 message,
             )
 
-            cycle.message_post(
-                body=msg,
-                partner_ids=partners.ids,
-                message_type="notification",
-                subtype_xmlid="mail.mt_comment",
-            )
+            cycle._send_inbox_notification(partners, _("Planning Cycle: %s") % status_title, msg)
 
             # Send Email Template
             template = self.env.ref("bunna_pbms.mail_template_cycle_status_changed", raise_if_not_found=False)
@@ -488,26 +482,13 @@ class PbmsPlanningCycle(models.Model):
                 _("Planning cycle '%s' is now open for plan and budget input.<br/>%s") % (cycle.name, deadline_info),
             )
 
-            # Schedule activities for all planning users across branches, districts, and head offices
-            todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
-            if todo_type:
-                target_users = cycle._get_all_planning_users()
-                summary = _("Plan Submission Window Open: %s") % cycle.name
-                note = _(
-                    "Planning cycle <b>%s</b> is now open for plan and budget input.<br/>%s"
-                ) % (cycle.name, deadline_info)
-                deadline = (cycle.branch_deadline.date() if cycle.branch_deadline else cycle.date_end) or fields.Date.today()
-                for user in target_users:
-                    try:
-                        cycle.activity_schedule(
-                            activity_type_id=todo_type.id,
-                            summary=summary,
-                            note=note,
-                            user_id=user.id,
-                            date_deadline=deadline,
-                        )
-                    except Exception as e:
-                        _logger.warning("Could not schedule activity for user %s: %s", user.id, e)
+            # In-app inbox notifications for all planning users across branches, districts, and head offices
+            target_users = cycle._get_all_planning_users()
+            summary = _("Plan Submission Window Open: %s") % cycle.name
+            note = _(
+                "Planning cycle <b>%s</b> is now open for plan and budget input.<br/>%s"
+            ) % (cycle.name, deadline_info)
+            cycle._send_inbox_notification(target_users, summary, note)
 
     def action_start_consolidation(self):
         self.write({"state": "consolidation"})

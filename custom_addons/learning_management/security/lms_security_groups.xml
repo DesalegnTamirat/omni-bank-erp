@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <!-- Module Category -->
+        <record id="module_category_learning_management" model="ir.module.category">
+            <field name="name">Learning Management</field>
+            <field name="description">Bunna Bank Learning Management System (LMS) Access Control</field>
+            <field name="sequence">28</field>
+        </record>
+
+        <!-- Privilege -->
+        <record id="res_groups_privilege_lms" model="res.groups.privilege">
+            <field name="name">Learning Management</field>
+            <field name="sequence">10</field>
+            <field name="category_id" ref="learning_management.module_category_learning_management"/>
+        </record>
+
+        <!-- 1. Group: Learner / Employee (Default for all internal users) -->
+        <record id="group_lms_learner" model="res.groups">
+            <field name="name">Learner / Employee</field>
+            <field name="sequence">10</field>
+            <field name="privilege_id" ref="learning_management.res_groups_privilege_lms"/>
+            <field name="comment">Can view assigned courses, stream video lessons, take quizzes, and view earned certificates.</field>
+        </record>
+
+        <record id="base.group_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('group_lms_learner'))]"/>
+        </record>
+
+        <!-- 2. Group: Instructor / Content Creator -->
+        <record id="group_lms_instructor" model="res.groups">
+            <field name="name">Instructor / Course Creator</field>
+            <field name="sequence">20</field>
+            <field name="privilege_id" ref="learning_management.res_groups_privilege_lms"/>
+            <field name="implied_ids" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="comment">Can design courses, upload videos, assemble quizzes, and author learning paths.</field>
+        </record>
+
+        <!-- 3. Group: Training Manager / L&D Officer -->
+        <record id="group_lms_manager" model="res.groups">
+            <field name="name">Training Manager / L&amp;D Officer</field>
+            <field name="sequence">30</field>
+            <field name="privilege_id" ref="learning_management.res_groups_privilege_lms"/>
+            <field name="implied_ids" eval="[(4, ref('learning_management.group_lms_instructor'))]"/>
+            <field name="comment">Can approve courses for publication, dispatch assignment campaigns, and view branch compliance matrices.</field>
+        </record>
+
+        <!-- 4. Group: LMS Administrator -->
+        <record id="group_lms_admin" model="res.groups">
+            <field name="name">LMS Administrator</field>
+            <field name="sequence">40</field>
+            <field name="privilege_id" ref="learning_management.res_groups_privilege_lms"/>
+            <field name="implied_ids" eval="[(4, ref('learning_management.group_lms_manager'))]"/>
+            <field name="comment">Full administrative system configuration: certificate templates, question banks, and crons.</field>
+        </record>
+
+    </data>
+</odoo>

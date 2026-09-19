@@ -235,6 +235,8 @@ class HrAttendance(models.Model):
 
             shift_start_dt = check_in_local.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
             shift_end_dt = check_in_local.replace(hour=end_hour, minute=end_min, second=0, microsecond=0)
+            if shift_end < shift_start:
+                shift_end_dt += datetime.timedelta(days=1)
 
             # 3. Calculate Effective Check-In & Effective Check-Out
             check_out_local = fields.Datetime.context_timestamp(emp, rec.check_out) if emp else rec.check_out
@@ -313,14 +315,25 @@ class HrAttendance(models.Model):
                         shift_end = saturday_exit_time
 
             # Calculate shift lunch duration
+            lunch_start_float = shift_info.get('lunch_out_time', 12.0) if (shift_info and shift_info.get('has_lunch_break')) else 12.0
             if shift_info and shift_info.get('has_lunch_break'):
                 lunch_dur = shift_info.get('lunch_duration', default_lunch_duration if enable_lunch else 0.0)
             elif enable_lunch:
                 lunch_dur = default_lunch_duration
             else:
                 lunch_dur = 0.0
+            lunch_end_float = lunch_start_float + lunch_dur
 
-            total_shift_dur = max(0.0, (shift_end - shift_start) - lunch_dur)
+            # Deduct lunch ONLY if this specific record spans across the entire lunch break window
+            # (e.g. Continuous single record where shift_start < lunch_start and shift_end > lunch_end)
+            # For split sessions (Morning 08:00-12:00 or Afternoon 13:00-17:00), lunch is BETWEEN sessions, so deduction is 0.
+            if lunch_dur > 0 and shift_start < lunch_start_float and shift_end > lunch_end_float:
+                effective_lunch_dur = lunch_dur
+            else:
+                effective_lunch_dur = 0.0
+
+            shift_end_adj = (shift_end + 24.0) if shift_end < shift_start else shift_end
+            total_shift_dur = max(0.0, (shift_end_adj - shift_start) - effective_lunch_dur)
             rec.expected_hours = round(total_shift_dur, 2)
 
 
@@ -1017,18 +1030,18 @@ class HrAttendance(models.Model):
                     SELECT 
                         ha.id AS att_id,
                         ha.check_in,
-                        COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0) AS resolved_start_time,
-                        COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) AS resolved_end_time,
+                        COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0) AS resolved_start_time,
+                        COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) AS resolved_end_time,
                         (
                             (
                                 date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                + (COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
+                                + (COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
                             ) AT TIME ZONE 'Africa/Addis_Ababa'
                         ) AT TIME ZONE 'UTC' AS shift_start_utc,
                         (
                             (
                                 date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                                + (COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                                + (COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
                             ) AT TIME ZONE 'Africa/Addis_Ababa'
                         ) AT TIME ZONE 'UTC' AS shift_end_utc
                     FROM hr_attendance ha

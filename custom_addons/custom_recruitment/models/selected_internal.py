@@ -539,6 +539,8 @@ class NewInternalRecruitmentSelected(models.Model):
         return _("Head Office")
 
     def notify_interview_panel(self):
+        if not self.new_int_rec_panel or not any(line.emp_name for line in self.new_int_rec_panel):
+            raise UserError(_('No panel members have been added. Please add at least one panel member before notifying the interview panel.'))
         if not self.interview_date:
             raise UserError(_('Please specify the Interview Date before notifying the panel.'))
         pos_title = self._get_position_title()
@@ -651,7 +653,17 @@ class NewInternalRecruitmentSelected(models.Model):
         channel.message_post(body=Markup(message), message_type='comment', subtype_xmlid='mail.mt_comment')
 
     def notify_interview(self):
-        if not self.exam_scores_fetched:
+        vac = False
+        if self.vacancy_id:
+            vac = self.env['job.vacancy'].browse(self.vacancy_id)
+        elif self.vacancy_reference:
+            vac = self.env['job.vacancy'].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        has_exam = True
+        if vac and hasattr(vac, 'has_written_exam'):
+            has_exam = vac.has_written_exam
+
+        if has_exam and not self.exam_scores_fetched:
             raise UserError(_("Sequence Error: You must fetch written exam scores ('Fetch Exam Score') before sending interview invitations to candidates."))
         if not self.panel_notified:
             raise UserError(_("Sequence Error: You must notify the Interview Panel ('Notify Interview Panel') before sending interview invitations to candidates."))
@@ -659,7 +671,7 @@ class NewInternalRecruitmentSelected(models.Model):
             raise UserError(_('Please specify the Interview Date before sending candidate invitations.'))
         for val in self.new_int_rec_sel:
             score = val.written_exam_score or 0.0
-            if score < 50.0:
+            if has_exam and score < 50.0:
                 val.select_flag = False
                 val.remarks = _("Disqualified: Written Exam score (%.2f%%) is below 50%% threshold.") % score
             else:
@@ -798,14 +810,28 @@ class NewInternalRecruitmentSelected(models.Model):
     def _get_internal_weights(self):
         """
         Fetches PMS, Written Exam, and Interview weight percentages directly from the 
-        Assessment module Weight Profiles (assessment.weight.profile).
+        Vacancy form, auto-populated from Assessment module Weight Profiles (assessment.weight.profile).
         """
         self.ensure_one()
+        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
+        if not vac and self.vacancy_reference:
+            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        if vac and (vac.pms_weight or vac.written_weight or vac.interview_weight):
+            pms_w = vac.pms_weight
+            exam_w = vac.written_weight if getattr(vac, 'has_written_exam', True) else 0.0
+            int_w = vac.interview_weight
+            total = pms_w + exam_w + int_w
+            if total > 0 and abs(total - 100.0) > 0.01:
+                pms_w = round((pms_w / total) * 100.0, 2)
+                int_w = round(100.0 - pms_w, 2)
+                exam_w = 0.0
+            return (pms_w, exam_w, int_w)
+
         pms_w, exam_w, int_w = (40.0, 30.0, 30.0)
 
         if "assessment.weight.profile" in self.env:
-            role_lvl = "non_managerial"
-            vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
+            role_lvl = "managerial" if (vac and vac.employee_category == 'Managerial') else "non_managerial"
             if vac and getattr(vac, "interview_type", False):
                 role_lvl = vac.interview_type
 
@@ -819,6 +845,15 @@ class NewInternalRecruitmentSelected(models.Model):
                         exam_w = line.weight_percentage
                     elif line.component == "interview":
                         int_w = line.weight_percentage
+
+        if vac and hasattr(vac, 'has_written_exam') and not vac.has_written_exam:
+            exam_w = 0.0
+            total_rem = pms_w + int_w
+            if total_rem > 0:
+                pms_w = round((pms_w / total_rem) * 100.0, 2)
+                int_w = round(100.0 - pms_w, 2)
+            else:
+                pms_w, int_w = 60.0, 40.0
 
         return (pms_w, exam_w, int_w)
 
@@ -836,13 +871,33 @@ class NewInternalRecruitmentSelected(models.Model):
         ]
 
         # Compute raw weighted score per candidate
+        vac = self.env["job.vacancy"].browse(self.vacancy_id) if self.vacancy_id else False
+        if not vac and self.vacancy_reference:
+            vac = self.env["job.vacancy"].search([('reference', '=', self.vacancy_reference)], limit=1)
+
+        is_trf_matrix = vac and getattr(vac, 'transfer_eval_mode', False) == 'transfer_matrix_only'
+
         scored = []
         for cand in all_candidates:
             pms  = cand.pms_score or 0.0
             exam = cand.written_exam_score or 0.0
             intv = cand.interview_score or 0.0
-            # Weights are percentages — divide by 100
-            ws = round((pms * pms_w / 100.0) + (exam * exam_w / 100.0) + (intv * int_w / 100.0), 2)
+
+            if is_trf_matrix:
+                app_w = getattr(vac, 'app_date_weight', 20.0) or 20.0
+                exp_w = getattr(vac, 'experience_weight', 20.0) or 20.0
+                loc_w = getattr(vac, 'location_weight', 20.0) or 20.0
+                rec_w = getattr(vac, 'recommendation_weight', 10.0) or 10.0
+                
+                app_score = 100.0
+                exp_score = getattr(cand, 'total_experience', 5.0) * 10.0 if hasattr(cand, 'total_experience') else 80.0
+                loc_score = getattr(cand, 'service_in_company', 3.0) * 10.0 if hasattr(cand, 'service_in_company') else 75.0
+                rec_score = cand.supervisor_recommendation_score if hasattr(cand, 'supervisor_recommendation_score') and cand.supervisor_recommendation_score else 90.0
+
+                ws = round((pms * pms_w / 100.0) + (app_score * app_w / 100.0) + (min(100.0, exp_score) * exp_w / 100.0) + (min(100.0, loc_score) * loc_w / 100.0) + (rec_score * rec_w / 100.0), 2)
+            else:
+                ws = round((pms * pms_w / 100.0) + (exam * exam_w / 100.0) + (intv * int_w / 100.0), 2)
+
             cand.weighted_score = ws
             scored.append((cand, ws))
 
@@ -1623,7 +1678,7 @@ class InternalRecruitmentSelectedCandidates(models.Model):
     demoted = fields.Boolean(string='Demoted Employee', default=False)
     written_exam_score = fields.Float(string="Written Exam Score")
     interview_score = fields.Float(string="Interview Score")
-    # pms_score = fields.Float(string="PMS Score")
+    supervisor_recommendation_score = fields.Float(string="Supervisor Recommendation Score", default=90.0)
     weighted_score = fields.Float(string="Weighted Score")
     rank = fields.Integer(string="Rank", default=0)
     # selection_type = fields.Char(string="Selection Type")

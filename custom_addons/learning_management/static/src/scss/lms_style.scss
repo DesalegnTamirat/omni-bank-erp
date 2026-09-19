@@ -1,0 +1,29 @@
+/* Bunna Bank Learning Management System (LMS) Styles */
+/* Primary Brand Color: #541718 Deep Maroon | Secondary: #1d2b32 Navy | Accents: #c17540 Orange, #726732 Olive */
+
+.o_lms_badge_maroon {
+    background-color: #541718 !important;
+    color: #ffffff !important;
+}
+
+.o_lms_badge_navy {
+    background-color: #1d2b32 !important;
+    color: #ffffff !important;
+}
+
+.o_lms_player_card {
+    border-radius: 12px;
+    background-color: #0f172a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.o_lms_progress_bar_custom {
+    background-color: #e2e8f0;
+    border-radius: 4px;
+    height: 8px;
+
+    .progress-bar {
+        background-color: #541718;
+    }
+}

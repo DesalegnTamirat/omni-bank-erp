@@ -41,7 +41,7 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
             departments.append({
                 "id": d.id,
                 "name": d.name,
-                "code": d.code or d.sol_id or "",
+                "code": (getattr(d.code, "name", False) or getattr(d.code, "code", False) or "") if d.code else (d.sol_id or ""),
                 "type": type_label,
                 "display_name": f"[{type_label}] {d.name}",
             })
@@ -75,55 +75,27 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
         existing = OUJobPos.search([("operating_unit_id", "in", matched_ou_ids)])
         existing_pairs = {(p.operating_unit_id.id, p.job_position_id.id) for p in existing}
 
-        # 1. Active employees (ou, job) pairs
         ou_tuple = tuple(matched_ou_ids)
         self.env.cr.execute("""
             SELECT DISTINCT
-                COALESCE(v.operating_unit_id, e.default_operating_unit_id) AS ou_id,
-                COALESCE(e.job_position, v.job_id) AS job_id
-            FROM hr_employee e
-            LEFT JOIN hr_version v ON v.employee_id = e.id AND v.active = true
-            WHERE e.active = true
-              AND (v.operating_unit_id IN %s OR e.default_operating_unit_id IN %s)
-              AND (e.job_position IS NOT NULL OR v.job_id IS NOT NULL)
-        """, (ou_tuple, ou_tuple))
-        emp_pairs = self.env.cr.fetchall()
+                v.operating_unit_id AS ou_id,
+                v.job_id AS job_id
+            FROM hr_version v
+            WHERE v.active = true
+              AND v.operating_unit_id IN %s
+              AND v.operating_unit_id IS NOT NULL
+              AND v.job_id IS NOT NULL
+        """, (ou_tuple,))
 
-        to_create = []
-        for ou_id, job_id in emp_pairs:
-            if ou_id and job_id and ou_id in matched_ou_ids and (ou_id, job_id) not in existing_pairs:
-                to_create.append({
-                    "operating_unit_id": ou_id,
-                    "job_position_id": job_id,
-                    "active": True,
-                })
-                existing_pairs.add((ou_id, job_id))
-
-        # 2. Approved plan (ou, job) pairs
-        if "pbms.plan.category.line" in self.env:
-            self.env.cr.execute("""
-                SELECT DISTINCT org_unit_id, job_id
-                FROM pbms_plan_category_line
-                WHERE line_type = 'manpower'
-                  AND org_unit_id IN %s
-                  AND job_id IS NOT NULL
-            """, (ou_tuple,))
-            for ou_id, job_id in self.env.cr.fetchall():
-                if ou_id and job_id and ou_id in matched_ou_ids and (ou_id, job_id) not in existing_pairs:
-                    to_create.append({
-                        "operating_unit_id": ou_id,
-                        "job_position_id": job_id,
-                        "active": True,
-                    })
-                    existing_pairs.add((ou_id, job_id))
+        all_pairs = self.env.cr.fetchall()
+        to_create = [
+            {"operating_unit_id": ou_id, "job_position_id": job_id, "active": True}
+            for ou_id, job_id in all_pairs
+            if ou_id in matched_ou_ids and (ou_id, job_id) not in existing_pairs
+        ]
 
         if to_create:
-            created_records = OUJobPos.sudo().create(to_create)
-            created_records._compute_baseline_count()
-            created_records._compute_active_employee_count()
-            created_records._compute_approved_plan_count()
-            created_records._compute_total_headcount()
-            created_records._compute_vacant_position_count()
+            OUJobPos.sudo().create(to_create)
 
     @api.model
     def get_dashboard_metrics(self, level="corporate", department_id=None, workunit_id=None, cycle_id=None, search_term=""):
@@ -143,11 +115,20 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
             target_ou_domain.append(("id", "=", int(workunit_id)))
         elif level == "department" and department_id:
             dept_id = int(department_id)
-            target_ou_domain += [
-                "|",
-                ("id", "=", dept_id),
-                ("parent_unit", "=", dept_id),
-            ]
+            selected_ou = OU.browse(dept_id)
+            if selected_ou and selected_ou.department:
+                target_ou_domain += [
+                    "|", "|",
+                    ("id", "=", dept_id),
+                    ("parent_unit", "=", dept_id),
+                    ("department", "=", selected_ou.department.id),
+                ]
+            else:
+                target_ou_domain += [
+                    "|",
+                    ("id", "=", dept_id),
+                    ("parent_unit", "=", dept_id),
+                ]
         # 'corporate' includes all units without extra filter
 
         matched_ous = OU.search(target_ou_domain)
@@ -169,7 +150,14 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
             pos_domain.append(("job_position_id.name", "ilike", search_term))
             pos_domain.append(("operating_unit_id.name", "ilike", search_term))
 
-        establishment_lines = OUJobPos.search(pos_domain, order="operating_unit_id, job_position_id")
+        raw_lines = OUJobPos.search(pos_domain, order="operating_unit_id, job_position_id")
+        seen_keys = set()
+        establishment_lines = []
+        for line in raw_lines:
+            k = (line.operating_unit_id.id, line.job_position_id.id if line.job_position_id else False)
+            if k not in seen_keys:
+                seen_keys.add(k)
+                establishment_lines.append(line)
 
         # 3. Query in-flight recruitment requests
         rec_req_domain = [
@@ -218,31 +206,29 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
                         val = getattr(pl, "approved_annual_total", 0.0) or (pl.quantity or 0.0)
                     approved_plan_map[k] = approved_plan_map.get(k, 0.0) + (val or 0.0)
 
-        # 5. Fetch Active Employees from hr_version (operating_unit_id) or hr_employee (default_operating_unit_id)
-        # Note: Cycle is NOT considered for active employees. Active status only; no check on planning approved.
+        # 5. Fetch Active Employees strictly from hr_version (v.active = true)
         ou_tuple = tuple(matched_ou_ids)
         self.env.cr.execute("""
             SELECT 
-                COALESCE(v.operating_unit_id, e.default_operating_unit_id) AS ou_id,
-                COALESCE(e.job_position, v.job_id) AS job_id,
-                COUNT(DISTINCT e.id) AS active_cnt
-            FROM hr_employee e
-            LEFT JOIN hr_version v ON v.employee_id = e.id AND v.active = true
-            WHERE e.active = true
-              AND (v.operating_unit_id IN %s OR e.default_operating_unit_id IN %s)
-              AND (e.job_position IS NOT NULL OR v.job_id IS NOT NULL)
+                v.operating_unit_id AS ou_id,
+                v.job_id AS job_id,
+                COUNT(DISTINCT v.id) AS active_cnt
+            FROM hr_version v
+            WHERE v.active = true
+              AND v.operating_unit_id IN %s
+              AND v.operating_unit_id IS NOT NULL
+              AND v.job_id IS NOT NULL
             GROUP BY 1, 2
-        """, (ou_tuple, ou_tuple))
+        """, (ou_tuple,))
         active_emp_map = {(r[0], r[1]): r[2] for r in self.env.cr.fetchall()}
 
-        # Direct scope total active employee count (active status only, no cycle filter)
+        # Direct scope total active employee count strictly from hr_version where active = true
         self.env.cr.execute("""
-            SELECT COUNT(DISTINCT e.id)
-            FROM hr_employee e
-            LEFT JOIN hr_version v ON v.employee_id = e.id AND v.active = true
-            WHERE e.active = true
-              AND (v.operating_unit_id IN %s OR e.default_operating_unit_id IN %s)
-        """, (ou_tuple, ou_tuple))
+            SELECT COUNT(DISTINCT v.id)
+            FROM hr_version v
+            WHERE v.active = true
+              AND v.operating_unit_id IN %s
+        """, (ou_tuple,))
         scope_total_active = self.env.cr.fetchone()[0] or 0
 
         # 6. Process establishment lines and compute aggregated metrics
@@ -267,16 +253,16 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
             key = (ou.id, job.id if job else False)
 
-            # 1) Active employee fetched from hr_version / hr_employee (active status only, no cycle filter)
-            act = active_emp_map.get(key, line.active_employee_count or 0)
+            # 1) Active employee fetched strictly from hr_version (v.active = true)
+            act = active_emp_map.get(key, 0)
             # 2) Approved plan fetched from pbms_plan_category_line (display_approved_annual_total)
             plan = int(round(approved_plan_map.get(key, line.approved_plan_count or 0)))
-            # Baseline
-            base = line.baseline_count or 0
-            # 3) Headcount: sum of baseline + Approved
-            tot = base + plan
+            # Baseline: active employee count + approved plan additions
+            base = act + plan
+            # 3) Headcount: baseline count (which includes approved plan additions)
+            tot = base
             # 4) Vacant: headcount - active
-            vac = tot - act
+            vac = max(0, tot - act)
 
             inflight = inflight_map.get(key, 0)
 
@@ -313,7 +299,7 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
                 "id": line.id,
                 "operating_unit_id": ou.id,
                 "operating_unit_name": ou.name,
-                "district_name": ou.parent_unit.name if ou.parent_unit else (ou.name if ou.work_unit_type in ["district_office", "head_office"] else "-"),
+                "district_name": ou.department.name if ou.department else (ou.parent_unit.name if ou.parent_unit else (ou.name if ou.work_unit_type in ["district_office", "head_office"] else "-")),
                 "sol_id": ou.sol_id or "",
                 "job_position_id": job.id if job else False,
                 "job_position_name": job.name if job else _("Unassigned"),
@@ -349,6 +335,7 @@ class RecruitmentManpowerDashboardService(models.AbstractModel):
 
         # Ensure total_active reflects all active employees in scope
         total_active = max(total_active, scope_total_active)
+        total_authorized = total_baseline
 
         # Calculate fulfillment rate
         fulfillment_rate = round((total_active / total_authorized * 100), 1) if total_authorized > 0 else 100.0

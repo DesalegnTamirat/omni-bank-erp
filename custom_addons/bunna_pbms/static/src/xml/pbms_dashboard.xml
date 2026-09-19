@@ -96,14 +96,14 @@
                             <div class="progress mt-3" style="height: 4px;">
                                 <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #425727 0%, #597435 100%);"></div>
                             </div>
-                            <div class="text-end text-white-50 small mt-1">Click to view all</div>
+                            <div class="text-end text-muted small mt-1">Click to view all</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-xl-3 col-lg-6 col-md-6">
                     <div class="card h-100 shadow-sm border-0 kpi-card kpi-draft clickable"
-                         t-on-click="() => this.openKPIView(null, 'draft')">
+                         t-on-click="() => this.openKPIView('draft')">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
@@ -117,14 +117,14 @@
                             <div class="progress mt-3" style="height: 4px;">
                                 <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #6c757d 0%, #adb5bd 100%);"></div>
                             </div>
-                            <div class="text-end text-white-50 small mt-1">Click to view drafts</div>
+                            <div class="text-end text-muted small mt-1">Click to view drafts</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-xl-3 col-lg-6 col-md-6">
                     <div class="card h-100 shadow-sm border-0 kpi-card kpi-submitted clickable"
-                         t-on-click="() => this.openKPIView(null, 'submitted')">
+                         t-on-click="() => this.openKPIView('in_review_or_submitted')">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
@@ -138,14 +138,14 @@
                             <div class="progress mt-3" style="height: 4px;">
                                 <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #2A6F7B 0%, #4FA3B3 100%);"></div>
                             </div>
-                            <div class="text-end text-white-50 small mt-1">Click to view active pipeline</div>
+                            <div class="text-end text-muted small mt-1">Click to view active pipeline</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-xl-3 col-lg-6 col-md-6">
                     <div class="card h-100 shadow-sm border-0 kpi-card kpi-approved clickable"
-                         t-on-click="() => this.openKPIView(null, 'approved')">
+                         t-on-click="() => this.openKPIView('approved')">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
@@ -159,7 +159,7 @@
                             <div class="progress mt-3" style="height: 4px;">
                                 <div class="progress-bar" style="width: 100%; background: linear-gradient(90deg, #425727 0%, #6C8D41 100%);"></div>
                             </div>
-                            <div class="text-end text-white-50 small mt-1">Click to view approved</div>
+                            <div class="text-end text-muted small mt-1">Click to view approved</div>
                         </div>
                     </div>
                 </div>
@@ -266,7 +266,7 @@
                                     </div>
                                     <div class="col-6">
                                         <div class="status-item ho-item clickable"
-                                             t-on-click="() => this.openPlanByStatus(plan.model, 'returned')">
+                                             t-on-click="() => this.openPlanByStatus(plan.model, 'returned_rejected')">
                                             <span class="small text-muted">Revision / Rejected</span>
                                             <span class="fw-bold"><t t-esc="getStatusCounts(plan).returned_rejected"/></span>
                                         </div>

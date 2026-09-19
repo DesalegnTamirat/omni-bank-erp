@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- DIGITAL LIBRARY LIST VIEW                                 -->
+        <!-- ========================================================= -->
+        <record id="view_kms_digital_library_list" model="ir.ui.view">
+            <field name="name">kms.digital.library.list</field>
+            <field name="model">kms.digital.library</field>
+            <field name="arch" type="xml">
+                <list string="Digital Library Catalog">
+                    <field name="name" string="Resource Title"/>
+                    <field name="resource_type" widget="badge"/>
+                    <field name="author"/>
+                    <field name="category_id"/>
+                    <field name="is_recommended" string="Featured" widget="boolean_toggle"/>
+                    <field name="view_count" string="Views"/>
+                    <field name="download_count" string="Downloads"/>
+                    <field name="file_size_display" string="Size"/>
+                    <field name="is_external_link" string="External Link"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- DIGITAL LIBRARY KANBAN VIEW                               -->
+        <!-- ========================================================= -->
+        <record id="view_kms_digital_library_kanban" model="ir.ui.view">
+            <field name="name">kms.digital.library.kanban</field>
+            <field name="model">kms.digital.library</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="name"/>
+                    <field name="author"/>
+                    <field name="resource_type"/>
+                    <field name="category_id"/>
+                    <field name="is_recommended"/>
+                    <field name="cover_image"/>
+                    <field name="view_count"/>
+                    <field name="download_count"/>
+                    <field name="file_size_display"/>
+                    <field name="is_external_link"/>
+                    <field name="external_url"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-2 bg-white d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="badge bg-primary"><t t-esc="record.resource_type.value"/></span>
+                                        <span t-if="record.is_recommended.raw_value" class="badge bg-warning text-dark"><i class="fa fa-star me-1"/>Recommended</span>
+                                    </div>
+                                    <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.name.value"/></div>
+                                    <div class="text-muted small mb-2">
+                                        <i class="fa fa-user me-1"/> <t t-esc="record.author.value or 'Institutional SME'"/> | 
+                                        <i class="fa fa-tag ms-1 me-1"/> <t t-esc="record.category_id.value"/>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                                    <div class="small text-muted">
+                                        <i class="fa fa-eye me-1"/> <t t-esc="record.view_count.value"/>
+                                        <i class="fa fa-download ms-2 me-1"/> <t t-esc="record.download_count.value"/>
+                                    </div>
+                                    <span t-if="record.is_external_link.raw_value" class="badge bg-info text-white"><i class="fa fa-external-link"/> Link</span>
+                                    <span t-else="" class="badge bg-light text-dark border"><t t-esc="record.file_size_display.value or 'File'"/></span>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- DIGITAL LIBRARY FORM VIEW                                 -->
+        <!-- ========================================================= -->
+        <record id="view_kms_digital_library_form" model="ir.ui.view">
+            <field name="name">kms.digital.library.form</field>
+            <field name="model">kms.digital.library</field>
+            <field name="arch" type="xml">
+                <form string="Digital Library Asset">
+                    <header>
+                        <button name="action_read_resource" string="Open / Read Asset" type="object" class="btn-primary" icon="fa-book-open"/>
+                        <button name="action_download_resource" string="Download Asset" type="object" class="btn-secondary" icon="fa-download" invisible="is_external_link or not file_data"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" icon="fa-eye">
+                                <field name="view_count" string="Reads" widget="statinfo"/>
+                            </button>
+                            <button class="oe_stat_button" icon="fa-download" invisible="is_external_link">
+                                <field name="download_count" string="Downloads" widget="statinfo"/>
+                            </button>
+                        </div>
+
+                        <field name="cover_image" widget="image" class="oe_avatar" options="{'preview_image': 'cover_image', 'size': [90, 90]}"/>
+
+                        <div class="oe_title">
+                            <label for="name" string="Asset Title"/>
+                            <h1><field name="name" placeholder="e.g. Modern Banking Risk Management &amp; Basel III Accords"/></h1>
+                        </div>
+
+                        <group>
+                            <group string="Cataloging &amp; Authoring">
+                                <field name="resource_type"/>
+                                <field name="author" placeholder="Author name or issuing institution"/>
+                                <field name="publisher"/>
+                                <field name="publication_year"/>
+                                <field name="isbn_or_ref"/>
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            </group>
+                            <group string="Curated Recommendations &amp; Scoping (FR-KMS-008)">
+                                <field name="is_recommended"/>
+                                <field name="rating_average" widget="priority"/>
+                                <field name="target_job_ids" widget="many2many_tags" placeholder="Roles Recommended For"/>
+                                <field name="target_department_ids" widget="many2many_tags" placeholder="Departments"/>
+                                <field name="course_reference_note" placeholder="Related Course Reference Code/Title"/>
+                            </group>
+                        </group>
+
+                        <group string="Resource Access Mode (File Attachment or External Reference)">
+                            <field name="is_external_link"/>
+                            <field name="external_url" widget="url" invisible="not is_external_link" placeholder="https://www.nbe.gov.et/directives/..."/>
+                            <field name="file_data" filename="file_name" invisible="is_external_link"/>
+                            <field name="file_name" invisible="1"/>
+                            <field name="file_size_display" string="Attached Size" invisible="is_external_link"/>
+                        </group>
+
+                        <notebook>
+                            <page string="Summary &amp; Key Takeaways">
+                                <field name="summary" placeholder="Executive brief and overview of key insights in this publication..."/>
+                            </page>
+                            <page string="Curator Recommendation Notes" invisible="not is_recommended">
+                                <field name="curator_notes" placeholder="Explain why staff in targeted job roles should read this material..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- DIGITAL LIBRARY SEARCH VIEW                               -->
+        <!-- ========================================================= -->
+        <record id="view_kms_digital_library_search" model="ir.ui.view">
+            <field name="name">kms.digital.library.search</field>
+            <field name="model">kms.digital.library</field>
+            <field name="arch" type="xml">
+                <search string="Search Digital Library">
+                    <field name="name" string="Title / Keyword" filter_domain="['|', ('name', 'ilike', self), ('author', 'ilike', self)]"/>
+                    <field name="resource_type"/>
+                    <field name="category_id"/>
+                    <field name="target_job_ids"/>
+                    <field name="tag_ids"/>
+
+                    <filter name="filter_recommended" string="Featured &amp; Recommended" domain="[('is_recommended', '=', True)]"/>
+                    <filter name="filter_ebooks" string="E-Books" domain="[('resource_type', '=', 'ebook')]"/>
+                    <filter name="filter_whitepapers" string="Whitepapers" domain="[('resource_type', '=', 'whitepaper')]"/>
+                    <filter name="filter_training" string="Training References" domain="[('resource_type', '=', 'training_reference')]"/>
+
+                    <separator/>
+                    <group>
+                        <filter name="group_resource_type" string="Resource Type" context="{'group_by': 'resource_type'}"/>
+                        <filter name="group_category" string="Category" context="{'group_by': 'category_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_kms_digital_library_all" model="ir.actions.act_window">
+            <field name="name">Digital Library</field>
+            <field name="res_model">kms.digital.library</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="search_view_id" ref="view_kms_digital_library_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    Bunna Bank Digital Library
+                </p>
+                <p>
+                    Browse curated e-books, whitepapers, banking industry research, and training references.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

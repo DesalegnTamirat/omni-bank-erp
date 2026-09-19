@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- MONTHLY RECOGNITION (BEST CONTRIBUTOR) KANBAN             -->
+        <!-- ========================================================= -->
+        <record id="view_kms_monthly_recognition_kanban" model="ir.ui.view">
+            <field name="name">kms.monthly.recognition.kanban</field>
+            <field name="model">kms.monthly.recognition</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="name"/>
+                    <field name="employee_id"/>
+                    <field name="department_id"/>
+                    <field name="period_date"/>
+                    <field name="points_total"/>
+                    <field name="badge"/>
+                    <field name="citation"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-4 rounded shadow-sm border mb-3 bg-white text-center">
+                                <div class="mb-2">
+                                    <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                                        <i class="fa fa-trophy me-1"/> <t t-esc="record.badge.value"/>
+                                    </span>
+                                </div>
+                                <div class="my-3">
+                                    <field name="employee_id" widget="image" options="{'preview_image': 'avatar_128', 'size': [80, 80]}" class="rounded-circle border border-warning border-3 shadow-sm mx-auto"/>
+                                </div>
+                                <div class="fw-bold fs-5 text-dark mb-1"><t t-esc="record.employee_id.value"/></div>
+                                <div class="text-muted small mb-2"><t t-esc="record.department_id.value"/></div>
+                                <div class="badge bg-primary fs-6 mb-3">
+                                    <i class="fa fa-star me-1"/> <t t-esc="record.points_total.value"/> Contribution Points
+                                </div>
+                                <p class="text-muted small fst-italic px-3 mb-0"><t t-esc="record.citation.value"/></p>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <record id="view_kms_monthly_recognition_list" model="ir.ui.view">
+            <field name="name">kms.monthly.recognition.list</field>
+            <field name="model">kms.monthly.recognition</field>
+            <field name="arch" type="xml">
+                <list string="Monthly Knowledge Recognitions">
+                    <field name="period_date" string="Month"/>
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="department_id"/>
+                    <field name="operating_unit_id"/>
+                    <field name="points_total" string="Total Points"/>
+                    <field name="badge" widget="badge"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Contributor Points Ledger List -->
+        <record id="view_kms_contributor_point_list" model="ir.ui.view">
+            <field name="name">kms.contributor.point.list</field>
+            <field name="model">kms.contributor.point</field>
+            <field name="arch" type="xml">
+                <list string="Contribution Points Ledger" create="0" delete="0">
+                    <field name="date_earned"/>
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="points" string="Points" decoration-success="points > 0"/>
+                    <field name="source" widget="badge"/>
+                    <field name="description"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Actions -->
+        <record id="action_kms_recognition_all" model="ir.actions.act_window">
+            <field name="name">Best Contributor of the Month (KMS)</field>
+            <field name="res_model">kms.monthly.recognition</field>
+            <field name="view_mode">kanban,list,form</field>
+        </record>
+
+        <record id="action_kms_points_ledger" model="ir.actions.act_window">
+            <field name="name">Knowledge Contribution Points Ledger</field>
+            <field name="res_model">kms.contributor.point</field>
+            <field name="view_mode">list</field>
+        </record>
+
+    </data>
+</odoo>

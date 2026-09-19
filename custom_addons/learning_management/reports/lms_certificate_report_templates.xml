@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Report Action for Issued Certificates -->
+        <record id="action_report_lms_certificate" model="ir.actions.report">
+            <field name="name">Print Training Certificate</field>
+            <field name="model">lms.certificate</field>
+            <field name="report_type">qweb-pdf</field>
+            <field name="report_name">learning_management.report_lms_certificate</field>
+            <field name="report_file">learning_management.report_lms_certificate</field>
+            <field name="print_report_name">'Certificate - %s' % (object.name)</field>
+            <field name="binding_model_id" ref="model_lms_certificate"/>
+            <field name="binding_type">report</field>
+        </record>
+
+        <!-- Printable QWeb Template -->
+        <template id="report_lms_certificate">
+            <t t-call="web.basic_layout">
+                <t t-foreach="docs" t-as="o">
+                    <div class="page" style="border: 8px double #541718; padding: 40px; text-align: center; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #fffcf9; min-height: 700px; position: relative;">
+                        
+                        <!-- Header / Crest -->
+                        <div style="margin-bottom: 25px;">
+                            <h2 style="color: #541718; letter-spacing: 4px; font-weight: bold; margin-bottom: 5px; font-size: 26px;">
+                                BUNNA BANK S.C.
+                            </h2>
+                            <h4 style="color: #c17540; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; margin-top: 0;">
+                                People Performance &amp; Development Directorate — E-Academy
+                            </h4>
+                            <hr style="border: 1px solid #541718; width: 60%; margin: 15px auto;"/>
+                        </div>
+
+                        <div style="margin-top: 30px; margin-bottom: 20px;">
+                            <h1 style="color: #1d2b32; font-size: 32px; letter-spacing: 3px; font-weight: 800; text-transform: uppercase;">
+                                Certificate of Completion
+                            </h1>
+                            <p style="font-size: 16px; color: #555; margin-top: 10px;">
+                                This certifies that
+                            </p>
+                        </div>
+
+                        <!-- Learner Name -->
+                        <div style="margin: 25px 0;">
+                            <h2 style="color: #541718; font-size: 30px; font-weight: bold; border-bottom: 2px solid #c17540; display: inline-block; padding-bottom: 8px; min-width: 350px;">
+                                <span t-field="o.employee_id.name"/>
+                            </h2>
+                            <div style="font-size: 14px; color: #666; margin-top: 5px;">
+                                <span t-field="o.department_id.name"/> | <span t-field="o.operating_unit_id.name"/>
+                            </div>
+                        </div>
+
+                        <!-- Course Title -->
+                        <div style="margin: 25px 0; padding: 0 40px;">
+                            <p style="font-size: 15px; color: #333; line-height: 1.6;">
+                                has successfully fulfilled all educational requirements and passed the comprehensive examination for
+                            </p>
+                            <h3 style="color: #1d2b32; font-size: 22px; font-weight: 700; margin: 15px 0;">
+                                <span t-field="o.course_id.name"/>
+                            </h3>
+                            <p style="font-size: 13px; color: #777;">
+                                Score Achieved: <strong><span t-field="o.score_percentage"/>%</strong> | Issue Date: <strong><span t-field="o.issue_date"/></strong>
+                            </p>
+                        </div>
+
+                        <!-- Signatures & Verification -->
+                        <div style="margin-top: 60px; display: table; width: 100%;">
+                            <div style="display: table-cell; width: 33%; text-align: center;">
+                                <div style="border-top: 1px solid #1d2b32; width: 80%; margin: 0 auto; padding-top: 6px;">
+                                    <strong style="color: #1d2b32; font-size: 13px;">Chief Human Resources Officer</strong>
+                                    <div style="font-size: 11px; color: #777;">People Performance &amp; Development</div>
+                                </div>
+                            </div>
+
+                            <div style="display: table-cell; width: 34%; text-align: center;">
+                                <div style="border: 1px dashed #c17540; padding: 8px; border-radius: 6px; display: inline-block;">
+                                    <div style="font-size: 10px; color: #541718; font-weight: bold;">OFFICIALLY VERIFIED</div>
+                                    <div style="font-size: 9px; font-family: monospace; color: #333;"><span t-field="o.name"/></div>
+                                    <div style="font-size: 8px; font-family: monospace; color: #666;"><span t-field="o.verification_code"/></div>
+                                </div>
+                            </div>
+
+                            <div style="display: table-cell; width: 33%; text-align: center;">
+                                <div style="border-top: 1px solid #1d2b32; width: 80%; margin: 0 auto; padding-top: 6px;">
+                                    <strong style="color: #1d2b32; font-size: 13px;">Chief Executive Officer</strong>
+                                    <div style="font-size: 11px; color: #777;">Bunna Bank S.C.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </t>
+            </t>
+        </template>
+
+    </data>
+</odoo>

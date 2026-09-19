@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- KNOWLEDGE CAPTURE SESSIONS (FR-KMS-029)                   -->
+        <!-- ========================================================= -->
+        <record id="view_kms_session_list" model="ir.ui.view">
+            <field name="name">kms.knowledge.session.list</field>
+            <field name="model">kms.knowledge.session</field>
+            <field name="arch" type="xml">
+                <list string="Knowledge Capture Sessions" decoration-info="state == 'planned'" decoration-success="state == 'completed'">
+                    <field name="name" string="Session Title"/>
+                    <field name="session_type" widget="badge"/>
+                    <field name="expert_id" widget="many2one_avatar_employee"/>
+                    <field name="facilitator_id" widget="many2one_avatar_employee" optional="show"/>
+                    <field name="session_date"/>
+                    <field name="duration_hours" string="Duration (Hrs)" optional="show"/>
+                    <field name="cop_id" optional="show"/>
+                    <field name="state" widget="badge" decoration-info="state == 'planned'" decoration-success="state == 'completed'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_kms_session_form" model="ir.ui.view">
+            <field name="name">kms.knowledge.session.form</field>
+            <field name="model">kms.knowledge.session</field>
+            <field name="arch" type="xml">
+                <form string="Knowledge Capture Session">
+                    <header>
+                        <button name="action_complete_session" string="Mark Completed &amp; Finalize Knowledge" type="object" class="btn-primary" invisible="state != 'planned'"/>
+                        <field name="state" widget="statusbar"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Session Title"/>
+                            <h1><field name="name" placeholder="e.g. Credit Underwriting in High-Inflation Sectors: Masterclass with Senior Director"/></h1>
+                        </div>
+                        <group>
+                            <group string="Format &amp; Participants">
+                                <field name="session_type"/>
+                                <field name="expert_id" widget="many2one_avatar_employee"/>
+                                <field name="facilitator_id" widget="many2one_avatar_employee"/>
+                                <field name="cop_id" options="{'no_create': True}"/>
+                            </group>
+                            <group string="Logistics &amp; Scheduling">
+                                <field name="session_date"/>
+                                <field name="duration_hours"/>
+                                <field name="location"/>
+                                <field name="recording_url" widget="url" placeholder="https://stream.bunnabanksc.com/recordings/..."/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Executive Brief &amp; Context">
+                                <field name="summary" placeholder="Provide contextual background on why this knowledge capture session was conducted..."/>
+                            </page>
+                            <page string="Tacit Insights &amp; Captured Know-How">
+                                <field name="key_takeaways" placeholder="Record specific practical know-how, decision heuristics, case insights, and unwritten operational wisdom captured..."/>
+                            </page>
+                            <page string="Action Items &amp; Recommendations">
+                                <field name="action_items" placeholder="Institutional actions, process revisions, or training modules resulting from this session..."/>
+                            </page>
+                            <page string="Attendees &amp; Artifacts">
+                                <group>
+                                    <field name="attendee_ids" widget="many2many_tags_avatar"/>
+                                </group>
+                                <field name="attachment_ids" widget="many2many_binary"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LESSONS LEARNED (FR-KMS-030)                              -->
+        <!-- ========================================================= -->
+        <record id="view_kms_lesson_list" model="ir.ui.view">
+            <field name="name">kms.lesson.learned.list</field>
+            <field name="model">kms.lesson.learned</field>
+            <field name="arch" type="xml">
+                <list string="Lessons Learned" decoration-warning="state == 'draft'" decoration-success="state == 'reviewed'">
+                    <field name="code"/>
+                    <field name="name" string="Lesson Title"/>
+                    <field name="project_initiative" string="Project / Incident"/>
+                    <field name="category_id"/>
+                    <field name="severity_impact" widget="badge" decoration-danger="severity_impact in ('high', 'critical')" decoration-warning="severity_impact == 'medium'" decoration-info="severity_impact == 'low'"/>
+                    <field name="author_id" widget="many2one_avatar_employee"/>
+                    <field name="department_id" optional="show"/>
+                    <field name="incident_date"/>
+                    <field name="helpful_votes" string="Votes" optional="show"/>
+                    <field name="state" widget="badge" decoration-warning="state == 'draft'" decoration-success="state == 'reviewed'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_kms_lesson_form" model="ir.ui.view">
+            <field name="name">kms.lesson.learned.form</field>
+            <field name="model">kms.lesson.learned</field>
+            <field name="arch" type="xml">
+                <form string="Lesson Learned">
+                    <header>
+                        <button name="action_approve" string="Validate &amp; Publish Lesson" type="object" class="btn-success" invisible="state != 'draft'" groups="knowledge_management.group_kms_reviewer,knowledge_management.group_kms_manager"/>
+                        <button name="action_vote_helpful" string="Helpful Insight (+1)" type="object" class="btn-outline-primary" icon="fa-thumbs-up" invisible="state != 'reviewed'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,reviewed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button" icon="fa-thumbs-up">
+                                <field name="helpful_votes" string="Helpful Votes" widget="statinfo"/>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="code" string="Reference"/>
+                            <h2><field name="code" readonly="1"/></h2>
+                            <label for="name" string="Lesson Title"/>
+                            <h1><field name="name" placeholder="e.g. Core Banking Cutover Timeout: Mitigation for Network Latency"/></h1>
+                        </div>
+                        <group>
+                            <group string="Operational Context">
+                                <field name="project_initiative"/>
+                                <field name="category_id" options="{'no_create': True}"/>
+                                <field name="cop_id" options="{'no_create': True}"/>
+                                <field name="severity_impact"/>
+                            </group>
+                            <group string="Origin &amp; Authoring">
+                                <field name="author_id" widget="many2one_avatar_employee"/>
+                                <field name="department_id"/>
+                                <field name="operating_unit_id"/>
+                                <field name="incident_date"/>
+                                <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Institutional Lesson &amp; Recommendations">
+                                <group string="Core Lesson Learned">
+                                    <field name="key_lesson" placeholder="What is the key reusable insight or operating rule for future operations?"/>
+                                </group>
+                                <group string="Corrective &amp; Preventive Recommendations">
+                                    <field name="mitigation_recommendation" placeholder="Specific actionable recommendations to prevent repeat occurrences..."/>
+                                </group>
+                            </page>
+                            <page string="Incident Analysis &amp; Root Cause">
+                                <group string="Event Summary">
+                                    <field name="event_summary" placeholder="What happened, when, and what was the operational consequence?"/>
+                                </group>
+                                <group string="Root Cause Analysis">
+                                    <field name="root_cause" placeholder="Underlying technical, process, or human factors identified..."/>
+                                </group>
+                                <group>
+                                    <field name="what_went_well" placeholder="What responses or safeguards worked effectively?"/>
+                                    <field name="challenges_faced" placeholder="What obstacles hindered resolution?"/>
+                                </group>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- MENTORING TRACKING (FR-KMS-031)                           -->
+        <!-- ========================================================= -->
+        <record id="view_kms_mentoring_list" model="ir.ui.view">
+            <field name="name">kms.mentoring.track.list</field>
+            <field name="model">kms.mentoring.track</field>
+            <field name="arch" type="xml">
+                <list string="Mentoring &amp; Knowledge Handover Tracks" decoration-info="state == 'in_progress'" decoration-success="state == 'completed'">
+                    <field name="name"/>
+                    <field name="mentor_id" widget="many2one_avatar_employee"/>
+                    <field name="mentee_id" widget="many2one_avatar_employee"/>
+                    <field name="department_id"/>
+                    <field name="start_date"/>
+                    <field name="target_end_date"/>
+                    <field name="state" widget="badge" decoration-info="state == 'in_progress'" decoration-success="state == 'completed'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_kms_mentoring_form" model="ir.ui.view">
+            <field name="name">kms.mentoring.track.form</field>
+            <field name="model">kms.mentoring.track</field>
+            <field name="arch" type="xml">
+                <form string="Mentoring &amp; Knowledge Transfer Plan">
+                    <header>
+                        <button name="action_start" string="Start Mentoring Cycle" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_complete" string="Sign-off &amp; Complete Transfer" type="object" class="btn-success" invisible="state != 'in_progress'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,in_progress,completed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Plan Title"/>
+                            <h1><field name="name" placeholder="e.g. Senior Foreign Exchange Underwriting Handover"/></h1>
+                        </div>
+                        <group>
+                            <group string="Mentoring Bilateral Pair">
+                                <field name="mentor_id" widget="many2one_avatar_employee"/>
+                                <field name="mentee_id" widget="many2one_avatar_employee"/>
+                                <field name="department_id"/>
+                            </group>
+                            <group string="Timeline">
+                                <field name="start_date"/>
+                                <field name="target_end_date"/>
+                                <field name="actual_end_date" invisible="not actual_end_date"/>
+                            </group>
+                        </group>
+                        <group string="Knowledge Transfer Domain Focus &amp; Objectives">
+                            <field name="transfer_focus" placeholder="Outline specific competencies, operational systems, and tacit know-how to transfer..."/>
+                        </group>
+                        <notebook>
+                            <page string="Transfer Milestones">
+                                <field name="milestone_ids">
+                                    <list editable="bottom">
+                                        <field name="name" string="Milestone / Learning Goal"/>
+                                        <field name="target_date"/>
+                                        <field name="is_achieved" widget="boolean_toggle" string="Achieved"/>
+                                        <field name="completion_date"/>
+                                        <field name="notes" string="Verification Notes"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Final Evaluation &amp; Handover Sign-off">
+                                <field name="overall_evaluation" placeholder="Document final mentor assessment of mentee readiness and successful handover..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_kms_session_all" model="ir.actions.act_window">
+            <field name="name">Knowledge Capture Sessions</field>
+            <field name="res_model">kms.knowledge.session</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_kms_lesson_all" model="ir.actions.act_window">
+            <field name="name">Lessons Learned Repository</field>
+            <field name="res_model">kms.lesson.learned</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_kms_mentoring_all" model="ir.actions.act_window">
+            <field name="name">Mentoring &amp; Knowledge Transfer</field>
+            <field name="res_model">kms.mentoring.track</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

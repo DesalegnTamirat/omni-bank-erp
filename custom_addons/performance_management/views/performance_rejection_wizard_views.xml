@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_performance_rejection_wizard_form" model="ir.ui.view">
+        <field name="name">performance.rejection.wizard.form</field>
+        <field name="model">performance.rejection.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reject Document">
+                <div class="alert alert-warning mb-3" role="alert">
+                    <i class="fa fa-info-circle me-1"/>
+                    Please provide the reason for rejecting this document. Your manager will be notified of this reason.
+                </div>
+                <group>
+                    <field name="res_model" invisible="1"/>
+                    <field name="res_id" invisible="1"/>
+                    <field name="reason" placeholder="Explain what needs adjustment or why this is being rejected..." rows="4"/>
+                </group>
+                <footer>
+                    <button name="action_confirm_reject" string="Submit Rejection" type="object" class="btn-danger"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

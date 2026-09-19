@@ -666,21 +666,28 @@ class TestPbmsWorkflow(TransactionCase):
             "grade_code": "GR-TEST",
             "grade_name": "Grade Test",
             "base_salary": 10000.0,
+            "salary_factor": 1.2,
         })
-        job = self.env["hr.job"].create({
-            "name": "Senior Branch Officer",
-            "job_grade": grade.id,
-        })
+        job_vals = {"name": "Senior Branch Officer"}
+        if "grade" in self.env["hr.job"]._fields:
+            job_vals["grade"] = grade.id
+        elif "grade_id" in self.env["hr.job"]._fields:
+            job_vals["grade_id"] = grade.id
+        job = self.env["hr.job"].create(job_vals)
 
         # 2. Create an active employee for branch
-        emp = self.env["hr.employee"].create({
+        emp_vals = {
             "name": "Test Employee",
             "job_position": job.id,
-            "job_grade": grade.id,
             "default_operating_unit_id": self.branch.id,
             "operating_unit_ids": [(6, 0, [self.branch.id])],
             "wage": 10000.0,
-        })
+        }
+        if "job_grade" in self.env["hr.employee"]._fields:
+            emp_vals["job_grade"] = grade.id
+        elif "grade_id" in self.env["hr.employee"]._fields:
+            emp_vals["grade_id"] = grade.id
+        emp = self.env["hr.employee"].create(emp_vals)
 
         # 3. Create a planning record for branch (with default category='deposit', enable_manpower=True)
         pos_type_new = self.env["pbms.position.type"].search([("code", "=", "new")], limit=1)
@@ -697,26 +704,27 @@ class TestPbmsWorkflow(TransactionCase):
                 "line_type": "manpower",
                 "position_type_id": pos_type_new.id,
                 "job_id": job.id,
+                "new_job_title": "Senior Branch Officer",
+                "new_job_grade": "GR-TEST",
+                "new_job_grade_id": grade.id,
                 "base_salary": 15000.0,
                 "pension_rate": 11.0,
-                "benefit_factor": 10.0,
-                "allowance_monthly": 1000.0,
                 "q1": 1,
             })],
         })
 
-        # Verify current staff salary: 10,000 * 12 = 120,000
-        self.assertEqual(plan.current_staff_salary_budget, 120000.0)
+        # Verify current staff salary: 12,000 * 12 = 144,000 (base 10,000 * salary_factor 1.2)
+        self.assertEqual(plan.current_staff_salary_budget, 144000.0)
 
-        # Verify new planned staff cost: monthly = 15000 + 1650 + 1500 + 1000 = 19150; annual unit_cost = 229,800; Q1 = 1 -> 229,800
+        # Verify new planned staff cost: monthly = 15000 + 1650 = 16650; unit_cost = 16650 * 12 = 199,800; Q1 = 1 -> 199,800
         mp_line = plan.manpower_line_ids[0]
-        self.assertEqual(mp_line.monthly_total_compensation, 19150.0)
-        self.assertEqual(mp_line.unit_cost, 229800.0)
-        self.assertEqual(mp_line.annual_total_cost, 229800.0)
-        self.assertEqual(plan.new_planned_salary_budget, 229800.0)
+        self.assertEqual(mp_line.monthly_total_compensation, 16650.0)
+        self.assertEqual(mp_line.unit_cost, 199800.0)
+        self.assertEqual(mp_line.annual_total_cost, 199800.0)
+        self.assertEqual(plan.new_planned_salary_budget, 199800.0)
 
-        # Verify Total Workforce Budget = 120,000 + 229,800 = 349,800.0
-        self.assertEqual(plan.total_operating_unit_manpower_budget, 349800.0)
+        # Verify Total Workforce Budget = 144,000 + 199,800 = 343,800.0
+        self.assertEqual(plan.total_operating_unit_manpower_budget, 343800.0)
 
     def test_sppmd_approver_edit_permissions(self):
         """Verify SPPMD Plan Approver can adjust and add requirement lines during review stages."""

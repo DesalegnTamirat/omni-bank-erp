@@ -32,6 +32,13 @@ class RecruitmentRequest(models.Model):
         return False
 
     def _default_department_id(self):
+        unit_id = self._default_operating_unit_id()
+        if unit_id:
+            ou = self.env["operating.unit"].browse(unit_id)
+            if ou and getattr(ou, "department", False):
+                return ou.department.id
+            if ou and getattr(ou, "parent_unit", False) and getattr(ou.parent_unit, "department", False):
+                return ou.parent_unit.department.id
         user = self.env.user
         employee = user.employee_id or self.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
         return employee.department_id.id if employee and employee.department_id else False
@@ -97,11 +104,32 @@ class RecruitmentRequest(models.Model):
 
     job_position_id = fields.Many2one("hr.job", string="Job Position", required=True, tracking=True)
     job_grade_id = fields.Many2one("employee.grade", string="Job Grade")
+
+    @api.depends("operating_unit_id", "operating_unit_id.department", "operating_unit_id.parent_unit")
+    def _compute_department_id(self):
+        for rec in self:
+            if rec.operating_unit_id and getattr(rec.operating_unit_id, "department", False):
+                rec.department_id = rec.operating_unit_id.department
+            elif rec.operating_unit_id and getattr(rec.operating_unit_id, "parent_unit", False) and getattr(rec.operating_unit_id.parent_unit, "department", False):
+                rec.department_id = rec.operating_unit_id.parent_unit.department
+            elif rec.requested_by and rec.requested_by.department_id:
+                rec.department_id = rec.requested_by.department_id
+            else:
+                user = rec.env.user
+                emp = user.employee_id or rec.env["hr.employee"].search([("user_id", "=", user.id)], limit=1)
+                rec.department_id = emp.department_id if emp and emp.department_id else False
+
     department_id = fields.Many2one(
         "hr.department", string="Department", required=True,
-        default=lambda self: self._default_department_id(),readonly= True,
-        help="Defaults to the logged-in user's own Department and is "
-             "read-only in Draft."
+        compute="_compute_department_id", store=True, readonly=False, precompute=True,
+        default=lambda self: self._default_department_id(),
+        help="Defaults to the hiring Work Unit's Department."
+    )
+    work_unit_type = fields.Selection(
+        related="operating_unit_id.work_unit_type",
+        string="Work Unit Type",
+        readonly=True,
+        store=True,
     )
     employment_type = fields.Selection(
         [("permanent", "Permanent"), ("contractual", "Contractual"), ("internship", "Internship")],
@@ -574,6 +602,8 @@ class RecruitmentRequest(models.Model):
 
             if hasattr(self.operating_unit_id, "department") and self.operating_unit_id.department:
                 self.department_id = self.operating_unit_id.department
+            elif getattr(self.operating_unit_id, "parent_unit", False) and getattr(self.operating_unit_id.parent_unit, "department", False):
+                self.department_id = self.operating_unit_id.parent_unit.department
 
         if self.workforce_plan_id and self.workforce_plan_id.org_unit_id != self.operating_unit_id:
             self.workforce_plan_id = False
@@ -588,12 +618,11 @@ class RecruitmentRequest(models.Model):
         if not self.job_position_id:
             return
 
-        # Auto-sync department from job position or operating unit
-        if self.job_position_id.department_id:
-            self.department_id = self.job_position_id.department_id
-        elif self.operating_unit_id and hasattr(self.operating_unit_id,
-                                                "department") and self.operating_unit_id.department:
+        # Auto-sync department strictly from Hiring Work Unit
+        if self.operating_unit_id and getattr(self.operating_unit_id, "department", False):
             self.department_id = self.operating_unit_id.department
+        elif self.operating_unit_id and getattr(self.operating_unit_id, "parent_unit", False) and getattr(self.operating_unit_id.parent_unit, "department", False):
+            self.department_id = self.operating_unit_id.parent_unit.department
 
         # Auto-sync description and qualification from Job Position
         job_desc = getattr(self.job_position_id, 'job_description', False) or getattr(self.job_position_id, 'description', False)

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ========================================================= -->
+        <!-- LMS ENROLLMENT LIST VIEW                                  -->
+        <!-- ========================================================= -->
+        <record id="view_lms_enrollment_list" model="ir.ui.view">
+            <field name="name">lms.enrollment.list</field>
+            <field name="model">lms.enrollment</field>
+            <field name="arch" type="xml">
+                <list string="Learner Enrollments" decoration-danger="is_overdue" decoration-info="state == 'in_progress'" decoration-success="state == 'completed'">
+                    <field name="employee_id" widget="many2one_avatar_employee"/>
+                    <field name="course_id"/>
+                    <field name="department_id" optional="show"/>
+                    <field name="operating_unit_id" optional="show"/>
+                    <field name="is_mandatory" widget="boolean_toggle"/>
+                    <field name="due_date"/>
+                    <field name="is_overdue" widget="badge" decoration-danger="is_overdue" optional="show"/>
+                    <field name="progress_percentage" widget="progressbar" string="Progress %"/>
+                    <field name="final_score_percentage" string="Final Score (%)" optional="show"/>
+                    <field name="certificate_id" optional="show"/>
+                    <field name="state" widget="badge" decoration-danger="state == 'failed'" decoration-info="state in ('enrolled', 'in_progress')" decoration-success="state == 'completed'"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LMS ENROLLMENT KANBAN VIEW                                -->
+        <!-- ========================================================= -->
+        <record id="view_lms_enrollment_kanban" model="ir.ui.view">
+            <field name="name">lms.enrollment.kanban</field>
+            <field name="model">lms.enrollment</field>
+            <field name="arch" type="xml">
+                <kanban class="o_kanban_mobile" sample="1">
+                    <field name="id"/>
+                    <field name="employee_id"/>
+                    <field name="course_id"/>
+                    <field name="is_mandatory"/>
+                    <field name="due_date"/>
+                    <field name="is_overdue"/>
+                    <field name="progress_percentage"/>
+                    <field name="state"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="oe_kanban_global_click p-3 rounded shadow-sm border mb-3 bg-white">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span t-if="record.is_mandatory.raw_value" class="badge bg-danger">Mandatory</span>
+                                    <span t-else="" class="badge bg-info">Elective</span>
+                                    <span t-if="record.is_overdue.raw_value" class="badge bg-danger text-white"><i class="fa fa-clock-o me-1"/>Overdue</span>
+                                    <span t-else="" class="badge bg-secondary"><t t-esc="record.state.value"/></span>
+                                </div>
+                                <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.course_id.value"/></div>
+                                <div class="text-muted small mb-2"><i class="fa fa-user me-1"/> <t t-esc="record.employee_id.value"/></div>
+                                <div class="my-2">
+                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                        <span>Course Progress</span>
+                                        <span class="fw-bold"><t t-esc="record.progress_percentage.value"/>%</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" t-attf-style="width: #{record.progress_percentage.raw_value}%;"/>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top text-muted small">
+                                    <span>Due: <t t-esc="record.due_date.value or 'Self-Paced'"/></span>
+                                    <span t-if="record.state.raw_value == 'completed'" class="text-success fw-bold"><i class="fa fa-certificate me-1"/>Certified</span>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- LMS ENROLLMENT FORM VIEW                                  -->
+        <!-- ========================================================= -->
+        <record id="view_lms_enrollment_form" model="ir.ui.view">
+            <field name="name">lms.enrollment.form</field>
+            <field name="model">lms.enrollment</field>
+            <field name="arch" type="xml">
+                <form string="Course Enrollment Record">
+                    <header>
+                        <button name="action_start_course" string="Start / Resume Learning" type="object" class="btn-primary" invisible="state not in ('enrolled', 'in_progress')"/>
+                        <field name="state" widget="statusbar" statusbar_visible="enrolled,in_progress,completed"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Certified" bg_color="text-bg-success" invisible="state != 'completed'"/>
+                        <widget name="web_ribbon" title="Overdue" bg_color="text-bg-danger" invisible="not is_overdue"/>
+
+                        <div class="oe_title">
+                            <label for="course_id" string="Course"/>
+                            <h1><field name="course_id" options="{'no_create': True}"/></h1>
+                            <label for="employee_id" string="Learner / Employee"/>
+                            <h2><field name="employee_id" options="{'no_create': True}"/></h2>
+                        </div>
+
+                        <group>
+                            <group string="Dates &amp; Urgency">
+                                <field name="is_mandatory"/>
+                                <field name="enrollment_date"/>
+                                <field name="due_date"/>
+                                <field name="completion_date" invisible="not completion_date"/>
+                                <field name="is_overdue" invisible="1"/>
+                            </group>
+                            <group string="Academic Record &amp; Certificate">
+                                <field name="progress_percentage" widget="progressbar"/>
+                                <field name="completed_lessons_count" string="Completed / Total Lessons"/>
+                                <field name="final_score_percentage" invisible="not final_score_percentage"/>
+                                <field name="certificate_id" readonly="1" invisible="not certificate_id"/>
+                            </group>
+                        </group>
+
+                        <notebook>
+                            <page string="Curriculum Progress &amp; Anti-Skip Logs (FR-LMS-007 to 009)">
+                                <field name="lesson_progress_ids">
+                                    <list decoration-success="state == 'completed'" decoration-info="state == 'in_progress'">
+                                        <field name="lesson_id" string="Lesson Module"/>
+                                        <field name="state" widget="badge" decoration-success="state == 'completed'" decoration-info="state == 'in_progress'"/>
+                                        <field name="watch_percentage" widget="progressbar" string="Watched %"/>
+                                        <field name="max_watched_seconds" string="Farthest Legitimate Watched (Sec)"/>
+                                        <field name="last_position_seconds" string="Resume Position (Sec)"/>
+                                        <field name="date_completed" string="Completed Timestamp"/>
+                                        <button name="mark_completed" string="Complete Lesson" type="object" icon="fa-check" invisible="state == 'completed'"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- ACTIONS                                                   -->
+        <!-- ========================================================= -->
+        <record id="action_lms_my_enrollments" model="ir.actions.act_window">
+            <field name="name">My Active Courses</field>
+            <field name="res_model">lms.enrollment</field>
+            <field name="view_mode">kanban,list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid), ('state', 'in', ['enrolled', 'in_progress'])]</field>
+        </record>
+
+        <record id="action_lms_my_history" model="ir.actions.act_window">
+            <field name="name">My Learning History &amp; Completed Courses</field>
+            <field name="res_model">lms.enrollment</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('employee_id.user_id', '=', uid), ('state', '=', 'completed')]</field>
+        </record>
+
+        <record id="action_lms_enrollment_all" model="ir.actions.act_window">
+            <field name="name">All Learner Enrollments</field>
+            <field name="res_model">lms.enrollment</field>
+            <field name="view_mode">list,kanban,form</field>
+        </record>
+
+    </data>
+</odoo>

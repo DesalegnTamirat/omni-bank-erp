@@ -161,8 +161,8 @@ class OperatingUnitJobPosition(models.Model):
         self.ensure_one()
         from datetime import timedelta
 
-        # Revalidate that approved plan is greater than 0
-        if self.approved_plan_count <= 0:
+        # Revalidate that approved plan is greater than 0 for planned requests
+        if not self.env.context.get('unplanned') and self.approved_plan_count <= 0:
             raise UserError(_(
                 "Cannot create vacancy: The approved manpower plan count for '%(job)s' at '%(unit)s' is %(plan)s. "
                 "The number of opening vacancies cannot exceed the approved plan count."
@@ -263,21 +263,28 @@ class OperatingUnitJobPosition(models.Model):
                 rec.job_grade_id = False
 
     @api.depends('operating_unit_id', 'job_position_id')
-    def _compute_baseline_count(self):
-        """Auto-compute: count active employees whose default_operating_unit_id
-        matches this work unit, whose job_position matches this position, and
-        whose current contract (hr.version) has operating_unit_id = this work unit
-        and state in open or probation."""
-        HrVersion = self.env['hr.version']
+    def _compute_active_employee_count(self):
         for rec in self:
             if rec.operating_unit_id and rec.job_position_id:
-                rec.baseline_count = HrVersion.search_count([
-                    ('state', 'in', ['open', 'probation']),
-                    ('operating_unit_id', '=', rec.operating_unit_id.id),
-                    ('employee_id.active', '=', True),
-                    ('employee_id.job_position', '=', rec.job_position_id.id),
-                    ('employee_id.default_operating_unit_id', '=', rec.operating_unit_id.id),
-                ])
+                self.env.cr.execute("""
+                    SELECT COUNT(DISTINCT v.id)
+                    FROM hr_version v
+                    WHERE v.active = true
+                      AND v.job_id = %s
+                      AND v.operating_unit_id = %s
+                """, (rec.job_position_id.id, rec.operating_unit_id.id))
+                rec.active_employee_count = self.env.cr.fetchone()[0] or 0
+            else:
+                rec.active_employee_count = 0
+
+    @api.depends('operating_unit_id', 'job_position_id', 'active_employee_count', 'approved_plan_count')
+    def _compute_baseline_count(self):
+        """Baseline Count = active employee count + approved_plan_count."""
+        for rec in self:
+            if rec.operating_unit_id and rec.job_position_id:
+                act = rec.active_employee_count or 0
+                plan = rec.approved_plan_count or 0
+                rec.baseline_count = act + plan
             else:
                 rec.baseline_count = 0
 
@@ -321,24 +328,7 @@ class OperatingUnitJobPosition(models.Model):
     @api.depends('baseline_count', 'approved_plan_count')
     def _compute_total_headcount(self):
         for rec in self:
-            rec.total_headcount = (rec.baseline_count or 0) + (rec.approved_plan_count or 0)
-
-    @api.depends('operating_unit_id', 'job_position_id')
-    def _compute_active_employee_count(self):
-        for rec in self:
-            if rec.operating_unit_id and rec.job_position_id:
-                # Active employees fetched from hr_version (operating_unit_id) or hr_employee (default_operating_unit_id), active status only
-                self.env.cr.execute("""
-                    SELECT COUNT(DISTINCT e.id)
-                    FROM hr_employee e
-                    LEFT JOIN hr_version v ON v.employee_id = e.id AND v.active = true
-                    WHERE e.active = true
-                      AND (e.job_position = %s OR v.job_id = %s)
-                      AND (v.operating_unit_id = %s OR e.default_operating_unit_id = %s)
-                """, (rec.job_position_id.id, rec.job_position_id.id, rec.operating_unit_id.id, rec.operating_unit_id.id))
-                rec.active_employee_count = self.env.cr.fetchone()[0] or 0
-            else:
-                rec.active_employee_count = 0
+            rec.total_headcount = rec.baseline_count or 0
 
     @api.depends('total_headcount', 'active_employee_count')
     def _compute_vacant_position_count(self):
@@ -346,11 +336,10 @@ class OperatingUnitJobPosition(models.Model):
             rec.vacant_position_count = (rec.total_headcount or 0) - (rec.active_employee_count or 0)
 
     def _recompute_all_counts(self):
-        """Helper: recompute baseline, active, approved plan, total, and vacant counts for this recordset."""
-        self._compute_baseline_count()
-        self._compute_approved_plan_count()
+        """Helper: recompute active, approved plan, baseline, total, and vacant counts for this recordset."""
         self._compute_active_employee_count()
-        # total_headcount & vacant_position_count depend on the above, trigger them too
+        self._compute_approved_plan_count()
+        self._compute_baseline_count()
         self._compute_total_headcount()
         self._compute_vacant_position_count()
 

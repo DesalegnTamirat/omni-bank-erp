@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lms_category_list" model="ir.ui.view">
+            <field name="name">lms.category.list</field>
+            <field name="model">lms.category</field>
+            <field name="arch" type="xml">
+                <list string="Course Categories">
+                    <field name="complete_name" string="Category Hierarchy"/>
+                    <field name="code"/>
+                    <field name="course_count" string="Active Courses"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_category_form" model="ir.ui.view">
+            <field name="name">lms.category.form</field>
+            <field name="model">lms.category</field>
+            <field name="arch" type="xml">
+                <form string="Course Category">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Category Name"/>
+                            <h1><field name="name" placeholder="e.g. Credit &amp; Lending Operations"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="code"/>
+                                <field name="parent_id" options="{'no_create': True}"/>
+                            </group>
+                            <group>
+                                <field name="color" widget="color_picker"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Description">
+                            <field name="description"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_lms_category" model="ir.actions.act_window">
+            <field name="name">Course Categories</field>
+            <field name="res_model">lms.category</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

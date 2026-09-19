@@ -34,11 +34,10 @@ class PopulateT2ScorecardWizard(models.TransientModel):
         if not employees:
             raise UserError('No cascaded Objectives found. Configure Tier2 Objectives first.')
 
-        planning_name = 'Corporate Scorecard %s %s' % (self.fiscal_year_id.name, self.appraisal_period_id.name)
-
         existing = self.env['t2.scorecard'].search([
             ('employee_id', 'in', employees.ids),
-            ('planning_name', '=', planning_name),
+            ('appraisal_period_id', '=', self.appraisal_period_id.id),
+            ('fiscal_year_id', '=', self.fiscal_year_id.id),
         ])
         draft_existing = existing.filtered(lambda r: r.state == 'draft')
         locked_existing = existing - draft_existing
@@ -52,16 +51,24 @@ class PopulateT2ScorecardWizard(models.TransientModel):
         for emp in employees:
             if emp.id in locked_employee_ids:
                 continue
+
+            op_unit = self.env['performance.objective'].search(
+                [('employee_id', '=', emp.id)], limit=1
+            ).employee_operating_unit_id
+            unit_name = op_unit.name if op_unit else emp.name
+            planning_name = '%s Scorecard Plan %s %s' % (
+                unit_name, self.fiscal_year_id.name, self.appraisal_period_id.name
+            )
+
             vals_list.append({
                 'employee_id': emp.id,
                 'planning_name': planning_name,
+                'fiscal_year_id': self.fiscal_year_id.id,
                 'appraisal_period_id': self.appraisal_period_id.id,
                 'start_date': fyl.date_start,
                 'end_date': fyl.date_end,
                 'company_id': emp.company_id.id if emp.company_id else False,
-                'operating_unit_id': self.env['performance.objective'].search(
-                    [('employee_id', '=', emp.id)], limit=1
-                ).employee_operating_unit_id.id or False,
+                'operating_unit_id': op_unit.id if op_unit else False,
                 'manager_id': emp.coach_id.id if emp.coach_id else False,
                 'job_id': emp.job_id.id if emp.job_id else False,
             })

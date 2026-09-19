@@ -91,6 +91,9 @@ class PerformanceJobMeasure(models.Model):
     target_type = fields.Selection([
         ('number', 'Number'),
         ('percent', 'Percent'),
+        ('expense', 'Expense'),
+        ('hours', 'Hours'),
+        ('days', 'Days'),
         ('text', 'Text'),
     ], string='Target Type', default='number', required=True)
     active = fields.Boolean(default=True)

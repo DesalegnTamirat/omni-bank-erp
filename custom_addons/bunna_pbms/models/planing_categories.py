@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Unified Planning Categories logic - Enhanced for Manpower & Fixed Asset."""
-from odoo import api, fields, models, _
+from odoo import Command, api, fields, models, _
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
 
@@ -443,6 +443,7 @@ class PbmsPlanCategoryLine(models.Model):
         store=True,
         readonly=True,
         index=True,
+        aggregator=None,
     )
 
     @api.depends("source_unit_id", "source_unit_id.sol_id", "plan_id.org_unit_id", "plan_id.org_unit_id.sol_id")
@@ -557,6 +558,7 @@ class PbmsPlanCategoryLine(models.Model):
         compute="_compute_line_type",
         store=True,
         readonly=False,
+        index=True,
     )
 
     # ---- Configurable dropdown domains (from planning config) ----
@@ -2669,11 +2671,6 @@ class PbmsPlanCategoryLine(models.Model):
             or self.env.context.get("bypass_plan_lock")
             or self.env.context.get("skip_reviewer_check")
         )
-        if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer()):
-            raise UserError(_(
-                "District Reviewers and Head Office Reviewers cannot add new lines. "
-                "You can only edit lines created by the branch."
-            ))
 
         is_admin = (
             self.env.is_admin()
@@ -2683,7 +2680,9 @@ class PbmsPlanCategoryLine(models.Model):
             or self.env.context.get("bypass_plan_lock")
         )
         for vals in vals_list:
-            if not vals.get("plan_id"):
+            target_line_type = vals.get("line_type") or self.env.context.get("default_line_type")
+            plan_id = vals.get("plan_id")
+            if not plan_id:
                 plan_id = (
                     self.env.context.get("default_plan_id")
                     or self.env.context.get("plan_id")
@@ -2691,31 +2690,60 @@ class PbmsPlanCategoryLine(models.Model):
                 )
                 if not plan_id and self.env.context.get("params", {}).get("id") and self.env.context.get("params", {}).get("model") == "pbms.planning.category":
                     plan_id = self.env.context.get("params", {}).get("id")
-                if not plan_id:
-                    Config = self.env["pbms.planning.config"] if "pbms.planning.config" in self.env else False
-                    default_type = Config.get_default_category_for_unit(org_unit_id) if (Config and org_unit_id) else "deposit"
-                    line_type = vals.get("line_type") or self.env.context.get("default_line_type") or default_type
-                    if org_unit_id and cycle_id:
-                        found_plan = Plan.search([
-                            ("org_unit_id", "=", org_unit_id),
-                            ("cycle_id", "=", cycle_id),
-                            ("active", "=", True),
-                        ], limit=1)
-                        if found_plan:
-                            plan_id = found_plan.id
-                        else:
-                            new_plan = Plan.sudo().create({
-                                "org_unit_id": org_unit_id,
-                                "cycle_id": cycle_id,
-                                "category": line_type,
-                            })
-                            plan_id = new_plan.id
-                if plan_id:
+
+            # Validate plan_id matches target_line_type to avoid saving across different categories
+            if plan_id and target_line_type:
+                curr_plan = Plan.browse(plan_id)
+                if curr_plan.exists() and curr_plan.category and curr_plan.category != target_line_type:
+                    found_plan = Plan.search([
+                        ("org_unit_id", "=", curr_plan.org_unit_id.id),
+                        ("cycle_id", "=", curr_plan.cycle_id.id),
+                        ("category", "=", target_line_type),
+                        ("active", "=", True),
+                    ], limit=1)
+                    if not found_plan:
+                        found_plan = Plan.sudo().create({
+                            "org_unit_id": curr_plan.org_unit_id.id,
+                            "cycle_id": curr_plan.cycle_id.id,
+                            "company_id": curr_plan.company_id.id if curr_plan.company_id else self.env.company.id,
+                            "category": target_line_type,
+                            "state": "draft",
+                        })
+                    plan_id = found_plan.id
                     vals["plan_id"] = plan_id
 
-            plan_id = vals.get("plan_id")
+            if not plan_id:
+                Config = self.env["pbms.planning.config"] if "pbms.planning.config" in self.env else False
+                default_type = Config.get_default_category_for_unit(org_unit_id) if (Config and org_unit_id) else "deposit"
+                line_type = target_line_type or default_type
+                if org_unit_id and cycle_id:
+                    found_plan = Plan.search([
+                        ("org_unit_id", "=", org_unit_id),
+                        ("cycle_id", "=", cycle_id),
+                        ("category", "=", line_type),
+                        ("active", "=", True),
+                    ], limit=1)
+                    if found_plan:
+                        plan_id = found_plan.id
+                    else:
+                        new_plan = Plan.sudo().create({
+                            "org_unit_id": org_unit_id,
+                            "cycle_id": cycle_id,
+                            "category": line_type,
+                            "state": "draft",
+                        })
+                        plan_id = new_plan.id
+            if plan_id:
+                vals["plan_id"] = plan_id
+
             if plan_id and not is_admin:
                 plan = Plan.browse(plan_id)
+                if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer()):
+                    if not plan._is_own_operating_unit_plan():
+                        raise UserError(_(
+                            "District Reviewers and Head Office Reviewers cannot add new lines to child work unit plans. "
+                            "You can only edit lines created by the branch."
+                        ))
                 if plan.cycle_id and plan.cycle_id.state != "open":
                     cycle_label = dict(plan.cycle_id._fields["state"].selection).get(plan.cycle_id.state, plan.cycle_id.state)
                     raise AccessError(_(
@@ -2796,10 +2824,12 @@ class PbmsPlanCategoryLine(models.Model):
             or self.env.context.get("skip_reviewer_check")
         )
         if not is_bypass and (user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer()):
-            raise UserError(_(
-                "District Reviewers and Head Office Reviewers cannot delete lines. "
-                "You can only edit lines created by the branch."
-            ))
+            for line in self:
+                if line.plan_id and not line.plan_id._is_own_operating_unit_plan():
+                    raise UserError(_(
+                        "District Reviewers and Head Office Reviewers cannot delete lines from child work unit plans. "
+                        "You can only edit lines created by the branch."
+                    ))
         self._pbms_check_parent_plan_editable()
         return super().unlink()
 
@@ -2845,12 +2875,34 @@ class PbmsPlanCategoryLine(models.Model):
     _hc_m10_non_negative = models.Constraint("CHECK(hc_m10 >= 0)", "Apr headcount cannot be negative.")
     _hc_m11_non_negative = models.Constraint("CHECK(hc_m11 >= 0)", "May headcount cannot be negative.")
     _hc_m12_non_negative = models.Constraint("CHECK(hc_m12 >= 0)", "Jun headcount cannot be negative.")
+
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_plan_line_plan_type_idx
+            ON pbms_plan_category_line (plan_id, line_type);
+            CREATE INDEX IF NOT EXISTS pbms_plan_line_source_type_idx
+            ON pbms_plan_category_line (source_unit_id, line_type);
+        """)
+
+
 class PbmsPlanningCategory(models.Model):
     _name = "pbms.planning.category"
     _description = "Plan & Budget Category"
     _inherit = ["pbms.cumulative.plan.mixin", "mail.thread", "mail.activity.mixin"]
     _rec_name = "display_name"
     _order = "category, org_unit_id, id"
+
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS pbms_planning_category_lookup_idx
+            ON pbms_planning_category (cycle_id, category, state);
+            CREATE INDEX IF NOT EXISTS pbms_planning_category_ou_cycle_idx
+            ON pbms_planning_category (org_unit_id, cycle_id);
+            CREATE INDEX IF NOT EXISTS pbms_planning_category_dist_cycle_idx
+            ON pbms_planning_category (district_id, cycle_id, category);
+        """)
 
     # Active field for archive functionality
     active = fields.Boolean(
@@ -2873,7 +2925,8 @@ class PbmsPlanningCategory(models.Model):
         WORK_UNIT_TYPES,
         related="org_unit_id.work_unit_type",
         store=True,
-        readonly=True
+        readonly=True,
+        index=True,
     )
     sol_id = fields.Integer(
         string="Sol ID",
@@ -2881,6 +2934,7 @@ class PbmsPlanningCategory(models.Model):
         store=True,
         readonly=True,
         index=True,
+        aggregator=None,
     )
     # Configurable Business Justification
     justification_category_id = fields.Many2one(
@@ -2981,11 +3035,46 @@ class PbmsPlanningCategory(models.Model):
     can_view_sourcing_fields = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_edit_sourcing_fields = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
     can_add_lines = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_add_expense_lines = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_edit_expense = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_add_fixed_asset_lines = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_edit_fixed_asset = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_add_manpower_lines = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
+    can_edit_manpower = fields.Boolean(compute="_compute_access_flags", compute_sudo=False)
 
     @api.depends("state", "org_unit_id", "org_unit_id.parent_unit", "org_unit_type", "category", "cycle_id", "cycle_id.state")
     def _compute_access_flags(self):
         user = self.env.user
         is_admin = user._pbms_is_sppmd_admin() or user.has_group("base.group_system")
+        is_bhc = user._pbms_is_budget_hiring_committee()
+        is_ps = user._pbms_is_people_solutions()
+        is_cpco = user._pbms_is_cpco()
+        is_ceo = user._pbms_is_ceo()
+        is_chief = user._pbms_is_respective_chief()
+        is_ho = user._pbms_is_ho_reviewer()
+        is_dist = user._pbms_is_district_reviewer()
+        is_appr = user._pbms_is_sppmd_approver()
+        child_ou_ids = set(user._pbms_child_operating_unit_ids()) if is_chief else set()
+        is_sourcing_privileged_base = (
+            is_ps or is_cpco or is_bhc or is_ceo or is_ho or is_admin
+        )
+
+        # Pre-fetch sibling resource plans across the batch in a single indexed query to eliminate N*3 searches
+        ou_ids = [ou.id for ou in self.mapped("org_unit_id") if ou]
+        cycle_ids = [cy.id for cy in self.mapped("cycle_id") if cy]
+        sibling_plans_map = {}
+        if ou_ids and cycle_ids:
+            sibling_plans = self.search([
+                ("org_unit_id", "in", ou_ids),
+                ("cycle_id", "in", cycle_ids),
+                ("category", "in", ("general_expense", "fixed_asset", "manpower")),
+                ("active", "=", True),
+            ])
+            for sp in sibling_plans:
+                key = (sp.org_unit_id.id, sp.cycle_id.id, sp.category)
+                if key not in sibling_plans_map:
+                    sibling_plans_map[key] = sp
+
         for rec in self:
             rec.can_edit_content = rec._pbms_can_edit_plan_content()
             rec.can_delete_plan = rec._pbms_can_delete_plan()
@@ -2997,42 +3086,51 @@ class PbmsPlanningCategory(models.Model):
             rec.can_committee_review = (
                 rec.category in ("manpower", "general_expense", "fixed_asset")
                 and rec.state == "committee_review"
-                and (user._pbms_is_budget_hiring_committee() or is_admin)
+                and (is_bhc or is_admin)
             )
             rec.can_hr_fulfill = (
                 rec.category == "manpower"
                 and rec.state in ("people_solutions_review", "cpco_review", "hr_fulfillment")
-                and (user._pbms_is_people_solutions() or user._pbms_is_cpco() or rec._pbms_can_ho_review_plan() or is_admin)
+                and (is_ps or is_cpco or rec._pbms_can_ho_review_plan() or is_admin)
             )
             rec.can_ceo_approve = (
                 rec.category == "manpower"
                 and rec.state == "ceo_approval"
-                and (user._pbms_is_ceo() or is_admin)
+                and (is_ceo or is_admin)
             )
             rec.can_chief_review = (
                 rec.category == "manpower"
-                and rec.state == "chief_review"
-                and (user._pbms_is_respective_chief() or is_admin)
+                and rec.state in ("chief_review", "district_approved", "district_endorsed")
+                and (
+                    is_admin
+                    or (
+                        is_chief
+                        and (
+                            rec._is_child_operating_unit_plan()
+                            or (rec.org_unit_id and rec.org_unit_id.id in child_ou_ids)
+                        )
+                    )
+                )
             )
             rec.can_cpco_review = (
                 rec.category == "manpower"
                 and rec.state == "cpco_review"
-                and (user._pbms_is_cpco() or is_admin)
+                and (is_cpco or is_admin)
             )
             rec.can_people_solutions_review = (
                 rec.category == "manpower"
                 and rec.state == "people_solutions_review"
-                and (user._pbms_is_people_solutions() or is_admin)
+                and (is_ps or is_admin)
             )
             rec.can_ho_endorse = (
                 rec.category == "manpower"
                 and rec.state == "ho_endorse"
-                and (user._pbms_is_ho_reviewer() or rec._pbms_can_ho_review_plan() or is_admin)
+                and (is_ho or rec._pbms_can_ho_review_plan() or is_admin)
             )
             rec.can_cpco_endorse = (
                 rec.category == "manpower"
                 and rec.state == "cpco_endorse"
-                and (user._pbms_is_cpco() or is_admin)
+                and (is_cpco or is_admin)
             )
 
             # Sourcing fields visibility:
@@ -3040,60 +3138,113 @@ class PbmsPlanningCategory(models.Model):
             # Visible to: People Solutions Directorate, CPCO, Budget Hiring Committee, CEO, HO Functional Reviewer, Admin.
             # Hidden from: branch/HO user, district reviewer, respective chief.
             is_sourcing_privileged = (
-                user._pbms_is_people_solutions()
-                or user._pbms_is_cpco()
-                or user._pbms_is_budget_hiring_committee()
-                or user._pbms_is_ceo()
-                or user._pbms_is_ho_reviewer()
+                is_sourcing_privileged_base
                 or rec._pbms_can_ho_review_plan()
+            )
+            is_editable_state = (not rec.state) or (rec.state in PBMS_BRANCH_EDITABLE_STATES)
+            is_ps_actor = (
+                is_ps
                 or is_admin
+                or (rec.org_unit_id and (
+                    (rec.org_unit_id.name or "").lower() in ("hr", "people solutions", "people solutions directorate", "human resources", "people & culture")
+                    or ("people" in (rec.org_unit_id.name or "").lower() and "solution" in (rec.org_unit_id.name or "").lower())
+                ))
             )
             rec.can_view_sourcing_fields = (
                 rec.category == "manpower"
                 and is_sourcing_privileged
-                and rec.state in (
-                    "people_solutions_review",
-                    "cpco_review",
-                    "committee_review",
-                    "hr_fulfillment",
-                    "ceo_approval",
-                    "ho_endorse",
-                    "cpco_endorse",
-                    "approved",
+                and (
+                    rec.state in (
+                        "people_solutions_review",
+                        "cpco_review",
+                        "committee_review",
+                        "hr_fulfillment",
+                        "ceo_approval",
+                        "ho_endorse",
+                        "cpco_endorse",
+                        "approved",
+                    )
+                    or (is_editable_state and is_ps_actor)
                 )
             )
 
             # Sourcing fields editability:
-            # - Sourcing fulfillment is made by People Solutions Directorate in people_solutions_review.
+            # - Sourcing fulfillment is made by People Solutions Directorate in people_solutions_review, OR during draft/creation of its own plan!
             # - CPCO is able to View and Edit in cpco_review (and perform all other CPCO actions).
             # - Budget Hiring Committee in committee_review.
             # - CEO in ceo_approval.
             rec.can_edit_sourcing_fields = (
                 rec.category == "manpower"
                 and (
-                    (rec.state == "people_solutions_review" and (user._pbms_is_people_solutions() or is_admin))
-                    or (rec.state in ("cpco_review", "hr_fulfillment") and (user._pbms_is_cpco() or is_admin))
-                    or (rec.state == "committee_review" and (user._pbms_is_budget_hiring_committee() or is_admin))
-                    or (rec.state == "ceo_approval" and (user._pbms_is_ceo() or is_admin))
+                    (rec.state == "people_solutions_review" and (is_ps or is_admin))
+                    or (is_editable_state and is_ps_actor)
+                    or (rec.state in ("cpco_review", "hr_fulfillment") and (is_cpco or is_admin))
+                    or (rec.state == "committee_review" and (is_bhc or is_admin))
+                    or (rec.state == "ceo_approval" and (is_ceo or is_admin))
                 )
             )
 
             # Administrator has permission to add lines in editable states
             if is_admin:
                 rec.can_add_lines = rec.state in PBMS_BRANCH_EDITABLE_STATES
-            # District Reviewer and Head Office Reviewer CANNOT add lines (they can only edit lines created by branch)
-            elif user._pbms_is_district_reviewer() or user._pbms_is_ho_reviewer():
-                rec.can_add_lines = False
-            elif rec.org_unit_type == "district_office" and rec.category in ("deposit", "customer_base", "fx", "digital_banking"):
-                rec.can_add_lines = False
-            elif rec.org_unit_type == "head_office" and rec.category in ("deposit", "customer_base", "fx", "digital_banking"):
-                rec.can_add_lines = False
-            elif user._pbms_is_sppmd_approver() and not is_admin:
-                rec.can_add_lines = False
+            # Planners managing their own operating unit plan in editable states (draft, returned, info_requested)
             elif rec.state in PBMS_BRANCH_EDITABLE_STATES and rec._is_own_operating_unit_plan():
-                rec.can_add_lines = bool(rec.cycle_id and rec.cycle_id.state == "open")
+                # District and Head Office dedicated overview cards for mobilization aggregate from branches (no manual lines)
+                if not getattr(rec, "is_planning_request", False) and rec.org_unit_type in ("district_office", "head_office") and rec.category in ("deposit", "customer_base", "fx", "digital_banking"):
+                    rec.can_add_lines = False
+                else:
+                    rec.can_add_lines = bool(rec.cycle_id and rec.cycle_id.state == "open")
+            # District Reviewer and Head Office Reviewer reviewing child unit plans CANNOT add lines (they can only edit lines created by branch)
+            elif is_dist or is_ho:
+                rec.can_add_lines = False
+            elif is_appr and not is_admin:
+                rec.can_add_lines = False
             else:
                 rec.can_add_lines = False
+
+            # Category-specific flags for Expense, Fixed Asset, and Manpower
+            is_own = rec._is_own_operating_unit_plan()
+            cycle_open = bool(rec.cycle_id and rec.cycle_id.state == "open")
+            default_addable = (is_own and cycle_open) or is_admin
+
+            # 1. General Expense
+            if rec.category == "general_expense":
+                rec.can_add_expense_lines = rec.can_add_lines
+                rec.can_edit_expense = rec.can_edit_content
+            else:
+                expense_plan = sibling_plans_map.get((rec.org_unit_id.id, rec.cycle_id.id, "general_expense")) if (rec.org_unit_id and rec.cycle_id) else False
+                if not expense_plan:
+                    rec.can_add_expense_lines = default_addable
+                    rec.can_edit_expense = default_addable
+                else:
+                    rec.can_add_expense_lines = expense_plan.can_add_lines
+                    rec.can_edit_expense = expense_plan.can_edit_content
+
+            # 2. Fixed Asset
+            if rec.category == "fixed_asset":
+                rec.can_add_fixed_asset_lines = rec.can_add_lines
+                rec.can_edit_fixed_asset = rec.can_edit_content
+            else:
+                fa_plan = sibling_plans_map.get((rec.org_unit_id.id, rec.cycle_id.id, "fixed_asset")) if (rec.org_unit_id and rec.cycle_id) else False
+                if not fa_plan:
+                    rec.can_add_fixed_asset_lines = default_addable
+                    rec.can_edit_fixed_asset = default_addable
+                else:
+                    rec.can_add_fixed_asset_lines = fa_plan.can_add_lines
+                    rec.can_edit_fixed_asset = fa_plan.can_edit_content
+
+            # 3. Manpower
+            if rec.category == "manpower":
+                rec.can_add_manpower_lines = rec.can_add_lines
+                rec.can_edit_manpower = rec.can_edit_content
+            else:
+                mp_plan = sibling_plans_map.get((rec.org_unit_id.id, rec.cycle_id.id, "manpower")) if (rec.org_unit_id and rec.cycle_id) else False
+                if not mp_plan:
+                    rec.can_add_manpower_lines = default_addable
+                    rec.can_edit_manpower = default_addable
+                else:
+                    rec.can_add_manpower_lines = mp_plan.can_add_lines
+                    rec.can_edit_manpower = mp_plan.can_edit_content
 
     @api.depends("org_unit_id", "org_unit_id.work_unit_type", "category", "org_unit_type", "is_planning_request")
     def _compute_eligibility(self):
@@ -3111,30 +3262,47 @@ class PbmsPlanningCategory(models.Model):
             ("fixed_asset", "enable_fixed_asset"),
         ]
 
-        user = self.env.user
-        is_branch_user = (
-            user._pbms_is_branch_user()
-            and not user._pbms_is_district_reviewer()
-            and not user._pbms_is_ho_reviewer()
-            and not user._pbms_is_sppmd_approver()
-            and not user._pbms_is_sppmd_admin()
-        )
-
         for rec in self:
-            if rec.is_planning_request:
-                # In Planning Request workspace: all configured categories enabled for this work unit are displayed (unified form)
-                if rec.org_unit_id:
+            is_req = rec.is_planning_request or bool(self.env.context.get("is_planning_request"))
+            unit_type = rec.org_unit_type or (rec.org_unit_id.work_unit_type if rec.org_unit_id else False)
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
+
+            if is_req:
+                # In Planning Request workspace:
+                # District Reviewer and Head Office operating units plan ONLY workforce, general expense, and fixed asset!
+                # Mobilization categories (deposit, customer base, FX, digital banking) are consolidated from branches,
+                # so they are never allowed or visible in the Planning Request tabs for district & HO units.
+                if is_dist_or_ho:
+                    rec.enable_deposit = False
+                    rec.enable_customer_base = False
+                    rec.enable_fx = False
+                    rec.enable_digital_banking = False
+                    if rec.org_unit_id and Config is not None:
+                        rec.enable_expense = Config.is_category_enabled("general_expense", rec.org_unit_id)
+                        rec.enable_manpower = Config.is_category_enabled("manpower", rec.org_unit_id)
+                        rec.enable_fixed_asset = Config.is_category_enabled("fixed_asset", rec.org_unit_id)
+                    else:
+                        rec.enable_expense = True
+                        rec.enable_manpower = True
+                        rec.enable_fixed_asset = True
+                elif rec.org_unit_id:
                     for cat, toggle in CATEGORY_TOGGLE_MAP:
                         rec[toggle] = Config.is_category_enabled(cat, rec.org_unit_id)
                 else:
                     for _cat, toggle in CATEGORY_TOGGLE_MAP:
                         rec[toggle] = True
+
             elif rec.category:
-                # Dedicated category card (branch, district office, head office): STRICT isolation to this category only,
-                # but ONLY if this category is actually enabled in Planning Configuration for this operating unit!
-                is_enabled = Config.is_category_enabled(rec.category, rec.org_unit_id) if (Config and rec.org_unit_id) else True
+                # Dedicated category card in Planning Categories:
+                # Mobilization categories for District Office and Head Office are consolidated overview cards,
+                # so they COME IN PLANNING CATEGORIES WHETHER THEY ARE ENABLED IN PLANNING CONFIGURATION OR NOT!
+                if is_dist_or_ho and rec.category in MOBILIZATION_CATS:
+                    is_enabled = True
+                else:
+                    is_enabled = Config.is_category_enabled(rec.category, rec.org_unit_id) if (Config and rec.org_unit_id) else True
                 for cat, toggle in CATEGORY_TOGGLE_MAP:
                     rec[toggle] = (cat == rec.category) and is_enabled
+
             elif rec.org_unit_id:
                 for cat, toggle in CATEGORY_TOGGLE_MAP:
                     rec[toggle] = Config.is_category_enabled(cat, rec.org_unit_id)
@@ -3240,9 +3408,15 @@ class PbmsPlanningCategory(models.Model):
     @api.depends("line_ids.line_type", "manpower_line_ids", "deposit_line_ids", "customer_base_line_ids", "fx_line_ids", "digital_banking_line_ids", "expense_line_ids", "fixed_asset_line_ids", "org_unit_id")
     def _compute_category(self):
         Config = self.env.get("pbms.planning.config")
+        MOBILIZATION_CATS = {"deposit", "customer_base", "fx", "digital_banking"}
+        RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
         for rec in self:
+            unit_type = rec.org_unit_type or (rec.org_unit_id.work_unit_type if rec.org_unit_id else False)
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
             is_valid_category = False
-            if rec.category and rec.org_unit_id and Config is not None:
+            if rec.category and is_dist_or_ho and rec.category in MOBILIZATION_CATS:
+                is_valid_category = True
+            elif rec.category and rec.org_unit_id and Config is not None:
                 is_valid_category = Config.is_category_enabled(rec.category, rec.org_unit_id)
             elif rec.category:
                 is_valid_category = True
@@ -3259,9 +3433,12 @@ class PbmsPlanningCategory(models.Model):
                     rec.category = present_line_types[0]
             elif not rec.category or not is_valid_category:
                 if Config is not None and rec.org_unit_id:
-                    rec.category = Config.get_default_category_for_unit(rec.org_unit_id)
+                    if is_dist_or_ho:
+                        rec.category = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, rec.org_unit_id)), "general_expense")
+                    else:
+                        rec.category = Config.get_default_category_for_unit(rec.org_unit_id)
                 else:
-                    rec.category = "deposit"
+                    rec.category = "general_expense" if is_dist_or_ho else "deposit"
 
             if rec.category == "manpower" and rec.request_number and not rec.request_number.startswith("WFP/"):
                 rec.request_number = (
@@ -3413,7 +3590,8 @@ class PbmsPlanningCategory(models.Model):
         CategoryPlan = self.sudo()
 
         for rec in self:
-            if not rec.cycle_id or not rec.org_unit_id or not rec.category:
+            rec_real_id = rec._origin.id if isinstance(rec._origin.id, int) else (rec.id if isinstance(rec.id, int) else False)
+            if not rec_real_id or not rec.cycle_id or not rec.org_unit_id or not rec.category:
                 continue
 
             # Ensure any lines of this category for this unit & cycle are attached to this card
@@ -3421,12 +3599,12 @@ class PbmsPlanningCategory(models.Model):
                 ("plan_id.org_unit_id", "=", rec.org_unit_id.id),
                 ("plan_id.cycle_id", "=", rec.cycle_id.id),
                 ("line_type", "=", rec.category),
-                ("plan_id", "!=", rec.id),
+                ("plan_id", "!=", rec_real_id),
             ])
             if detached:
                 detached = detached.filtered(lambda l: getattr(l.plan_id, "is_planning_request", False) or l.plan_id.category != rec.category)
                 if detached:
-                    detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": rec.id})
+                    detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": rec_real_id})
 
 
 
@@ -3919,16 +4097,36 @@ class PbmsPlanningCategory(models.Model):
     @api.onchange("category", "org_unit_id", "enable_manpower")
     def _onchange_category_and_unit(self):
         Config = self.env.get("pbms.planning.config")
+        RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
         for rec in self:
-            if rec.org_unit_id and Config is not None:
+            unit_type = rec.org_unit_type or (rec.org_unit_id.work_unit_type if rec.org_unit_id else False)
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            if rec.category and is_dist_or_ho and rec.category in ("deposit", "customer_base", "fx", "digital_banking"):
+                pass  # Preserve mobilization category for district/HO overview cards
+            elif rec.org_unit_id and Config is not None:
                 if not rec.category or not Config.is_category_enabled(rec.category, rec.org_unit_id):
-                    rec.category = Config.get_default_category_for_unit(rec.org_unit_id)
-            if (rec.category == "manpower" or rec.enable_manpower) and rec.org_unit_id and not rec.existing_manpower_summary_ids:
+                    if is_dist_or_ho:
+                        rec.category = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, rec.org_unit_id)), "general_expense")
+                    else:
+                        rec.category = Config.get_default_category_for_unit(rec.org_unit_id)
+            is_manpower = rec.category == "manpower" or rec.enable_manpower
+            unit_changed = bool(rec._origin.org_unit_id and rec.org_unit_id != rec._origin.org_unit_id)
+            if is_manpower and rec.org_unit_id and (not rec.existing_manpower_summary_ids or unit_changed):
                 rec._sync_existing_manpower_lines()
 
     # Category summaries per tab (Plan Overview & Quarterly Rollup)
     has_cascaded_targets = fields.Boolean(
         compute="_compute_has_cascaded_targets", store=True, string="Has Cascaded Targets",
+    )
+    is_targets_cascaded = fields.Boolean(
+        string="Targets Cascaded",
+        compute="_compute_is_targets_cascaded",
+        inverse="_inverse_is_targets_cascaded",
+        store=True,
+        readonly=False,
+        copy=False,
+        tracking=True,
+        help="Indicates whether targets from this plan have already been cascaded to subordinate units to prevent double cascade.",
     )
     deposit_line_count = fields.Integer(compute="_compute_category_summaries", store=True)
     deposit_annual_total = fields.Float(compute="_compute_category_summaries", store=True)
@@ -4206,6 +4404,7 @@ class PbmsPlanningCategory(models.Model):
             "is_customer_base_monetary", "is_fx_monetary", "is_digital_banking_monetary",
             "is_expense_monetary", "is_manpower_monetary", "is_fixed_asset_monetary",
             "has_cascaded_targets",
+            "is_targets_cascaded",
             "enable_deposit", "enable_customer_base", "enable_fx", "enable_digital_banking",
             "enable_expense", "enable_manpower", "enable_fixed_asset",
             # Workspace Links
@@ -4443,7 +4642,7 @@ class PbmsPlanningCategory(models.Model):
     )
     def _compute_existing_manpower_data(self):
         for rec in self:
-            mp_lines = rec._get_category_lines("manpower")
+            mp_lines = rec._get_category_lines("manpower") if hasattr(rec, "_get_category_lines") else rec.line_ids.filtered(lambda l: l.line_type == "manpower")
             is_manpower_applicable = (
                 rec.category == "manpower"
                 or rec.enable_manpower
@@ -4454,7 +4653,12 @@ class PbmsPlanningCategory(models.Model):
                 rec.existing_total_active = sum(rec.existing_manpower_summary_ids.mapped("active_employee_count"))
                 rec.existing_total_vacancies = sum(rec.existing_manpower_summary_ids.mapped("vacant_position_count"))
                 rec.existing_total_monthly_salary = sum(rec.existing_manpower_summary_ids.mapped("monthly_salary"))
-                rec.existing_total_annual_salary = sum(rec.existing_manpower_summary_ids.mapped("annual_salary"))
+                annual = sum(rec.existing_manpower_summary_ids.mapped("annual_salary"))
+                rec.existing_total_annual_salary = annual
+                rec.current_staff_salary_budget = annual
+                new_cost = sum(mp_lines.mapped("annual_total_cost"))
+                rec.new_planned_salary_budget = new_cost
+                rec.total_operating_unit_manpower_budget = annual + new_cost
             else:
                 rec.existing_total_authorized = 0
                 rec.existing_total_active = 0
@@ -4462,10 +4666,11 @@ class PbmsPlanningCategory(models.Model):
                 rec.existing_total_monthly_salary = 0.0
                 rec.existing_total_annual_salary = 0.0
 
-
     def action_refresh_existing_manpower(self):
         """Action button to re-fetch and synchronize existing manpower from HR contracts and operating unit."""
         self._sync_existing_manpower_lines()
+        self._compute_existing_manpower_data()
+        self._compute_operating_unit_manpower_budget()
         return {
             "type": "ir.actions.client",
             "tag": "display_notification",
@@ -4484,8 +4689,8 @@ class PbmsPlanningCategory(models.Model):
         has_ou_job_pos = "operating.unit.job.position" in self.env
         has_employee_model = "hr.employee" in self.env
         ContractModel = (
-            self.env["hr.version"] if "hr.version" in self.env else (
-                self.env["hr.contract"] if "hr.contract" in self.env else False
+            self.env["hr.version"].sudo() if "hr.version" in self.env else (
+                self.env["hr.contract"].sudo() if "hr.contract" in self.env else False
             )
         )
 
@@ -4498,10 +4703,6 @@ class PbmsPlanningCategory(models.Model):
             if not is_manpower_applicable or not plan.org_unit_id:
                 continue
 
-            # Clear existing lines
-            plan.existing_manpower_summary_ids.unlink()
-            plan.existing_employee_line_ids.unlink()
-
             unit_id = plan.org_unit_id.id
 
             # 1. Gather all active employees in this work unit
@@ -4512,15 +4713,15 @@ class PbmsPlanningCategory(models.Model):
                     ("operating_unit_ids", "in", [unit_id]),
                     ("default_operating_unit_id", "=", unit_id),
                 ]
-                employees = self.env["hr.employee"].search(emp_domain)
+                employees = self.env["hr.employee"].sudo().search(emp_domain)
             else:
-                employees = self.env["hr.employee"]
+                employees = self.env["hr.employee"].sudo()
 
             # 2. Gather eligible positions from operating.unit.job.position
-            ou_positions = self.env["operating.unit.job.position"].search([
+            ou_positions = self.env["operating.unit.job.position"].sudo().search([
                 ("operating_unit_id", "=", unit_id),
                 ("active", "=", True),
-            ]) if has_ou_job_pos else self.env["operating.unit.job.position"]
+            ]) if has_ou_job_pos else self.env["operating.unit.job.position"].sudo()
 
             # Map positions: job_id -> position info
             pos_dict = {}
@@ -4596,7 +4797,6 @@ class PbmsPlanningCategory(models.Model):
                 emp_code = getattr(emp, "emp_code", False) or getattr(emp, "barcode", False) or getattr(emp, "identification_id", False) or ""
 
                 emp_records_to_create.append({
-                    "plan_id": plan.id,
                     "employee_id": emp.id,
                     "employee_code": emp_code,
                     "job_id": job.id,
@@ -4606,9 +4806,6 @@ class PbmsPlanningCategory(models.Model):
                     "annual_salary": annual,
                     "contract_state": c_state if c_state in ('draft', 'probation', 'open', 'close', 'cancel') else 'open',
                 })
-
-            if emp_records_to_create and has_emp_line_model:
-                self.env["pbms.existing.employee.line"].create(emp_records_to_create)
 
             # Build position summary records
             pos_records_to_create = []
@@ -4630,7 +4827,6 @@ class PbmsPlanningCategory(models.Model):
                 pos_annual = pos_monthly * 12.0
 
                 pos_records_to_create.append({
-                    "plan_id": plan.id,
                     "job_id": job_id,
                     "grade_id": p_info["grade"].id if p_info["grade"] else False,
                     "approved_plan_count": approved_count,
@@ -4640,8 +4836,12 @@ class PbmsPlanningCategory(models.Model):
                     "annual_salary": pos_annual,
                 })
 
-            if pos_records_to_create and has_summary_model:
-                self.env["pbms.existing.manpower.summary"].create(pos_records_to_create)
+            if has_emp_line_model:
+                plan.existing_employee_line_ids = [Command.clear()] + [Command.create(r) for r in emp_records_to_create]
+            if has_summary_model:
+                plan.existing_manpower_summary_ids = [Command.clear()] + [Command.create(r) for r in pos_records_to_create]
+            plan._compute_existing_manpower_data()
+            plan._compute_operating_unit_manpower_budget()
 
     def _get_category_lines(self, cat):
         self.ensure_one()
@@ -4670,9 +4870,16 @@ class PbmsPlanningCategory(models.Model):
             real_cycle_id = self.cycle_id._origin.id if (hasattr(self.cycle_id, "_origin") and self.cycle_id._origin) else (self.cycle_id.id if isinstance(self.cycle_id.id, int) else False)
             if real_unit_id and real_cycle_id:
                 if self.org_unit_type == "district_office":
+                    if cat in ("deposit", "customer_base", "fx", "digital_banking"):
+                        return self.env["pbms.plan.category.line"].search([
+                            "|",
+                            ("district_id", "=", real_unit_id),
+                            ("plan_id.org_unit_id", "=", real_unit_id),
+                            ("cycle_id", "=", real_cycle_id),
+                            ("plan_id.active", "=", True),
+                            ("line_type", "=", cat),
+                        ])
                     return self.env["pbms.plan.category.line"].search([
-                        "|",
-                        ("district_id", "=", real_unit_id),
                         ("plan_id.org_unit_id", "=", real_unit_id),
                         ("cycle_id", "=", real_cycle_id),
                         ("plan_id.active", "=", True),
@@ -4680,7 +4887,7 @@ class PbmsPlanningCategory(models.Model):
                     ])
                 return self.env["pbms.plan.category.line"].search([
                     ("plan_id.org_unit_id", "=", real_unit_id),
-                    ("plan_id.cycle_id", "=", real_cycle_id),
+                    ("cycle_id", "=", real_cycle_id),
                     ("plan_id.active", "=", True),
                     ("line_type", "=", cat),
                 ])
@@ -4689,36 +4896,80 @@ class PbmsPlanningCategory(models.Model):
     @api.depends(
         "org_unit_id",
         "category",
+        "enable_manpower",
         "line_ids.annual_total_cost",
         "line_ids.line_type",
         "line_ids.position_type",
         "line_ids.quantity",
         "existing_total_annual_salary",
+        "existing_total_monthly_salary",
         "existing_manpower_summary_ids.annual_salary",
+        "existing_manpower_summary_ids.monthly_salary",
     )
     def _compute_operating_unit_manpower_budget(self):
         for rec in self:
-            if rec.category != "manpower":
+            mp_lines = rec._get_category_lines("manpower") if hasattr(rec, "_get_category_lines") else rec.line_ids.filtered(lambda l: l.line_type == "manpower")
+            is_mp_applicable = (
+                rec.category == "manpower"
+                or rec.enable_manpower
+                or bool(mp_lines)
+            )
+            if not is_mp_applicable:
                 rec.current_staff_salary_budget = 0.0
                 rec.new_planned_salary_budget = 0.0
                 rec.total_operating_unit_manpower_budget = 0.0
                 continue
 
-            mp_lines = rec._get_category_lines("manpower")
-            current_salary_total = rec.existing_total_annual_salary or 0.0
+            current_salary_total = (
+                rec.existing_total_annual_salary
+                or sum(rec.existing_manpower_summary_ids.mapped("annual_salary"))
+                or (rec.existing_total_monthly_salary * 12.0)
+                or 0.0
+            )
+
+            # Check sibling manpower plan if current card has no existing salary
+            if not current_salary_total and rec.org_unit_id and rec.cycle_id:
+                mp_plan = self.search([
+                    ("org_unit_id", "=", rec.org_unit_id.id),
+                    ("cycle_id", "=", rec.cycle_id.id),
+                    ("category", "=", "manpower"),
+                    ("active", "=", True),
+                ], limit=1)
+                if mp_plan and mp_plan.id != rec.id:
+                    current_salary_total = (
+                        mp_plan.existing_total_annual_salary
+                        or mp_plan.current_staff_salary_budget
+                        or sum(mp_plan.existing_manpower_summary_ids.mapped("annual_salary"))
+                        or (mp_plan.existing_total_monthly_salary * 12.0)
+                        or 0.0
+                    )
+
             if not current_salary_total and rec.org_unit_id:
                 EmployeeModel = self.env["hr.employee"] if "hr.employee" in self.env else False
                 if EmployeeModel:
-                    emps = EmployeeModel.search([
+                    emps = EmployeeModel.sudo().search([
                         ("active", "=", True),
-                        "|",
+                        "|", "|",
+                        ("operating_unit_id", "=", rec.org_unit_id.id),
                         ("operating_unit_ids", "in", [rec.org_unit_id.id]),
                         ("default_operating_unit_id", "=", rec.org_unit_id.id),
                     ])
+                    ContractModel = (
+                        self.env["hr.version"] if "hr.version" in self.env else (
+                            self.env["hr.contract"] if "hr.contract" in self.env else False
+                        )
+                    )
                     for emp in emps:
                         w = 0.0
                         if hasattr(emp, "contract_id") and emp.contract_id:
                             w = getattr(emp.contract_id, "wage", 0.0) or getattr(emp.contract_id, "base_salary", 0.0) or 0.0
+                        elif ContractModel:
+                            c = ContractModel.sudo().search([
+                                ("employee_id", "=", emp.id),
+                                ("state", "in", ("open", "probation", "draft")),
+                            ], limit=1)
+                            if c:
+                                w = getattr(c, "wage", 0.0) or getattr(c, "base_salary", 0.0) or 0.0
                         if not w and hasattr(emp, "wage") and emp.wage:
                             w = emp.wage
                         if not w:
@@ -4733,6 +4984,11 @@ class PbmsPlanningCategory(models.Model):
             new_planned_cost = sum(mp_lines.mapped("annual_total_cost"))
             rec.new_planned_salary_budget = new_planned_cost
             rec.total_operating_unit_manpower_budget = current_salary_total + new_planned_cost
+
+    @api.onchange("existing_total_annual_salary", "existing_total_monthly_salary", "existing_manpower_summary_ids")
+    def _onchange_existing_manpower_salary_budget(self):
+        for rec in self:
+            rec._compute_operating_unit_manpower_budget()
 
     @api.depends("line_ids.fa_annual_total_cost", "line_ids.line_type")
     def _compute_total_fixed_asset_cost(self):
@@ -4762,6 +5018,59 @@ class PbmsPlanningCategory(models.Model):
     def _compute_has_cascaded_targets(self):
         for rec in self:
             rec.has_cascaded_targets = any(l.is_cascaded for l in rec.line_ids)
+
+    @api.depends("state", "line_ids", "line_ids.is_cascaded", "cycle_id")
+    def _compute_is_targets_cascaded(self):
+        Line = self.env["pbms.plan.category.line"].sudo()
+        for rec in self:
+            if rec.is_targets_cascaded:
+                continue
+            if rec.org_unit_type == "head_office" and rec.category != "manpower" and rec.state == "approved":
+                has_dist = Line.search_count([
+                    ("cycle_id", "=", rec.cycle_id.id),
+                    ("line_type", "=", rec.category),
+                    ("org_unit_id.work_unit_type", "=", "district_office"),
+                    ("is_cascaded", "=", True),
+                ]) > 0
+                rec.is_targets_cascaded = bool(has_dist)
+            elif rec.org_unit_type == "district_office" and rec.category != "manpower" and rec.has_cascaded_targets:
+                child_branches = self.env["operating.unit"].sudo().search([
+                    ("parent_unit", "=", rec.org_unit_id.id),
+                    ("work_unit_type", "in", ("branch", "sub_branch", "service_center")),
+                ])
+                if child_branches:
+                    has_branch = Line.search_count([
+                        ("cycle_id", "=", rec.cycle_id.id),
+                        ("line_type", "=", rec.category),
+                        ("org_unit_id", "in", child_branches.ids),
+                        ("is_cascaded", "=", True),
+                    ]) > 0
+                else:
+                    has_branch = False
+                rec.is_targets_cascaded = bool(has_branch)
+            else:
+                rec.is_targets_cascaded = False
+
+    def _inverse_is_targets_cascaded(self):
+        """Allow explicit writes to is_targets_cascaded."""
+        pass
+
+    def action_already_cascaded_notice(self):
+        """Display an informational notification when clicking the 'Cascaded' button."""
+        self.ensure_one()
+        target_dest = _("districts") if self.org_unit_type == "head_office" else _("child branches")
+        return {
+            "type": "ir.actions.client",
+            "tag": "display_notification",
+            "params": {
+                "title": _("Already Cascaded"),
+                "message": _("Targets for %s have already been cascaded to %s. Re-cascading is prevented.") % (
+                    self.display_name, target_dest
+                ),
+                "type": "info",
+                "sticky": False,
+            },
+        }
 
     @api.depends(
         "line_ids",
@@ -5282,13 +5591,39 @@ class PbmsPlanningCategory(models.Model):
         Config = self.env.get("pbms.planning.config")
         if "category" in fields_list:
             cur_cat = res.get("category")
+            unit_type = ou.work_unit_type if ou else False
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            if cur_cat and is_dist_or_ho and cur_cat in ("deposit", "customer_base", "fx", "digital_banking"):
+                return res  # Preserve explicit mobilization category for district/HO overview cards
             if not cur_cat or (Config is not None and ou and not Config.is_category_enabled(cur_cat, ou)):
                 if Config is not None and ou:
-                    res["category"] = Config.get_default_category_for_unit(ou)
+                    if is_dist_or_ho:
+                        RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
+                        res["category"] = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, ou)), "general_expense")
+                    else:
+                        res["category"] = Config.get_default_category_for_unit(ou)
         return res
 
     @api.model_create_multi
     def create(self, vals_list):
+        # Return existing overview card if already created for a district/HO unit
+        if len(vals_list) == 1:
+            vals0 = vals_list[0]
+            ou0 = vals0.get("org_unit_id") or self.env.context.get("default_org_unit_id")
+            cyc0 = vals0.get("cycle_id") or self.env.context.get("default_cycle_id")
+            cat0 = vals0.get("category") or self.env.context.get("default_category")
+            if ou0 and cyc0 and cat0 in ("deposit", "customer_base", "fx", "digital_banking"):
+                ou_rec = self.env["operating.unit"].browse(ou0)
+                if ou_rec.work_unit_type in ("district_office", "head_office"):
+                    existing_card = self.search([
+                        ("org_unit_id", "=", ou0),
+                        ("cycle_id", "=", cyc0),
+                        ("category", "=", cat0),
+                        ("active", "=", True),
+                    ], limit=1)
+                    if existing_card:
+                        return existing_card
+
         user_unit_ids = self.env.user._pbms_operating_unit_ids()
         for vals in vals_list:
             org_unit_id = vals.get("org_unit_id")
@@ -5342,66 +5677,83 @@ class PbmsPlanningCategory(models.Model):
                 elif vals.get("deposit_type_id") or vals.get("plan_category"):
                     vals["category"] = "deposit"
 
-            # If category is disabled for this unit, re-assign to default enabled category or lines category
+            # If category is disabled for this unit, re-assign only if not an explicit category or mobilization category for district/HO
             Config = self.env.get("pbms.planning.config")
             ou = self.env["operating.unit"].browse(org_unit_id) if org_unit_id else self.env.user.default_operating_unit_id
-            if Config is not None and ou and vals.get("category") and not Config.is_category_enabled(vals["category"], ou):
+            unit_type = ou.work_unit_type if ou else False
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            explicit_cat = vals.get("category") or self.env.context.get("default_category")
+            if explicit_cat and is_dist_or_ho and explicit_cat in ("deposit", "customer_base", "fx", "digital_banking"):
+                vals["category"] = explicit_cat
+            elif Config is not None and ou and vals.get("category") and not Config.is_category_enabled(vals["category"], ou):
                 found_cat = False
                 for cat, fname in self._tab_line_fields.items():
                     if vals.get(fname) and Config.is_category_enabled(cat, ou):
                         found_cat = cat
                         break
-                vals["category"] = found_cat or Config.get_default_category_for_unit(ou)
+                if found_cat:
+                    vals["category"] = found_cat
+                elif not is_dist_or_ho:
+                    vals["category"] = Config.get_default_category_for_unit(ou)
+                else:
+                    RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
+                    vals["category"] = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, ou)), "general_expense")
 
             # Default fallback if still not determined
             if not vals.get("category"):
-                vals["category"] = Config.get_default_category_for_unit(ou) if (Config is not None and ou) else "deposit"
+                if is_dist_or_ho:
+                    RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
+                    vals["category"] = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, ou)), "general_expense") if (Config is not None and ou) else "general_expense"
+                else:
+                    vals["category"] = Config.get_default_category_for_unit(ou) if (Config is not None and ou) else "deposit"
 
             # 1. Submitted Plan Check: Prevent creating another plan for the same category if already submitted or approved
             if org_unit_id and vals.get("cycle_id") and not self.env.context.get("skip_sync_category_records"):
-                submitted_existing = self.search([
-                    ("org_unit_id", "=", org_unit_id),
-                    ("cycle_id", "=", vals.get("cycle_id")),
-                    ("category", "=", vals.get("category")),
-                    ("active", "=", True),
-                    ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
-                ], limit=1)
-                if submitted_existing:
-                    unit_name = self.env["operating.unit"].browse(org_unit_id).display_name
-                    cycle_name = self.env["pbms.planning.cycle"].browse(vals.get("cycle_id")).name
-                    cat_name = dict(self._fields["category"].selection).get(vals.get("category"), vals.get("category"))
-                    state_label = dict(self._fields["state"].selection).get(submitted_existing.state, submitted_existing.state)
-                    raise ValidationError(_(
-                        "A %(cat)s plan for %(unit)s in budget year '%(cycle)s' has already been submitted and is currently in '%(state)s' status.\n"
-                        "Each operating unit can only have one plan per category per fiscal year. You cannot create a second plan while a plan is already submitted or approved.\n"
-                        "If you need to make changes, request the reviewer to return the plan for revision or reset it to draft.",
-                        cat=cat_name,
-                        unit=unit_name,
-                        cycle=cycle_name,
-                        state=state_label,
-                    ))
+                is_mobilization_card = is_dist_or_ho and vals.get("category") in ("deposit", "customer_base", "fx", "digital_banking")
+                if not is_mobilization_card:
+                    submitted_existing = self.search([
+                        ("org_unit_id", "=", org_unit_id),
+                        ("cycle_id", "=", vals.get("cycle_id")),
+                        ("category", "=", vals.get("category")),
+                        ("active", "=", True),
+                        ("state", "in", ("submitted", "district_approved", "district_endorsed", "ho_reviewed", "approved")),
+                    ], limit=1)
+                    if submitted_existing:
+                        unit_name = self.env["operating.unit"].browse(org_unit_id).display_name
+                        cycle_name = self.env["pbms.planning.cycle"].browse(vals.get("cycle_id")).name
+                        cat_name = dict(self._fields["category"].selection).get(vals.get("category"), vals.get("category"))
+                        state_label = dict(self._fields["state"].selection).get(submitted_existing.state, submitted_existing.state)
+                        raise ValidationError(_(
+                            "A %(cat)s plan for %(unit)s in budget year '%(cycle)s' has already been submitted and is currently in '%(state)s' status.\n"
+                            "Each operating unit can only have one plan per category per fiscal year. You cannot create a second plan while a plan is already submitted or approved.\n"
+                            "If you need to make changes, request the reviewer to return the plan for revision or reset it to draft.",
+                            cat=cat_name,
+                            unit=unit_name,
+                            cycle=cycle_name,
+                            state=state_label,
+                        ))
 
-                # 2. Duplicate Plan Check: Ensure an operating unit creates only ONE plan per category per cycle
-                existing = self.search([
-                    ("org_unit_id", "=", org_unit_id),
-                    ("cycle_id", "=", vals.get("cycle_id")),
-                    ("category", "=", vals.get("category")),
-                    ("active", "=", True),
-                ], limit=1)
-                if existing:
-                    unit_name = self.env["operating.unit"].browse(org_unit_id).display_name
-                    cycle_name = self.env["pbms.planning.cycle"].browse(vals.get("cycle_id")).name
-                    cat_name = dict(self._fields["category"].selection).get(vals.get("category"), vals.get("category"))
-                    raise ValidationError(_(
-                        "A %(cat)s plan already exists for %(unit)s in budget year '%(cycle)s' (Request No: %(req)s).\n"
-                        "Each work unit can only create one plan per category per fiscal year.\n"
-                        "Please open and edit the existing %(cat)s plan instead of creating a duplicate.\n"
-                        "(If you wish to create a new plan, please archive or delete the existing plan first).",
-                        cat=cat_name,
-                        unit=unit_name,
-                        cycle=cycle_name,
-                        req=existing.request_number or "N/A",
-                    ))
+                    # 2. Duplicate Plan Check: Ensure an operating unit creates only ONE plan per category per cycle
+                    existing = self.search([
+                        ("org_unit_id", "=", org_unit_id),
+                        ("cycle_id", "=", vals.get("cycle_id")),
+                        ("category", "=", vals.get("category")),
+                        ("active", "=", True),
+                    ], limit=1)
+                    if existing:
+                        unit_name = self.env["operating.unit"].browse(org_unit_id).display_name
+                        cycle_name = self.env["pbms.planning.cycle"].browse(vals.get("cycle_id")).name
+                        cat_name = dict(self._fields["category"].selection).get(vals.get("category"), vals.get("category"))
+                        raise ValidationError(_(
+                            "A %(cat)s plan already exists for %(unit)s in budget year '%(cycle)s' (Request No: %(req)s).\n"
+                            "Each work unit can only create one plan per category per fiscal year.\n"
+                            "Please open and edit the existing %(cat)s plan instead of creating a duplicate.\n"
+                            "(If you wish to create a new plan, please archive or delete the existing plan first).",
+                            cat=cat_name,
+                            unit=unit_name,
+                            cycle=cycle_name,
+                            req=existing.request_number or "N/A",
+                        ))
 
 
             if "active" not in vals:
@@ -5575,6 +5927,8 @@ class PbmsPlanningCategory(models.Model):
                 # 3. Head Office units are directly visible to HO Reviewers.
                 ho_domain = [
                     "|",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    "|",
                     ("org_unit_type", "=", "head_office"),
                     "|",
                     "&",
@@ -5589,6 +5943,25 @@ class PbmsPlanningCategory(models.Model):
                     ("state", "in", ("district_approved", "district_endorsed", "committee_review", "board_ceo_approval", "ho_reviewed", "approved")),
                 ]
                 domain = expression.AND([domain, ho_domain])
+            elif user.has_group("bunna_pbms.group_pbms_respective_chief"):
+                child_unit_ids = user._pbms_child_operating_unit_ids()
+                chief_domain = [
+                    "|",
+                    "&",
+                    ("org_unit_id", "in", user._pbms_operating_unit_ids()),
+                    ("org_unit_id", "not in", child_unit_ids),
+                    "&",
+                    ("category", "=", "manpower"),
+                    "&",
+                    ("org_unit_id", "in", child_unit_ids),
+                    ("state", "in", (
+                        "chief_review", "district_approved", "district_endorsed",
+                        "people_solutions_review", "cpco_review", "committee_review",
+                        "ceo_approval", "board_ceo_approval", "ho_endorse", "cpco_endorse",
+                        "approved", "rejected", "info_requested",
+                    )),
+                ]
+                domain = expression.AND([domain, chief_domain])
 
         return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
 
@@ -5650,7 +6023,7 @@ class PbmsPlanningCategory(models.Model):
                         'title': _('Planning Cycle Not Open for Input'),
                         'message': _(
                             "Planning cycle '%(name)s' is currently '%(state)s' and is not open for unit input. "
-                            "Branch users cannot input or submit plan data until SPPMD officially opens the cycle for unit input."
+                            "Operating unit users (Branch & Head Office) cannot input or submit plan data until SPPMD officially opens the cycle for unit input."
                         ) % {'name': pending_cycle.name, 'state': state_label},
                         'type': 'warning',
                         'sticky': True,
@@ -5670,7 +6043,15 @@ class PbmsPlanningCategory(models.Model):
         plan = False
         if org_unit and cycle:
             Config = self.env.get("pbms.planning.config")
-            default_cat = Config.get_default_category_for_unit(org_unit) if Config is not None else "deposit"
+            unit_type = org_unit.work_unit_type
+            is_dist_or_ho = unit_type in ("district_office", "head_office")
+            if is_dist_or_ho:
+                RESOURCE_CATS = ["general_expense", "manpower", "fixed_asset"]
+                default_cat = next((c for c in RESOURCE_CATS if Config.is_category_enabled(c, org_unit)), "general_expense")
+                target_categories = [c for c in RESOURCE_CATS if Config.is_category_enabled(c, org_unit)] or RESOURCE_CATS
+            else:
+                default_cat = Config.get_default_category_for_unit(org_unit) if Config is not None else "deposit"
+                target_categories = [c for c in ITEMIZED_CATEGORIES if Config.is_category_enabled(c, org_unit)] if Config is not None else ITEMIZED_CATEGORIES
 
             existing_plans = self.search([
                 ("org_unit_id", "=", org_unit.id),
@@ -5678,32 +6059,74 @@ class PbmsPlanningCategory(models.Model):
                 ("active", "=", True),
             ], order="id asc")
 
-            # Clean up / archive any active plans that belong to a disabled category and have NO lines or data
-            for ep in existing_plans:
-                if Config is not None and not Config.is_category_enabled(ep.category, org_unit):
-                    has_ep_data = bool(ep.line_ids) or bool(getattr(ep, "_get_category_lines", lambda c: False)(ep.category)) or (getattr(ep, "annual_total", 0.0) or 0.0) > 0.0
-                    if not has_ep_data and ep.state in ("draft", "returned", "info_requested"):
-                        try:
-                            ep.sudo().with_context(bypass_plan_lock=True).unlink()
-                        except Exception:
-                            ep.sudo().with_context(bypass_plan_lock=True).write({"active": False})
+            # Clean up / archive any active plans that belong to a disabled category and have NO lines or data (branches only)
+            if not is_dist_or_ho:
+                for ep in existing_plans:
+                    if Config is not None and not Config.is_category_enabled(ep.category, org_unit):
+                        has_ep_data = bool(ep.line_ids) or bool(getattr(ep, "_get_category_lines", lambda c: False)(ep.category)) or (getattr(ep, "annual_total", 0.0) or 0.0) > 0.0
+                        if not has_ep_data and ep.state in ("draft", "returned", "info_requested"):
+                            try:
+                                ep.sudo().with_context(bypass_plan_lock=True).unlink()
+                            except Exception:
+                                ep.sudo().with_context(bypass_plan_lock=True).write({"active": False})
 
-            # Re-fetch active plans that are actually enabled in configuration
-            enabled_plans = self.search([
+            # Ensure an active plan exists for every enabled category for this operating unit
+            all_unit_plans = self.search([
                 ("org_unit_id", "=", org_unit.id),
                 ("cycle_id", "=", cycle.id),
                 ("active", "=", True),
             ], order="id asc")
-            if Config is not None:
-                enabled_plans = enabled_plans.filtered(lambda p: Config.is_category_enabled(p.category, org_unit))
+            for cat in target_categories:
+                if Config is not None and Config.is_category_enabled(cat, org_unit):
+                    if not all_unit_plans.filtered(lambda p: p.category == cat):
+                        new_card = self.sudo().create({
+                            "org_unit_id": org_unit.id,
+                            "cycle_id": cycle.id,
+                            "company_id": org_unit.company_id.id if hasattr(org_unit, "company_id") and org_unit.company_id else self.env.company.id,
+                            "category": cat,
+                            "state": "draft",
+                        })
+                        all_unit_plans |= new_card
 
-            # Select plan: prefer matching default_cat, or first enabled plan
-            for p in enabled_plans:
-                if p.category == default_cat:
-                    plan = p
-                    break
+            # Re-fetch active plans that are actually enabled in configuration
+            enabled_plans = all_unit_plans.filtered(lambda p: p.category in target_categories and (Config is None or Config.is_category_enabled(p.category, org_unit)))
+
+            # Smart Plan Selection:
+            # 1. Prefer default_category from context if valid and enabled
+            ctx_cat = self.env.context.get("default_category")
+            if ctx_cat and ctx_cat in target_categories:
+                for p in enabled_plans:
+                    if p.category == ctx_cat:
+                        plan = p
+                        break
+
+            # 2. Prefer an editable draft/returned plan matching default_cat
+            if not plan:
+                for p in enabled_plans:
+                    if p.category == default_cat and p.state in PBMS_BRANCH_EDITABLE_STATES:
+                        plan = p
+                        break
+
+            # 3. Prefer ANY editable draft/returned plan for this unit
+            if not plan:
+                for p in enabled_plans:
+                    if p.state in PBMS_BRANCH_EDITABLE_STATES:
+                        plan = p
+                        break
+
+            # 4. Fallback: matching default_cat or first enabled plan
+            if not plan:
+                for p in enabled_plans:
+                    if p.category == default_cat:
+                        plan = p
+                        break
             if not plan and enabled_plans:
                 plan = enabled_plans[0]
+
+            # 5. Fallback: if all target plans are submitted or existing, open the existing plan safely
+            if not plan and all_unit_plans:
+                resource_plans = all_unit_plans.filtered(lambda p: p.category in target_categories)
+                plan = resource_plans[0] if resource_plans else all_unit_plans[0]
 
             if not plan:
                 plan = self.sudo().create({
@@ -5711,17 +6134,19 @@ class PbmsPlanningCategory(models.Model):
                     "cycle_id": cycle.id,
                     "company_id": org_unit.company_id.id if hasattr(org_unit, "company_id") and org_unit.company_id else self.env.company.id,
                     "category": default_cat,
+                    "state": "draft",
                 })
             else:
-                # Consolidate any lines from sibling plan records for the same unit & cycle matching this category
-                sibling_lines = self.env["pbms.plan.category.line"].search([
-                    ("plan_id.org_unit_id", "=", org_unit.id),
-                    ("plan_id.cycle_id", "=", cycle.id),
-                    ("line_type", "=", plan.category),
-                    ("plan_id", "!=", plan.id),
-                ])
-                if sibling_lines:
-                    sibling_lines.write({"plan_id": plan.id})
+                rec_real_id = plan._origin.id if isinstance(plan._origin.id, int) else (plan.id if isinstance(plan.id, int) else False)
+                if rec_real_id:
+                    sibling_lines = self.env["pbms.plan.category.line"].search([
+                        ("plan_id.org_unit_id", "=", org_unit.id),
+                        ("plan_id.cycle_id", "=", cycle.id),
+                        ("line_type", "=", plan.category),
+                        ("plan_id", "!=", rec_real_id),
+                    ])
+                    if sibling_lines:
+                        sibling_lines.write({"plan_id": rec_real_id})
 
         view = self.env.ref("bunna_pbms.view_pbms_planning_request_form", raise_if_not_found=False)
         view_id = view.id if view else False
@@ -5739,6 +6164,28 @@ class PbmsPlanningCategory(models.Model):
         return res
 
 
+
+    @api.model
+    def get_view(self, view_id=None, view_type='form', **options):
+        """Dynamically serve category-specific list view when requested for a category context."""
+        if not view_id and view_type == 'list':
+            cat = self.env.context.get('default_category')
+            if cat:
+                cat_list_view_map = {
+                    'fixed_asset': 'bunna_pbms.view_pbms_planning_category_list_fixed_asset',
+                    'manpower': 'bunna_pbms.view_pbms_planning_category_list_manpower',
+                    'general_expense': 'bunna_pbms.view_pbms_planning_category_list_expense',
+                    'deposit': 'bunna_pbms.view_pbms_planning_category_list_retail',
+                    'customer_base': 'bunna_pbms.view_pbms_planning_category_list_retail',
+                    'fx': 'bunna_pbms.view_pbms_planning_category_list_fx',
+                    'digital_banking': 'bunna_pbms.view_pbms_planning_category_list_digital',
+                }
+                view_name = cat_list_view_map.get(cat)
+                if view_name:
+                    view = self.env.ref(view_name, raise_if_not_found=False)
+                    if view:
+                        view_id = view.id
+        return super().get_view(view_id=view_id, view_type=view_type, **options)
 
     def get_formview_id(self, access_uid=None):
         """Return category-specific form view which sets the matching category tab as default."""
@@ -5759,17 +6206,20 @@ class PbmsPlanningCategory(models.Model):
         if not self.env.context.get("skip_read_line_attach"):
             Line = self.env["pbms.plan.category.line"].sudo()
             for rec in self:
+                rec_real_id = rec._origin.id if isinstance(rec._origin.id, int) else (rec.id if isinstance(rec.id, int) else False)
+                if not rec_real_id:
+                    continue
                 if rec.org_unit_id and rec.cycle_id and rec.category:
                     detached = Line.search([
                         ("plan_id.org_unit_id", "=", rec.org_unit_id.id),
                         ("plan_id.cycle_id", "=", rec.cycle_id.id),
                         ("line_type", "=", rec.category),
-                        ("plan_id", "!=", rec.id),
+                        ("plan_id", "!=", rec_real_id),
                     ])
                     if detached:
                         detached = detached.filtered(lambda l: getattr(l.plan_id, "is_planning_request", False) or l.plan_id.category != rec.category)
                         if detached:
-                            detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": rec.id})
+                            detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": rec_real_id})
 
         res = super().read(fields=fields, load=load)
         cat_field_map = {
@@ -5810,17 +6260,18 @@ class PbmsPlanningCategory(models.Model):
         cat = self.category or self.env.context.get("default_category") or default_cat
         view_id = self.get_formview_id(access_uid=access_uid)
 
-        if self.org_unit_id and self.cycle_id and cat:
+        self_real_id = self._origin.id if isinstance(self._origin.id, int) else (self.id if isinstance(self.id, int) else False)
+        if self_real_id and self.org_unit_id and self.cycle_id and cat:
             detached = self.env["pbms.plan.category.line"].sudo().search([
                 ("plan_id.org_unit_id", "=", self.org_unit_id.id),
                 ("plan_id.cycle_id", "=", self.cycle_id.id),
                 ("line_type", "=", cat),
-                ("plan_id", "!=", self.id),
+                ("plan_id", "!=", self_real_id),
             ])
             if detached:
                 detached = detached.filtered(lambda l: getattr(l.plan_id, "is_planning_request", False) or l.plan_id.category != cat)
                 if detached:
-                    detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": self.id})
+                    detached.with_context(bypass_plan_lock=True, skip_sync_category_records=True).write({"plan_id": self_real_id})
 
         return {
             "name": self.display_name or _("Planning Category"),
@@ -6181,16 +6632,28 @@ class PbmsPlanningCategory(models.Model):
             elif cat == "manpower":
                 ws = wb.add_worksheet("Manpower (BB-APF-19)")
                 ws.freeze_panes(6, 4)
-                ws.merge_range(0, 0, 0, 10, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 10, "Proposed New or Vacant Post", fmt_doc_title)
-                ws.merge_range(2, 0, 2, 10, f"for the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 10, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
-                ws.write(4, 0, "BB-APF-19", fmt_form_code)
 
                 headers = [
-                    "SOL ID", "Work Unit Name", "Districts Name", "Broad Category", "Type of Position",
-                    "Type of Employment", "Job Title", "Job Grade", "Qty", "Date Needed", "Reason for the Proposed"
+                    "SOL ID", "Work Unit Name", "Districts Name", "Broad Category",
+                    "Type of Position", "Type of Employment", "Job Title", "Job Grade", "Employee Category",
+                    "Authorized Baseline", "Active Staff", "Vacancies",
+                    "Qty", "Date Needed", "Reason for the Proposed", "Remarks / Details",
+                    "Jul", "Aug", "Sep", "Q1 (Jul-Sep)",
+                    "Oct", "Nov", "Dec", "Q2 (Oct-Dec)",
+                    "Jan", "Feb", "Mar", "Q3 (Jan-Mar)",
+                    "Apr", "May", "Jun", "Q4 (Apr-Jun)",
+                    "Annual Headcount", "Approved Target",
+                    "Promotion", "Transfer", "Lateral", "External Vacancy", "Total Sourced",
+                    "Base Salary", "Pension (11%)", "Annual Unit Cost", "Annual Total Cost"
                 ]
+                last_col = len(headers) - 1
+
+                ws.merge_range(0, 0, 0, last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, last_col, "Proposed New or Vacant Post", fmt_doc_title)
+                ws.merge_range(2, 0, 2, last_col, f"for the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                ws.write(4, 0, "BB-APF-19", fmt_form_code)
+
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
@@ -6199,13 +6662,40 @@ class PbmsPlanningCategory(models.Model):
                     lines = p.manpower_line_ids or p.line_ids.filtered(lambda l: l.line_type == "manpower")
                     for l in lines:
                         sol_id, unit_name, district_name, broad_cat = get_meta(l, p)
-                        pos_type = (l.employee_category_id.display_name if l.employee_category_id else (l.position_type_id.name if l.position_type_id else (dict(l._fields['position_type'].selection).get(l.position_type, 'Non-Managerial'))))
-                        emp_type = (dict(l._fields['employment_type'].selection).get(l.employment_type, l.employment_type)) if l.employment_type else 'Permanent'
+                        pos_type = (l.position_type_id.name if l.position_type_id else (dict(l._fields['position_type'].selection).get(l.position_type, 'New Position')))
+                        emp_type = (dict(l._fields['employment_type'].selection).get(l.employment_type, l.employment_type.capitalize() if l.employment_type else 'Permanent')) if l.employment_type else 'Permanent'
                         job_title = l.job_id.name if l.job_id else (l.new_job_title or "")
                         grade_str = (l.job_grade_id.grade_code or l.job_grade_id.display_name) if l.job_grade_id else (l.new_job_grade_id.grade_code or l.new_job_grade_id.display_name or l.new_job_grade or "")
+                        emp_cat = (l.employee_category_id.display_name if l.employee_category_id else (l.new_employee_category_id.display_name if l.new_employee_category_id else ""))
+                        baseline = int(l.existing_establishment or 0)
+                        active_staff = int(l.active_staff_count or 0)
+                        vacancies = int(l.vacant_count or 0)
                         qty = int(round(l.annual_total or l.quantity or 0))
                         date_str = l.date_needed.strftime('%d-%b-%y') if l.date_needed else f"1-Jul-{y1}"
-                        reason_str = l.other_justification or (l.justification_category_id.display_name if l.justification_category_id else getattr(l, "reason", "")) or (dict(l._fields['position_type'].selection).get(l.position_type, 'New'))
+                        reason_str = (l.justification_category_id.display_name if l.justification_category_id else (getattr(l, "reason", "") or (dict(l._fields['position_type'].selection).get(l.position_type, 'New'))))
+                        remarks_str = l.other_justification or ""
+
+                        m_vals = l._manpower_month_values() if hasattr(l, "_manpower_month_values") else {
+                            f"m{i:02d}": int(getattr(l, f"m{i:02d}", 0) or getattr(l, f"hc_m{i:02d}", 0) or 0) for i in range(1, 13)
+                        }
+                        q1 = int(round(l.quarter1_total or l.q1 or (m_vals["m01"] + m_vals["m02"] + m_vals["m03"])))
+                        q2 = int(round(l.quarter2_total or l.q2 or (m_vals["m04"] + m_vals["m05"] + m_vals["m06"])))
+                        q3 = int(round(l.quarter3_total or l.q3 or (m_vals["m07"] + m_vals["m08"] + m_vals["m09"])))
+                        q4 = int(round(l.quarter4_total or l.q4 or (m_vals["m10"] + m_vals["m11"] + m_vals["m12"])))
+
+                        annual_hc = int(round(l.annual_total or l.quantity or (q1 + q2 + q3 + q4)))
+                        appr_target = int(round(l.display_approved_annual_total or l.approved_annual_total or 0))
+
+                        prom = int(l.fulfillment_promotion or 0)
+                        trans = int(l.fulfillment_transfer or 0)
+                        lat = int(l.fulfillment_lateral or 0)
+                        ext = int(l.fulfillment_external or 0)
+                        tot_sourced = int(l.fulfillment_total or (prom + trans + lat + ext))
+
+                        base_sal = float(l.base_salary or 0.0)
+                        pension = float(l.monthly_pension or 0.0)
+                        unit_cost = float(l.unit_cost or 0.0)
+                        annual_cost = float(l.annual_total_cost or 0.0)
 
                         ws.write(row_cur, 0, sol_id, fmt_cell_int)
                         ws.write(row_cur, 1, unit_name, fmt_cell_text)
@@ -6215,32 +6705,84 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 5, emp_type, fmt_cell_text)
                         ws.write(row_cur, 6, job_title, fmt_cell_text)
                         ws.write(row_cur, 7, grade_str, fmt_cell_text)
-                        ws.write(row_cur, 8, qty, fmt_cell_int)
-                        ws.write(row_cur, 9, date_str, fmt_cell_date)
-                        ws.write(row_cur, 10, reason_str, fmt_cell_text)
+                        ws.write(row_cur, 8, emp_cat, fmt_cell_text)
+                        ws.write(row_cur, 9, baseline, fmt_cell_int)
+                        ws.write(row_cur, 10, active_staff, fmt_cell_int)
+                        ws.write(row_cur, 11, vacancies, fmt_cell_int)
+                        ws.write(row_cur, 12, qty, fmt_cell_int)
+                        ws.write(row_cur, 13, date_str, fmt_cell_date)
+                        ws.write(row_cur, 14, reason_str, fmt_cell_text)
+                        ws.write(row_cur, 15, remarks_str, fmt_cell_text)
+                        ws.write(row_cur, 16, m_vals["m01"], fmt_cell_int)
+                        ws.write(row_cur, 17, m_vals["m02"], fmt_cell_int)
+                        ws.write(row_cur, 18, m_vals["m03"], fmt_cell_int)
+                        ws.write(row_cur, 19, q1, fmt_cell_int)
+                        ws.write(row_cur, 20, m_vals["m04"], fmt_cell_int)
+                        ws.write(row_cur, 21, m_vals["m05"], fmt_cell_int)
+                        ws.write(row_cur, 22, m_vals["m06"], fmt_cell_int)
+                        ws.write(row_cur, 23, q2, fmt_cell_int)
+                        ws.write(row_cur, 24, m_vals["m07"], fmt_cell_int)
+                        ws.write(row_cur, 25, m_vals["m08"], fmt_cell_int)
+                        ws.write(row_cur, 26, m_vals["m09"], fmt_cell_int)
+                        ws.write(row_cur, 27, q3, fmt_cell_int)
+                        ws.write(row_cur, 28, m_vals["m10"], fmt_cell_int)
+                        ws.write(row_cur, 29, m_vals["m11"], fmt_cell_int)
+                        ws.write(row_cur, 30, m_vals["m12"], fmt_cell_int)
+                        ws.write(row_cur, 31, q4, fmt_cell_int)
+                        ws.write(row_cur, 32, annual_hc, fmt_cell_int)
+                        ws.write(row_cur, 33, appr_target, fmt_cell_int)
+                        ws.write(row_cur, 34, prom, fmt_cell_int)
+                        ws.write(row_cur, 35, trans, fmt_cell_int)
+                        ws.write(row_cur, 36, lat, fmt_cell_int)
+                        ws.write(row_cur, 37, ext, fmt_cell_int)
+                        ws.write(row_cur, 38, tot_sourced, fmt_cell_int)
+                        ws.write(row_cur, 39, base_sal, fmt_cell_num_acc)
+                        ws.write(row_cur, 40, pension, fmt_cell_num_acc)
+                        ws.write(row_cur, 41, unit_cost, fmt_cell_num_acc)
+                        ws.write(row_cur, 42, annual_cost, fmt_cell_num_acc)
                         row_cur += 1
 
+                # TOTAL ROW
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
-                for ci in range(1, 8):
+                for ci in range(1, len(headers)):
                     ws.write(row_cur, ci, "", fmt_tot_label)
-                if row_cur > 6:
-                    ws.write_formula(row_cur, 8, f"=SUM(I7:I{row_cur})", fmt_tot_int)
-                else:
-                    ws.write(row_cur, 8, 0, fmt_tot_int)
-                ws.write(row_cur, 9, "", fmt_tot_label)
-                ws.write(row_cur, 10, "", fmt_tot_label)
 
-                ws.set_column(0, 0, 10)
-                ws.set_column(1, 1, 22)
-                ws.set_column(2, 2, 18)
-                ws.set_column(3, 3, 16)
-                ws.set_column(4, 4, 18)
-                ws.set_column(5, 5, 18)
-                ws.set_column(6, 6, 26)
-                ws.set_column(7, 7, 12)
-                ws.set_column(8, 8, 10)
-                ws.set_column(9, 9, 16)
-                ws.set_column(10, 10, 26)
+                int_sum_cols = [
+                    9, 10, 11,
+                    12,
+                    16, 17, 18, 19,
+                    20, 21, 22, 23,
+                    24, 25, 26, 27,
+                    28, 29, 30, 31,
+                    32, 33,
+                    34, 35, 36, 37, 38,
+                ]
+                for ci in int_sum_cols:
+                    if row_cur > 6:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(ci)
+                        ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_int)
+                    else:
+                        ws.write(row_cur, ci, 0, fmt_tot_int)
+
+                if row_cur > 6:
+                    c_letter = xlsxwriter.utility.xl_col_to_name(42)
+                    ws.write_formula(row_cur, 42, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                else:
+                    ws.write(row_cur, 42, 0.0, fmt_tot_num)
+
+                col_widths = [
+                    10, 24, 18, 16, 18, 18, 28, 12, 18,
+                    18, 14, 14, 10, 14, 26, 24,
+                    10, 10, 10, 14,
+                    10, 10, 10, 14,
+                    10, 10, 10, 14,
+                    10, 10, 10, 14,
+                    18, 16,
+                    12, 12, 12, 16, 14,
+                    16, 16, 18, 20,
+                ]
+                for ci, w in enumerate(col_widths):
+                    ws.set_column(ci, ci, w)
 
             elif cat in ("deposit", "customer_base"):
                 title = f"Deposit Plan by District and Deposit Type for the FY {clean_fy}" if cat == "deposit" else f"Customer Base Plan by District and Customer Type for the FY {clean_fy}"
@@ -7262,3 +7804,9 @@ class PbmsPlanningCategory(models.Model):
             ho_plan._compute_category_summaries()
 
         return ho_plan
+
+    def _register_hook(self):
+        super()._register_hook()
+        etb = self.env.ref("base.ETB", raise_if_not_found=False)
+        if etb and etb.symbol:
+            etb.sudo().write({"symbol": ""})

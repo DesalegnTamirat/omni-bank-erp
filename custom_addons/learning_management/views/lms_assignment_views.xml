@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_lms_assignment_list" model="ir.ui.view">
+            <field name="name">lms.course.assignment.list</field>
+            <field name="model">lms.course.assignment</field>
+            <field name="arch" type="xml">
+                <list string="Course Assignment Campaigns" decoration-info="state == 'draft'" decoration-success="state == 'executed'">
+                    <field name="name"/>
+                    <field name="course_id"/>
+                    <field name="assignment_type" widget="badge"/>
+                    <field name="is_mandatory" widget="boolean_toggle"/>
+                    <field name="due_date"/>
+                    <field name="enrolled_count" string="Learners Enrolled"/>
+                    <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'executed'"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_lms_assignment_form" model="ir.ui.view">
+            <field name="name">lms.course.assignment.form</field>
+            <field name="model">lms.course.assignment</field>
+            <field name="arch" type="xml">
+                <form string="Course Assignment Campaign">
+                    <header>
+                        <button name="action_execute_assignment" string="Execute Campaign &amp; Enroll Learners" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,executed"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Campaign Title"/>
+                            <h1><field name="name" placeholder="e.g. FY2026 Q1 Bank-Wide AML/CFT Mandatory Certification"/></h1>
+                        </div>
+                        <group>
+                            <group string="Course &amp; Urgency">
+                                <field name="course_id" options="{'no_create': True}"/>
+                                <field name="learning_path_id" options="{'no_create': True}"/>
+                                <field name="is_mandatory"/>
+                                <field name="due_date"/>
+                            </group>
+                            <group string="Target Audience Scope (FR-LMS-003)">
+                                <field name="assignment_type"/>
+                                <field name="enrolled_count" readonly="1" invisible="state != 'executed'"/>
+                            </group>
+                        </group>
+
+                        <group string="Audience Filters">
+                            <field name="employee_ids" widget="many2many_tags" invisible="assignment_type != 'individual'"/>
+                            <field name="department_ids" widget="many2many_tags" invisible="assignment_type != 'department'"/>
+                            <field name="operating_unit_ids" widget="many2many_tags" invisible="assignment_type != 'operating_unit'"/>
+                            <field name="job_ids" widget="many2many_tags" invisible="assignment_type != 'job_position'"/>
+                            <field name="grade_ids" widget="many2many_tags" invisible="assignment_type != 'grade'"/>
+                            <field name="target_competency_id" options="{'no_create': True}" placeholder="Target specific competency gap (Optional)"/>
+                        </group>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_lms_assignment_all" model="ir.actions.act_window">
+            <field name="name">Assignment Campaigns</field>
+            <field name="res_model">lms.course.assignment</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+    </data>
+</odoo>

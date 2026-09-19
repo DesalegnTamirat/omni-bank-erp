@@ -17,6 +17,7 @@ class CompetencyDirectorPeerConfig(models.Model):
 
     director_id = fields.Many2one(
         'hr.employee', string='Director', required=True, ondelete='cascade',
+        domain="[('is_director_or_chief', '=', True), ('active', '=', True)]",
         index=True)
     job_id = fields.Many2one(
         'hr.job', related='director_id.job_id', string='Job Position', store=True, readonly=True)
@@ -201,8 +202,14 @@ class CompetencyDirectorPeerConfig(models.Model):
             dir_g_num = self._get_grade_number(dir_emp)
             dir_grade_id = rec.grade_id.id if rec.grade_id else False
 
-            domain = [('id', '!=', dir_emp.id), ('active', '=', True)]
-            all_emps = self.env['hr.employee'].search(domain)
+            # Search active directors and chiefs efficiently
+            all_emps = self.env['hr.employee'].search([
+                ('id', '!=', dir_emp.id),
+                ('active', '=', True),
+                ('is_director_or_chief', '=', True)
+            ])
+            if not all_emps:
+                all_emps = self.env['hr.employee'].search([('id', '!=', dir_emp.id), ('active', '=', True)])
 
             if dir_g_num in (16, 17):
                 candidates = all_emps.filtered(lambda c: self._get_grade_number(c) == dir_g_num)
@@ -224,20 +231,30 @@ class CompetencyDirectorPeerConfig(models.Model):
                 if existing:
                     raise ValidationError(_("A peer configuration record already exists for Director '%s'.") % rec.director_id.name)
 
+    @api.constrains('director_id')
+    def _check_director_grade(self):
+        for rec in self:
+            if rec.director_id and not self._is_director_or_chief(rec.director_id):
+                raise ValidationError(_("Employee '%s' cannot be configured here. Director Peer Configuration is strictly reserved for Directors (Grade XVI) and Chiefs (Grade XVII).") % rec.director_id.name)
+
     @api.model
     def action_generate_director_records(self):
-        """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging Grade II, III, IV, etc. non-executive entries."""
-        all_employees = self.env['hr.employee'].search([('active', '=', True)])
-        director_emp_ids = set()
+        """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging non-executive entries."""
+        director_emps = self.env['hr.employee'].search([
+            ('active', '=', True),
+            ('is_director_or_chief', '=', True)
+        ])
+        if not director_emps:
+            all_employees = self.env['hr.employee'].search([('active', '=', True)])
+            director_emps = all_employees.filtered(lambda e: self._is_director_or_chief(e))
 
-        for emp in all_employees:
-            if self._is_director_or_chief(emp):
-                director_emp_ids.add(emp.id)
+        director_emp_ids = set(director_emps.ids)
 
         # Purge non-director/non-chief config records (e.g. Grade II, III, IV, etc.)
-        invalid_configs = self.search([('director_id', 'not in', list(director_emp_ids))])
-        if invalid_configs:
-            invalid_configs.unlink()
+        if director_emp_ids:
+            invalid_configs = self.search([('director_id', 'not in', list(director_emp_ids))])
+            if invalid_configs:
+                invalid_configs.unlink()
 
         existing_director_ids = set(self.search([]).mapped('director_id.id'))
         created_count = 0
@@ -259,4 +276,18 @@ class CompetencyDirectorPeerConfig(models.Model):
                 'sticky': False,
             }
         }
+
+    @api.model
+    def action_open_director_peer_config(self):
+        """Auto-populate any newly appointed Directors/Chiefs before displaying configuration."""
+        self.action_generate_director_records()
+        return self.env.ref('competency_management.action_competency_director_peer_config').read()[0]
+
+    def _register_hook(self):
+        super()._register_hook()
+        # Scan and populate when the module / server registry loads
+        try:
+            self.sudo().action_generate_director_records()
+        except Exception:
+            pass
 

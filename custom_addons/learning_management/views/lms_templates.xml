@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Public Certificate Verification Page (Success) -->
+        <template id="certificate_verify_success" name="Certificate Verification Success">
+            <t t-call="web.layout">
+                <div class="container my-5">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                                <div class="card-header text-white text-center py-4" style="background-color: #541718;">
+                                    <h2 class="fw-bold mb-1"><i class="fa fa-shield me-2"/>Bunna Bank Digital Certificate Verification</h2>
+                                    <p class="mb-0 opacity-75">Institutional Credential Verification Service</p>
+                                </div>
+                                <div class="card-body p-5 text-center bg-light">
+                                    <div class="mb-4">
+                                        <span t-if="is_valid" class="badge bg-success fs-5 px-4 py-2 rounded-pill shadow-sm">
+                                            <i class="fa fa-check-circle me-2"/>OFFICIALLY VERIFIED &amp; VALID
+                                        </span>
+                                        <span t-else="" class="badge bg-danger fs-5 px-4 py-2 rounded-pill shadow-sm">
+                                            <i class="fa fa-exclamation-triangle me-2"/>CERTIFICATE EXPIRED OR REVOKED
+                                        </span>
+                                    </div>
+
+                                    <div class="bg-white p-4 rounded-3 border shadow-sm text-start mb-4">
+                                        <div class="row mb-3">
+                                            <div class="col-sm-4 fw-bold text-muted">Certificate Number:</div>
+                                            <div class="col-sm-8 fw-bold fs-5 text-dark"><t t-esc="cert_number"/></div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-sm-4 fw-bold text-muted">Certified Learner:</div>
+                                            <div class="col-sm-8 fw-bold fs-5" style="color: #541718;"><t t-esc="learner_name"/></div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-sm-4 fw-bold text-muted">Training Program:</div>
+                                            <div class="col-sm-8 fw-bold text-dark"><t t-esc="course_name"/></div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-sm-4 fw-bold text-muted">Issuance Date:</div>
+                                            <div class="col-sm-8 text-dark"><t t-esc="issue_date"/></div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-sm-4 fw-bold text-muted">Validity Expiration:</div>
+                                            <div class="col-sm-8 text-dark"><t t-esc="expiry_date"/></div>
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-sm-4 fw-bold text-muted">Verification Hash:</div>
+                                            <div class="col-sm-8 font-monospace small text-muted"><t t-esc="cert.verification_code"/></div>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-muted small mb-0">
+                                        This digital credential record was authenticated directly from Bunna Bank S.C. Learning Management System.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+        <!-- Public Certificate Verification Page (Not Found) -->
+        <template id="certificate_verify_not_found" name="Certificate Not Found">
+            <t t-call="web.layout">
+                <div class="container my-5 text-center">
+                    <div class="card shadow border-0 rounded-4 p-5 mx-auto" style="max-width: 600px;">
+                        <div class="text-danger mb-3">
+                            <i class="fa fa-times-circle fa-4x"/>
+                        </div>
+                        <h2 class="fw-bold text-danger">Invalid Certificate Hash</h2>
+                        <p class="text-muted">
+                            No certificate matching code <code><t t-esc="code"/></code> could be verified in the Bunna Bank LMS database.
+                        </p>
+                    </div>
+                </div>
+            </t>
+        </template>
+
+    </data>
+</odoo>

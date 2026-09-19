@@ -26,11 +26,11 @@ class PbmsDashboard(models.AbstractModel):
             cat = g.get("category") or "unknown"
             unit_type = g.get("org_unit_type") or "unknown"
             per_category.setdefault(cat, {}).setdefault(unit_type, {})[g["state"]] = g["__count"]
-        for cat, by_unit in per_category.items():
+        for cat, label in category_labels.items():
             result.append({
                 "model": cat,
-                "label": category_labels.get(cat, cat),
-                "counts": by_unit,
+                "label": label,
+                "counts": per_category.get(cat, {}),
             })
         return result
 
@@ -55,3 +55,25 @@ class PbmsDashboard(models.AbstractModel):
             [], ["id", "name", "state"], order="date_start desc", limit=10,
         )
         return cycles
+
+    @api.model
+    def get_dashboard_data(self, cycle_id=None):
+        """Batched RPC endpoint for OWL dashboard:
+        Fetches cycles, resolves active cycle, submission status, and KPI summary
+        in a single client-server network round-trip.
+        """
+        cycles = self.get_cycles()
+        active_cycle_id = cycle_id
+        if not active_cycle_id and cycles:
+            open_cycle = next((c for c in cycles if c.get("state") == "open"), None)
+            active_cycle_id = open_cycle["id"] if open_cycle else cycles[0]["id"]
+
+        submission = self.get_submission_status(active_cycle_id) if active_cycle_id else []
+        kpi = self.get_kpi_summary(active_cycle_id) if active_cycle_id else []
+        return {
+            "cycles": cycles,
+            "active_cycle_id": active_cycle_id,
+            "submission": submission,
+            "kpi": kpi,
+        }
+

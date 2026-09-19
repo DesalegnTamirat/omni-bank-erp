@@ -82,29 +82,259 @@
             <list decoration-muted="state == 'draft'"
                   decoration-success="state == 'approved'"
                   decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
-                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested')">
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'people_solutions_review', 'cpco_review', 'committee_review', 'ceo_approval')">
                 <field name="request_number" string="Request No." optional="show"/>
                 <field name="plan_category_title" string="Plan Scope" optional="show"/>
-                <field name="category" optional="hide"/>
+                <field name="category" optional="show"/>
                 <field name="org_unit_id"/>
                 <field name="sol_id" string="Sol ID" optional="show"/>
                 <field name="work_unit_type" optional="show"/>
                 <field name="district_id" optional="hide"/>
-                <field name="justification_category_id" optional="hide" invisible="category != 'manpower'"/>
-                <field name="deposit_type_id" optional="hide" invisible="category not in ('deposit', 'customer_base')"/>
-                <field name="plan_category" optional="hide" invisible="category != 'deposit'"/>
-                <field name="base_type" optional="hide" invisible="category != 'customer_base'"/>
-                <field name="fx_source_type" optional="hide" invisible="category != 'fx'"/>
-                <field name="channel_id" optional="hide" invisible="category != 'digital_banking'"/>
-                <field name="expense_account_id" optional="hide" invisible="category != 'general_expense'"/>
                 <field name="cycle_id"/>
-                <field name="annual_total" sum="Total" optional="show"/>
-                <field name="total_manpower_cost" sum="Total Manpower Cost" optional="show" invisible="category != 'manpower'"/>
-                <field name="line_count" optional="show"/>
-                <field name="total_estimated_amount" sum="Total FA Cost" optional="hide" invisible="category != 'fixed_asset'"/>
+
+                <!-- Category Specific: Workforce (only visible when default_category is manpower) -->
+                <field name="manpower_total_headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Requested Headcount" sum="Total Requested" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_approved_headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Approved Headcount" sum="Total Approved" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_total_promotion" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Promotion" sum="Total Promotion" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_total_transfer" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Transfer" sum="Total Transfer" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_total_lateral" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Lateral" sum="Total Lateral" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_total_external" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="External Vacancy" sum="Total External" class="text-danger fw-bold" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_total_fulfillment" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Total Sourced" sum="Total Sourced" class="fw-bold" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="manpower_fulfillment_balance" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Sourcing Balance" optional="hide" column_invisible="context.get('default_category') != 'manpower'"/>
+                <field name="total_manpower_cost" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" sum="Total Manpower Cost" optional="show" column_invisible="context.get('default_category') != 'manpower'"/>
+
+                <!-- Category Specific: Fixed Asset (only visible when default_category is fixed_asset) -->
+                <field name="fixed_asset_total_quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Requested Quantity" sum="Total Requested Qty" optional="show" column_invisible="context.get('default_category') != 'fixed_asset'"/>
+                <field name="fixed_asset_approved_quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Approved Quantity" sum="Total Approved Qty" optional="show" column_invisible="context.get('default_category') != 'fixed_asset'"/>
+                <field name="total_estimated_amount" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Estimated Cost" sum="Total Estimated Cost" optional="show" column_invisible="context.get('default_category') != 'fixed_asset'"/>
+                <field name="fixed_asset_approved_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Approved Cost" sum="Total Approved Cost" optional="show" column_invisible="context.get('default_category') != 'fixed_asset'"/>
+                <field name="fixed_asset_line_count" widget="integer" digits="[16, 0]" string="Asset Items Count" sum="Total Asset Items" optional="show" column_invisible="context.get('default_category') != 'fixed_asset'"/>
+
+                <!-- Category Specific: General Expense (only visible when default_category is general_expense) -->
+                <field name="expense_account_id" optional="show" column_invisible="context.get('default_category') != 'general_expense'"/>
+                <field name="expense_proposed_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Proposed Budget" sum="Total Proposed Budget" optional="show" column_invisible="context.get('default_category') != 'general_expense'"/>
+                <field name="expense_approved_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Approved Budget" sum="Total Approved Budget" optional="show" column_invisible="context.get('default_category') != 'general_expense'"/>
+                <field name="expense_annual_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Annual Budget" sum="Total Annual Budget" optional="show" column_invisible="context.get('default_category') != 'general_expense'"/>
+                <field name="expense_line_count" widget="integer" digits="[16, 0]" string="Expense Lines" sum="Total Lines" optional="show" column_invisible="context.get('default_category') != 'general_expense'"/>
+
+                <!-- Common summary / totals -->
+                <field name="annual_total" sum="Total" optional="show" options="{'no_symbol': True}"/>
+                <field name="line_count" widget="integer" digits="[16, 0]" optional="show"/>
                 <field name="state" widget="badge"
                        decoration-success="state == 'approved'"
-                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested')"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'people_solutions_review', 'cpco_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: FIXED ASSET         -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_fixed_asset" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.fixed_asset</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" column_invisible="1"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="fixed_asset_total_quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Requested Quantity" sum="Total Requested Qty" optional="show"/>
+                <field name="fixed_asset_approved_quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Approved Quantity" sum="Total Approved Qty" optional="show"/>
+                <field name="total_estimated_amount" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Estimated Cost" sum="Total Estimated Cost" optional="show"/>
+                <field name="fixed_asset_approved_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Approved Cost" sum="Total Approved Cost" optional="show"/>
+                <field name="fixed_asset_line_count" widget="integer" digits="[16, 0]" string="Asset Items Count" sum="Total Asset Items" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: WORKFORCE           -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_manpower" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.manpower</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'people_solutions_review', 'cpco_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" column_invisible="1"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="justification_category_id" optional="hide"/>
+                <field name="existing_total_active" widget="integer" digits="[16, 0]" string="Active Staff" sum="Total Active" optional="hide"/>
+                <field name="existing_total_authorized" widget="integer" digits="[16, 0]" string="Authorized Baseline" sum="Total Baseline" optional="hide"/>
+                <field name="manpower_total_headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Requested Headcount" sum="Total Requested" optional="show"/>
+                <field name="manpower_approved_headcount" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Approved Headcount" sum="Total Approved" optional="show"/>
+                <field name="manpower_total_promotion" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Promotion" sum="Total Promotion" optional="show"/>
+                <field name="manpower_total_transfer" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Transfer" sum="Total Transfer" optional="show"/>
+                <field name="manpower_total_lateral" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Lateral" sum="Total Lateral" optional="show"/>
+                <field name="manpower_total_external" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="External Vacancy" sum="Total External" class="text-danger fw-bold" optional="show"/>
+                <field name="manpower_total_fulfillment" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Total Sourced" sum="Total Sourced" class="fw-bold" optional="show"/>
+                <field name="manpower_fulfillment_balance" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" string="Sourcing Balance" optional="hide"/>
+                <field name="total_manpower_cost" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Total Manpower Cost" sum="Total Cost" optional="show"/>
+                <field name="manpower_line_count" widget="integer" digits="[16, 0]" string="Positions Planned" sum="Total Positions" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'people_solutions_review', 'cpco_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: GENERAL EXPENSE     -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_expense" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.expense</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" column_invisible="1"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="expense_account_id" optional="show"/>
+                <field name="expense_proposed_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Proposed Budget" sum="Total Proposed Budget" optional="show"/>
+                <field name="expense_approved_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Approved Budget" sum="Total Approved Budget" optional="show"/>
+                <field name="expense_annual_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Annual Budget" sum="Annual Total" optional="show"/>
+                <field name="expense_line_count" widget="integer" digits="[16, 0]" string="Expense Lines" sum="Total Expense Lines" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: RETAIL BANKING      -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_retail" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.retail</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" string="Type" optional="show"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="deposit_type_id" optional="show" invisible="category != 'deposit'"/>
+                <field name="base_type" optional="show" invisible="category != 'customer_base'"/>
+                <field name="annual_total" string="Proposed Target" sum="Total Proposed" optional="show" options="{'no_symbol': True}"/>
+                <field name="deposit_approved_total" string="Approved Target" sum="Total Approved" optional="show" options="{'no_symbol': True}"/>
+                <field name="line_count" widget="integer" digits="[16, 0]" string="Target Lines" sum="Total Lines" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: FX MOBILIZATION     -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_fx" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.fx</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" column_invisible="1"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="fx_source_type" optional="show"/>
+                <field name="fx_proposed_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Proposed FX Target" sum="Total Proposed FX" optional="show"/>
+                <field name="fx_approved_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Approved FX Target" sum="Total Approved FX" optional="show"/>
+                <field name="fx_annual_total" widget="monetary" options="{'no_symbol': True, 'currency_field': 'currency_id'}" string="Annual FX Total" sum="Annual Total" optional="show"/>
+                <field name="line_count" widget="integer" digits="[16, 0]" string="Target Lines" sum="Total Lines" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')"
+                       decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                       decoration-muted="state == 'draft'"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================ -->
+    <!-- DEDICATED CATEGORY LIST: DIGITAL BANKING     -->
+    <!-- ============================================ -->
+    <record id="view_pbms_planning_category_list_digital" model="ir.ui.view">
+        <field name="name">pbms.planning.category.list.digital</field>
+        <field name="model">pbms.planning.category</field>
+        <field name="arch" type="xml">
+            <list decoration-muted="state == 'draft'"
+                  decoration-success="state == 'approved'"
+                  decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
+                  decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')">
+                <field name="request_number" string="Request No." optional="show"/>
+                <field name="plan_category_title" string="Plan Scope" optional="show"/>
+                <field name="category" column_invisible="1"/>
+                <field name="org_unit_id"/>
+                <field name="sol_id" string="Sol ID" optional="show"/>
+                <field name="work_unit_type" optional="show"/>
+                <field name="district_id" optional="hide"/>
+                <field name="cycle_id"/>
+                <field name="channel_id" optional="show"/>
+                <field name="digital_banking_proposed_total" widget="float" string="Proposed Target" sum="Total Proposed Target" optional="show"/>
+                <field name="digital_banking_approved_total" widget="float" string="Approved Target" sum="Total Approved Target" optional="show"/>
+                <field name="digital_banking_annual_total" widget="float" string="Annual Total" sum="Annual Total" optional="show"/>
+                <field name="line_count" widget="integer" digits="[16, 0]" string="Target Lines" sum="Total Lines" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'approved'"
+                       decoration-warning="state in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed', 'info_requested', 'chief_review', 'committee_review', 'ceo_approval')"
                        decoration-danger="state in ('returned', 'rejection_recommended', 'rejected')"
                        decoration-muted="state == 'draft'"/>
                 <field name="currency_id" column_invisible="1"/>
@@ -321,6 +551,90 @@
         <field name="context">{'search_default_pending': 1, 'default_category': 'fixed_asset'}</field>
     </record>
 
+    <!-- Review Window Action Views: Retail Banking -->
+    <record id="action_pbms_review_retail_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_retail"/>
+    </record>
+    <record id="action_pbms_review_retail_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_retail"/>
+        <field name="act_window_id" ref="action_pbms_review_retail"/>
+    </record>
+
+    <!-- Review Window Action Views: Workforce / Manpower -->
+    <record id="action_pbms_review_workforce_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_workforce"/>
+    </record>
+    <record id="action_pbms_review_workforce_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_manpower"/>
+        <field name="act_window_id" ref="action_pbms_review_workforce"/>
+    </record>
+
+    <!-- Review Window Action Views: FX Mobilization -->
+    <record id="action_pbms_review_fx_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_fx"/>
+    </record>
+    <record id="action_pbms_review_fx_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_fx"/>
+        <field name="act_window_id" ref="action_pbms_review_fx"/>
+    </record>
+
+    <!-- Review Window Action Views: Digital Banking -->
+    <record id="action_pbms_review_digital_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_digital"/>
+    </record>
+    <record id="action_pbms_review_digital_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_digital"/>
+        <field name="act_window_id" ref="action_pbms_review_digital"/>
+    </record>
+
+    <!-- Review Window Action Views: General Expense -->
+    <record id="action_pbms_review_expense_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_expense"/>
+    </record>
+    <record id="action_pbms_review_expense_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_expense"/>
+        <field name="act_window_id" ref="action_pbms_review_expense"/>
+    </record>
+
+    <!-- Review Window Action Views: Fixed Assets -->
+    <record id="action_pbms_review_fixed_asset_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_pbms_planning_category_kanban"/>
+        <field name="act_window_id" ref="action_pbms_review_fixed_asset"/>
+    </record>
+    <record id="action_pbms_review_fixed_asset_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_pbms_planning_category_list_fixed_asset"/>
+        <field name="act_window_id" ref="action_pbms_review_fixed_asset"/>
+    </record>
+
 
 
     <!-- ============================================ -->
@@ -394,8 +708,15 @@
                 <field name="hc_m12" string="Jun" column_invisible="line_type != 'manpower'" optional="show"/>
                 <field name="q4" sum="Q4 Total" string="Q4 (Apr-Jun)" class="fw-bold" column_invisible="line_type != 'manpower'" optional="show"/>
 
-                <field name="quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Positions" string="Requested Headcount" class="fw-bold text-primary" column_invisible="line_type != 'manpower'"/>
-                <field name="total_establishment" sum="Total Establishment" string="Total Approved Establishment" class="fw-bold text-success" column_invisible="line_type != 'manpower'"/>
+                <field name="quantity" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Requested" string="Requested Headcount" class="fw-bold text-primary" column_invisible="line_type != 'manpower'"/>
+                <field name="display_approved_annual_total" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" sum="Total Approved" string="Approved Headcount" class="fw-bold text-success" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_promotion" string="Promotion" sum="Total Promotion" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_transfer" string="Transfer" sum="Total Transfer" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_lateral" string="Lateral" sum="Total Lateral" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_external" string="External Vacancy" sum="Total External" class="text-danger fw-bold" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_total" string="Total Sourced" sum="Sum Sourced" class="fw-bold" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="show"/>
+                <field name="fulfillment_balance" string="Sourcing Balance" widget="integer" digits="[16, 0]" options="{'digits': [16, 0]}" column_invisible="line_type != 'manpower'" optional="hide"/>
+                <field name="total_establishment" sum="Total Establishment" string="Total Approved Establishment" class="fw-bold text-success" column_invisible="line_type != 'manpower'" optional="hide"/>
 
                 <!-- Monthly & Quarterly Targets for Other Planning Categories -->
                 <field name="m01" string="Jul" column_invisible="line_type in ('manpower', 'fixed_asset')" optional="show" options="{'no_symbol': True}"/>
@@ -777,7 +1098,7 @@
                 <header>
                     <!-- Submitter / Branch actions -->
                     <button name="action_submit" type="object" string="Submit Plan" icon="fa-paper-plane"
-                            invisible="org_unit_type == 'head_office' or state not in ('draft', 'returned', 'info_requested') or not is_cycle_open" class="btn-primary"/>
+                            invisible="state not in ('draft', 'returned', 'info_requested') or not is_cycle_open" class="btn-primary"/>
 
                     <button name="action_reset_to_draft" type="object" string="Reset to Draft" icon="fa-undo"
                             invisible="state not in ('submitted', 'returned', 'info_requested')" class="btn-secondary"/>
@@ -797,8 +1118,15 @@
 
                     <button name="%(bunna_pbms.action_pbms_target_cascade_district_wizard)d" type="action"
                             string="Cascade Targets to Branches" icon="fa-share-alt"
-                            invisible="category == 'manpower' or org_unit_type != 'district_office' or not has_cascaded_targets" class="btn-primary"
+                            invisible="category == 'manpower' or org_unit_type != 'district_office' or not has_cascaded_targets or is_targets_cascaded" class="btn-primary"
                             context="{'default_plan_id': id, 'default_cascade_level': 'district_to_branch'}"
+                            groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="action_already_cascaded_notice" type="object"
+                            string="Cascaded" icon="fa-check-circle"
+                            invisible="category == 'manpower' or org_unit_type != 'district_office' or not has_cascaded_targets or not is_targets_cascaded"
+                            class="btn-success"
+                            title="Targets have already been cascaded to child branches to prevent double cascade."
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <!-- Head Office Functional Reviewer Action: Final Approve for Mobilization Categories -->
@@ -810,7 +1138,7 @@
                     <!-- Head Office Functional Reviewer Action: Submit to Review Committee for General Expense and Fixed Asset -->
                     <button name="action_submit_to_committee" type="object"
                             string="Submit to Review Committee" icon="fa-users"
-                            invisible="category not in ('general_expense', 'fixed_asset') or (org_unit_type != 'head_office' and state not in ('district_approved', 'district_endorsed')) or (org_unit_type == 'head_office' and state not in ('submitted', 'ho_reviewed', 'district_approved', 'district_endorsed'))" class="btn-primary"
+                            invisible="category not in ('general_expense', 'fixed_asset') or state not in ('submitted', 'district_approved', 'district_endorsed', 'ho_reviewed')" class="btn-primary"
                             groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <!-- Review Committee Action: Final Approve for General Expense and Fixed Asset -->
@@ -823,13 +1151,13 @@
                     <!-- Manpower Category Specific Workflow Buttons -->
                     <button name="action_district_approve_workforce" type="object"
                             string="Review &amp; Escalate to Chief" icon="fa-arrow-circle-right"
-                            invisible="category != 'manpower' or state not in ('submitted', 'info_requested')"
+                            invisible="category != 'manpower' or state not in ('submitted', 'info_requested') or org_unit_type == 'head_office'"
                             class="btn-primary"
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <button name="action_chief_approve_escalate" type="object"
                             string="Chief Approve &amp; Escalate" icon="fa-check-circle"
-                            invisible="category != 'manpower' or state not in ('chief_review', 'district_approved', 'district_endorsed')"
+                            invisible="not can_chief_review"
                             class="btn-success"
                             groups="bunna_pbms.group_pbms_respective_chief,bunna_pbms.group_pbms_manager"/>
 
@@ -871,8 +1199,15 @@
 
                     <button name="%(bunna_pbms.action_pbms_target_cascade_ho_wizard)d" type="action"
                             string="Cascade Targets to Districts" icon="fa-share-alt"
-                            invisible="category == 'manpower' or org_unit_type != 'head_office' or state != 'approved'" class="btn-primary"
+                            invisible="category == 'manpower' or org_unit_type != 'head_office' or state != 'approved' or is_targets_cascaded" class="btn-primary"
                             context="{'default_plan_id': id, 'default_cascade_level': 'ho_to_district'}"
+                            groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+
+                    <button name="action_already_cascaded_notice" type="object"
+                            string="Cascaded" icon="fa-check-circle"
+                            invisible="category == 'manpower' or org_unit_type != 'head_office' or state != 'approved' or not is_targets_cascaded"
+                            class="btn-success"
+                            title="Targets have already been cascaded to districts to prevent double cascade."
                             groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <!-- SPPMD Final Approver Action Buttons (for non-mobilization/resource categories) -->
@@ -921,6 +1256,7 @@
                 <sheet>
                     <field name="is_cycle_open" invisible="1"/>
                     <field name="cycle_state" invisible="1"/>
+                    <field name="is_targets_cascaded" invisible="1"/>
                     <div class="alert alert-warning d-flex align-items-center mb-3" role="alert" invisible="is_cycle_open">
                         <i class="fa fa-exclamation-triangle fa-2x me-3 text-warning"/>
                         <div>
@@ -928,7 +1264,7 @@
                             <span>
                                 The planning cycle <strong><field name="cycle_id" readonly="1" options="{'no_open': True}"/></strong> is currently in 
                                 <strong><field name="cycle_state" readonly="1"/></strong> status. 
-                                Branch users cannot input, import, or submit plan targets until the cycle is officially opened for input by SPPMD.
+                                Operating unit users (Branch &amp; Head Office) cannot input, import, or submit plan targets until the cycle is officially opened for input by SPPMD.
                             </span>
                         </div>
                     </div>
@@ -959,9 +1295,10 @@
                     <group>
                         <group>
                             <field name="cycle_id" readonly="state not in ('draft', 'returned', 'info_requested')"/>
-                            <field name="org_unit_id" readonly="state not in ('draft', 'returned', 'info_requested')"/>
+                            <field name="org_unit_id" readonly="is_planning_request or state not in ('draft', 'returned', 'info_requested')"/>
                             <field name="sol_id" string="Sol ID" readonly="1"/>
                             <field name="work_unit_type" readonly="1"/>
+                            <field name="category" readonly="state not in ('draft', 'returned', 'info_requested')" invisible="is_planning_request"/>
                         </group>
                         <group>
                             <field name="currency_id" groups="base.group_multi_currency"/>
@@ -990,7 +1327,6 @@
 
 
                     <!-- Hidden Category & Measurement Type Flags -->
-                    <field name="category" invisible="1"/>
                     <field name="has_cascaded_targets" invisible="1"/>
                     <field name="is_planning_request" invisible="1"/>
                     <field name="is_deposit_monetary" invisible="1"/>
@@ -1025,6 +1361,12 @@
                     <field name="available_job_ids" invisible="1"/>
                     <field name="can_add_lines" invisible="1"/>
                     <field name="can_edit_content" invisible="1"/>
+                    <field name="can_add_expense_lines" invisible="1"/>
+                    <field name="can_edit_expense" invisible="1"/>
+                    <field name="can_add_fixed_asset_lines" invisible="1"/>
+                    <field name="can_edit_fixed_asset" invisible="1"/>
+                    <field name="can_add_manpower_lines" invisible="1"/>
+                    <field name="can_edit_manpower" invisible="1"/>
                     <field name="can_committee_review" invisible="1"/>
                     <field name="can_hr_fulfill" invisible="1"/>
                     <field name="can_chief_review" invisible="1"/>
@@ -1498,7 +1840,7 @@
                                     <field name="expense_q4_total" widget="integer" readonly="1" string="Q4 Total" invisible="is_expense_monetary"/>
                                 </group>
                             </group>
-                            <field name="expense_line_ids" string="General Expense Lines" context="{'default_line_type': 'general_expense', 'default_plan_id': id}" readonly="not can_edit_content" options="{'create': [('can_add_lines', '=', True)], 'delete': [('can_add_lines', '=', True)]}">
+                            <field name="expense_line_ids" string="General Expense Lines" context="{'default_line_type': 'general_expense', 'default_plan_id': id}" readonly="not can_edit_expense" options="{'create': [('can_add_expense_lines', '=', True)], 'delete': [('can_add_expense_lines', '=', True)]}">
 
                                 <list editable="bottom">
                                     <field name="line_type" column_invisible="1"/>
@@ -1584,9 +1926,9 @@
                                     <group>
                                         <group string="Headcount &amp; Cost Overview">
                                             <field name="manpower_line_count" string="Requested Position Types"/>
-                                            <field name="current_staff_salary_budget" widget="monetary" options="{'no_symbol': True}" string="Current Staff Salary (hr_contract)"/>
-                                            <field name="new_planned_salary_budget" widget="monetary" options="{'no_symbol': True}" string="New Planned Staff Cost (hr_employee_grade)"/>
-                                            <field name="total_operating_unit_manpower_budget" widget="monetary" options="{'no_symbol': True}" string="Total Operating Unit Workforce Budget" class="fw-bold fs-5 text-primary"/>
+                                            <field name="current_staff_salary_budget" widget="monetary" options="{'no_symbol': True}" string="Current Staff Salary (hr_contract)" readonly="1" force_save="1"/>
+                                            <field name="new_planned_salary_budget" widget="monetary" options="{'no_symbol': True}" string="New Planned Staff Cost (hr_employee_grade)" readonly="1" force_save="1"/>
+                                            <field name="total_operating_unit_manpower_budget" widget="monetary" options="{'no_symbol': True}" string="Total Operating Unit Workforce Budget" class="fw-bold fs-5 text-primary" readonly="1" force_save="1"/>
                                         </group>
                                         <group string="Quarterly Cost Rollup">
                                             <field name="q1_total_cost" widget="monetary" options="{'no_symbol': True}" readonly="1" string="Q1 Total Cost"/>
@@ -1619,7 +1961,7 @@
                                      </div>
 
                                      <!-- Manpower Requirement Lines -->
-                                     <field name="manpower_line_ids" string="Workforce Requirement Lines" context="{'default_line_type': 'manpower', 'default_plan_id': id}" readonly="not can_edit_content and not can_cpco_review and not can_committee_review and not can_chief_review and not can_ceo_approve" options="{'create': [('can_add_lines', '=', True)], 'delete': [('can_add_lines', '=', True)]}">
+                                     <field name="manpower_line_ids" string="Workforce Requirement Lines" context="{'default_line_type': 'manpower', 'default_plan_id': id}" readonly="not can_edit_manpower and not can_people_solutions_review and not can_cpco_review and not can_committee_review and not can_chief_review and not can_ceo_approve" options="{'create': [('can_add_manpower_lines', '=', True)], 'delete': [('can_add_manpower_lines', '=', True)]}">
 
                                          <list editable="bottom">
                                             <field name="line_type" column_invisible="1"/>
@@ -1784,7 +2126,7 @@
                             </group>
 
                             <!-- Fixed Asset Lines -->
-                            <field name="fixed_asset_line_ids" string="Asset Requirements" context="{'default_line_type': 'fixed_asset', 'default_plan_id': id}" readonly="not can_edit_content" options="{'create': [('can_add_lines', '=', True)], 'delete': [('can_add_lines', '=', True)]}">
+                            <field name="fixed_asset_line_ids" string="Asset Requirements" context="{'default_line_type': 'fixed_asset', 'default_plan_id': id}" readonly="not can_edit_fixed_asset" options="{'create': [('can_add_fixed_asset_lines', '=', True)], 'delete': [('can_add_fixed_asset_lines', '=', True)]}">
 
                                 <list editable="bottom">
                                     <field name="line_type" column_invisible="1"/>
@@ -1854,6 +2196,9 @@
         <field name="inherit_id" ref="bunna_pbms.view_pbms_planning_category_form"/>
         <field name="mode">primary</field>
         <field name="arch" type="xml">
+            <xpath expr="//field[@name='org_unit_id']" position="attributes">
+                <attribute name="readonly">1</attribute>
+            </xpath>
             <xpath expr="//page[@name='page_deposit']" position="attributes">
                 <attribute name="invisible">not enable_deposit</attribute>
             </xpath>

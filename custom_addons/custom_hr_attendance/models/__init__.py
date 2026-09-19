@@ -23,6 +23,7 @@ from . import attendance_preapproval_report
 from . import acknowledged_attendance_report
 from . import res_users
 from . import restrict_checkin
+from . import hr_employee
 from . import attendance_payroll_payload
 # Rolling violation counters
 from . import hr_employee_discipline_profile

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Categories -->
+        <record id="view_kms_category_list" model="ir.ui.view">
+            <field name="name">kms.category.list</field>
+            <field name="model">kms.category</field>
+            <field name="arch" type="xml">
+                <list string="Knowledge Categories">
+                    <field name="complete_name" string="Category Hierarchy"/>
+                    <field name="code"/>
+                    <field name="document_count" string="Documents"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_kms_category_form" model="ir.ui.view">
+            <field name="name">kms.category.form</field>
+            <field name="model">kms.category</field>
+            <field name="arch" type="xml">
+                <form string="Knowledge Category">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Category Name"/>
+                            <h1><field name="name" placeholder="e.g. Credit &amp; Lending Operations"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="code"/>
+                                <field name="parent_id" options="{'no_create': True}"/>
+                            </group>
+                            <group>
+                                <field name="color" widget="color_picker"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Description">
+                            <field name="description"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Document Types -->
+        <record id="view_kms_doc_type_list" model="ir.ui.view">
+            <field name="name">kms.document.type.list</field>
+            <field name="model">kms.document.type</field>
+            <field name="arch" type="xml">
+                <list string="Document Types">
+                    <field name="sequence" widget="handle"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="requires_approval" widget="boolean_toggle"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Classifications -->
+        <record id="view_kms_classification_list" model="ir.ui.view">
+            <field name="name">kms.classification.list</field>
+            <field name="model">kms.classification</field>
+            <field name="arch" type="xml">
+                <list string="Security Classifications">
+                    <field name="security_level" string="Level Rank"/>
+                    <field name="name"/>
+                    <field name="code"/>
+                    <field name="badge_color" widget="badge"/>
+                    <field name="watermark_mandatory" widget="boolean_toggle"/>
+                    <field name="download_restricted_default" widget="boolean_toggle"/>
+                    <field name="view_only_default" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="view_kms_classification_form" model="ir.ui.view">
+            <field name="name">kms.classification.form</field>
+            <field name="model">kms.classification</field>
+            <field name="arch" type="xml">
+                <form string="Security Classification">
+                    <sheet>
+                        <div class="oe_title">
+                            <label for="name" string="Classification Name"/>
+                            <h1><field name="name" placeholder="e.g. Confidential"/></h1>
+                        </div>
+                        <group>
+                            <group string="Identifier &amp; Display">
+                                <field name="code"/>
+                                <field name="security_level"/>
+                                <field name="badge_color"/>
+                            </group>
+                            <group string="Default Security Policies">
+                                <field name="watermark_mandatory"/>
+                                <field name="download_restricted_default"/>
+                                <field name="view_only_default"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <group string="Policy Description">
+                            <field name="description"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Tags -->
+        <record id="view_kms_tag_list" model="ir.ui.view">
+            <field name="name">kms.tag.list</field>
+            <field name="model">kms.tag</field>
+            <field name="arch" type="xml">
+                <list string="Knowledge Tags" editable="bottom">
+                    <field name="name"/>
+                    <field name="color" widget="color_picker"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Actions -->
+        <record id="action_kms_category" model="ir.actions.act_window">
+            <field name="name">Taxonomy Categories</field>
+            <field name="res_model">kms.category</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_kms_doc_type" model="ir.actions.act_window">
+            <field name="name">Document Types</field>
+            <field name="res_model">kms.document.type</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_kms_classification" model="ir.actions.act_window">
+            <field name="name">Security Classifications</field>
+            <field name="res_model">kms.classification</field>
+            <field name="view_mode">list,form</field>
+        </record>
+
+        <record id="action_kms_tag" model="ir.actions.act_window">
+            <field name="name">Tag Vocabulary</field>
+            <field name="res_model">kms.tag</field>
+            <field name="view_mode">list</field>
+        </record>
+
+    </data>
+</odoo>

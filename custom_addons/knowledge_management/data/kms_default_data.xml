@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- ========================================================= -->
+        <!-- SECURITY CLASSIFICATIONS (FR-KMS-002, FR-KMS-014/018)     -->
+        <!-- ========================================================= -->
+
+        <record id="kms_class_public" model="kms.classification">
+            <field name="name">Public</field>
+            <field name="code">PUB</field>
+            <field name="security_level">1</field>
+            <field name="badge_color">success</field>
+            <field name="watermark_mandatory">False</field>
+            <field name="download_restricted_default">False</field>
+            <field name="view_only_default">False</field>
+            <field name="description">Information approved for general public and external circulation.</field>
+        </record>
+
+        <record id="kms_class_internal" model="kms.classification">
+            <field name="name">Internal Use Only</field>
+            <field name="code">INT</field>
+            <field name="security_level">2</field>
+            <field name="badge_color">info</field>
+            <field name="watermark_mandatory">True</field>
+            <field name="download_restricted_default">False</field>
+            <field name="view_only_default">False</field>
+            <field name="description">Internal operational documents accessible to all verified Bunna Bank staff members.</field>
+        </record>
+
+        <record id="kms_class_confidential" model="kms.classification">
+            <field name="name">Confidential</field>
+            <field name="code">CONF</field>
+            <field name="security_level">3</field>
+            <field name="badge_color">warning</field>
+            <field name="watermark_mandatory">True</field>
+            <field name="download_restricted_default">True</field>
+            <field name="view_only_default">False</field>
+            <field name="description">Sensitive business, financial, or strategic documents restricted to authorized personnel.</field>
+        </record>
+
+        <record id="kms_class_strictly_confidential" model="kms.classification">
+            <field name="name">Strictly Confidential</field>
+            <field name="code">SCONF</field>
+            <field name="security_level">4</field>
+            <field name="badge_color">danger</field>
+            <field name="watermark_mandatory">True</field>
+            <field name="download_restricted_default">True</field>
+            <field name="view_only_default">True</field>
+            <field name="description">Executive, board, security, or legal documents with strict view-only policies and full audit tracking.</field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- DOCUMENT TYPES (FR-KMS-002)                               -->
+        <!-- ========================================================= -->
+
+        <record id="kms_type_policy" model="kms.document.type">
+            <field name="name">Bank Policy</field>
+            <field name="code">POL</field>
+            <field name="sequence">10</field>
+            <field name="requires_approval">True</field>
+            <field name="description">Institutional governance principles and regulatory compliance policies.</field>
+        </record>
+
+        <record id="kms_type_sop" model="kms.document.type">
+            <field name="name">Standard Operating Procedure (SOP)</field>
+            <field name="code">SOP</field>
+            <field name="sequence">20</field>
+            <field name="requires_approval">True</field>
+            <field name="description">Step-by-step instructions for executing standard banking operations.</field>
+        </record>
+
+        <record id="kms_type_manual" model="kms.document.type">
+            <field name="name">Operational Manual</field>
+            <field name="code">MAN</field>
+            <field name="sequence">30</field>
+            <field name="requires_approval">True</field>
+            <field name="description">Comprehensive operational handbooks and reference manuals.</field>
+        </record>
+
+        <record id="kms_type_directive" model="kms.document.type">
+            <field name="name">Regulatory Directive &amp; Circular</field>
+            <field name="code">DIR</field>
+            <field name="sequence">40</field>
+            <field name="requires_approval">True</field>
+            <field name="description">National Bank of Ethiopia (NBE) regulatory directives and internal compliance circulars.</field>
+        </record>
+
+        <record id="kms_type_guideline" model="kms.document.type">
+            <field name="name">Guideline &amp; Job Aid</field>
+            <field name="code">GDL</field>
+            <field name="sequence">50</field>
+            <field name="requires_approval">False</field>
+            <field name="description">Practical field guides, checklists, and quick reference job aids.</field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- TAXONOMY CATEGORIES (FR-KMS-002, FR-KMS-003)              -->
+        <!-- ========================================================= -->
+
+        <record id="kms_cat_credit" model="kms.category">
+            <field name="name">Credit &amp; Lending Operations</field>
+            <field name="code">CAT_CREDIT</field>
+            <field name="description">Credit underwriting, collateral evaluation, loan monitoring, and remedial management.</field>
+            <field name="color">1</field>
+        </record>
+
+        <record id="kms_cat_trade" model="kms.category">
+            <field name="name">Trade Services &amp; International Banking</field>
+            <field name="code">CAT_TRADE</field>
+            <field name="description">Letters of credit, guarantees, import/export documentation, and foreign exchange.</field>
+            <field name="color">2</field>
+        </record>
+
+        <record id="kms_cat_retail" model="kms.category">
+            <field name="name">Retail &amp; Branch Banking</field>
+            <field name="code">CAT_RETAIL</field>
+            <field name="description">Branch customer service, cash management, account maintenance, and branch audit compliance.</field>
+            <field name="color">3</field>
+        </record>
+
+        <record id="kms_cat_risk" model="kms.category">
+            <field name="name">Risk Management &amp; Regulatory Compliance</field>
+            <field name="code">CAT_RISK</field>
+            <field name="description">AML/CFT, operational risk, compliance frameworks, and KYC governance.</field>
+            <field name="color">4</field>
+        </record>
+
+        <record id="kms_cat_digital" model="kms.category">
+            <field name="name">Digital Banking &amp; FinTech</field>
+            <field name="code">CAT_DIGITAL</field>
+            <field name="description">Mobile banking, internet banking, agency banking, POS/ATM integrations.</field>
+            <field name="color">5</field>
+        </record>
+
+        <record id="kms_cat_cyber" model="kms.category">
+            <field name="name">IT Infrastructure &amp; Cyber Resilience</field>
+            <field name="code">CAT_CYBER</field>
+            <field name="description">Core banking system, database administration, information security, and network controls.</field>
+            <field name="color">6</field>
+        </record>
+
+        <record id="kms_cat_ppdd" model="kms.category">
+            <field name="name">People Performance &amp; Development</field>
+            <field name="code">CAT_PPDD</field>
+            <field name="description">Talent acquisition, competency frameworks, learning, performance, and succession.</field>
+            <field name="color">7</field>
+        </record>
+
+        <!-- ========================================================= -->
+        <!-- CRON: BEST CONTRIBUTOR OF THE MONTH (FR-REC-003)          -->
+        <!-- ========================================================= -->
+
+        <record id="ir_cron_kms_monthly_recognition" model="ir.cron">
+            <field name="name">KMS: Calculate Best Contributor of the Month</field>
+            <field name="model_id" ref="knowledge_management.model_kms_monthly_recognition"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_calculate_monthly_winner()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">months</field>
+            <field name="active">True</field>
+        </record>
+
+    </data>
+</odoo>
