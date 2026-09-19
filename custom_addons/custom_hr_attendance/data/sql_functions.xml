@@ -354,8 +354,8 @@ BEGIN
         write_date = NOW()
     FROM resolved_shifts rs
     WHERE ha.id = rs.att_id
-      /* Dynamic Grace Period Verification: Current time must be past shift_end + v_grace_hours */
-      AND NOW() >= (rs.shift_end_utc + (v_grace_hours || ' hours')::interval);
+      /* Midnight Verification: Close all shifts that have already ended */
+      AND NOW() >= rs.shift_end_utc;
 
 END;
 $$ LANGUAGE plpgsql;
