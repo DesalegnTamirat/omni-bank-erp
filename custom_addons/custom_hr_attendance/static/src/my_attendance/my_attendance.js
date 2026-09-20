@@ -38,8 +38,13 @@ export class MyAttendance extends Component {
             departmentName: "",
             hoursToday: "00:00",
             weeklyHoursFormatted: "00h 00m",
+            weeklyTargetHoursFormatted: "40h 00m",
             monthlyHoursFormatted: "00h 00m",
             dailyBreakdown: [],
+            currentWeekOffset: 0,
+            weekRangeLabel: "",
+            isCurrentWeek: true,
+            isLoadingWeek: false,
             todaySessions: [],
             checkInTimeStr: "",
             checkInStatus: "",
@@ -147,12 +152,14 @@ export class MyAttendance extends Component {
                             String(tMins).padStart(2, '0') + "m";
 
                         // Synchronize today's row in weekly breakdown live
-                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length) {
+                        if (this.state.dailyBreakdown && this.state.dailyBreakdown.length && this.state.isCurrentWeek) {
                             const todayRow = this.state.dailyBreakdown.find(d => d.is_today);
                             if (todayRow) {
                                 todayRow.hours_formatted = this.state.hoursToday;
                                 todayRow.hours = totalSecsToday / 3600.0;
-                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / 8.0) * 100));
+                                const expHrs = todayRow.expected_hours || 8.0;
+                                todayRow.percentage = Math.min(100, Math.round((todayRow.hours / expHrs) * 100));
+                                todayRow.is_completed = (todayRow.hours >= expHrs && expHrs > 0);
                             }
                         }
 
@@ -223,6 +230,10 @@ export class MyAttendance extends Component {
         this.state.hoursToday = String(hHrs).padStart(2, '0') + "h " + String(hMins).padStart(2, '0') + "m";
 
         this.state.weeklyHoursFormatted = data.weekly_hours_formatted || "00h 00m";
+        this.state.weeklyTargetHoursFormatted = data.weekly_target_hours_formatted || "40h 00m";
+        this.state.weekRangeLabel = data.week_range_label || "";
+        this.state.isCurrentWeek = data.is_current_week !== undefined ? data.is_current_week : true;
+        this.state.currentWeekOffset = 0;
         this.state.monthlyHoursFormatted = data.monthly_hours_formatted || "00h 00m";
         this.state.dailyBreakdown = data.daily_breakdown || [];
         this.state.todaySessions = data.today_sessions || [];
@@ -236,6 +247,49 @@ export class MyAttendance extends Component {
         this.state.shiftInfo = data.shift_info || null;
 
         this.updateClock();
+    }
+
+    async onPrevWeek() {
+        this.state.currentWeekOffset -= 1;
+        await this._fetchWeeklyBreakdown();
+    }
+
+    async onNextWeek() {
+        if (this.state.currentWeekOffset < 0) {
+            this.state.currentWeekOffset += 1;
+            await this._fetchWeeklyBreakdown();
+        }
+    }
+
+    async onCurrentWeek() {
+        if (this.state.currentWeekOffset !== 0) {
+            this.state.currentWeekOffset = 0;
+            await this._fetchWeeklyBreakdown();
+        }
+    }
+
+    async _fetchWeeklyBreakdown() {
+        this.state.isLoadingWeek = true;
+        try {
+            const res = await rpc("/custom_hr_attendance/get_weekly_breakdown", {
+                week_offset: this.state.currentWeekOffset
+            });
+            if (res && res.daily_breakdown) {
+                this.state.dailyBreakdown = res.daily_breakdown;
+                this.state.weeklyHoursFormatted = res.weekly_hours_formatted || "00h 00m";
+                this.state.weeklyTargetHoursFormatted = res.weekly_target_hours_formatted || "40h 00m";
+                this.state.weekRangeLabel = res.week_range_label || "";
+                this.state.isCurrentWeek = !!res.is_current_week;
+                if (this.state.isCurrentWeek) {
+                    this.state.hoursCompletedWeek = res.hours_weekly_completed || 0.0;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load weekly breakdown:", e);
+        } finally {
+            this.state.isLoadingWeek = false;
+            this.updateClock();
+        }
     }
 
     async _toggle(latitude = false, longitude = false) {

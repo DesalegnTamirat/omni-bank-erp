@@ -28,6 +28,162 @@ class BunnaMyAttendance(http.Controller):
             return None
         return employee._get_employee_shift_info(target_date=target_date)
 
+    def _build_weekly_breakdown(self, employee, target_date=None):
+        """
+        Builds daily attendance breakdown for a given target_date's week (Mon-Sun).
+        Harmonizes expected scheduled hours per day and calculates completion percentage.
+        """
+        if not employee:
+            return {}
+
+        user = employee.user_id or employee.env.user
+        today = fields.Date.context_today(user)
+        target_date = target_date or today
+
+        start_of_week = target_date - datetime.timedelta(days=target_date.weekday())
+        end_of_week = start_of_week + datetime.timedelta(days=6)
+
+        week_schedules = employee._resolve_schedules_batch(start_of_week, end_of_week)
+
+        tz_name = user.tz or employee.env.user.tz or 'UTC'
+        try:
+            local_tz = pytz.timezone(tz_name)
+        except Exception:
+            local_tz = pytz.utc
+
+        search_start_utc = local_tz.localize(
+            datetime.datetime.combine(start_of_week - datetime.timedelta(days=1), datetime.time.min)
+        ).astimezone(pytz.utc).replace(tzinfo=None)
+        search_end_utc = local_tz.localize(
+            datetime.datetime.combine(end_of_week + datetime.timedelta(days=1), datetime.time.max)
+        ).astimezone(pytz.utc).replace(tzinfo=None)
+
+        attendances = employee.env['hr.attendance'].sudo().search([
+            ('employee_id', '=', employee.id),
+            ('check_in', '>=', search_start_utc),
+            ('check_in', '<=', search_end_utc)
+        ], order='check_in asc')
+
+        day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        daily_hours = {d: 0.0 for d in range(7)}
+        daily_checked_in = {d: False for d in range(7)}
+        weekly_completed_hours = 0.0
+        weekly_target_hours = 0.0
+
+        for att in attendances:
+            check_in_local_dt = fields.Datetime.context_timestamp(employee, att.check_in)
+            check_in_local_date = check_in_local_dt.date()
+
+            if not (start_of_week <= check_in_local_date <= end_of_week):
+                continue
+
+            day_idx = check_in_local_dt.weekday()
+
+            if att.check_out:
+                duration = att.worked_hours or 0.0
+                weekly_completed_hours += duration
+            else:
+                now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
+                live_ref_dt = att.check_in if (att.check_in_status == 'Normal' and att.check_in) else (att.actual_check_in or att.check_in)
+                live_start_dt = fields.Datetime.context_timestamp(employee, live_ref_dt)
+
+                shift_end_f = att.shift_end_float
+                if not shift_end_f:
+                    att_date = live_start_dt.date()
+                    s_info = week_schedules.get(att_date) or employee._get_employee_shift_info(target_date=att_date)
+                    shift_end_f = s_info.get('end_time', 17.0) if s_info else 17.0
+                    shift_start_f = s_info.get('start_time', 8.0) if s_info else 8.0
+                else:
+                    shift_start_f = att.shift_start_float or 8.0
+
+                is_overnight = (shift_end_f <= shift_start_f)
+                shift_end_utc = employee._float_to_utc_datetime(shift_end_f, live_start_dt, is_next_day=is_overnight)
+                shift_end_local = fields.Datetime.context_timestamp(employee, shift_end_utc)
+
+                effective_now = min(now_dt, shift_end_local)
+                if effective_now >= live_start_dt:
+                    duration = max(0.0, (effective_now - live_start_dt).total_seconds() / 3600.0)
+                else:
+                    duration = 0.0
+                daily_checked_in[day_idx] = True
+
+            daily_hours[day_idx] += duration
+
+        total_weekly_hours = sum(daily_hours.values())
+        daily_breakdown = []
+
+        for d in range(7):
+            cur_date = start_of_week + datetime.timedelta(days=d)
+            hrs = round(daily_hours[d], 2)
+            hours_int = int(hrs)
+            mins_int = int(round((hrs - hours_int) * 60))
+
+            day_shift = week_schedules.get(cur_date, {})
+            is_day_off = day_shift.get('is_day_off', False)
+            is_on_leave = day_shift.get('is_on_leave', False)
+            leave_name = day_shift.get('leave_name', 'Time Off')
+
+            # Calculate expected scheduled hours for this day
+            if is_day_off or is_on_leave:
+                expected_hours = 0.0
+            else:
+                s_start = day_shift.get('start_time', 8.0)
+                s_end = day_shift.get('end_time', 17.0)
+                raw_span = (s_end + 24.0 - s_start) if s_end <= s_start else (s_end - s_start)
+                lunch_dur = day_shift.get('lunch_duration', 1.0) if day_shift.get('enable_lunch', True) else 0.0
+                net_span = max(1.0, raw_span - lunch_dur) if raw_span > 5.0 else raw_span
+                expected_hours = round(net_span, 2)
+
+            weekly_target_hours += expected_hours
+
+            pct = 0
+            if expected_hours > 0:
+                pct = min(100, int(round((hrs / expected_hours) * 100)))
+
+            if is_on_leave and hrs == 0:
+                hours_formatted = f"🌴 {leave_name}"
+            elif is_day_off and hrs == 0:
+                hours_formatted = 'Day Off'
+            else:
+                hours_formatted = f"{hours_int:02d}h {mins_int:02d}m"
+
+            exp_int = int(expected_hours)
+            exp_mins = int(round((expected_hours - exp_int) * 60))
+
+            daily_breakdown.append({
+                'day_name': day_names[d],
+                'date_str': cur_date.strftime('%b %d'),
+                'hours': hrs,
+                'hours_formatted': hours_formatted,
+                'expected_hours': expected_hours,
+                'expected_hours_formatted': f"{exp_int:02d}h {exp_mins:02d}m",
+                'percentage': pct,
+                'is_completed': (hrs >= expected_hours and expected_hours > 0),
+                'is_today': (cur_date == today),
+                'checked_in': daily_checked_in[d],
+                'is_day_off': is_day_off,
+                'is_on_leave': is_on_leave,
+                'leave_name': leave_name,
+            })
+
+        wk_hours_int = int(total_weekly_hours)
+        wk_mins_int = int(round((total_weekly_hours - wk_hours_int) * 60))
+        target_hours_int = int(weekly_target_hours)
+        target_mins_int = int(round((weekly_target_hours - target_hours_int) * 60))
+
+        week_range_label = f"{start_of_week.strftime('%b %d')} - {end_of_week.strftime('%b %d, %Y')}"
+
+        return {
+            'daily_breakdown': daily_breakdown,
+            'weekly_hours_formatted': f"{wk_hours_int:02d}h {wk_mins_int:02d}m",
+            'weekly_hours_float': round(total_weekly_hours, 2),
+            'weekly_target_hours_formatted': f"{target_hours_int:02d}h {target_mins_int:02d}m",
+            'weekly_target_hours_float': round(weekly_target_hours, 2),
+            'week_range_label': week_range_label,
+            'is_current_week': (start_of_week <= today <= end_of_week),
+            'hours_weekly_completed': round(weekly_completed_hours, 6),
+        }
+
     def _enrich_attendance_data(self, employee, data):
         if not employee or not data:
             return data
@@ -40,11 +196,11 @@ class BunnaMyAttendance(http.Controller):
 
         # Batch resolve full weekly schedule in a single pass (3-4 bulk queries total)
         week_schedules = employee._resolve_schedules_batch(start_of_week, end_of_week)
-        cfg = employee._get_attendance_config_params()
 
         data['job_title'] = employee.job_title or (employee.job_id.name if employee.job_id else "") or ""
         data['department_name'] = employee.department_id.name if employee.department_id else ""
         data['shift_info'] = week_schedules.get(today, employee._get_employee_shift_info(target_date=today))
+        cfg = employee._get_attendance_config_params()
 
         # Month calculation
         start_of_month = today.replace(day=1)
@@ -76,44 +232,29 @@ class BunnaMyAttendance(http.Controller):
             ('check_in', '<=', search_end_utc)
         ], order='check_in asc')
 
-        day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        daily_hours = {d: 0.0 for d in range(7)}
-        daily_checked_in = {d: False for d in range(7)}
-
-        total_weekly_hours = 0.0
         total_monthly_hours = 0.0
         today_completed_hours = 0.0
-        weekly_completed_hours = 0.0
         monthly_completed_hours = 0.0
 
         for att in attendances:
             check_in_local_dt = fields.Datetime.context_timestamp(employee, att.check_in)
             check_in_local_date = check_in_local_dt.date()
 
-            in_week = (start_of_week <= check_in_local_date <= end_of_week)
             in_month = (start_of_month <= check_in_local_date <= end_of_month)
-
-            if not (in_week or in_month):
-                continue
-
-            day_idx = check_in_local_dt.weekday()
             is_today_att = (check_in_local_date == today)
 
             if att.check_out:
                 duration = att.worked_hours or 0.0
                 if is_today_att:
                     today_completed_hours += duration
-                if in_week:
-                    weekly_completed_hours += duration
                 if in_month:
                     monthly_completed_hours += duration
+                    total_monthly_hours += duration
             else:
                 now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
-                # For Normal check-in (snapped to shift start), payable live timer starts from official check_in
                 live_ref_dt = att.check_in if (att.check_in_status == 'Normal' and att.check_in) else (att.actual_check_in or att.check_in)
                 live_start_dt = fields.Datetime.context_timestamp(employee, live_ref_dt)
 
-                # Cap live counter at scheduled shift end time
                 shift_end_f = att.shift_end_float
                 if not shift_end_f:
                     att_date = live_start_dt.date()
@@ -132,69 +273,21 @@ class BunnaMyAttendance(http.Controller):
                     duration = max(0.0, (effective_now - live_start_dt).total_seconds() / 3600.0)
                 else:
                     duration = 0.0
-                if in_week:
-                    daily_checked_in[day_idx] = True
 
-            if in_week:
-                daily_hours[day_idx] += duration
-            if in_month:
-                total_monthly_hours += duration
+                if in_month:
+                    total_monthly_hours += duration
 
-        total_weekly_hours = sum(daily_hours.values())
-
-        daily_breakdown = []
-        max_daily = max(daily_hours.values()) if any(daily_hours.values()) else 8.0
-        if max_daily <= 0:
-            max_daily = 8.0
-
-        for d in range(7):
-            cur_date = start_of_week + datetime.timedelta(days=d)
-            hrs = round(daily_hours[d], 2)
-            hours_int = int(hrs)
-            mins_int = int(round((hrs - hours_int) * 60))
-
-            day_shift = week_schedules.get(cur_date, {})
-            is_day_off = day_shift.get('is_day_off', False)
-            is_on_leave = day_shift.get('is_on_leave', False)
-            leave_name = day_shift.get('leave_name', 'Time Off')
-
-            pct = min(100, int((hrs / 9.0) * 100))
-
-            if is_on_leave and hrs == 0:
-                hours_formatted = f"🌴 {leave_name}"
-            elif is_day_off and hrs == 0:
-                hours_formatted = 'Day Off'
-            else:
-                hours_formatted = f"{hours_int:02d}h {mins_int:02d}m"
-
-            daily_breakdown.append({
-                'day_name': day_names[d],
-                'date_str': cur_date.strftime('%b %d'),
-                'hours': hrs,
-                'hours_formatted': hours_formatted,
-                'percentage': pct,
-                'is_today': cur_date == today,
-                'checked_in': daily_checked_in[d],
-                'is_day_off': is_day_off,
-                'is_on_leave': is_on_leave,
-                'leave_name': leave_name,
-            })
-
-        # Format weekly & monthly hours
-        wk_hours_int = int(total_weekly_hours)
-        wk_mins_int = int(round((total_weekly_hours - wk_hours_int) * 60))
-        data['weekly_hours_formatted'] = f"{wk_hours_int:02d}h {wk_mins_int:02d}m"
-        data['weekly_hours_float'] = round(total_weekly_hours, 2)
+        # Populate structured weekly breakdown
+        wk_breakdown = self._build_weekly_breakdown(employee, target_date=today)
+        data.update(wk_breakdown)
 
         mo_hours_int = int(total_monthly_hours)
         mo_mins_int = int(round((total_monthly_hours - mo_hours_int) * 60))
         data['monthly_hours_formatted'] = f"{mo_hours_int:02d}h {mo_mins_int:02d}m"
         data['monthly_hours_float'] = round(total_monthly_hours, 2)
 
-        data['daily_breakdown'] = daily_breakdown
         # Send completed hours as float hours so JS can format live timer accurately
         data['hours_today_completed'] = round(today_completed_hours, 6)
-        data['hours_weekly_completed'] = round(weekly_completed_hours, 6)
         data['hours_monthly_completed'] = round(monthly_completed_hours, 6)
         data['hours_today'] = round(today_completed_hours, 6)
 
@@ -450,6 +543,17 @@ class BunnaMyAttendance(http.Controller):
         employee = request.env.user.employee_id
         res = HrAttendance._get_employee_info_response(employee)
         return self._enrich_attendance_data(employee, res)
+
+    @http.route('/custom_hr_attendance/get_weekly_breakdown', type='jsonrpc', auth='user', readonly=True)
+    def get_weekly_breakdown(self, week_offset=0):
+        """Fetch weekly attendance breakdown for a given week offset (e.g. 0=current, -1=last week)."""
+        employee = request.env.user.employee_id
+        if not employee:
+            return {'error': 'No linked employee found'}
+        user = employee.user_id or employee.env.user
+        today = fields.Date.context_today(user)
+        target_date = today + datetime.timedelta(weeks=int(week_offset or 0))
+        return self._build_weekly_breakdown(employee, target_date=target_date)
 
     @http.route('/custom_hr_attendance/my_attendance_toggle', type='jsonrpc', auth='user')
     def my_attendance_toggle(self, latitude=False, longitude=False):

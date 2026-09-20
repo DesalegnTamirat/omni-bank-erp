@@ -255,10 +255,11 @@
                 
                 .progress-bar {
                     border-radius: 999px;
-                    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+                    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
                     
                     &.bar-today { background: linear-gradient(90deg, #d48756, #c17540); }
                     &.bar-past { background: linear-gradient(90deg, #877a3d, #726732); }
+                    &.bar-completed { background: linear-gradient(90deg, #877a3d, #726732); }
                     &.bar-empty { background: transparent; }
                 }
             }
