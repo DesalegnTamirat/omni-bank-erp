@@ -151,7 +151,9 @@ class HrEmployeePrivate(models.Model):
                         'shift_start': 0.0, 'shift_end': 0.0, 'has_lunch': False,
                         'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
                         'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
-                        'shift_name': 'Scheduled Day Off'
+                        'shift_name': 'Scheduled Day Off',
+                        'is_custom_exception': True,
+                        'source_label': 'Job Position Roster Exception'
                     }
                 shift = line.shift_id
                 if shift:
@@ -164,7 +166,9 @@ class HrEmployeePrivate(models.Model):
                         'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                         'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                         'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
-                        'shift_name': shift.name
+                        'shift_name': shift.name,
+                        'is_custom_exception': True,
+                        'source_label': 'Job Position Roster Exception'
                     }
 
         # 2. Job Position Exception (Static)
@@ -186,7 +190,9 @@ class HrEmployeePrivate(models.Model):
                 'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                 'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                 'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
-                'shift_name': shift.name
+                'shift_name': shift.name,
+                'is_custom_exception': True,
+                'source_label': 'Job Position Exception'
             }
 
         # 3. Location-based shifts
@@ -219,7 +225,9 @@ class HrEmployeePrivate(models.Model):
                 'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                 'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                 'is_night_shift': bool(is_night), 'is_day_off': False,
-                'shift_name': (shift.name if shift else loc.name) or 'Location Shift'
+                'shift_name': (shift.name if shift else loc.name) or 'Location Shift',
+                'is_custom_exception': True,
+                'source_label': 'Location-Based Exception'
             }
 
         # 4. Default global schedule
@@ -228,7 +236,9 @@ class HrEmployeePrivate(models.Model):
                 'shift_start': 0.0, 'shift_end': 0.0,
                 'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
                 'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
-                'shift_name': 'Scheduled Day Off (Sunday)'
+                'shift_name': 'Scheduled Day Off (Sunday)',
+                'is_custom_exception': False,
+                'source_label': 'Default Calendar'
             }
 
         s_end = default_exit_time
@@ -365,7 +375,8 @@ class HrEmployeePrivate(models.Model):
                         'shift_start': 0.0, 'shift_end': 0.0, 'has_lunch': False,
                         'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
                         'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
-                        'shift_name': 'Scheduled Day Off'
+                        'shift_name': 'Scheduled Day Off', 'is_custom_exception': True,
+                        'source_label': 'Job Position Roster Exception'
                     }
                 else:
                     shift = line.shift_id
@@ -379,7 +390,8 @@ class HrEmployeePrivate(models.Model):
                             'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                             'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                             'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
-                            'shift_name': shift.name
+                            'shift_name': shift.name, 'is_custom_exception': True,
+                            'source_label': 'Job Position Roster Exception'
                         }
                     else:
                         result[cur_date] = self._resolve_employee_full_schedule(target_date=cur_date)
@@ -398,7 +410,8 @@ class HrEmployeePrivate(models.Model):
                     'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                     'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                     'is_night_shift': bool(shift.is_night_shift), 'is_day_off': False,
-                    'shift_name': shift.name
+                    'shift_name': shift.name, 'is_custom_exception': True,
+                    'source_label': 'Job Position Exception'
                 }
                 cur_date += datetime.timedelta(days=1)
                 continue
@@ -419,7 +432,9 @@ class HrEmployeePrivate(models.Model):
                     'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                     'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                     'is_night_shift': bool(is_night), 'is_day_off': False,
-                    'shift_name': (shift.name if shift else loc.name) or 'Location Shift'
+                    'shift_name': (shift.name if shift else loc.name) or 'Location Shift',
+                    'is_custom_exception': True,
+                    'source_label': 'Location-Based Exception'
                 }
                 cur_date += datetime.timedelta(days=1)
                 continue
@@ -430,7 +445,9 @@ class HrEmployeePrivate(models.Model):
                     'shift_start': 0.0, 'shift_end': 0.0,
                     'has_lunch': False, 'lunch_start': 0.0, 'lunch_end': 0.0, 'lunch_duration': 0.0,
                     'lunch_midpoint': 0.0, 'is_night_shift': False, 'is_day_off': True,
-                    'shift_name': 'Scheduled Day Off (Sunday)'
+                    'shift_name': 'Scheduled Day Off (Sunday)',
+                    'is_custom_exception': False,
+                    'source_label': 'Default Calendar'
                 }
             else:
                 s_end = default_exit_time
@@ -450,10 +467,40 @@ class HrEmployeePrivate(models.Model):
                     'has_lunch': has_l, 'lunch_start': l_start, 'lunch_end': l_end,
                     'lunch_duration': l_dur, 'lunch_midpoint': (l_start + l_end) / 2.0 if has_l else 0.0,
                     'is_night_shift': False, 'is_day_off': False,
-                    'shift_name': 'Default Global Shift (Saturday Half Day)' if is_sat_half else 'Default Global Shift'
+                    'shift_name': 'Default Global Shift (Saturday Half Day)' if is_sat_half else 'Default Global Shift',
+                    'is_custom_exception': False,
+                    'source_label': 'Default Global Shift'
                 }
 
             cur_date += datetime.timedelta(days=1)
+
+        # Uniformly enrich all schedule dictionaries
+        for dt_key, sched in result.items():
+            s_start = sched.get('shift_start', 8.0)
+            s_end = sched.get('shift_end', 17.0)
+            l_start = sched.get('lunch_start', 12.0)
+            l_dur = sched.get('lunch_duration', 1.0)
+            has_l = sched.get('has_lunch', False)
+            is_off = sched.get('is_day_off', False)
+
+            start_str = _fmt(s_start)
+            end_str = _fmt(s_end)
+            l_start_str = _fmt(l_start)
+            l_end_str = _fmt(l_start + l_dur)
+            lunch_str = f"{l_start_str} - {l_end_str} ({l_dur:.1f}h)" if has_l else "No Lunch Break"
+
+            sched['name'] = sched.get('shift_name') or 'Default Global Shift'
+            sched['start_time'] = s_start
+            sched['end_time'] = s_end
+            sched['start_time_str'] = start_str
+            sched['end_time_str'] = end_str
+            sched['time_range'] = f"{start_str} - {end_str}" if not is_off else "No mandatory shift today"
+            sched['lunch_out_time'] = l_start if has_l else 0.0
+            sched['lunch_duration'] = l_dur if has_l else 0.0
+            sched['has_lunch_break'] = has_l
+            sched['lunch_time_str'] = lunch_str
+            sched['is_custom_exception'] = sched.get('is_custom_exception', False)
+            sched['source_label'] = sched.get('source_label') or sched['name']
 
         return result
 
@@ -744,12 +791,13 @@ class HrEmployeePrivate(models.Model):
         enable_checkout_restriction = self.env['ir.config_parameter'].sudo().get_param(
             'hr_attendance.enable_checkout_restriction', 'True').lower() in ('true', '1')
 
-        is_manager = (
-            self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or 
-            self.env.user.has_group('hr_attendance.group_hr_attendance_user') or 
-            self.env.is_superuser() or
-            (self.user_id and self.user_id.id == self.env.uid and (self.user_id.has_group('hr_attendance.group_hr_attendance_manager') or self.user_id.has_group('hr_attendance.group_hr_attendance_user')))
+        acting_user = self.env.user
+        is_manager = bool(
+            acting_user.has_group('hr_attendance.group_hr_attendance_manager') or
+            acting_user.has_group('base.group_system') or
+            acting_user.id == 1
         )
+        _logger.info("ATTENDANCE_ACTION_CHANGE: employee=%s, user=%s (uid=%s), is_manager=%s", self.name, acting_user.login, acting_user.id, is_manager)
 
         self._last_attendance_action = False
 

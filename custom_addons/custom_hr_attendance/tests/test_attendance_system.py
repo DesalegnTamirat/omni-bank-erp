@@ -84,6 +84,8 @@ class TestAttendanceSystem(TransactionCase):
         status, late_h, _, _ = self.regular_emp._evaluate_checkin_status(8.75, 8.0, 0.3333, False, is_manager=False, allow_late=False)
         self.assertEqual(status, 'Very Late')
         self.assertAlmostEqual(late_h, 0.75, places=2)
+        # Restore configuration back to default True
+        self._set_config('hr_attendance.enable_checkin_restriction', True)
 
     def test_02_preapproval_workflow(self):
         """Test employee preapproval submission and supervisor approval."""

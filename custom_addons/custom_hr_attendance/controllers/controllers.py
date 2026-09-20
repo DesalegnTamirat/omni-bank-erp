@@ -708,4 +708,6 @@ class BunnaMyAttendance(http.Controller):
         for key in int_keys:
             if key in settings:
                 params.set_param(f'hr_attendance.{key}', str(int(settings[key])))
+        request.env.registry.clear_cache()
         return {'status': 'success'}
+
