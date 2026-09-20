@@ -23,6 +23,16 @@ def _fmt(f):
 class HrEmployeePrivate(models.Model):
     _inherit = 'hr.employee'
 
+    _last_action_cache = {}
+
+    @property
+    def _last_attendance_action(self):
+        return HrEmployeePrivate._last_action_cache.get(self.id, False)
+
+    @_last_attendance_action.setter
+    def _last_attendance_action(self, value):
+        HrEmployeePrivate._last_action_cache[self.id] = value
+
     # ============================================================
     # CONFIG PARAMETER CACHING (O(1) in RAM via @tools.ormcache)
     # ============================================================
@@ -674,7 +684,7 @@ class HrEmployeePrivate(models.Model):
         except (ValueError, TypeError):
             return 4.0
 
-    def _float_to_utc_datetime(self, float_hour, local_dt):
+    def _float_to_utc_datetime(self, float_hour, local_dt, is_next_day=False):
         tz_name = self.user_id.tz or self.env.user.tz or 'Africa/Addis_Ababa'
         try:
             local_tz = pytz.timezone(tz_name)
@@ -690,6 +700,8 @@ class HrEmployeePrivate(models.Model):
             h += 1
             m = 0
         local_target = local_dt.replace(hour=h, minute=m, second=s, microsecond=0)
+        if is_next_day:
+            local_target += datetime.timedelta(days=1)
         utc_target = local_tz.localize(local_target.replace(tzinfo=None)).astimezone(pytz.utc)
         return utc_target.replace(tzinfo=None)
 
@@ -739,9 +751,45 @@ class HrEmployeePrivate(models.Model):
             (self.user_id and self.user_id.id == self.env.uid and (self.user_id.has_group('hr_attendance.group_hr_attendance_manager') or self.user_id.has_group('hr_attendance.group_hr_attendance_user')))
         )
 
+        self._last_attendance_action = False
+
         # ----------------------------------------------------
         # SCENARIO 1: EMPLOYEE HAS AN OPEN ATTENDANCE RECORD
         # ----------------------------------------------------
+        if open_attendance:
+            attendance = open_attendance
+            open_att_local = fields.Datetime.context_timestamp(self, attendance.check_in) if attendance.check_in else local_dt
+            open_att_date = open_att_local.date()
+
+            # Determine if this open attendance belongs to an already-ended previous shift (JIT Auto-Heal)
+            is_prev_day_session = (open_att_date < today_date)
+            if is_prev_day_session:
+                old_s_end = attendance.shift_end_float or 17.0
+                old_s_start = attendance.shift_start_float or 8.0
+                is_old_night = (old_s_end <= old_s_start)
+                old_shift_end_utc = self._float_to_utc_datetime(old_s_end, open_att_local, is_next_day=is_old_night)
+
+                actual_out_utc = old_shift_end_utc if (attendance.check_in and attendance.check_in < old_shift_end_utc) else (attendance.check_in + datetime.timedelta(hours=8))
+                gross_dur = max(0.0, (actual_out_utc - attendance.check_in).total_seconds() / 3600.0) if attendance.check_in else 8.0
+
+                attendance.with_context(tracking_disable=True, mail_notrack=True).write({
+                    'check_out': actual_out_utc,
+                    'check_out_status': 'Force Checkout',
+                    'is_force_checkout': True,
+                    'worked_hours': round(gross_dur, 2),
+                })
+                attendance.flush_recordset()
+                _logger.info("JIT Auto-Heal: Force-closed expired session %s for %s", attendance.id, self.name)
+                try:
+                    profile = self.env['hr.employee.discipline.profile'].sudo().search([('employee_id', '=', self.id)], limit=1)
+                    if profile:
+                        profile.sudo().write({'force_checkout_count_rolling': profile.force_checkout_count_rolling + 1})
+                except Exception as e:
+                    _logger.warning("Could not increment discipline profile on JIT auto-heal: %s", e)
+
+                open_attendance = False
+                self._last_attendance_action = 'jit_auto_heal_checkin'
+
         if open_attendance:
             attendance = open_attendance
 
@@ -769,6 +817,7 @@ class HrEmployeePrivate(models.Model):
                             'check_out': utc_naive_dt,
                             'check_out_status': 'Early Check-out',
                         })
+                        self._last_attendance_action = 'check_out'
                         _logger.info("Early Morning Lunch Checkout for %s at %.2f", self.name, current_float)
                         return attendance
 
@@ -779,6 +828,7 @@ class HrEmployeePrivate(models.Model):
                         'check_out': lunch_checkout_utc,
                         'check_out_status': 'Normal',
                     })
+                    self._last_attendance_action = 'check_out'
                     _logger.info("Normal Morning Lunch Checkout for %s at %.2f (Check-out stamped: %s)", self.name, current_float, lunch_start)
                     return attendance
 
@@ -791,13 +841,16 @@ class HrEmployeePrivate(models.Model):
                         'check_out_status': 'Force Checkout',
                         'is_force_checkout': True,
                     })
+                    attendance.flush_recordset()
+                    self._last_attendance_action = 'dual_transition'
                     _logger.info("1-Click Force Checkout Morning Session for %s at %.2f", self.name, current_float)
 
                     fast_att_env = self.env['hr.attendance'].with_context(
                         tracking_disable=True,
                         mail_create_nosubscribe=True,
                         mail_create_nolog=True,
-                        mail_notrack=True
+                        mail_notrack=True,
+                        skip_duplicate_check=True,
                     )
 
                     if current_float <= afternoon_start:
@@ -874,6 +927,7 @@ class HrEmployeePrivate(models.Model):
                 'check_out': utc_naive_dt,
                 'check_out_status': out_status,
             })
+            self._last_attendance_action = 'check_out'
             _logger.info("Check-Out recorded for %s at %.2f (Status: %s)", self.name, current_float, out_status)
             return attendance
 
@@ -884,8 +938,9 @@ class HrEmployeePrivate(models.Model):
             shift_start, shift_end = self._select_applicable_shift(
                 current_float, morning_start, exit_time, target_date=today_date, is_manager=is_manager
             )
+            is_night = (shift_end <= shift_start)
             shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
-            shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt)
+            shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt, is_next_day=is_night)
 
             is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= sched['lunch_midpoint'])
 
@@ -920,4 +975,6 @@ class HrEmployeePrivate(models.Model):
             )
             attendance = fast_att_env.create(vals)
             attendance._enqueue_attendance_side_effects()
+            if not getattr(self, '_last_attendance_action', None):
+                self._last_attendance_action = 'check_in'
             return attendance

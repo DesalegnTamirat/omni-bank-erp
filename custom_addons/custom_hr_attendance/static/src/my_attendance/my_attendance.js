@@ -44,6 +44,8 @@ export class MyAttendance extends Component {
             checkInTimeStr: "",
             checkInStatus: "",
             checkInRaw: false,
+            shiftEndRaw: false,
+            isShiftEnded: false,
             hoursCompletedToday: 0.0,   // float hours of closed sessions today
             hoursCompletedWeek: 0.0,    // float hours of closed sessions this week
             hoursCompletedMonth: 0.0,   // float hours of closed sessions this month
@@ -105,7 +107,21 @@ export class MyAttendance extends Component {
                 const checkInDt = DateTime.fromISO(this.state.checkInRaw);
 
                 if (checkInDt && checkInDt.isValid) {
-                    const diffSecs = Math.max(0, Math.floor(now.diff(checkInDt, 'seconds').seconds));
+                    let effectiveNow = now;
+                    // Cap live counter at scheduled shift end time
+                    if (this.state.shiftEndRaw) {
+                        const shiftEndDt = DateTime.fromISO(this.state.shiftEndRaw);
+                        if (shiftEndDt && shiftEndDt.isValid && now > shiftEndDt) {
+                            effectiveNow = shiftEndDt;
+                            this.state.isShiftEnded = true;
+                        } else {
+                            this.state.isShiftEnded = false;
+                        }
+                    } else {
+                        this.state.isShiftEnded = false;
+                    }
+
+                    const diffSecs = Math.max(0, Math.floor(effectiveNow.diff(checkInDt, 'seconds').seconds));
                     if (!isNaN(diffSecs)) {
                         const hrs = Math.floor(diffSecs / 3600);
                         const mins = Math.floor((diffSecs % 3600) / 60);
@@ -171,6 +187,7 @@ export class MyAttendance extends Component {
             }
         } else {
             this.state.liveWorkedTimer = "00:00:00";
+            this.state.isShiftEnded = false;
             const completedSecsToday = Math.round((this.state.hoursCompletedToday || 0) * 3600);
             const tHrs = Math.floor(completedSecsToday / 3600);
             const tMins = Math.floor((completedSecsToday % 3600) / 60);
@@ -212,6 +229,7 @@ export class MyAttendance extends Component {
         this.state.checkInTimeStr = data.check_in_time_str || "";
         this.state.checkInStatus = data.check_in_status || "";
         this.state.checkInRaw = data.check_in_raw || false;
+        this.state.shiftEndRaw = data.shift_end_raw || false;
         this.state.hoursCompletedToday = data.hours_today_completed || 0.0;
         this.state.hoursCompletedWeek = data.hours_weekly_completed || 0.0;
         this.state.hoursCompletedMonth = data.hours_monthly_completed || 0.0;
@@ -227,6 +245,12 @@ export class MyAttendance extends Component {
                 longitude,
             });
             this._fill(data);
+            if (data && data.notification) {
+                this.notification.add(data.notification.message, {
+                    title: data.notification.title,
+                    type: data.notification.type || "success",
+                });
+            }
         } catch (error) {
             if (error instanceof ConnectionLostError) {
                 this.notification.add(

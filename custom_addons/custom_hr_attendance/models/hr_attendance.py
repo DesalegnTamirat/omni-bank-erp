@@ -1049,6 +1049,12 @@ class HrAttendance(models.Model):
                             (
                                 date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
                                 + (COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                                + CASE 
+                                    WHEN COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) <= 
+                                         COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)
+                                    THEN INTERVAL '1 day'
+                                    ELSE INTERVAL '0 day'
+                                  END
                             ) AT TIME ZONE 'Africa/Addis_Ababa'
                         ) AT TIME ZONE 'UTC' AS shift_end_utc
                     FROM hr_attendance ha

@@ -269,36 +269,26 @@ env.cr.execute(sql)
             <field name="model_id" ref="base.model_res_partner"/>
             <field name="state">code</field>
             <field name="code"><![CDATA[
-# Shift-Aware High Performance Auto-Checkout PostgreSQL Function (3-Hour Grace Period & Shift End Capping)
+# Shift-Aware High Performance Auto-Checkout PostgreSQL Function
 sql = """
 CREATE OR REPLACE FUNCTION auto_checkout_all_employees()
 RETURNS void
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    v_grace_hours NUMERIC := 3.0;
 BEGIN
-    /* Read dynamic post-shift grace period from ir_config_parameter, defaulting to 3.0 hours if unconfigured */
-    SELECT COALESCE(value::numeric, 3.0) INTO v_grace_hours
-    FROM ir_config_parameter
-    WHERE key = 'hr_attendance.post_shift_grace_hours'
-    LIMIT 1;
-
-    IF v_grace_hours IS NULL OR v_grace_hours <= 0 THEN
-        v_grace_hours := 3.0;
-    END IF;
-
     WITH resolved_shifts AS (
         SELECT 
             ha.id AS att_id,
             ha.check_in,
             COALESCE(
+                ha.shift_start_float,
                 js_roster.start_time,
                 js_static.start_time,
                 lbe.start_time,
                 8.0
             ) AS resolved_start_time,
             COALESCE(
+                ha.shift_end_float,
                 js_roster.end_time,
                 js_static.end_time,
                 lbe.end_time,
@@ -307,13 +297,19 @@ BEGIN
             (
                 (
                     date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
+                    + (COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)) * INTERVAL '1 hour'
                 ) AT TIME ZONE 'Africa/Addis_Ababa'
             ) AT TIME ZONE 'UTC' AS shift_start_utc,
             (
                 (
                     date_trunc('day', ha.check_in AT TIME ZONE 'UTC' AT TIME ZONE 'Africa/Addis_Ababa')
-                    + (COALESCE(js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                    + (COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0)) * INTERVAL '1 hour'
+                    + CASE 
+                        WHEN COALESCE(ha.shift_end_float, js_roster.end_time, js_static.end_time, lbe.end_time, 17.0) <= 
+                             COALESCE(ha.shift_start_float, js_roster.start_time, js_static.start_time, lbe.start_time, 8.0)
+                        THEN INTERVAL '1 day'
+                        ELSE INTERVAL '0 day'
+                      END
                 ) AT TIME ZONE 'Africa/Addis_Ababa'
             ) AT TIME ZONE 'UTC' AS shift_end_utc
         FROM hr_attendance ha
@@ -363,7 +359,7 @@ BEGIN
         write_date = NOW()
     FROM resolved_shifts rs
     WHERE ha.id = rs.att_id
-      /* Midnight Verification: Close all shifts that have already ended */
+      /* Midnight Verification: Close all open shifts that ended on or before midnight to unblock next-day check-in */
       AND NOW() >= rs.shift_end_utc;
 
 END;

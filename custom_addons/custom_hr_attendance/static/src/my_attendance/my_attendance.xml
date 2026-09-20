@@ -199,6 +199,11 @@
                                             <span t-if="state.checkInStatus"
                                                   t-attf-class="badge rounded-pill ms-2 {{ state.checkInStatus === 'Late' ? 'bg-warning text-dark' : 'bg-success text-white' }}"
                                                   t-esc="state.checkInStatus"/>
+                                            <span t-if="state.isShiftEnded"
+                                                  class="badge rounded-pill ms-2 bg-secondary text-white"
+                                                  title="Live timer capped at scheduled shift end">
+                                                <i class="fa fa-flag-checkered me-1"/> Shift Ended
+                                            </span>
                                         </div>
 
                                         <!-- Integrated compact session breakdown -->

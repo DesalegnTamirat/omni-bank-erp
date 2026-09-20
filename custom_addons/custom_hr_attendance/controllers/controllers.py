@@ -32,7 +32,8 @@ class BunnaMyAttendance(http.Controller):
         if not employee or not data:
             return data
 
-        today = fields.Date.context_today(request.env.user)
+        user = employee.user_id or employee.env.user
+        today = fields.Date.context_today(user)
         # Week starts on Monday
         start_of_week = today - datetime.timedelta(days=today.weekday())
         end_of_week = start_of_week + datetime.timedelta(days=6)
@@ -56,7 +57,7 @@ class BunnaMyAttendance(http.Controller):
         search_start_date = min(start_of_week, start_of_month) - datetime.timedelta(days=1)
         search_end_date = max(end_of_week, end_of_month) + datetime.timedelta(days=1)
 
-        tz_name = request.env.user.tz or 'UTC'
+        tz_name = user.tz or employee.env.user.tz or 'UTC'
         try:
             local_tz = pytz.timezone(tz_name)
         except Exception:
@@ -69,7 +70,7 @@ class BunnaMyAttendance(http.Controller):
             datetime.datetime.combine(search_end_date, datetime.time.max)
         ).astimezone(pytz.utc).replace(tzinfo=None)
 
-        attendances = request.env['hr.attendance'].sudo().search([
+        attendances = employee.env['hr.attendance'].sudo().search([
             ('employee_id', '=', employee.id),
             ('check_in', '>=', search_start_utc),
             ('check_in', '<=', search_end_utc)
@@ -111,8 +112,24 @@ class BunnaMyAttendance(http.Controller):
                 # For Normal check-in (snapped to shift start), payable live timer starts from official check_in
                 live_ref_dt = att.check_in if (att.check_in_status == 'Normal' and att.check_in) else (att.actual_check_in or att.check_in)
                 live_start_dt = fields.Datetime.context_timestamp(employee, live_ref_dt)
-                if now_dt >= live_start_dt:
-                    duration = max(0.0, (now_dt - live_start_dt).total_seconds() / 3600.0)
+
+                # Cap live counter at scheduled shift end time
+                shift_end_f = att.shift_end_float
+                if not shift_end_f:
+                    att_date = live_start_dt.date()
+                    s_info = week_schedules.get(att_date) or employee._get_employee_shift_info(target_date=att_date)
+                    shift_end_f = s_info.get('end_time', 17.0) if s_info else 17.0
+                    shift_start_f = s_info.get('start_time', 8.0) if s_info else 8.0
+                else:
+                    shift_start_f = att.shift_start_float or 8.0
+
+                is_overnight = (shift_end_f <= shift_start_f)
+                shift_end_utc = employee._float_to_utc_datetime(shift_end_f, live_start_dt, is_next_day=is_overnight)
+                shift_end_local = fields.Datetime.context_timestamp(employee, shift_end_utc)
+
+                effective_now = min(now_dt, shift_end_local)
+                if effective_now >= live_start_dt:
+                    duration = max(0.0, (effective_now - live_start_dt).total_seconds() / 3600.0)
                 else:
                     duration = 0.0
                 if in_week:
@@ -182,7 +199,7 @@ class BunnaMyAttendance(http.Controller):
         data['hours_today'] = round(today_completed_hours, 6)
 
         # Determine real-time check-in state directly from active open attendance record
-        open_att = request.env['hr.attendance'].sudo().search([
+        open_att = employee.env['hr.attendance'].sudo().search([
             ('employee_id', '=', employee.id),
             ('check_out', '=', False)
         ], order='check_in desc', limit=1)
@@ -194,6 +211,20 @@ class BunnaMyAttendance(http.Controller):
             data['check_in_raw'] = fields.Datetime.to_string(live_check_in).replace(' ', 'T') + 'Z'
             check_in_local = fields.Datetime.context_timestamp(employee, open_att.check_in)
             data['check_in_time_str'] = check_in_local.strftime('%I:%M %p')
+
+            # Calculate and pass shift_end_raw so frontend freezes counter as well
+            shift_end_f = open_att.shift_end_float
+            if not shift_end_f:
+                check_in_date = check_in_local.date()
+                s_info = week_schedules.get(check_in_date) or employee._get_employee_shift_info(target_date=check_in_date)
+                shift_end_f = s_info.get('end_time', 17.0) if s_info else 17.0
+                shift_start_f = s_info.get('start_time', 8.0) if s_info else 8.0
+            else:
+                shift_start_f = open_att.shift_start_float or 8.0
+
+            is_overnight = (shift_end_f <= shift_start_f)
+            shift_end_utc = employee._float_to_utc_datetime(shift_end_f, check_in_local, is_next_day=is_overnight)
+            data['shift_end_raw'] = fields.Datetime.to_string(shift_end_utc).replace(' ', 'T') + 'Z'
 
             # Dynamic Shift Punctuality Check (Shift-Specific)
             check_in_date = check_in_local.date()
@@ -208,6 +239,7 @@ class BunnaMyAttendance(http.Controller):
             data['check_in_raw'] = False
             data['check_in_time_str'] = False
             data['check_in_status'] = False
+            data['shift_end_raw'] = False
 
         # Dual-Session Status Breakdown for Today
         now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
@@ -218,7 +250,7 @@ class BunnaMyAttendance(http.Controller):
         today_start_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.min)).astimezone(pytz.utc).replace(tzinfo=None)
         today_end_utc = local_tz.localize(datetime.datetime.combine(today, datetime.time.max)).astimezone(pytz.utc).replace(tzinfo=None)
 
-        today_atts = request.env['hr.attendance'].sudo().search([
+        today_atts = employee.env['hr.attendance'].sudo().search([
             ('employee_id', '=', employee.id),
             ('check_in', '>=', today_start_utc),
             ('check_in', '<=', today_end_utc)
@@ -249,11 +281,11 @@ class BunnaMyAttendance(http.Controller):
             a_start = m_end + today_shift.get('lunch_duration', 1.0)
             a_end = today_shift.get('end_time', 17.0)
 
-            enable_checkin_restriction = request.env['ir.config_parameter'].sudo().get_param(
+            enable_checkin_restriction = employee.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
-            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
-            checkin_grace = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
-            checkin_buffer = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
+            dead_time = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
+            checkin_grace = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
+            checkin_buffer = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
 
             m_cutoff = m_start + checkin_grace + dead_time
             a_cutoff = a_start + dead_time
@@ -353,11 +385,11 @@ class BunnaMyAttendance(http.Controller):
             # Single Session (e.g. Saturday Half Day or Continuous Shift)
             s_start = today_shift.get('start_time', 8.0)
             s_end = today_shift.get('end_time', 12.0)
-            enable_checkin_restriction = request.env['ir.config_parameter'].sudo().get_param(
+            enable_checkin_restriction = employee.env['ir.config_parameter'].sudo().get_param(
                 'hr_attendance.enable_checkin_restriction', 'True').lower() in ('true', '1')
-            dead_time = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
-            checkin_grace = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
-            checkin_buffer = float(request.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
+            dead_time = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.dead_time', 0.50))
+            checkin_grace = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_grace_period', 0.25))
+            checkin_buffer = float(employee.env['ir.config_parameter'].sudo().get_param('hr_attendance.checkin_buffer', 0.50))
             s_cutoff = s_start + checkin_grace + dead_time
 
             if open_att:
@@ -421,11 +453,70 @@ class BunnaMyAttendance(http.Controller):
 
     @http.route('/custom_hr_attendance/my_attendance_toggle', type='jsonrpc', auth='user')
     def my_attendance_toggle(self, latitude=False, longitude=False):
-        """Check the current user's employee in or out instantly."""
+        """Check the current user's employee in or out instantly with tailored greetings/goodbyes."""
         employee = request.env.user.employee_id
+        if not employee:
+            return {'error': 'No linked employee found'}
+
+        # Execute attendance action
         employee._attendance_action_change()
+        
+        # Enrich and prepare response payload
         res = HrAttendance._get_employee_info_response(employee)
-        return self._enrich_attendance_data(employee, res)
+        enriched = self._enrich_attendance_data(employee, res)
+
+        # Build personalized greeting / goodbye notification
+        now_dt = fields.Datetime.context_timestamp(employee, fields.Datetime.now())
+        emp_name = employee.name or "Colleague"
+        first_name = emp_name.split()[0] if emp_name else "Colleague"
+        current_hour = now_dt.hour
+
+        action_type = getattr(employee, '_last_attendance_action', None)
+        if not action_type:
+            action_type = 'check_in' if enriched.get('attendance_state') == 'checked_in' else 'check_out'
+
+        if action_type == 'dual_transition':
+            # 1-Click Dual Transition (Late Lunch Force Checkout + Afternoon Check-In)
+            notif_title = f"Welcome Back, {first_name}!"
+            notif_msg = f"Morning session closed at lunch time. Afternoon shift checked in successfully. Have a great afternoon!"
+            notif_type = "success"
+        elif action_type == 'jit_auto_heal_checkin':
+            # Self-Healing JIT (Previous Unclosed Shift Finalized + New Check-In)
+            notif_title = f"Welcome, {first_name}!"
+            notif_msg = f"Your previous unclosed shift was automatically finalized (Force Checkout). Checked in for your new shift."
+            notif_type = "info"
+        elif action_type == 'check_out':
+            # Regular Check-Out
+            hours_str = enriched.get('hoursToday') or "today"
+            if current_hour < 14:
+                notif_title = f"Lunch Break Started"
+                notif_msg = f"Enjoy your lunch break, {first_name}! See you this afternoon."
+            elif current_hour < 18:
+                notif_title = f"Goodbye, {first_name}!"
+                notif_msg = f"Checked out successfully. Great job today! (Total: {hours_str}). Have a wonderful evening!"
+            else:
+                notif_title = f"Goodbye, {first_name}!"
+                notif_msg = f"Checked out successfully. Have a wonderful evening and restful night! (Total: {hours_str})."
+            notif_type = "success"
+        else:
+            # Regular Check-In
+            if current_hour < 12:
+                notif_title = f"Good Morning, {first_name}!"
+                notif_msg = f"Welcome to Bunna Bank. Have a productive and successful day ahead!"
+            elif current_hour < 17:
+                notif_title = f"Good Afternoon, {first_name}!"
+                notif_msg = f"Welcome back! Have a productive afternoon session."
+            else:
+                notif_title = f"Good Evening, {first_name}!"
+                notif_msg = f"Welcome to your shift. Have a safe and productive night!"
+            notif_type = "success"
+
+        enriched['notification'] = {
+            'title': notif_title,
+            'message': notif_msg,
+            'type': notif_type
+        }
+        return enriched
 
     @http.route('/custom_hr_attendance/get_settings', type='jsonrpc', auth='user', readonly=True)
     def get_settings(self):
