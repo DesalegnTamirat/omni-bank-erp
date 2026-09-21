@@ -556,7 +556,6 @@ class HrEmployeePrivate(models.Model):
             morning_e = sched['lunch_start']
             afternoon_s = sched['lunch_end']
             afternoon_e = sched['shift_end']
-            lunch_midpoint = sched['lunch_midpoint']
             afternoon_buffer_start = afternoon_s - 0.25  # Fixed 15 min buffer before afternoon start
 
             if current_float >= afternoon_e:
@@ -565,14 +564,8 @@ class HrEmployeePrivate(models.Model):
                     "Your scheduled shift ended at %s."
                 ) % _fmt(afternoon_e))
 
-            if current_float < lunch_midpoint:
+            if current_float < morning_e:
                 # Morning Session
-                if current_float >= morning_e and enable_checkin_restriction and not is_manager:
-                    raise UserError(_(
-                        "Check-in is not allowed during lunch break.\n\n"
-                        "Morning shift ended at %s. Afternoon check-in opens at %s."
-                    ) % (_fmt(morning_e), _fmt(afternoon_buffer_start)))
-
                 earliest_checkin = morning_s - checkin_buffer
                 if current_float >= earliest_checkin or not enable_checkin_restriction or is_manager:
                     _logger.info("Using Morning Shift Session: %.2f - %.2f", morning_s, morning_e)
@@ -582,22 +575,18 @@ class HrEmployeePrivate(models.Model):
                     "You are too early for the Morning shift (%s - %s).\n"
                     "Check-in window opens at %s (Buffer: %d min)."
                 ) % (_fmt(morning_s), _fmt(morning_e), _fmt(earliest_checkin), int(round(checkin_buffer * 60))))
-            else:
-                # Afternoon Session
-                if current_float < afternoon_buffer_start and enable_checkin_restriction and not is_manager:
+            elif current_float < afternoon_buffer_start:
+                # Lunch Break Window (e.g. 12:00 - 12:45)
+                if enable_checkin_restriction and not is_manager:
                     raise UserError(_(
-                        "Check-in is not allowed during lunch break.\n\n"
-                        "You are too early for the Afternoon shift (%s - %s).\n"
-                        "Check-in window opens at %s (15 min buffer)."
-                    ) % (_fmt(afternoon_s), _fmt(afternoon_e), _fmt(afternoon_buffer_start)))
-
-                if current_float >= afternoon_buffer_start or not enable_checkin_restriction or is_manager:
-                    _logger.info("Using Afternoon Shift Session: %.2f - %.2f", afternoon_s, afternoon_e)
-                    return afternoon_s, afternoon_e
-                raise UserError(_(
-                    "Check-in is not allowed yet.\n\n"
-                    "You are too early for the Afternoon shift (%s - %s)."
-                ) % (_fmt(afternoon_s), _fmt(afternoon_e)))
+                        "Check-in is not allowed during lunch break (%s - %s).\n\n"
+                        "Morning shift ended at %s. Afternoon check-in opens at %s."
+                    ) % (_fmt(morning_e), _fmt(afternoon_s), _fmt(morning_e), _fmt(afternoon_buffer_start)))
+                return afternoon_s, afternoon_e
+            else:
+                # Afternoon Session (e.g. 12:45 - 17:00)
+                _logger.info("Using Afternoon Shift Session: %.2f - %.2f", afternoon_s, afternoon_e)
+                return afternoon_s, afternoon_e
         else:
             # Single Continuous Shift (e.g. Saturday Half Day, regular continuous shift, location shift)
             if sched['is_night_shift']:
@@ -792,11 +781,9 @@ class HrEmployeePrivate(models.Model):
             'hr_attendance.enable_checkout_restriction', 'True').lower() in ('true', '1')
 
         acting_user = self.env.user
-        is_manager = bool(
-            acting_user.has_group('hr_attendance.group_hr_attendance_manager') or
-            acting_user.has_group('base.group_system') or
-            acting_user.id == 1
-        )
+        # Strict equality: all self-service attendance actions enforce standard shift regulations for all users (including Admins and Managers).
+        # Administrative override is strictly limited to backend manual management tools via explicit context flag.
+        is_manager = bool(self.env.context.get('bypass_attendance_restrictions', False))
         _logger.info("ATTENDANCE_ACTION_CHANGE: employee=%s, user=%s (uid=%s), is_manager=%s", self.name, acting_user.login, acting_user.id, is_manager)
 
         self._last_attendance_action = False
@@ -872,6 +859,8 @@ class HrEmployeePrivate(models.Model):
                 elif current_float < afternoon_buffer_start:
                     # NORMAL LUNCH CHECKOUT (e.g. 12:00 PM - 12:44 PM)
                     lunch_checkout_utc = self._float_to_utc_datetime(lunch_start, local_dt)
+                    if attendance.check_in and lunch_checkout_utc < attendance.check_in:
+                        lunch_checkout_utc = attendance.check_in
                     attendance.write({
                         'check_out': lunch_checkout_utc,
                         'check_out_status': 'Normal',
@@ -884,6 +873,8 @@ class HrEmployeePrivate(models.Model):
                     # 1-CLICK AFTERNOON TRANSITION (e.g. 12:45 PM onwards)
                     # Employee forgot morning lunch checkout and clicks for the first time during afternoon entry!
                     lunch_checkout_utc = self._float_to_utc_datetime(lunch_start, local_dt)
+                    if attendance.check_in and lunch_checkout_utc < attendance.check_in:
+                        lunch_checkout_utc = attendance.check_in
                     attendance.write({
                         'check_out': lunch_checkout_utc,
                         'check_out_status': 'Force Checkout',
@@ -990,7 +981,7 @@ class HrEmployeePrivate(models.Model):
             shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
             shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt, is_next_day=is_night)
 
-            is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= sched['lunch_midpoint'])
+            is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= (sched['lunch_end'] - 0.25))
 
             status, late_time, ot, pre_late = self._evaluate_checkin_status(
                 current_float, shift_start, dead_time, predefined_late,

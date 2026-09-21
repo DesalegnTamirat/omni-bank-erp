@@ -17,56 +17,70 @@ class TestAttendanceSystem(TransactionCase):
                 'company_id': cls.company.id,
             })
 
-        cls.manager_user = cls.env['res.users'].search([('login', '=', 'alemu')], limit=1)
-        if not cls.manager_user:
-            cls.manager_user = cls.env['res.users'].create({
-                'name': 'Alemu Desta Workneh',
-                'login': 'alemu_test',
-                'email': 'alemu@bunnabank.com',
-                'group_ids': [(6, 0, [
-                    cls.env.ref('base.group_user').id,
-                    cls.env.ref('hr_attendance.group_hr_attendance_manager').id,
-                ])],
-            })
-        else:
-            cls.manager_user.sudo().write({
-                'group_ids': [(4, cls.env.ref('hr_attendance.group_hr_attendance_manager').id)]
-            })
+        manager_groups = [
+            cls.env.ref('base.group_user').id,
+            cls.env.ref('hr_attendance.group_hr_attendance_user').id,
+            cls.env.ref('hr_attendance.group_hr_attendance_manager').id,
+        ]
+        cls.manager_user = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test Attendance Manager',
+            'login': f'test_mgr_{fields.Datetime.now().timestamp()}',
+            'email': 'test_mgr@bunnabank.com',
+            'group_ids': [(6, 0, manager_groups)],
+        })
+        cls.manager_emp = cls.env['hr.employee'].create({
+            'name': cls.manager_user.name,
+            'user_id': cls.manager_user.id,
+            'work_email': cls.manager_user.email,
+            'default_operating_unit_id': cls.operating_unit.id,
+        })
+        mgr_versions = cls.env['hr.version'].search([('employee_id', '=', cls.manager_emp.id)])
+        if mgr_versions:
+            mgr_versions.sudo().write({'state': 'open'})
 
-        cls.manager_emp = cls.manager_user.employee_id
-        if not cls.manager_emp:
-            cls.manager_emp = cls.env['hr.employee'].create({
-                'name': cls.manager_user.name,
-                'user_id': cls.manager_user.id,
-                'work_email': cls.manager_user.email,
-                'default_operating_unit_id': cls.operating_unit.id,
-            })
-
-        cls.regular_user = cls.env['res.users'].search([('login', '=', 'bekele')], limit=1)
-        if not cls.regular_user:
-            cls.regular_user = cls.env['res.users'].create({
-                'name': 'Bekele Shiferaw Ayana',
-                'login': 'bekele_test',
-                'email': 'bekele@bunnabank.com',
-                'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
-            })
-        cls.regular_emp = cls.regular_user.employee_id
-        if not cls.regular_emp:
-            cls.regular_emp = cls.env['hr.employee'].create({
-                'name': cls.regular_user.name,
-                'user_id': cls.regular_user.id,
-                'work_email': cls.regular_user.email,
-                'parent_id': cls.manager_emp.id,
-                'default_operating_unit_id': cls.operating_unit.id,
-            })
+        cls.regular_user = cls.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test Regular Employee',
+            'login': f'test_emp_{fields.Datetime.now().timestamp()}',
+            'email': 'test_emp@bunnabank.com',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref('custom_hr_attendance.group_hr_attendance_manual_user').id,
+            ])],
+        })
+        cls.regular_emp = cls.env['hr.employee'].create({
+            'name': cls.regular_user.name,
+            'user_id': cls.regular_user.id,
+            'work_email': cls.regular_user.email,
+            'parent_id': cls.manager_emp.id,
+            'default_operating_unit_id': cls.operating_unit.id,
+        })
+        reg_versions = cls.env['hr.version'].search([('employee_id', '=', cls.regular_emp.id)])
+        if reg_versions:
+            reg_versions.sudo().write({'state': 'open'})
 
     def _set_config(self, key, value):
         self.env['ir.config_parameter'].sudo().set_param(key, str(value))
+        self.env.registry.clear_cache()
+
+    def setUp(self):
+        super().setUp()
+        self.manager_user = self.manager_user.with_env(self.env)
+        self.regular_user = self.regular_user.with_env(self.env)
+        self.manager_emp = self.manager_emp.with_env(self.env)
+        self.regular_emp = self.regular_emp.with_env(self.env)
+        # Clean up any open attendances for test employees
+        open_atts = self.env['hr.attendance'].sudo().search([
+            ('employee_id', 'in', [self.regular_emp.id, self.manager_emp.id]),
+            ('check_out', '=', False)
+        ])
+        if open_atts:
+            open_atts.with_context(force_unlink_attendance=True).unlink()
 
     def test_01_config_matrix_grace_and_restriction(self):
         """Test on-time within grace, late within dead time, and blocked past dead time."""
         self._set_config('hr_attendance.enable_checkin_restriction', True)
         self._set_config('hr_attendance.enable_checkin_grace', True)
+        self._set_config('hr_attendance.checkin_grace_period', 0.25)
         self._set_config('hr_attendance.dead_time', 0.3333)
 
         status, late_h, _, _ = self.regular_emp._evaluate_checkin_status(8.0833, 8.0, 0.3333, False, is_manager=False, allow_late=False)
@@ -173,8 +187,8 @@ class TestAttendanceSystem(TransactionCase):
         self.env.cr.execute("UPDATE hr_attendance SET create_date = %s WHERE id = %s", (yesterday_in, old_att.id))
         self.assertFalse(old_att.check_out)
 
-        # Trigger attendance action today
-        new_att = self.regular_emp._attendance_action_change()
+        # Trigger attendance action today (bypassing restriction to allow checkin regardless of test run hour)
+        new_att = self.regular_emp.with_context(bypass_attendance_restrictions=True)._attendance_action_change()
         
         old_att.invalidate_recordset()
         self.assertTrue(old_att.check_out)

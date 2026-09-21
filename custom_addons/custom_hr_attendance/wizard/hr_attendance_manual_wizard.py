@@ -441,14 +441,14 @@ class HrAttendanceManualWizard(models.TransientModel):
                     ) % (self.employee_id.name, self.work_date))
 
                 effective_out = self.check_out_time
-                if has_lunch and (lunch_start < effective_out <= lunch_midpoint):
+                if has_lunch and (lunch_start < effective_out < afternoon_start):
                     effective_out = lunch_start
 
                 dt_check_out = self._float_time_to_utc_dt(self.work_date, effective_out)
                 if dt_check_out <= open_att.check_in:
                     raise ValidationError(_('Check-Out time must be strictly after the recorded Check-In time (%s).') % fields.Datetime.to_string(open_att.check_in))
 
-                s_end = open_att.shift_end_float or (lunch_start if (has_lunch and effective_out <= lunch_midpoint) else shift_end)
+                s_end = open_att.shift_end_float or (lunch_start if (has_lunch and effective_out <= lunch_start) else shift_end)
                 early_exit_hour = 0.0
                 acknowledged_exit = 0.0
                 over_time_hour = 0.0
@@ -527,7 +527,7 @@ class HrAttendanceManualWizard(models.TransientModel):
 
                 dt_check_in = self._float_time_to_utc_dt(self.work_date, effective_checkin)
 
-                if self.target_session == 'afternoon' or (has_lunch and effective_checkin >= lunch_midpoint):
+                if self.target_session == 'afternoon' or (has_lunch and effective_checkin >= afternoon_start):
                     session_start = afternoon_start if has_lunch else shift_start
                     session_end = shift_end
                 else:
@@ -698,7 +698,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if has_lunch:
                     if lunch_start < effective_in <= afternoon_start:
                         effective_in = afternoon_start
-                    if lunch_start < effective_out <= lunch_midpoint:
+                    if lunch_start < effective_out < afternoon_start:
                         effective_out = lunch_start
 
                 dt_check_in = self._float_time_to_utc_dt(self.work_date, effective_in)
@@ -707,7 +707,7 @@ class HrAttendanceManualWizard(models.TransientModel):
                 if dt_check_out <= dt_check_in:
                     raise ValidationError(_('Check-Out time must be strictly after Check-In time.'))
 
-                if self.target_session == 'afternoon' or (has_lunch and effective_in >= lunch_midpoint):
+                if self.target_session == 'afternoon' or (has_lunch and effective_in >= afternoon_start):
                     session_start = afternoon_start if has_lunch else shift_start
                     session_end = shift_end
                 else:
