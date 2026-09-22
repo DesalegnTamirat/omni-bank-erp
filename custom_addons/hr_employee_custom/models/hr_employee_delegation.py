@@ -50,12 +50,7 @@ class HrEmployee(models.Model):
                 ('parent_id', '=', emp.id)
             ])
             visible_ids.update(subordinates.ids)
-
-            # Immediate coach and parent
-            if emp.coach_id:
-                visible_ids.add(emp.coach_id.id)
-            if emp.parent_id:
-                visible_ids.add(emp.parent_id.id)
+            # (Coach and parent are not included so hierarchy remains strictly downward)
 
             # Active delegations where this employee is the delegate
             today = fields.Date.today()

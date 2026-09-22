@@ -22,7 +22,7 @@ class RecognitionMonthlyAward(models.Model):
     ], string='Award Type', required=True, index=True)
     employee_id = fields.Many2one('hr.employee', string='Honored Employee', required=True)
     department_id = fields.Many2one('hr.department', related='employee_id.department_id', string='Department', readonly=True)
-    operating_unit_id = fields.Many2one('operating.unit', related='employee_id.default_operating_unit_id', string='Branch / Unit', readonly=True)
+    branch_name = fields.Char(string='Branch / Operating Unit', compute='_compute_branch_name', store=True)
     points_total = fields.Integer(string='Monthly Points Tally', default=0)
     average_score = fields.Float(string='Average Exam Score (%)', default=0.0)
     courses_completed = fields.Integer(string='Courses Completed', default=0)
@@ -42,6 +42,12 @@ class RecognitionMonthlyAward(models.Model):
                 rec.name = f"{type_label} - {month_str} ({rec.employee_id.name})"
             else:
                 rec.name = _("Monthly Recognition Award")
+
+    @api.depends('employee_id')
+    def _compute_branch_name(self):
+        for rec in self:
+            op_unit = getattr(rec.employee_id, 'default_operating_unit_id', False)
+            rec.branch_name = op_unit.name if op_unit else ''
 
     @api.model
     def cron_calculate_monthly_awards(self):

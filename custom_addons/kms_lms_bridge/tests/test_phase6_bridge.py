@@ -43,7 +43,7 @@ class TestKmsLmsBridge(TransactionCase):
         lib_item = self.KmsLibrary.create({
             'name': 'National Bank of Ethiopia AML Directives Compendium',
             'category_id': self.kms_cat.id,
-            'resource_type': 'directive',
+            'resource_type': 'regulatory',
             'author': 'NBE Governance',
         })
 

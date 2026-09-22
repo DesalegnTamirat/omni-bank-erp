@@ -65,7 +65,7 @@
                         </group>
                         <group>
                             <field name="department_id"/>
-                            <field name="operating_unit_id"/>
+                            <field name="branch_name"/>
                             <field name="points_total"/>
                             <field name="average_score" invisible="award_type != 'best_learner'"/>
                             <field name="courses_completed" invisible="award_type != 'best_learner'"/>

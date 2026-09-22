@@ -111,13 +111,14 @@
         <record id="rule_hr_employee_competency_read" model="ir.rule">
             <field name="name">360 Competency Evaluation HR Employee Read Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
-            <field name="domain_force">['|', ('user_id', '=', user.id), '|', ('parent_id.user_id', '=', user.id), '|', ('default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="domain_force">['|', '|', ('user_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('id', 'in', user.env['competency.assessment'].search([('assessor_id', '=', user.id)]).mapped('employee_id').ids)]</field>
             <field name="global" eval="False"/>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee')), (4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
+            <field name="active" eval="True"/>
         </record>
 
         <!-- Dashboard Snapshot: supervisor / manager sees own Operating Unit snapshots -->
