@@ -6,12 +6,29 @@
         <!-- KMS DOCUMENT RECORD RULES                                 -->
         <!-- ========================================================= -->
 
-        <!-- 1. Employee: Can view approved documents or own drafts -->
+        <!-- 1. Employee: Can view approved documents based on classification hierarchy -->
+        <!--
+            Intended Boolean Structure:
+            classification in ('public', 'internal')
+            OR (classification = 'confidential' AND (department_id = False OR department_id = user.employee_id.department_id.id))
+            OR (classification = 'restricted' AND authorized_employee_ids.user_id = user.id)
+        -->
         <record id="rule_kms_document_employee_read" model="ir.rule">
-            <field name="name">Employee View Approved or Own Documents</field>
+            <field name="name">Employee View Documents by Classification</field>
             <field name="model_id" ref="knowledge_management.model_kms_document"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_employee'))]"/>
-            <field name="domain_force">['|', ('owner_id.user_id', '=', user.id), '&amp;', ('state', '=', 'approved'), '|', ('department_id', '=', False), '|', ('department_id', '=', user.employee_id.department_id.id), ('operating_unit_id', '=', False)]</field>
+            <field name="domain_force">['|',
+    ('classification', 'in', ['public', 'internal']),
+    '|',
+        '&amp;',
+            ('classification', '=', 'confidential'),
+            '|',
+                ('department_id', '=', False),
+                ('department_id', '=', user.employee_id.department_id.id),
+        '&amp;',
+            ('classification', '=', 'restricted'),
+            ('authorized_employee_ids.user_id', '=', user.id)
+]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

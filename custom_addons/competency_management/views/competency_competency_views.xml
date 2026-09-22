@@ -66,14 +66,15 @@
             <field name="name">competency.competency.list</field>
             <field name="model">competency.competency</field>
             <field name="arch" type="xml">
-                <list>
+                <list string="Competency Dictionary" decoration-muted="state == 'retired'" decoration-success="state == 'approved'">
                     <field name="code"/>
                     <field name="name"/>
+                    <field name="version" widget="badge"/>
                     <field name="pillar" widget="badge"/>
                     <field name="functional_domain"/>
                     <field name="state" widget="badge"/>
                     <field name="status" widget="badge"/>
-                    <field name="active"/>
+                    <field name="active" optional="hide"/>
                 </list>
             </field>
         </record>
@@ -87,41 +88,66 @@
                     <header>
                         <button name="action_submit" string="Submit for Approval" type="object" class="oe_highlight" invisible="state != 'draft'"/>
                         <button name="action_approve" string="Approve Competency" type="object" class="oe_highlight" invisible="state != 'submitted'" groups="competency_management.group_competency_admin"/>
+                        <button name="action_create_new_version" string="Create New Version" type="object" class="btn-primary" invisible="state != 'approved'"/>
                         <button name="action_retire" string="Retire / Inactivate" type="object" class="btn-warning" invisible="state != 'approved'"/>
                         <button name="action_reset_draft" string="Reset to Draft" type="object" invisible="state not in ('submitted', 'retired')"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,retired"/>
                     </header>
                     <sheet>
-                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="state != 'retired'"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_versions" type="object" class="oe_stat_button" icon="fa-history" invisible="not id">
+                                <field name="version_count" widget="statinfo" string="Versions"/>
+                            </button>
+                        </div>
+                        <widget name="web_ribbon" title="Superseded" bg_color="text-bg-secondary" invisible="state != 'retired' or not child_version_ids"/>
+                        <widget name="web_ribbon" title="Retired" bg_color="text-bg-secondary" invisible="state != 'retired' or child_version_ids"/>
                         <group>
                             <group string="Identity">
-                                <field name="name" readonly="state in ('approved', 'retired')"/>
-                                <field name="code" readonly="state in ('approved', 'retired')"/>
-                                <field name="pillar" readonly="state in ('approved', 'retired')"/>
-                                <field name="functional_domain" readonly="state in ('approved', 'retired')"/>
+                                <field name="name" readonly="state != 'draft'"/>
+                                <field name="code" readonly="state != 'draft'"/>
+                                <field name="version" readonly="state != 'draft'"/>
+                                <field name="pillar" readonly="state != 'draft'"/>
+                                <field name="functional_domain" readonly="state != 'draft'"/>
                                 <field name="is_rating_model_readonly" invisible="1"/>
-                                <field name="rating_model_id" readonly="is_rating_model_readonly or state in ('approved', 'retired')"/>
+                                <field name="rating_model_id" readonly="is_rating_model_readonly or state != 'draft'"/>
                             </group>
-                            <group string="Status &amp; Approval">
+                            <group string="Status &amp; Lineage">
                                 <field name="status" widget="badge" readonly="1"/>
                                 <field name="active" readonly="1"/>
+                                <field name="previous_version_id" readonly="1" invisible="not previous_version_id"/>
+                                <field name="parent_competency_id" readonly="1" invisible="not parent_competency_id"/>
+                                <field name="child_version_ids" invisible="1"/>
                             </group>
                         </group>
                         <group string="Definition">
-                            <field name="definition" readonly="status == 'retired'" placeholder="Define the competency and what it covers..." colspan="2"/>
+                            <field name="definition" readonly="state != 'draft'" placeholder="Define the competency and what it covers..." colspan="2"/>
+                            <field name="change_description" readonly="state != 'draft'" placeholder="Describe changes introduced in this version..." colspan="2"/>
                         </group>
                         <notebook>
                             <page string="Proficiency Levels">
-                                <field name="proficiency_level_ids" readonly="status == 'retired'">
+                                <field name="proficiency_level_ids" readonly="state != 'draft'">
                                     <list editable="bottom">
-                                        <field name="level"/>
-                                        <field name="name"/>
-                                        <field name="behavioral_indicators" required="1"/>
+                                        <field name="level" readonly="parent.state != 'draft'"/>
+                                        <field name="name" readonly="parent.state != 'draft'"/>
+                                        <field name="behavioral_indicators" required="1" readonly="parent.state != 'draft'"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Applicable Job Positions">
                                 <field name="applicable_job_ids" widget="many2many_tags"/>
+                            </page>
+                            <page string="Version History" invisible="version_count &lt;= 1">
+                                <field name="version_history_ids" readonly="1" context="{'active_test': False}">
+                                    <list decoration-muted="state == 'retired'" decoration-success="state == 'approved'" decoration-info="state == 'draft'">
+                                        <field name="version"/>
+                                        <field name="name"/>
+                                        <field name="state" widget="badge"/>
+                                        <field name="status" widget="badge"/>
+                                        <field name="change_description"/>
+                                        <field name="write_date" string="Last Modified"/>
+                                        <field name="write_uid" string="Modified By"/>
+                                    </list>
+                                </field>
                             </page>
                             <page string="Definition Change History" groups="competency_management.group_competency_admin">
                                 <field name="change_log_ids">
@@ -150,9 +176,14 @@
                 <search>
                     <field name="name"/>
                     <field name="code"/>
+                    <field name="version"/>
                     <field name="pillar"/>
                     <field name="functional_domain"/>
                     <filter string="Active Competencies" name="active_status" domain="[('status','=','active')]"/>
+                    <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
+                    <filter string="Draft / Pending Versions" name="state_draft" domain="[('state','in',('draft', 'submitted'))]"/>
+                    <filter string="Archived / Superseded" name="archived" domain="[('active','=',False)]"/>
+                    <separator/>
                     <filter string="Core" name="pillar_core" domain="[('pillar','=','core')]"/>
                     <filter string="Leadership" name="pillar_leadership" domain="[('pillar','=','leadership')]"/>
                     <filter string="Technical" name="pillar_technical" domain="[('pillar','=','technical')]"/>
@@ -160,6 +191,8 @@
                     <group name="group_by">
                         <filter string="Pillar" name="group_pillar" context="{'group_by':'pillar'}"/>
                         <filter string="Status" name="group_status" context="{'group_by':'status'}"/>
+                        <filter string="Approval State" name="group_state" context="{'group_by':'state'}"/>
+                        <filter string="Version" name="group_version" context="{'group_by':'version'}"/>
                     </group>
                 </search>
             </field>

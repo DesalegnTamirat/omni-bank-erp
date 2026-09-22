@@ -29,6 +29,7 @@ Operationalizes BRD Part 3 Module 2 requirements for employee training and compl
         'hr_employee_custom',
         'competency_management',
         'knowledge_management',
+        'recognition_engine',
     ],
     'data': [
         'security/lms_security_groups.xml',

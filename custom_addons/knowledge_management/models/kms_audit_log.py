@@ -20,18 +20,22 @@ class KmsAuditLog(models.Model):
     operating_unit_id = fields.Many2one('operating.unit', string='Branch / Unit', readonly=True)
 
     action = fields.Selection([
-        ('view', 'Document Viewed / Consulted'),
-        ('download', 'Document Downloaded'),
-        ('upload', 'New Document Uploaded'),
-        ('modify', 'Document Modified / Submitted'),
-        ('approve', 'Document Approved'),
-        ('archive', 'Document Archived'),
+        ('view', 'Document / Resource Viewed'),
+        ('download', 'Document / Resource Downloaded'),
+        ('upload', 'New Resource Uploaded / Created'),
+        ('modify', 'Resource Modified / Updated'),
+        ('approve', 'Resource Approved / Validated'),
+        ('archive', 'Resource Archived'),
         ('access_denied', 'Access / Download Attempt Denied'),
+        ('join', 'Joined Community'),
+        ('leave', 'Left Community'),
     ], string='Action Taken', required=True, readonly=True, index=True)
 
     resource_type = fields.Selection([
         ('document', 'Governed Policy / SOP'),
         ('digital_library', 'Digital Library Asset'),
+        ('cop', 'Community of Practice'),
+        ('forum', 'Knowledge Forum / Q&A'),
         ('lesson_learned', 'Lesson Learned'),
         ('tacit_session', 'Knowledge Capture Session'),
     ], string='Asset Type', default='document', readonly=True, index=True)
@@ -40,6 +44,23 @@ class KmsAuditLog(models.Model):
     resource_name = fields.Char(string='Resource Name / Code', readonly=True)
     details = fields.Text(string='Event Audit Trail & Metadata', readonly=True)
     create_date = fields.Datetime(string='Timestamp', readonly=True, index=True)
+
+    @api.model
+    def log_audit_event(self, action, resource_type, resource_name, details='', doc_id=False, user=None):
+        """Unified logging method for bank-wide audit compliance (BRD 7.3, NFR-KMS-001)."""
+        user = user or self.env.user
+        emp = user.employee_id
+        return self.sudo().create({
+            'user_id': user.id,
+            'employee_id': emp.id if emp else False,
+            'department_id': emp.department_id.id if emp and emp.department_id else False,
+            'operating_unit_id': emp.default_operating_unit_id.id if emp and emp.default_operating_unit_id else False,
+            'action': action,
+            'resource_type': resource_type,
+            'resource_name': resource_name,
+            'details': details or f"Action {action} performed on {resource_name}",
+            'document_id': doc_id,
+        })
 
     @api.model_create_multi
     def create(self, vals_list):

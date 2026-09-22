@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_recognition_point_user,recognition.point.user,model_recognition_point,group_recognition_user,1,0,0,0
+access_recognition_point_manager,recognition.point.manager,model_recognition_point,group_recognition_manager,1,1,1,1
+access_recognition_award_user,recognition.monthly.award.user,model_recognition_monthly_award,group_recognition_user,1,0,0,0
+access_recognition_award_manager,recognition.monthly.award.manager,model_recognition_monthly_award,group_recognition_manager,1,1,1,1

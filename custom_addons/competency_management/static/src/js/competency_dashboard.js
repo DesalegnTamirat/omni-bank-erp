@@ -18,18 +18,22 @@ export class CompetencyDashboard extends Component {
         this.trendCanvasRef = useRef("trendChart");
 
         this.state = useState({
-            persona: "executive", // 'executive' | 'supervisor' | 'employee'
+            persona: "executive",
             cycleId: false,
             departmentId: false,
+            operatingUnitId: false,
             loading: true,
             error: false,
             alertDismissed: false,
             radarHasData: false,
             data: {
+                is_dept_readonly: false,
+                is_ou_readonly: false,
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
                 all_cycles: [],
                 all_departments: [],
+                all_operating_units: [],
                 stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
                 charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
                 team_roster: [],
@@ -56,7 +60,7 @@ export class CompetencyDashboard extends Component {
                     this.renderCharts();
                 }
             },
-            () => [this.state.loading, this.state.persona, this.state.cycleId]
+            () => [this.state.loading, this.state.cycleId, this.state.departmentId, this.state.operatingUnitId]
         );
     }
 
@@ -71,13 +75,20 @@ export class CompetencyDashboard extends Component {
                 {
                     cycle_id: this.state.cycleId || false,
                     department_id: this.state.departmentId || false,
-                    persona: this.state.persona,
+                    operating_unit_id: this.state.operatingUnitId || false,
                 }
             );
 
             this.state.data = result;
+            this.state.persona = result.persona || "executive";
             if (!this.state.cycleId && result.cycle && result.cycle.id) {
                 this.state.cycleId = result.cycle.id;
+            }
+            if (result.is_dept_readonly || (!this.state.departmentId && result.selected_department_id)) {
+                this.state.departmentId = result.selected_department_id;
+            }
+            if (result.is_ou_readonly || (!this.state.operatingUnitId && result.selected_operating_unit_id)) {
+                this.state.operatingUnitId = result.selected_operating_unit_id;
             }
 
             this.state.loading = false;
@@ -86,10 +97,13 @@ export class CompetencyDashboard extends Component {
             this.state.error = true;
             this.state.loading = false;
             this.state.data = {
+                is_dept_readonly: false,
+                is_ou_readonly: false,
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
                 all_cycles: [],
                 all_departments: [],
+                all_operating_units: [],
                 stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
                 charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
                 team_roster: [],
@@ -98,18 +112,19 @@ export class CompetencyDashboard extends Component {
         }
     }
 
-    onPersonaChange(newPersona) {
-        this.state.persona = newPersona;
-        this.loadData();
-    }
-
     onCycleChange(ev) {
-        this.state.cycleId = ev.target.value;
+        this.state.cycleId = ev.target.value ? parseInt(ev.target.value) : false;
         this.loadData();
     }
 
     onDepartmentChange(ev) {
-        this.state.departmentId = ev.target.value;
+        this.state.departmentId = ev.target.value ? parseInt(ev.target.value) : false;
+        this.state.operatingUnitId = false;
+        this.loadData();
+    }
+
+    onOperatingUnitChange(ev) {
+        this.state.operatingUnitId = ev.target.value ? parseInt(ev.target.value) : false;
         this.loadData();
     }
 

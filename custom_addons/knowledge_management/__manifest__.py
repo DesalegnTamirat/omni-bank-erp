@@ -27,6 +27,7 @@ Operationalizes BRD Part 3 Module 1 requirements for institutional knowledge man
         'portal',
         'hr_employee_custom',
         'competency_management',
+        'recognition_engine',
     ],
     'data': [
         'security/kms_security_groups.xml',

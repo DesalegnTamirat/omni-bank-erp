@@ -48,6 +48,20 @@ class KmsDocument(models.Model):
         tracking=True,
         index=True
     )
+    classification = fields.Selection([
+        ('public', 'Public'),
+        ('internal', 'Internal'),
+        ('confidential', 'Confidential'),
+        ('restricted', 'Restricted'),
+    ], string='Security Classification Scope', compute='_compute_classification', store=True, readonly=False)
+    authorized_employee_ids = fields.Many2many(
+        'hr.employee',
+        'kms_doc_authorized_employee_rel',
+        'doc_id',
+        'employee_id',
+        string='Authorized Employees (Restricted Access)',
+        help='Specific employees granted access when document is restricted.'
+    )
     tag_ids = fields.Many2many('kms.tag', string='Tags')
 
     # Organizational Scoping & Governance
@@ -117,6 +131,12 @@ class KmsDocument(models.Model):
         default=True,
         help='Automatically stamps downloader identity, department, and timestamp onto every page of the downloaded PDF.'
     )
+    require_encryption = fields.Boolean(
+        string='Session-Bound Download Encryption',
+        default=False,
+        tracking=True,
+        help='Encrypts download payload with session-bound key so it can only be opened inside verified KMS session (FR-KMS-016).'
+    )
     allowed_download_group_ids = fields.Many2many(
         'res.groups',
         'kms_doc_download_rel',
@@ -143,6 +163,12 @@ class KmsDocument(models.Model):
             rec._log_audit_action('upload', 'Document created in Draft')
         return records
 
+    def write(self, vals):
+        if 'state' in vals and vals['state'] in ('approved', 'published', 'archived'):
+            if not self.env.user.has_group('knowledge_management.group_kms_manager') and not self.env.su:
+                raise AccessError(_("Only KMS Managers can publish or archive documents."))
+        return super(KmsDocument, self).write(vals)
+
     @api.depends('file_data', 'file_name')
     def _compute_file_metadata(self):
         for rec in self:
@@ -167,12 +193,43 @@ class KmsDocument(models.Model):
                 rec.mimetype = False
                 rec.is_pdf = False
 
+    @api.depends('classification_id', 'classification_id.code')
+    def _compute_classification(self):
+        code_map = {
+            'PUB': 'public', 'public': 'public',
+            'INT': 'internal', 'internal': 'internal',
+            'CONF': 'confidential', 'confidential': 'confidential',
+            'SCONF': 'restricted', 'restricted': 'restricted',
+        }
+        for rec in self:
+            if rec.classification_id and rec.classification_id.code:
+                rec.classification = code_map.get(rec.classification_id.code, 'internal')
+            elif not rec.classification:
+                rec.classification = 'internal'
+
+    @api.onchange('classification')
+    def _onchange_classification(self):
+        if self.classification:
+            inv_map = {
+                'public': 'PUB',
+                'internal': 'INT',
+                'confidential': 'CONF',
+                'restricted': 'SCONF',
+            }
+            target_code = inv_map.get(self.classification)
+            if target_code:
+                cl = self.env['kms.classification'].search([('code', '=', target_code)], limit=1)
+                if cl:
+                    self.classification_id = cl.id
+
     @api.onchange('classification_id')
     def _onchange_classification_id(self):
         if self.classification_id:
-            if self.classification_id.view_only_default:
+            code_map = {'PUB': 'public', 'INT': 'internal', 'CONF': 'confidential', 'SCONF': 'restricted'}
+            self.classification = code_map.get(self.classification_id.code, 'internal')
+            if getattr(self.classification_id, 'view_only_default', False):
                 self.is_view_only = True
-            if self.classification_id.watermark_mandatory:
+            if getattr(self.classification_id, 'watermark_mandatory', False):
                 self.require_watermark = True
 
     # Lifecycle Actions
@@ -282,7 +339,7 @@ class KmsDocument(models.Model):
 
         # Check role-based download permissions (FR-KMS-014)
         if self.allowed_download_group_ids:
-            user_groups = self.env.user.groups_id
+            user_groups = self.env.user.group_ids
             if not any(g in user_groups for g in self.allowed_download_group_ids) and not self.env.user.has_group('knowledge_management.group_kms_manager'):
                 raise AccessError(_('Your assigned role does not have download permissions for this document.'))
 

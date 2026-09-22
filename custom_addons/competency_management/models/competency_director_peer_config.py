@@ -39,6 +39,89 @@ class CompetencyDirectorPeerConfig(models.Model):
         domain="[('id', 'in', candidate_peer_ids)]",
         help="Select peers for this Director. Restricted strictly to candidates sharing the same coach with a different position.")
     notes = fields.Text(string='Notes / Rationale')
+    has_open_cycle = fields.Boolean(
+        string='Has Open Cycle', compute='_compute_has_open_cycle',
+        help="Technical flag indicating if there is at least one currently open assessment cycle."
+    )
+
+    def _compute_has_open_cycle(self):
+        has_open = bool(self.env['competency.assessment.cycle'].search_count([('state', '=', 'open')]))
+        for rec in self:
+            rec.has_open_cycle = has_open
+
+    def action_sync_cycle_peers(self):
+        """Synchronize 360 peer assessments for this Director/Chief with the active open cycle.
+        - Newly added peers get a new draft peer assessment generated with populated competency lines.
+        - Existing peer assessments that were previously generated are preserved.
+        - Peers removed from configuration have their unsubmitted draft assessment deleted.
+        """
+        self.ensure_one()
+        open_cycle = self.env['competency.assessment.cycle'].search([('state', '=', 'open')], order='id desc', limit=1)
+        if not open_cycle:
+            raise UserError(_("There is currently no Open assessment cycle. This action can only be performed during an active open cycle."))
+
+        director = self.director_id
+        if not director:
+            raise UserError(_("Please specify a Director or Chief before synchronizing peers."))
+
+        # 1. Assigned peers in this configuration
+        target_peers = self.peer_ids.filtered(lambda p: p.active and p.user_id)
+        target_user_ids = set(target_peers.mapped('user_id.id'))
+
+        # 2. Existing peer assessments for this director in the open cycle
+        existing_peer_asms = self.env['competency.assessment'].search([
+            ('cycle_id', '=', open_cycle.id),
+            ('employee_id', '=', director.id),
+            ('assessment_type', '=', 'peer'),
+        ])
+
+        existing_user_ids = set(existing_peer_asms.mapped('assessor_id.id'))
+
+        # 3. Handle removed peers: delete draft assessments if assessor is no longer in target_user_ids
+        removed_asms = existing_peer_asms.filtered(
+            lambda a: a.assessor_id.id not in target_user_ids and a.state == 'draft'
+        )
+        removed_count = len(removed_asms)
+        if removed_asms:
+            removed_asms.unlink()
+
+        # 4. Handle newly added peers: create peer assessment if assessor is in target_user_ids but not yet created
+        added_count = 0
+        AssessmentSudo = self.env['competency.assessment'].sudo()
+        for peer in target_peers:
+            if peer.user_id.id not in existing_user_ids:
+                new_asm = AssessmentSudo.create({
+                    'cycle_id': open_cycle.id,
+                    'employee_id': director.id,
+                    'assessor_id': peer.user_id.id,
+                    'assessment_type': 'peer',
+                })
+                # Auto-populate competencies according to configuration
+                try:
+                    new_asm._do_populate_lines()
+                except Exception:
+                    pass
+                added_count += 1
+
+        preserved_count = len(target_user_ids & existing_user_ids)
+        msg = _(
+            "Peer synchronization complete for %s in cycle '%s':\n"
+            "• %d new peer assessment(s) generated.\n"
+            "• %d removed peer draft assessment(s) deleted.\n"
+            "• %d active peer assessment(s) preserved."
+        ) % (director.name, open_cycle.name, added_count, removed_count, preserved_count)
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Cycle Peers Synchronized'),
+                'message': msg,
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
 
     @api.model
     def _get_employee_job(self, emp):
@@ -212,6 +295,13 @@ class CompetencyDirectorPeerConfig(models.Model):
     @api.depends('director_id', 'grade_id', 'director_id.job_id', 'director_id.grade_id', 'director_id.job_grade')
     def _compute_candidate_peer_ids(self):
         """Calculate pool of eligible peers for Directors (Grade 16) & Chiefs (Grade 17) matching the exception rule: Same Job Grade."""
+        # Retrieve all active executive peers from existing configurations or active directors
+        all_configs = self.search([])
+        dir_pool = all_configs.mapped('director_id').filtered(lambda e: e.active)
+        if not dir_pool:
+            all_active = self.env['hr.employee'].search([('active', '=', True)])
+            dir_pool = all_active.filtered(lambda e: self._is_director_or_chief(e))
+
         for rec in self:
             if not rec.director_id:
                 rec.candidate_peer_ids = self.env['hr.employee']
@@ -219,23 +309,14 @@ class CompetencyDirectorPeerConfig(models.Model):
 
             dir_emp = rec.director_id
             dir_g_num = self._get_grade_number(dir_emp)
-            dir_grade_id = rec.grade_id.id if rec.grade_id else False
-
-            # Search active directors and chiefs efficiently
-            all_emps = self.env['hr.employee'].search([
-                ('id', '!=', dir_emp.id),
-                ('active', '=', True),
-                ('is_director_or_chief', '=', True)
-            ])
-            if not all_emps:
-                all_emps = self.env['hr.employee'].search([('id', '!=', dir_emp.id), ('active', '=', True)])
+            pool = dir_pool.filtered(lambda e: e.id != dir_emp.id)
 
             if dir_g_num in (16, 17):
-                candidates = all_emps.filtered(lambda c: self._get_grade_number(c) == dir_g_num)
-            elif dir_grade_id:
-                candidates = all_emps.filtered(lambda c: self._resolve_employee_grade(c).id == dir_grade_id)
+                candidates = pool.filtered(lambda c: self._get_grade_number(c) == dir_g_num)
+            elif rec.grade_id:
+                candidates = pool.filtered(lambda c: self._resolve_employee_grade(c).id == rec.grade_id.id)
             else:
-                candidates = all_emps
+                candidates = pool
 
             rec.candidate_peer_ids = candidates
 
@@ -256,17 +337,10 @@ class CompetencyDirectorPeerConfig(models.Model):
             if rec.director_id and not self._is_director_or_chief(rec.director_id):
                 raise ValidationError(_("Employee '%s' cannot be configured here. Director Peer Configuration is strictly reserved for Directors (Grade XVI) and Chiefs (Grade XVII).") % rec.director_id.name)
 
-    @api.model
-    def action_generate_director_records(self):
+    def action_generate_director_records(self, *args, **kwargs):
         """Scan active hr.employee records strictly for Directors (Grade 16) and Chiefs (Grade 17) and create missing configuration records, purging non-executive entries."""
-        director_emps = self.env['hr.employee'].search([
-            ('active', '=', True),
-            ('is_director_or_chief', '=', True)
-        ])
-        if not director_emps:
-            all_employees = self.env['hr.employee'].search([('active', '=', True)])
-            director_emps = all_employees.filtered(lambda e: self._is_director_or_chief(e))
-
+        all_employees = self.env['hr.employee'].search([('active', '=', True)])
+        director_emps = all_employees.filtered(lambda e: self._is_director_or_chief(e))
         director_emp_ids = set(director_emps.ids)
 
         # Purge non-director/non-chief config records (e.g. Grade II, III, IV, etc.)
@@ -284,7 +358,7 @@ class CompetencyDirectorPeerConfig(models.Model):
                 existing_director_ids.add(emp_id)
                 created_count += 1
 
-        msg = _("Successfully synchronized Director Peer Configuration. Created: %d, Total Active Directors (Grade 16) & Chiefs (Grade 17): %d. Non-executive records purged.") % (created_count, len(existing_director_ids))
+        msg = _("Successfully synchronized Director Peer Configuration.\nCreated: %d, Total Active Directors & Chiefs: %d.\nNon-executive records purged.") % (created_count, len(existing_director_ids))
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -306,7 +380,9 @@ class CompetencyDirectorPeerConfig(models.Model):
         super()._register_hook()
         # Scan and populate when the module / server registry loads
         try:
-            self.sudo().action_generate_director_records()
+            with self.env.cr.savepoint():
+                self.sudo().action_generate_director_records()
         except Exception:
             pass
+
 

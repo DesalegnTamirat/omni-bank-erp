@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Certificate Rule Views -->
+    <record id="view_eds_certificate_rule_tree" model="ir.ui.view">
+        <field name="name">eds.certificate.rule.tree</field>
+        <field name="model">eds.certificate.rule</field>
+        <field name="arch" type="xml">
+            <list string="Certificate Rules &amp; Policy">
+                <field name="name"/>
+                <field name="category"/>
+                <field name="require_attendance"/>
+                <field name="min_attendance_pct"/>
+                <field name="require_level2_pass"/>
+                <field name="min_level2_score"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_certificate_rule_form" model="ir.ui.view">
+        <field name="name">eds.certificate.rule.form</field>
+        <field name="model">eds.certificate.rule</field>
+        <field name="arch" type="xml">
+            <form string="Certificate Rule Policy">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="e.g. Standard 80% Attendance + L2 Pass Rule"/></h1>
+                    </div>
+                    <group>
+                        <group string="Program Target &amp; Attendance">
+                            <field name="category"/>
+                            <field name="require_attendance"/>
+                            <field name="min_attendance_pct" invisible="not require_attendance"/>
+                        </group>
+                        <group string="Assessment &amp; Status">
+                            <field name="require_level2_pass"/>
+                            <field name="min_level2_score" invisible="not require_level2_pass"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <group string="Policy Notes">
+                        <field name="notes" placeholder="Notes on policy background..."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_certificate_rule" model="ir.actions.act_window">
+        <field name="name">Certification Rules &amp; Policy</field>
+        <field name="res_model">eds.certificate.rule</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Certificate Views -->
+    <record id="view_eds_certificate_tree" model="ir.ui.view">
+        <field name="name">eds.certificate.tree</field>
+        <field name="model">eds.certificate</field>
+        <field name="arch" type="xml">
+            <list string="Issued Certificates">
+                <field name="code"/>
+                <field name="employee_id"/>
+                <field name="course_id"/>
+                <field name="session_id"/>
+                <field name="issue_date"/>
+                <field name="is_eligible" widget="boolean_toggle"/>
+                <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'issued'" decoration-danger="state == 'void'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_certificate_form" model="ir.ui.view">
+        <field name="name">eds.certificate.form</field>
+        <field name="model">eds.certificate</field>
+        <field name="arch" type="xml">
+            <form string="Completion Certificate">
+                <header>
+                    <button name="action_issue" string="Issue Certificate" type="object" class="oe_highlight" invisible="state != 'pending'"/>
+                    <button name="action_void" string="Void Certificate" type="object" invisible="state == 'void'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,issued,void"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="code" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="employee_id"/>
+                            <field name="session_id"/>
+                            <field name="course_id"/>
+                        </group>
+                        <group>
+                            <field name="issue_date"/>
+                            <field name="issued_by"/>
+                            <field name="is_eligible"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Eligibility Analysis">
+                            <field name="eligibility_reason" readonly="1"/>
+                        </page>
+                        <page string="Certificate Attachment">
+                            <group>
+                                <field name="file" filename="file_name"/>
+                                <field name="file_name" invisible="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_certificate" model="ir.actions.act_window">
+        <field name="name">Issued Completion Certificates</field>
+        <field name="res_model">eds.certificate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

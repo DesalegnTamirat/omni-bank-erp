@@ -58,9 +58,10 @@ class KmsCommunityOfPractice(models.Model):
     image = fields.Binary(string='Community Banner / Logo', attachment=True)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'Community of Practice code must be unique!'),
-    ]
+    _unique_code = models.Constraint(
+        'unique(code)',
+        'Community of Practice code must be unique!',
+    )
 
     @api.depends('member_ids')
     def _compute_is_member(self):
@@ -75,14 +76,28 @@ class KmsCommunityOfPractice(models.Model):
             rec.lesson_count = self.env['kms.lesson.learned'].search_count([('cop_id', '=', rec.id)])
             rec.discussion_count = self.env['kms.forum.topic'].search_count([('cop_id', '=', rec.id)])
 
+    def _log_audit_action(self, action_type, details=None):
+        for rec in self:
+            try:
+                self.env['kms.audit.log'].sudo().log_audit_event(
+                    action=action_type,
+                    resource_type='cop',
+                    resource_name=f"{rec.code} - {rec.name}",
+                    details=details or f"Action {action_type} performed on CoP {rec.name}"
+                )
+            except Exception as e:
+                _logger = __import__('logging').getLogger(__name__)
+                _logger.warning("Could not log CoP audit: %s", e)
+
     def action_join(self):
         emp = self.env.user.employee_id
         if not emp:
             raise UserError(_('No employee profile is linked to your user account.'))
         for rec in self:
             if emp.id not in rec.member_ids.ids:
-                rec.write({'member_ids': [(4, emp.id)]})
-                rec.message_post(body=_('%s has joined the community.') % emp.name)
+                rec.sudo().write({'member_ids': [(4, emp.id)]})
+                rec.sudo().message_post(body=_('%s has joined the community.') % emp.name)
+                rec._log_audit_action('join', f"{emp.name} joined community of practice {rec.name}")
         return True
 
     def action_leave(self):
@@ -91,8 +106,9 @@ class KmsCommunityOfPractice(models.Model):
             raise UserError(_('No employee profile is linked to your user account.'))
         for rec in self:
             if emp.id in rec.member_ids.ids:
-                rec.write({'member_ids': [(3, emp.id)]})
-                rec.message_post(body=_('%s has left the community.') % emp.name)
+                rec.sudo().write({'member_ids': [(3, emp.id)]})
+                rec.sudo().message_post(body=_('%s has left the community.') % emp.name)
+                rec._log_audit_action('leave', f"{emp.name} left community of practice {rec.name}")
         return True
 
     def action_view_sessions(self):

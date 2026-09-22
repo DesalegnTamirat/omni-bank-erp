@@ -37,6 +37,18 @@ class KmsContributorPoint(models.Model):
         """Helper to create point ledger entries safely."""
         if not user:
             return
+        try:
+            self.env['recognition.point'].sudo().award_points(
+                user=user,
+                points=points,
+                source_module='kms',
+                source_action=source,
+                description=description or '',
+            )
+        except Exception as e:
+            _logger = __import__('logging').getLogger(__name__)
+            _logger.warning("Could not push points to recognition.point: %s", e)
+
         return self.sudo().create({
             'user_id': user.id,
             'points': points,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError, ValidationError, AccessError
 
 
 class LmsCourse(models.Model):
@@ -103,6 +103,12 @@ class LmsCourse(models.Model):
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('lms.course') or _('New')
         return super(LmsCourse, self).create(vals_list)
+
+    def write(self, vals):
+        if 'state' in vals and vals['state'] in ('published', 'archived'):
+            if not self.env.user.has_group('learning_management.group_lms_manager') and not self.env.su:
+                raise AccessError(_("Only LMS Managers can publish or archive courses."))
+        return super(LmsCourse, self).write(vals)
 
     @api.depends('lesson_ids', 'lesson_ids.duration_minutes')
     def _compute_lesson_stats(self):

@@ -18,6 +18,13 @@ class CompetencyRoleMapping(models.Model):
     mapping_name = fields.Char(
         string='Role Mapping', compute='_compute_mapping_name', store=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position', required=True, tracking=True)
+    department_id = fields.Many2one(
+        related='job_position_id.department_id',
+        string='Department',
+        store=True,
+        readonly=True,
+        index=True
+    )
     grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
     line_ids = fields.One2many('competency.role.mapping.line', 'mapping_id', string='Competency Lines')
     cluster_ids = fields.Many2many('competency.cluster', string='Competency Clusters')

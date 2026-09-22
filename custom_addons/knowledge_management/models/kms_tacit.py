@@ -57,10 +57,34 @@ class KmsKnowledgeSession(models.Model):
         string='Artifacts & Slides'
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super(KmsKnowledgeSession, self).create(vals_list)
+        for rec in records:
+            try:
+                self.env['kms.audit.log'].log_audit_event(
+                    action='upload',
+                    resource_type='tacit_session',
+                    resource_name=rec.name,
+                    details=f"Created knowledge capture session '{rec.name}' ({rec.session_type})"
+                )
+            except Exception:
+                pass
+        return records
+
     def action_complete_session(self):
         for rec in self:
             rec.write({'state': 'completed'})
             rec.message_post(body=_('Knowledge capture session completed and tacit insights documented.'))
+            try:
+                self.env['kms.audit.log'].log_audit_event(
+                    action='approve',
+                    resource_type='tacit_session',
+                    resource_name=rec.name,
+                    details=f"Completed knowledge capture session '{rec.name}'"
+                )
+            except Exception:
+                pass
             # Award points to expert and facilitator
             if rec.expert_id and rec.expert_id.user_id:
                 self.env['kms.contributor.point'].award_points(
@@ -120,19 +144,45 @@ class KmsLessonLearned(models.Model):
         ('archived', 'Archived'),
     ], string='Status', default='draft', tracking=True, index=True)
 
-    helpful_votes = fields.Integer(string='Helpful Votes', default=0, readonly=True)
+    vote_ids = fields.One2many('kms.lesson.learned.vote', 'lesson_id', string='Helpful Votes')
+    helpful_votes = fields.Integer(string='Helpful Votes', compute='_compute_helpful_votes', store=True)
+
+    @api.depends('vote_ids')
+    def _compute_helpful_votes(self):
+        for rec in self:
+            rec.helpful_votes = len(rec.vote_ids)
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('code', _('New')) == _('New'):
                 vals['code'] = self.env['ir.sequence'].next_by_code('kms.lesson.learned') or _('New')
-        return super(KmsLessonLearned, self).create(vals_list)
+        records = super(KmsLessonLearned, self).create(vals_list)
+        for rec in records:
+            try:
+                self.env['kms.audit.log'].log_audit_event(
+                    action='upload',
+                    resource_type='lesson_learned',
+                    resource_name=f"{rec.code} - {rec.name}",
+                    details=f"Documented lesson learned '{rec.name}' for {rec.project_initiative}"
+                )
+            except Exception:
+                pass
+        return records
 
     def action_approve(self):
         for rec in self:
             rec.write({'state': 'reviewed'})
             rec.message_post(body=_('Lesson learned validated and published to the bank repository.'))
+            try:
+                self.env['kms.audit.log'].log_audit_event(
+                    action='approve',
+                    resource_type='lesson_learned',
+                    resource_name=f"{rec.code} - {rec.name}",
+                    details=f"Validated and approved lesson learned '{rec.name}'"
+                )
+            except Exception:
+                pass
             if rec.author_id and rec.author_id.user_id:
                 self.env['kms.contributor.point'].award_points(
                     rec.author_id.user_id,
@@ -142,8 +192,39 @@ class KmsLessonLearned(models.Model):
                 )
 
     def action_vote_helpful(self):
+        Vote = self.env['kms.lesson.learned.vote']
         for rec in self:
-            rec.sudo().write({'helpful_votes': rec.helpful_votes + 1})
+            existing = Vote.search([('lesson_id', '=', rec.id), ('user_id', '=', self.env.uid)], limit=1)
+            if existing:
+                existing.unlink()
+            else:
+                Vote.create({
+                    'lesson_id': rec.id,
+                    'user_id': self.env.uid,
+                })
+                try:
+                    self.env['kms.audit.log'].log_audit_event(
+                        action='modify',
+                        resource_type='lesson_learned',
+                        resource_name=f"{rec.code} - {rec.name}",
+                        details=f"Voted helpful on lesson learned '{rec.name}'"
+                    )
+                except Exception:
+                    pass
+
+
+class KmsLessonLearnedVote(models.Model):
+    """Vote record preventing multiple votes on a lesson learned entry by the same user (FR-KMS-030)."""
+    _name = 'kms.lesson.learned.vote'
+    _description = 'Lesson Learned Helpful Vote'
+
+    lesson_id = fields.Many2one('kms.lesson.learned', string='Lesson Learned', required=True, ondelete='cascade', index=True)
+    user_id = fields.Many2one('res.users', string='User', required=True, ondelete='cascade', default=lambda self: self.env.user, index=True)
+
+    _unique_lesson_user = models.Constraint(
+        'unique(lesson_id, user_id)',
+        'A user can only vote once per lesson learned entry!',
+    )
 
 
 class KmsMentoringTrack(models.Model):

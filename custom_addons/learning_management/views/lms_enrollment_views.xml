@@ -62,7 +62,7 @@
                                     </div>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top text-muted small">
-                                    <span>Due: <t t-esc="record.due_date.value or 'Self-Paced'"/></span>
+                                    <span>Due: <t t-esc="(record.due_date and record.due_date.value) or 'Self-Paced'"/></span>
                                     <span t-if="record.state.raw_value == 'completed'" class="text-success fw-bold"><i class="fa fa-certificate me-1"/>Certified</span>
                                 </div>
                             </div>

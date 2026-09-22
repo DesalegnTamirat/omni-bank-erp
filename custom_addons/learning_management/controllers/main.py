@@ -10,16 +10,70 @@ _logger = logging.getLogger(__name__)
 
 class LmsController(http.Controller):
 
+    def _check_video_access(self, lesson_id, env=None):
+        """
+        Authorization check for video streaming and heartbeat (FR-LMS-004, FR-LMS-005).
+        Returns (True, lesson, enrollment) if authorized, or (False, error_response, None).
+        Returns HTTP 403 / Access Denied without leaking whether the lesson exists.
+        """
+        if env is None:
+            try:
+                env = request.env
+            except Exception:
+                return False, Response("Forbidden: Access Denied", status=403), None
+        user = env.user
+        emp = user.employee_id
+        if not emp:
+            _logger.warning("Video access denied: user %s has no linked employee", user.login)
+            return False, Response("Forbidden: Access Denied", status=403), None
+
+        # Sudo read to verify lesson and course existence without information disclosure
+        lesson = env['lms.lesson'].sudo().browse(int(lesson_id))
+        if not lesson.exists() or not lesson.course_id:
+            return False, Response("Forbidden: Access Denied", status=403), None
+
+        is_staff = user.has_group('learning_management.group_lms_instructor') or \
+                   user.has_group('learning_management.group_lms_manager')
+
+        # Check course enrollment for this employee
+        enrollment = env['lms.enrollment'].sudo().search([
+            ('employee_id', '=', emp.id),
+            ('course_id', '=', lesson.course_id.id),
+        ], limit=1)
+
+        if not enrollment and not is_staff:
+            _logger.warning("Video access denied: employee %s not enrolled in course %s", emp.name, lesson.course_id.name)
+            return False, Response("Forbidden: Access Denied", status=403), None
+
+        # Ensure course is published, or user has instructor/manager privileges
+        if lesson.course_id.state != 'published' and not is_staff:
+            _logger.warning("Video access denied: course %s in state %s", lesson.course_id.name, lesson.course_id.state)
+            return False, Response("Forbidden: Access Denied", status=403), None
+
+        # Check pre-assessment gating (FR-LMS-013)
+        if enrollment and lesson.course_id.has_pre_assessment and not enrollment.pre_assessment_passed and not is_staff:
+            _logger.warning("Video access denied: pre-assessment not passed for employee %s", emp.name)
+            return False, Response("Forbidden: You must pass the pre-course assessment first.", status=403), None
+
+        # Check learning path sequencing gating (FR-LMS-002)
+        if enrollment and enrollment.is_locked and not is_staff:
+            _logger.warning("Video access denied: course is locked by learning path sequencing for employee %s", emp.name)
+            return False, Response("Forbidden: Prerequisite courses must be completed first.", status=403), None
+
+        return True, lesson, enrollment
+
     @http.route(['/lms/video/<int:lesson_id>/stream'], type='http', auth='user')
     def stream_lesson_video(self, lesson_id, **kwargs):
         """
         Internal Video Streaming Controller with HTTP 206 Partial Content Range support
         (FR-LMS-004, FR-LMS-005).
         Enables adaptive buffering across branch and mobile environments without YouTube dependencies.
+        Enforces enrollment and course visibility before serving any bytes.
         """
-        lesson = request.env['lms.lesson'].browse(lesson_id)
-        if not lesson.exists():
-            return request.not_found()
+        authorized, result, enrollment = self._check_video_access(lesson_id)
+        if not authorized:
+            return result
+        lesson = result
 
         # If hosted via internal streaming URL, redirect
         if lesson.video_source_type == 'url' and lesson.video_url:
@@ -60,34 +114,26 @@ class LmsController(http.Controller):
         """
         Anti-Skip Watch Time Heartbeat (FR-LMS-007, FR-LMS-008, FR-LMS-009).
         Called periodically (e.g. every 5s) by video player.
+        Enforces enrollment authorization before processing heartbeat.
         """
-        emp = request.env.user.employee_id
-        if not emp:
-            return {'status': 'error', 'message': 'No linked employee record'}
-
-        lesson = request.env['lms.lesson'].browse(int(lesson_id))
-        if not lesson.exists():
-            return {'status': 'error', 'message': 'Lesson not found'}
-
-        # Find active enrollment
-        enrollment = request.env['lms.enrollment'].search([
-            ('employee_id', '=', emp.id),
-            ('course_id', '=', lesson.course_id.id),
-        ], limit=1)
+        authorized, result, enrollment = self._check_video_access(lesson_id)
+        if not authorized:
+            return {'status': 'error', 'message': 'Access Denied', 'code': 403}
+        lesson = result
 
         if not enrollment:
-            return {'status': 'error', 'message': 'Not enrolled in course'}
+            return {'status': 'error', 'message': 'Not enrolled in course', 'code': 403}
 
-        progress = request.env['lms.lesson.progress'].search([
+        progress = request.env['lms.lesson.progress'].sudo().search([
             ('enrollment_id', '=', enrollment.id),
             ('lesson_id', '=', lesson.id),
         ], limit=1)
 
         if not progress:
-            progress = request.env['lms.lesson.progress'].create({
+            progress = request.env['lms.lesson.progress'].sudo().create({
                 'enrollment_id': enrollment.id,
                 'lesson_id': lesson.id,
-                'employee_id': emp.id,
+                'employee_id': request.env.user.employee_id.id,
             })
 
         result = progress.update_progress(current_time, duration)

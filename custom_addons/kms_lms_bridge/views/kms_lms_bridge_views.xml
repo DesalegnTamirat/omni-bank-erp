@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Course Form View Extension -->
+    <record id="view_lms_course_form_inherit_kms_bridge" model="ir.ui.view">
+        <field name="name">lms.course.form.inherit.kms.bridge</field>
+        <field name="model">lms.course</field>
+        <field name="inherit_id" ref="learning_management.view_lms_course_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_library_resources" type="object" class="oe_stat_button" icon="fa-book" invisible="library_resource_count == 0">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value"><field name="library_resource_count"/></span>
+                        <span class="o_stat_text">Library Assets</span>
+                    </div>
+                </button>
+                <button name="action_view_lessons_learned" type="object" class="oe_stat_button" icon="fa-lightbulb-o" invisible="lesson_learned_count == 0">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value"><field name="lesson_learned_count"/></span>
+                        <span class="o_stat_text">Lessons</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="KMS Knowledge Linkage" name="page_kms_bridge">
+                    <group>
+                        <group string="Curated Digital Library Materials">
+                            <field name="library_resource_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select reference library materials..."/>
+                        </group>
+                        <group string="Institutional Lessons Learned">
+                            <field name="lesson_learned_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select relevant lessons learned..."/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Digital Library Form View Extension -->
+    <record id="view_kms_digital_library_form_inherit_lms_bridge" model="ir.ui.view">
+        <field name="name">kms.digital.library.form.inherit.lms.bridge</field>
+        <field name="model">kms.digital.library</field>
+        <field name="inherit_id" ref="knowledge_management.view_kms_digital_library_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='course_reference_note']" position="after">
+                <field name="related_course_ids" widget="many2many_tags" placeholder="Link associated LMS courses..."/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Lesson Learned Form View Extension -->
+    <record id="view_kms_lesson_form_inherit_lms_bridge" model="ir.ui.view">
+        <field name="name">kms.lesson.learned.form.inherit.lms.bridge</field>
+        <field name="model">kms.lesson.learned</field>
+        <field name="inherit_id" ref="knowledge_management.view_kms_lesson_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="related_course_ids" widget="many2many_tags" placeholder="Link associated LMS courses..."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

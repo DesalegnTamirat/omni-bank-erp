@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 import uuid
 import hashlib
+import base64
+import logging
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class LmsCertificateTemplate(models.Model):
@@ -107,6 +111,18 @@ class LmsCertificate(models.Model):
             'state': 'valid',
             'certificate_filename': f"Bunna_Cert_{cert_num.replace('/', '_')}.pdf",
         })
+
+        # Render QWeb certificate PDF immediately upon issuance (FR-LMS-014, NFR-LMS-004)
+        try:
+            pdf_bytes, _ = self.env['ir.actions.report']._render_qweb_pdf(
+                'learning_management.report_lms_certificate',
+                [cert.id]
+            )
+            if pdf_bytes:
+                cert.certificate_pdf = base64.b64encode(pdf_bytes)
+        except Exception as e:
+            _logger.error("Could not generate certificate PDF for cert %s: %s", cert.id, e)
+            cert.message_post(body=_('Warning: Could not pre-render certificate PDF: %s') % e)
 
         # Bridge 1: Automatically push to core HR hr.training.history (FR-LMS-022)
         try:

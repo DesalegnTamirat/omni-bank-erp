@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Certification Sponsorship Views -->
+    <record id="view_eds_sponsorship_tree" model="ir.ui.view">
+        <field name="name">eds.sponsorship.tree</field>
+        <field name="model">eds.sponsorship</field>
+        <field name="arch" type="xml">
+            <list string="Certification Sponsorships &amp; Bonds">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="program_name"/>
+                <field name="sponsorship_type"/>
+                <field name="service_months"/>
+                <field name="eligible" widget="boolean_toggle"/>
+                <field name="approved_amount"/>
+                <field name="outstanding_obligation"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-success="state == 'active'" decoration-danger="state == 'breached'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_sponsorship_form" model="ir.ui.view">
+        <field name="name">eds.sponsorship.form</field>
+        <field name="model">eds.sponsorship</field>
+        <field name="arch" type="xml">
+            <form string="Certification Sponsorship &amp; Bond">
+                <header>
+                    <button name="action_verify_eligibility" string="Verify 12-Month Eligibility" type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve Sponsorship" type="object" class="oe_highlight" invisible="state != 'eligibility_check'"/>
+                    <button name="action_activate_bond" string="Activate Bond Agreement" type="object" class="oe_highlight" invisible="state != 'approved'"/>
+                    <button name="action_mark_breached" string="Mark Bond Breached" type="object" class="btn-danger" invisible="state != 'active'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,eligibility_check,approved,active,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Employee &amp; Eligibility">
+                            <field name="employee_id"/>
+                            <field name="sponsorship_type"/>
+                            <field name="service_months"/>
+                            <field name="eligible"/>
+                        </group>
+                        <group string="Sponsorship &amp; Bond Terms">
+                            <field name="program_name"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="approved_amount"/>
+                            <field name="bond_duration_months"/>
+                            <field name="bond_start_date"/>
+                            <field name="bond_end_date"/>
+                            <field name="outstanding_obligation"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Signed Bond Document">
+                            <group>
+                                <field name="bond_agreement" filename="bond_filename"/>
+                                <field name="bond_filename" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Repayment / Cost Recovery Lines">
+                            <field name="repayment_line_ids">
+                                <list editable="bottom">
+                                    <field name="date"/>
+                                    <field name="amount"/>
+                                    <field name="schedule_type"/>
+                                    <field name="waiver_authority"/>
+                                    <field name="payload_id"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_sponsorship" model="ir.actions.act_window">
+        <field name="name">Certification Sponsorships &amp; Bonds</field>
+        <field name="res_model">eds.sponsorship</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Staff Education Assistance Views -->
+    <record id="view_eds_education_assistance_tree" model="ir.ui.view">
+        <field name="name">eds.education.assistance.tree</field>
+        <field name="model">eds.education.assistance</field>
+        <field name="arch" type="xml">
+            <list string="Staff Education Assistance">
+                <field name="name"/>
+                <field name="employee_id"/>
+                <field name="program"/>
+                <field name="institution"/>
+                <field name="degree_level"/>
+                <field name="tuition_amount"/>
+                <field name="approved_amount"/>
+                <field name="approval_state" widget="badge" decoration-success="approval_state == 'cpco_approved'"/>
+                <field name="reimbursement_state" widget="badge" decoration-success="reimbursement_state == 'disbursed'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_eds_education_assistance_form" model="ir.ui.view">
+        <field name="name">eds.education.assistance.form</field>
+        <field name="model">eds.education.assistance</field>
+        <field name="arch" type="xml">
+            <form string="Staff Education Assistance Request">
+                <header>
+                    <button name="action_submit" string="Submit Request" type="object" class="oe_highlight" invisible="approval_state != 'draft'"/>
+                    <button name="action_dept_approve" string="Dept Head Approve" type="object" class="oe_highlight" invisible="approval_state != 'submitted'"/>
+                    <button name="action_ppdd_validate" string="PPDD Validate" type="object" class="oe_highlight" invisible="approval_state != 'dept_approved'"/>
+                    <button name="action_cpco_approve" string="CPCO Approve" type="object" class="oe_highlight" invisible="approval_state != 'ppdd_validated'"/>
+                    <button name="action_disburse" string="Disburse Reimbursement" type="object" class="oe_highlight" invisible="approval_state != 'cpco_approved' or reimbursement_state == 'disbursed'"/>
+                    <field name="approval_state" widget="statusbar" statusbar_visible="draft,submitted,dept_approved,ppdd_validated,cpco_approved"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Applicant &amp; Program">
+                            <field name="employee_id"/>
+                            <field name="program"/>
+                            <field name="institution"/>
+                            <field name="degree_level"/>
+                        </group>
+                        <group string="Financials &amp; Disbursement">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="tuition_amount"/>
+                            <field name="approved_amount"/>
+                            <field name="reimbursement_state" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Academic Progress &amp; Documents">
+                            <group>
+                                <field name="academic_progress" placeholder="Enter transcript details &amp; GPA summary..."/>
+                                <field name="proof_document" filename="proof_filename"/>
+                                <field name="proof_filename" invisible="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_eds_education_assistance" model="ir.actions.act_window">
+        <field name="name">Staff Education Assistance</field>
+        <field name="res_model">eds.education.assistance</field>
+        <field name="view_mode">list,form</field>
+    </record>
+</odoo>

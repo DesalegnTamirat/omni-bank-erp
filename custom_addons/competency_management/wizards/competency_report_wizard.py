@@ -85,6 +85,9 @@ class CompetencyReportWizard(models.TransientModel):
     ], string='Competency Pillars / Categories', default='all', required=True)
 
     competency_ids = fields.Many2many('competency.competency', string='Competencies')
+    competency_domain = fields.Char(compute='_compute_dynamic_domains')
+    operating_unit_domain = fields.Char(compute='_compute_dynamic_domains')
+    employee_domain = fields.Char(compute='_compute_dynamic_domains')
 
     required_level = fields.Selection([
         ('all', 'All Required Proficiency Levels'),
@@ -114,49 +117,74 @@ class CompetencyReportWizard(models.TransientModel):
     @api.depends_context('uid')
     def _compute_user_permissions(self):
         user = self.env.user.sudo()
-        is_admin = user.has_group('competency_management.group_competency_admin')
-        is_supervisor = user.has_group('competency_management.group_competency_supervisor')
+        is_admin = bool(
+            user.has_group('competency_management.group_competency_admin')
+            or user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_admin()
+        )
         emp = user.employee_id
+        is_supervisor = user.has_group('competency_management.group_competency_supervisor') or (emp and bool(emp.child_ids))
 
-        user_ou_ids = self._get_user_scope_ou_ids(user)
+        # Check if user is a Department Leader / Manager
+        is_dept_manager = False
+        if emp:
+            managed_depts = self.env['hr.department'].sudo().search([('manager_id', '=', emp.id)])
+            if managed_depts or (emp.department_id and emp.department_id.manager_id.id == emp.id):
+                is_dept_manager = True
 
         for rec in self:
             if is_admin or not emp:
+                # 1. Administrator: Unrestricted across all departments, OUs, and employees
                 rec.is_dept_readonly = False
                 rec.is_ou_readonly = False
                 rec.is_emp_readonly = False
-            elif is_supervisor:
-                rec.is_dept_readonly = False
-                rec.is_ou_readonly = True if len(user_ou_ids) == 1 else False
+            elif is_dept_manager:
+                # 2. Department Leader: Department locked, but Operating Units & Employees within that department are selectable
+                rec.is_dept_readonly = True
+                rec.is_ou_readonly = False
                 rec.is_emp_readonly = False
             else:
-                rec.is_dept_readonly = True if emp.department_id else False
-                rec.is_ou_readonly = True if user_ou_ids else False
-                rec.is_emp_readonly = True
+                # 3. Below Operating Unit (Coach, Unit Supervisor, Regular User):
+                # Both Department and Operating Unit are strictly read-only!
+                rec.is_dept_readonly = True
+                rec.is_ou_readonly = True
+                # A supervisor / coach below OU can select their team members; a regular employee is locked to themselves
+                rec.is_emp_readonly = False if is_supervisor else True
 
     @api.model
     def default_get(self, fields_list):
         res = super().default_get(fields_list)
         user = self.env.user.sudo()
         emp = user.employee_id
-        is_admin = user.has_group('competency_management.group_competency_admin')
-        is_supervisor = user.has_group('competency_management.group_competency_supervisor')
+        is_admin = bool(
+            user.has_group('competency_management.group_competency_admin')
+            or user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_admin()
+        )
+        if not emp or is_admin:
+            return res
 
-        user_ou_ids = self._get_user_scope_ou_ids(user)
+        managed_depts = self.env['hr.department'].sudo().search([('manager_id', '=', emp.id)])
+        is_dept_manager = bool(managed_depts or (emp.department_id and emp.department_id.manager_id.id == emp.id))
 
-        if emp and not is_admin:
-            if is_supervisor:
-                if user_ou_ids and 'operating_unit_ids' in fields_list:
-                    res['operating_unit_ids'] = [(6, 0, user_ou_ids)]
-                if emp.department_id and 'department_ids' in fields_list:
-                    res['department_ids'] = [(6, 0, [emp.department_id.id])]
-            else:
-                if emp.department_id and 'department_ids' in fields_list:
-                    res['department_ids'] = [(6, 0, [emp.department_id.id])]
-                if user_ou_ids and 'operating_unit_ids' in fields_list:
-                    res['operating_unit_ids'] = [(6, 0, user_ou_ids)]
-                if 'employee_ids' in fields_list:
-                    res['employee_ids'] = [(6, 0, [emp.id])]
+        if is_dept_manager:
+            depts = managed_depts or emp.department_id
+            if depts and 'department_ids' in fields_list:
+                res['department_ids'] = [(6, 0, depts.ids)]
+        else:
+            # Below Operating Unit (Coach / Regular User)
+            user_ou_ids = self._get_user_scope_ou_ids(user)
+            if emp.department_id and 'department_ids' in fields_list:
+                res['department_ids'] = [(6, 0, [emp.department_id.id])]
+            if user_ou_ids and 'operating_unit_ids' in fields_list:
+                res['operating_unit_ids'] = [(6, 0, user_ou_ids)]
+
+            is_supervisor = user.has_group('competency_management.group_competency_supervisor') or bool(emp.child_ids)
+            if not is_supervisor and 'employee_ids' in fields_list:
+                res['employee_ids'] = [(6, 0, [emp.id])]
+
         return res
 
     @api.depends('required_level', 'current_level')
@@ -177,35 +205,116 @@ class CompetencyReportWizard(models.TransientModel):
             else:
                 rec.is_status_readonly = False
 
-    @api.onchange('department_ids')
+    @api.depends('pillar', 'department_ids', 'operating_unit_ids')
+    def _compute_dynamic_domains(self):
+        for rec in self:
+            # 1. Competency Domain
+            if rec.pillar and rec.pillar != 'all':
+                comp_dom = [('pillar', '=', rec.pillar), ('state', '=', 'approved')]
+            else:
+                comp_dom = [('state', '=', 'approved')]
+            rec.competency_domain = str(comp_dom)
+
+            # 2. Operating Unit Domain
+            if rec.department_ids:
+                ou_direct = self.env['operating.unit'].search([('department', 'in', rec.department_ids.ids)])
+                ou_from_dept = rec.department_ids.mapped('operating_unit_id')
+                dept_emps = self.env['hr.employee'].search([('department_id', 'in', rec.department_ids.ids)])
+                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+                allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+                rec.operating_unit_domain = str([('id', 'in', allowed_ous.ids)])
+            else:
+                rec.operating_unit_domain = '[]'
+
+            # 3. Employee Domain
+            emp_conditions = [('active', '=', True)]
+            if rec.department_ids and rec.operating_unit_ids:
+                emp_conditions.append(('department_id', 'in', rec.department_ids.ids))
+                emp_conditions.extend([
+                    '|',
+                    ('default_operating_unit_id', 'in', rec.operating_unit_ids.ids),
+                    ('operating_unit_id', 'in', rec.operating_unit_ids.ids)
+                ])
+            elif rec.operating_unit_ids:
+                emp_conditions.extend([
+                    '|',
+                    ('default_operating_unit_id', 'in', rec.operating_unit_ids.ids),
+                    ('operating_unit_id', 'in', rec.operating_unit_ids.ids)
+                ])
+            elif rec.department_ids:
+                emp_conditions.append(('department_id', 'in', rec.department_ids.ids))
+
+            rec.employee_domain = str(emp_conditions)
+
+    @api.onchange('cycle_id', 'department_ids')
     def _onchange_department_ids(self):
         """Cascading Filter 1: Department -> Operating Unit, Jobs, and Employees."""
-        domain_ou = []
-        domain_emp = []
-        domain_job = []
-
         if self.department_ids:
-            domain_ou = ['|', ('department_id', 'in', self.department_ids.ids), ('id', 'in', self.department_ids.mapped('operating_unit_id.id'))]
+            ou_direct = self.env['operating.unit'].search([('department', 'in', self.department_ids.ids)])
+            ou_from_dept = self.department_ids.mapped('operating_unit_id')
+            dept_emps = self.env['hr.employee'].search([('department_id', 'in', self.department_ids.ids)])
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+            domain_ou = [('id', 'in', allowed_ous.ids)]
             domain_job = [('department_id', 'in', self.department_ids.ids)]
-            if not self.operating_unit_ids:
-                domain_emp = [('department_id', 'in', self.department_ids.ids)]
-            else:
-                domain_emp = ['|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)]
-        else:
+
+            # Prune selected operating units that no longer match the selected departments
             if self.operating_unit_ids:
-                domain_emp = ['|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)]
+                self.operating_unit_ids = self.operating_unit_ids.filtered(lambda u: u.id in allowed_ous.ids)
+
+            # Prune selected jobs
+            if self.job_ids:
+                matching_jobs = self.env['hr.job'].search(domain_job)
+                self.job_ids = self.job_ids & matching_jobs
+
+            if not self.operating_unit_ids:
+                domain_emp = [('active', '=', True), ('department_id', 'in', self.department_ids.ids)]
+            else:
+                domain_emp = [
+                    ('active', '=', True),
+                    ('department_id', 'in', self.department_ids.ids),
+                    '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                ]
+            if self.employee_ids:
+                matching_emps = self.env['hr.employee'].search(domain_emp)
+                self.employee_ids = self.employee_ids & matching_emps
+        else:
+            domain_ou = []
+            domain_job = []
+            if self.operating_unit_ids:
+                domain_emp = [
+                    ('active', '=', True),
+                    '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                ]
+                if self.employee_ids:
+                    matching_emps = self.env['hr.employee'].search(domain_emp)
+                    self.employee_ids = self.employee_ids & matching_emps
+            else:
+                domain_emp = [('active', '=', True)]
 
         return {'domain': {'operating_unit_ids': domain_ou, 'job_ids': domain_job, 'employee_ids': domain_emp}}
 
     @api.onchange('operating_unit_ids')
     def _onchange_operating_unit_ids(self):
         """Cascading Filter 2: Operating Unit -> Employee."""
-        if self.operating_unit_ids:
-            domain_emp = ['|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', self.operating_unit_ids.ids)]
+        domain_emp = [('active', '=', True)]
+        if self.operating_unit_ids and self.department_ids:
+            domain_emp.append(('department_id', 'in', self.department_ids.ids))
+            domain_emp.extend([
+                '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids),
+                     ('operating_unit_id', 'in', self.operating_unit_ids.ids)
+            ])
+        elif self.operating_unit_ids:
+            domain_emp.extend([
+                '|', ('default_operating_unit_id', 'in', self.operating_unit_ids.ids),
+                     ('operating_unit_id', 'in', self.operating_unit_ids.ids)
+            ])
         elif self.department_ids:
-            domain_emp = [('department_id', 'in', self.department_ids.ids)]
-        else:
-            domain_emp = []
+            domain_emp.append(('department_id', 'in', self.department_ids.ids))
+
+        if self.employee_ids:
+            matching_emps = self.env['hr.employee'].search(domain_emp)
+            self.employee_ids = self.employee_ids & matching_emps
 
         return {'domain': {'employee_ids': domain_emp}}
 
@@ -213,7 +322,7 @@ class CompetencyReportWizard(models.TransientModel):
     def _onchange_job_ids(self):
         """Cascading Filter 3: Job Position -> Employee."""
         if self.job_ids:
-            domain_emp = [('job_id', 'in', self.job_ids.ids)]
+            domain_emp = [('active', '=', True), ('job_id', 'in', self.job_ids.ids)]
             if self.department_ids:
                 domain_emp.append(('department_id', 'in', self.department_ids.ids))
             return {'domain': {'employee_ids': domain_emp}}
@@ -223,22 +332,46 @@ class CompetencyReportWizard(models.TransientModel):
     def _onchange_pillar(self):
         """Cascading Filter 4: Pillar -> Competencies."""
         if self.pillar and self.pillar != 'all':
-            return {'domain': {'competency_ids': [('pillar', '=', self.pillar)]}}
-        return {'domain': {'competency_ids': []}}
+            domain_comp = [('pillar', '=', self.pillar), ('state', '=', 'approved')]
+            if self.competency_ids:
+                self.competency_ids = self.competency_ids.filtered(lambda c: c.pillar == self.pillar)
+        else:
+            domain_comp = [('state', '=', 'approved')]
+        return {'domain': {'competency_ids': domain_comp}}
 
     def _build_line_domain(self):
-        """Construct domain based on wizard selections and enforce server-side OU isolation."""
+        """Construct domain based on wizard selections and enforce server-side boundary isolation."""
         domain = [('cycle_id', '=', self.cycle_id.id), ('is_primary_reporting_line', '=', True)]
 
-        # Server-side Operating-Unit Boundary Scoping for non-admins
-        user = self.env.user
-        is_admin = user.has_group('competency_management.group_competency_admin')
-        if not is_admin:
-            user_ou_ids = self._get_user_scope_ou_ids(user)
-            if user_ou_ids:
-                domain.append('|')
-                domain.append(('employee_id.default_operating_unit_id', 'in', user_ou_ids))
-                domain.append(('department_id.operating_unit_id', 'in', user_ou_ids))
+        user = self.env.user.sudo()
+        emp = user.employee_id
+        is_admin = bool(
+            user.has_group('competency_management.group_competency_admin')
+            or user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_admin()
+        )
+
+        # Server-side Boundary Scoping for non-admins
+        if not is_admin and emp:
+            managed_depts = self.env['hr.department'].sudo().search([('manager_id', '=', emp.id)])
+            is_dept_manager = bool(managed_depts or (emp.department_id and emp.department_id.manager_id.id == emp.id))
+            if is_dept_manager:
+                # Scoped to their managed department(s)
+                depts = managed_depts or emp.department_id
+                domain.append(('department_id', 'in', depts.ids))
+            else:
+                user_ou_ids = self._get_user_scope_ou_ids(user)
+                is_supervisor = user.has_group('competency_management.group_competency_supervisor') or bool(emp.child_ids)
+                if is_supervisor:
+                    # Scoped to their operating unit or team
+                    if user_ou_ids:
+                        domain.append('|')
+                        domain.append(('employee_id.default_operating_unit_id', 'in', user_ou_ids))
+                        domain.append(('department_id.operating_unit_id', 'in', user_ou_ids))
+                else:
+                    # Individual employee: only themselves
+                    domain.append(('employee_id', '=', emp.id))
 
         if self.department_ids:
             domain.append(('department_id', 'in', self.department_ids.ids))
@@ -277,17 +410,85 @@ class CompetencyReportWizard(models.TransientModel):
             return self.action_export_xlsx()
 
     def action_apply_filter(self):
-        """Action: Open filtered line list/pivot view in place."""
+        """Action: Open filtered list/pivot view tailored to selected report_type."""
         self.ensure_one()
-        domain = self._build_line_domain()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': _('Filtered Competency & TNA Report Lines'),
-            'res_model': 'competency.assessment.line',
-            'view_mode': 'list,graph,pivot,form',
-            'domain': domain,
-            'target': 'current',
-        }
+
+        if self.report_type == 'detailed_matrix':
+            domain = self._build_line_domain()
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Comprehensive Competency Performance & Gap Matrix'),
+                'res_model': 'competency.assessment.line',
+                'view_mode': 'list,pivot,graph,form',
+                'domain': domain,
+                'target': 'current',
+            }
+
+        elif self.report_type == 'dept_role_gap':
+            domain = self._build_line_domain()
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Departmental & Role Competency Gap Analysis'),
+                'res_model': 'competency.assessment.line',
+                'view_mode': 'pivot,list,graph',
+                'domain': domain,
+                'context': {
+                    'group_by': ['department_id', 'job_id'],
+                },
+                'target': 'current',
+            }
+
+        elif self.report_type == 'individual':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend([
+                    '|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids),
+                    ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                ])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Individual Employee Competency Profiles'),
+                'res_model': 'competency.assessment',
+                'view_mode': 'list,form,pivot,graph',
+                'domain': asm_domain,
+                'context': {
+                    'group_by': ['department_id'],
+                },
+                'target': 'current',
+            }
+
+        elif self.report_type == 'campaign_progress':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend([
+                    '|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids),
+                    ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)
+                ])
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            return {
+                'type': 'ir.actions.act_window',
+                'name': _('Assessment Completion & Campaign Progress Tracking'),
+                'res_model': 'competency.assessment',
+                'view_mode': 'pivot,list,graph',
+                'domain': asm_domain,
+                'context': {
+                    'group_by': ['department_id', 'state'],
+                },
+                'target': 'current',
+            }
 
     def _get_360_report_data_rows(self):
         """Compute comprehensive 360 weighted data rows for reports and exports."""
@@ -403,33 +604,114 @@ class CompetencyReportWizard(models.TransientModel):
         return rows
 
     def action_export_csv(self):
-        """Action: Export report dataset as CSV file."""
+        """Action: Export report dataset as CSV file matching selected report_type."""
         self.ensure_one()
-        rows = self._get_360_report_data_rows()
-        
         output = io.StringIO()
         writer = csv.writer(output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        
-        writer.writerow([
-            'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
-            'Competency Name', 'Pillar', 'Functional Domain',
-            'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
-            'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
-        ])
-        
-        for r in rows:
+
+        if self.report_type == 'detailed_matrix':
+            rows = self._get_360_report_data_rows()
             writer.writerow([
-                r['cycle_name'], r['emp_id_code'], r['emp_name'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'],
-                r['competency_name'], r['pillar_name'], r['domain_name'],
-                r['self_rating'], r['peer_avg'], r['subordinate_avg'], r['supervisor_avg'], r['team_avg'],
-                r['weighted_rating'], r['required_level'], r['weighted_gap'], r['achievement_status']
+                'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                'Competency Name', 'Pillar', 'Functional Domain',
+                'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
+                'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
             ])
+            for r in rows:
+                writer.writerow([
+                    r['cycle_name'], r['emp_id_code'], r['emp_name'], r['operating_unit_name'], r['department_name'], r['job_name'], r['grade_name'],
+                    r['competency_name'], r['pillar_name'], r['domain_name'],
+                    r['self_rating'], r['peer_avg'], r['subordinate_avg'], r['supervisor_avg'], r['team_avg'],
+                    r['weighted_rating'], r['required_level'], r['weighted_gap'], r['achievement_status']
+                ])
+
+        elif self.report_type == 'dept_role_gap':
+            rows = self._get_360_report_data_rows()
+            grouped = {}
+            for r in rows:
+                key = (r['department_name'], r['job_name'])
+                grouped.setdefault(key, []).append(r)
+
+            writer.writerow([
+                'Cycle', 'Department', 'Job Position', 'Total Evaluated Lines',
+                'Fit / Qualified Count', 'Underqualified Count', 'Overqualified Count', 'Average Gap'
+            ])
+            for (dept, job), items in sorted(grouped.items()):
+                meets = sum(1 for x in items if x['achievement_status'] == 'Fit / Qualified')
+                below = sum(1 for x in items if x['achievement_status'] == 'Underqualified')
+                exceeds = sum(1 for x in items if x['achievement_status'] == 'Overqualified')
+                gaps = [x['weighted_gap'] for x in items if isinstance(x['weighted_gap'], (int, float))]
+                avg_gap = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
+                writer.writerow([
+                    self.cycle_id.name, dept, job, len(items),
+                    meets, below, exceeds, avg_gap
+                ])
+
+        elif self.report_type == 'individual':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
+            writer.writerow([
+                'Cycle', 'Assessment Ref', 'Staff ID', 'Employee Name', 'Department', 'Operating Unit',
+                'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
+            ])
+            for a in asms:
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                ou_name = emp_ou.name if emp_ou else 'N/A'
+                tot_comps = len(a.line_ids)
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
+                writer.writerow([
+                    self.cycle_id.name, a.name, a.employee_id.id, a.employee_id.name,
+                    a.department_id.name if a.department_id else 'N/A',
+                    ou_name, a.job_id.name if a.job_id else 'N/A',
+                    tot_comps, gap_cnt, round(a.average_gap or 0.0, 2),
+                    overall_score, dict(a._fields['state'].selection).get(a.state, a.state)
+                ])
+
+        elif self.report_type == 'campaign_progress':
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
+            dept_map = {}
+            for a in asms:
+                dept_name = a.department_id.name if a.department_id else 'Unassigned'
+                dept_map.setdefault(dept_name, []).append(a)
+
+            writer.writerow([
+                'Cycle', 'Department', 'Total Assessments', 'Draft', 'Submitted',
+                'Supervisor Review', 'HR Verified', 'Approved', 'Locked', 'Completion Rate %'
+            ])
+            for d_name, items in sorted(dept_map.items()):
+                draft_cnt = sum(1 for x in items if x.state == 'draft')
+                sub_cnt = sum(1 for x in items if x.state == 'submitted')
+                sup_cnt = sum(1 for x in items if x.state == 'supervisor_review')
+                hr_cnt = sum(1 for x in items if x.state == 'hr_verified')
+                app_cnt = sum(1 for x in items if x.state == 'approved')
+                lock_cnt = sum(1 for x in items if x.state == 'locked')
+                done_cnt = app_cnt + lock_cnt
+                rate = round((done_cnt / len(items)) * 100, 1) if items else 0.0
+                writer.writerow([
+                    self.cycle_id.name, d_name, len(items), draft_cnt, sub_cnt,
+                    sup_cnt, hr_cnt, app_cnt, lock_cnt, f"{rate}%"
+                ])
 
         csv_bytes = output.getvalue().encode('utf-8')
         output.close()
-        
+
         attachment = self.env['ir.attachment'].create({
-            'name': f'Competency_360_Report_{self.cycle_id.name}.csv',
+            'name': f'Competency_{self.report_type}_{self.cycle_id.name}.csv',
             'datas': base64.b64encode(csv_bytes),
             'mimetype': 'text/csv',
         })
@@ -440,13 +722,10 @@ class CompetencyReportWizard(models.TransientModel):
         }
 
     def action_export_xlsx(self):
-        """Action: Export report dataset as Excel (.xlsx) file using xlsxwriter (FR-RPT-009)."""
+        """Action: Export report dataset as Excel (.xlsx) file matching selected report_type."""
         self.ensure_one()
-        rows = self._get_360_report_data_rows()
-
         output = io.BytesIO()
         workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        worksheet = workbook.add_worksheet('360 Competency Report')
 
         header_format = workbook.add_format({
             'bold': True,
@@ -459,44 +738,158 @@ class CompetencyReportWizard(models.TransientModel):
         cell_format = workbook.add_format({'border': 1, 'valign': 'vcenter'})
         num_format = workbook.add_format({'border': 1, 'valign': 'vcenter', 'num_format': '0.00'})
 
-        headers = [
-            'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
-            'Competency Name', 'Pillar', 'Functional Domain',
-            'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
-            'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
-        ]
+        if self.report_type == 'detailed_matrix':
+            worksheet = workbook.add_worksheet('Detailed Matrix')
+            rows = self._get_360_report_data_rows()
+            headers = [
+                'Cycle', 'Employee ID', 'Employee Name', 'Operating Unit', 'Department', 'Job Position', 'Job Grade',
+                'Competency Name', 'Pillar', 'Functional Domain',
+                'Self Rating', 'Peer Avg', 'Subordinate Avg', 'Supervisor Avg', 'Team Avg',
+                'Weighted Current Rating', 'Required Level', 'Weighted Gap', 'Qualification Status'
+            ]
+            for col_num, header in enumerate(headers):
+                worksheet.write(0, col_num, header, header_format)
+                worksheet.set_column(col_num, col_num, 18)
 
-        for col_num, header in enumerate(headers):
-            worksheet.write(0, col_num, header, header_format)
-            worksheet.set_column(col_num, col_num, 18)
+            for row_num, r in enumerate(rows, start=1):
+                worksheet.write(row_num, 0, r['cycle_name'], cell_format)
+                worksheet.write(row_num, 1, r['emp_id_code'], cell_format)
+                worksheet.write(row_num, 2, r['emp_name'], cell_format)
+                worksheet.write(row_num, 3, r['operating_unit_name'], cell_format)
+                worksheet.write(row_num, 4, r['department_name'], cell_format)
+                worksheet.write(row_num, 5, r['job_name'], cell_format)
+                worksheet.write(row_num, 6, r['grade_name'], cell_format)
+                worksheet.write(row_num, 7, r['competency_name'], cell_format)
+                worksheet.write(row_num, 8, r['pillar_name'], cell_format)
+                worksheet.write(row_num, 9, r['domain_name'], cell_format)
+                worksheet.write(row_num, 10, r['self_rating'], num_format if isinstance(r['self_rating'], (int, float)) else cell_format)
+                worksheet.write(row_num, 11, r['peer_avg'], num_format if isinstance(r['peer_avg'], (int, float)) else cell_format)
+                worksheet.write(row_num, 12, r['subordinate_avg'], num_format if isinstance(r['subordinate_avg'], (int, float)) else cell_format)
+                worksheet.write(row_num, 13, r['supervisor_avg'], num_format if isinstance(r['supervisor_avg'], (int, float)) else cell_format)
+                worksheet.write(row_num, 14, r['team_avg'], num_format if isinstance(r['team_avg'], (int, float)) else cell_format)
+                worksheet.write(row_num, 15, r['weighted_rating'], num_format)
+                worksheet.write(row_num, 16, r['required_level'], cell_format)
+                worksheet.write(row_num, 17, r['weighted_gap'], num_format)
+                worksheet.write(row_num, 18, r['achievement_status'], cell_format)
 
-        for row_num, r in enumerate(rows, start=1):
-            worksheet.write(row_num, 0, r['cycle_name'], cell_format)
-            worksheet.write(row_num, 1, r['emp_id_code'], cell_format)
-            worksheet.write(row_num, 2, r['emp_name'], cell_format)
-            worksheet.write(row_num, 3, r['operating_unit_name'], cell_format)
-            worksheet.write(row_num, 4, r['department_name'], cell_format)
-            worksheet.write(row_num, 5, r['job_name'], cell_format)
-            worksheet.write(row_num, 6, r['grade_name'], cell_format)
-            worksheet.write(row_num, 7, r['competency_name'], cell_format)
-            worksheet.write(row_num, 8, r['pillar_name'], cell_format)
-            worksheet.write(row_num, 9, r['domain_name'], cell_format)
-            worksheet.write(row_num, 10, r['self_rating'], num_format if isinstance(r['self_rating'], (int, float)) else cell_format)
-            worksheet.write(row_num, 11, r['peer_avg'], num_format if isinstance(r['peer_avg'], (int, float)) else cell_format)
-            worksheet.write(row_num, 12, r['subordinate_avg'], num_format if isinstance(r['subordinate_avg'], (int, float)) else cell_format)
-            worksheet.write(row_num, 13, r['supervisor_avg'], num_format if isinstance(r['supervisor_avg'], (int, float)) else cell_format)
-            worksheet.write(row_num, 14, r['team_avg'], num_format if isinstance(r['team_avg'], (int, float)) else cell_format)
-            worksheet.write(row_num, 15, r['weighted_rating'], num_format)
-            worksheet.write(row_num, 16, r['required_level'], cell_format)
-            worksheet.write(row_num, 17, r['weighted_gap'], num_format)
-            worksheet.write(row_num, 18, r['achievement_status'], cell_format)
+        elif self.report_type == 'dept_role_gap':
+            worksheet = workbook.add_worksheet('Dept & Role Gap')
+            rows = self._get_360_report_data_rows()
+            grouped = {}
+            for r in rows:
+                key = (r['department_name'], r['job_name'])
+                grouped.setdefault(key, []).append(r)
+
+            headers = [
+                'Cycle', 'Department', 'Job Position', 'Total Evaluated Lines',
+                'Fit / Qualified Count', 'Underqualified Count', 'Overqualified Count', 'Average Gap'
+            ]
+            for col_num, header in enumerate(headers):
+                worksheet.write(0, col_num, header, header_format)
+                worksheet.set_column(col_num, col_num, 20)
+
+            for row_num, ((dept, job), items) in enumerate(sorted(grouped.items()), start=1):
+                meets = sum(1 for x in items if x['achievement_status'] == 'Fit / Qualified')
+                below = sum(1 for x in items if x['achievement_status'] == 'Underqualified')
+                exceeds = sum(1 for x in items if x['achievement_status'] == 'Overqualified')
+                gaps = [x['weighted_gap'] for x in items if isinstance(x['weighted_gap'], (int, float))]
+                avg_gap = round(sum(gaps) / len(gaps), 2) if gaps else 0.0
+                worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
+                worksheet.write(row_num, 1, dept, cell_format)
+                worksheet.write(row_num, 2, job, cell_format)
+                worksheet.write(row_num, 3, len(items), cell_format)
+                worksheet.write(row_num, 4, meets, cell_format)
+                worksheet.write(row_num, 5, below, cell_format)
+                worksheet.write(row_num, 6, exceeds, cell_format)
+                worksheet.write(row_num, 7, avg_gap, num_format)
+
+        elif self.report_type == 'individual':
+            worksheet = workbook.add_worksheet('Employee Profiles')
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            if self.operating_unit_ids:
+                asm_domain.extend(['|', ('employee_id.default_operating_unit_id', 'in', self.operating_unit_ids.ids), ('employee_id.operating_unit_id', 'in', self.operating_unit_ids.ids)])
+            if self.job_ids:
+                asm_domain.append(('job_id', 'in', self.job_ids.ids))
+            if self.employee_ids:
+                asm_domain.append(('employee_id', 'in', self.employee_ids.ids))
+            if self.stage_filter and self.stage_filter != 'all':
+                asm_domain.append(('state', '=', self.stage_filter))
+
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
+            headers = [
+                'Cycle', 'Assessment Ref', 'Staff ID', 'Employee Name', 'Department', 'Operating Unit',
+                'Job Position', 'Total Competencies', 'Gap Count', 'Average Gap', 'Overall Score', 'Status'
+            ]
+            for col_num, header in enumerate(headers):
+                worksheet.write(0, col_num, header, header_format)
+                worksheet.set_column(col_num, col_num, 18)
+
+            for row_num, a in enumerate(asms, start=1):
+                emp_ou = getattr(a.employee_id, 'default_operating_unit_id', False) or getattr(a.employee_id, 'operating_unit_id', False) or getattr(a.department_id, 'operating_unit_id', False)
+                ou_name = emp_ou.name if emp_ou else 'N/A'
+                tot_comps = len(a.line_ids)
+                gap_cnt = len(a.line_ids.filtered(lambda l: l.gap and l.gap > 0))
+                overall_score = round(sum([float(l.weighted_current_level or l.current_level or 0) for l in a.line_ids]) / tot_comps, 2) if tot_comps else 0.0
+                worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
+                worksheet.write(row_num, 1, a.name, cell_format)
+                worksheet.write(row_num, 2, a.employee_id.id, cell_format)
+                worksheet.write(row_num, 3, a.employee_id.name, cell_format)
+                worksheet.write(row_num, 4, a.department_id.name if a.department_id else 'N/A', cell_format)
+                worksheet.write(row_num, 5, ou_name, cell_format)
+                worksheet.write(row_num, 6, a.job_id.name if a.job_id else 'N/A', cell_format)
+                worksheet.write(row_num, 7, tot_comps, cell_format)
+                worksheet.write(row_num, 8, gap_cnt, cell_format)
+                worksheet.write(row_num, 9, round(a.average_gap or 0.0, 2), num_format)
+                worksheet.write(row_num, 10, overall_score, num_format)
+                worksheet.write(row_num, 11, dict(a._fields['state'].selection).get(a.state, a.state), cell_format)
+
+        elif self.report_type == 'campaign_progress':
+            worksheet = workbook.add_worksheet('Campaign Progress')
+            asm_domain = [('cycle_id', '=', self.cycle_id.id)]
+            if self.department_ids:
+                asm_domain.append(('department_id', 'in', self.department_ids.ids))
+            asms = self.env['competency.assessment'].sudo().search(asm_domain)
+            dept_map = {}
+            for a in asms:
+                dept_name = a.department_id.name if a.department_id else 'Unassigned'
+                dept_map.setdefault(dept_name, []).append(a)
+
+            headers = [
+                'Cycle', 'Department', 'Total Assessments', 'Draft', 'Submitted',
+                'Supervisor Review', 'HR Verified', 'Approved', 'Locked', 'Completion Rate %'
+            ]
+            for col_num, header in enumerate(headers):
+                worksheet.write(0, col_num, header, header_format)
+                worksheet.set_column(col_num, col_num, 18)
+
+            for row_num, (d_name, items) in enumerate(sorted(dept_map.items()), start=1):
+                draft_cnt = sum(1 for x in items if x.state == 'draft')
+                sub_cnt = sum(1 for x in items if x.state == 'submitted')
+                sup_cnt = sum(1 for x in items if x.state == 'supervisor_review')
+                hr_cnt = sum(1 for x in items if x.state == 'hr_verified')
+                app_cnt = sum(1 for x in items if x.state == 'approved')
+                lock_cnt = sum(1 for x in items if x.state == 'locked')
+                done_cnt = app_cnt + lock_cnt
+                rate = round((done_cnt / len(items)) * 100, 1) if items else 0.0
+                worksheet.write(row_num, 0, self.cycle_id.name, cell_format)
+                worksheet.write(row_num, 1, d_name, cell_format)
+                worksheet.write(row_num, 2, len(items), cell_format)
+                worksheet.write(row_num, 3, draft_cnt, cell_format)
+                worksheet.write(row_num, 4, sub_cnt, cell_format)
+                worksheet.write(row_num, 5, sup_cnt, cell_format)
+                worksheet.write(row_num, 6, hr_cnt, cell_format)
+                worksheet.write(row_num, 7, app_cnt, cell_format)
+                worksheet.write(row_num, 8, lock_cnt, cell_format)
+                worksheet.write(row_num, 9, f"{rate}%", cell_format)
 
         workbook.close()
         xlsx_bytes = output.getvalue()
         output.close()
 
         attachment = self.env['ir.attachment'].create({
-            'name': f'Competency_360_Report_{self.cycle_id.name}.xlsx',
+            'name': f'Competency_{self.report_type}_{self.cycle_id.name}.xlsx',
             'datas': base64.b64encode(xlsx_bytes),
             'mimetype': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         })

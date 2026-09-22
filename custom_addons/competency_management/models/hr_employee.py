@@ -14,33 +14,45 @@ class HrEmployeeCompetency(models.Model):
 
     latest_competency_assessment_id = fields.Many2one(
         'competency.assessment', string='Latest Competency Assessment',
-        compute='_compute_latest_competency_assessment', store=True,
+        compute='_compute_latest_competency_assessment', store=False,
         help="Points to the employee's most recent approved/completed competency evaluation.")
     latest_competency_overall_score = fields.Float(
         string='Latest Competency Score (%)',
-        compute='_compute_latest_competency_assessment', store=True,
+        compute='_compute_latest_competency_assessment', store=False,
         help="Overall weighted score percentage achieved in the latest evaluation.")
     latest_competency_assessment_date = fields.Date(
         string='Latest Assessment Date',
-        compute='_compute_latest_competency_assessment', store=True)
+        compute='_compute_latest_competency_assessment', store=False)
     latest_competency_gap_summary = fields.Text(
         string='Latest Competency Gap Summary',
-        compute='_compute_latest_competency_assessment', store=True,
+        compute='_compute_latest_competency_assessment', store=False,
         help="Summary of competency requirements, achieved levels, and gaps for Career Path and external analytics.")
 
     is_director_or_chief = fields.Boolean(
         string='Is Director or Chief',
         compute='_compute_is_director_or_chief',
-        store=True,
-        index=True,
+        search='_search_is_director_or_chief',
+        store=False,
         help="Designates whether the employee holds Grade XVI (Director) or Grade XVII (Chief)."
     )
+
+    def _search_is_director_or_chief(self, operator, value):
+        peer_config_model = self.env['competency.director.peer.config']
+        all_active = self.env['hr.employee'].search([('active', '=', True)])
+        matched_ids = [e.id for e in all_active if peer_config_model._is_director_or_chief(e)]
+
+        is_true = (operator in ('=', '==') and bool(value)) or (operator in ('!=', '<>') and not bool(value))
+        if is_true:
+            return [('id', 'in', matched_ids)]
+        else:
+            return [('id', 'not in', matched_ids)]
 
     @api.depends('job_grade', 'grade_id', 'job_id', 'active')
     def _compute_is_director_or_chief(self):
         peer_config_model = self.env['competency.director.peer.config']
         for emp in self:
             emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp)
+
 
     @api.depends('competency_assessment_ids', 'competency_assessment_ids.state', 'competency_assessment_ids.create_date', 'competency_assessment_ids.line_ids')
     def _compute_latest_competency_assessment(self):
@@ -123,47 +135,41 @@ class HrEmployeeCompetency(models.Model):
 
     baseline_assessment_deadline = fields.Date(
         string='Baseline Assessment Deadline',
-        help='Automatically set to 3 months (90 days) from hire or job/department position change.'
+        compute='_compute_baseline_assessment_deadline',
+        store=False,
+        help='Automatically set to 3 months (90 days) from hire or employee creation.'
     )
+
+    def _compute_baseline_assessment_deadline(self):
+        for emp in self:
+            base_date = fields.Date.to_date(emp.create_date) if emp.create_date else fields.Date.today()
+            emp.baseline_assessment_deadline = base_date + timedelta(days=90)
+
     is_eligible_for_promotion = fields.Boolean(
         string='Eligible for Promotion',
         compute='_compute_is_eligible_for_promotion',
-        store=True,
+        store=False,
         help='False if employee missed baseline assessment deadline.'
     )
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        for vals in vals_list:
-            if not vals.get('baseline_assessment_deadline'):
-                vals['baseline_assessment_deadline'] = fields.Date.context_today(self) + timedelta(days=90)
-        return super().create(vals_list)
-
-    def write(self, vals):
-        if 'job_id' in vals or 'department_id' in vals:
-            vals['baseline_assessment_deadline'] = fields.Date.context_today(self) + timedelta(days=90)
-        return super().write(vals)
-
-    @api.depends('baseline_assessment_deadline', 'competency_assessment_ids.state')
+    @api.depends('competency_assessment_ids.state')
     def _compute_is_eligible_for_promotion(self):
         today = fields.Date.context_today(self)
         for emp in self:
             # Check baseline deadline compliance
             has_logged_assessment = bool(emp.competency_assessment_ids.filtered(lambda a: a.state in ('approved', 'locked')))
             missed_baseline = bool(emp.baseline_assessment_deadline and emp.baseline_assessment_deadline < today and not has_logged_assessment)
-            
-            if missed_baseline:
-                emp.is_eligible_for_promotion = False
-            else:
-                emp.is_eligible_for_promotion = True
+            emp.is_eligible_for_promotion = not missed_baseline
 
     @api.model
     def _cron_baseline_assessment_reminders(self):
         """Cron action: Sends reminders to supervisor 14 days before baseline deadline if no assessment logged."""
         today = fields.Date.context_today(self)
         target_date = today + timedelta(days=14)
+        target_create_date = target_date - timedelta(days=90)
         employees_due = self.search([
-            ('baseline_assessment_deadline', '=', target_date),
+            ('create_date', '>=', f"{target_create_date} 00:00:00"),
+            ('create_date', '<=', f"{target_create_date} 23:59:59"),
             ('parent_id', '!=', False)
         ])
         for emp in employees_due:
@@ -175,6 +181,7 @@ class HrEmployeeCompetency(models.Model):
                     note=_('3-Month Baseline Assessment deadline for %s is on %s (14 days remaining).') % (emp.name, emp.baseline_assessment_deadline),
                     user_id=emp.parent_id.user_id.id,
                 )
+
 
     def action_view_competency_assessments(self):
         self.ensure_one()

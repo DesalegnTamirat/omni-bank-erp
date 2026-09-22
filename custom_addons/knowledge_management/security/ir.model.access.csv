@@ -47,3 +47,7 @@ access_kms_points_user,kms.contributor.point.user,model_kms_contributor_point,kn
 access_kms_points_manager,kms.contributor.point.manager,model_kms_contributor_point,knowledge_management.group_kms_manager,1,1,1,1
 access_kms_recognition_user,kms.monthly.recognition.user,model_kms_monthly_recognition,knowledge_management.group_kms_employee,1,0,0,0
 access_kms_recognition_manager,kms.monthly.recognition.manager,model_kms_monthly_recognition,knowledge_management.group_kms_manager,1,1,1,1
+access_kms_forum_post_vote_user,kms.forum.post.vote.user,model_kms_forum_post_vote,knowledge_management.group_kms_employee,1,1,1,1
+access_kms_forum_post_vote_manager,kms.forum.post.vote.manager,model_kms_forum_post_vote,knowledge_management.group_kms_manager,1,1,1,1
+access_kms_lesson_learned_vote_user,kms.lesson.learned.vote.user,model_kms_lesson_learned_vote,knowledge_management.group_kms_employee,1,1,1,1
+access_kms_lesson_learned_vote_manager,kms.lesson.learned.vote.manager,model_kms_lesson_learned_vote,knowledge_management.group_kms_manager,1,1,1,1

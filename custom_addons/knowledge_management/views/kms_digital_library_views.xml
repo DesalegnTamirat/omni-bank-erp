@@ -53,7 +53,7 @@
                                     </div>
                                     <div class="fw-bold fs-6 text-dark mb-1"><t t-esc="record.name.value"/></div>
                                     <div class="text-muted small mb-2">
-                                        <i class="fa fa-user me-1"/> <t t-esc="record.author.value or 'Institutional SME'"/> | 
+                                        <i class="fa fa-user me-1"/> <t t-esc="(record.author and record.author.value) or 'Institutional SME'"/> | 
                                         <i class="fa fa-tag ms-1 me-1"/> <t t-esc="record.category_id.value"/>
                                     </div>
                                 </div>
@@ -63,7 +63,7 @@
                                         <i class="fa fa-download ms-2 me-1"/> <t t-esc="record.download_count.value"/>
                                     </div>
                                     <span t-if="record.is_external_link.raw_value" class="badge bg-info text-white"><i class="fa fa-external-link"/> Link</span>
-                                    <span t-else="" class="badge bg-light text-dark border"><t t-esc="record.file_size_display.value or 'File'"/></span>
+                                    <span t-else="" class="badge bg-light text-dark border"><t t-esc="(record.file_size_display and record.file_size_display.value) or 'File'"/></span>
                                 </div>
                             </div>
                         </t>

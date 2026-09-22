@@ -50,6 +50,16 @@ class LmsEnrollment(models.Model):
     # Issued Certificate Linkage (FR-LMS-018)
     certificate_id = fields.Many2one('lms.certificate', string='Earned Certificate', readonly=True, copy=False)
 
+    completed_lesson_ids = fields.Many2many(
+        'lms.lesson',
+        string='Completed Lessons',
+        compute='_compute_completed_lessons',
+    )
+    is_locked = fields.Boolean(
+        string='Locked by Prerequisites',
+        compute='_compute_is_locked',
+    )
+
     lesson_progress_ids = fields.One2many('lms.lesson.progress', 'enrollment_id', string='Lesson Progress Logs')
 
     _sql_constraints = [
@@ -80,6 +90,54 @@ class LmsEnrollment(models.Model):
                 rec.completed_lessons_count = 0
                 rec.progress_percentage = 0.0
 
+    @api.depends('lesson_progress_ids.state', 'lesson_progress_ids.lesson_id')
+    def _compute_completed_lessons(self):
+        for rec in self:
+            rec.completed_lesson_ids = rec.lesson_progress_ids.filtered(lambda lp: lp.state == 'completed').mapped('lesson_id')
+
+    @api.depends('employee_id', 'course_id')
+    def _compute_is_locked(self):
+        for rec in self:
+            locked = False
+            if rec.employee_id and rec.course_id:
+                path = rec.assignment_id.learning_path_id if rec.assignment_id else None
+                path_courses = self.env['lms.learning.path.course'].search([('course_id', '=', rec.course_id.id)])
+                if path:
+                    path_courses = path_courses.filtered(lambda pc: pc.path_id == path)
+
+                for pc in path_courses:
+                    # 1. Explicit branched prerequisites (FR-LMS-002)
+                    if pc.prerequisite_course_ids:
+                        done_prereqs = self.env['lms.enrollment'].search([
+                            ('employee_id', '=', rec.employee_id.id),
+                            ('course_id', 'in', pc.prerequisite_course_ids.ids),
+                            ('state', '=', 'completed'),
+                        ]).mapped('course_id')
+                        if len(done_prereqs) < len(pc.prerequisite_course_ids):
+                            locked = True
+                            break
+
+                    # 2. Sequential stage prerequisites (FR-LMS-002)
+                    prior_pcs = pc.path_id.path_course_ids.filtered(
+                        lambda p: p.sequence < pc.sequence and not p.is_optional_branch and p.course_id != rec.course_id
+                    )
+                    if prior_pcs:
+                        prior_course_ids = prior_pcs.mapped('course_id.id')
+                        completed_count = self.env['lms.enrollment'].search_count([
+                            ('employee_id', '=', rec.employee_id.id),
+                            ('course_id', 'in', prior_course_ids),
+                            ('state', '=', 'completed'),
+                        ])
+                        if completed_count < len(prior_course_ids):
+                            enrolled_in_prior = self.env['lms.enrollment'].search_count([
+                                ('employee_id', '=', rec.employee_id.id),
+                                ('course_id', 'in', prior_course_ids),
+                            ])
+                            if enrolled_in_prior > 0 or (rec.assignment_id and rec.assignment_id.learning_path_id):
+                                locked = True
+                                break
+            rec.is_locked = locked
+
     @api.model_create_multi
     def create(self, vals_list):
         records = super(LmsEnrollment, self).create(vals_list)
@@ -105,6 +163,10 @@ class LmsEnrollment(models.Model):
 
     def action_start_course(self):
         for rec in self:
+            if rec.is_locked:
+                raise UserError(_("This course is locked. Complete prerequisite courses in the learning path first."))
+            if rec.course_id.has_pre_assessment and not rec.pre_assessment_passed:
+                raise UserError(_("You must pass the pre-assessment before accessing course content."))
             if rec.state == 'enrolled':
                 rec.write({'state': 'in_progress'})
 
@@ -118,6 +180,7 @@ class LmsEnrollment(models.Model):
                 'final_score_percentage': score_pct,
                 'post_assessment_passed': True,
             })
+            self.env['lms.enrollment'].invalidate_model(['is_locked'])
             rec.message_post(body=_('Course completed successfully with score of %.1f%%.') % score_pct)
 
             # Issue Certificate (FR-LMS-018)
@@ -175,11 +238,18 @@ class LmsLessonProgress(models.Model):
             else:
                 rec.watch_percentage = 100.0 if rec.state == 'completed' else 0.0
 
-    def update_progress(self, current_time, duration):
-        """Called by video player heartbeat controller to record legitimate watch seconds."""
+    def update_progress(self, current_time, duration=None):
+        """
+        Called by video player heartbeat controller to record legitimate watch seconds.
+        Authoritative duration is strictly derived from lesson_id.video_duration_seconds (FR-LMS-007).
+        """
         self.ensure_one()
-        current_time = int(current_time)
-        duration = int(duration) if duration else (self.lesson_id.video_duration_seconds or 600)
+        auth_duration = self.lesson_id.video_duration_seconds or 600
+        tolerance = 5  # Allow small buffer for player clock drift
+        max_valid_time = auth_duration + tolerance
+
+        # Clamp client current_time to non-negative and not exceeding nominal duration + tolerance
+        current_time = max(0, min(int(current_time), max_valid_time))
 
         # Anti-skip guard: cannot jump more than 10 seconds ahead of max_watched_seconds
         if current_time > self.max_watched_seconds + 10 and self.lesson_id.prevent_fast_forward:
@@ -187,7 +257,7 @@ class LmsLessonProgress(models.Model):
         else:
             allowed_pos = current_time
             if current_time > self.max_watched_seconds:
-                self.max_watched_seconds = current_time
+                self.max_watched_seconds = min(current_time, auth_duration)
 
         self.last_position_seconds = allowed_pos
         self.total_seconds_watched += 5
@@ -197,9 +267,9 @@ class LmsLessonProgress(models.Model):
             if self.enrollment_id.state == 'enrolled':
                 self.enrollment_id.state = 'in_progress'
 
-        # Check if mandatory watch percentage is reached (FR-LMS-007)
+        # Check if mandatory watch percentage is reached using authoritative duration (FR-LMS-007)
         req_pct = self.lesson_id.min_watch_percentage or 90.0
-        curr_pct = (self.max_watched_seconds / float(duration)) * 100.0 if duration > 0 else 100.0
+        curr_pct = (self.max_watched_seconds / float(auth_duration)) * 100.0 if auth_duration > 0 else 100.0
 
         if curr_pct >= req_pct and self.state != 'completed':
             self.mark_completed()

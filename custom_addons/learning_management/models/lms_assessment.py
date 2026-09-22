@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+from datetime import timedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
@@ -81,11 +81,37 @@ class LmsAssessment(models.Model):
         if not emp:
             raise UserError(_('No employee record associated with current user account.'))
 
-        # Check training completion gate for post-assessments (FR-LMS-012)
-        if self.assessment_type == 'post_course' and enrollment:
-            not_done = enrollment.lesson_progress_ids.filtered(lambda lp: lp.state != 'completed' and lp.lesson_id.is_mandatory)
-            if not_done:
-                raise UserError(_('Training Completion Gate: You must complete all mandatory lessons and videos in this course before taking the final assessment.'))
+        # Fix 4: Resolve enrollment from current user if not passed
+        if not enrollment and self.course_id:
+            enrollment = self.env['lms.enrollment'].search([
+                ('employee_id', '=', emp.id),
+                ('course_id', '=', self.course_id.id),
+            ], limit=1)
+
+        if not enrollment and self.course_id:
+            raise UserError(_("You must be enrolled in %s to take this exam.") % self.course_id.name)
+
+        # Fix 6: Check learning path sequence locked status
+        if enrollment and enrollment.is_locked:
+            raise UserError(_("This course is locked. Complete prerequisite courses in the learning path first."))
+
+        # Fix 4: Check training completion gate for post-assessments (FR-LMS-012)
+        if self.assessment_type == 'post_course':
+            incomplete = self.course_id.lesson_ids - enrollment.completed_lesson_ids
+            if incomplete:
+                raise UserError(_("You must complete all lessons before taking this exam. Incomplete: %s") % ', '.join(incomplete.mapped('name')))
+
+        # Fix 7: Check attempt cooldown (FR-LMS-016)
+        if self.cooldown_hours > 0:
+            last_session = self.env['lms.exam.session'].search([
+                ('assessment_id', '=', self.id),
+                ('employee_id', '=', emp.id),
+                ('state', 'in', ['submitted', 'passed', 'failed']),
+            ], order='end_time desc', limit=1)
+            if last_session and last_session.end_time:
+                earliest_allowed = last_session.end_time + timedelta(hours=self.cooldown_hours)
+                if fields.Datetime.now() < earliest_allowed:
+                    raise UserError(_("Cooldown period active. You can retry after %s.") % earliest_allowed.strftime('%Y-%m-%d %H:%M:%S'))
 
         # Check attempt limits (FR-LMS-016)
         attempts = self.env['lms.exam.session'].search([

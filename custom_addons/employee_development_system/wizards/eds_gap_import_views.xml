@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ══════════════ Competency Gap Import Wizard ══════════════ -->
+        <record id="view_eds_competency_gap_import_form" model="ir.ui.view">
+            <field name="name">eds.competency.gap.import.form</field>
+            <field name="model">eds.competency.gap.import</field>
+            <field name="arch" type="xml">
+                <form string="Import Competency Gaps">
+                    <div class="alert alert-info" role="alert">
+                        <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/>
+                        <strong>Competency Gap Assessment Ingestion:</strong> Upload a CSV sheet containing evaluated competency gaps to automatically create draft TNA entries for this cycle.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="cycle_id" readonly="1"/>
+                            <field name="csv_file" filename="filename"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <div invisible="not result_log">
+                        <group string="Import Results">
+                            <field name="result_log" nolabel="1" readonly="1" widget="text"/>
+                        </group>
+                    </div>
+                    <footer>
+                        <button name="action_download_template" string="Download CSV Template"
+                                type="object" icon="fa-download" class="btn-secondary"/>
+                        <button name="action_import_competency_gaps" string="Import Competency Gaps"
+                                type="object" class="btn-primary" invisible="result_log"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_competency_gap_import" model="ir.actions.act_window">
+            <field name="name">Import Competency Gaps</field>
+            <field name="res_model">eds.competency.gap.import</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <!-- ══════════════ PMS Appraisal Gap Import Wizard ══════════════ -->
+        <record id="view_eds_pms_gap_import_form" model="ir.ui.view">
+            <field name="name">eds.pms.gap.import.form</field>
+            <field name="model">eds.pms.gap.import</field>
+            <field name="arch" type="xml">
+                <form string="Import PMS Performance Appraisal Gaps">
+                    <div class="alert alert-info" role="alert">
+                        <span class="fa fa-info-circle me-1" title="Information" aria-hidden="true"/>
+                        <strong>Performance Appraisal Gap Ingestion:</strong> Upload a CSV sheet of evaluated PMS gaps (KPIs/Objectives below target) to merge them into the TNA Cycle.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="cycle_id" readonly="1"/>
+                            <field name="csv_file" filename="filename"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <div invisible="not result_log">
+                        <group string="Import Results">
+                            <field name="result_log" nolabel="1" readonly="1" widget="text"/>
+                        </group>
+                    </div>
+                    <footer>
+                        <button name="action_download_template" string="Download CSV Template"
+                                type="object" icon="fa-download" class="btn-secondary"/>
+                        <button name="action_import_pms_gaps" string="Import PMS Gaps"
+                                type="object" class="btn-primary" invisible="result_log"/>
+                        <button string="Close" class="btn-secondary" special="cancel"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_eds_pms_gap_import" model="ir.actions.act_window">
+            <field name="name">Import Gaps from PMS</field>
+            <field name="res_model">eds.pms.gap.import</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+    </data>
+</odoo>

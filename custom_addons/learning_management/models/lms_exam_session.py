@@ -62,15 +62,16 @@ class LmsExamSession(models.Model):
         attempt_no = previous_attempts + 1
 
         selected_questions = []
-        if assessment.use_random_pool and assessment.pool_ids:
-            all_pool_questions = self.env['lms.question'].search([('pool_id', 'in', assessment.pool_ids.ids)])
+        assessment_sudo = assessment.sudo()
+        if assessment_sudo.use_random_pool and assessment_sudo.pool_ids:
+            all_pool_questions = self.env['lms.question'].sudo().search([('pool_id', 'in', assessment_sudo.pool_ids.ids)])
             pool_q_list = list(all_pool_questions)
-            sample_size = min(assessment.questions_per_session or 10, len(pool_q_list))
+            sample_size = min(assessment_sudo.questions_per_session or 10, len(pool_q_list))
             selected_questions = random.sample(pool_q_list, sample_size)
-        elif assessment.fixed_question_ids:
-            selected_questions = list(assessment.fixed_question_ids)
+        elif assessment_sudo.fixed_question_ids:
+            selected_questions = list(assessment_sudo.fixed_question_ids)
 
-        if assessment.shuffle_questions:
+        if assessment_sudo.shuffle_questions:
             random.shuffle(selected_questions)
 
         session = self.create({
@@ -84,7 +85,7 @@ class LmsExamSession(models.Model):
 
         # Create session lines
         for q in selected_questions:
-            self.env['lms.exam.session.line'].create({
+            self.env['lms.exam.session.line'].sudo().create({
                 'session_id': session.id,
                 'question_id': q.id,
             })
@@ -102,7 +103,7 @@ class LmsExamSession(models.Model):
                 weight = q.points or 1.0
                 total_available += weight
 
-                correct_ids = set(q.answer_ids.filtered(lambda a: a.is_correct).ids)
+                correct_ids = set(q.sudo().answer_ids.filtered(lambda a: a.is_correct).ids)
                 selected_ids = set(line.selected_answer_ids.ids)
 
                 if q.question_type in ('single_choice', 'true_false'):
@@ -126,17 +127,32 @@ class LmsExamSession(models.Model):
                 'state': 'passed' if passed else 'failed',
             })
 
+            enrollment = rec.enrollment_id or (
+                rec.assessment_id.course_id and self.env['lms.enrollment'].search([
+                    ('employee_id', '=', rec.employee_id.id),
+                    ('course_id', '=', rec.assessment_id.course_id.id),
+                ], limit=1)
+            )
+
+            # Pre-course diagnostic assessment handling (FR-LMS-013)
+            if enrollment and rec.assessment_id.assessment_type == 'pre_course':
+                if passed:
+                    enrollment.write({'pre_assessment_passed': True})
+                    enrollment.message_post(body=_('Pre-course diagnostic assessment passed with score %.1f%%.') % score_pct)
+                else:
+                    enrollment.message_post(body=_('Pre-course diagnostic assessment failed with score %.1f%% (Passing threshold: %.1f%%).') % (score_pct, rec.assessment_id.pass_score_percentage))
+
             # If passed post-assessment, certify enrollment
-            if passed and rec.enrollment_id and rec.assessment_id.assessment_type == 'post_course':
-                rec.enrollment_id.action_mark_completed_and_certify(score_pct)
-            elif not passed and rec.enrollment_id and rec.assessment_id.assessment_type == 'post_course':
+            if passed and enrollment and rec.assessment_id.assessment_type == 'post_course':
+                enrollment.action_mark_completed_and_certify(score_pct)
+            elif not passed and enrollment and rec.assessment_id.assessment_type == 'post_course':
                 attempts = self.search_count([
                     ('assessment_id', '=', rec.assessment_id.id),
                     ('employee_id', '=', rec.employee_id.id),
                     ('state', 'in', ['passed', 'failed']),
                 ])
                 if rec.assessment_id.max_attempts > 0 and attempts >= rec.assessment_id.max_attempts:
-                    rec.enrollment_id.write({'state': 'failed'})
+                    enrollment.write({'state': 'failed'})
 
 
 class LmsExamSessionLine(models.Model):

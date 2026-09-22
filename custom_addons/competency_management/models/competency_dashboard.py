@@ -343,29 +343,89 @@ class CompetencyDashboard(models.TransientModel):
         }
 
     @api.model
-    def get_dashboard_data(self, cycle_id=None, department_id=None, persona=None):
+    def get_dashboard_data(self, cycle_id=None, department_id=None, operating_unit_id=None, persona=None):
         """RPC API endpoint supplying structured JSON metrics and Chart.js datasets to OWL frontend (FR-RPT-002, FR-RPT-010)."""
-        user = self.env.user
+        user = self.env.user.sudo()
         emp = user.employee_id
-        is_admin = user.has_group('competency_management.group_competency_admin')
-        is_supervisor = user.has_group('competency_management.group_competency_supervisor') or is_admin
+        is_admin = bool(
+            user.has_group('competency_management.group_competency_admin')
+            or user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_admin()
+        )
 
-        # Determine Operating Unit boundary for current user (direct access, declared dependency).
-        # `assigned_operating_unit_ids` is the manager's supervisory/reporting scope (Scenario 2 boundary);
-        # it takes priority over the broader `operating_unit_ids` (general multi-branch access) so that
-        # dashboard scoping matches the record rules in security/competency_security.xml exactly.
-        user_ou_ids = []
-        if not is_admin:
-            if getattr(user, 'assigned_operating_unit_ids', False):
-                user_ou_ids = user.assigned_operating_unit_ids.ids
-            elif getattr(user, 'operating_unit_ids', False):
-                user_ou_ids = user.operating_unit_ids.ids
-            elif user.default_operating_unit_id:
-                user_ou_ids = [user.default_operating_unit_id.id]
-            elif emp:
+        # Check if user is a Department Leader
+        is_dept_manager = False
+        managed_depts = self.env['hr.department'].sudo().browse()
+        if emp:
+            managed_depts = self.env['hr.department'].sudo().search([('manager_id', '=', emp.id)])
+            if not managed_depts and emp.department_id and emp.department_id.manager_id.id == emp.id:
+                managed_depts = emp.department_id
+            if managed_depts:
+                is_dept_manager = True
+
+        has_subordinates = bool(emp and self.env['hr.employee'].sudo().search_count([('parent_id', '=', emp.id)]) > 0)
+        is_supervisor = bool(
+            user.has_group('competency_management.group_competency_supervisor')
+            or (emp and bool(emp.child_ids))
+            or has_subordinates
+            or is_dept_manager
+        )
+
+        # Access & Scoping rules:
+        # If admin: can select department and operating unit. Persona = executive.
+        # If leader of one department: department is readonly (fixed to managed dept), can select operating unit. Persona = manager.
+        # If not: both department and operating unit are fixed. Persona = manager if supervisor, else employee.
+        if is_admin:
+            is_dept_readonly = False
+            is_ou_readonly = False
+            persona = 'executive'
+            all_departments = self.env['hr.department'].sudo().search_read([], ['id', 'name'], order='name asc')
+            if department_id:
+                dept_recs = self.env['hr.department'].sudo().browse([int(department_id)])
+                ou_direct = self.env['operating.unit'].sudo().search([('department', 'in', dept_recs.ids)])
+                ou_from_dept = dept_recs.mapped('operating_unit_id')
+                dept_emps = self.env['hr.employee'].sudo().search([('department_id', 'in', dept_recs.ids)])
+                ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+                allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+                all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous]
+            else:
+                all_operating_units = self.env['operating.unit'].sudo().search_read([], ['id', 'name'], order='name asc')
+        elif is_dept_manager:
+            is_dept_readonly = True
+            is_ou_readonly = False
+            persona = 'manager'
+            lead_dept = managed_depts[:1]
+            department_id = lead_dept.id
+            all_departments = [{'id': d.id, 'name': d.name} for d in managed_depts]
+
+            ou_direct = self.env['operating.unit'].sudo().search([('department', 'in', managed_depts.ids)])
+            ou_from_dept = managed_depts.mapped('operating_unit_id')
+            dept_emps = self.env['hr.employee'].sudo().search([('department_id', 'in', managed_depts.ids)])
+            ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
+            allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
+            all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous]
+        else:
+            is_dept_readonly = True
+            is_ou_readonly = True
+            persona = 'manager' if is_supervisor else 'employee'
+            user_dept = emp.department_id if emp else False
+            department_id = user_dept.id if user_dept else False
+            all_departments = [{'id': user_dept.id, 'name': user_dept.name}] if user_dept else []
+
+            emp_ou = False
+            if emp:
                 emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
-                if emp_ou:
-                    user_ou_ids = [emp_ou.id]
+            if not emp_ou and user.default_operating_unit_id:
+                emp_ou = user.default_operating_unit_id
+            operating_unit_id = emp_ou.id if emp_ou else False
+            all_operating_units = [{'id': emp_ou.id, 'name': emp_ou.name}] if emp_ou else []
+
+        # Validate operating_unit_id within allowed OUs
+        if operating_unit_id:
+            allowed_ou_ids = [u['id'] for u in all_operating_units]
+            if int(operating_unit_id) not in allowed_ou_ids:
+                operating_unit_id = False
 
         # Selected Cycle resolution
         if cycle_id:
@@ -410,16 +470,6 @@ class CompetencyDashboard(models.TransientModel):
         # Available Cycles list
         all_cycles = self.env['competency.assessment.cycle'].sudo().search_read([], ['id', 'name', 'state', 'assessment_deadline'], order='id desc')
 
-        # Available Departments list
-        if user_ou_ids:
-            dept_domain = ['|', ('operating_unit_id', 'in', user_ou_ids), ('id', 'in', self.env['hr.employee'].sudo().search(['|', ('default_operating_unit_id', 'in', user_ou_ids), ('operating_unit_id', 'in', user_ou_ids)]).mapped('department_id.id'))]
-            all_departments = self.env['hr.department'].search_read(dept_domain, ['id', 'name'], order='name asc')
-        else:
-            all_departments = self.env['hr.department'].search_read([], ['id', 'name'], order='name asc')
-
-        # Selected Persona logic
-        persona = persona or 'executive'
-
         # Baseline domains
         line_domain = [('cycle_id', '=', cycle.id)] if cycle else []
         asm_domain = [('cycle_id', '=', cycle.id)] if cycle else []
@@ -427,18 +477,19 @@ class CompetencyDashboard(models.TransientModel):
         # Persona-based & Role-based employee scoping
         if persona == 'employee' and emp:
             scoped_emp_ids = [emp.id]
-        elif (persona == 'supervisor' or persona == 'manager') and emp:
+        elif persona == 'manager' and emp:
             subordinate_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('id', 'child_of', emp.id),
                 '|', ('parent_id', '=', emp.id),
                 ('coach_id', '=', emp.id)
             ]).ids
-            dept_emp_ids = []
-            if emp.department_id:
+            if is_dept_manager and managed_depts:
+                dept_emp_ids = self.env['hr.employee'].sudo().search([('department_id', 'in', managed_depts.ids)]).ids
+            elif emp.department_id:
                 dept_emp_ids = self.env['hr.employee'].sudo().search([('department_id', 'child_of', emp.department_id.id)]).ids
+            else:
+                dept_emp_ids = []
             scoped_emp_ids = list(set(subordinate_emp_ids + dept_emp_ids + [emp.id]))
-        elif not is_admin and not is_supervisor and emp:
-            scoped_emp_ids = [emp.id]
         else:
             scoped_emp_ids = False
 
@@ -446,19 +497,18 @@ class CompetencyDashboard(models.TransientModel):
             line_domain.append(('employee_id', 'in', scoped_emp_ids))
             asm_domain.append(('employee_id', 'in', scoped_emp_ids))
 
-        # Operating Unit Strict Boundary Restriction for non-admin users (applied on executive/hrbp views)
-        if user_ou_ids and persona == 'executive':
-            ou_emp_ids = self.env['hr.employee'].sudo().search([
-                '|', ('default_operating_unit_id', 'in', user_ou_ids),
-                '|', ('operating_unit_id', 'in', user_ou_ids),
-                ('department_id.operating_unit_id', 'in', user_ou_ids)
-            ]).ids
-            line_domain.append(('employee_id', 'in', ou_emp_ids))
-            asm_domain.append(('employee_id', 'in', ou_emp_ids))
-
         if department_id:
             line_domain.append(('department_id', '=', int(department_id)))
             asm_domain.append(('department_id', '=', int(department_id)))
+
+        if operating_unit_id:
+            ou_emp_ids = self.env['hr.employee'].sudo().search([
+                '|', ('default_operating_unit_id', '=', int(operating_unit_id)),
+                '|', ('operating_unit_id', '=', int(operating_unit_id)),
+                ('department_id.operating_unit_id', '=', int(operating_unit_id))
+            ]).ids
+            line_domain.append(('employee_id', 'in', ou_emp_ids))
+            asm_domain.append(('employee_id', 'in', ou_emp_ids))
 
         # 360 Primary reporting lines for capability & gap metrics
         primary_line_domain = list(line_domain) + [
@@ -490,12 +540,13 @@ class CompetencyDashboard(models.TransientModel):
         tech_avg = round(sum([l.gap for l in tech_lines if l.gap is not None]) / len(tech_lines), 2) if tech_lines else 0.0
         bank_avg = round(sum([l.gap for l in lines if l.gap is not None]) / len(lines), 2) if lines else 0.0
 
-        # Data Quality Counters (Scoped to User OU if non-admin)
-        if user_ou_ids:
+        # Data Quality Counters (Scoped to selected or fixed OU if set)
+        target_ou_ids = [int(operating_unit_id)] if operating_unit_id else []
+        if target_ou_ids:
             ou_emp_domain = [
-                '|', ('default_operating_unit_id', 'in', user_ou_ids),
-                '|', ('operating_unit_id', 'in', user_ou_ids),
-                ('department_id.operating_unit_id', 'in', user_ou_ids)
+                '|', ('default_operating_unit_id', 'in', target_ou_ids),
+                '|', ('operating_unit_id', 'in', target_ou_ids),
+                ('department_id.operating_unit_id', 'in', target_ou_ids)
             ]
             ou_employees = self.env['hr.employee'].sudo().search(ou_emp_domain)
             ou_jobs = ou_employees.mapped('job_id')
@@ -625,6 +676,12 @@ class CompetencyDashboard(models.TransientModel):
 
         return {
             'persona': persona,
+            'is_dept_readonly': is_dept_readonly,
+            'is_ou_readonly': is_ou_readonly,
+            'selected_department_id': int(department_id) if department_id else False,
+            'selected_operating_unit_id': int(operating_unit_id) if operating_unit_id else False,
+            'all_departments': all_departments,
+            'all_operating_units': all_operating_units,
             'user': {
                 'name': user.name,
                 'is_admin': is_admin,
@@ -640,7 +697,6 @@ class CompetencyDashboard(models.TransientModel):
             },
             'active_cycle_info': active_cycle_info,
             'all_cycles': all_cycles,
-            'all_departments': all_departments,
             'stats': {
                 'has_data': has_real_data,
                 'bank_avg_gap': bank_avg,

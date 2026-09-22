@@ -46,6 +46,7 @@ class LmsQuestion(models.Model):
 
     answer_ids = fields.One2many('lms.question.answer', 'question_id', string='Answer Choices')
     explanation = fields.Html(string='Explanation / Rationale (Displayed Post-Grading)')
+    session_line_ids = fields.One2many('lms.exam.session.line', 'question_id', string='Session Lines')
 
     active = fields.Boolean(default=True)
 
@@ -67,4 +68,8 @@ class LmsQuestionAnswer(models.Model):
     question_id = fields.Many2one('lms.question', string='Question', required=True, ondelete='cascade', index=True)
     sequence = fields.Integer(default=10)
     answer_text = fields.Char(string='Answer Option Text', required=True)
-    is_correct = fields.Boolean(string='Is Correct Answer', default=False)
+    is_correct = fields.Boolean(
+        string='Is Correct Answer',
+        default=False,
+        groups='learning_management.group_lms_instructor'
+    )

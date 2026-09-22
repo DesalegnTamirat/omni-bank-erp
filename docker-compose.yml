@@ -21,9 +21,9 @@ services:
       - '8069:8069'
       - '8072:8072'
     environment:
-      HOST: db
-      USER: odoo
-      PASSWORD: odoo
+      HOST: 10.1.11.53
+      USER: odoo19
+      PASSWORD: odoo19
     volumes:
       - odoo-web-data:/var/lib/odoo
       - ./config:/etc/odoo

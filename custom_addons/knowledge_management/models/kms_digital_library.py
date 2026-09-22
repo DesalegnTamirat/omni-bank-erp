@@ -89,8 +89,22 @@ class KmsDigitalLibrary(models.Model):
             else:
                 rec.file_size_display = False
 
+    def _log_audit_action(self, action_type, details=None):
+        for rec in self:
+            try:
+                self.env['kms.audit.log'].log_audit_event(
+                    action=action_type,
+                    resource_type='digital_library',
+                    resource_name=f"{rec.isbn_or_ref or 'LIB'} - {rec.name}",
+                    details=details or f"Action {action_type} performed on library asset {rec.name}"
+                )
+            except Exception as e:
+                _logger = __import__('logging').getLogger(__name__)
+                _logger.warning("Could not log digital library audit: %s", e)
+
     def action_read_resource(self):
         self.ensure_one()
+        self._log_audit_action('view', f'Read digital library resource: {self.name}')
         self.sudo().write({'view_count': self.view_count + 1})
         if self.is_external_link and self.external_url:
             return {
@@ -111,6 +125,7 @@ class KmsDigitalLibrary(models.Model):
         self.ensure_one()
         if not self.file_data:
             raise UserError(_('No downloadable file attached.'))
+        self._log_audit_action('download', f'Downloaded digital library resource: {self.name}')
         self.sudo().write({'download_count': self.download_count + 1})
         return {
             'type': 'ir.actions.act_url',

@@ -114,5 +114,57 @@
             <field name="perm_unlink" eval="True"/>
         </record>
 
+        <!-- ========================================================= -->
+        <!-- LMS QUESTION & ANSWER RECORD RULES (Fix: Exam Security)   -->
+        <!-- ========================================================= -->
+
+        <!-- 1. Learner: Only view questions in own active/assigned exam session lines -->
+        <record id="rule_lms_question_learner" model="ir.rule">
+            <field name="name">Learner View Own Exam Session Questions</field>
+            <field name="model_id" ref="learning_management.model_lms_question"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">[('session_line_ids.session_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- 2. Instructor & Manager: Full Question Bank Access -->
+        <record id="rule_lms_question_instructor" model="ir.rule">
+            <field name="name">Instructor and Manager Full Question Access</field>
+            <field name="model_id" ref="learning_management.model_lms_question"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_instructor')), (4, ref('learning_management.group_lms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
+        <!-- 3. Learner: Only view answer options for questions in own exam session lines -->
+        <record id="rule_lms_answer_learner" model="ir.rule">
+            <field name="name">Learner View Own Exam Session Answers</field>
+            <field name="model_id" ref="learning_management.model_lms_question_answer"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
+            <field name="domain_force">[('question_id.session_line_ids.session_id.employee_id.user_id', '=', user.id)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- 4. Instructor & Manager: Full Answer Key Access -->
+        <record id="rule_lms_answer_instructor" model="ir.rule">
+            <field name="name">Instructor and Manager Full Answer Access</field>
+            <field name="model_id" ref="learning_management.model_lms_question_answer"/>
+            <field name="groups" eval="[(4, ref('learning_management.group_lms_instructor')), (4, ref('learning_management.group_lms_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="True"/>
+            <field name="perm_unlink" eval="True"/>
+        </record>
+
     </data>
 </odoo>
