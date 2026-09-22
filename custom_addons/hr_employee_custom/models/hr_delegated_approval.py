@@ -21,7 +21,7 @@ class HrDelegatedApproval(models.Model):
     request_date = fields.Date(string="Request Date", readonly=True)
     request_type = fields.Char(string="Request Type", readonly=True)
     summary = fields.Char(string="Summary", readonly=True)
-    notes = fields.Text(string="Justification / Details", readonly=True)
+    notes = fields.Html(string="Justification / Details", readonly=True)
     state = fields.Selection([
         ('requested', 'Pending Review'),
         ('approved', 'Approved'),
@@ -80,15 +80,32 @@ class HrDelegatedApproval(models.Model):
                         req_emp = False
                         if hasattr(target_rec, 'employee_id') and target_rec.employee_id:
                             req_emp = target_rec.employee_id.id
+                        elif hasattr(target_rec, 'requester_name') and target_rec.requester_name:
+                            req_emp = target_rec.requester_name.id
                         elif hasattr(target_rec, 'create_uid') and target_rec.create_uid.employee_id:
                             req_emp = target_rec.create_uid.employee_id.id
 
-                        req_date = getattr(target_rec, 'date', False) or getattr(target_rec, 'create_date', False)
+                        req_date = getattr(target_rec, 'date', False) or getattr(target_rec, 'create_date', False) or getattr(target_rec, 'start_date', False)
                         if req_date and hasattr(req_date, 'date'):
                             req_date = req_date.date()
 
-                        target_state = getattr(target_rec, 'state', 'requested')
+                        target_state = getattr(target_rec, 'state', getattr(target_rec, 'status', 'requested'))
                         rec_state = 'approved' if target_state in ['approved', 'done', 'validate'] else ('rejected' if target_state in ['rejected', 'refused', 'cancel'] else 'requested')
+
+                        # Determine friendly Category / Type name
+                        model_record = self.env['ir.model'].sudo().search([('model', '=', act.res_model)], limit=1)
+                        if model_record and model_record.name:
+                            category_type = model_record.name
+                        elif 'leave' in act.res_model:
+                            category_type = _("Leave Request")
+                        elif 'overtime' in act.res_model:
+                            category_type = _("Overtime Request")
+                        elif 'attendance' in act.res_model:
+                            category_type = _("Attendance Request")
+                        elif 'service' in act.res_model:
+                            category_type = _("Service Request")
+                        else:
+                            category_type = act.activity_type_id.name if act.activity_type_id and act.activity_type_id.name != 'To-Do' else _("Approval Request")
 
                         vals = {
                             'name': act.res_name or f"{act.res_model} #{act.res_id}",
@@ -99,7 +116,7 @@ class HrDelegatedApproval(models.Model):
                             'delegate_id': current_emp.id if current_emp else False,
                             'requester_id': req_emp,
                             'request_date': req_date or today,
-                            'request_type': act.activity_type_id.name or 'Approval To-Do',
+                            'request_type': category_type,
                             'summary': act.summary or act.res_name,
                             'notes': act.note or '',
                             'activity_id': act.id,

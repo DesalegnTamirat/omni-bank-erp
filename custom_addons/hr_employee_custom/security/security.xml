@@ -10,10 +10,10 @@
         ====================================================== -->
 
         <!-- User group — internal access, sees own records + coached employees.
-             privilege_id is False so it does NOT appear in the Employees dropdown on the User form. -->
+             privilege_id is set so it appears in the Employees dropdown on the User form. -->
          <record id="group_hr_employee_user" model="res.groups">
              <field name="name">User</field>
-             <field name="privilege_id" eval="False"/>
+             <field name="privilege_id" ref="hr.res_groups_privilege_employees"/>
              <field name="sequence">5</field>
              <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
          </record>
@@ -37,9 +37,10 @@
          <field name="placeholder">No</field>
      </record>
 
-     <!-- Ensure group_hr_employee_user has no privilege_id so it is removed from the Employees dropdown -->
+     <!-- Ensure group_hr_employee_user has privilege_id so it is visible in the Employees dropdown -->
      <record id="group_hr_employee_user" model="res.groups">
-         <field name="privilege_id" eval="False"/>
+         <field name="privilege_id" ref="hr.res_groups_privilege_employees"/>
+         <field name="sequence">5</field>
      </record>
 
     <!-- Officer implies User → Officers automatically get User group too,

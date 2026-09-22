@@ -56,7 +56,7 @@
                             <page string="Details &amp; Notes">
                                 <group>
                                     <field name="summary" readonly="1"/>
-                                    <field name="notes" readonly="1"/>
+                                    <field name="notes" widget="html" readonly="1"/>
                                 </group>
                             </page>
                             <page string="System Identifiers" invisible="1">

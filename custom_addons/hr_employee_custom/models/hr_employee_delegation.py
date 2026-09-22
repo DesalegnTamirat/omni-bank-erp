@@ -43,19 +43,45 @@ class HrEmployee(models.Model):
         if emp:
             visible_ids.add(emp.id)
 
-            # Direct and indirect subordinates of own employee
-            subordinates = self.env['hr.employee'].sudo().search([
+            # Direct and recursive indirect subordinates of own employee
+            direct_and_indirect = self.env['hr.employee'].sudo().search([
                 '|',
                 ('coach_id', '=', emp.id),
                 ('parent_id', '=', emp.id)
             ])
-            visible_ids.update(subordinates.ids)
+            visible_ids.update(direct_and_indirect.ids)
+
+            # Recursive subordinates traversing hierarchy
+            current_level = direct_and_indirect
+            visited = set(direct_and_indirect.ids)
+            visited.add(emp.id)
+            while current_level:
+                sub_level = self.env['hr.employee'].sudo().search([
+                    '|',
+                    ('coach_id', 'in', current_level.ids),
+                    ('parent_id', 'in', current_level.ids)
+                ])
+                new_subs = sub_level.filtered(lambda e: e.id not in visited)
+                if not new_subs:
+                    break
+                visible_ids.update(new_subs.ids)
+                visited.update(new_subs.ids)
+                current_level = new_subs
 
             # Immediate coach and parent
             if emp.coach_id:
                 visible_ids.add(emp.coach_id.id)
+                # Higher leadership (coach of coach)
+                if emp.coach_id.coach_id:
+                    visible_ids.add(emp.coach_id.coach_id.id)
+                if emp.coach_id.parent_id:
+                    visible_ids.add(emp.coach_id.parent_id.id)
             if emp.parent_id:
                 visible_ids.add(emp.parent_id.id)
+                if emp.parent_id.parent_id:
+                    visible_ids.add(emp.parent_id.parent_id.id)
+                if emp.parent_id.coach_id:
+                    visible_ids.add(emp.parent_id.coach_id.id)
 
             # Active delegations where this employee is the delegate
             today = fields.Date.today()
@@ -112,7 +138,7 @@ class HrEmployeeDelegation(models.Model):
     manager_job_id = fields.Many2one(
         'hr.job',
         string="Job Position",
-        related="employee_id.job_id",
+        related="employee_id.job_position",
         compute_sudo=True,
         readonly=True
     )
@@ -181,7 +207,7 @@ class HrEmployeeDelegation(models.Model):
     delegate_job_id = fields.Many2one(
         'hr.job',
         string="Delegate Job Position",
-        related="delegate_id.job_id",
+        related="delegate_id.job_position",
         compute_sudo=True,
         readonly=True
     )
@@ -193,12 +219,12 @@ class HrEmployeeDelegation(models.Model):
         'delegation_id',
         'employee_id',
         string="The following employees will receive delegation notifications",
-        help="Adjustable list of stakeholders and leaders to receive delegation notice upon submission"
+        help="Adjustable list of employees and leaders to receive delegation notice upon submission"
     )
     stakeholder_ids = fields.One2many(
         'hr.employee.delegation.stakeholder',
         'delegation_id',
-        string="Stakeholders to Notify",
+        string="Employees to Notify",
         copy=True
     )
 
@@ -337,17 +363,72 @@ class HrEmployeeDelegation(models.Model):
             rec.is_requestor = bool(rec.employee_id and rec.employee_id.user_id.id == current_uid)
 
 
+    def _ensure_mandatory_talent_director_notified(self):
+        """Ensures that Director - Talent Management Directorate is present in stakeholder_ids."""
+        for rec in self:
+            has_talent_director = any(
+                'Talent Management' in (s.job_name or '') or
+                'Talent Management' in (s.department_name or '') or
+                'Talent Management' in (s.category or '') or
+                'People Operations Management' in (s.job_name or '') or
+                'HR Director' in (s.job_name or '')
+                for s in rec.stakeholder_ids
+            )
+            if not has_talent_director:
+                director_emp = self.env['hr.employee'].sudo().search([
+                    '|', '|', '|',
+                    ('job_position.name', 'ilike', 'Talent Management'),
+                    ('job_position.name', 'ilike', 'People Operations Management Director'),
+                    ('job_position.name', 'ilike', 'HR Director'),
+                    ('job_name', 'ilike', 'Talent Management')
+                ], limit=1)
+                if director_emp:
+                    self.env['hr.employee.delegation.stakeholder'].sudo().create({
+                        'delegation_id': rec.id,
+                        'employee_id': director_emp.id,
+                        'name': director_emp.name or _('Director - Talent Management Directorate'),
+                        'work_email': director_emp.work_email or '',
+                        'department_name': director_emp.department_id.name if director_emp.department_id else '',
+                        'job_name': director_emp.job_position.name if director_emp.job_position else _('Director - Talent Management Directorate'),
+                        'category': 'Talent Management Directorate',
+                    })
+                else:
+                    self.env['hr.employee.delegation.stakeholder'].sudo().create({
+                        'delegation_id': rec.id,
+                        'name': _('Director - Talent Management Directorate'),
+                        'job_name': _('Director - Talent Management Directorate'),
+                        'category': 'Talent Management Directorate',
+                    })
+
+    def _sync_notification_recipients(self):
+        for rec in self:
+            emp_ids = rec.stakeholder_ids.mapped('employee_id').ids
+            if emp_ids:
+                rec.sudo().write({'notification_recipient_ids': [(6, 0, emp_ids)]})
+
     def action_submit(self):
         for rec in self:
             if not rec.delegate_id:
                 raise ValidationError(_("Please select a delegated staff member before submitting."))
             if not rec.is_manager_coach and not rec.leave_request_id:
                 raise ValidationError(_("Only managerial employees with direct staff under them can submit delegation requests."))
-            
+
+            # If stakeholder_ids is empty or only contains dummy blank rows, regenerate
+            valid_stakeholders = rec.stakeholder_ids.filtered(
+                lambda s: s.work_email or s.department_name or s.job_name or (s.name and s.name != _('Employee') and s.name != 'Employee')
+            )
+            if not valid_stakeholders and rec.employee_id:
+                rec._set_default_notification_recipients()
+            else:
+                rec._ensure_mandatory_talent_director_notified()
+
             vals = {'state': 'submitted'}
             if not rec.name or rec.name in (_('New'), _('Draft'), 'New', 'Draft', '/'):
-                vals['name'] = self.env['ir.sequence'].next_by_code('hr.employee.delegation') or _('Draft')
+                seq = self.env['ir.sequence'].sudo().next_by_code('hr.employee.delegation')
+                if seq:
+                    vals['name'] = seq
             rec.write(vals)
+            rec._sync_notification_recipients()
             rec._send_delegation_notifications()
         return {
             'type': 'ir.actions.client',
@@ -511,6 +592,24 @@ class HrEmployeeDelegation(models.Model):
     # -------------------------------------------------------------------------
 
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super().default_get(fields_list)
+        emp_id = res.get('employee_id')
+        if not emp_id:
+            emp = self.env.user.employee_id.sudo() if self.env.user.employee_id else False
+            if emp:
+                res['employee_id'] = emp.id
+                emp_id = emp.id
+        else:
+            emp = self.env['hr.employee'].sudo().browse(emp_id)
+
+        if emp and 'stakeholder_ids' in fields_list:
+            lines = self._get_default_stakeholder_lines(emp)
+            res['stakeholder_ids'] = [(0, 0, l) for l in lines]
+            res['notification_recipient_ids'] = [(6, 0, [l['employee_id'] for l in lines if l.get('employee_id')])]
+        return res
+
     def _default_employee_id(self):
         return self.env.user.employee_id.id if self.env.user.employee_id else False
 
@@ -535,9 +634,9 @@ class HrEmployeeDelegation(models.Model):
             delegate = self.env['hr.employee'].sudo().browse(rec.delegate_id.id) if rec.delegate_id else False
             rec.employee_display_name = emp.name if emp else ''
             rec.delegate_display_name = delegate.name if delegate else ''
-            rec.manager_job_name = emp.job_id.name if (emp and emp.job_id) else ''
+            rec.manager_job_name = emp.job_position.name if (emp and emp.job_position) else (emp.job_name if emp else '')
             rec.manager_department_name = emp.department_id.name if (emp and emp.department_id) else ''
-            rec.delegate_job_name = delegate.job_id.name if (delegate and delegate.job_id) else ''
+            rec.delegate_job_name = delegate.job_position.name if (delegate and delegate.job_position) else (delegate.job_name if delegate else '')
 
     @api.depends('stakeholder_ids', 'stakeholder_ids.name', 'stakeholder_ids.work_email', 'stakeholder_ids.department_name', 'stakeholder_ids.job_name', 'stakeholder_ids.category')
     def _compute_notification_recipients_display(self):
@@ -552,7 +651,7 @@ class HrEmployeeDelegation(models.Model):
                     <table class="table table-sm table-striped">
                         <thead>
                             <tr>
-                                <th>Stakeholder Name</th>
+                                <th>Employee Name</th>
                                 <th>Work Email</th>
                                 <th>Department</th>
                                 <th>Job Position</th>
@@ -563,7 +662,7 @@ class HrEmployeeDelegation(models.Model):
                     </table>
                 """)
             else:
-                rec.notification_recipients_display = Markup("<p class='text-muted'>No notification stakeholders assigned.</p>")
+                rec.notification_recipients_display = Markup("<p class='text-muted'>No notification employees assigned.</p>")
 
 
 
@@ -675,7 +774,9 @@ class HrEmployeeDelegation(models.Model):
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
-            self._set_default_notification_recipients()
+            lines = self._get_default_stakeholder_lines(self.employee_id)
+            self.stakeholder_ids = [(5, 0, 0)] + [(0, 0, l) for l in lines]
+            self.notification_recipient_ids = [(6, 0, [l['employee_id'] for l in lines if l.get('employee_id')])]
 
     @api.onchange('include_sub_level_staff', 'filter_coach_id', 'employee_id', 'start_date', 'end_date')
     def _onchange_delegate_options(self):
@@ -690,156 +791,130 @@ class HrEmployeeDelegation(models.Model):
             }
         }
 
-
-
-    def _get_default_notification_recipients(self):
-        self.ensure_one()
-        recipients = set()
-        manager = self.employee_id.sudo()
-
-        if not manager:
+    def _get_default_stakeholder_lines(self, manager_employee):
+        if not manager_employee:
             return []
+        manager = manager_employee.sudo()
+        lines = []
+
+        def _emp_job_name(e):
+            if not e:
+                return ''
+            if hasattr(e, 'job_position') and e.job_position:
+                return e.job_position.name or ''
+            if hasattr(e, 'job_id') and e.job_id:
+                return e.job_id.name or ''
+            if hasattr(e, 'job_name') and e.job_name:
+                return e.job_name or ''
+            return ''
+
+        def _emp_dept_name(e):
+            if not e or not e.department_id:
+                return ''
+            return e.department_id.name or ''
 
         # 1. Immediate Coach / Manager
         imm_coach = manager.coach_id or manager.parent_id
-        if imm_coach:
-            recipients.add(imm_coach.id)
+        if imm_coach and imm_coach.id != manager.id:
+            lines.append({
+                'employee_id': imm_coach.id,
+                'name': imm_coach.name or _('Direct Manager / Coach'),
+                'work_email': imm_coach.work_email or '',
+                'department_name': _emp_dept_name(imm_coach),
+                'job_name': _emp_job_name(imm_coach),
+                'category': 'Direct Manager / Coach',
+            })
 
-            # 2. Coach of the immediate coach
+            # 2. Coach of Coach (Higher Leadership)
             coach_of_coach = imm_coach.coach_id or imm_coach.parent_id
-            if coach_of_coach:
-                recipients.add(coach_of_coach.id)
+            if coach_of_coach and coach_of_coach.id not in [manager.id, imm_coach.id]:
+                lines.append({
+                    'employee_id': coach_of_coach.id,
+                    'name': coach_of_coach.name or _('Higher Leadership'),
+                    'work_email': coach_of_coach.work_email or '',
+                    'department_name': _emp_dept_name(coach_of_coach),
+                    'job_name': _emp_job_name(coach_of_coach),
+                    'category': 'Higher Leadership',
+                })
 
-        # 3. Direct employees under the requestor
+        # 3. Direct Staff under manager
         direct_staff = self.env['hr.employee'].sudo().search([
+            '|', ('coach_id', '=', manager.id), ('parent_id', '=', manager.id),
+            ('id', '!=', manager.id)
+        ])
+        for st in direct_staff:
+            lines.append({
+                'employee_id': st.id,
+                'name': st.name or _('Direct Staff'),
+                'work_email': st.work_email or '',
+                'department_name': _emp_dept_name(st),
+                'job_name': _emp_job_name(st),
+                'category': 'Direct Staff',
+            })
+
+        # 4. Director - Talent Management Directorate / People Operations Management Director / HR Director
+        talent_mgmt = self.env['hr.employee'].sudo().search([
+            '|', '|', '|',
+            ('job_position.name', 'ilike', 'Talent Management'),
+            ('job_position.name', 'ilike', 'People Operations Management Director'),
+            ('job_position.name', 'ilike', 'HR Director'),
+            ('job_name', 'ilike', 'Talent Management')
+        ])
+        for tm in talent_mgmt:
+            lines.append({
+                'employee_id': tm.id,
+                'name': tm.name or _('Director - Talent Management Directorate'),
+                'work_email': tm.work_email or '',
+                'department_name': _emp_dept_name(tm),
+                'job_name': _emp_job_name(tm) or _('Director - Talent Management Directorate'),
+                'category': 'Talent Management Directorate',
+            })
+
+        # 5. Chief People and Culture Officer
+        cpc = self.env['hr.employee'].sudo().search([
             '|',
-            ('coach_id', '=', manager.id),
-            ('parent_id', '=', manager.id)
+            ('job_position.name', 'ilike', 'Chief People and Culture'),
+            ('job_name', 'ilike', 'Chief People and Culture')
         ])
-        recipients.update(direct_staff.ids)
+        for c in cpc:
+            lines.append({
+                'employee_id': c.id,
+                'name': c.name or _('Chief People and Culture Officer'),
+                'work_email': c.work_email or '',
+                'department_name': _emp_dept_name(c),
+                'job_name': _emp_job_name(c),
+                'category': 'Corporate HR Leadership',
+            })
 
-        # 4. People Operations Management Directorate
-        people_ops_emp = self.env['hr.employee'].sudo().search([
-            '|',
-            ('job_id.name', 'ilike', 'People Operation'),
-            ('department_id.name', 'ilike', 'People Operation')
-        ])
-        recipients.update(people_ops_emp.ids)
+        # Deduplicate lines by employee_id
+        seen_emp_ids = set()
+        unique_lines = []
+        for l in lines:
+            emp_id = l.get('employee_id')
+            if emp_id:
+                if emp_id not in seen_emp_ids:
+                    seen_emp_ids.add(emp_id)
+                    unique_lines.append(l)
+            else:
+                unique_lines.append(l)
+        return unique_lines
 
-        # 5. Chief People and Culture Office
-        cpc_emp = self.env['hr.employee'].sudo().search([
-            ('job_id.name', 'ilike', 'Chief People and Culture')
-        ])
-        recipients.update(cpc_emp.ids)
-
-        # Exclude delegating manager from notification list if present
-        recipients.discard(manager.id)
-
-        # Filter out system administrator user
-        valid_recipients = self.env['hr.employee'].sudo().browse(list(recipients)).filtered(
-            lambda e: e.user_id and e.user_id.login != 'admin' and e.active
-        )
-        return valid_recipients.ids
+    def _get_default_notification_recipients(self):
+        self.ensure_one()
+        lines = self._get_default_stakeholder_lines(self.employee_id)
+        return [l['employee_id'] for l in lines if l.get('employee_id')]
 
     def _set_default_notification_recipients(self):
         for rec in self:
-            rec.stakeholder_ids.sudo().unlink()
-            manager = rec.employee_id.sudo()
-            if not manager:
+            if not rec.employee_id:
                 continue
-
-            lines = []
-            recip_ids = set()
-
-            # 1. Immediate Coach / Manager
-            imm_coach = manager.coach_id or manager.parent_id
-            if imm_coach and imm_coach.id != manager.id:
-                lines.append({
-                    'employee_id': imm_coach.id,
-                    'name': imm_coach.name,
-                    'work_email': imm_coach.work_email or '',
-                    'department_name': imm_coach.department_id.name if imm_coach.department_id else '',
-                    'job_name': imm_coach.job_id.name if imm_coach.job_id else '',
-                    'category': 'Direct Manager / Coach',
-                })
-                recip_ids.add(imm_coach.id)
-
-                # 2. Coach of Coach
-                coach_of_coach = imm_coach.coach_id or imm_coach.parent_id
-                if coach_of_coach and coach_of_coach.id not in [manager.id, imm_coach.id]:
-                    lines.append({
-                        'employee_id': coach_of_coach.id,
-                        'name': coach_of_coach.name,
-                        'work_email': coach_of_coach.work_email or '',
-                        'department_name': coach_of_coach.department_id.name if coach_of_coach.department_id else '',
-                        'job_name': coach_of_coach.job_id.name if coach_of_coach.job_id else '',
-                        'category': 'Higher Leadership',
-                    })
-                    recip_ids.add(coach_of_coach.id)
-
-            # 3. Direct Staff under manager
-            direct_staff = self.env['hr.employee'].sudo().search([
-                '|', ('coach_id', '=', manager.id), ('parent_id', '=', manager.id),
-                ('id', '!=', manager.id)
-            ])
-            for st in direct_staff:
-                lines.append({
-                    'employee_id': st.id,
-                    'name': st.name,
-                    'work_email': st.work_email or '',
-                    'department_name': st.department_id.name if st.department_id else '',
-                    'job_name': st.job_id.name if st.job_id else '',
-                    'category': 'Direct Staff',
-                })
-                recip_ids.add(st.id)
-
-            # 4. People Operations
-            people_ops = self.env['hr.employee'].sudo().search([
-                '|',
-                ('job_id.name', 'ilike', 'People Operation'),
-                ('department_id.name', 'ilike', 'People Operation')
-            ])
-            for po in people_ops:
-                lines.append({
-                    'employee_id': po.id,
-                    'name': po.name,
-                    'work_email': po.work_email or '',
-                    'department_name': po.department_id.name if po.department_id else '',
-                    'job_name': po.job_id.name if po.job_id else '',
-                    'category': 'People Operations',
-                })
-                recip_ids.add(po.id)
-
-            # 5. Chief People and Culture
-            cpc = self.env['hr.employee'].sudo().search([
-                ('job_id.name', 'ilike', 'Chief People and Culture')
-            ])
-            for c in cpc:
-                lines.append({
-                    'employee_id': c.id,
-                    'name': c.name,
-                    'work_email': c.work_email or '',
-                    'department_name': c.department_id.name if c.department_id else '',
-                    'job_name': c.job_id.name if c.job_id else '',
-                    'category': 'Corporate HR Leadership',
-                })
-                recip_ids.add(c.id)
-
-            # Deduplicate lines by employee_id
-            seen_emp_ids = set()
-            unique_lines = []
-            for l in lines:
-                emp_id = l.get('employee_id')
-                if emp_id:
-                    if emp_id not in seen_emp_ids:
-                        seen_emp_ids.add(emp_id)
-                        unique_lines.append((0, 0, l))
-                else:
-                    unique_lines.append((0, 0, l))
-
+            lines = self._get_default_stakeholder_lines(rec.employee_id)
+            rec.stakeholder_ids.sudo().unlink()
+            unique_lines = [(0, 0, l) for l in lines]
+            recip_ids = [l['employee_id'] for l in lines if l.get('employee_id')]
             rec.sudo().write({
                 'stakeholder_ids': unique_lines,
-                'notification_recipient_ids': [(6, 0, list(recip_ids))]
+                'notification_recipient_ids': [(6, 0, recip_ids)]
             })
 
     def action_reset_default_recipients(self):
@@ -979,18 +1054,52 @@ class HrEmployeeDelegation(models.Model):
     # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
+        is_hr = (
+            self.env.user.has_group('hr.group_hr_manager')
+            or self.env.user.has_group('base.group_system')
+            or self.env.is_superuser()
+        )
+
         for vals in vals_list:
             if not vals.get('name') or vals.get('name') in (_('New'), 'New'):
                 vals['name'] = _('Draft')
+            if vals.get('state') == 'submitted' and vals.get('name') in (_('Draft'), 'Draft', _('New'), 'New', '/', False):
+                seq = self.env['ir.sequence'].sudo().next_by_code('hr.employee.delegation')
+                if seq:
+                    vals['name'] = seq
+
+            # Prevent non-coaches from creating delegation requests manually
+            emp_id = vals.get('employee_id') or (self.env.user.employee_id.id if self.env.user.employee_id else False)
+            if emp_id and not vals.get('leave_request_id') and not is_hr:
+                count = self.env['hr.employee'].sudo().search_count([
+                    '|',
+                    ('coach_id', '=', emp_id),
+                    ('parent_id', '=', emp_id)
+                ])
+                if count == 0:
+                    emp = self.env['hr.employee'].sudo().browse(emp_id)
+                    raise ValidationError(_(
+                        "Employee '%s' is not listed as a direct coach or manager of any staff members. "
+                        "Only managerial employees with direct staff under them can create delegation requests."
+                    ) % (emp.name or _('User')))
 
         records = super().create(vals_list)
         for rec in records:
-            if not rec.stakeholder_ids:
+            valid_stakeholders = rec.stakeholder_ids.filtered(
+                lambda s: s.work_email or s.department_name or s.job_name or (s.name and s.name != _('Employee') and s.name != 'Employee')
+            )
+            if not valid_stakeholders and rec.employee_id:
                 rec._set_default_notification_recipients()
         return records
 
 
     def write(self, vals):
+        if vals.get('state') == 'submitted':
+            for rec in self:
+                if not vals.get('name') and (not rec.name or rec.name in (_('Draft'), 'Draft', _('New'), 'New', '/', False)):
+                    seq = self.env['ir.sequence'].sudo().next_by_code('hr.employee.delegation')
+                    if seq:
+                        vals['name'] = seq
         return super().write(vals)
 
     def unlink(self):
@@ -1042,29 +1151,6 @@ class HrEmployeeDelegation(models.Model):
                     message_type='comment',
                     subtype_xmlid='mail.mt_comment'
                 )
-
-
-            # Create Odoo activity for each recipient user so they receive top navbar clock/activity alert
-            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-            model = self.env.ref('hr_employee_custom.model_hr_employee_delegation', raise_if_not_found=False)
-            if activity_type and model:
-                for emp in recip_employees:
-                    if emp.user_id:
-                        existing_act = self.env['mail.activity'].sudo().search([
-                            ('res_model_id', '=', model.id),
-                            ('res_id', '=', rec.id),
-                            ('user_id', '=', emp.user_id.id),
-                        ], limit=1)
-                        if not existing_act:
-                            self.env['mail.activity'].sudo().create({
-                                'activity_type_id': activity_type.id,
-                                'summary': _("Manager Delegation Notice: %s") % rec.name,
-                                'note': body,
-                                'res_id': rec.id,
-                                'res_model_id': model.id,
-                                'user_id': emp.user_id.id,
-                                'date_deadline': rec.start_date or fields.Date.today(),
-                            })
 
             # Send Direct 1-on-1 Discuss Channel message per recipient
             for emp in recip_employees:
@@ -1200,24 +1286,56 @@ class HrEmployeeDelegation(models.Model):
 
 class HrEmployeeDelegationStakeholder(models.Model):
     _name = "hr.employee.delegation.stakeholder"
-    _description = "Delegation Notification Stakeholder"
+    _description = "Delegation Notification Employee"
     _order = "id asc"
 
     delegation_id = fields.Many2one('hr.employee.delegation', string="Delegation", ondelete='cascade', required=True)
     employee_id = fields.Many2one('hr.employee', string="Employee Reference", ondelete='set null')
-    name = fields.Char(string="Stakeholder Name", required=True)
+    name = fields.Char(string="Employee Name", required=True, default=lambda self: _('Employee'))
     work_email = fields.Char(string="Work Email")
     department_name = fields.Char(string="Department")
     job_name = fields.Char(string="Job Position")
-    category = fields.Char(string="Category / Role", default="Custom Stakeholder")
+    category = fields.Char(string="Role / Category", default="Direct Staff")
 
     @api.onchange('employee_id')
     def _onchange_employee_id(self):
         if self.employee_id:
             emp = self.employee_id.sudo()
-            self.name = emp.name or ''
+            self.name = emp.name or _('Employee')
             self.work_email = emp.work_email or ''
             self.department_name = emp.department_id.name if emp.department_id else ''
-            self.job_name = emp.job_id.name if emp.job_id else ''
-            self.category = "Selected Stakeholder"
+            self.job_name = emp.job_position.name if (hasattr(emp, 'job_position') and emp.job_position) else (emp.job_name or '')
+            self.category = "Selected Employee"
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('employee_id'):
+                emp = self.env['hr.employee'].sudo().browse(vals['employee_id'])
+                if not vals.get('name'):
+                    vals['name'] = emp.name or _('Employee')
+                if not vals.get('work_email'):
+                    vals['work_email'] = emp.work_email or ''
+                if not vals.get('department_name') and emp.department_id:
+                    vals['department_name'] = emp.department_id.name or ''
+                if not vals.get('job_name'):
+                    vals['job_name'] = emp.job_position.name if (hasattr(emp, 'job_position') and emp.job_position) else (emp.job_name or '')
+            elif not vals.get('name'):
+                vals['name'] = _('Employee')
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if 'employee_id' in vals and vals.get('employee_id'):
+            emp = self.env['hr.employee'].sudo().browse(vals['employee_id'])
+            if 'name' not in vals or not vals.get('name'):
+                vals['name'] = emp.name or _('Employee')
+            if 'work_email' not in vals:
+                vals['work_email'] = emp.work_email or ''
+            if 'department_name' not in vals and emp.department_id:
+                vals['department_name'] = emp.department_id.name or ''
+            if 'job_name' not in vals:
+                vals['job_name'] = emp.job_position.name if (hasattr(emp, 'job_position') and emp.job_position) else (emp.job_name or '')
+        elif 'name' in vals and not vals.get('name'):
+            vals['name'] = _('Employee')
+        return super().write(vals)
 

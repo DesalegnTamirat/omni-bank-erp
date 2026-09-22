@@ -9,7 +9,7 @@
             <field name="arch" type="xml">
                 <form string="Cancel Delegation">
                     <p class="text-muted">
-                        Cancelling this delegation will immediately revoke all delegated managerial authority and send an official cancellation notification to the delegated staff member and all assigned stakeholders.
+                        Cancelling this delegation will immediately revoke all delegated managerial authority and send an official cancellation notification to the delegated staff member and all assigned employees.
                     </p>
                     <group>
                         <group string="Delegation Details">
@@ -29,7 +29,7 @@
                     </group>
                     <footer>
                         <button name="action_confirm_cancel"
-                                string="Confirm Cancellation &amp; Notify Stakeholders"
+                                string="Confirm Cancellation &amp; Notify Employees"
                                 type="object"
                                 class="btn-danger"/>
                         <button string="Discard"
