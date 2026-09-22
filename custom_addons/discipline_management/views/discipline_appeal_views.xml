@@ -22,37 +22,74 @@
             <field name="arch" type="xml">
                 <form>
                     <header>
-                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info" invisible="state != 'submitted'"/>
-                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success" invisible="state != 'under_review'"/>
-                        <field name="state" widget="statusbar" statusbar_visible="submitted,under_review,decided"/>
+                        <button name="action_submit_appeal" string="Submit Appeal" type="object" class="btn-primary"
+                                invisible="state != 'draft'"/>
+                        <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info"
+                                invisible="state != 'submitted' or not can_user_review_current_stage"
+                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                        <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success"
+                                invisible="state != 'under_review' or not can_user_review_current_stage"
+                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                        <button name="action_create_next_appeal" string="Submit Escalated Appeal" type="object" class="btn-warning"
+                                invisible="not can_submit_next_appeal"
+                                help="Submit an appeal escalation to the next designated higher authority."/>
+                        <field name="state" widget="statusbar" statusbar_visible="draft,submitted,under_review,decided"/>
                     </header>
                     <sheet>
+                        <field name="can_submit_next_appeal" invisible="1"/>
+                        <field name="can_submit_second_appeal" invisible="1"/>
+                        <field name="next_appeal_button_label" invisible="1"/>
+                        <field name="is_appeal_reviewer_or_admin" invisible="1"/>
+                        <field name="can_user_review_current_stage" invisible="1"/>
+                        <field name="is_appellant_employee" invisible="1"/>
                         <group>
-                            <group string="Original Case Information">
-                                <field name="name"/>
-                                <field name="case_id"/>
-                                <field name="employee_id"/>
-                                <field name="original_offense_id"/>
-                                <field name="original_decision_date"/>
+                            <group string="Appeal Information &amp; Stage">
+                                <field name="name" readonly="1"/>
+                                <field name="case_id" readonly="state not in ('draft', 'submitted')"
+                                       domain="[('state', 'in', ['enforced', 'closed'])]"/>
+                                <field name="employee_id" readonly="1"/>
+                                <field name="appeal_level" readonly="1"/>
+                                <field name="parent_appeal_id" invisible="appeal_level == 'first'" readonly="1"/>
+                                <field name="child_appeal_ids" invisible="not child_appeal_ids" readonly="1" widget="many2many_tags"/>
+                                <field name="case_origin_type" readonly="1"/>
+                                <field name="appeal_target_authority" readonly="1"/>
                             </group>
-                            <group string="Appeal Submission">
-                                <field name="submission_date"/>
-                                <field name="reviewer_id"/>
-                                <field name="review_date"/>
-                                <field name="supporting_document" filename="document_filename"/>
+                            <group string="Appeal Submission &amp; Authority">
+                                <field name="submission_date" readonly="state not in ('draft', 'submitted')"/>
+                                <field name="is_submitted_on_behalf"
+                                       groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
+                                       invisible="not is_submitted_on_behalf and not is_appeal_reviewer_or_admin"
+                                       readonly="state not in ('draft', 'submitted')"/>
+                                <field name="submitted_by_id"
+                                       groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
+                                       invisible="not is_submitted_on_behalf"
+                                       readonly="1"/>
+                                <field name="reviewer_id" invisible="state in ('draft', 'submitted')" readonly="1"/>
+                                <field name="review_date" invisible="state in ('draft', 'submitted')" readonly="1"/>
+                                <field name="supporting_document" filename="document_filename" readonly="state not in ('draft', 'submitted')"/>
                                 <field name="document_filename" invisible="1"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Appeal Grounds">
-                                <field name="appeal_grounds" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
+                                <field name="appeal_grounds" readonly="state not in ('draft', 'submitted')" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
                             </page>
-                            <page string="Decision Outcome &amp; Revised Actions">
+                            <page string="Decision Outcome &amp; Revised Actions" invisible="state in ('draft', 'submitted')">
                                 <group>
-                                    <field name="decision_outcome"/>
-                                    <field name="revised_punishment_type"/>
-                                    <field name="revised_penalty_percentage"/>
-                                    <field name="appeal_decision_notes" placeholder="Board justification for upholding, overturning, or reducing penalty..."/>
+                                    <group string="Original Enforced Penalty (Reference)">
+                                        <field name="original_punishment_type" readonly="1"/>
+                                        <field name="original_penalty_percentage" readonly="1"/>
+                                        <field name="original_fine_days" readonly="1"/>
+                                    </group>
+                                    <group string="Revised Appeal Decision">
+                                        <field name="decision_outcome" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_punishment_type" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_penalty_percentage" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                        <field name="revised_fine_days" readonly="state != 'under_review' or not can_user_review_current_stage"/>
+                                    </group>
+                                </group>
+                                <group string="Decision Justification &amp; Rationale">
+                                    <field name="appeal_decision_notes" nolabel="1" readonly="state != 'under_review' or not can_user_review_current_stage" placeholder="Appeal authority justification for upholding, overturning, or reducing penalty..."/>
                                 </group>
                             </page>
                         </notebook>

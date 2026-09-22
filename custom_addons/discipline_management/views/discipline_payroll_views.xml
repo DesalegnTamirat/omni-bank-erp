@@ -9,7 +9,10 @@
                     <field name="name"/>
                     <field name="case_id"/>
                     <field name="employee_id"/>
+                    <field name="penalty_type"/>
                     <field name="penalty_percentage"/>
+                    <field name="suspension_days"/>
+                    <field name="daily_rate"/>
                     <field name="calculated_amount"/>
                     <field name="effective_date"/>
                     <field name="state" widget="badge"/>
@@ -25,18 +28,33 @@
                     <header>
                         <button name="action_transmit_to_payroll" string="Transmit to Payroll" type="object" class="oe_highlight" invisible="state != 'pending'"/>
                         <button name="action_mark_deducted" string="Mark as Deducted" type="object" class="btn-success" invisible="state != 'transferred'"/>
+                        <!-- Cancel button -->
+                        <button name="action_cancel" string="Cancel / Waive" type="object" class="btn-danger"
+                                invisible="state in ('deducted', 'cancelled')"
+                                confirm="Cancel this penalty deduction?"/>
                         <field name="state" widget="statusbar" statusbar_visible="pending,transferred,deducted"/>
                     </header>
                     <sheet>
                         <group>
                             <group string="Penalty &amp; Case">
-                                <field name="name"/>
+                                <field name="name" readonly="1"/>
                                 <field name="case_id"/>
                                 <field name="employee_id"/>
                             </group>
+                            <!-- Penalty type selector -->
+                            <group string="Calculation Type">
+                                <field name="penalty_type"/>
+                                <field name="penalty_percentage" invisible="penalty_type != 'percentage'"/>
+                                <field name="suspension_id" invisible="penalty_type != 'suspension_without_pay'"/>
+                                <field name="suspension_days" invisible="penalty_type != 'suspension_without_pay'"/>
+                                <field name="managerial_days" invisible="penalty_type != 'managerial'"/>
+                                <field name="daily_rate" readonly="1"
+                                       invisible="penalty_type not in ('suspension_without_pay', 'managerial')"/>
+                            </group>
+                        </group>
+                        <group>
                             <group string="Deduction Amounts &amp; Dates">
-                                <field name="penalty_percentage"/>
-                                <field name="calculated_amount"/>
+                                <field name="calculated_amount" readonly="1"/>
                                 <field name="effective_date"/>
                                 <field name="payslip_reference"/>
                             </group>

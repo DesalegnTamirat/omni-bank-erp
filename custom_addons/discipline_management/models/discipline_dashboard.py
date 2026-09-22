@@ -12,7 +12,7 @@ class DisciplineCaseDashboard(models.Model):
         today = fields.Date.context_today(self)
         first_of_month = today.replace(day=1)
 
-        # ---- Case Counts ----
+        # Case Counts
         total_cases = self.search_count([])
         active_cases = self.search_count([
             ('state', 'in', ['initiated', 'investigating', 'committee_review', 'pending_approval'])
@@ -30,13 +30,15 @@ class DisciplineCaseDashboard(models.Model):
             ('final_decision_date', '>=', first_of_month),
         ])
 
-        # ---- Related Model Counts ----
+        # Related Model Counts
         inv_model = self.env.get('discipline.investigation')
-        investigations = inv_model.search_count([('state', '!=', 'concluded')]) if inv_model else 0
+        # discipline.investigation valid states: draft/submitted/approved
+        investigations = inv_model.search_count([('state', '!=', 'approved')]) if inv_model else 0
 
         comm_model = self.env.get('discipline.committee.meeting')
+        # discipline.committee.meeting valid terminal state: 'completed' (not 'concluded')
         committee_meetings = comm_model.search_count([
-            ('state', 'not in', ['concluded', 'cancelled'])
+            ('state', 'not in', ['completed', 'cancelled'])
         ]) if comm_model else 0
 
         susp_model = self.env.get('discipline.suspension')
@@ -54,7 +56,7 @@ class DisciplineCaseDashboard(models.Model):
             ('state', '=', 'pending')
         ]) if payroll_model else 0
 
-        # ---- Recent Cases ----
+        # Recent Cases
         recent_case_ids = self.search([], limit=10, order='incident_date desc, id desc')
         recent_cases = []
         for case in recent_case_ids:
