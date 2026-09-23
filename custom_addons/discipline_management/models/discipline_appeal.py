@@ -47,9 +47,11 @@ class DisciplineAppeal(models.Model):
     )
     original_punishment_type = fields.Selection([
         ('dismissal', 'Dismissal / Separation'),
+        ('demotion', 'Demotion to Lower Grade / Position'),
         ('final_warning_penalty', 'Final Written Warning + Penalty'),
         ('second_warning_penalty', 'Second Written Warning + Penalty'),
         ('first_warning_penalty', 'First Written Warning + Penalty'),
+        ('fine', 'Salary Fine Deduction'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('exonerate', 'Exonerated / No Action'),
     ], string='Original Punishment', compute='_compute_original_penalty_details', store=True, readonly=True)

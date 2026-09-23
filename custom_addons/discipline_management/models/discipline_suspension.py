@@ -11,7 +11,7 @@ class DisciplineSuspension(models.Model):
     _order = 'start_date desc, id desc'
 
     name = fields.Char(string='Suspension Ref', required=True, copy=False, readonly=True, default=lambda self: _('New'))
-    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, tracking=True)
+    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Employee', related='case_id.employee_id', store=True, readonly=True)
     department_id = fields.Many2one('hr.department', string='Department', related='employee_id.department_id', store=True, readonly=True)
 

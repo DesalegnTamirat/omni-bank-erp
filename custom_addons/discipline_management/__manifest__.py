@@ -40,6 +40,7 @@ Key Features:
         'data/bunna_regulation_seed_data.xml',
         'data/discipline_cron.xml',
         'views/discipline_severity_level_views.xml',
+        'views/discipline_article_views.xml',
         'views/discipline_offense_views.xml',
         'views/discipline_case_views.xml',
         'views/discipline_investigation_views.xml',

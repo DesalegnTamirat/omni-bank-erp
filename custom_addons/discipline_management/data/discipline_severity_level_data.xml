@@ -85,10 +85,10 @@
             <field name="default_non_managerial_fine_days">0.0</field>
             <field name="default_managerial_penalty_pct">0.0</field>
             <field name="default_managerial_fine_days">0.0</field>
-            <field name="default_reset_window_months">3</field>
-            <field name="active_duration_days">90</field>
+            <field name="default_reset_window_months">1</field>
+            <field name="active_duration_days">30</field>
             <field name="default_approval_authority">direct_manager</field>
-            <field name="description">Minor breach entailing recorded verbal warning without salary penalty.</field>
+            <field name="description">Minor breach entailing recorded verbal warning without salary penalty (1-month record validity per Article 33.10.1.1).</field>
         </record>
     </data>
 </odoo>

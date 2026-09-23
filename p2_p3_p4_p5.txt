@@ -1,0 +1,4047 @@
+=== PAGE 42 ===
+Business Requirement Document for ERP Upgrading 
+ 
+36 
+ 
+enabler that fosters a high -performance culture, develops employee potential, and supports the Bank's 
+mission of sustainable growth, operational excellence, and superior customer service. 
+ 
+ 
+Part 2 Employee Development System 
+1. Introduction 
+The Employee Development System (EDS) is an integrated module of Bunna  Bank S.C.'s ERP system that 
+automates and manages the end -to-end employee learning and development lifecycle. The system 
+supports Training Needs Assessment (TNA), curriculum and course management, annual learning 
+planning, training delivery, evaluation, sponsorship, learning partnerships, and reporting. 
+The EDS integrates with the Bank's HRIS, Performance Management System (PMS), Learning Management 
+System (LMS), Succession Planning, Career Development, Payroll, Finance, and other ERP modules to 
+provide a centralized, secure, and auditable platform for employee development. 
+2. Objectives 
+The Employee Development System aims to: 
+ Digitize and standardize the end-to-end Learning and Development (L&D) process.  
+ Align employee development with competency requirements, performance, and business 
+objectives.  
+ Automate workflows, approvals, notifications, and audit trails.  
+ Improve planning, delivery, monitoring, and evaluation of learning programs.  
+ Provide integrated reporting, dashboards, and analytics for informed decision-making.  
+ Maintain a centralized employee learning history and development record. 
+2. Purpose 
+The purpose of the Employee Development System is to provide a centralized and automated platform for 
+planning, managing, delivering, monitoring, and evaluating employee learning and development activities. 
+The system ensures that all learning interventions are competency -based, properly governed, fully 
+traceable, and integrated with the Bank's ERP. 
+
+
+
+=== PAGE 43 ===
+Business Requirement Document for ERP Upgrading 
+ 
+37 
+ 
+3. Scope 
+The Employee Development System covers the following functional areas: 
+ Training Needs Assessment (TNA)  
+ Curriculum and Course Management  
+ Annual Learning and Development Planning  
+ Vendor, Venue, and Training Provider Management  
+ Training Delivery and Learning Management System (LMS) Integration  
+ Coaching, Mentoring, On -the-Job Training (OJT), Induction, and Individual Development Plans 
+(IDPs)  
+ Training Evaluation and Impact Assessment  
+ Sponsorship, Education Assistance, and Internship Management  
+ Learning Partnership Management  
+ Continuous Improvement and Unscheduled Training Requests  
+ Reporting, Dashboards, and Analytics  
+ Integration with HRIS, PMS, LMS, Payroll, Finance, and other ERP modules 
+4. Definitions 
+Term Definition 
+EDS Employee Development System - the classroom/instructor-led training management platform 
+covered by this document. 
+LMS Learning Management System - separate system responsible for e -learning content hosting 
+and delivery. 
+TNA Training Needs Analysis - structured process of identifying employee/role competency and 
+skill gaps. 
+ILT Instructor-Led Training - classroom-based, facilitator-delivered training. 
+IDP Individual Development Plan - a personalized combination of learning interventions assigned 
+to an employee. 
+L&D Learning & Development - team responsible for L&D within PPDD. 
+PPDD People Performance & Development Directorate - directorate responsible for performance 
+management, learning and development, and KM. 
+
+
+
+=== PAGE 44 ===
+Business Requirement Document for ERP Upgrading 
+ 
+38 
+ 
+Term Definition 
+HRIS Human Resource Information System - central employee database and system of record for 
+employee master data. 
+SMC Senior Management Committee - executive body receiving strategic and compliance reporting. 
+RBAC Role-Based Access Control - security mechanism for restricting system access by defined role. 
+TOT Training of Trainers - certification process qualifying internal staff to deliver training. 
+SME Subject Matter Expert. 
+5. Stakeholders 
+Stakeholder Responsibility 
+Employees Nomination acceptance, attendance, participation in assessments and 
+evaluations. 
+Supervisors/Managers Nomination of staff, approval of training requests, Level 3 behavior follow -up 
+evaluation. 
+L&D  End-to-end ownership of TNA consolidation, program design, scheduling, 
+delivery oversight, and reporting. 
+Trainers/Facilitators Session delivery, attendance confirmation, assessment scoring, and feedback 
+input. 
+Finance Training budget allocation, cost tracking, and payment processing for venues, 
+trainers, and materials. 
+IT System administration, integration between EDS, LMS, and HRIS, and technical 
+support. 
+Internal Audit  Review of governance documentation, TNA processes, and audit trail 
+compliance. 
+Senior Management / SMC Strategic oversight, budget approval, and review of training coverage and 
+compliance reporting. 
+6. Business Rules 
+The EDS shall operate under the following overarching business rules: 
+
+
+
+=== PAGE 45 ===
+Business Requirement Document for ERP Upgrading 
+ 
+39 
+ 
+• TNA-Driven: All classroom training data shall originate from Training Needs Analysis (TNA) entries or 
+a documented ad-hoc exception with justification. 
+• Single Source of Truth: Employee, job role, and organizational data shall be sourced exclusively from 
+Employee Master Data (HRIS); no duplicate manual entry shall be permitted in EDS. 
+• Segregation of Duties: No single user shall both nominate/approve a part icipant and record their 
+evaluation score for the same session. 
+• Role-Based Access: System access shall be restricted based on defined roles (Employee, Manager, 
+Trainer, L&D Admin, Executive). 
+• Audit Trail: Every nomination, approval, attendance record, and evaluation score shall be recorded 
+with Timestamp, User ID, and prior/new value where applicable. 
+• Certification Gating: Certificate issuance shall be gated by a configurable rule requiring attendance 
+and, where applicable, a passing Level 2 assessment score. 
+• LMS Routing: All classroom training requiring e-learning delivery shall be routed to the LMS rather than 
+duplicated within EDS. 
+• Immutability: Audit logs and evaluation records shall be non -editable and retained per Bank 
+compliance policy. 
+7. Module: Employee Development System (EDS) - Classroom Training Management 
+7.1 Business Rules 
+The EDS module shall apply the following module-specific business rules: 
+• Delivery Mode Classification: A training need shall be classified as Classroom, E-Learning, or Blended 
+at the point of TNA consolidation; only Classroom and the classroom component of Blended needs 
+shall be actioned within EDS. 
+• Capacity Control: Nominations shall not exceed the configured maximum capacity of a session; 
+excess nominations shall be waitlisted. 
+• Approval Hierarchy: Nomination and approval shall follow a configurable multi -level workflow (Line 
+Manager to L&D, with Budget/HR). 
+• Ad-Hoc Exception Handling: Ad-hoc nominations outside the approved TNA register shall require 
+documented justification and L&D approval. 
+
+
+
+=== PAGE 46 ===
+Business Requirement Document for ERP Upgrading 
+ 
+40 
+ 
+• Minimum Attendance Threshold: For multi-session programs, overall completion shall be determined 
+by a configurable minimum attendance threshold across sessions. 
+ 
+7.2 Functional Requirements 
+Training Needs Analysis (TNA) 
+FR ID Requirement Description 
+REDS001 Annual Training 
+Needs Assessment 
+Cycle 
+The system shall allow PPDD to initiate the annual Bank -wide Training 
+Needs Assessment (TNA) cycle (default start date 1 April) and 
+configure the assessment timeline, methodology, and responsible 
+team. 
+FREDS002 work Unit -Level 
+Training Needs 
+Submission 
+The system shall provide Line Managers and Supervisors with an online 
+form to submit unit -level training needs linked to competency 
+frameworks and job role profiles within a configurable  submission 
+window (default 10 working days). 
+FREDS003 Automated Training 
+Needs Identification 
+The system shall automatically populate candidate training needs from 
+Performance Management System (PMS) outputs, including Personal 
+Development Plans (PDP), Performance Improvement Plans (PIP), 
+performance appraisal results, succession planning records, career 
+development plans, and previous Training Needs Assessment history 
+where integrated systems are available. 
+FREDS004 Manual Training 
+Needs Capture 
+The sy stem shall support manual entry of training needs identified 
+from strategic plans, audit findings, risk assessments, regulatory and 
+compliance requirements, customer feedback, industry trends, and 
+other approved organizational sources. 
+FREDS005 Competency Gap 
+Assessment 
+The system shall calculate competency gap scores by comparing 
+required and actual proficiency levels for each job family and 
+leadership level and support leadership capability assessment cycles 
+
+
+
+=== PAGE 47 ===
+Business Requirement Document for ERP Upgrading 
+ 
+41 
+ 
+FR ID Requirement Description 
+at configurable intervals, with a minimum freq uency of once every 
+three years. 
+FREDS006 Training Needs 
+Prioritization and 
+Scoring 
+The system shall provide a configurable prioritization and scoring 
+engine for training needs using criteria including strategic alignment, 
+Target Operating Model (TOM) imp act, severity of performance or 
+competency gaps, risk level, regulatory and compliance requirements, 
+and future organizational capability needs. 
+FREDS007 Bank-Wide Training 
+Needs Consolidation 
+The system shall consolidate Training Needs Assessment submissions 
+from District Offices and Head Office Directorates into a single 
+standardized, competency-based Bank-wide Training Needs Dataset 
+and automatically identify duplicate, invalid, or non -training-related 
+items (such as process, system, or structural issue s) for review and 
+exclusion. 
+FREDS008 Training Needs 
+Assessment 
+Approval Workflow 
+The system shall route the consolidated Training Needs Assessment 
+report through a configurable approval workflow consisting of PPDD 
+Validation, Director – PPDD Review, Chief People and Culture Officer 
+(CPCO) Endorsement, and Senior Management Committee (SMC) Final 
+Approval, while maintaining complete audit trails, timestamps, and 
+approval history. 
+FREDS009 Training Needs 
+Assessment 
+Deadline 
+Management 
+The system shall e nforce the annual Training Needs Assessment 
+approval deadline (default 31 May) by automatically generating 
+reminder notifications and escalation alerts to responsible approvers 
+prior to the configured deadline. 
+FREDS010 Approved Training 
+Needs Assessment 
+Control 
+Upon final approval by the Senior Management Committee (SMC), the 
+system shall lock the approved Training Needs Assessment report as 
+the official source for curriculum development and the Annual 
+Learning and Development Plan, and shall require a do cumented 
+
+
+
+=== PAGE 48 ===
+Business Requirement Document for ERP Upgrading 
+ 
+42 
+ 
+FR ID Requirement Description 
+change request with approval workflow for any subsequent 
+modifications. 
+FR-EDS-001 
+Structured TNA 
+Capture 
+System shall allow structured Training Needs Analysis data collection 
+per employee, role, department, and competency area. 
+FR-EDS-002 
+Competency 
+Framework Linkage 
+System shall link TNA entries to the organization's approved 
+competency framework and job role requirements. 
+FR-EDS-003 
+Appraisal-Linked 
+Gap Input 
+System shall allow competency or performance gaps identified in the 
+Performance Management System to be imported or manually logged 
+as TNA input. 
+FR-EDS-004 
+Manager Nomination 
+Input 
+System shall allow Supervisors/Managers to submit training needs on 
+behalf of their team members. 
+FR-EDS-005 
+Self-Nomination 
+Input 
+System shall allow employees to submit self-identified training needs 
+for manager review. 
+FR-EDS-006 TNA Consolidation 
+System shall consolidate individual TNA submissions into a periodic 
+(annual, quarterly &monthly) Training Needs Register. 
+FR-EDS-007 
+Prioritization 
+Scoring 
+System shall support configurable prioritization of TNA entries (e.g., 
+Critical, High, Medium, Low) based on gap severity. 
+FR-EDS-008 
+Delivery Mode 
+Classification 
+System shall allow each TNA entry to be classified as Classroom, E -
+Learning, or Blended, determining routing to EDS or LMS. 
+FR-EDS-009 
+TNA Approval 
+Workflow 
+System shall route the consolidated Training Needs Register through a 
+configurable approval workflow (Department Head to L&D). 
+
+
+
+=== PAGE 49 ===
+Business Requirement Document for ERP Upgrading 
+ 
+43 
+ 
+FR ID Requirement Description 
+FR-EDS-010 
+TNA to Program 
+Linkage 
+Approved TNA entries  shall be traceable to the training program 
+ultimately created to address them. 
+Curriculum & Course Design 
+FR ID Requirement Description 
+FREDS011 Course Development 
+Request 
+Management 
+The system shall allow the Learning and Development (L&D) Team 
+Leader to convert approved Training Needs Assessment (TNA) outputs 
+into course development requests assigned to Senior Learning and 
+Development Officers or Learning and Development Officers, 
+capturing competency gaps, target job roles, required proficiency 
+levels, and expected learning outcomes. 
+FREDS012 Course-to-
+Competency 
+Mapping 
+The system shall provide a standardized course mapping template 
+linking each course to the competency framework, job role profiles, 
+career pathways, and learning pathways, while monitoring a 
+configurable validation Service Level Agreement (SLA) with a default 
+duration of five working days. 
+FREDS013 Curriculum Design 
+Management 
+The system shall provide a standardized curriculum design template 
+that captures learning objectives, ex pected learning outcomes, 
+proficiency levels, assessment methods, and supports collaborative 
+development by Subject Matter Experts (SMEs), internal trainers, and 
+business unit stakeholders. 
+FREDS014 Curriculum 
+Development SLA 
+Monitoring 
+The system shall monitor curriculum development activities against a 
+configurable Service Level Agreement (SLA) with a default duration of 
+ten working days per course and automatically notify the Learning and 
+Development Team Leader of overdue activities. 
+
+
+
+=== PAGE 50 ===
+Business Requirement Document for ERP Upgrading 
+ 
+44 
+ 
+FR ID Requirement Description 
+FREDS015 Curriculum Content 
+Management 
+The system shall maintain comprehensive curriculum records 
+including course title, course description, competency-linked learning 
+objectives, module structure, delivery methodology, target audience, 
+course duration, training schedule,  prerequisites, and supporting 
+documentation. 
+FREDS016 Curriculum Review 
+and Approval 
+Workflow 
+The system shall route curriculum documents through a configurable 
+multi-stage approval workflow consisting of Learning and 
+Development Quality Review, Director  – People Performance and 
+Development Directorate (PPDD) Internal Validation, and Chief People 
+and Culture Officer (CPCO) Approval, while monitoring configurable 
+review Service Level Agreements and maintaining complete audit 
+trails. 
+FREDS017 Curriculum Re vision 
+Management 
+The system shall record approval decisions, reviewer feedback, and 
+revision comments from the Chief People and Culture Officer (CPCO), 
+and where revisions are required, automatically return the curriculum 
+to the originating officer for up date, resubmission, and subsequent 
+approval tracking. 
+FREDS018 Annual Learning and 
+Development Plan 
+Integration 
+Upon final approval, the system shall automatically integrate the 
+approved curriculum into the Annual Learning and Development Plan 
+and Trainin g Calendar and, where applicable, trigger automatic 
+Learning Management System (LMS) course shell creation for digital 
+learning content. 
+FREDS019 Curriculum Version 
+Control 
+The system shall maintain complete version history for all curriculum 
+records, inc luding version numbers, revision history, superseded 
+versions, reviewer comments, approval dates, approval status, and 
+document audit trails. 
+
+
+
+=== PAGE 51 ===
+Business Requirement Document for ERP Upgrading 
+ 
+45 
+ 
+FR ID Requirement Description 
+FREDS011 Course Development 
+Request 
+Management 
+The system shall allow the Learning and Development (L&D) Team 
+Leader to convert approved Training Needs Assessment (TNA) outputs 
+into course development requests assigned to Senior Learning and 
+Development Officers or Learning and Development Officers, 
+capturing competency gaps, target job roles, required proficiency  
+levels, and expected learning outcomes. 
+FR-EDS-011 
+Course Catalog 
+Management 
+System shall maintain a catalog of classroom/instructor -led training 
+programs including title, objective, target audience, and duration. 
+FR-EDS-012 
+Curriculum 
+Structure 
+System shall support definition of curriculum/module structure for 
+multi-session programs. 
+FR-EDS-013 
+Prerequisite 
+Configuration 
+System shall allow configuration of prerequisite courses or 
+qualifications per program. 
+FR-EDS-014 
+Trainer Profile 
+Management 
+System shall maintain trainer/facilitator profiles, including internal 
+Subject Matter Experts (SMEs), TOT -certified staff, and external 
+trainers. 
+FR-EDS-015 
+Trainer Qualification 
+Tagging 
+System shall allow programs to be tagged with required trainer 
+qualifications or certification level. 
+FR-EDS-016 
+External Trainer 
+Assessment 
+System shall allow recording/uploading of pre/post assessment result 
+sent by external trainers. 
+FR-EDS-017 
+Program Status 
+Control 
+System shall support program lifecycle statuses (Draft, Active, 
+Suspended, Retired). 
+Annual L&D Plan & Calendar 
+
+
+
+=== PAGE 52 ===
+Business Requirement Document for ERP Upgrading 
+ 
+46 
+ 
+FR ID Requirement Description 
+FREDS020 Annual Learning and 
+Development 
+Calendar Generation 
+The system shall automatically generate a draft Annual Learning and 
+Development (L&D) Calendar from the approved Training Needs 
+Assessment (TNA) and validated curricula within a configurable 
+Service Level Agreement (SLA) with a default duration of five working 
+days, categorizing programs as Developmental, Values and Ethics, and 
+Technical or Compliance training. 
+FREDS021 Learning and 
+Development 
+Schedule 
+Prioritization 
+The system shall sequence Learning and Development calendar 
+activities using configurable prioritization criteria including 
+competency gap criticality, strategic and business impact, regulatory  
+requirements, and operational urgency, and shall automatically 
+identify and flag scheduling conflicts with predefined peak operational 
+periods. 
+FREDS022 Annual Learning and 
+Development Plan 
+Management 
+The system shall compile and maintain the Annual Lear ning and 
+Development Plan, including learning objectives, target participants or 
+employee segments, implementation timelines, budget allocations, 
+resource requirements, delivery methods (internal, local external, or 
+international), and associated training programs. 
+FREDS023 Annual Learning and 
+Development Plan 
+Approval Workflow 
+The system shall route the draft Annual Learning and Development 
+Plan and Calendar through a configurable approval workflow 
+consisting of Director – People Performance and Developme nt 
+Directorate (PPDD) Review, Chief People and Culture Officer (CPCO) 
+Endorsement, and Senior Management Committee (SMC) Final 
+Approval, while capturing comments, revision history, approval status, 
+and audit trails at each stage. 
+FREDS024 Approved Learnin g 
+and Development 
+Plan Publication 
+Upon final approval by the Senior Management Committee (SMC), the 
+system shall publish the approved Annual Learning and Development 
+Plan and Calendar to authorized stakeholders and automatically 
+
+
+
+=== PAGE 53 ===
+Business Requirement Document for ERP Upgrading 
+ 
+47 
+ 
+FR ID Requirement Description 
+activate downstream traini ng preparation, scheduling, and delivery 
+workflows. 
+FREDS025 Learning and 
+Development Plan 
+Implementation 
+Monitoring 
+The system shall support monthly and quarterly monitoring of Annual 
+Learning and Development Plan implementation by comparing planned 
+and actual activities and shall automatically generate variance reports, 
+progress dashboards, and management reports for the People 
+Performance and Development Directorate (PPDD) and the Chief 
+People and Culture Officer (CPCO). 
+FREDS026 Learning and 
+Development Plan 
+Amendment 
+Management 
+The system shall support controlled and auditable amendments to the 
+approved Annual Learning and Development Plan and Calendar, 
+including unscheduled training requests, while enforcing configurable 
+approval workflows, maintaining version history, documenting change 
+justifications, and preserving complete audit trails. 
+Vendor, Venue & Training Provider Management 
+FR ID Requirement Description 
+FREDS027 Training Delivery 
+Sourcing 
+Recommendation 
+The system shall allow the assigned  Learning and Development (L&D) 
+Officer to record the recommended training delivery source (Internal, 
+External Local, or External International) for each training program, 
+including justification, and route the recommendation to the Director 
+– People Performance and Development Directorate (PPDD) for review 
+and decision. 
+FREDS028 Internal Trainer Pool 
+Management 
+The system shall maintain a centralized internal trainer pool register, 
+including trainer profiles, competencies, Training -of-Trainers (ToT) 
+certification status, periodic review cycles (default every two years), 
+
+
+
+=== PAGE 54 ===
+Business Requirement Document for ERP Upgrading 
+ 
+48 
+ 
+FR ID Requirement Description 
+trainer selection history, evaluation results, participant feedback, 
+quarterly performance reviews, and trainer availability. 
+FREDS029 External Training 
+Provider and Venue 
+Registry 
+The system shall maintain an approved database of local and 
+international training providers and venues, including provider 
+categorization, accreditation status, service offerings, historical 
+performance ratings, pre -qualification status, contractual 
+information, and vendor eligibility records. 
+FREDS030 Request for Proposal 
+(RFP) Management 
+The system shall generate, manage, and issue structured Requests for 
+Proposal (RFPs) for training vendors and venues, capturing training 
+objectives, scope of work, techni cal specifications, venue and 
+accommodation requirements, evaluation criteria, submission 
+deadlines, and distribution to a configurable minimum number of 
+qualified providers, while maintaining complete issuance and 
+response tracking. 
+FREDS031 Proposal Submission 
+and Registration 
+The system shall support secure two -envelope proposal submission 
+consisting of separate technical and financial proposals and shall 
+provide controlled proposal receipt, opening, registration, and audit 
+logging by the designated Evaluation Committee. 
+FREDS032 Vendor Technical 
+and Financial 
+Evaluation 
+The system shall provide configurable weighted evaluation templates 
+for technical and financial assessments, including technical criteria 
+such as content quality, training methodology, trainer qualifications, 
+venue suitability, facilities, organizational experience, and reputation, 
+and financial criteria including cost competitiveness, value for money, 
+and pricing transparency, while enforcing minimum technical 
+qualification thresholds before financial evaluation is permitted. 
+
+
+
+=== PAGE 55 ===
+Business Requirement Document for ERP Upgrading 
+ 
+49 
+ 
+FR ID Requirement Description 
+FREDS033 International 
+Training Provider 
+Evaluation 
+The system shall provide a configurable weighted evaluation module 
+for international training providers and host -country selection based 
+on strategic relevance, a ccreditation, organizational credibility, 
+learning impact, practical applicability, cost effectiveness, logistics, 
+safety, and political stability, and shall generate ranked 
+recommendations for Director – PPDD and Chief People and Culture 
+Officer (CPCO) review. 
+FREDS034 Vendor Selection 
+and Approval 
+Workflow 
+The system shall automatically calculate combined technical and 
+financial evaluation scores, rank training providers and venues, and 
+route recommendations through a configurable approval workflow 
+consisting of Director – PPDD Review, Chief People and Culture Officer 
+(CPCO) Endorsement, and Final Approval by the Learning and 
+Development Vendor and Venue Service Procurement Committee for 
+local procurements or the appropriate Senior Management Committee 
+(SMC) or Board-level authority for international procurements. 
+FREDS035 Training Contract 
+Management 
+The system shall automatically generate structured training contracts 
+or service agreements using approved Request for Proposal (RFP) and 
+evaluation data, r oute contracts to the Legal Directorate for review, 
+capture legal comments and amendments, maintain version history, 
+and record final approval and authorized signatures. 
+FREDS036 Vendor and Venue 
+Performance 
+Monitoring 
+The system shall support monitoring of training delivery by recording 
+service quality, venue readiness, facilities, catering, accommodation, 
+issues raised, corrective actions, and post -training vendor and venue 
+evaluations, and shall automatically update the historical performance 
+profile of each provider and venue. 
+
+
+
+=== PAGE 56 ===
+Business Requirement Document for ERP Upgrading 
+ 
+50 
+ 
+FR ID Requirement Description 
+FREDS037 Venue Requirement 
+Specification 
+Management 
+The system shall provide a standardized Venue Requirement 
+Specification (VRS) template, support preparation and approval by the 
+Director – People Performance and Development Dir ectorate (PPDD), 
+and require approval before initiating the Request for Proposal (RFP) 
+process for venue procurement. 
+ 
+Training Delivery Management 
+FR ID Requirement Description 
+FREDS038 Training Participant 
+Nomination 
+Management 
+The system shall generate participant nomination lists from the 
+approved Annual Learning and Development Plan and competency 
+requirements and route nominations through configurable approval 
+workflows for Line Manager and People Performance and 
+Development Directorate (PPDD) confirmation. 
+FREDS039 Training Session 
+Scheduling 
+The system shall support scheduling of classroom training sessions 
+with configurable class -size limits (default 25 –30 participants, 
+excluding Board of Directors and Senior Management Committee 
+programs), trainer assignment, venue allocation, and automated 
+notifications to participants, trainers, and other stakeholders. 
+FREDS040 Training Attendance 
+and Assessment 
+Management 
+The system shall record participant attendance, enforce configurable 
+attendance requirements (default minimum 80% attendance for 
+certification eligibility), capture pre -training and post -training 
+assessment scores, and record daily participant feedback for 
+classroom training sessions. 
+FREDS041 International 
+Training 
+Management 
+The system shall support end -to-end management of international 
+training programs through configurable workflows covering 
+preparation, delivery, and post -training application phases, including 
+
+
+
+=== PAGE 57 ===
+Business Requirement Document for ERP Upgrading 
+ 
+51 
+ 
+FR ID Requirement Description 
+proposal preparation, cost estimation, approval workflow, tra vel 
+arrangements, visa processing, insurance, travel authorization, flight 
+booking, per diem processing, entitlement validation, post -training 
+reporting, knowledge -sharing activities, and workplace application 
+tracking. 
+FREDS042 Learning 
+Management System 
+(LMS) Integration 
+The system shall integrate with or provide Learning Management 
+System (LMS) functionality supporting course publishing, participant 
+enrollment, enrollment windows, learning schedules, completion 
+deadlines, automated reminders, online lea rning activities, quizzes, 
+assessments, configurable minimum passing scores, and electronic 
+certificate generation. 
+FREDS043 Learning Analytics 
+and Progress 
+Monitoring 
+The system shall provide dashboards and analytical reports for 
+Learning Management System participation, including enrollment 
+statistics, completion rates, assessment scores, learning progress, 
+average time to complete courses, and other configurable learning 
+metrics accessible to the Learning and Development Team and 
+authorized Line Managers. 
+FREDS044 Training Certificate 
+Management 
+The system shall automatically generate and issue electronic training 
+certificates upon successful completion of attendance and 
+assessment requirements and store certificates as part of the 
+employee's permanent learning and development history. 
+FREDS045 Training Material 
+Approval 
+Management 
+The system shall manage training material development, quality 
+review, and approval workflows, requiring approval by the Director – 
+People Performance and Development Dir ectorate (PPDD) before 
+confirming training schedules and program readiness, while 
+maintaining complete version history and audit trails. 
+
+
+
+=== PAGE 58 ===
+Business Requirement Document for ERP Upgrading 
+ 
+52 
+ 
+FR ID Requirement Description 
+FREDS038 Training Participant 
+Nomination 
+Management 
+The system shall generate participant nomination lists from the 
+approved Annual Learning and Development Plan and competency 
+requirements and route nominations through configurable approval 
+workflows for Line Manager and People Performance and 
+Development Directorate (PPDD) confirmation. 
+FREDS039 Training Session 
+Scheduling 
+The system shall support scheduling of classroom training sessions 
+with configurable class -size limits (default 25 –30 participants, 
+excluding Board of Directors and Senior Management Committee 
+programs), trainer assignment, venue allocation, and automated 
+notifications to participants, trainers, and other stakeholders. 
+FREDS040 Training Attendance 
+and Assessment 
+Management 
+The system shall record participant attendance, enforce configurable 
+attendance requirements (default minimum 80% attendance for 
+certification eligibility), capture pre -training and post -training 
+assessment scores, and record daily participant feedback for 
+classroom training sessions. 
+FREDS041 International 
+Training 
+Management 
+The system shall support end -to-end management of i nternational 
+training programs through configurable workflows covering 
+preparation, delivery, and post -training application phases, including 
+proposal preparation, cost estimation, approval workflow, travel 
+arrangements, visa processing, insurance, travel authorization, flight 
+booking, per diem processing, entitlement validation, post -training 
+reporting, knowledge -sharing activities, and workplace application 
+tracking. 
+FREDS042 Learning 
+Management System 
+(LMS) Integration 
+The system shall integrate with or  provide Learning Management 
+System (LMS) functionality supporting course publishing, participant 
+enrollment, enrollment windows, learning schedules, completion 
+deadlines, automated reminders, online learning activities, quizzes, 
+
+
+
+=== PAGE 59 ===
+Business Requirement Document for ERP Upgrading 
+ 
+53 
+ 
+FR ID Requirement Description 
+assessments, configurable minimum passing scores, and electronic 
+certificate generation. 
+FREDS043 Learning Analytics 
+and Progress 
+Monitoring 
+The system shall provide dashboards and analytical reports for 
+Learning Management System participation, including enrollment 
+statistics, co mpletion rates, assessment scores, learning progress, 
+average time to complete courses, and other configurable learning 
+metrics accessible to the Learning and Development Team and 
+authorized Line Managers. 
+FREDS044 Training Certificate 
+Management 
+The system shall automatically generate and issue electronic training 
+certificates upon successful completion of attendance and 
+assessment requirements and store certificates as part of the 
+employee's permanent learning and development history. 
+FREDS045 Training Material 
+Approval 
+Management 
+The system shall manage training material development, quality 
+review, and approval workflows, requiring approval by the Director – 
+People Performance and Development Directorate (PPDD) before 
+confirming training schedules and program readiness, while 
+maintaining complete version history and audit trails. 
+ 
+Apply-Stage Development Interventions 
+FR ID Requirement Description 
+FREDS046 Buddy and On -the-
+Job Training 
+Assignment 
+The system shall allow Line Managers to assign a Buddy or On-the-Job 
+Training (OJT) Supervisor to newly recruited, transferred, promoted, 
+or reassigned employees and provide access to competency -based 
+OJT modules, learning plans, and standardized checklists maintained 
+by the People Performance and Development Directorate (PPDD). 
+
+
+
+=== PAGE 60 ===
+Business Requirement Document for ERP Upgrading 
+ 
+54 
+ 
+FR ID Requirement Description 
+FREDS047 On-the-Job Training 
+Progress 
+Management 
+The system shall monitor On -the-Job Training (OJT) progress, 
+maintain trainee completion reports, capture supervisor evaluations 
+and feedback, and support configurable Buddy or OJT  program 
+durations, with a default period corresponding to the employee's 
+probation period or the first three months of assignment. 
+FREDS048 Coaching Program 
+Management 
+The system shall support the creation and management of structured 
+coaching plans, inc luding coach assignment, coaching session 
+scheduling, session documentation, progress monitoring, coaching 
+outcomes, and the management of internal and external coaching 
+engagements where specialized expertise is required. 
+FREDS049 Mentoring Program 
+Management 
+The system shall support the administration of formal mentoring 
+programs for critical positions by managing mentor assignments, 
+mentoring objectives, program guidelines, mentoring schedules, 
+periodic progress reviews, feedback, and completion records for both 
+internal and external mentors. 
+FREDS050 Employee Induction 
+Program 
+Management 
+The system shall support planning, scheduling, and delivery of periodic 
+induction and onboarding programs using blended learning 
+approaches, including classroom and e -learning content, participant 
+enrollment, completion tracking, and Line Manager onboarding 
+checklists. 
+FREDS051 Knowledge Sharing 
+and Learning Event 
+Management 
+The system shall allow business units and the People Performance and 
+Development Directorate (PPDD) to initiate, schedule, and manage 
+workshops, seminars, conferences, knowledge-sharing sessions, and 
+short learning events, including recording topics, facilitators, 
+participants, attendance, learning materials, and event outcomes. 
+
+
+
+=== PAGE 61 ===
+Business Requirement Document for ERP Upgrading 
+ 
+55 
+ 
+FR ID Requirement Description 
+FREDS052 Individual 
+Development Plan 
+Management 
+The system shall provide each employee with a digital Individual 
+Development Plan (IDP) or Personal Development Plan (PDP) that 
+integrates competency gap assessments, Performance Improvement 
+Plan (PIP) recommendations, career  development objectives, 
+succession planning requirements, learning activities, self -directed 
+learning, development milestones, and periodic progress reviews with 
+automated reminder notifications. 
+FREDS053 Self-Development 
+Activity 
+Management 
+The system s hall enable employees to record self -development 
+activities, including professional certifications, online learning, 
+workshops, conferences, coaching, mentoring, reading, research, and 
+other learning activities, maintain supporting evidence and 
+documentation, and make the information available for performance 
+evaluation, career development, succession planning, and talent 
+review processes. 
+Monitoring & Evaluation 
+FR ID Requirement Description 
+FREDS054 Level I Training 
+Reaction Evaluation 
+The system shall automatically distribute Level I (Reaction) training 
+evaluation questionnaires immediately upon completion of each 
+learning program, consolidate participant responses, analyze results, 
+and generate evaluation reports within a configurable Service Level 
+Agreement (SLA) with a default duration of seven working days. 
+FREDS055 Level II Learning 
+Evaluation 
+The system shall support configurable pre -training and post -training 
+assessment instruments for Level II (Learning) evaluation, 
+automatically calculate assessment results, compare learning 
+outcomes against defined training objectives, and maintain 
+assessment records for each participant. 
+
+
+
+=== PAGE 62 ===
+Business Requirement Document for ERP Upgrading 
+ 
+56 
+ 
+FR ID Requirement Description 
+FREDS056 Level III Behavior 
+Evaluation 
+The system shall automatically initiate Level III (Behavior) evaluation 
+workflows within a configurable period (default three to six months 
+after training completion), supporting workplace observations, 
+structured surveys, Line Manager assessments, interviews, 
+competency evaluations, and consolidation of findings for review by 
+the People Performance and Development Directorate (PPDD). 
+FREDS057 Level IV Business 
+Results Evaluation 
+The system shall initiate Level IV (Business Results) evaluation 
+workflows within a configurable period (default six to twelve months 
+after training complet ion), enabling the People Performance and 
+Development Directorate (PPDD) to measure training effectiveness 
+using organizational Key Performance Indicators (KPIs), operational 
+performance data, productivity indicators, business outcomes, and 
+structured stakeholder feedback. 
+FREDS058 Training Impact 
+Assessment 
+Reporting 
+The system shall consolidate Level I, Level II, Level III, and Level IV 
+evaluation results into comprehensive Training Impact Assessment 
+reports for individual training programs, participant cohorts, 
+departments, and organization -wide analysis, and route reports 
+through configurable validation workflows for the Learning and 
+Development Team Leader. 
+FREDS059 Evaluation 
+Instrument 
+Management 
+The system shall support periodic review, version control, and 
+management of training evaluation instruments, methodologies, 
+questionnaires, assessment templates, and evaluation criteria while 
+retaining historical versions to enable trend analysis, benchma rking, 
+and longitudinal comparisons. 
+FREDS060 Assessment Center 
+Management 
+The system shall support end -to-end administration of Assessment 
+Centers, including definition of target positions and competency 
+profiles, configuration of standardized assessment  tools, simulations 
+and exercises, assessor assignment, candidate nomination and 
+
+
+
+=== PAGE 63 ===
+Business Requirement Document for ERP Upgrading 
+ 
+57 
+ 
+FR ID Requirement Description 
+scheduling, independent assessor scoring, consensus -based 
+evaluation, and integration of assessment results with recruitment, 
+promotion, succession planning, talent management , and employee 
+development processes, subject to appropriate management approval 
+workflows. 
+FREDS061 Assessment Center 
+Security and Audit 
+Management 
+The system shall enforce role -based confidentiality controls, secure 
+access management, comprehensive audi t trails, document security, 
+and standardized assessment governance for Assessment Center 
+records to ensure objectivity, fairness, transparency, consistency, and 
+compliance with organizational policies and regulatory requiremen 
+ 
+Sponsorship, Service Reimbursement Management 
+FR ID Requirement Description 
+FREDS062 Certification 
+Sponsorship 
+Eligibility Validation 
+The system shall validate employee eligibility for certification 
+sponsorship programs based on configurable eligibility criteria, 
+including employee category, eligible job roles, management level, 
+business function requirements, and minimum continuous service 
+period (default one year), prior to initiating the approval process. 
+FREDS063 Certification 
+Sponsorship 
+Agreement 
+Management 
+The system shall generate and manage Certification/Education 
+Sponsorship and Service Bond Agreements, including sponsorship 
+details, approved funding amount, employee obligations, bond 
+duration proportional to the investment value, and electronic 
+signature workflow prior to training fund disbursement. 
+FREDS064 Service Bond 
+Tracking and 
+The system shall track employee service bond status, bond start and 
+end dates, outstanding obligations, and automatically calculate 
+applicable repaymen t amounts based on the Bank -approved 
+
+
+
+=== PAGE 64 ===
+Business Requirement Document for ERP Upgrading 
+ 
+58 
+ 
+FR ID Requirement Description 
+Repayment 
+Calculation 
+repayment schedule in cases of resignation, breach of agreement, 
+withdrawal, or failure to complete the sponsored program during the 
+bond period. 
+FREDS065 Training Cost 
+Recovery 
+Management 
+The system shall integrate with Payroll and Finance systems to support 
+recovery of outstanding sponsorship or training costs through salary 
+deductions, terminal benefits, or other payable entitlements in 
+accordance with applicable labour laws and Bank policies, while 
+maintaining recor ds of approved waivers authorized by the Chief 
+Executive Officer (CEO), including redundancy, certified medical 
+incapacity, or Bank-initiated termination without employee fault. 
+FREDS066 Certification 
+Sponsorship 
+Performance 
+Tracking 
+The system shall main tain a centralized Certification Sponsorship 
+Management Tracker capturing sponsorship utilization, participant 
+completion status, certification achievement rates, program costs, 
+benefits realization, return on investment (ROI), and generate periodic 
+and annual management reports. 
+FREDS067 Education 
+Assistance and 
+Tuition 
+Reimbursement 
+Management 
+The system shall support end -to-end management of education 
+assistance and tuition reimbursement applications, including 
+eligibility verification, approval workflows, Chief People and Culture 
+Officer (CPCO) approval, supporting document submission and 
+validation (proof of payment, transcripts, academic records), 
+academic progress monitoring, reimbursement calculation, payment 
+status tracking, and compliance with defined service timelines. 
+FREDS068 Internship Program 
+Management 
+The system shall support internship lifecycle management, including 
+internship application submission, eligibility screening, placement 
+assignment, host department allocation, superviso r assignment, 
+internship progress monitoring, periodic performance evaluations, 
+completion records, and internship outcome reporting. 
+ 
+
+
+
+=== PAGE 65 ===
+Business Requirement Document for ERP Upgrading 
+ 
+59 
+ 
+Training Budget & Payment Management 
+FR ID Requirement Description 
+FREDS069 Learning 
+Partnership 
+Proposal 
+Management 
+The system shall capture inbound and People Performance and 
+Development Directorate (PPDD) -initiated learning partnership 
+proposals and support structured technical screening against 
+configurable evaluation criteria, including relevance to organizational 
+needs, customization capability, institutional reputation, learning 
+methodology, digital and IT infrastructure, geographic coverage, and 
+financial capability, while enforcing a configurable minimum 
+qualification threshold (default 70%). 
+FREDS070 Learning 
+Partnership 
+Evaluation and 
+Approval Workflow 
+The system shall route qualified learning partnership proposals 
+through a configurable approval workflow consisting of Director – 
+People Performance and Development Directorate (PPDD) 
+Endorsement, Chief People a nd Culture Officer (CPCO) Review, and 
+Chief Executive Officer (CEO) Final Approval, while maintaining 
+supporting evaluation documents, assessment scores, comments, 
+approval decisions, and audit trails. 
+FREDS071 Partnership 
+Agreement and MoU 
+Management 
+The system shall support generation and management of learning 
+partnership agreements and Memoranda of Understanding (MoUs), 
+including Legal Directorate review tracking, amendment management, 
+Director – PPDD endorsement, CPCO approval and electronic 
+signature, partnership effective dates, standard partnership duration 
+management (default two to three years), and automated renewal 
+alerts. 
+FREDS072 Learning Partner 
+Performance 
+Management 
+The system shall maintain a centralized learning partner performance 
+database capturing trainee feedback, service quality indicators, 
+engagement history, delivery performance, compliance records, and 
+evaluation results after each learning engagement to support 
+partnership renewal, improvement actions, or termination decisions. 
+
+
+
+=== PAGE 66 ===
+Business Requirement Document for ERP Upgrading 
+ 
+60 
+ 
+Continuous Improvement & Unscheduled Training Requests 
+FR ID Requirement Description 
+FREDS073 Learning 
+Improvement Action 
+Management 
+The system shall allow improvement actions identified from Level I–IV 
+training evaluation results, participant feedback, learning 
+effectiveness reviews, audit findings, and performance outcomes to 
+be recorded, assigned to responsible owners, monitored, and tracked 
+through completion and closure. 
+FREDS074 Learning Strategy 
+and Framework 
+Version Management 
+The system shall support periodic review, revision, and version control 
+of learning strategies, frameworks, policies, methodologies, and 
+operating models, while maintaining complete change history, 
+previous versions, approval records, and effective dates. 
+FREDS075 Unscheduled 
+Training Request 
+Management 
+The system shall allow Chief Officers and Heads of Work Units to 
+submit unscheduled training requests, capturing business 
+justification, learning objectives, target participants, delivery 
+approach, estimated budget requirem ents, urgency level, and 
+expected outcomes, and shall route requests to the Director – People 
+Performance and Development Directorate (PPDD) for review and the 
+Chief People and Culture Officer (CPCO) for relevance and urgency 
+assessment. 
+FREDS076 Unscheduled 
+Training Approval 
+Workflow 
+The system shall route approval of unscheduled training requests 
+based on configurable program categories, including Chief People and 
+Culture Officer (CPCO) approval for local programs and Chief Executive 
+Officer (CEO) approv al for international programs, and shall 
+automatically record approved requests as authorized addenda to the 
+Annual Learning and Development Plan and Calendar. 
+FREDS073 Learning 
+Improvement Action 
+Management 
+The system shall allow improvement actions identified from Level I–IV 
+training evaluation results, participant feedback, learning 
+effectiveness reviews, audit findings, and performance outcomes to 
+
+
+
+=== PAGE 67 ===
+Business Requirement Document for ERP Upgrading 
+ 
+61 
+ 
+FR ID Requirement Description 
+be recorded, assigned to responsible owners, monitored, and tracked 
+through completion and closure. 
+FREDS074 Learning Strategy 
+and Framework 
+Version Management 
+The system shall support periodic review, revision, and version control 
+of learning strategies, frameworks, policies, methodologies, and 
+operating models, while maintaining complete change history, 
+previous versions, approval records, and effective dates. 
+FREDS075 Unscheduled 
+Training Request 
+Management 
+The system shall allow Chief Officers and Heads of Work Units to 
+submit unscheduled training requests, capturing business 
+justification, learning ob jectives, target participants, delivery 
+approach, estimated budget requirements, urgency level, and 
+expected outcomes, and shall route requests to the Director – People 
+Performance and Development Directorate (PPDD) for review and the 
+Chief People and Cult ure Officer (CPCO) for relevance and urgency 
+assessment. 
+FREDS076 Unscheduled 
+Training Approval 
+Workflow 
+The system shall route approval of unscheduled training requests 
+based on configurable program categories, including Chief People and 
+Culture Officer (CPCO) approval for local programs and Chief Executive 
+Officer (CEO) approval for international programs, and shall 
+automatically record approved requests as authorized addenda to the 
+Annual Learning and Development Plan and Calendar. 
+ 
+Reporting, Dashboards & Analytics 
+FR ID Requirement Description 
+FR-EDS-001 Automated Report 
+Generation 
+The system shall automatically generate standard Learning and 
+Development (L&D) reports by consolidating data from Training Needs 
+Assessment (TNA), Annual L&D Plans, curriculum records, training 
+
+
+
+=== PAGE 68 ===
+Business Requirement Document for ERP Upgrading 
+ 
+62 
+ 
+FR ID Requirement Description 
+delivery, Learning Management System (LMS), evaluation results, 
+sponsorship programs, partnerships, and employee learning history, 
+replacing manual data consolidation activities. 
+FR-EDS-002 Bank-Wide Training 
+Needs Assessment 
+Report 
+The system shall generate a consolidated Bank -wide Training Needs 
+Assessment (TNA) report containing identified competency gaps, 
+priority training needs, affected employee groups, job families, 
+strategic alignment, and approved training requirements for review by 
+Director – PPDD, Chief People and Culture Officer (CPCO), and Senior 
+Management Committee (SMC). 
+FR-EDS-003 Annual Learning and 
+Development Plan 
+Report 
+The system shall generate an approved Annual Learning and 
+Development Plan and Calendar report suitable for management and 
+Board/SMC reporting, including training objectives, programs, target 
+participants, timelines, delivery methods, budget requirements, and 
+implementation status. 
+FR-EDS-004 Learning Plan 
+Execution and 
+Variance Reporting 
+The system shall generate automated monthly and quarterly Plan 
+Execution and Variance Reports comparing planned versus actual 
+training activities, participant completion, budget utilization, delays, 
+cancellations, and corrective actions. 
+FR-EDS-005 Training Vendor and 
+Venue Evaluation 
+Reporting 
+The system shall generate vendor and venue evaluation reports, 
+including Request for Proposal (RFP) evaluation results, technical and 
+financial scoring, selection recommendations, post -engagement 
+performance ratings, service quality indicators, and historical 
+performance trends. 
+FR-EDS-006 Training Delivery and 
+Attendance 
+Reporting 
+The system shall generate training delivery reports containing 
+program details, participant nominations, attendance status, 
+
+
+
+=== PAGE 69 ===
+Business Requirement Document for ERP Upgrading 
+ 
+63 
+ 
+FR ID Requirement Description 
+completion rates, assessment results, certification status, and 
+program-level implementation statistics. 
+FR-EDS-007 Learning 
+Management System 
+Utilization 
+Dashboard 
+The system shall provide real -time and on -demand LMS dashboards 
+displaying course enrollment, complet ion rates, learning progress, 
+assessment performance, learner engagement, overdue learning 
+activities, and utilization trends accessible to authorized users. 
+FR-EDS-008 Training Evaluation 
+and Impact 
+Reporting 
+The system shall generate training evaluation reports covering Level I 
+(Reaction), Level II (Learning), Level III (Behavior/Application), and 
+Level IV (Business Results/ROI) assessments based on configurable 
+evaluation timelines and consolidate results into Training Impact 
+Assessment Reports for management review. 
+FR-EDS-009 Training ROI and 
+Business Impact 
+Analytics 
+The system shall support calculation and reporting of training 
+effectiveness and return on investment (ROI) by linking training 
+outcomes with competency improvements, employee performanc e 
+indicators, operational metrics, and business results where integrated 
+data sources are available. 
+FR-EDS-010 Certification 
+Sponsorship and 
+Service Reporting 
+The system shall generate certification sponsorship utilization 
+reports, certification completion and pass -rate analysis, investment 
+tracking, ROI analysis, outstanding service bond obligations, 
+repayment liabilities, and employee exit-related recovery reports. 
+FR-EDS-011 Training Budget 
+Utilization Reporting 
+The system shall generate train ing budget utilization reports showing 
+approved budgets, actual expenditure, committed costs, remaining 
+balances, cost per participant, cost by program category, and 
+compliance tracking against applicable regulatory thresholds and 
+organizational limits. 
+
+
+
+=== PAGE 70 ===
+Business Requirement Document for ERP Upgrading 
+ 
+64 
+ 
+FR ID Requirement Description 
+FR-EDS-012 Partnership Portfolio 
+Reporting 
+The system shall generate learning partnership portfolio reports 
+containing active partnerships, engagement history, performance 
+ratings, renewal status, expiry dates, and automated renewal or review 
+alerts. 
+FR-EDS-013 Assessment Center 
+Analytics Report 
+The system shall generate confidential Assessment Center reports 
+containing candidate participation, competency assessment results, 
+assessor ratings, final consensus scores, identified strengths and 
+development area s, and recommendations for recruitment, 
+promotion, succession planning, and development decisions. 
+FR-EDS-014 Employee Learning 
+History and 
+Certification 
+Transcript 
+The system shall provide employees, Line Managers, and authorized 
+PPDD users with on -demand access to individual learning history 
+records, including completed courses, attendance, assessment 
+results, certificates, sponsorship records, development activities, and 
+competency-related learning achievements. 
+FR-EDS-015 Unscheduled 
+Training Request 
+Reporting 
+The system shall generate reports on unscheduled training requests, 
+including request details, justification, approval status, budget 
+implications, program category, decision outcomes, and 
+implementation status. 
+FR-EDS-016 Internal Audit and 
+Compliance 
+Reporting 
+The system shall provide audit and compliance reports containing user 
+activities, approvals, workflow history, data changes, document 
+versions, access logs, training compliance status, and other 
+information required for internal audit and regulatory review. 
+FR-EDS-017 Configurable and Ad-
+Hoc Reporting 
+The system shall provide authorized users with configurable reporting 
+tools allowing creation of customized reports based on available data 
+fields, filters, parameters, grouping, sorting, visualization options, and 
+export formats without requiring system development changes. 
+
+
+
+=== PAGE 71 ===
+Business Requirement Document for ERP Upgrading 
+ 
+65 
+ 
+FR ID Requirement Description 
+FR-EDS-018 Executive Learning 
+Analytics Dashboard 
+The system shall provide executive dashboards for CPCO, SMC, and 
+senior management displaying key learning and developm ent 
+indicators, including training investment, completion rates, 
+competency gap closure, learning effectiveness, ROI, critical 
+capability development, compliance status, and strategic workforce 
+development insights. 
+FR-EDS-019 Automated Report 
+Scheduling and 
+Distribution 
+The system shall support configurable report scheduling and 
+automated distribution of reports and dashboards to predefined 
+recipients through approved communication channels based on 
+reporting frequency, role, and access permissions. 
+FR-EDS-020 Reporting Security 
+and Access Control 
+The system shall enforce role -based access control for reports and 
+dashboards to ensure confidentiality, particularly for employee 
+performance data, assessment results, sponsorship information, 
+financial information, and other sensitive learning records. 
+ 
+ 
+ 
+ 
+Scheduling and arrangements 
+FR ID Requirement Description 
+FR-EDS-017 Session Scheduling 
+System shall allow creation of training sessions with date, time, 
+duration, map location, and recurrence pattern. 
+FR-EDS-018 Venue Booking 
+System shall allow booking of training venues/rooms with capacity 
+validation. 
+
+
+
+=== PAGE 72 ===
+Business Requirement Document for ERP Upgrading 
+ 
+66 
+ 
+FR ID Requirement Description 
+FR-EDS-019 
+Venue Conflict 
+Check 
+System shall prevent double -booking of the same venue for 
+overlapping time slots. 
+FR-EDS-020 Trainer Assignment 
+System shall allow assignment of one or more trainers to a session with 
+availability conflict checking. 
+FR-EDS-021 
+Batch/Cohort 
+Creation 
+System shall allow creation of batches/cohorts with configurable 
+maximum capacity per session. 
+FR-EDS-022 
+Session 
+Rescheduling 
+System shall allow authorized users to reschedule or cancel a session, 
+with automatic notification to nominated participants. 
+Nomination, Approval and Enrollment 
+FR ID Requirement Description 
+FR-EDS-024 
+TNA-Based 
+Nomination 
+System shall allow Supervisors/Managers to nominate employees for a 
+scheduled session based on approved TNA entries. 
+FR-EDS-025 Ad-Hoc Nomination 
+System shall allow nomination of employees outside the TNA register 
+with mandatory justification, subject to L&D approval. 
+FR-EDS-026 
+Multi-Level Approval 
+Workflow 
+System shall support a configurable multi -level approval workflow 
+(Line Manager to L&D) 
+FR-EDS-027 
+Capacity 
+Enforcement 
+System shall enforce session capacity limits and prevent enrollment 
+beyond configured maximum. 
+FR-EDS-028 Wait listing 
+System shall place nominations exceeding session capacity on a 
+waitlist and automatically promote waitlisted nominees upon a 
+vacancy. 
+
+
+
+=== PAGE 73 ===
+Business Requirement Document for ERP Upgrading 
+ 
+67 
+ 
+FR ID Requirement Description 
+FR-EDS-029 
+Nomination 
+Notification 
+System shall notify nominees and their managers upon nomination 
+submission, approval, rejection, or waitlist status change. 
+FR-EDS-030 
+Nomination 
+Withdrawal 
+System shall allow authorized withdrawal of a nomination prior to 
+session start, with reason capture. 
+Evaluation and Assessment 
+FR ID Requirement Description 
+FR-EDS-035 
+Level 1 Reaction 
+Survey 
+System shall allow uploading of the post -session reaction survey 
+covering content relevance, trainer effectiveness, and arrangements. 
+FR-EDS-036 Level 1 Aggregation 
+System shall aggregate Level 1 satisfaction scores by session, 
+program, and trainer. 
+FR-EDS-037 
+Level 2 Pre/Post 
+Assessment 
+System shall allow uploading of the Pre/Post assessment result. 
+FR-EDS-038 
+Level 2 Scoring and 
+Threshold 
+System shall calculate assessment scores and apply a configurable 
+pass/fail threshold. 
+FR-EDS-039 
+Level 3 Behavior 
+Follow-Up 
+System shall support scheduling of a delayed (30/60/90 -day 
+configurable) manager-completed on-the-job application observation 
+form. 
+FR-EDS-040 
+Level 4 Business 
+Impact Tagging 
+System shall allow a training program to be tagged to a related 
+business/performance KPI for manual downstream impact analysis. 
+FR-EDS-041 
+Evaluation-to-TNA 
+Feedback Loop 
+Persistently low Level 2 scores for a competency area shall be flagged 
+as a candidate input for the next TNA cycle. 
+Completion and Certification 
+
+
+
+=== PAGE 74 ===
+Business Requirement Document for ERP Upgrading 
+ 
+68 
+ 
+FR ID Requirement Description 
+FR-EDS-043 Certification System shall allow uploading a certificate of completion. 
+FR-EDS-044 
+Certification 
+Integration 
+System shall forward certificates from the EDS to Employee module to 
+be attached to employee profile 
+FR-EDS-045 
+Classroom Training 
+History 
+System shall maintain a per -employee classroom training history 
+accessible to the employee, their manager, and L&D. 
+8. System Integration Specifications 
+The EDS shall integrate with the following systems: 
+Integration Point EDS Area Description 
+LMS TNA / Reporting Delivery-mode routing at TNA stage (Classroom vs. E -Learning 
+vs. Blended); bi -directional exchange of employee training 
+completion records for a consolidated training history. 
+Employee Master 
+Data (HRIS) 
+All EDS Functions Single source of employee, job role, department, and 
+organizational structure data - read-only within EDS, no 
+duplicate manual entry. 
+Performance 
+Management 
+System (PMS) 
+TNA Read-only import  of appraisal -linked competency or 
+performance gaps as TNA input. 
+Finance/Budget 
+System 
+Training cost 
+Tracking 
+Transmission of actual cost data for reconciliation. 
+IT Access  All EDS Functions Authentication consistent with ERP access credentials. 
+
+
+
+=== PAGE 75 ===
+Business Requirement Document for ERP Upgrading 
+ 
+69 
+ 
+9. Non-Functional Requirements 
+Category Requirement 
+Security Role-Based Access Control; segregation of duties between nomination, approval, and 
+evaluation scoring; session management. 
+Audit Immutable audit logs of nominations, approvals, attendance, and evaluation records; 
+timestamped user actions. 
+Performance Support for concurrent users during peak nomination/enrollment periods; response 
+time under 3 seconds for standard transactions. 
+Availability 99.5% uptime target; scheduled backup and disaster recovery provisions. 
+Scalability Modular architecture supporting growth in program volume, participant numbers, and 
+directorates served. 
+User Experience Responsive, intuitive interface; mobile -friendly access for nomination and approval 
+actions. 
+Compliance Alignment with internal audit governance requirements and Bunna Bank PPDD 
+procedures. 
+Integration API-based integration with LMS, HRIS, and PMS; real -time or scheduled batch 
+synchronization; error handling and retry mechanism. 
+10. Internship Facilitation 
+ The system shall allow uploading of scanned internship application 
+ The system shall allow sending the scanned application and notifying concerned work units 
+regarding inter availability 
+ The system shall allow accepting/rejecting of the internship request by work units 
+
+
+
+=== PAGE 76 ===
+Business Requirement Document for ERP Upgrading 
+ 
+70 
+ 
+11. Conclusion 
+The Employee Development System shall provide a structured, auditable, and TNA -driven platform for 
+managing the Bank's classroom training lifecycle, from need identification through delivery, evaluation, 
+and certification. Through defined integration with the LMS, HRIS, and PMS, the EDS shall ensure a single, 
+consolidated view of each employee's development record while enforcing consistent governance, 
+approval, and reporting standards for classroom-based learning. 
+Part 3 Knowledge Management System & Learning Management System 
+1. Introduction 
+The Knowledge Management System (KMS) and Learning Management System (LMS) shall provide a 
+secure, and scalable digital platform for the centralized capture, storage, and retrieval of institutional 
+knowledge both explicit (documented) and tacit (experience-based), and for structured employee training 
+and compliance learning within Bunna Bank. The platform shall operate under People Performance & 
+Development Directorate (PPDD) governance and shall be aligned with the Bank's regulatory, security, and 
+internal control standards. 
+2. Purpose 
+The purpose of this document shall be to define the technical, functional, security, and integration 
+requirements for the implementation of a KMS and LMS within Bunna Bank. The document shall serve as 
+the single reference for  business and technical teams throughout design, development, testing, and 
+deployment. 
+3. Scope 
+The KMS and LMS platform shall cover the following core systems: 
+
+
+
+=== PAGE 77 ===
+Business Requirement Document for ERP Upgrading 
+ 
+71 
+ 
+System Description 
+Knowledge Management 
+System (KMS) 
+Centralized platform for institutional kn owledge- a governed Document Repository  for 
+policies, SOPs, manuals, and regulatory content; a Digital Library of e-books, whitepapers, and 
+training reference materials; and tacit knowledge capability (staff expertise, know-how, and 
+lessons learned) – with secure, role-based access, controlled download, and full-text search. 
+Learning Management 
+System (LMS) 
+Structured platform for employee training and compliance learning, including internally 
+hosted video content, mandatory completion controls, assessments, certification, and 
+reporting. 
+Both systems must operate in a secure, scalable, and fully integrated banking environment, aligned with 
+regulatory and internal security standards. 
+4. Definitions 
+Term Definition 
+KMS 
+Knowledge Management System – centralized platform for institutional knowledge storage, 
+capture, and retrieval. The KMS encompasses the Document Repository and Digital Library 
+together with access control, audit, and tacit knowledge capability described in Section 7. 
+Document 
+Repository 
+The governed document management component of the KMS, covering storage, categorization, 
+version control, approval workflow, and retrieval of Bank policies, SOPs, manuals, and regulatory 
+content. 
+Digital Library 
+The curated collection of refere nce and learning material within the KMS, such as e -books, 
+whitepapers, research articles, and training reference materials. Distinct from the Document 
+Repository, the Digital Library is browsable/consultative in nature and is not subject to the same 
+approval and version-control workflow as governed documents. 
+LMS Learning Management System – platform for structured employee training and compliance 
+learning. 
+Explicit 
+Knowledge 
+Documented knowledge that can be codified and stored, e.g., policies, SOPs, manuals, and 
+regulatory content. 
+Tacit 
+Knowledge 
+Uncodified, experience-based knowledge held by staff, e.g., expertise, know -how, and lessons 
+learned, captured through structured knowledge-sharing mechanisms. 
+
+
+
+=== PAGE 78 ===
+Business Requirement Document for ERP Upgrading 
+ 
+72 
+ 
+Term Definition 
+CoP Community of Practice – a structured group of practitioners who share expertise and collaborate 
+to develop institutional knowledge. 
+SOP Standard Operating Procedure – documented internal process instructions. 
+RBAC Role-Based Access Control – security mechanism restricting system access by role. 
+MFA Multi-Factor Authentication – additional identity verification beyond username/password. 
+AD / LDAP Active Directory / Lightweight Directory Access Protocol – centralized directory and 
+authentication service. 
+ERP Enterprise Resource Planning – integrated system for core business processes, e.g., EDS, HR 
+system. 
+API Application Programming Interface – interface enabling system-to-system integration. 
+SLA Service Level Agreement – defined performance and availability commitment. 
+RTO Recovery Time Objective – maximum acceptable downtime after a disruption. 
+RPO Recovery Point Objective – maximum acceptable data loss measured in time. 
+UAT User Acceptance Testing – validation of the system by end users prior to go-live. 
+5. Stakeholders 
+Stakeholder Responsibility 
+Employees Access learning content, complete assigned courses, and retrieve knowledge 
+documents. 
+Content Owners / SMEs ,KMLID Upload, categorize, version, and maintain knowledge documents and training 
+courses. 
+PPDD Governance, compliance tracking, training assignment, and reporting oversight. 
+IT Wing System administration, integration, security configuration, infrastructure 
+support, User access provisioning, RBAC configuration, and platform 
+maintenance. Compliance / Internal Audit  Regulatory compliance monitoring and audit trail review. 
+Branch Staff Access KMS/LMS content, including in low-bandwidth branch environments. 
+Senior Management / SMC Strategic oversight, reporting dashboards, and policy approval. 
+
+
+
+=== PAGE 79 ===
+Business Requirement Document for ERP Upgrading 
+ 
+73 
+ 
+6. Business Rules 
+The KMS and LMS shall operate under the following overarching business rules: 
+● Single Repository Principle:  All institutional knowledge and training content shall be hosted 
+internally, eliminating dependency on external platforms such as YouTube. 
+● Explicit and Tacit Knowledge Coverage:  The platform shall address both documented (explicit) 
+knowledge and undocumented, experience-based (tacit) knowledge held by staff. 
+● Version Control:  All documents and courses shall follow a defined lifecycle – Draft, Review, 
+Approved, Archived. 
+● Role-Based Access: System access shall be restricted based on defined roles, departments , and 
+branch assignment. 
+● Mandatory Completion: Learners shall not be permitted to skip or fast-forward mandatory learning 
+content. 
+● Assessment Gate:  Quiz or assessment access shall be granted only after completion of the 
+associated training content. 
+● Audit Trail: All user activity, including view, download, modify, and delete actions, shall be logged 
+and shall remain non-editable. 
+● Regulatory Compliance: All functionality shall align with applicable regulatory, data protection, and 
+internal security standards. 
+● Integration Requirement: The platform shall integrate seamlessly with HR/ERP systems and Active 
+Directory / LDAP for data exchange and authentication. 
+7. Module 1: Knowledge Management System (KMS) 
+7.1 Introduction 
+The Knowledge Management System shall provide a centralized, secure digital platform covering three 
+complementary knowledge assets. First, a governed Document Repository shall enable structured 
+storage, categorization, version control, and controlled distr ibution of Bank policies, Standard Operating 
+Procedures, manuals, and regulatory content. Second, a Digital Library shall provide a curated, browsable 
+collection of reference and learning materials, such as e -books, whitepapers, research articles, and 
+training reference materials, distinct from governed policy documents. Third, structured tacit knowledge 
+
+
+
+=== PAGE 80 ===
+Business Requirement Document for ERP Upgrading 
+ 
+74 
+ 
+mechanisms – including Communities of Practice, expert directories, knowledge capture sessions, and 
+lessons-learned repositories – shall surface and docume nt staff expertise and experience that would 
+otherwise remain undocumented. 
+ 
+7.2 Purpose 
+The purpose of the KMS shall be to eliminate dependency on fragmented, manual document repositories 
+by providing a single source of truth for governed institutional kn owledge, to give employees a 
+consolidated library of reference and learning material to support self -directed development, and to 
+reduce the loss of expertise arising from staff turnover, transfer, or retirement by converting tacit 
+knowledge into shared, r etrievable organizational knowledge. This shall be supported by robust access 
+control, secure download, indexed search, communities of practice, and audit capabilities. 
+7.3 Business Rules 
+● Central Repository: All policies, SOPs, manuals, and regulatory cont ent shall be stored in a single, 
+centrally managed Document Repository, subject to version control and approval workflow. 
+● Separation of Governed and Reference Content:  The Digital Library's e -books, whitepapers, and 
+reference materials shall be organized s eparately from governed policy and SOP documents, and 
+shall not be subject to the same approval/version-control workflow. 
+● Tacit Knowledge Capture: Structured mechanisms shall be provided to capture tacit knowledge 
+from staff, including Communities of Pract ice, expert interviews, and lessons -learned 
+documentation. 
+● Controlled Download:  All document downloads shall be subject to role -based permissions, 
+watermarking, and encryption. 
+● Classification-Based Access: Sensitive documents may be restricted to view-only where required. 
+● Full Auditability: All KMS user activity shall be logged and available for audit-ready reporting. 
+7.4 Functional Requirements 
+7.4.1. Document Repository 
+The Document Repository is the governed component of the KMS used for SOPs, policies, manuals, and 
+regulatory content, subject to version control and approval workflow. It is a subset of the KMS, not a 
+
+
+
+=== PAGE 81 ===
+Business Requirement Document for ERP Upgrading 
+ 
+75 
+ 
+replacement for it: the access control, secure download, audit, and tacit knowledge capabilities defined 
+in the subsections below are required in addition to the Document Repository for the platform to constitute 
+a complete KMS. 
+FR ID Requirement Description 
+FR-KMS-001 Central Repository System shall provide a central, governed repository for documents including 
+policies, SOPs, manuals, and regulatory content. 
+FR-KMS-002 
+Taxonomy 
+Configuration 
+System shall allow an authorized administrator to define and maintain the 
+department list, document type list, classification levels, and tag vocabulary 
+used for document categorization, including adding, editing, and retiring values 
+without requiring a system change request. 
+FR-KMS-003 Document 
+Categorization 
+System shall support document categorization by department, type, 
+classification, and tags. 
+FR-KMS-004 Version Control & 
+Lifecycle 
+System shall support version control and lifecycle management (Draft, Review, 
+Approved, Archived). 
+FR-KMS-005 Full-Text & Metadata 
+Search 
+System shall provide full-text and metadata-based search capabilities. 
+7.4.2 Digital Library 
+The Digital Library is a curated, browsable collection of reference and learning material – distinct from the 
+governed Document Repository above. Digital Library content is not subject to the same approval and 
+version-control workflow as SOPs and policies;  it exists to support employee self -directed learning and 
+reference, complementing structured training delivered through the both LMS and Classroom. 
+FR ID Requirement Description 
+FR-KMS-006 E-Book & Reference 
+Repository 
+System shall provide a repository for e -books, whitepapers, and 
+reference materials. 
+FR-KMS-007 Training Reference 
+Material Catalog 
+System shall catalog training reference and research materials, with 
+linkage to related courses. 
+FR-KMS-008 Content Curation & 
+Recommendations 
+System shall support curated collections and recommended reading lists 
+organized by topic or role. 
+FR-KMS-009 External Reference 
+Linking 
+System shall support linking to external reference sources, such as 
+regulatory publications or industry research, where permitted. 
+
+
+
+=== PAGE 82 ===
+Business Requirement Document for ERP Upgrading 
+ 
+76 
+ 
+ 
+7.4.3. Secure Access Control 
+FR ID Requirement Description 
+FR-KMS-010 Role-Based Access Control System shall implement Role-Based Access Control (RBAC). 
+FR-KMS-011 Department/Branch 
+Restriction 
+System shall enforce department - and branch -based access 
+restrictions. 
+FR-KMS-012 AD/LDAP Integration System shall integrate with Active Directory / LDAP for authentication. 
+FR-KMS-013 MFA System shall support Multi-Factor Authentication (MFA)  
+7.4.4. Secure Document Download 
+FR ID Requirement Description 
+FR-KMS-014 
+Role-Based 
+Download 
+Permission 
+System shall only allow a document to be downloaded if the employee's assigned role 
+has been granted download permission for that document; employees without 
+permission can still view it on screen but cannot download it. 
+FR-KMS-015 
+Automatic 
+Watermarking 
+System shall automatically stamp every downloaded document with the downloader's 
+user ID, the date and time of download, and their department, visible on the document 
+itself. Purpose: if a copy is later found outside the system, it can be traced back to the 
+person who downloaded it. 
+FR-KMS-016 
+Download 
+Encryption 
+System shall automatically lock (encrypt) every downloaded file so that only the 
+authorized recipient can open it. If the file is later copied to another device, lost, or 
+intercepted, its contents remain unreadable to anyone else. Purpose: protects what is 
+inside the file itself, separate from the watermark, which only identifies who 
+downloaded it. 
+FR-KMS-017 Download 
+Audit Logging 
+System shall automatically record, for every download, who downloaded which 
+document and when, in a log that administrators and auditors can review. Purpose: 
+provides a complete download history for compliance checks and investigations. 
+FR-KMS-018 
+View-Only 
+Restriction 
+System shall allow especially sensitive documents to be marked as view -only, which 
+lets employees read the document on screen but removes the download option for that 
+document entirely. 
+Note on FR -KMS-015 (Download Encryption): encryption here does not require the intended user to enter a 
+password or key. Decryption is intended to happen automatically for the authorized user, tied to their verified 
+identity or active session (e.g., opened through the KMS's own viewer, or on a company-managed device), so 
+it is invisible to someone with proper access. If the file ends up with anyone else, for example through loss, 
+theft, or forwarding, it simply fails to open, since their identity or device does not match.  
+
+
+
+=== PAGE 83 ===
+Business Requirement Document for ERP Upgrading 
+ 
+77 
+ 
+7.4.5. Search and Retrieval 
+An indexed search engine works like the index at the back of a textbook. Instead of reading every document 
+from scratch each time someone searches, the system builds a lookup table in advance, as documents are 
+uploaded, mapping words to the documents that contain them. This is the underlying technical foundation 
+that makes FR -KMS-004 (Full-Text and Metadata Search), FR -KMS-019 (Fast Document Retrieval), and FR -
+KMS-020 (Metadata Filtering) possible at speed, even as the repository grows to thousands of documents; it 
+is infrastructure rather than a separate user-facing feature. 
+FR ID Requirement Description 
+FR-KMS-019 Indexed Search Engine System shall provide an indexed search engine for fast retrieval. 
+FR-KMS-020 Fast Document Retrieval System shall support fast retrieval of documents across the 
+repository. 
+FR-KMS-021 Metadata Filtering 
+(like author, date, or category) 
+System shall enable filtering of search results by metadata and 
+classification. 
+7.4.6. Audit and Logging 
+FR ID Requirement Description 
+FR-KMS-022 Activity Logging System shall log all user activities, including view, download, modify, and 
+delete. 
+FR-KMS-023 Audit-Ready Reporting System shall provide audit-ready reporting for compliance purposes. 
+7.4.7. Storage and Scalability 
+FR ID Requirement Description 
+FR-KMS-024 Scalable Storage 
+Architecture 
+System shall support scalable storage architecture (cloud, on -premise, or 
+hybrid). 
+FR-KMS-025 High Availability & 
+Redundancy 
+System shall ensure high availability and redundancy of stored content. 
+FR-KMS-026 Large Volume Data 
+Support 
+System shall support large volumes of structured and unstructured data. 
+7.4.8. Tacit Knowledge Capture and Communities of Practice 
+A Community of  Practice (CoP) is a dedicated group space for practitioners in a shared domain (e.g., a 
+specific function or discipline) to interact on an ongoing basis – discussing problems, sharing experience, 
+
+
+
+=== PAGE 84 ===
+Business Requirement Document for ERP Upgrading 
+ 
+78 
+ 
+and jointly developing know -how. CoP spaces support the ong oing, collaborative process through which 
+tacit knowledge is surfaced and refined. Outputs from CoP discussions and knowledge capture sessions 
+may subsequently be formalized and published into the Document Repository or Digital Library as 
+approved knowledge assets. 
+FR ID Requirement Description 
+FR-KMS-027 Expert / Skill 
+Directory 
+System shall maintain a searchable directory of subject matter experts and their 
+areas of expertise. 
+FR-KMS-028 Communities of 
+Practice Spaces 
+System shall provide dedicated Community of Practice (CoP) spaces for 
+structured knowledge sharing and collaboration among practitioners. 
+FR-KMS-029 
+Knowledge 
+Capture Sessions 
+System shall support scheduling and recording of knowledge capture sessions, 
+such as expert interviews and debriefs, to convert tacit knowledge into 
+documented content. 
+FR-KMS-030 Lessons Learned 
+Repository 
+System shall provide a structured repository for lessons learned and post-activity 
+reviews. 
+FR-KMS-031 Mentoring & 
+Knowledge 
+Transfer Tracking 
+System shall track mentoring assignments and knowledge transfer activities 
+between experienced and new staff. 
+FR-KMS-032 Discussion 
+Forums / Q&A 
+System shall provide discussion forums or Q&A functionality to enable informal 
+knowledge exchange among employees. 
+8. Module 2: Learning Management System (LMS) 
+8.1 Introduction 
+The Learning Management System shall provide a structured, trackable platform for employee training and 
+compliance learning, with content hosted entirely within a secure internal environment, eliminating 
+dependency on external platforms such as YouTube. 
+8.2 Purpose 
+The purpose of the LMS shall be to standardize training delivery across the Bank, enforce mandatory 
+completion and assessment controls, support certification management, and provide real-time 
+compliance and engagement reporting to management. 
+
+
+
+=== PAGE 85 ===
+Business Requirement Document for ERP Upgrading 
+ 
+79 
+ 
+8.3 Business Rules 
+● Internal Hosting Only: All training video content shall be hosted internally with no dependency on 
+external video platforms. 
+● Mandatory Completion: Mandatory courses shall not permit skipping or fast-forwarding of content. 
+● Assessment Gating: Post a ssessments shall be accessible only after the associated training 
+content has been completed. 
+● Certification Tracking: Certificates shall be generated automatically and tracked for valid ity and 
+expiry. 
+● Reporting Requirement: Completion, compliance, and engagement status shall be reportable by 
+branch and department. 
+8.4 Functional Requirements 
+8.4.1. Course Management 
+FR ID Requirement Description 
+FR-LMS-001 Course Creation & 
+Management 
+System shall enable creation, upload, and management of training 
+courses.  
+FR-LMS-002 
+Structured Learning 
+Paths 
+System shall allow related courses to be grouped into a defined, 
+ordered sequence (a "learning path"), so that an employee 
+completes them in a set order – for example, a series of 
+onboarding courses that must each be finished before the next 
+one becomes available." 
+FR-LMS-003 Course Assignment System shall allow assignment of courses by role, department, or 
+individual. 
+Course Creation & Management Workflow (FR-LMS-001): the following steps define the course lifecycle 
+for development reference: 
+1) Create Course Shell – the assigned content creator creates a new course entry with title, description, 
+category, and target audience. 
+2) Upload Content – uploads the video files, documents, and assessment materials that make up the 
+course. 
+3) Configure Course Settings – sets mandatory/optional status, prerequisites, estimated duration, and 
+the passing criteria for any linked assessment. 
+4) Assign to a Learning Path (optional) – links the course into a structured, ordered sequence  
+5) Save as Draft – the course remains in Draft status, visible only to the creator and reviewers, not yet 
+
+
+
+=== PAGE 86 ===
+Business Requirement Document for ERP Upgrading 
+ 
+80 
+ 
+visible to employees. 
+6) Submit for Review and Approval – the course is routed to a designated reviewer/approver before it can 
+go live. 
+7) Publish – once approved, the course becomes visible to its assigned audience (per FR-LMS-003) and 
+appears on employee dashboards. 
+8) Edit/Update – the Content creator can revise a published course with version-based archiving option 
+(if its minor correction, update the existing version, if its substantive change, apply version-based rule) 
+9) Retire/Archive – the Content creator can archive a course that is no longer relevant, removing it from 
+active assignment while retaining historical records  
+8.4.2. Secure Video Hosting 
+FR ID Requirement Description 
+FR-LMS-004 Internal Video 
+Hosting 
+System shall provide internal video hosting with no external dependency 
+such as YouTube. 
+FR-LMS-005 Adaptive 
+Streaming 
+System shall support adaptive streaming for low -bandwidth 
+environments. 
+FR-LMS-006 Content 
+Protection 
+System shall apply watermarking, encryption, download restriction, and 
+screen-capture restriction (where technically feasible). 
+Implementation Note: "Internal hosting" refers to a private, access -controlled video platform or a self -
+managed solution using the Bank's own cloud storage and streaming infrastructure) rather than a literal 
+on-premise media server. To meet the adaptive streaming (FR -LMS-005) and mobile low -bandwidth 
+optimization (FR-MOB-004) requirements elsewhere in this document, the selected hosting approach shall 
+include Content Delivery Network (CDN) support to ensure acceptable p layback performance across 
+branches and mobile devices. 
+8.4.3. Learning Control Mechanisms 
+FR ID Requirement Description 
+FR-LMS-007 Mandatory Completion 
+Enforcement 
+System shall enforce mandatory completion of content before 
+progression. 
+FR-LMS-008 Skip/Fast-Forward 
+Prevention 
+System shall prevent skipping or fast-forwarding in mandatory 
+modules. 
+FR-LMS-009 Resume Capability System shall support resume capability for interrupted 
+sessions. 
+
+
+
+=== PAGE 87 ===
+Business Requirement Document for ERP Upgrading 
+ 
+81 
+ 
+FR ID Requirement Description 
+FR-LMS-010 
+Dashboard Filtering to 
+Active/Assigned 
+Courses 
+System shall, by default, display on the employee's dashboard 
+only courses that are currently assigned, in progress, or 
+recently completed; the full course catalog shall remain 
+available through a separate “Course Library” or “My Learning 
+History” view. 
+FR-LMS-011 Version-Based Content 
+Archiving 
+System shall restrict employee access to a course version 
+once it is superseded by an updated version, and shall retain 
+superseded versions in an admin-only archive for audit and 
+historical reference rather than employee self-service. 
+8.4.4. Assessment Engine 
+FR ID Requirement Description 
+FR-LMS-012 Training Completion Gate System shall require completion of training before post 
+assessment  access. 
+FR-LMS-013 Pre Assessment System shall allow pre course assessment when required 
+(Pre assessment completion before course access) 
+FR-LMS-014 Timed Assessments System shall support timed assessments. 
+FR-LMS-015 Randomized Question Pools System shall provide randomized question pools. 
+FR-LMS-016 Attempt Limits System shall enforce configurable attempt limits. 
+FR-LMS-017 Automated Grading System shall support automated grading. 
+8.4.5. Certification Management 
+FR ID Requirement Description 
+FR-LMS-018 Automatic Certificate Generation System shall generate certificates automatically 
+upon course completion. 
+FR-LMS-019 Customizable Certificate Templates System shall support customizable certificate 
+templates, including branding and signatures. 
+FR-LMS-020 Certification Validity Tracking System shall track certification validity and expiry. 
+FR-LMS-021 Certification History System shall maintain certification history per 
+employee. 
+
+
+
+=== PAGE 88 ===
+Business Requirement Document for ERP Upgrading 
+ 
+82 
+ 
+FR ID Requirement Description 
+FR-LMS-022 Certification linkage 
+System shall automatically route certificates to 
+employee master data to be attached to employee 
+profile 
+ 
+ 
+8.4.6. Reporting and Analytics 
+FR ID Requirement Description 
+FR-LMS-023 Management Dashboards System shall provide dashboards for management 
+reporting. 
+FR-LMS-024 Completion Tracking System shall track completion by branch and 
+department. 
+FR-LMS-025 Compliance Status Monitoring System shall monitor and report compliance status. 
+FR-LMS-026 Engagement Analytics System shall provide engagement analytics, including 
+watch time, drop-off rates, and scores. 
+8.4.7. Notifications and Automation 
+FR ID Requirement Description 
+FR-LMS-027 Automated Notifications System shall send automated notifications for course 
+assignments, progress updates, and completion alerts. 
+FR-LMS-028 Reminder Mechanism System shall provide reminder mechanisms for overdue courses 
+or tasks. 
+FR-LMS-029 Configurable Notification 
+Rules 
+System shall support configurable notification rules. 
+9. System Integration Specifications 
+Integration Point Module Description 
+Employee Module KMS & LMS Real-time synchronization of employee data for access 
+provisioning, course assignment, certification, and reporting. 
+
+
+
+=== PAGE 89 ===
+Business Requirement Document for ERP Upgrading 
+ 
+83 
+ 
+Integration Point Module Description 
+Employee Development 
+(EDS) Module 
+LMS Automated data exchange for training assignment and completion 
+updates. 
+Active Directory / LDAP KMS & LMS Centralized authentication enforcement. 
+10. Non-Functional Requirements 
+Category Requirement 
+Deployment / Infrastructure Support on -premise, cloud, or hybrid deployment; optimized for low -
+bandwidth branch environments. 
+Security 
+Role-Based Access Control; Multi-Factor Authentication; Single Sign -On; 
+encryption of data at rest and in transit; secure API communication; 
+protection against unauthorized access and content leakage. 
+Audit Full audit logging and monitoring of all user activities; audit records sha ll be 
+non-editable. 
+Backup & Disaster Recovery 
+Automated scheduled backups; dedicated disaster recovery environment; 
+defined Recovery Time Objective (RTO) and Recovery Point Objective (RPO); 
+data integrity during restoration. 
+Performance Maintain ≥ 99.5% uptime; support concurrent users across all branches; fast 
+document and content retrieval; smooth video streaming with minimal 
+buffering. 
+Scalability Support scalability for increasing users and content volume across on -
+premise, cloud, or hybrid architectures. 
+Reliability & Maintainability System shall be reliable and maintainable, with minimal unplanned downtime. 
+Usability Usable across multiple devices; compatible with modern browsers and mobile 
+devices. 
+11. Mobile Access Requirements 
+The KMS  and LMS shall both be accessible on mobile devices, enabling employees and branch staff to 
+retrieve knowledge content and complete training outside of a desktop environment. Mobile access shall 
+be delivered through a responsive mobile -optimized interface and/or dedicated mobile application, 
+subject to the following requirements: 
+
+
+
+=== PAGE 90 ===
+Business Requirement Document for ERP Upgrading 
+ 
+84 
+ 
+FR ID Requirement Description 
+FR-MOB-001 Mobile-Responsive / 
+Native Access 
+KMS and LMS shall be accessible via a responsive mobile web 
+interface and/or a native mobile application on iOS and Android. 
+FR-MOB-002 
+Mobile 
+Authentication 
+Mobile access shall enforce the same Multi-Factor Authentication 
+(MFA) controls as desktop access, with optional biometric login 
+(fingerprint/face) where supported by the device. 
+FR-MOB-003 
+Mobile Role-Based 
+Access 
+Mobile sessions shall apply the same Role -Based Access Control 
+(RBAC) and document classification restrictions as desktop 
+access. 
+FR-MOB-004 
+Low-Bandwidth 
+Optimization 
+Mobile access shall be optimized for low -bandwidth branch and 
+field environments, including adaptive video streaming and 
+compressed document previews. 
+FR-MOB-005 
+Offline Access to 
+Assigned Courses 
+The LMS mobile application shall let an employee download an 
+assigned mandatory course onto their device while they have a 
+connection, so they can complete it (watch videos, take 
+assessments) later with no internet access at all, similar to 
+downloading a video for a flight. The app shall continue to enforce 
+mandatory sequencing (no skipping ahead) while offline. Once the 
+device reconnects to the internet, completion status and 
+assessment results shall be sent to the central LMS automatically, 
+with no manual step required from the employee 
+FR-MOB-006 
+Mobile Document 
+Security 
+Mobile document viewing shall retain watermarking, view-only 
+restrictions, and download controls equivalent to desktop access; 
+screen capture restriction shall apply where technically feasible. 
+FR-MOB-007 
+Mobile Push 
+Notifications 
+The mobile application shall deliver push notifications for course 
+assignments, approaching deadlines, completion alerts, and new 
+knowledge publications. 
+FR-MOB-008 Mobile Assessment 
+and Certification 
+Employees shall be able to complete timed assessments and view 
+or download issued certificates from a mobile device. 
+FR-MOB-009 
+Mobile Session 
+Security 
+Mobile sessions shall enforce automatic timeout, device -level 
+encryption of cached content, and remote session revocation 
+upon device loss or role change. 
+
+
+
+=== PAGE 91 ===
+Business Requirement Document for ERP Upgrading 
+ 
+85 
+ 
+12. Recognition and Gamification 
+To encourage sustained engagement with both learning and knowledge sharing, the platform shall provide 
+recognition mechanisms spanning the LMS (training performance) and KMS (knowledge contribution).  
+FR ID Requirement Description 
+FR-REC-001 Leaderboard System shall maintain a leaderboard ranking employees on training 
+performance, such as assessment scores and completion speed. 
+FR-REC-002 Best Scorer of the 
+Month (LMS) 
+System shall identify and recognize the top-performing learner(s) each 
+month based on assessment scores and completion metrics. 
+FR-REC-003 Best Contributor of the 
+Month (KMS) 
+System shall identify and recognize the employee(s) who contributed 
+most to institutional knowledge each month, based on activity such as 
+Document Repository/Digital Library uploads, CoP participation, and 
+knowledge capture sessions. 
+FR-REC-004 Recognition Badges / 
+Achievements 
+System shall award digital badges or achievement markers for 
+milestones, such as course completions, certifications, and 
+knowledge contributions. 
+FR-REC-005 Recognition Visibility 
+System shall display current recognition (e.g., “Best Scorer”, “Best 
+Contributor”) on a recognition dashboard and on the relevant 
+employee's profile. 
+FR-REC-006 Configurable 
+Recognition Criteria 
+System shall allow PPDD/KMLID to configure recognition categories, 
+eligibility criteria, and scoring weights. 
+FR-REC-007 Recognition 
+Notification 
+System shall notify recognized employees and their supervisors when 
+an award or recognition is issued. 
+FR-REC-008 Recognition History 
+and Reporting 
+System shall maintain a historical record of recognition awarded, 
+available for HR reporting on engagement and participation. 
+15. Conclusion 
+The Knowledge Management System and Learning Management System shall provide Bunna  Bank with a 
+secure, unified platform for institutional knowledge management and employee training, accessible 
+across desktop and mobile devices. The system shall eliminate dependency on external platforms, enforce 
+robust access, audit, and content protection controls, and deliver real-time compliance and engagement 
+reporting to management. Successful implementation shall result in a single source of truth for 
+institutional knowledge, standardized and trackable learning across all branches, and a strengthened audit 
+and compliance framework. 
+
+
+
+=== PAGE 92 ===
+Business Requirement Document for ERP Upgrading 
+ 
+86 
+ 
+Part 4 Succession Planning & Career Path Module 
+1.  Introduction  
+1.1 Purpose 
+This document defines the business and system requirements for the Career Path and Succession 
+Planning Module to be implemented as an integrated component of Bunna Bank S.C.'s Enterprise Resource 
+Planning (ERP) platform. The module will integrate with the Performance Management System 
+(PMS/APMS), Employee Development System (EDS), Learning Management System (LMS), Employee Self-
+Service (ESS), and Core HRIS.  
+1.2 Scope 
+This document covers the functional, integration, reporting, workflow, security, and non-functional 
+requirements for the Career Path and Succession Planning Module. The solution shall enable the Bank to: 
+ Manage career frameworks, job architecture, and career pathways.  
+ Support competency-based career progression and internal mobility.  
+ Manage talent pools, critical positions, and succession pipelines.  
+ Assess employee readiness and competency gaps.  
+ Manage Individual Career Development Plans (ICDPs).  
+ Provide dashboards, reports, workflows, and analytics.  
+ Integrate with HRIS, PMS, LMS/EDS, ESS, Payroll, and other ERP modules. 
+1.3 Business Context 
+To ensure leadership continuity and develop future talent, Bunna Bank requires an integrated Career Path 
+and Succession Planning Module. The solution will provide a standardized, competency -based approach 
+to career development, internal mobility, talent management, and succession planning by integrating 
+employee, performance, competency, and learning data to support transparent, data -driven workforce 
+decisions.. 
+Business Rules: 
+o Career Paths: HR Administrators shall be responsible for defining and maintaining default career paths 
+and job progression ladders for all job codes. 
+o Visibility: Employees shall have view -only access to career paths and the required competencies for 
+roles they are not currently in. 
+
+
+
+=== PAGE 93 ===
+Business Requirement Document for ERP Upgrading 
+ 
+87 
+ 
+o Gap Analysis: The system shall automatically compare an employee's current skills and performance 
+data against the requirements for a selected target role. 
+o Integration: The module shall integrate seamlessly with Employee Master Data, Performance 
+Management (PMS), Employee Self-Service (ESS), and Learning Management Systems. 
+2.  Business Objectives 
+The Career Path and Succession Planning Module shall: 
+ Establish a standardized career management and succession planning framework. 
+ Support competency-based career progression and internal mobility. 
+ Identify and develop talent for critical and leadership positions. 
+ Strengthen succession planning and leadership pipeline management. 
+ Integrate career planning with performance management and learning. 
+ Support Individual Career Development Plans (ICDPs). 
+ Improve workforce planning through dashboards and analytics. 
+ Automate workflows, approvals, and governance processes. 
+ Integrate seamlessly with the Bank's ERP/HCM ecosystem. 
+3 Functional Requirements 
+3.1 Strategic Workforce Planning & Critical Position Identification 
+FR ID Requirement Description 
+FR-SWP-001 Strategic Workforce 
+Planning Inputs 
+The system shall allow PPDD to capture and maintain strategic 
+workforce planning inputs, including strategic plan review 
+outcomes, future capability requirements, workforce risks, and 
+emerging business needs, which shall be used as key inputs for 
+identifying critical positions and succession priorities. 
+FR-SWP-002 Critical Position 
+Register 
+The system shall maintain a centralized critical position register 
+containing all identified critical roles, categorized by executive 
+leadership, specialized technical, key operational management, 
+and high regulatory/business -risk positions, including business 
+impact, risk level, and justification for critical designation. 
+
+
+
+=== PAGE 94 ===
+Business Requirement Document for ERP Upgrading 
+ 
+88 
+ 
+FR ID Requirement Description 
+FR-SWP-003 Critical Role 
+Competency Profile 
+Management 
+The system shall provide standardized competency profile 
+templates for critical positions, enabling PPDD to define required 
+core, leadership, and functional/te chnical competencies with 
+corresponding proficiency levels, qualifications, experience 
+requirements, and behavioral expectations. 
+FR-SWP-004 Critical Position 
+Review Cycle 
+Management 
+The system shall support periodic review and validation of critical 
+positions and successor requirements based on configurable 
+review cycles, generating automated reminders and notifications 
+to responsible users before review deadlines. 
+FR-SWP-005 Critical Position 
+Approval Workflow 
+The system shall route newly identified critical positions, role 
+changes, and removal requests through configurable approval 
+workflows involving PPDD and SPMC, while tracking review status, 
+approval decisions, comments, and turnaround time. 
+FR-SWP-006 Critical Position 
+History Tracking 
+The syst em shall maintain historical records of critical positions, 
+including designation changes, review outcomes, competency 
+updates, approval records, and effective dates for governance and 
+audit purposes. 
+FR-RDY-004 Deployment 
+Prioritization & Profile 
+Update 
+The system shall prioritize, in deployment recommendations, 
+candidates meeting required competency thresholds and 
+demonstrating readiness, and shall record the final succession 
+appointment or progression decision and structured leadership -
+transition plan, automatically updating the employee's career 
+profile upon approval. 
+ 
+3.2 Talent Pool Identification & Competency Profiling 
+ 
+
+
+
+=== PAGE 95 ===
+Business Requirement Document for ERP Upgrading 
+ 
+89 
+ 
+FR ID Requirement Description 
+FR-TAL-001 Talent Pool Candidate 
+Identification 
+The system shall identify and recommend potential talent pool 
+candidates based on configurable criteria including performance 
+results, competency assessment outcomes, qualifications, 
+experience, career aspirations, and readiness indicators. 
+FR-TAL-002 Talent Pool 
+Management 
+The system shall allow PPDD to  create, maintain, and manage 
+structured talent pools linked to specific career paths, critical 
+positions, and future capability requirements. 
+FR-TAL-003 Succession Planning 
+Database 
+The system shall maintain a centralized succession database 
+containing s uccessor profiles, talent pool membership, 
+competency assessments, readiness levels, development plans, 
+and succession history. 
+FR-TAL-004 Vacancy-to-Candidate 
+Matching 
+The system shall automatically identify and rank potential 
+successors for vacant criti cal positions by comparing candidate 
+competency profiles, experience, qualifications, and readiness 
+status against position requirements. 
+FR-TAL-005 9-Box Talent 
+Integration 
+The system shall integrate 9 -box assessment outcomes and allow 
+high-potential employees to be identified, tagged, and linked to 
+relevant succession pools and career opportunities. 
+ 
+3.3 Successor Selection & Competency-Based Assessment 
+FR ID Requirement Description 
+FR-SEL-001 Eligible Candidate List 
+Management 
+The system shall allow authorized users to generate and maintain 
+eligible successor candidate lists containing employee profiles, 
+performance history, competency results, qualifications, and 
+experience information. 
+
+
+
+=== PAGE 96 ===
+Business Requirement Document for ERP Upgrading 
+ 
+90 
+ 
+FR ID Requirement Description 
+FR-SEL-002 Competency-Based 
+Assessment 
+Management 
+The system shall support multiple successor assessment 
+methods including structured interviews, assessment centers, 
+simulations, examinations, and 180/360-degree feedback against 
+predefined competency requirements. 
+FR-SEL-003 Internal Talent 
+Assessment Workflow 
+The system shall support workflow -based review and evaluation 
+of successor candidates by responsible managers, PPDD, and 
+SPMC members based on defined assessment criteria. 
+FR-SEL-004 Successor Selection 
+Decision Recording 
+The system shall record successor selection decisions, including 
+assessment results, approval status, justification, development 
+requirements, and confirmation of employee participation in the 
+succession program. 
+FR-SEL-005 Readiness Status 
+Classification 
+The system shall classify successor readiness levels as Ready 
+Now, Ready Soon (1–2 years), or Ready Later (3–5 years) based on 
+competency achievement, performance consistency, and 
+development progress. 
+FR-RDY-005 POMD Placement 
+Notification 
+The system shall notify the Director – People Operations 
+Management Directorate (POMD) upon an approved succession 
+appointment to action the placement, and shall log the outcome 
+against the succession planning database. 
+FR-RDY-003 Deployment/Progression 
+Approval Workflow 
+The system shall trigge r a structured deployment -review 
+workflow upon notification of a leadership vacancy, or an 
+eligibility/approval workflow upon nomination for career 
+progression: reviewing the candidate list, evaluating readiness 
+and capability, and routing for approval thr ough Line Manager → 
+Principal Officer → PPD Director → SPMC (critical/leadership 
+
+
+
+=== PAGE 97 ===
+Business Requirement Document for ERP Upgrading 
+ 
+91 
+ 
+FR ID Requirement Description 
+roles), recording the outcome (approved / deferred / rejected) 
+with justification. 
+ 
+3.4 Successor Development Planning 
+FR ID Requirement Description 
+FR-SDP-001 Competency-Based 
+Skills Gap Analysis 
+The system shall support competency -based gap analysis for 
+succession candidates by comparing current employee 
+competency levels against required competencies for target 
+critical roles, career levels, or successor positions. 
+FR-SDP-002 Successor 
+Development Plan 
+Management 
+The system shall enable PPDD and managers to create structured 
+successor development plans linked to identified competency 
+gaps, readiness levels, and future role requirements. 
+FR-SDP-003 Development 
+Intervention 
+Management 
+The system shall support planning and tracking of development 
+interventions including coaching, mentoring, job rotation, stretch 
+assignments, leadership programs, professional certifications, and 
+formal training. 
+FR-SDP-004 Critical Role 
+Development 
+Prioritization 
+The system shall allow PPDD to prioritize development 
+interventions for critical and leadership roles based on business 
+impact, succession risk, and capability gaps. 
+FR-SDP-005 Annual Development 
+Plan Integration 
+The system shall integrate successor development requirements 
+with the annual learning and development plan and budget process, 
+enabling consolidation of organizational capability requirements. 
+
+
+
+=== PAGE 98 ===
+Business Requirement Document for ERP Upgrading 
+ 
+92 
+ 
+FR ID Requirement Description 
+FR-SDP-006 Development Progress 
+Monitoring 
+The system shall monit or completion of successor development 
+activities, competency improvement, readiness progression, and 
+remaining development requirements. 
+3.5 Career Framework & Job Architecture 
+FR ID Requirement Description 
+FR-CFW-001 Bank-Wide Career 
+Framework 
+Management 
+The system shall maintain a centralized career framework covering 
+all job families, sub -families, roles, career levels, and progression 
+pathways across the Bank. 
+FR-CFW-002 Job Family and Role 
+Hierarchy 
+Management 
+The system shall maintain Job Family, Sub-Family, Role, Grade, and 
+Position hierarchy synchronized with the Bank’s organizational 
+structure and HR master data. 
+FR-CFW-003 Career Track 
+Management 
+The system shall support multiple career tracks including 
+managerial/leadership, professio nal/technical specialist, and 
+project/value-stream career pathways. 
+FR-CFW-004 Vertical and Lateral 
+Career Path 
+Management 
+The system shall support both upward career progression and 
+lateral/cross-functional career movement between related roles 
+and job families (Dual Career Path) 
+FR-CFW-005 Role Competency 
+Mapping 
+The system shall map required core, leadership, and 
+functional/technical competencies with proficiency levels for each 
+role and career level. 
+FR-CFW-006 Career Level 
+Progression Criteria 
+The system shall maintain progression requirements for each 
+career level including minimum tenure, performance history, 
+competency achievement, qualifications, and experience 
+requirements. 
+
+
+
+=== PAGE 99 ===
+Business Requirement Document for ERP Upgrading 
+ 
+93 
+ 
+FR ID Requirement Description 
+FR-CFW-007 Job Grade and 
+Compensation Linkage 
+The system shall link career levels with job grades, salary bands, and 
+job descriptions maintained within the HRIS. 
+FR-CFW-008 Career Framework 
+Version Control 
+The system shall maintain version history of career frameworks, 
+including effective dates, modification details, approv al records, 
+and previous versions. 
+FR-CFW-009 Career Path 
+Publication 
+The system shall allow PPDD to publish approved career paths and 
+role information through Employee Self -Service and manager 
+portals. 
+FR-CFW-009 Job Family/Role 
+Hierarchy & Path 
+Mapping 
+The system shall maintain a Job Family / Sub -Family / Role 
+hierarchy synchronized with the Bank's organizational structure and 
+TOM, and shall allow each role to be mapped to one or more career 
+paths to support vertical and lateral/cross-functional movement.  
+FR-CFW-010 Unmapped Role 
+Flagging 
+The system shall flag roles with no defined career path or no active 
+successor pipeline for PPDD review.  
+FR-CFW-012 Comprehensive Role 
+Information Display 
+The system shall display comprehensive information for each job 
+role, including job description, required competencies, technical 
+and behavioral skills, qualifications, certifications, experience 
+requirements, grade, and organizational placement.  
+FR-CFW-005 Three Parallel Career 
+Tracks 
+The system shall maintain three parallel career tracks 
+(managerial/leadership, professional/technical, value -
+stream/project) with defined progression steps, competency 
+requirements, and performance benchmarks per track, ensuring 
+parity in grading, compensation visibility, recogniti on, and access 
+to development programs. 
+
+
+
+=== PAGE 100 ===
+Business Requirement Document for ERP Upgrading 
+ 
+94 
+ 
+FR ID Requirement Description 
+FR-CFW-004 Value-Stream-Based 
+Job Grading (TOM 
+Roles) 
+The system shall support value -stream-based job grading for 
+Target Operating Model (TOM) roles (SAT Leaders, ToT Leaders, 
+Value Stream Managers, Product Owners, Functional Leads), 
+capturing contribution to customer value, cross -functional 
+collaboration, innovation/agility, and accountability for measurable 
+outcomes. 
+FR-CFW-002 Role Competency & 
+Progression Criteria 
+The system shall record, for each role, defined competency 
+requirements, proficiency levels, and progression criteria, 
+supporting transparent and consistent standardized career paths. 
+FR-CFW-003 Competency 
+Categorization & Role 
+Mapping 
+The system shall categorize competencies into Core, Leadership, 
+and Functional/Technical, each with defined proficiency levels and 
+behavioral indicators, and shall map required 
+competencies/proficiency levels to each role for use in career-path 
+and development planning. 
+FR-RDY-006 Automated 
+Progression Eligibility 
+Check 
+The system shall run an automated eligibility check when an 
+employee is nominated for career progression, validating minimum 
+tenure, performance -rating history, and competency -proficiency 
+thresholds against the target career level 
+3.6 Talent & Competency Assessment (Career) 
+ 
+FR ID Requirement Description 
+FR-TCA-001 Standardized Career -
+Readiness 
+Assessment 
+The system shall support standardized, competency -based 
+assessment tools to determine career -advancement readiness, 
+using performance outcomes, competency assessments, and 
+potential indicators. 
+
+
+
+=== PAGE 101 ===
+Business Requirement Document for ERP Upgrading 
+ 
+95 
+ 
+FR ID Requirement Description 
+FR-TCA-002 Competency Gap 
+Documentation 
+The system shall document identified competency gaps and 
+development needs arising from career assessments to inform 
+targeted ICDP interventions. 
+FR-TCA-003 Assessment 
+Integration & 
+Calibration 
+The system shall integrate assessment results with the PMS, the 
+career framework, and succession planning records, and shall 
+support periodic talent -review and calibration sessions with 
+recorded validation outcomes. 
+FR-TCA-004 Automated 
+Competency-Gap 
+Visualization 
+The system shall automatically calculate and visually display an 
+employee's competency gap by comparing the latest PMS 
+competency assessment against the requirements of a selected 
+target career level.  
+ 
+3.7 Employee Career Management & Self-Service 
+FR ID Requirement Description 
+FR-CAR-001 Employee Career 
+Profile 
+The system shall provide employees with access to their current 
+role, career level, competency profile, performance history, and 
+available career opportunities through Employee Self-Service. 
+FR-CAR-002 Career Exploration 
+Capability 
+The system shall provide career exploration features enabling 
+employees to view available career paths through guided 
+recommendations, job family browsing, and direct role search. 
+FR-CAR-003 Career Aspiration 
+Management 
+The system shall allow employees to record, update, and manage 
+career aspirations including preferred roles, functions, locations, 
+and career interests. 
+
+
+
+=== PAGE 102 ===
+Business Requirement Document for ERP Upgrading 
+ 
+96 
+ 
+FR ID Requirement Description 
+FR-CAR-004 Career Gap Analysis 
+View 
+The system shall display competency gaps between an employee’s 
+current capability and the requirements of selected target roles or 
+career levels. 
+FR-CAR-005 Career Development 
+Recommendation 
+The system shall provide recommended development actions, 
+learning programs, and  experiences required to achieve targeted 
+career progression. 
+FR-CAR-006 Career History 
+Timeline 
+The system shall maintain and display employee career history 
+including appointments, promotions, transfers, acting 
+assignments, and lateral movements. 
+FR-CAA-002 Career Discussion 
+Record Template 
+The system shall provide a structured career -discussion record 
+template for line managers to document guidance, expectations, 
+and planning outcomes from regular career discussions. 
+FR-CAA-003 Career Aspiration 
+Submission & 
+Alignment 
+The system shall allow employees to submit and update career 
+aspirations, which shall be systematically reviewed and aligned with 
+organizational needs, workforce planning, and succession 
+priorities, including target roles, functions, and locations. 
+FR-CAA-004 Employee Career Path 
+Self-Service View 
+Employees shall view their current role, career level, and available 
+career-path options (vertical and lateral) via Employee Self-Service.  
+3.8 Career Progression & Internal Mobility 
+FR ID Requirement Description 
+FR-MOB-001 Career Progression 
+Eligibility Assessment 
+The system shall automatically assess employee eligibility for 
+career progression based on configured criteria including tenure, 
+
+
+
+=== PAGE 103 ===
+Business Requirement Document for ERP Upgrading 
+ 
+97 
+ 
+FR ID Requirement Description 
+performance rating, competency achievement, qualifications, and 
+development completion. 
+FR-MOB-002 Progression Request 
+Management 
+The system shall allow employees and managers to submit career 
+progression requests subject to predefined eligibility requirements 
+and approval workflows. 
+FR-MOB-003 Internal Mobility 
+Management 
+The system shall support internal mobility processes including 
+promotion, lateral movement, project assignment, and temporary 
+acting opportunities. 
+FR-MOB-004 Talent Marketplace 
+Capability 
+The system shall provide an internal opportunity marketplace 
+allowing employees to view and apply for available career 
+opportunities based on eligibility and competency alignment. 
+FR-MOB-005 Progression Decision 
+Workflow 
+The system shall route career progression cases through 
+configurable approval workflows involving Line Manager, PPDD, and 
+SPMC where applicable. 
+FR-MOB-006 Career Profile Update 
+After Movement 
+The system shall automatically update employee career profiles 
+following approved promotion, transfer, or progression decisions. 
+3.9 Individual Development Plan (IDP/ICDP) Management 
+FR ID Requirement Description 
+FR-IDP-001 Digital Individual 
+Career Development 
+Plan 
+The system shall provide employees and successors with digital 
+Individual Career Development Plans (ICDPs) capturing career 
+aspirations, target roles, competency gaps, development 
+objectives, actions, timelines, milestones, and expected outcomes. 
+
+
+
+=== PAGE 104 ===
+Business Requirement Document for ERP Upgrading 
+ 
+98 
+ 
+FR ID Requirement Description 
+FR-IDP-002 Development Action 
+Recommendation 
+The system shall automatically recommend development actions 
+based on competency  gaps, selected career paths, succession 
+requirements, and employee readiness assessment results. 
+FR-IDP-003 On-the-Job 
+Development 
+Management 
+The system shall support recording and monitoring of experiential 
+development activities including coaching, mentoring, job rotation, 
+acting assignments, and stretch assignments. 
+FR-IDP-004 Formal Learning 
+Integration 
+The system shall integrate with the Learning Management System 
+(LMS/EDS) to recommend and track training programs, 
+certifications, and learning activities linked to career and 
+succession objectives. 
+FR-IDP-005 IDP Review and 
+Approval Workflow 
+The system shall support configurable review and approval 
+workflows involving employees, supervisors, PPDD, and relevant 
+approvers for creation, modification, and completion of 
+development plans. 
+FR-IDP-006 Development History 
+Tracking 
+The system shall maintain historical records of employee 
+development plans, completed interventions, competency 
+improvements, and career progression evidence. 
+ 
+ 
+3.10Succession Governance, Workflow & Audit Management 
+FR ID Requirement Description 
+FR-GOV-001 Succession 
+Governance 
+Management 
+The system shall support SPMC governance processes including 
+review, endorsement, approval, and monitoring of succession 
+planning activities. 
+
+
+
+=== PAGE 105 ===
+Business Requirement Document for ERP Upgrading 
+ 
+99 
+ 
+FR ID Requirement Description 
+FR-GOV-002 Role-Based Access 
+Control 
+The system shall enforce role -based access controls ensuring 
+confidentiality of succession information, readiness ratings, and 
+talent assessment results. 
+FR-GOV-003 Configurable Approval 
+Workflow 
+The system shall support configurable multi -level approval 
+workflows for career framework changes, succession decisions, 
+development plans, and progression requests. 
+FR-GOV-004 Audit Trail 
+Management 
+The system shall maintain complete audit trails capturi ng user 
+actions, changes, approvals, decisions, timestamps, and 
+supporting evidence. 
+FR-GOV-005 Continuous 
+Improvement 
+Management 
+The system shall allow PPDD to capture feedback, review outcomes, 
+and update career and succession practices based on 
+organizational needs. 
+FR-GOV-001 Succession 
+Governance 
+Management 
+The system shall support SPMC governance processes including 
+review, endorsement, approval, and monitoring of succession 
+planning activities. 
+ 
+  
+
+
+
+=== PAGE 106 ===
+Business Requirement Document for ERP Upgrading 
+ 
+100 
+ 
+3.11 Talent Assessment & Readiness Management 
+FR ID Requirement Description 
+FR-TAR-001 Career Readiness 
+Assessment 
+The system shall support standardized talent and career readiness 
+assessments to evaluate employees against target roles, career 
+levels, and succession requirements using performance results, 
+competency assessments, qualifications, experience, and potential 
+indicators. 
+FR-TAR-002 Competency-Based 
+Readiness Calculation 
+The system shall automatically calculate employee readiness levels 
+by comparing assessed competencies, demonstrated behaviors, 
+performance outcomes, and development progress against 
+predefined role and career-level requirements. 
+FR-TAR-003 Talent Assessment 
+Framework 
+Configuration 
+The system shall allow PPDD to configure assessment criteria, 
+scoring methods, competency  weights, readiness thresholds, and 
+evaluation parameters based on organizational talent management 
+policies. 
+FR-TAR-004 Multi-Source 
+Assessment 
+Integration 
+The system shall support integration of multiple assessment inputs 
+including PMS competency evalua tions, 180/360-degree feedback, 
+assessment center results, interviews, examinations, and manager 
+assessments. 
+FR-TAR-005 Talent Calibration 
+Management 
+The system shall support talent review and calibration sessions by 
+allowing authorized users to review, validate, adjust, and approve 
+talent assessment outcomes while maintaining decision history. 
+FR-TAR-006 Readiness 
+Classification 
+Management 
+The system shall classify employees into readiness categories 
+including Ready Now, Ready Soon (1 –2 years), and Ready Later (3–5 
+years) for succession and career progression purposes. 
+
+
+
+=== PAGE 107 ===
+Business Requirement Document for ERP Upgrading 
+ 
+101 
+ 
+FR ID Requirement Description 
+FR-TAR-007 Talent Potential 
+Identification 
+The system shall identify high -potential employees based on 
+configurable criteria including sustained performance, learning 
+agility, leadership potential, competency achievement, and future 
+role requirements. 
+FR-TAR-008 Readiness Profile 
+Dashboard 
+The system shall provide individual and organizational readiness 
+profiles showing competency status, development progress, career 
+targets, succession potential, and readiness gaps. 
+ 
+3.12 Reporting & Analytics 
+ 
+FR ID Requirement Description 
+FR-RPT-001 Career Path Analytics 
+Dashboard 
+The system shall provide dashboards displaying career framework 
+utilization, employee career-path participation, progression trends, 
+career movement patterns, and employee engagement with career 
+development tools. 
+FR-RPT-002 Succession Pipeline 
+Dashboard 
+The system shall provide succession dashboards showing critical 
+positions, available successors, readiness classification, successor 
+coverage, and succession risk levels. 
+FR-RPT-003 Bench Strength 
+Analysis 
+The system shall generate bench -strength reports by job family, 
+business unit, career level, and critical position to support 
+workforce planning and leadership decisions. 
+FR-RPT-004 Competency Gap 
+Analytics 
+The system shall provide competency gap reports identifying 
+capability shortages by employee, role, job family, department, and 
+organizational level. 
+
+
+
+=== PAGE 108 ===
+Business Requirement Document for ERP Upgrading 
+ 
+102 
+ 
+FR ID Requirement Description 
+FR-RPT-005 Career Progression 
+Analytics 
+The system shall provide reports on promotions, lateral 
+movements, acting assignments, time -in-level, progression rates, 
+and career mobility trends. 
+FR-RPT-006 Talent Pool Analytics The system shall provide analysis of talent pool composition, 
+readiness distribution , development progress, and succession 
+coverage for identified talent groups. 
+FR-RPT-007 Development 
+Effectiveness 
+Reporting 
+The system shall provide reports measuring the effectiveness of 
+development interventions, including training completion, 
+competency improvement, readiness advancement, and career 
+progression outcomes. 
+FR-RPT-008 Executive Talent 
+Dashboard 
+The system shall provide Senior Management and SPMC dashboards 
+presenting strategic talent insights, succession risks, critical 
+capability gaps, and workforce readiness indicators. 
+FR-RPT-009 Report Export 
+Capability 
+The system shall support exporting reports and dashboards into 
+commonly used formats including Excel and PDF for management 
+review, governance meetings, and decision-making. 
+3.13 Notifications & Alerts 
+FR ID Requirement Description 
+FR-NOT-001 Career Progression 
+Eligibility Notification 
+The system shall automatically notify employees and responsible 
+managers when employees meet predefined career progression 
+eligibility criteria. 
+FR-NOT-002 Approval Workflow 
+Notification 
+The system shall notify employees, managers, PPDD, and 
+authorized approvers when career progression requests, 
+
+
+
+=== PAGE 109 ===
+Business Requirement Document for ERP Upgrading 
+ 
+103 
+ 
+FR ID Requirement Description 
+succession decisions, development plans, or framework updates 
+require review or approval. 
+FR-NOT-003 Pending Action 
+Reminder 
+The system shall send automated reminders for pending actions 
+including career discussions, ICDP approvals, development 
+activities, assessments, and succession reviews. 
+FR-NOT-004 Development Plan 
+Reminder 
+The system shall notify emp loyees and supervisors regarding 
+overdue or upcoming Individual Career Development Plan activities, 
+milestones, and development commitments. 
+FR-NOT-005 Critical Position 
+Review Alert 
+The system shall notify PPDD and SPMC members regarding 
+scheduled critical position reviews, successor validation cycles, 
+and competency framework updates. 
+FR-NOT-006 Succession Risk Alert The system shall generate alerts when critical positions have 
+insufficient successors, increased succession risk, or delayed 
+successor development activities. 
+3.14 Manager Visibility 
+FR ID Requirement Description 
+FR-MHT-001 Manager Career 
+Management 
+Dashboard 
+The system shall provide managers with dashboards showing 
+direct-report career profiles, career aspirations, competency gaps, 
+readiness status, development plans, and progression 
+opportunities. 
+FR-MHT-002 Employee Readiness 
+View 
+The system shall allow managers to view readiness levels and career 
+progression status of their employees based on approved access 
+rights and confidentiality rules. 
+
+
+
+=== PAGE 110 ===
+Business Requirement Document for ERP Upgrading 
+ 
+104 
+ 
+FR ID Requirement Description 
+FR-MHT-003 Career Discussion 
+Management 
+The system shall allow managers to record structured career 
+discussions, agreed development actions, employee aspirations, 
+and follow-up commitments. 
+FR-MHT-004 Talent Nomination 
+Management 
+The system shall allow authorized managers to nominate employees 
+for talent pools, accelerated development programs, succession 
+consideration, and career progression opportunities. 
+FR-MHT-005 HRBP Talent Analytics 
+Access 
+The system shall provide HRBPs/Principal Officers with 
+consolidated talent analytics across assigned business units, 
+including career progression, succession readiness, competency 
+gaps, and development status. 
+FR-MHT-006 Manager Approval 
+Capability 
+The system shall enable managers to review, comment on, approve, 
+or reject career development plans, progression requests, and 
+talent nominations according to assigned authority levels. 
+3.15 Integration Requirements 
+FR ID Requirement Description 
+FR-INT-001 HRIS Integration The system shall integrate with the core HRIS to synchronize 
+employee master data, organizational structure, job information, 
+grades, positions, reporting relationships, employment status, and 
+employee history. 
+FR-INT-002 Performance 
+Management System 
+Integration 
+The system shall integrate with the PMS/APMS module to retrieve 
+performance ratings, competency assessment results, objectives, 
+KPI achievement data, and evaluation outcomes required for career 
+and succession decisions. 
+
+
+
+=== PAGE 111 ===
+Business Requirement Document for ERP Upgrading 
+ 
+105 
+ 
+FR ID Requirement Description 
+FR-INT-003 Learning Management 
+System Integration 
+The system shall integrate with the LMS/EDS platform to exchange 
+training requirements, enrollment information, completion status, 
+certifications, and learning outcomes linked to career and 
+succession development plans. 
+FR-INT-004 Employee Self-Service 
+Integration 
+The system shall integrate with the ESS portal to provide employees 
+with access to career paths, competency profiles, career 
+aspirations, development plans, progression requests, and talent 
+information available to employees. 
+FR-INT-005 Organization Structure 
+Integration 
+The system shall synchronize with organizational hierarchy data to 
+ensure accurate mapping of job families, departments, branches, 
+reporting relationships, and position structures. 
+FR-INT-006 Single Sign -On 
+Integration 
+The system shall integrate with the Bank’s authentication services, 
+including Active Directory/Single Sign -On (SSO), to provide secure 
+user authentication and access management. 
+FR-INT-007 Payroll and 
+Compensation 
+Integration 
+The system shall integrate with payroll and compensation systems 
+to retrieve job grades, salary bands, and compensation information 
+required for career progression and job architecture management. 
+FR-INT-008 Data Exchange 
+Capability 
+The system shall support secure data ex change through APIs, web 
+services, or approved integration mechanisms to enable 
+interoperability with existing Bank systems. 
+FR-INT-009 Data Synchronization 
+and Validation 
+The system shall validate and synchronize integrated data regularly 
+to ensure accuracy, completeness, and consistency across HR, 
+PMS, LMS, and talent management modules. 
+ 
+
+
+
+=== PAGE 112 ===
+Business Requirement Document for ERP Upgrading 
+ 
+106 
+ 
+4.  Non-Functional Requirements 
+4.1 Security & Access Control 
+• Role-based access control (RBAC) shall govern all module functions, consistent with the user role 
+matrix in Section 10. 
+• The module shall integrate with the Bank's Active Directory/Single Sign-On (SSO) for authentication. 
+• Sensitive career and succession data (e.g., successor tags, readiness scores) shall be visible only to 
+authorized roles. 
+• Data shall be encrypted in transit and at rest, in line with the Bank's IT security policy. 
+4.2 Performance & Scalability 
+• Standard self-service pages shall load within 3 seconds under normal load. 
+• The module shall support concurrent access by all Bank staff across Head Office and branches 
+without performance degradation. 
+4.3 Usability 
+• The employee and manager interfaces shall be mobile -responsive and accessible via the existing 
+APMS/ERP portal. 
+• The module shall support English and Amharic language interfaces. 
+4.4 Data Privacy & Compliance 
+• Access to career aspiration and succession data shall comply with the Bank's data protection and 
+confidentiality policies. 
+• Audit trails shall be retained in accordance with the Bank's records retention policy. 
+4.5 Availability & Business Continuity 
+• The module shall target 99.5% uptime during business hours, with scheduled maintenance windows 
+communicated in advance. 
+• The module shall be included in the APMS/ERP's existing backup and disaster recovery plan. 
+4.6 Auditability 
+• All configuration changes to career path frameworks and all progression decisions shall be logged 
+and reportable for internal audit. 
+ 
+ 
+ 
+ 
+ 
+
+
+
+=== PAGE 113 ===
+Business Requirement Document for ERP Upgrading 
+ 
+107 
+ 
+ 
+ 
+ 
+ 
+ 
+Part 5 Competency Management System 
+ 
+1. Introduction 
+1.1 Purpose 
+This business Requirements defines the business and system requirements for the implementation of 
+Bunna Bank's integrated Competency Management, Career Path, Succession Planning, and Learning & 
+Development System  within the Enterprise Resource Planning (ERP), Automated  Performance 
+Management System (APMS), Employee Development System (EDS), and Learning Management System 
+(LMS). 
+The system will automate competency-based talent management processes and provide a single platform 
+for managing competencies, career development, succession planning, learning, and workforce capability 
+development across the Bank. 
+1.2 Scope 
+This document covers the functional and non -functional requirements for an integrated solution 
+supporting: 
+ Competency Framework and Dictionary Management  
+ Competency Mapping and Assessment  
+ Competency Gap Analysis  
+ Career Path and Career Development Management  
+ Succession Planning and Critical Position Management  
+ Talent Assessment and Readiness Management  
+ Individual Development Planning (IDP/ICDP)  
+ Learning and Development Planning  
+
+
+
+=== PAGE 114 ===
+Business Requirement Document for ERP Upgrading 
+ 
+108 
+ 
+ Competency-Based Training Management  
+ Continuous Learning Credit (CLC) Management  
+ eLearning/LMS Integration  
+ Training Evaluation and Knowledge Management  
+ Reporting, Analytics, Workflow, Security, and System Integration  
+The solution shall integrate with the Bank's HRIS, Performance Management System (PMS/APMS), Employee 
+Self-Service (ESS), Learning Management System (LMS/EDS), Payroll, and Organizational Structure 
+modules. 
+1.3 Business Context 
+Bunna Bank's Integrated Competency Framework establishes a common foundation for competency-based 
+people management by defining the knowledge, skills, behaviors, and leadership capabilities required 
+across all job families and organizational levels. Built on three competency pillars —Core, Leadership, and 
+Technical—the framework supports consistent recruitment, performance management, learning and 
+development, career progression, succession planning, and workforce planning. 
+To operationalize this framework, the Bank requires an integrated digital solution that automates 
+competency assessment, identifies capability gaps, supports structured career development, strengthens 
+succession planning, recommends targeted learning interventions, and provides real -time analytics for 
+strategic talent de cisions. The system will replace fragmented manual processes with standardized 
+workflows, ensuring transparency, governance, and alignment between employee capability development 
+and the Bank's strategic objectives. 
+2. Business Objectives 
+The integrated solution shall enable Bunna Bank to: 
+ Implement a standardized competency-based talent management framework across the Bank.  
+ Establish and maintain Core, Leadership, and Technical competency frameworks for all job families 
+and career levels.  
+ Assess employee  competencies and identify competency gaps at individual, team, and 
+organizational levels.  
+ Support competency-based career path planning and transparent career progression.  
+
+
+
+=== PAGE 115 ===
+Business Requirement Document for ERP Upgrading 
+ 
+109 
+ 
+ Strengthen succession planning by identifying, assessing, and developing successo rs for critical 
+positions.  
+ Generate Individual Development Plans (IDPs/ICDPs) and recommend competency -based learning 
+interventions.  
+ Integrate competency management with Performance Management, Learning Management, 
+Employee Development, and HRIS modules.  
+ Improve workforce planning, leadership pipeline management, and organizational capability 
+development.  
+ Provide self -service tools that enable employees to manage career aspirations, competency 
+development, and learning activities.  
+ Deliver real -time dashboards, analytics, and reporting to support evidence -based talent 
+management and strategic workforce decisions.  
+ Improve organizational capability, employee engagement, leadership continuity, and business 
+sustainability in support of Bunna Bank's strategic vision. 
+Competency Framework & Dictionary Administration  
+FR ID Requirement Description 
+FR-CFD-001 Competency 
+Dictionary 
+Management 
+The system shall maintain a centralized competency dictionary 
+organized into Core, Leadership, and Technical competency pillars, 
+including functional domains and competency classifications 
+aligned with the Bank’s competency framework. 
+FR-CFD-002 Competency Definition 
+and Proficiency Levels 
+The system shall maintain competency details including 
+competency name, category/pillar, functional domain, definition, 
+and behavioral indicators mapped to defined proficiency levels 
+(Basic, Intermediate, Advanced, and Expert). 
+FR-CFD-003 Competency Search 
+and Filtering 
+The system shall provide search and filtering capabilities for the 
+competency dictionary by competency pillar, functional domain, 
+competency name, and keywords to support employees, managers, 
+and PPDD users. 
+
+
+
+=== PAGE 116 ===
+Business Requirement Document for ERP Upgrading 
+ 
+110 
+ 
+FR ID Requirement Description 
+FR-CFD-004 Competency 
+Framework Version 
+Control 
+The system shall maintain version -controlled competency 
+framework records, including competency additions, 
+modifications, retirements, effective dates, change history, and 
+approval records. 
+FR-CFD-005 Competency 
+Governance Workflow 
+The system shall support configurable approval workflows for 
+competency framework changes, including competency creation, 
+modification, and retirement, with review and approval by 
+authorized stakeholders. 
+FR-CFD-006 Competency 
+Framework Dashboard 
+The syst em shall provide competency framework dashboards 
+showing competency distribution by pillar, functional domain, and 
+status, and shall identify inconsistencies or gaps against the 
+approved competency framework structure. 
+FR-CFD-0169 Configurable 
+Competency Types 
+System shall support configurable competency frameworks 
+covering Technical, Core/Behavioral, and Leadership 
+competencies, and shall allow creation of various competencies 
+categorized into types such as Ability, Skill, and Knowledge. 
+FR-CFD-0170 Framework Lifecycle 
+Management 
+System shall allow creation, modification, activation, and 
+retirement of competency frameworks. 
+FR-CFD-0171 Centralized 
+Competency Library 
+System shall provide a centralized competency library. 
+FR-CFD-0172 Multiple Rating Models System shall allow creation of multiple rating models (evaluation 
+scales) for competency assessment and enable attaching them to 
+competencies. 
+Competency Mapping to Roles, Job Families & Grades 
+
+
+
+=== PAGE 117 ===
+Business Requirement Document for ERP Upgrading 
+ 
+111 
+ 
+FR ID Requirement Description 
+FR-CFD-0173 
+Role-Based 
+Competency Mapping 
+System shall enable role -based competency mapping, with the 
+ability to define roles in terms of Position, Job Title/Grade, and Job 
+Task. 
+FR-CFD-0174 Minimum Proficiency 
+Definition 
+System shall allow definition of minimum required proficiency 
+levels for each competency linked to a role. 
+FR-CFD-0175 Many-to-Many Role -
+Competency Linkage 
+System shall support mapping multiple competencies to one role 
+and one competency to multiple roles. 
+FR-CFD-0176 
+Competency Clusters 
+System shall support definition of competency clusters 
+(combinations of related competencies with minimum proficiency 
+requirements) and attach them to roles. 
+FR-CFD-0177 
+Governed Framework 
+Management 
+System shall provide the ability to define and manage competency 
+frameworks aligned with job roles and grades, with governance to 
+ensure consistency, approval, and standardization across the 
+Bank. 
+FR-CFD-0178 Dynamic Requirement 
+Updates 
+System shall allow dynamic updates to competency requirements 
+based on organizational changes. 
+FR-MAP-001 Role-Based 
+Competency Mapping 
+The system shall enable PPDD to define required competencies, 
+including Core, applicable Leadership, and role -specific 
+Functional/Technical competencies, with target proficiency levels 
+for each role/job profile. 
+FR-MAP-002 Job Family and Grade -
+Level Competency 
+Mapping 
+The system shall support mapping of competencies and required 
+proficiency levels across job families, job grades, and roles to 
+establish standardized competency requirements throughout the 
+Bank. 
+FR-MAP-003 Role Competency Map 
+as Master Reference 
+The system shall maintain role -competency mappings as the 
+single source of reference for competency assessment, gap 
+
+
+
+=== PAGE 118 ===
+Business Requirement Document for ERP Upgrading 
+ 
+112 
+ 
+FR ID Requirement Description 
+analysis, career path management, succession planning, and 
+development planning processes. 
+FR-MAP-004 Competency Mapping 
+Replication and Bulk 
+Configuration 
+The system shall support bulk competency mapping and allow 
+existing role competency profiles to be copied, adapted, and 
+reused for similar roles to improve configuration efficiency. 
+FR-MAP-005 Competency Map 
+Version Control 
+The system shall maintain version history of role -competency 
+mappings, including changes to required competencies, 
+proficiency levels, effective dates, approval status, and 
+modification records. 
+FR-MAP-006 Competency Mapping 
+Approval Workflow 
+The system shall support configurable review and approval 
+workflows for creation and modification of role competency 
+requirements to ensure governance and consistency. 
+FR-MAP-007 Competency Coverage 
+Reporting 
+The system shall provide reports identifying roles, job families, 
+grades, and locations without completed competency mappings 
+to support implementation monitoring and framework rollout. 
+Competency Assessment 
+FR ID Requirement Description 
+FR-ASM-001 Manager Competency 
+Assessment 
+The system shall provide structured manager assessment forms 
+and checklists for evaluating employees against assigned role 
+competencies and required proficiency levels using objective, 
+evidence-based assessment criteria. 
+FR-ASM-002 360-Degree 
+Competency 
+Assessment 
+The system shall support 360 -degree feedback assessments 
+involving configurable sources including managers, peers, 
+subordinates, and other approved stakeholders, with configurable 
+confidentiality and anonymity settings. 
+
+
+
+=== PAGE 119 ===
+Business Requirement Document for ERP Upgrading 
+ 
+113 
+ 
+FR ID Requirement Description 
+FR-ASM-003 Skills Testing and 
+Examination 
+Management 
+The system shall support competency -based skills assessments, 
+including case studies, simulations, practical tests, and 
+examinations, with results recorded against relevant 
+competencies. 
+FR-ASM-004 Employee Self -
+Assessment 
+The system shall enable employees to assess their own 
+competency levels against assigned role competencies and 
+proficiency requirements for comparison with other assessment 
+results. 
+FR-ASM-005 Multi-Source 
+Assessment 
+Consolidation 
+The system shall consolidate competency assessment results 
+from manager evaluations, 360 -degree feedback, self -
+assessments, and skills testing to determine employee 
+competency achievement against required proficiency levels. 
+FR-ASM-006 Competency 
+Achievement Status 
+The system shall identify whether employees exceed, meet, or fall 
+below required competency proficiency levels for their current or 
+target roles. 
+FR-ASM-007 Competency 
+Assessment History 
+The system shall maintain historical competency assessment 
+records by employee and competency, enabling trend analysis of 
+competency growth, improvement, and development needs. 
+FR-ASM-008 Assessment Cycle 
+Management 
+The system shall support configurable competency assessment 
+cycles, includin g scheduled assessments, role -based 
+assessments, and automated notifications to assessors, 
+employees, and reviewers. 
+4.4.4 Competency Gap Analysis 
+
+
+
+=== PAGE 120 ===
+Business Requirement Document for ERP Upgrading 
+ 
+114 
+ 
+FR ID Requirement Description 
+FR-CFD-0124 Competency 
+Assessment 
+The system shall support assessment of employee competencies, 
+including Knowledge, Skills, and Attitudes (KSA), against defined 
+competency frameworks. 
+FR-CFD-0125 Competency Gap 
+Analysis Reports 
+The system shall generate competency gap reports identifying 
+current capability gaps against role, position, and future career 
+requirements. 
+FR-CFD-0126 Development Plan 
+Integration 
+The system shall link identified competency gaps with employee 
+development plans, training needs, and recommended 
+interventions. 
+FR-CFD-0127 Supervisor 
+Competency 
+Assessment 
+Integration 
+The system shall capture supervisor -identified competency gaps, 
+skill requirements, and development recommendations as part of 
+the employee assessment process. 
+FR-CFD-0128 Competency 
+Framework 
+Management 
+The system shall support configuration and maintenance of 
+competency frameworks by job family, position, grade, and career 
+level. 
+FR-CFD-0129 Competency Gap 
+Tracking 
+The system shall track competency gap status, improvement 
+actions, responsible parties, and completion progress. 
+FR-CFD-0130 Competency-Based 
+Reporting 
+The system shall provide competency analytics and reports to 
+support workforce planning, succession planning, and talent 
+development decisions. 
+FR-GAP-001 Automated 
+Competency Gap 
+Calculation 
+The system shall automatically calculate competency gaps by 
+comparing employee assessed proficiency levels against required 
+proficiency levels defined for their current or target roles. 
+
+
+
+=== PAGE 121 ===
+Business Requirement Document for ERP Upgrading 
+ 
+115 
+ 
+FR ID Requirement Description 
+FR-GAP-002 Multi-Level 
+Competency Gap 
+Analysis 
+The system shall provide competency gap  analysis at individual, 
+team, department, and organizational levels to support workforce 
+planning and talent development decisions. 
+FR-GAP-003 Competency Gap 
+Analysis Reports 
+The system shall generate competency gap reports showing 
+competency name, curre nt proficiency level, required proficiency 
+level, gap size, identified gaps, and development requirements for 
+employees and organizational units. 
+FR-GAP-004 Competency Gap 
+Action Planning 
+The system shall allow PPDD, managers, and authorized users to 
+record recommended development actions for identified 
+competency gaps, including training, coaching, mentoring, job 
+rotation, reassignment, and other interventions. 
+FR-GAP-005 Competency Gap 
+Prioritization 
+The system shall support prioritization of competency  gaps using 
+configurable criteria such as business impact, competency 
+importance, and urgency levels (High, Medium, and Low). 
+FR-GAP-006 Team Competency Gap 
+Dashboard 
+The system shall provide team -level competency gap analysis 
+showing competency strengths , weaknesses, average proficiency 
+levels, and capability gaps to support team development planning. 
+FR-GAP-007 Individual Competency 
+Gap Profile 
+The system shall provide employees and managers with individual 
+competency gap profiles showing current versus  required 
+proficiency levels, recommended actions, priority, timelines, and 
+progress status. 
+FR-GAP-008 Competency Gap 
+Closure Tracking 
+The system shall support periodic reassessment and monitoring of 
+competency gaps to track improvement progress, closure  status, 
+and ongoing development needs. 
+
+
+
+=== PAGE 122 ===
+Business Requirement Document for ERP Upgrading 
+ 
+116 
+ 
+FR ID Requirement Description 
+FR-GAP-009 Competency 
+Benchmarking 
+The system shall support benchmarking of competency 
+requirements and proficiency levels against approved internal 
+standards or external benchmarks where applicable. 
+Individual Learning & Development Planning 
+FR ID Requirement Description 
+FR-ILD-001 Digital Individual 
+Learning & 
+Development Plan 
+The system shall provide employees with a digital Individual 
+Learning and Development Plan (ILDP/ICDP) generated from 
+identified competency gaps, capturing development needs, 
+required competencies, learning objectives, expected outcomes, 
+and planned interventions. 
+FR-ILD-002 Personalized Training 
+Request Management 
+The system shall enable employees to submit personalized training 
+requests, including development needs, preferred learning 
+methods (online, instructor -led, mentoring, coaching, or other 
+formats), and planned completion dates, subject to supervisor and 
+PPDD review. 
+FR-ILD-003 Development Journey 
+Workflow Tracking 
+The system shall track the complete learning and development 
+lifecycle, including needs identification, program design, approval, 
+delivery, completion, and evaluation stages, with status visibility for 
+employees, managers, and PPDD. 
+FR-ILD-004 Performance 
+Management 
+Integration 
+The system shall integrate Individual Learning and Development 
+Plans with the Performance Management System to align employee 
+development objectives with performance outcomes, career goals, 
+and competency requirements. 
+FR-ILD-005 Development Activity 
+Tracking 
+The system shall track completion status, effectiveness, and 
+outcomes of development activities including training, coaching, 
+mentoring, certifications, and experiential learning interventions. 
+
+
+
+=== PAGE 123 ===
+Business Requirement Document for ERP Upgrading 
+ 
+117 
+ 
+FR ID Requirement Description 
+FR-ILD-006 Competency 
+Improvement 
+Feedback 
+The system shall update employee competency development 
+records based on completed learning activities and reassessment 
+results to support competency growth tracking and career 
+readiness evaluation 
+Departmental & Bank-Level L&D Planning 
+FR ID Requirement Description 
+FR-LDP-001 Work Unit Training 
+Needs Capture 
+The system shall allow departments/work units to submit training 
+and development requirements based on competency gaps, 
+business objectives, and future capability needs. 
+FR-LDP-002 Department Learning 
+Plan Management 
+The system shall support creation and management of 
+departmental learning and development plans aligned with 
+organizational objectives. 
+FR-LDP-003 Bank-Level L&D Plan 
+Consolidation 
+The system shall consolidate individual and departmental 
+development requirements into a Bank -wide Learning and 
+Development Plan. 
+FR-LDP-004 L&D Plan Approval 
+Workflow 
+The system shall route Bank -level L&D plans through PPDD review 
+and authorized management approval workflows. 
+FR-LDP-005 L&D Execution 
+Monitoring 
+The system shall track planned versus actual learning activities, 
+completion status, and development outcomes. 
+FR-LDP-006 LMS/EDS Integration The system shall integrate with LMS/EDS to synchronize training 
+programs, enrollment, completion status, and learning outcomes. 
+Competency-Based Training Design & Delivery Linkage 
+
+
+
+=== PAGE 124 ===
+Business Requirement Document for ERP Upgrading 
+ 
+118 
+ 
+FR ID Requirement Description 
+FR-CBT-001 Competency-Based 
+Training Trigger 
+The system shall initiate competency-based training requirements 
+based on confirmed competency gaps identified through 
+competency assessments, career readiness assessments, and 
+succession planning processes. 
+FR-CBT-002 Competency-Based 
+Training Plan 
+Management 
+The system shall allow PPDD to define competency -based training 
+plans including targeted competency, required proficiency level, 
+learning objectives, delivery method, and expected outcomes. 
+FR-CBT-003 Training Requirement 
+Integration with 
+LMS/EDS 
+The system shall integrate with the LMS/EDS platform to transfer 
+approved competency -based training requirements, avoiding 
+duplicate data entry between competency management and 
+learning management modules. 
+FR-CBT-004 Training Intervention 
+Tracking 
+The system shall track competency -based development 
+interventions including training programs, coaching, mentoring, job 
+assignments, certifications, and other learning activities. 
+FR-CBT-005 Post-Training 
+Competency 
+Assessment 
+The system shall support post-training competency reassessment 
+to measure improvement, update employee competency profiles, 
+and determine competency gap closure. 
+FR-CBT-006 Training Effectiveness 
+Analysis 
+The system shall provide reports comparing pre-training and post-
+training competency levels to evaluate the effectiveness of 
+competency-based development interventions. 
+FR-CBT-007 Continuous 
+Competency 
+Improvement 
+Management 
+The system shall support continuous improvement by analyzing 
+competency trends, identifying emerging capability requirements, 
+and supporting updates to competency frameworks. 
+Training Classification Management 
+
+
+
+=== PAGE 125 ===
+Business Requirement Document for ERP Upgrading 
+ 
+119 
+ 
+FR ID Requirement Description 
+FR-TCL-001 Training Classification 
+Framework 
+Management 
+The system shall classify all learning and development activities 
+into approved training categories including Mandatory Education, 
+Corporate Training, Team/Unit Specific Development, and 
+Individual Learning & Development. 
+FR-TCL-002 Training Classification 
+Assignment 
+The system shall allow PPDD/L&D administrators to assign and 
+maintain training classification for each learning activity, program, 
+and development intervention. 
+FR-TCL-003 Mandatory Training 
+Compliance Tracking 
+The system shall track employee completion status for mandatory 
+training requirements and generate automated alerts for 
+incomplete or overdue mandatory learning activities. 
+FR-TCL-004 Training Classification 
+Reporting 
+The system shall provide reports on training participation, 
+completion rates, and compliance status by training category, 
+employee group, job grade, and business unit. 
+FR-TCL-005 Training Program 
+Catalog Management 
+The system shall maintain a centralized training catalog containing 
+approved learning programs, classifications, competency 
+alignment, target audience, and delivery information for reuse in 
+future planning cycles. 
+ELearning & Micro-Learning Platform Integration 
+FR ID Requirement Description 
+FR-ELN-001 LMS/eLearning 
+Platform Integration 
+The system shall integrate with the Bank's Learning Management 
+System (LMS/eLearning platform) to synchronize learning 
+programs, enrollments, course assignments, completion status, 
+assessment results, and certifications. 
+
+
+
+=== PAGE 126 ===
+Business Requirement Document for ERP Upgrading 
+ 
+120 
+ 
+FR ID Requirement Description 
+FR-ELN-002 Competency-Based 
+Learning Assignment 
+The system shall assign and recommend learning programs based 
+on identified competency gaps, Individual Development Plans 
+(IDPs/ICDPs), career paths, and succession development 
+requirements. 
+FR-ELN-003 Digital Learning 
+Support 
+The system shall support integration with self -paced, instructor-
+led, virtual, mobile, and micro-learning programs delivered through 
+the LMS/eLearning platform. 
+FR-ELN-004 Learning Progress 
+Synchronization 
+The system shall automatically synchronize learning completion, 
+assessment scores, certifications, and competency achievements 
+from the LMS to employee competency profiles, career 
+development records, succession plans, and CLC records where 
+applicable. 
+FR-ELN-005 Learning Analytics The system shall provide dashboards and reports on learning 
+enrollment, completion rates, assessment results, certification 
+status, competency improvement, and learning effectiveness by e 
+Training Evaluation (Formative) 
+FR ID Requirement Description 
+FR-TEV-001 Training Evaluation 
+Framework 
+The system shall support configurable training evaluation 
+frameworks, including formative and summative evaluations, for 
+learning and development programs. 
+FR-TEV-002 Learning Evaluation 
+Management 
+The system shall support collection and management of participant 
+feedback, learning assessments, behavioral evaluations, and 
+business impact assessments based on configured evaluation 
+methods. 
+
+
+
+=== PAGE 127 ===
+Business Requirement Document for ERP Upgrading 
+ 
+121 
+ 
+FR ID Requirement Description 
+FR-TEV-003 Configurable 
+Evaluation Models 
+The system shall allow PPDD to configure evaluation methods, 
+questionnaires, assessment criteria, evaluation stages, and 
+applicable evaluation levels for each learning program. 
+FR-TEV-004 Training Effectiveness 
+Measurement 
+The system shall measure training effectiveness using participant 
+satisfaction, knowledge acquisition, competency improvement, 
+behavioral change, business performance indicators, and other 
+configured evaluation metrics. 
+FR-TEV-005 Return on Investment 
+(ROI) Analysis 
+The system shall support calculation and reporting of training 
+return on investment (ROI) where training costs and measurable 
+business outcomes are available. 
+FR-TEV-006 Learning Evaluation 
+Reporting 
+The syst em shall provide reports and dashboards summarizing 
+evaluation results, training effectiveness, competency 
+improvement, business impact, and return on investment to 
+support continuous improvement of learning programs. 
+Collaborative Learning & Knowledge Sharing 
+FR ID Requirement Description 
+FR-CLK-001 Knowledge Sharing 
+Management 
+The system shall support a centralized knowledge -sharing 
+repository where employees can publish, access, search, and share 
+learning resources, best practices, lessons learned, and knowledge 
+assets by competency, job family, or subject area. 
+FR-CLK-002 Mentoring & Coaching 
+Management 
+The system shall support administration of mentoring and coaching 
+programs by assigning mentors and coaches, linking them to 
+competency gaps, career development plans, and succession 
+development activities, and tracking progress and outcomes. 
+
+
+
+=== PAGE 128 ===
+Business Requirement Document for ERP Upgrading 
+ 
+122 
+ 
+FR ID Requirement Description 
+FR-CLK-003 Collaborative Learning 
+Support 
+The system shall support collaborative learning activities, including 
+discussion groups, communities of practice, and knowledge-
+sharing sessions integrated with the LMS/eLearning platform 
+where applicable. 
+FR-CLK-004 Knowledge Sharing & 
+Mentoring Reporting 
+The system shall provide reports on mentoring and coaching 
+activities, knowledge-sharing participation, collaborative learning 
+engagement, and development outcomes to support organizational 
+learning and continuous improvement. 
+Competency Assessment & Tracking 
+FR ID Requirement Description 
+FR-CFD-0179 
+Employee Proficiency 
+Tracking 
+System shall track employee proficiency levels over time, and shall 
+assess employees on competencies required for their current job 
+and planned jobs, updating actual proficiency accordingly. 
+FR-CFD-0180 Historical Assessment 
+Records 
+System shall maintain historical competency assessment records 
+and provide trend analysis of competency growth or decline. 
+FR-CFD-0181 
+Dynamic Skill Gap 
+Identification 
+System shall enable identification of skill gaps dynamically based 
+on role requirements and current proficiency levels, automatically 
+identifying gaps at individual, team, and organizational levels. 
+FR-CFD-0182 
+Evaluation Score 
+Capture 
+System shall capture individual performance evaluation scores 
+along with supervisors' remarks and development 
+recommendations. 
+Reporting and Analytics 
+FR ID Requirement Description 
+FR-RPT-001 Standard Report 
+Generation 
+The system shall generate standard reports covering competency 
+management, career development, succession planning, learning 
+
+
+
+=== PAGE 129 ===
+Business Requirement Document for ERP Upgrading 
+ 
+123 
+ 
+FR ID Requirement Description 
+and development, training compliance, continuous learning credits, 
+and talent management. 
+FR-RPT-002 Executive Dashboards The system shall provide configurable dashboards for Executive 
+Management, CPCO, PPDD, Directors, Managers, and HRBPs, 
+presenting key workforce, competency, career, succession, and 
+learning performance indicators. 
+FR-RPT-003 Competency & Talent 
+Analytics 
+The system shall provide analytics on competency assessments, 
+competency gaps, readiness levels, talent pools, succession 
+coverage, career progression, and workforce capability trends. 
+FR-RPT-004 Learning & 
+Development Analytics 
+The system shall provide reports on learning plans, training 
+participation, completion rates, certifications, competency 
+improvement, training effectiveness, continuous learning credits, 
+and learning compliance. 
+FR-RPT-005 Succession & Career 
+Analytics 
+The system shall provide reports on succession pipelines, bench 
+strength, readiness classifications, critical position coverage, 
+internal mobility, promotions, and career progression trends. 
+FR-RPT-006 Compliance & Audit 
+Reporting 
+The system shall provide compliance and audit reports covering 
+mandatory training, competency assessments, a pproval 
+workflows, framework changes, CLC records, and audit trails. 
+FR-RPT-007 Configurable & Ad -hoc 
+Reporting 
+The system shall allow authorized users to create, customize, filter, 
+schedule, and save ad -hoc reports using configurable reporting 
+parameters without requiring system customization. 
+FR-RPT-008 Report Scheduling & 
+Distribution 
+The system shall support scheduled generation and automatic 
+distribution of reports and dashboards to authorized users via the 
+system and email according to defined reporting schedules. 
+
+
+
+=== PAGE 130 ===
+Business Requirement Document for ERP Upgrading 
+ 
+124 
+ 
+FR ID Requirement Description 
+FR-RPT-009 Report Export 
+Capability 
+The system shall support exporting reports and dashboards in 
+standard formats including Excel, PDF, CSV, and other approved 
+formats. 
+FR-RPT-010 Interactive Dashboard 
+Visualization 
+The system shall provide interactive dashboards with drill -down, 
+filtering, trend analysis, graphical visualization, and cross -
+functional analytics to support management decision-making. 
+ 
+
+
+

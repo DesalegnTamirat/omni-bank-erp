@@ -516,3 +516,292 @@ class TestDisciplineCase(TransactionCase):
         self.assertEqual(inv.reviewed_by_id.id, self.env.user.id)
         self.assertEqual(case.state, 'committee_review')
         self.assertTrue(case.is_locked_for_committee)
+
+    def test_17_article_one_click_case_creation_and_citation(self):
+        """Test one-click case creation action from Article and Offense models with statutory auto-population."""
+        art = self.env.ref('discipline_management.art_cba_33_4', raise_if_not_found=False)
+        offense = self.env.ref('discipline_management.offense_cba_33_4_1_a', raise_if_not_found=False)
+        if not art or not offense:
+            return
+
+        # Test action from Article
+        action_res = art.action_create_case()
+        self.assertEqual(action_res.get('res_model'), 'discipline.case')
+        self.assertEqual(action_res['context'].get('default_article_id'), art.id)
+
+        # Test action from Offense
+        action_res_off = offense.action_create_case()
+        self.assertEqual(action_res_off['context'].get('default_offense_id'), offense.id)
+        self.assertEqual(action_res_off['context'].get('default_article_id'), art.id)
+
+        # Create case using offense
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense.id,
+            'incident_date': Date.today(),
+            'description': 'Attire non-compliance test.',
+        })
+        self.assertEqual(case.article_id.id, art.id)
+        self.assertEqual(case.sub_article_code, '33.4.1(ሀ)')
+        self.assertIn('Article 33.4', case.legal_article_display)
+        self.assertTrue(case.legal_clause_text)
+
+    def test_18_penalty_modes_and_override(self):
+        """Test Penalty Mode 2 (Article Override) setting exact custom fine days."""
+        offense_override = self.env.ref('discipline_management.offense_mgr_10_4_2_a', raise_if_not_found=False)
+        if not offense_override:
+            return
+
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense_override.id,
+            'incident_date': Date.today(),
+            'description': 'Supervisory control failure test.',
+        })
+        self.assertEqual(case.punishment_type, 'fine')
+        self.assertEqual(case.fine_days, 2.0)
+        self.assertEqual(case.active_duration_days, 180)  # 6 months validity
+
+    def test_19_article_33_1_4_progressive_escalation(self):
+        """Test Article 33.1.4 progressive escalation bumping punishment up 1 grade if active warning is present."""
+        today = Date.today()
+        offense_verbal = self.env.ref('discipline_management.offense_cba_33_4_1_a', raise_if_not_found=False)
+        offense_verbal_2 = self.env.ref('discipline_management.offense_cba_33_4_1_c', raise_if_not_found=False)
+        if not offense_verbal or not offense_verbal_2:
+            return
+
+        # 1. Create first verbal warning case and enforce it
+        case1 = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense_verbal.id,
+            'incident_date': today - timedelta(days=5),
+            'case_action_track': 'direct_enforce',
+            'description': 'First minor verbal offense.',
+        })
+        case1.action_initiate()
+        case1.with_user(self.user_approver).action_approve_and_enforce()
+        self.assertEqual(case1.state, 'enforced')
+        self.assertEqual(case1.punishment_type, 'verbal_warning')
+
+        # 2. Within 30 days (active warning duration), commit a different Level 5 verbal offense
+        case2 = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense_verbal_2.id,
+            'incident_date': today,
+            'case_action_track': 'direct_enforce',
+            'description': 'Second minor offense within active warning window.',
+        })
+        # Under Art 33.1.4, should escalate from verbal_warning (Level 5) to first_warning_penalty (Level 4)
+        self.assertTrue(case2.is_escalated_by_active_warning)
+        self.assertEqual(case2.punishment_type, 'first_warning_penalty')
+
+    def test_20_cash_shortage_matrix_article_33_9(self):
+        """Test Article 33.9 Cash Shortage automatic tier determination based on shortage amount."""
+        today = Date.today()
+        offense_csh = self.env.ref('discipline_management.offense_cba_33_9_cash_shortage', raise_if_not_found=False)
+        if not offense_csh:
+            return
+
+        # Tier 1: <= 500 ETB (1st occurrence = Verbal Warning)
+        case_t1 = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense_csh.id,
+            'cash_shortage_amount': 350.0,
+            'incident_date': today,
+            'description': '350 ETB counter shortage.',
+        })
+        self.assertEqual(case_t1.punishment_type, 'verbal_warning')
+        self.assertEqual(case_t1.active_duration_days, 30)
+
+        # Tier 4: 5,001 - 10,000 ETB (1st occurrence = 2nd Warning + 10%)
+        emp_other = self.env['hr.employee'].create({'name': 'Cashier Test User'})
+        case_t4 = self.env['discipline.case'].create({
+            'employee_id': emp_other.id,
+            'offense_id': offense_csh.id,
+            'cash_shortage_amount': 7500.0,
+            'incident_date': today,
+            'description': '7,500 ETB vault shortage.',
+        })
+        self.assertEqual(case_t4.punishment_type, 'second_warning_penalty')
+        self.assertEqual(case_t4.penalty_percentage, 10.0)
+        self.assertEqual(case_t4.active_duration_days, 180)
+
+        # Tier 6: > 20,000 ETB (1st occurrence = Final Warning + 20%)
+        emp_third = self.env['hr.employee'].create({'name': 'Senior Cashier Test'})
+        case_t6 = self.env['discipline.case'].create({
+            'employee_id': emp_third.id,
+            'offense_id': offense_csh.id,
+            'cash_shortage_amount': 25000.0,
+            'incident_date': today,
+            'description': '25,000 ETB major shortage.',
+        })
+        self.assertEqual(case_t6.punishment_type, 'final_warning_penalty')
+        self.assertEqual(case_t6.penalty_percentage, 20.0)
+        self.assertEqual(case_t6.active_duration_days, 365)
+
+    def test_21_statutory_mitigation_article_33_13(self):
+        """Test Article 33.13 statutory mitigation reducing penalty grade by 1 rank upon justification."""
+        today = Date.today()
+        # Level 3 offense: Standard Second Warning + 10%
+        case = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_demotion.id,
+            'incident_date': today,
+            'is_statutory_mitigation_applied': True,
+            'mitigation_justification': 'Employee demonstrated 98% performance rating and prompt self-reporting.',
+            'description': 'Operational negligence with strong mitigation.',
+        })
+        # Standard Level 2 (final_warning_penalty) mitigated down to Level 3 (second_warning_penalty)
+        self.assertEqual(case.punishment_type, 'second_warning_penalty')
+
+    def test_22_statutory_action_deadlines(self):
+        """Test Article 33.11 statutory action deadlines: 7 days for Verbal, 15 days for Standard, 30 days for Dismissal."""
+        today = Date.today()
+        offense_verbal = self.env.ref('discipline_management.offense_cba_33_4_1_a', raise_if_not_found=False)
+        if not offense_verbal:
+            return
+
+        case_verbal = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': offense_verbal.id,
+            'incident_date': today,
+            'description': 'Verbal deadline test.',
+        })
+        self.assertEqual(case_verbal.statutory_deadline_date, today + timedelta(days=7))
+
+        case_dismissal = self.env['discipline.case'].create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'description': 'Dismissal deadline test.',
+        })
+        self.assertEqual(case_dismissal.statutory_deadline_date, today + timedelta(days=30))
+
+    def test_23_complete_end_to_end_governance_lifecycle(self):
+        """Test complete 10-step enterprise disciplinary lifecycle:
+        Director Initiate -> Chief Forward -> CEO Directive -> Precautionary Suspension ->
+        Audit 5-Stage Investigation -> Committee Review & Quorum Sign-off ->
+        Executive Enforcement -> Delivery Receipt -> Employee Appeal -> Final Closure.
+        """
+        import base64
+        today = Date.today()
+
+        # Step 1: Directorate Director initiates major case (Level 1 Dismissal track)
+        case = self.env['discipline.case'].with_user(self.user_reviewer).create({
+            'employee_id': self.employee.id,
+            'offense_id': self.offense_level1.id,
+            'incident_date': today,
+            'case_action_track': 'committee_escalation',
+            'initiator_type': 'director',
+            'initiator_id': self.user_reviewer.id,
+            'description': 'Suspected serious fraud and ledger falsification of ETB 250,000.',
+        })
+        case.action_initiate()
+        self.assertEqual(case.state, 'initiated')
+
+        # Step 2: Director forwards to Respective Chief Officer
+        case.with_user(self.user_reviewer).action_submit_to_chief()
+        self.assertEqual(case.state, 'submitted_chief')
+
+        # Step 3: Chief Officer forwards to CEO for executive directive
+        case.with_user(self.user_approver).action_chief_escalate_to_ceo()
+        self.assertEqual(case.state, 'ceo_review')
+
+        # Step 4: CEO refers to Audit Directorate for investigation & instructs Committee Secretary to suspend
+        case.with_user(self.user_approver).action_ceo_announce_audit_and_suspend()
+        self.assertEqual(case.state, 'investigating')
+        self.assertTrue(len(case.investigation_ids) > 0)
+        self.assertTrue(len(case.suspension_ids) > 0)
+
+        # Verify Precautionary Suspension is created (withheld pay per Art. 10.6.1)
+        suspension = case.suspension_ids[0]
+        self.assertEqual(suspension.suspension_type, 'without_pay')
+
+        # Step 5: Audit Directorate executes 5-stage investigation
+        inv = case.investigation_ids[0]
+        self.assertEqual(inv.state, 'draft')
+
+        # 5a. Assign investigation to auditor
+        inv.with_user(self.user_approver).write({'investigator_id': self.user_reviewer.id})
+        inv.with_user(self.user_approver).action_assign_investigation()
+        self.assertEqual(inv.state, 'assigned')
+
+        # 5b. Auditor completes inquiry, records ETB 250,000 loss, attaches PDF report & submits for Manager review
+        inv.with_user(self.user_reviewer).write({
+            'summary_findings': '<p>Forensic ledger audit confirmed unauthorized credit transfer of ETB 250,000.</p>',
+            'investigator_recommendation': '<p>Recommend Dismissal pursuant to CBA Article 33.4 / Policy 10.5.1.</p>',
+            'applicable_policy': 'Core Banking Security Standard & CBA Article 33.4',
+            'finding_outcome': 'liable',
+            'financial_loss_amount': 250000.0,
+            'loss_resolution_status': 'unresolved',
+            'report_file': base64.b64encode(b'Official Forensic Audit Report Content'),
+            'report_filename': 'forensic_audit_report.pdf',
+        })
+        inv.with_user(self.user_reviewer).action_submit_for_manager_review()
+        self.assertEqual(inv.state, 'manager_review')
+
+        # 5c. Audit Manager reviews & approves
+        inv.with_user(self.user_approver).action_manager_approve()
+        self.assertEqual(inv.state, 'director_review')
+
+        # 5d. Audit Director gives final sign-off & announces findings
+        inv.with_user(self.user_approver).action_director_approve_and_announce()
+        self.assertEqual(inv.state, 'approved')
+        self.assertEqual(case.state, 'committee_review')
+        self.assertTrue(case.is_locked_for_committee)
+
+        # Step 6: Disciplinary Committee Meeting, Quorum Validation, and Sign-off
+        meeting = self.env['discipline.committee.meeting'].create({
+            'case_id': case.id,
+            'meeting_date': fields.Datetime.now(),
+            'committee_chair_id': self.user_approver.id,
+            'member_ids': [(6, 0, [self.user_reviewer.id, self.user_approver.id])],
+            'present_members_count': 2,
+            'meeting_minutes': '<p>Disciplinary Committee reviewed audit evidence. Unanimous vote for dismissal.</p>',
+            'final_recommendation': 'dismissal',
+            'director_signed_off': True,
+            'state': 'completed',
+        })
+        self.assertEqual(meeting.state, 'completed')
+        self.assertTrue(meeting.is_quorum_met)
+
+        # Set committee decided punishment
+        case.with_context(force_write=True).write({
+            'decided_punishment_type': 'dismissal',
+            'severity_level_id': self.level_1.id,
+            'is_locked_for_committee': False,
+        })
+
+        # Step 7: Committee Secretary submits case decision for Executive Approval
+        case.with_user(self.user_approver).action_submit_for_approval()
+        self.assertEqual(case.state, 'pending_approval')
+
+        # Step 8: CEO / Executive Approves & Enforces Decision
+        case.with_user(self.user_approver).action_approve_and_enforce()
+        self.assertEqual(case.state, 'enforced')
+        self.assertTrue(self.employee.active_disciplinary_action)
+        self.assertTrue(self.employee.is_ineligible_for_promotion_transfer)
+
+        # Step 9: Delivery Acknowledgment & 10-Day Appeal Window
+        case.action_acknowledge_receipt()
+        self.assertTrue(case.is_appeal_window_open)
+
+        # Step 10: Employee Lodges Appeal, Appellate Review & Case Closure
+        appeal = self.env['discipline.appeal'].create({
+            'case_id': case.id,
+            'appeal_grounds': 'Procedural irregularity defense.',
+            'state': 'submitted',
+        })
+        self.assertEqual(appeal.state, 'submitted')
+
+        # Board / Appellate Body reviews and upholds decision
+        appeal.write({
+            'decision_outcome': 'upheld',
+            'appeal_decision_notes': 'Evidence was overwhelming and procedures strictly observed.',
+            'state': 'decided',
+        })
+        case.with_context(force_write=True).write({'state': 'closed'})
+        self.assertEqual(case.state, 'closed')
+
+
+

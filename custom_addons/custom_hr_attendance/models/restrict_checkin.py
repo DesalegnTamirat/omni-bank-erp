@@ -559,10 +559,12 @@ class HrEmployeePrivate(models.Model):
             afternoon_buffer_start = afternoon_s - 0.25  # Fixed 15 min buffer before afternoon start
 
             if current_float >= afternoon_e:
-                raise UserError(_(
-                    "Check-in is not allowed.\n\n"
-                    "Your scheduled shift ended at %s."
-                ) % _fmt(afternoon_e))
+                if enable_checkin_restriction and not is_manager:
+                    raise UserError(_(
+                        "Check-in is not allowed.\n\n"
+                        "Your scheduled shift ended at %s."
+                    ) % _fmt(afternoon_e))
+                return afternoon_s, afternoon_e
 
             if current_float < morning_e:
                 # Morning Session
@@ -881,8 +883,18 @@ class HrEmployeePrivate(models.Model):
                         'is_force_checkout': True,
                     })
                     attendance.flush_recordset()
+                    # Check if afternoon check-in window is still open or allowed
+                    # If it is past dead-time cutoff and not allowed to check in, treat this click as a day-end checkout!
+                    has_predefined = bool(predefined_late and current_float <= predefined_late.end_time)
+                    is_past_deadtime = (current_float > afternoon_late_cutoff)
+
+                    if is_past_deadtime and enable_checkin_restriction and not is_manager and not has_predefined:
+                        self._last_attendance_action = 'check_out'
+                        _logger.info("Morning Session Force-Closed at end of day for %s at %.2f (Afternoon check-in skipped as window is closed)", self.name, current_float)
+                        return attendance
+
                     self._last_attendance_action = 'dual_transition'
-                    _logger.info("1-Click Force Checkout Morning Session for %s at %.2f", self.name, current_float)
+                    _logger.info("1-Click Force Checkout Morning Session for %s at %.2f + Afternoon Check-In", self.name, current_float)
 
                     fast_att_env = self.env['hr.attendance'].with_context(
                         tracking_disable=True,
@@ -892,59 +904,33 @@ class HrEmployeePrivate(models.Model):
                         skip_duplicate_check=True,
                     )
 
-                    if current_float <= afternoon_start:
-                        # On-Time Afternoon Check-in (snapped to afternoon start)
-                        afternoon_start_utc = self._float_to_utc_datetime(afternoon_start, local_dt)
-                        vals = {
-                            'employee_id': self.id,
-                            'check_in': afternoon_start_utc,
-                            'actual_check_in': utc_naive_dt,
-                            'in_mode': self.env.context.get('attendance_mode', 'kiosk'),
-                            'check_in_status': 'Normal',
-                            'shift_start_float': afternoon_start,
-                            'shift_end_float': sched['shift_end'],
-                        }
-                        if geo_information:
-                            vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
-                        new_att = fast_att_env.create(vals)
-                        new_att._enqueue_attendance_side_effects()
-                        return new_att
-                    elif current_float <= afternoon_late_cutoff:
-                        # Late Afternoon Check-in (Zero Grace)
-                        late_hrs = max(0.0, round(current_float - afternoon_start, 4))
-                        vals = {
-                            'employee_id': self.id,
-                            'check_in': utc_naive_dt,
-                            'actual_check_in': utc_naive_dt,
-                            'in_mode': self.env.context.get('attendance_mode', 'kiosk'),
-                            'check_in_status': 'Late',
-                            'late_time_hour': late_hrs,
-                            'shift_start_float': afternoon_start,
-                            'shift_end_float': sched['shift_end'],
-                        }
-                        if geo_information:
-                            vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
-                        new_att = fast_att_env.create(vals)
-                        new_att._enqueue_attendance_side_effects()
-                        return new_att
-                    else:
-                        # Very Late Afternoon Check-in (Zero Grace)
-                        late_hrs = max(0.0, round(current_float - afternoon_start, 4))
-                        vals = {
-                            'employee_id': self.id,
-                            'check_in': utc_naive_dt,
-                            'actual_check_in': utc_naive_dt,
-                            'in_mode': self.env.context.get('attendance_mode', 'kiosk'),
-                            'check_in_status': 'Very Late',
-                            'late_time_hour': late_hrs,
-                            'shift_start_float': afternoon_start,
-                            'shift_end_float': sched['shift_end'],
-                        }
-                        if geo_information:
-                            vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
-                        new_att = fast_att_env.create(vals)
-                        new_att._enqueue_attendance_side_effects()
-                        return new_att
+                    # Evaluate afternoon check-in status using standard unified engine (enforces dead-time, preapprovals, and grace)
+                    status, late_hrs, ot, pre_late = self._evaluate_checkin_status(
+                        current_float, afternoon_start, dead_time, predefined_late,
+                        is_manager=is_manager, allow_late=not enable_checkin_restriction, is_afternoon=True
+                    )
+
+                    checkin_dt = utc_naive_dt if status in ('Late', 'Very Late', 'Pre-Defined Lateness') else self._float_to_utc_datetime(afternoon_start, local_dt)
+                    in_mode_val = 'predefined' if pre_late > 0 else self.env.context.get('attendance_mode', 'kiosk')
+
+                    vals = {
+                        'employee_id': self.id,
+                        'check_in': checkin_dt,
+                        'actual_check_in': utc_naive_dt,
+                        'in_mode': in_mode_val,
+                        'check_in_status': status,
+                        'late_time_hour': late_hrs,
+                        'pre_defined_lateness': pre_late,
+                        'shift_start_float': afternoon_start,
+                        'shift_end_float': sched['shift_end'],
+                    }
+                    if predefined_late and pre_late > 0:
+                        vals['pre_defined_attendance_id'] = predefined_late.id
+                    if geo_information:
+                        vals.update({'in_%s' % key: geo_information[key] for key in geo_information})
+                    new_att = fast_att_env.create(vals)
+                    new_att._enqueue_attendance_side_effects()
+                    return new_att
 
             # Regular Shift-End Check-Out (Afternoon or Full-Day / Saturday)
             # Use dynamic schedule shift_end to immediately reflect updated settings or Saturday half-day

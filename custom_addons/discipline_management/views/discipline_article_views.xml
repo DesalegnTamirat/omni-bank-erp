@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Discipline Article Search View -->
+        <record id="view_discipline_article_search" model="ir.ui.view">
+            <field name="name">discipline.article.search</field>
+            <field name="model">discipline.article</field>
+            <field name="arch" type="xml">
+                <search string="Disciplinary Articles &amp; Regulations">
+                    <field name="article_number"/>
+                    <field name="name"/>
+                    <field name="policy_version_id"/>
+                    <filter string="Non-Managerial Articles" name="filter_non_managerial" domain="[('staff_category', '=', 'non_managerial')]"/>
+                    <filter string="Managerial Articles" name="filter_managerial" domain="[('staff_category', '=', 'managerial')]"/>
+                    <filter string="Universal Articles" name="filter_universal" domain="[('staff_category', '=', 'all')]"/>
+                    <filter string="Archived" name="filter_inactive" domain="[('active', '=', False)]"/>
+                    <filter string="Regulation Document" name="group_policy_version" context="{'group_by': 'policy_version_id'}"/>
+                    <filter string="Staff Category" name="group_staff_category" context="{'group_by': 'staff_category'}"/>
+                    <filter string="Severity Level" name="group_severity_level" context="{'group_by': 'severity_level_id'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- Discipline Article List View -->
+        <record id="view_discipline_article_tree" model="ir.ui.view">
+            <field name="name">discipline.article.list</field>
+            <field name="model">discipline.article</field>
+            <field name="arch" type="xml">
+                <list string="Regulatory Articles &amp; Clauses">
+                    <field name="article_number"/>
+                    <field name="name"/>
+                    <field name="policy_version_id"/>
+                    <field name="staff_category" widget="badge"
+                           decoration-info="staff_category == 'non_managerial'"
+                           decoration-warning="staff_category == 'managerial'"
+                           decoration-success="staff_category == 'all'"/>
+                    <field name="severity_level_id"/>
+                    <field name="offense_count" string="Sub-Clauses"/>
+                    <field name="active" widget="boolean_toggle"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Discipline Article Form View -->
+        <record id="view_discipline_article_form" model="ir.ui.view">
+            <field name="name">discipline.article.form</field>
+            <field name="model">discipline.article</field>
+            <field name="arch" type="xml">
+                <form string="Regulatory Article">
+                    <header>
+                        <button name="action_create_case" string="Initiate Disciplinary Case from Article"
+                                type="object" class="oe_highlight" icon="fa-gavel"/>
+                    </header>
+                    <sheet>
+                        <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="oe_title">
+                            <span class="o_form_label">Article Number</span>
+                            <h1>
+                                <field name="article_number" placeholder="e.g., Article 33.4 or 10.4.1"/>
+                            </h1>
+                            <h2>
+                                <field name="name" placeholder="Article Title / Heading in Amharic or English"/>
+                            </h2>
+                        </div>
+                        <group>
+                            <group string="Regulation Context">
+                                <field name="policy_version_id"/>
+                                <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
+                                <field name="severity_level_id"/>
+                            </group>
+                            <group string="Configuration &amp; Metrics">
+                                <field name="offense_count" readonly="1"/>
+                                <field name="active"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Sub-Articles &amp; Specific Misconduct Clauses" name="offenses">
+                                <field name="offense_ids">
+                                    <list string="Misconduct Clauses" editable="bottom">
+                                        <field name="sub_article_code" placeholder="e.g. 33.4(ሀ)"/>
+                                        <field name="name"/>
+                                        <field name="category_id"/>
+                                        <field name="penalty_mode"/>
+                                        <field name="custom_punishment_type" string="Override Punishment"/>
+                                        <field name="custom_fine_days" string="Fine Days"/>
+                                        <button name="action_create_case" string="Initiate Case" type="object" icon="fa-plus-circle" class="btn-outline-primary btn-sm"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Full Statutory Text / Legal Provision" name="statutory_text">
+                                <field name="statutory_text" placeholder="Enter complete legal / statutory text of the article as written in the Collective Agreement or Policy Document..."/>
+                            </page>
+                            <page string="General Description &amp; Notes" name="description">
+                                <field name="description" placeholder="Additional commentary, guidelines, or interpretation notes..."/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Discipline Article Act Window -->
+        <record id="action_discipline_article" model="ir.actions.act_window">
+            <field name="name">Regulatory Articles Catalog</field>
+            <field name="res_model">discipline.article</field>
+            <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_discipline_article_search"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No regulatory articles defined yet.
+                </p>
+                <p>
+                    Browse and manage Bunna Bank disciplinary articles from the Collective Agreement (CBA Chapter 8) and Managerial Discipline Policy (Chapter X).
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

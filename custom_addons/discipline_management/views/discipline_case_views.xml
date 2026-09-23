@@ -11,12 +11,17 @@
                     <field name="name"/>
                     <field name="employee_id"/>
                     <field name="offense_id"/>
+                    <field name="article_id"/>
+                    <field name="sub_article_code"/>
+                    <field name="legal_article_display"/>
                     <field name="department_id"/>
                     <filter string="SLA Breached" name="filter_sla_exceeded" domain="[('is_sla_exceeded', '=', True)]"/>
                     <filter string="Level 1 (Dismissal)" name="filter_level_1" domain="[('severity_level', '=', 'level_1')]"/>
+                    <filter string="Escalated by Prior Warning" name="filter_escalated" domain="[('is_escalated_by_active_warning', '=', True)]"/>
                     <filter string="Enforced Cases" name="filter_enforced" domain="[('state', '=', 'enforced')]"/>
                     <filter string="Revoked Cases" name="filter_revoked" domain="[('state', '=', 'revoked')]"/>
                     <filter string="Employee" name="group_employee" context="{'group_by':'employee_id'}"/>
+                    <filter string="Regulatory Article" name="group_article" context="{'group_by':'article_id'}"/>
                     <filter string="Severity Level" name="group_severity" context="{'group_by':'severity_level'}"/>
                     <filter string="Status" name="group_state" context="{'group_by':'state'}"/>
                     <filter string="Department" name="group_dept" context="{'group_by':'department_id'}"/>
@@ -33,7 +38,9 @@
                     <field name="name"/>
                     <field name="employee_id"/>
                     <field name="department_id"/>
+                    <field name="legal_article_display" string="Article / Clause"/>
                     <field name="offense_id"/>
+                    <field name="occurrence_count" string="Occurrence #"/>
                     <field name="severity_level"/>
                     <field name="incident_date"/>
                     <field name="sla_deadline"/>
@@ -150,6 +157,10 @@
                                 <field name="name" readonly="1"/>
                             </h1>
                         </div>
+                        <div class="alert alert-warning" role="alert" invisible="not is_escalated_by_active_warning">
+                            <strong><i class="fa fa-level-up"/> Progressive Escalation Applied (Article 33.1.4):</strong>
+                            <field name="auto_applied_rule_summary" readonly="1"/>
+                        </div>
                         <div class="alert alert-warning" role="alert" invisible="case_action_track != 'direct_enforce' or severity_level != 'level_1'">
                             <strong>Dismissal Authority Restriction:</strong> Direct supervisors cannot directly enforce Level 1 Dismissal. Please switch Disciplinary Action Track to <em>'Formal Escalation'</em> to forward to Respective Chief for Audit Investigation and Disciplinary Committee Review.
                         </div>
@@ -166,17 +177,26 @@
                                 <field name="work_location_id"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
-                            <group string="Misconduct &amp; Offense Classification">
+                            <group string="Misconduct &amp; Statutory Legal Provision">
                                 <field name="case_action_track" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'initiated')" invisible="not is_director_user and not is_hr_admin"/>
                                 <field name="allowed_severity_level_ids" invisible="1"/>
+                                <field name="is_cash_shortage" invisible="1"/>
+                                <field name="policy_version_id" invisible="1"/>
                                 <field name="staff_category_display" readonly="1"/>
-                                <field name="offense_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="offense_category_id"/>
+                                <field name="article_id" string="Regulatory Article" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="offense_id" string="Offense / Clause" domain="[('article_id', '=?', article_id)]" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="cash_shortage_amount" invisible="not is_cash_shortage" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="legal_article_display" string="Statutory Citation" readonly="1"/>
+                                <field name="occurrence_count" string="Recurrence Level" readonly="1"/>
+                                <field name="is_escalated_by_active_warning" invisible="1"/>
+                                <field name="is_statutory_mitigation_applied" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="mitigation_justification" invisible="not is_statutory_mitigation_applied" required="is_statutory_mitigation_applied" readonly="state in ('enforced', 'closed', 'revoked')" placeholder="State reasons pursuant to Article 33.13 (e.g. Clean record, 95%+ performance rating, good faith)..."/>
+                                <field name="offense_category_id" invisible="1"/>
                                 <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="state in ('enforced', 'closed', 'revoked')" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="punishment_type" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="penalty_percentage" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="fine_days" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="active_duration_days" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="active_duration_days" string="Validity Duration (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="property_repair_cost" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
                             </group>
@@ -194,7 +214,9 @@
                                        required="severity_level == 'level_1' and state == 'pending_approval'"
                                        string="Dismissal Authority (CEO/CPCO)"/>
                             </group>
-                            <group string="SLA &amp; Resolution Timelines">
+                            <group string="SLA &amp; Statutory Resolution Timelines">
+                                <field name="statutory_deadline_date" readonly="1"/>
+                                <field name="is_deadline_exceeded" widget="boolean" readonly="1"/>
                                 <field name="sla_target_days"/>
                                 <field name="sla_deadline"/>
                                 <field name="is_sla_exceeded" widget="boolean"/>
@@ -216,6 +238,12 @@
                         <notebook>
                             <page string="Detailed Incident Description">
                                 <field name="description" placeholder="Provide complete facts, dates, time, witnesses, and details of misconduct..." readonly="state in ('enforced', 'closed', 'revoked')"/>
+                            </page>
+                            <page string="Statutory Legal Provision &amp; Verbatim Clause" name="statutory_clause" invisible="not legal_clause_text">
+                                <group>
+                                    <field name="legal_article_display" string="Full Citation" readonly="1"/>
+                                </group>
+                                <field name="legal_clause_text" readonly="1"/>
                             </page>
                             <page string="Investigations &amp; Findings" invisible="initiator_type == 'manager'">
                                 <field name="investigation_ids" readonly="not is_auditor_user or state in ('enforced', 'closed', 'revoked')">

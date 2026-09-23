@@ -38,7 +38,9 @@
                             <page string="Associated Offenses">
                                 <field name="offense_ids" readonly="1">
                                     <list>
+                                        <field name="sub_article_code"/>
                                         <field name="name"/>
+                                        <field name="penalty_mode"/>
                                     </list>
                                 </field>
                             </page>
@@ -54,55 +56,119 @@
             <field name="view_mode">list,form</field>
         </record>
 
-        <!-- Offense Definition Views -->
+        <!-- Offense Search View -->
+        <record id="view_discipline_offense_search" model="ir.ui.view">
+            <field name="name">discipline.offense.search</field>
+            <field name="model">discipline.offense</field>
+            <field name="arch" type="xml">
+                <search string="Disciplinary Offenses">
+                    <field name="name"/>
+                    <field name="sub_article_code"/>
+                    <field name="article_id"/>
+                    <field name="category_id"/>
+                    <field name="penalty_mode"/>
+                    <filter string="Non-Managerial" name="filter_non_mgr" domain="[('staff_category', '=', 'non_managerial')]"/>
+                    <filter string="Managerial" name="filter_mgr" domain="[('staff_category', '=', 'managerial')]"/>
+                    <filter string="Level Default" name="filter_mode_level" domain="[('penalty_mode', '=', 'level_default')]"/>
+                    <filter string="Article Override" name="filter_mode_override" domain="[('penalty_mode', '=', 'article_override')]"/>
+                    <filter string="Repetition Ladder" name="filter_mode_escalation" domain="[('penalty_mode', '=', 'repetition_escalation')]"/>
+                    <filter string="Article / Regulation" name="group_article" context="{'group_by': 'article_id'}"/>
+                    <filter string="Category" name="group_category" context="{'group_by': 'category_id'}"/>
+                    <filter string="Penalty Mode" name="group_penalty_mode" context="{'group_by': 'penalty_mode'}"/>
+                    <filter string="Staff Category" name="group_staff_category" context="{'group_by': 'staff_category'}"/>
+                </search>
+            </field>
+        </record>
+
+        <!-- Offense Definition List View -->
         <record id="view_discipline_offense_tree" model="ir.ui.view">
             <field name="name">discipline.offense.list</field>
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
-                <list>
+                <list string="Offenses &amp; Misconduct Catalog">
+                    <field name="sub_article_code"/>
                     <field name="name"/>
+                    <field name="article_id"/>
+                    <field name="staff_category" widget="badge"
+                           decoration-info="staff_category == 'non_managerial'"
+                           decoration-warning="staff_category == 'managerial'"
+                           decoration-success="staff_category == 'all'"/>
+                    <field name="penalty_mode" widget="badge"/>
                     <field name="category_id"/>
-                    <field name="policy_version_id"/>
-                    <field name="active"/>
+                    <field name="active" widget="boolean_toggle"/>
                 </list>
             </field>
         </record>
 
+        <!-- Offense Definition Form View -->
         <record id="view_discipline_offense_form" model="ir.ui.view">
             <field name="name">discipline.offense.form</field>
             <field name="model">discipline.offense</field>
             <field name="arch" type="xml">
-                <form>
+                <form string="Offense Classification &amp; Rule">
+                    <header>
+                        <button name="action_create_case" string="Initiate Disciplinary Case"
+                                type="object" class="oe_highlight" icon="fa-gavel"/>
+                    </header>
                     <sheet>
                         <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                        <div class="oe_title">
+                            <span class="o_form_label">Clause / Sub-Article Code</span>
+                            <h1>
+                                <field name="sub_article_code" placeholder="e.g., 33.4.1(ሀ) or 10.4.1(a)"/>
+                            </h1>
+                            <h2>
+                                <field name="name" placeholder="Concise title / misconduct summary"/>
+                            </h2>
+                        </div>
                         <group>
-                            <group string="Offense Attributes">
-                                <field name="name"/>
+                            <group string="Regulatory Context &amp; Scope">
+                                <field name="article_id"/>
+                                <field name="policy_version_id" readonly="1"/>
+                                <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
                                 <field name="category_id"/>
-                                <field name="policy_version_id"/>
                             </group>
-                            <group string="Status">
+                            <group string="Penalty Architecture &amp; Mode">
+                                <field name="penalty_mode" widget="radio"/>
                                 <field name="active"/>
                             </group>
                         </group>
+
+                        <!-- Mode 2: Custom Penalty Overrides Group -->
+                        <group string="Statutory Direct Penalty Settings (Override Mode)" invisible="penalty_mode != 'article_override'">
+                            <group>
+                                <field name="custom_punishment_type"/>
+                                <field name="custom_fine_days" invisible="custom_punishment_type != 'fine'"/>
+                                <field name="custom_penalty_percentage" invisible="custom_punishment_type not in ('first_warning_penalty', 'second_warning_penalty', 'final_warning_penalty', 'fine')"/>
+                            </group>
+                            <group>
+                                <field name="custom_warning_validity_months"/>
+                            </group>
+                        </group>
+
                         <notebook>
-                            <page string="Severity Escalation Matrix &amp; Rules">
-                                <button name="action_populate_default_severity_lines" string="Auto-Populate Configured Severity Levels" type="object" class="btn-outline-primary mb-2"/>
+                            <page string="Repetition Penalty Matrix (Ladder / Multi-Tier)" name="repetition_lines"
+                                  invisible="penalty_mode not in ('repetition_escalation', 'level_default')">
+                                <button name="action_populate_default_severity_lines" string="Auto-Populate Standard 5-Level Escalation"
+                                        type="object" class="btn-outline-primary mb-2"/>
                                 <field name="line_ids">
                                     <list editable="bottom">
                                         <field name="occurrence_number"/>
+                                        <field name="occurrence_label" placeholder="e.g. 1st Occurrence"/>
                                         <field name="severity_level_id"/>
                                         <field name="punishment_type"/>
-                                        <field name="non_managerial_penalty_pct"/>
-                                        <field name="non_managerial_fine_days"/>
-                                        <field name="managerial_penalty_pct"/>
-                                        <field name="managerial_fine_days"/>
-                                        <field name="reset_window_months"/>
+                                        <field name="fine_days" string="Fine Days"/>
+                                        <field name="penalty_percentage" string="Penalty %"/>
+                                        <field name="warning_validity_months" string="Validity (Mo)"/>
                                         <field name="approval_authority"/>
+                                        <field name="notes"/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Guidelines &amp; Policy Description">
+                            <page string="Full Statutory Text / Legal Clause Provision" name="clause_text">
+                                <field name="full_clause_text" placeholder="Enter verbatim text as written in the Collective Agreement or Policy document..."/>
+                            </page>
+                            <page string="Policy Guidelines &amp; Rationale" name="guidelines">
                                 <field name="description" placeholder="Enter policy guidelines, evidence requirements, and punishment rationale..."/>
                             </page>
                         </notebook>
@@ -116,6 +182,7 @@
             <field name="name">Offense Classifications &amp; Rules</field>
             <field name="res_model">discipline.offense</field>
             <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_discipline_offense_search"/>
         </record>
 
         <!-- Policy Version Views -->
@@ -123,12 +190,17 @@
             <field name="name">discipline.policy.version.list</field>
             <field name="model">discipline.policy.version</field>
             <field name="arch" type="xml">
-                <list>
+                <list string="Regulation Documents &amp; Policies">
                     <field name="version_number"/>
                     <field name="name"/>
+                    <field name="staff_category" widget="badge"/>
+                    <field name="chapter_reference"/>
+                    <field name="article_count" string="Articles"/>
+                    <field name="offense_count" string="Misconduct Clauses"/>
                     <field name="effective_date"/>
-                    <field name="approved_by_id"/>
-                    <field name="state"/>
+                    <field name="state" widget="badge"
+                           decoration-success="state == 'active'"
+                           decoration-muted="state == 'archived'"/>
                 </list>
             </field>
         </record>
@@ -137,25 +209,48 @@
             <field name="name">discipline.policy.version.form</field>
             <field name="model">discipline.policy.version</field>
             <field name="arch" type="xml">
-                <form>
+                <form string="Regulation &amp; Policy Document">
                     <header>
                         <button name="action_activate" string="Activate Policy Version" type="object" class="oe_highlight" invisible="state == 'active'"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,active,archived"/>
                     </header>
                     <sheet>
+                        <div class="oe_title">
+                            <span class="o_form_label">Document Code / Version</span>
+                            <h1>
+                                <field name="version_number" placeholder="e.g. CBA-2024-V1"/>
+                            </h1>
+                            <h2>
+                                <field name="name" placeholder="Document Title (e.g. Collective Bargaining Agreement)"/>
+                            </h2>
+                        </div>
                         <group>
-                            <group>
-                                <field name="name"/>
-                                <field name="version_number"/>
-                            </group>
-                            <group>
+                            <group string="Scope &amp; Reference">
+                                <field name="staff_category" widget="radio" options="{'horizontal': true}"/>
+                                <field name="chapter_reference" placeholder="e.g. ምዕራፍ ስምንት or Chapter X"/>
                                 <field name="effective_date"/>
                                 <field name="approved_by_id"/>
                             </group>
+                            <group string="Attachment &amp; Metrics">
+                                <field name="document_file" filename="document_filename"/>
+                                <field name="document_filename" invisible="1"/>
+                                <field name="article_count" readonly="1"/>
+                                <field name="offense_count" readonly="1"/>
+                            </group>
                         </group>
                         <notebook>
-                            <page string="Summary &amp; Changes">
-                                <field name="description" placeholder="Summary of changes in this policy version..."/>
+                            <page string="Articles &amp; Regulatory Clauses" name="articles">
+                                <field name="article_ids">
+                                    <list string="Articles">
+                                        <field name="article_number"/>
+                                        <field name="name"/>
+                                        <field name="severity_level_id"/>
+                                        <field name="offense_count" string="Sub-Clauses"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Summary &amp; Changes" name="summary">
+                                <field name="description" placeholder="Summary of provisions or changes in this policy version..."/>
                             </page>
                         </notebook>
                     </sheet>
@@ -165,7 +260,7 @@
         </record>
 
         <record id="action_discipline_policy_version" model="ir.actions.act_window">
-            <field name="name">Policy Version Control</field>
+            <field name="name">Regulation Documents &amp; Policies</field>
             <field name="res_model">discipline.policy.version</field>
             <field name="view_mode">list,form</field>
         </record>

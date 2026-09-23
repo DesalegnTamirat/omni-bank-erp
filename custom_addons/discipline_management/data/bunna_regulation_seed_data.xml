@@ -1,37 +1,390 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data noupdate="1">
+    <data>
 
         <!-- ======================================================== -->
-        <!-- 1. OFFENSE CATEGORIES (Bunna Bank Regulation Art. 10.4) -->
+        <!-- 1. POLICY VERSION DOCUMENTS                              -->
+        <!-- ======================================================== -->
+
+        <!-- Non-Managerial: CBA Chapter 8 -->
+        <record id="policy_cba_ch8" model="discipline.policy.version">
+            <field name="name">Bunna Bank Collective Bargaining Agreement (የህብረት ስምምነት)</field>
+            <field name="version_number">CBA-CH8-2024</field>
+            <field name="staff_category">non_managerial</field>
+            <field name="chapter_reference">ምዕራፍ ስምንት - የስነ ስርዓት(ዲሲፕሊን) እርምጃ</field>
+            <field name="effective_date">2024-01-01</field>
+            <field name="state">active</field>
+            <field name="description">የቡና ባንክ አ.ማ እና የቡና ባንክ የሰራተኞች መሰረታዊ ማህበር የህብረት ስምምነት ምዕራፍ ስምንት የስነ-ስርዓት ድንጋጌዎች (አንቀጽ 33.1 - 33.13)።</field>
+        </record>
+
+        <!-- Managerial: Chapter X Policy -->
+        <record id="policy_managerial_ch10" model="discipline.policy.version">
+            <field name="name">Bunna Bank Managerial Staff Discipline Policy</field>
+            <field name="version_number">MGR-CH10-2024</field>
+            <field name="staff_category">managerial</field>
+            <field name="chapter_reference">Chapter X - Disciplinary Measures for Managerial Staff</field>
+            <field name="effective_date">2024-01-01</field>
+            <field name="state">active</field>
+            <field name="description">Human Resource Management Policy Chapter X: Disciplinary Rules, Penalties, and Dismissal Clauses for Managerial and Supervisory Staff (Articles 10.1 - 10.9).</field>
+        </record>
+
+
+        <!-- ======================================================== -->
+        <!-- 2. OFFENSE CATEGORIES                                    -->
         <!-- ======================================================== -->
 
         <record id="cat_attendance" model="discipline.offense.category">
             <field name="name">Attendance &amp; Punctuality Misconduct</field>
             <field name="code">ATT</field>
-            <field name="description">Latecoming, leaving office without permission, absence without cause.</field>
+            <field name="description">Latecoming, leaving office without permission, absence without good cause.</field>
         </record>
 
         <record id="cat_conduct" model="discipline.offense.category">
             <field name="name">General Conduct &amp; Professional Ethics</field>
             <field name="code">CND</field>
-            <field name="description">Personal hygiene, attire, performance evaluation refusal, insubordination.</field>
+            <field name="description">Personal hygiene, attire, insubordination, evaluation refusal, workplace demeanor.</field>
         </record>
 
         <record id="cat_property" model="discipline.offense.category">
             <field name="name">Bank Property &amp; Operational Negligence</field>
             <field name="code">PRP</field>
-            <field name="description">Negligent property damage, failure to report accidents, duty negligence, unauthorized property utilization.</field>
+            <field name="description">Negligent property damage, failure to report accidents, unauthorized property utilization.</field>
         </record>
 
+        <record id="cat_supervisory" model="discipline.offense.category">
+            <field name="name">Supervisory &amp; Managerial Control Failures</field>
+            <field name="code">SUP</field>
+            <field name="description">Lack of supervision, operational override breaches, failure to implement audit findings.</field>
+        </record>
+
+        <record id="cat_fraud" model="discipline.offense.category">
+            <field name="name">Fraud, Corruption &amp; Gross Breach of Trust</field>
+            <field name="code">FRD</field>
+            <field name="description">Embezzlement, bribery, forgery, core banking security breach, conflict of interest.</field>
+        </record>
+
+
         <!-- ======================================================== -->
-        <!-- 2. OFFENSE TYPES & SEVERITY ESCALATION MATRIX (Art. 10.4.1) -->
+        <!-- 3. NON-MANAGERIAL ARTICLES & OFFENSES (CBA CHAPTER 8)    -->
         <!-- ======================================================== -->
+
+        <!-- ARTICLE 33.4: የቃል ማስጠንቀቂያ (Verbal Warning) -->
+        <record id="art_cba_33_4" model="discipline.article">
+            <field name="article_number">Article 33.4</field>
+            <field name="name">የቃል ማስጠንቀቂያ እርምጃ የሚያስከትሉ ጥፋቶች (Verbal Warning Offenses)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_5"/>
+            <field name="statutory_text">አንቀጽ 33.4፡ አንድ ሠራተኛ ከዚህ በታች ከተዘረዘሩት ጥፋቶች አንዱን ወይም ተቀራራቢውን ፈጽሞ ከተገኘ እንደ ጥፋቱ ክብደትና ሁኔታ የቃል ማስጠንቀቂያ ይሰጠዋል።</field>
+        </record>
+
+        <record id="offense_cba_33_4_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_4"/>
+            <field name="sub_article_code">33.4.1(ሀ)</field>
+            <field name="name">በሥራ ቦታ ላይ ተገቢ ያልሆነ አለባበስ መልበስ (Inappropriate Attire)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በሥራ ቦታ ላይ የባንኩን የስራ ባህሪና ክብር የማይመጥን ተገቢ ያልሆነ አለባበስ ለብሶ መገኘት።</field>
+        </record>
+
+        <record id="offense_cba_33_4_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_4"/>
+            <field name="sub_article_code">33.4.1(ለ)</field>
+            <field name="name">ተገቢ ባልሆነ ሁኔታ ተገኝቶ ሲገሰጽ ተገቢ ያልሆነ ፀባይ ማሳየት (Improper Demeanor Upon Admonition)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">ተገቢ ባልሆነ ሁኔታ ተገኝቶ በቅርብ ኃላፊው ወይም በክትትል አካላት ሲገሰጽ ተገቢ ያልሆነ ፀባይ ማሳየት።</field>
+        </record>
+
+        <record id="offense_cba_33_4_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_4"/>
+            <field name="sub_article_code">33.4.1(ሐ)</field>
+            <field name="name">የስራ ባልደረባን ማስቀየም ወይም መሳደብ (Offending or Insulting Colleagues)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በስራ ቦታ ላይ የስራ ባልደረባን ማስቀየም፣ ማዋረድ ወይም መሳደብ።</field>
+        </record>
+
+        <record id="offense_cba_33_4_1_d" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_4"/>
+            <field name="sub_article_code">33.4.1(መ)</field>
+            <field name="name">በሥራ ሰዓት ድምጽ በማሰማት ወይም ስልክ በመጠቀም ለሥራ መሰናክል መፍጠር (Workplace Disturbance)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በሥራ ሰዓት ከፍተኛ ድምጽ በማሰማት፣ ቪዲዮ/ሙዚቃ በመክፈት ወይም ሞባይል ስልክ ያለአግባብ በመጠቀም ለሥራና ለደንበኞች መሰናክል መፍጠር።</field>
+        </record>
+
+        <record id="offense_cba_33_4_1_e" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_4"/>
+            <field name="sub_article_code">33.4.1(ሠ)</field>
+            <field name="name">ለደንበኞች ያልተገባ ወይም አስነዋሪ ቃል መጠቀም (Improper Language with Customers)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">ለባንኩ ደንበኞች ያልተገባ፣ ያልተከበረ ወይም አስነዋሪ ቃል መጠቀም።</field>
+        </record>
+
+
+        <!-- ARTICLE 33.5: የመጀመሪያ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት (First Written Warning) -->
+        <record id="art_cba_33_5" model="discipline.article">
+            <field name="article_number">Article 33.5</field>
+            <field name="name">የመጀመሪያ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት የሚያስከትሉ ጥፋቶች (First Written Warning &amp; Fine Offenses)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_4"/>
+            <field name="statutory_text">አንቀጽ 33.5፡ አንድ ሠራተኛ ከዚህ በታች ከተዘረዘሩት ጥፋቶች አንዱን ወይም ተቀራራቢውን ፈጽሞ ከተገኘ የመጀመሪያ የጽሁፍ ማስጠንቀቂያና የ1 ቀን ደመወዝ ቅጣት ይሰጠዋል።</field>
+        </record>
+
+        <record id="offense_cba_33_5_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_5"/>
+            <field name="sub_article_code">33.5.1(ሀ)</field>
+            <field name="name">የቃል ማስጠንቀቂያ ከተሰጠ በኋላ ጥፋት መድገም (Repetition After Verbal Warning)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የቃል ማስጠንቀቂያ ከተሰጠበት ቀን ጀምሮ ባለው 1 ወር ጊዜ ውስጥ ተመሳሳይ ወይም ሌላ የቃል ማስጠንቀቂያ ጥፋት መድገም።</field>
+        </record>
+
+        <record id="offense_cba_33_5_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_5"/>
+            <field name="sub_article_code">33.5.1(ለ)</field>
+            <field name="name">ከሥራ ሰዓት ውጭ ያለፈቃድ በባንኩ ህንጻ ውስጥ መገኘት (Unauthorized Presence Outside Hours)</field>
+            <field name="category_id" ref="cat_attendance"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">ከሥራ ሰዓት ውጭ ያለበላይ ኃላፊ ፈቃድ በባንኩ ቢሮ ወይም ህንጻ ውስጥ መገኘት።</field>
+        </record>
+
+        <record id="offense_cba_33_5_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_5"/>
+            <field name="sub_article_code">33.5.1(ሐ)</field>
+            <field name="name">የባንኩን መታወቂያ ካርድ አለማድረግ ወይም ለሌላ አሳልፎ መስጠት (Misuse of Employee ID)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በባንኩ ግቢ ውስጥ የስራ መታወቂያ ካርድ አለማድረግ ወይም ለሌላ ሶስተኛ ወገን አሳልፎ መስጠት።</field>
+        </record>
+
+        <record id="offense_cba_33_5_1_d" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_5"/>
+            <field name="sub_article_code">33.5.1(መ)</field>
+            <field name="name">በስራ ሰዓት ያለፈቃድ ከስራ ገበታ ውጪ መገኘት (Away From Workstation Without Permission)</field>
+            <field name="category_id" ref="cat_attendance"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በስራ ሰዓት ያለቅርብ ኃላፊ ፈቃድ ከስራ ገበታ ርቆ መገኘት ወይም ቢሮን ጥሎ መሄድ።</field>
+        </record>
+
+        <record id="offense_cba_33_5_1_e" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_5"/>
+            <field name="sub_article_code">33.5.1(ሠ)</field>
+            <field name="name">የተሰጠውን መመሪያ ወይም ደንብ በቸልተኝነት አለማክበር (Negligent Disregard of Directives)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የባንኩን መመሪያዎች፣ ሰርኩላሮች ወይም የቅርብ ኃላፊ ህጋዊ የስራ መመሪያ በቸልተኝነት አለማክበር።</field>
+        </record>
+
+
+        <!-- ARTICLE 33.6: የሁለተኛ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት (Second Written Warning) -->
+        <record id="art_cba_33_6" model="discipline.article">
+            <field name="article_number">Article 33.6</field>
+            <field name="name">የሁለተኛ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት የሚያስከትሉ ጥፋቶች (Second Written Warning &amp; Fine Offenses)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_3"/>
+            <field name="statutory_text">አንቀጽ 33.6፡ አንድ ሠራተኛ ከዚህ በታች ከተዘረዘሩት ጥፋቶች አንዱን ወይም ተቀራራቢውን ፈጽሞ ከተገኘ የሁለተኛ የጽሁፍ ማስጠንቀቂያና የ3 ቀናት ደመወዝ ቅጣት ይሰጠዋል።</field>
+        </record>
+
+        <record id="offense_cba_33_6_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_6"/>
+            <field name="sub_article_code">33.6.1(ሀ)</field>
+            <field name="name">የመጀመሪያ የጽሁፍ ማስጠንቀቂያ ከተሰጠ በኋላ ጥፋት መድገም (Repetition After 1st Written Warning)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የመጀመሪያ የጽሁፍ ማስጠንቀቂያ ከተሰጠበት ቀን ጀምሮ ባለው 3 ወራት ጊዜ ውስጥ ጥፋት መድገም።</field>
+        </record>
+
+        <record id="offense_cba_33_6_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_6"/>
+            <field name="sub_article_code">33.6.1(ለ)</field>
+            <field name="name">ለደንበኞች ሆን ተብሎ የተዛባ መረጃ መስጠት (Intentionally Misleading Customers)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">ለደንበኞች ሆን ተብሎ የተዛባ፣ ያልተሟላ ወይም ሀሰተኛ መረጃ በመስጠት ቅሬታ መፍጠር።</field>
+        </record>
+
+        <record id="offense_cba_33_6_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_6"/>
+            <field name="sub_article_code">33.6.1(ሐ)</field>
+            <field name="name">በባንኩ ውስጥ የቁማር ወይም ጸያፍ ተግባር መፈጸም (Gambling or Indecent Acts in Bank)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በባንኩ ግቢ ወይም ቢሮ ውስጥ ቁማር መጫወት፣ መጠጣት ወይም አስነዋሪ ድርጊት መፈጸም።</field>
+        </record>
+
+        <record id="offense_cba_33_6_1_d" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_6"/>
+            <field name="sub_article_code">33.6.1(መ)</field>
+            <field name="name">የስራ ኃላፊን ህጋዊ ትዕዛዝ አለመቀበል (Insubordination to Lawful Orders)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የበላይ ኃላፊ የሰጠውን ህጋዊና ስራ ነክ መመሪያ ያለምንም በቂ ምክንያት አሻፈረኝ ማለት ወይም አለመፈጸም።</field>
+        </record>
+
+
+        <!-- ARTICLE 33.7: የመጨረሻ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት (Final Written Warning) -->
+        <record id="art_cba_33_7" model="discipline.article">
+            <field name="article_number">Article 33.7</field>
+            <field name="name">የመጨረሻ የጽሁፍ ማስጠንቀቂያና የደመወዝ ቅጣት የሚያስከትሉ ጥፋቶች (Final Written Warning &amp; Fine Offenses)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_2"/>
+            <field name="statutory_text">አንቀጽ 33.7፡ አንድ ሠራተኛ ከዚህ በታች ከተዘረዘሩት ጥፋቶች አንዱን ወይም ተቀራራቢውን ፈጽሞ ከተገኘ የመጨረሻ የጽሁፍ ማስጠንቀቂያና የ5 ቀናት ደመወዝ ቅጣት ይሰጠዋል።</field>
+        </record>
+
+        <record id="offense_cba_33_7_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_7"/>
+            <field name="sub_article_code">33.7.1(ሀ)</field>
+            <field name="name">ሁለተኛ የጽሁፍ ማስጠንቀቂያ ከተሰጠ በኋላ ጥፋት መድገም (Repetition After 2nd Written Warning)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የሁለተኛ የጽሁፍ ማስጠንቀቂያ ከተሰጠበት ቀን ጀምሮ ባለው 6 ወራት ጊዜ ውስጥ ጥፋት መድገም።</field>
+        </record>
+
+        <record id="offense_cba_33_7_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_7"/>
+            <field name="sub_article_code">33.7.1(ለ)</field>
+            <field name="name">በባንኩ ግቢ በስካር ወይም አደንዛዥ እፅ ተጽእኖ ስር መገኘት (Intoxication / Substance Abuse)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በባንኩ የስራ ሰዓት ወይም ግቢ ውስጥ በስካር፣ አደንዛዥ እፅ ወይም ጫት ተጽእኖ ስር ሆኖ መገኘት።</field>
+        </record>
+
+        <record id="offense_cba_33_7_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_7"/>
+            <field name="sub_article_code">33.7.1(ሐ)</field>
+            <field name="name">የስራ ባልደረባ ወይም የበላይ ኃላፊን መደብደብ ወይም ማዋረድ (Physical Assault at Workplace)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በባንኩ ቅጥር ጊቢ ወይም ስራ በሚከናወንበት ወቅት በስራ ባልደረባ ወይም የበላይ ኃላፊ ላይ አካላዊ ጥቃት መፈጸም ወይም ለመደብደብ መሞከር።</field>
+        </record>
+
+
+        <!-- ARTICLE 33.8: ያለማስጠንቀቂያ ከስራ የሚያሰናብቱ ከባድ ጥፋቶች (Dismissal Offenses) -->
+        <record id="art_cba_33_8" model="discipline.article">
+            <field name="article_number">Article 33.8</field>
+            <field name="name">ያለማስጠንቀቂያ ከስራ የሚያሰናብቱ ከባድ ጥፋቶች (Summary Dismissal Offenses)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_1"/>
+            <field name="statutory_text">አንቀጽ 33.8፡ አንድ ሠራተኛ ከዚህ በታች ከተዘረዘሩት ከባድ ጥፋቶች አንዱን ከፈጸመ ያለምንም ቅድመ ማስጠንቀቂያና የሥራ ስንብት ክፍያ ከስራ ይሰናበታል።</field>
+        </record>
+
+        <record id="offense_cba_33_8_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_8"/>
+            <field name="sub_article_code">33.8.1(ሀ)</field>
+            <field name="name">የባንኩን ገንዘብ ወይም ንብረት መመዝበር ወይም መስረቅ (Embezzlement or Theft of Funds)</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የባንኩን ወይም የደንበኛን ገንዘብ፣ ሰነድ ወይም ንብረት መመዝበር፣ መስረቅ ወይም ለራስ/ለሌላ ጥቅም ማዋል/ማዛወር።</field>
+        </record>
+
+        <record id="offense_cba_33_8_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_8"/>
+            <field name="sub_article_code">33.8.1(ለ)</field>
+            <field name="name">የሀሰት ሰነድ ወይም መረጃ ማዘጋጀት፣ መጠቀም ወይም ማቅረብ (Forgery &amp; Fraudulent Documents)</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የሀሰት ፊርማ፣ ቫውቸር፣ ቼክ፣ ዲክላሬሽን ወይም ማንኛውንም ሀሰተኛ ሰነድ ማዘጋጀት፣ መቀየር ወይም መጠቀም።</field>
+        </record>
+
+        <record id="offense_cba_33_8_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_8"/>
+            <field name="sub_article_code">33.8.1(ሐ)</field>
+            <field name="name">ጉቦ ወይም ያልተገባ ጥቅም መጠየቅ፣ መቀበል ወይም መስጠት (Bribery &amp; Graft)</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">ከደንበኛ ወይም ከማንኛውም አካል አገልግሎት ለመስጠት ጉቦ፣ ኮሚሽን ወይም ማንኛውንም ያልተገባ ስጦታ መጠየቅ ወይም መቀበል።</field>
+        </record>
+
+        <record id="offense_cba_33_8_1_d" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_8"/>
+            <field name="sub_article_code">33.8.1(መ)</field>
+            <field name="name">የባንኩን ሲስተም፣ የይለፍ ቃል ወይም ሚስጥር አሳልፎ መስጠት (Core Banking Credential Breach)</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">የኮር ባንኪንግ ሲስተም የይለፍ ቃል፣ የኦዲት ሎግ፣ የቮልት ወይም ሴፍ ሚስጥራዊ ቁልፍ ለሌላ ሰው አሳልፎ መስጠት ወይም ማጥቃት።</field>
+        </record>
+
+        <record id="offense_cba_33_8_1_e" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_8"/>
+            <field name="sub_article_code">33.8.1(ሠ)</field>
+            <field name="name">የፆታ ትንኮሳ ወይም አስገድዶ መድፈር መፈጸም (Sexual Harassment / Assault)</field>
+            <field name="category_id" ref="cat_conduct"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">በሥራ ባልደረባ ወይም ደንበኛ ላይ የፆታ ትንኮሳ፣ ማስገደድ ወይም አስነዋሪ ወሲባዊ ጥቃት መፈጸም።</field>
+        </record>
+
+
+        <!-- ARTICLE 33.9: ከጥሬ ገንዘብ ልዩነት ጋር በተያያዘ ቅጣት የሚያሰጡ ጥፋቶች (Cash Shortages) -->
+        <record id="art_cba_33_9" model="discipline.article">
+            <field name="article_number">Article 33.9</field>
+            <field name="name">ከጥሬ ገንዘብ ልዩነት (ጉድለት) ጋር በተያያዘ ቅጣት የሚያሰጡ ጥፋቶች (Cash Shortage Misconduct)</field>
+            <field name="policy_version_id" ref="policy_cba_ch8"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="severity_level_id" ref="severity_level_5"/>
+            <field name="statutory_text">አንቀጽ 33.9፡ ከጥሬ ገንዘብ አያያዝና አከፋፈል ጋር በተገናኘ የተጣሰ የባንኩ የውስጥ የአሰራር መመሪያ መኖሩ ሲረጋገጥ በተለይ በቆጠራ ስህተት ለሚከሰት የጥሬ ገንዘብ ልዩነት (ጉድለት) ከገንዘብ ጋር በተገናኘ የስራ መደብ ላይ ተመድበው የሚሰሩ ሰራተኞች ያጋጠመውን የገንዘብ ጉድለት ከመተካት በተጨማሪ በገንዘብ መጠኑና በድግግሞሹ መሰረት የዲሲፕሊን ቅጣት እርምጃ ይወሰድባቸዋል።</field>
+        </record>
+
+        <record id="offense_cba_33_9_cash_shortage" model="discipline.offense">
+            <field name="article_id" ref="art_cba_33_9"/>
+            <field name="sub_article_code">33.9</field>
+            <field name="name">የጥሬ ገንዘብ ጉድለት ወይም የቆጠራ ልዩነት መፍጠር (Cash Shortage / Difference Misconduct)</field>
+            <field name="category_id" ref="cat_property"/>
+            <field name="staff_category">non_managerial</field>
+            <field name="penalty_mode">article_override</field>
+            <field name="full_clause_text">በጥሬ ገንዘብ አያያዝና ክፍያ ሂደት ውስጥ በቸልተኝነት ወይም በቆጠራ ስህተት የገንዘብ ጉድለት ማድረስ (በአንቀጽ 33.9 የጥሬ ገንዘብ ልዩነት ሰንጠረዥ መሰረት የሚወሰን)።</field>
+        </record>
+
+
+        <!-- ======================================================== -->
+        <!-- 4. MANAGERIAL ARTICLES & OFFENSES (CHAPTER X)            -->
+        <!-- ======================================================== -->
+
+        <!-- ARTICLE 10.4.1: Managerial Repetition Escalation Misconduct -->
+        <record id="art_mgr_10_4_1" model="discipline.article">
+            <field name="article_number">Article 10.4.1</field>
+            <field name="name">Managerial Misconduct with Repetition Escalation Matrix</field>
+            <field name="policy_version_id" ref="policy_managerial_ch10"/>
+            <field name="staff_category">managerial</field>
+            <field name="statutory_text">Article 10.4.1: Managerial staff committing repetitive operational, conduct, or attendance misconduct shall be subjected to progressive multi-tier sanctions escalating up to dismissal.</field>
+        </record>
 
         <!-- Offense 1: Latecoming -->
         <record id="offense_latecoming" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_4_1"/>
+            <field name="sub_article_code">10.4.1(1)</field>
             <field name="name">Latecoming</field>
             <field name="category_id" ref="cat_attendance"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">repetition_escalation</field>
             <field name="description">Cumulative late hours or repeated tardiness under Bank Regulation Art 10.4.1.</field>
         </record>
 
@@ -39,12 +392,10 @@
             <field name="offense_id" ref="offense_latecoming"/>
             <field name="severity_level_id" ref="severity_level_5"/>
             <field name="occurrence_number">1</field>
+            <field name="occurrence_label">1st Occurrence</field>
             <field name="punishment_type">verbal_warning</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
+            <field name="warning_validity_months">1</field>
             <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
             <field name="approval_authority">direct_manager</field>
         </record>
 
@@ -52,12 +403,10 @@
             <field name="offense_id" ref="offense_latecoming"/>
             <field name="severity_level_id" ref="severity_level_4"/>
             <field name="occurrence_number">2</field>
+            <field name="occurrence_label">2nd Occurrence</field>
             <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.5</field>
-            <field name="managerial_penalty_pct">0.0</field>
+            <field name="warning_validity_months">3</field>
             <field name="managerial_fine_days">1.0</field>
-            <field name="reset_window_months">3</field>
             <field name="approval_authority">hr_manager</field>
         </record>
 
@@ -65,12 +414,10 @@
             <field name="offense_id" ref="offense_latecoming"/>
             <field name="severity_level_id" ref="severity_level_3"/>
             <field name="occurrence_number">3</field>
+            <field name="occurrence_label">3rd Occurrence</field>
             <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
+            <field name="warning_validity_months">6</field>
             <field name="managerial_fine_days">2.0</field>
-            <field name="reset_window_months">6</field>
             <field name="approval_authority">hr_manager</field>
         </record>
 
@@ -78,12 +425,10 @@
             <field name="offense_id" ref="offense_latecoming"/>
             <field name="severity_level_id" ref="severity_level_2"/>
             <field name="occurrence_number">4</field>
+            <field name="occurrence_label">4th Occurrence</field>
             <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">2.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
+            <field name="warning_validity_months">12</field>
             <field name="managerial_fine_days">3.0</field>
-            <field name="reset_window_months">12</field>
             <field name="approval_authority">cpco</field>
         </record>
 
@@ -91,480 +436,164 @@
             <field name="offense_id" ref="offense_latecoming"/>
             <field name="severity_level_id" ref="severity_level_1"/>
             <field name="occurrence_number">5</field>
+            <field name="occurrence_label">5th Occurrence</field>
             <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
+            <field name="warning_validity_months">12</field>
             <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
             <field name="approval_authority">ceo</field>
         </record>
 
 
-        <!-- Offense 2: Leaving Office During Working Hours Without Permission -->
-        <record id="offense_leaving_without_permission" model="discipline.offense">
-            <field name="name">Leaving office during working hours without permission</field>
-            <field name="category_id" ref="cat_attendance"/>
-            <field name="description">Unexcused departure from workplace during working hours under Regulation Art 10.4.1.</field>
+        <!-- ARTICLE 10.4.2: Direct 2-Day Salary Fine Offenses -->
+        <record id="art_mgr_10_4_2" model="discipline.article">
+            <field name="article_number">Article 10.4.2</field>
+            <field name="name">Misconduct Punishable with 2-Day Salary Fine</field>
+            <field name="policy_version_id" ref="policy_managerial_ch10"/>
+            <field name="staff_category">managerial</field>
+            <field name="statutory_text">Article 10.4.2: Any managerial employee found committing the following operational or supervisory breaches shall be sanctioned with a mandatory 2-day salary fine.</field>
         </record>
 
-        <record id="line_leaving_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_leaving_without_permission"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.5</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">1.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
+        <record id="offense_mgr_10_4_2_a" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_4_2"/>
+            <field name="sub_article_code">10.4.2(a)</field>
+            <field name="name">Failure to exercise proper supervisory control over subordinates</field>
+            <field name="category_id" ref="cat_supervisory"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">article_override</field>
+            <field name="custom_punishment_type">fine</field>
+            <field name="custom_fine_days">2.0</field>
+            <field name="custom_warning_validity_months">6</field>
+            <field name="full_clause_text">Failure to provide adequate supervisory oversight resulting in operational gaps in the branch or directorate.</field>
         </record>
 
-        <record id="line_leaving_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_leaving_without_permission"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">2.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
+        <record id="offense_mgr_10_4_2_b" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_4_2"/>
+            <field name="sub_article_code">10.4.2(b)</field>
+            <field name="name">Inaccurate or delayed submission of managerial compliance reports</field>
+            <field name="category_id" ref="cat_supervisory"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">article_override</field>
+            <field name="custom_punishment_type">fine</field>
+            <field name="custom_fine_days">2.0</field>
+            <field name="custom_warning_validity_months">6</field>
+            <field name="full_clause_text">Delayed, incomplete, or inaccurate submission of statutory and management compliance reports.</field>
         </record>
 
-        <record id="line_leaving_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_leaving_without_permission"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">2.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">3.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
+
+        <!-- ARTICLE 10.4.3: Direct 3-Day Salary Fine Offenses -->
+        <record id="art_mgr_10_4_3" model="discipline.article">
+            <field name="article_number">Article 10.4.3</field>
+            <field name="name">Misconduct Punishable with 3-Day Salary Fine</field>
+            <field name="policy_version_id" ref="policy_managerial_ch10"/>
+            <field name="staff_category">managerial</field>
+            <field name="statutory_text">Article 10.4.3: Any managerial employee committing significant supervisory omissions shall be sanctioned with a mandatory 3-day salary deduction.</field>
         </record>
 
-        <record id="line_leaving_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_leaving_without_permission"/>
+        <record id="offense_mgr_10_4_3_a" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_4_3"/>
+            <field name="sub_article_code">10.4.3(a)</field>
+            <field name="name">Gross supervision failure leading to operational disruption</field>
+            <field name="category_id" ref="cat_supervisory"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">article_override</field>
+            <field name="custom_punishment_type">fine</field>
+            <field name="custom_fine_days">3.0</field>
+            <field name="custom_warning_validity_months">6</field>
+            <field name="full_clause_text">Gross neglect of branch or department management responsibilities disrupting core banking services.</field>
+        </record>
+
+        <record id="offense_mgr_10_4_3_b" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_4_3"/>
+            <field name="sub_article_code">10.4.3(b)</field>
+            <field name="name">Failure to enforce dual-control and key custody protocols</field>
+            <field name="category_id" ref="cat_supervisory"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">article_override</field>
+            <field name="custom_punishment_type">fine</field>
+            <field name="custom_fine_days">3.0</field>
+            <field name="custom_warning_validity_months">6</field>
+            <field name="full_clause_text">Failure to strictly maintain dual control on vault, cash safe, or sensitive security materials.</field>
+        </record>
+
+
+        <!-- ARTICLE 10.5.1: Rigorous Dismissal Misconduct (Clauses a to w) -->
+        <record id="art_mgr_10_5_1" model="discipline.article">
+            <field name="article_number">Article 10.5.1</field>
+            <field name="name">Serious Managerial Misconduct Leading to Summary Dismissal</field>
+            <field name="policy_version_id" ref="policy_managerial_ch10"/>
+            <field name="staff_category">managerial</field>
             <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
+            <field name="statutory_text">Article 10.5.1: A managerial employee who commits any of the following grave offenses shall be summarily dismissed from employment without notice or severance pay.</field>
         </record>
 
-
-        <!-- Offense 3: Absence From Work Without Good Cause -->
-        <record id="offense_absence_without_cause" model="discipline.offense">
-            <field name="name">Absence from work without good cause</field>
-            <field name="category_id" ref="cat_attendance"/>
-            <field name="description">Unexcused absence without valid justification under Regulation Art 10.4.1.</field>
+        <record id="offense_mgr_10_5_1_a" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(a)</field>
+            <field name="name">Fraud, embezzlement, or misappropriation of bank funds</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Direct involvement, collusion, or facilitation of embezzlement, theft, or diversion of Bank or customer funds.</field>
         </record>
 
-        <record id="line_absence_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_absence_without_cause"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">1.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
+        <record id="offense_mgr_10_5_1_b" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(b)</field>
+            <field name="name">Forgery or alteration of bank instruments, records, or vouchers</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Forging signatures, fabricating credit records, manipulating general ledger balances, or doctoring vouchers.</field>
         </record>
 
-        <record id="line_absence_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_absence_without_cause"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">12.5</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">15.0</field>
-            <field name="managerial_fine_days">1.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
+        <record id="offense_mgr_10_5_1_c" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(c)</field>
+            <field name="name">Solicitation or acceptance of bribes, kickbacks, or corrupt payments</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Demanding or taking financial or non-financial bribes, commissions, or corrupt inducements from customers or suppliers.</field>
         </record>
 
-        <record id="line_absence_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_absence_without_cause"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">25.0</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">30.0</field>
-            <field name="managerial_fine_days">1.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
+        <record id="offense_mgr_10_5_1_d" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(d)</field>
+            <field name="name">Breach of core banking security and sharing supervisory override credentials</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Surrendering, sharing, or abusing managerial override credentials, OTPs, or cryptographic keys in core banking.</field>
         </record>
 
-        <record id="line_absence_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_absence_without_cause"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
+        <record id="offense_mgr_10_5_1_e" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(e)</field>
+            <field name="name">Granting unauthorized credit facilities, loans, or overdrafts</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Approving or disbursing unauthorized credit lines, exceeding delegated discretionary lending limits, or approving unbacked overdrafts.</field>
         </record>
 
-
-        <!-- Offense 4: Personal Hygiene and Attire -->
-        <record id="offense_hygiene_attire" model="discipline.offense">
-            <field name="name">Repeated failure to maintain a reasonable degree of personal hygiene and appropriate attire</field>
+        <record id="offense_mgr_10_5_1_f" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(f)</field>
+            <field name="name">Severe insubordination or defiance of lawful directives from Executive Management</field>
             <field name="category_id" ref="cat_conduct"/>
-            <field name="description">Dress code or personal hygiene non-compliance under Regulation Art 10.4.1.</field>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Gross insubordination, rebellion, or deliberate refusal to comply with written policy mandates or executive orders.</field>
         </record>
 
-        <record id="line_hygiene_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_hygiene_attire"/>
-            <field name="severity_level_id" ref="severity_level_5"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">verbal_warning</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">direct_manager</field>
-        </record>
-
-        <record id="line_hygiene_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_hygiene_attire"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">1.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">1.5</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_hygiene_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_hygiene_attire"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">2.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">3.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_hygiene_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_hygiene_attire"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">5.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">7.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_hygiene_5" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_hygiene_attire"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">5</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
-        </record>
-
-
-        <!-- Offense 5: Damage to Bank Property -->
-        <record id="offense_property_damage" model="discipline.offense">
-            <field name="name">Causing damage to the Bank's property due to negligent mishandling</field>
-            <field name="category_id" ref="cat_property"/>
-            <field name="description">Property damage caused by negligence under Regulation Art 10.4.1.</field>
-        </record>
-
-        <record id="line_prop_damage_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_property_damage"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_prop_damage_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_property_damage"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">10.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">15.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_prop_damage_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_property_damage"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
-        </record>
-
-
-        <!-- Offense 6: Failure to Report Accidents -->
-        <record id="offense_failure_report_accidents" model="discipline.offense">
-            <field name="name">Failure to report immediately accidents or damages to property to Management or concerned authority</field>
-            <field name="category_id" ref="cat_property"/>
-            <field name="description">Omission to report property damage or accidents under Regulation Art 10.4.1.</field>
-        </record>
-
-        <record id="line_report_accidents_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_failure_report_accidents"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_report_accidents_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_failure_report_accidents"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">10.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">15.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_report_accidents_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_failure_report_accidents"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
-        </record>
-
-
-        <!-- Offense 7: Negligent Performance of Duties -->
-        <record id="offense_negligent_performance" model="discipline.offense">
-            <field name="name">Negligent performance of duties</field>
-            <field name="category_id" ref="cat_property"/>
-            <field name="description">Duty negligence under Regulation Art 10.4.1.</field>
-        </record>
-
-        <record id="line_negligence_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_negligent_performance"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_negligence_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_negligent_performance"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">3.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">5.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_negligence_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_negligent_performance"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">7.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">10.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_negligence_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_negligent_performance"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
-        </record>
-
-
-        <!-- Offense 8: Unauthorized Utilization of Property -->
-        <record id="offense_unauthorized_property" model="discipline.offense">
-            <field name="name">Unauthorized utilization of the bank's property</field>
-            <field name="category_id" ref="cat_property"/>
-            <field name="description">Misuse or unauthorized utilization of Bank property under Regulation Art 10.4.1.</field>
-        </record>
-
-        <record id="line_unauthorized_prop_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_unauthorized_property"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_unauthorized_prop_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_unauthorized_property"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">5.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">7.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_unauthorized_prop_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_unauthorized_property"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">10.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">15.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_unauthorized_prop_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_unauthorized_property"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
-        </record>
-
-
-        <!-- Offense 9: Refusal to Sign Performance Evaluation -->
-        <record id="offense_refusal_sign_eval" model="discipline.offense">
-            <field name="name">Refusal to sign the performance evaluation</field>
-            <field name="category_id" ref="cat_conduct"/>
-            <field name="description">Refusal to sign performance evaluation under Regulation Art 10.4.1.</field>
-        </record>
-
-        <record id="line_refusal_eval_1" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_refusal_sign_eval"/>
-            <field name="severity_level_id" ref="severity_level_4"/>
-            <field name="occurrence_number">1</field>
-            <field name="punishment_type">first_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">3</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_refusal_eval_2" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_refusal_sign_eval"/>
-            <field name="severity_level_id" ref="severity_level_3"/>
-            <field name="occurrence_number">2</field>
-            <field name="punishment_type">second_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">3.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">5.0</field>
-            <field name="reset_window_months">6</field>
-            <field name="approval_authority">hr_manager</field>
-        </record>
-
-        <record id="line_refusal_eval_3" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_refusal_sign_eval"/>
-            <field name="severity_level_id" ref="severity_level_2"/>
-            <field name="occurrence_number">3</field>
-            <field name="punishment_type">final_warning_penalty</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">5.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">7.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">cpco</field>
-        </record>
-
-        <record id="line_refusal_eval_4" model="discipline.offense.line">
-            <field name="offense_id" ref="offense_refusal_sign_eval"/>
-            <field name="severity_level_id" ref="severity_level_1"/>
-            <field name="occurrence_number">4</field>
-            <field name="punishment_type">dismissal</field>
-            <field name="non_managerial_penalty_pct">0.0</field>
-            <field name="non_managerial_fine_days">0.0</field>
-            <field name="managerial_penalty_pct">0.0</field>
-            <field name="managerial_fine_days">0.0</field>
-            <field name="reset_window_months">12</field>
-            <field name="approval_authority">ceo</field>
+        <record id="offense_mgr_10_5_1_g" model="discipline.offense">
+            <field name="article_id" ref="art_mgr_10_5_1"/>
+            <field name="sub_article_code">10.5.1(g)</field>
+            <field name="name">Divulging proprietary banking secrets or confidential customer records</field>
+            <field name="category_id" ref="cat_fraud"/>
+            <field name="staff_category">managerial</field>
+            <field name="penalty_mode">level_default</field>
+            <field name="full_clause_text">Leaking proprietary strategies, customer balances, trade secrets, or confidential board/executive communications.</field>
         </record>
 
     </data>

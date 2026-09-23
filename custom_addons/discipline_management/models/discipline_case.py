@@ -17,8 +17,18 @@ class DisciplineCase(models.Model):
     work_location_id = fields.Many2one('hr.work.location', string='Work Location', related='employee_id.work_location_id', store=True, readonly=True)
     company_id = fields.Many2one('res.company', string='Company', required=True, default=lambda self: self.env.company)
 
-    offense_id = fields.Many2one('discipline.offense', string='Offense Type', required=True, tracking=True)
+    policy_version_id = fields.Many2one('discipline.policy.version', string='Governing Regulation', tracking=True)
+    article_id = fields.Many2one('discipline.article', string='Regulatory Article', tracking=True)
+    offense_id = fields.Many2one('discipline.offense', string='Offense Type / Clause', required=True, tracking=True)
     offense_category_id = fields.Many2one('discipline.offense.category', string='Offense Category', related='offense_id.category_id', store=True, readonly=True)
+    sub_article_code = fields.Char(related='offense_id.sub_article_code', string='Clause Code', store=True, readonly=True)
+    legal_article_display = fields.Char(string='Statutory Legal Citation', compute='_compute_legal_citation', store=True)
+    legal_clause_text = fields.Text(string='Verbatim Statutory Clause Text', compute='_compute_legal_citation', store=True)
+
+    occurrence_count = fields.Integer(string='Breach Occurrence Tier', default=1, compute='_compute_punishment_details', store=True, readonly=False, tracking=True)
+    is_escalated_by_active_warning = fields.Boolean(string='Escalated by Prior Active Warning (Art 33.1.4)', compute='_compute_punishment_details', store=True, readonly=False, tracking=True)
+    auto_applied_rule_summary = fields.Text(string='Rule Application Summary', compute='_compute_punishment_details', store=True)
+
     severity_level_id = fields.Many2one('discipline.severity.level', string='Severity Level', required=False, tracking=True)
     severity_level = fields.Char(string='Severity Code', related='severity_level_id.code', store=True, readonly=True)
     punishment_type = fields.Selection([
@@ -27,6 +37,7 @@ class DisciplineCase(models.Model):
         ('final_warning_penalty', 'Final Warning + Penalty'),
         ('second_warning_penalty', 'Second Warning + Penalty'),
         ('first_warning_penalty', 'First Warning + Penalty'),
+        ('fine', 'Salary Fine Deduction'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
         ('exonerate', 'Exonerated / Overturned'),
@@ -38,6 +49,7 @@ class DisciplineCase(models.Model):
         ('final_warning_penalty', 'Final Warning + Penalty'),
         ('second_warning_penalty', 'Second Warning + Penalty'),
         ('first_warning_penalty', 'First Warning + Penalty'),
+        ('fine', 'Salary Fine Deduction'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
         ('exonerate', 'Exonerated / Overturned'),
@@ -52,6 +64,7 @@ class DisciplineCase(models.Model):
         ('final_warning_penalty', 'Final Warning + Penalty'),
         ('second_warning_penalty', 'Second Warning + Penalty'),
         ('first_warning_penalty', 'First Warning + Penalty'),
+        ('fine', 'Salary Fine Deduction'),
         ('verbal_warning', 'Recorded Verbal Warning'),
         ('custom', 'Custom Administrative Action'),
         ('exonerate', 'Exonerated / Overturned'),
@@ -60,6 +73,17 @@ class DisciplineCase(models.Model):
     decided_penalty_percentage = fields.Float(string='Final Decided Penalty (%)', tracking=True)
     decided_fine_days = fields.Float(string='Final Decided Salary Fine (Days)', tracking=True)
     is_punishment_modified_by_committee = fields.Boolean(string='Punishment Modified by Committee', compute='_compute_is_punishment_modified', store=True)
+
+    @api.depends('article_id', 'offense_id', 'offense_id.sub_article_code', 'article_id.article_number')
+    def _compute_legal_citation(self):
+        for rec in self:
+            citations = []
+            if rec.article_id and rec.article_id.article_number:
+                citations.append(_('Article %s') % rec.article_id.article_number)
+            if rec.offense_id and rec.offense_id.sub_article_code:
+                citations.append(_('Clause %s') % rec.offense_id.sub_article_code)
+            rec.legal_article_display = ' - '.join(citations) if citations else False
+            rec.legal_clause_text = (rec.offense_id and rec.offense_id.full_clause_text) or (rec.article_id and rec.article_id.description) or False
 
     @api.depends('original_punishment_type', 'punishment_type', 'original_penalty_percentage', 'penalty_percentage', 'original_fine_days', 'fine_days')
     def _compute_is_punishment_modified(self):
@@ -70,51 +94,275 @@ class DisciplineCase(models.Model):
                 (rec.fine_days != rec.original_fine_days)
             )
 
-    @api.depends('severity_level_id', 'offense_id', 'employee_id')
-    def _compute_punishment_details(self):
+    cash_shortage_amount = fields.Float(string='Cash Shortage Amount (ETB)', tracking=True)
+    is_cash_shortage = fields.Boolean(string='Is Cash Shortage Misconduct', compute='_compute_is_cash_shortage', store=True)
+    is_statutory_mitigation_applied = fields.Boolean(string='Apply Article 33.13 Statutory Mitigation (-1 Grade)', tracking=True)
+    mitigation_justification = fields.Text(string='Mitigation Legal Justification', tracking=True)
+    statutory_deadline_date = fields.Date(string='Statutory Decision Deadline', compute='_compute_statutory_deadline', store=True)
+    is_deadline_exceeded = fields.Boolean(string='Statutory SLA Exceeded', compute='_compute_statutory_deadline', store=True)
+
+    @api.depends('offense_id', 'article_id', 'cash_shortage_amount')
+    def _compute_is_cash_shortage(self):
         for rec in self:
-            if rec.severity_level_id:
-                emp = rec.employee_id
-                job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
-                is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+            is_csh = False
+            if rec.cash_shortage_amount > 0:
+                is_csh = True
+            elif rec.offense_id and rec.offense_id.category_id and rec.offense_id.category_id.code == 'CSH':
+                is_csh = True
+            elif rec.article_id and '33.9' in (rec.article_id.article_number or ''):
+                is_csh = True
+            elif rec.offense_id and '33.9' in (rec.offense_id.sub_article_code or ''):
+                is_csh = True
+            rec.is_cash_shortage = is_csh
 
-                matching_line = False
-                if rec.offense_id and rec.offense_id.line_ids:
-                    matching_line = rec.offense_id.line_ids.filtered(lambda l: l.severity_level_id == rec.severity_level_id)
-
-                if matching_line:
-                    line = matching_line[0]
-                    punish = line.punishment_type
-                    if line.approval_authority and line.approval_authority in ['cpco', 'ceo']:
-                        rec.required_final_authority = line.approval_authority
-                    pct = line.managerial_penalty_pct if is_managerial else line.non_managerial_penalty_pct
-                    days = line.managerial_fine_days if is_managerial else line.non_managerial_fine_days
-                else:
-                    lvl = rec.severity_level_id
-                    punish = lvl.default_punishment_type
-                    if lvl.default_approval_authority and lvl.default_approval_authority in ['cpco', 'ceo']:
-                        rec.required_final_authority = lvl.default_approval_authority
-                    pct = (getattr(lvl, 'default_managerial_penalty_pct', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_penalty_pct', 0.0)) or getattr(lvl, 'default_penalty_percentage', 0.0)
-                    days = (getattr(lvl, 'default_managerial_fine_days', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_fine_days', 0.0)) or getattr(lvl, 'default_fine_days', 0.0)
-
-                rec.original_punishment_type = punish
-                rec.original_penalty_percentage = pct
-                rec.original_fine_days = days
-
-                rec.punishment_type = rec.decided_punishment_type or punish
-                rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
-                rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
+    @api.depends('incident_date', 'create_date', 'punishment_type', 'severity_level', 'state')
+    def _compute_statutory_deadline(self):
+        today = fields.Date.context_today(self)
+        for rec in self:
+            inc_date = rec.incident_date or (rec.create_date and rec.create_date.date()) or today
+            if rec.punishment_type == 'verbal_warning' or rec.severity_level == 'level_5':
+                # 7 days per Article 33.11.2
+                deadline = inc_date + timedelta(days=7)
+            elif rec.punishment_type == 'dismissal' or rec.severity_level == 'level_1':
+                # 30 days per Article 33.11.1 & 10.8.2
+                deadline = inc_date + timedelta(days=30)
             else:
-                rec.original_punishment_type = False
-                rec.original_penalty_percentage = 0.0
-                rec.original_fine_days = 0.0
-                rec.punishment_type = False
-                rec.penalty_percentage = 0.0
-                rec.fine_days = 0.0
+                # 15 days per Article 33.11.3 & 10.8.1
+                deadline = inc_date + timedelta(days=15)
+            rec.statutory_deadline_date = deadline
+            rec.is_deadline_exceeded = (today > deadline) if rec.state not in ['enforced', 'closed', 'revoked'] else False
 
-    @api.onchange('severity_level_id', 'offense_id', 'employee_id')
+    @api.depends(
+        'severity_level_id',
+        'severity_level_id.default_punishment_type',
+        'offense_id',
+        'offense_id.penalty_mode',
+        'offense_id.custom_punishment_type',
+        'offense_id.custom_fine_days',
+        'offense_id.custom_penalty_percentage',
+        'offense_id.severity_level_id',
+        'offense_id.article_id.severity_level_id',
+        'article_id',
+        'article_id.severity_level_id',
+        'employee_id',
+        'incident_date',
+        'decided_punishment_type',
+        'decided_penalty_percentage',
+        'decided_fine_days',
+        'cash_shortage_amount',
+        'is_statutory_mitigation_applied'
+    )
+    def _compute_punishment_details(self):
+        rank_order = {
+            'verbal_warning': 1,
+            'first_warning_penalty': 2,
+            'second_warning_penalty': 3,
+            'final_warning_penalty': 4,
+            'dismissal': 5,
+        }
+        rank_to_punish = {
+            1: 'verbal_warning',
+            2: 'first_warning_penalty',
+            3: 'second_warning_penalty',
+            4: 'final_warning_penalty',
+            5: 'dismissal',
+        }
+        for rec in self:
+            emp = rec.employee_id
+            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+            is_managerial = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+
+            # 1. Count active prior penalties within validity window
+            inc_date = rec.incident_date or fields.Date.context_today(rec)
+            prior_cases = self.env['discipline.case'].sudo().search([
+                ('employee_id', '=', emp.id),
+                ('id', '!=', rec._origin.id if rec._origin else (rec.id or 0)),
+                ('state', 'in', ['enforced', 'closed', 'appealed']),
+                ('active_penalty_end_date', '>=', inc_date),
+            ]) if emp else self.env['discipline.case']
+
+            has_active_prior_warning = bool(prior_cases)
+            same_offense_cases = prior_cases.filtered(lambda c: c.offense_id == rec.offense_id or (c.article_id and c.article_id == rec.article_id)) if rec.offense_id else self.env['discipline.case']
+            
+            occurrence = len(same_offense_cases) + 1
+            rec.occurrence_count = occurrence
+
+            punish = False
+            pct = 0.0
+            days = 0.0
+            rule_notes = []
+
+            off = rec.offense_id
+            lvl = rec.severity_level_id or (off and off.severity_level_id) or (off and off.article_id and off.article_id.severity_level_id)
+
+            # Cash Shortage Matrix Handling (Article 33.9)
+            is_csh_calc = rec.cash_shortage_amount > 0 or (off and off.category_id and off.category_id.code == 'CSH') or (off and '33.9' in (off.sub_article_code or '')) or (rec.article_id and '33.9' in (rec.article_id.article_number or ''))
+            if is_csh_calc and rec.cash_shortage_amount > 0:
+                csh_amt = rec.cash_shortage_amount
+                if csh_amt <= 500:
+                    if occurrence == 1:
+                        punish = 'verbal_warning'
+                        pct = 0.0
+                    elif occurrence == 2:
+                        punish = 'first_warning_penalty'
+                        pct = 0.0
+                    elif occurrence == 3:
+                        punish = 'second_warning_penalty'
+                        pct = 10.0
+                    else:
+                        punish = 'final_warning_penalty'
+                        pct = 20.0
+                elif csh_amt <= 5000:
+                    if occurrence == 1:
+                        punish = 'first_warning_penalty'
+                        pct = 0.0
+                    elif occurrence in (2, 3):
+                        punish = 'second_warning_penalty'
+                        pct = 10.0
+                    else:
+                        punish = 'final_warning_penalty'
+                        pct = 20.0
+                elif csh_amt <= 10000:
+                    if occurrence == 1:
+                        punish = 'second_warning_penalty'
+                        pct = 10.0
+                    elif occurrence == 2:
+                        punish = 'final_warning_penalty'
+                        pct = 20.0
+                    else:
+                        punish = 'demotion'
+                        pct = 0.0
+                elif csh_amt <= 20000:
+                    if occurrence == 1:
+                        punish = 'second_warning_penalty'
+                        pct = 10.0
+                    elif occurrence == 2:
+                        punish = 'final_warning_penalty'
+                        pct = 20.0
+                    else:
+                        punish = 'dismissal'
+                        pct = 0.0
+                else:  # > 20,000 ETB
+                    if occurrence == 1:
+                        punish = 'final_warning_penalty'
+                        pct = 20.0
+                    else:
+                        punish = 'dismissal'
+                        pct = 0.0
+                rule_notes.append(_('Applied Article 33.9 Cash Shortage Matrix (Amount: ETB %s, Recurrence Tier: %s)') % (csh_amt, occurrence))
+
+            elif off:
+                if off.penalty_mode == 'repetition_escalation' and off.line_ids:
+                    # Match repetition line
+                    match_line = off.line_ids.filtered(lambda l: l.occurrence_number == occurrence)
+                    if not match_line:
+                        # If occurrence exceeds max lines, pick highest tier
+                        sorted_lines = off.line_ids.sorted('occurrence_number')
+                        match_line = sorted_lines[-1:] if sorted_lines else False
+                    if match_line:
+                        line = match_line[0]
+                        punish = line.punishment_type
+                        pct = line.managerial_penalty_pct if is_managerial else (line.non_managerial_penalty_pct or line.penalty_percentage)
+                        days = line.managerial_fine_days if is_managerial else (line.non_managerial_fine_days or line.fine_days)
+                        rule_notes.append(_('Applied Repetition Escalation Ladder (Tier %s / %s)') % (occurrence, line.occurrence_label or ''))
+                elif off.penalty_mode == 'article_override':
+                    punish = off.custom_punishment_type or getattr(off, 'punishment_type', False) or (lvl and lvl.default_punishment_type)
+                    pct = off.custom_penalty_percentage or getattr(off, 'penalty_percentage', 0.0)
+                    days = off.custom_fine_days or getattr(off, 'fine_days', 0.0)
+                    if not punish and days > 0:
+                        punish = 'fine'
+                    rule_notes.append(_('Applied Custom Article Penalty Override (%s, %s days fine, %s%% deduction)') % (punish, days, pct))
+
+            if not punish and lvl:
+                punish = lvl.default_punishment_type
+                pct = (getattr(lvl, 'default_managerial_penalty_pct', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_penalty_pct', 0.0)) or getattr(lvl, 'default_penalty_percentage', 0.0)
+                days = (getattr(lvl, 'default_managerial_fine_days', 0.0) if is_managerial else getattr(lvl, 'default_non_managerial_fine_days', 0.0)) or getattr(lvl, 'default_fine_days', 0.0)
+                rule_notes.append(_('Applied Severity Level Standard Baseline (%s)') % lvl.name)
+
+            # Check Article 33.1.4 1-grade escalation if active prior warning exists and not already dismissal
+            is_escalated = False
+            if has_active_prior_warning and punish and punish != 'dismissal' and off and off.penalty_mode != 'repetition_escalation' and not is_csh_calc:
+                curr_rank = rank_order.get(punish, 2)
+                next_rank = min(curr_rank + 1, 5)
+                if next_rank > curr_rank:
+                    punish = rank_to_punish.get(next_rank, punish)
+                    is_escalated = True
+                    rule_notes.append(_('Escalated by 1 Rank pursuant to CBA Art. 33.1.4 / Management Policy Art. 10.3 due to %d active prior unexpired warning(s).') % len(prior_cases))
+
+            # Check Article 33.13 Statutory Mitigation (-1 Grade Reduction)
+            if rec.is_statutory_mitigation_applied and punish:
+                mitigation_rank_map = {
+                    'dismissal': 'final_warning_penalty',
+                    'demotion': 'second_warning_penalty',
+                    'final_warning_penalty': 'second_warning_penalty',
+                    'second_warning_penalty': 'first_warning_penalty',
+                    'first_warning_penalty': 'verbal_warning',
+                }
+                new_punish = mitigation_rank_map.get(punish)
+                if new_punish:
+                    punish = new_punish
+                    if punish == 'verbal_warning':
+                        pct = 0.0
+                        days = 0.0
+                    elif punish == 'first_warning_penalty':
+                        pct = min(pct, 5.0)
+                        days = min(days, 1.0)
+                    elif punish == 'second_warning_penalty':
+                        pct = min(pct, 10.0)
+                        days = min(days, 2.0)
+                    rule_notes.append(_('Mitigated by 1 Rank pursuant to CBA Art. 33.13 (Good faith / clean record / performance factor).'))
+
+            rec.is_escalated_by_active_warning = is_escalated
+            rec.auto_applied_rule_summary = ' | '.join(rule_notes) if rule_notes else False
+
+            rec.original_punishment_type = punish
+            rec.original_penalty_percentage = pct
+            rec.original_fine_days = days
+
+            rec.punishment_type = rec.decided_punishment_type or punish
+            rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
+            rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
+
+    @api.onchange('employee_id')
+    def _onchange_employee_id_filter_regulations(self):
+        if self.employee_id:
+            is_mgr = self.employee_id.is_managerial
+            cat = 'managerial' if is_mgr else 'non_managerial'
+            return {
+                'domain': {
+                    'policy_version_id': [('staff_category', 'in', [cat, 'all'])],
+                    'article_id': [('staff_category', 'in', [cat, 'all'])],
+                    'offense_id': [('staff_category', 'in', [cat, 'all'])],
+                }
+            }
+
+    @api.onchange('article_id')
+    def _onchange_article_id(self):
+        if self.article_id:
+            if not self.policy_version_id:
+                self.policy_version_id = self.article_id.policy_version_id
+            if self.article_id.severity_level_id:
+                self.severity_level_id = self.article_id.severity_level_id
+            return {
+                'domain': {
+                    'offense_id': [('article_id', '=', self.article_id.id)]
+                }
+            }
+
+    @api.onchange('offense_id')
+    def _onchange_offense_id(self):
+        if self.offense_id:
+            if self.offense_id.article_id:
+                self.article_id = self.offense_id.article_id
+                if not self.policy_version_id:
+                    self.policy_version_id = self.offense_id.article_id.policy_version_id
+            if self.offense_id.severity_level_id:
+                self.severity_level_id = self.offense_id.severity_level_id
+            self._compute_punishment_details()
+
+    @api.onchange('severity_level_id', 'offense_id', 'employee_id', 'cash_shortage_amount', 'is_statutory_mitigation_applied')
     def _onchange_offense_severity_resolve_rules(self):
-        """Re-trigger rule resolution immediately when severity level, offense, or employee changes."""
+        """Re-trigger rule resolution immediately when severity level, offense, employee, cash shortage, or mitigation changes."""
         self._compute_punishment_details()
 
     penalty_percentage = fields.Float(string='Penalty Percentage (%)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
@@ -153,8 +401,27 @@ class DisciplineCase(models.Model):
     ceo_assignment_notes = fields.Text(string='CEO Assignment Remarks', tracking=True)
     delivery_receipt_date = fields.Date(string='Decision Letter Delivery / Receipt Date', tracking=True)
 
-    active_duration_days = fields.Integer(string='Penalty Active Duration (Days)', related='severity_level_id.active_duration_days', store=True, readonly=True)
+    active_duration_days = fields.Integer(string='Penalty Active Duration (Days)', compute='_compute_active_duration_days', store=True, readonly=True)
     active_penalty_end_date = fields.Date(string='Penalty Active Expiration Date', compute='_compute_active_penalty_end_date', store=True, tracking=True)
+
+    @api.depends('punishment_type', 'decided_punishment_type', 'severity_level_id', 'severity_level_id.active_duration_days', 'offense_id', 'offense_id.custom_warning_validity_months')
+    def _compute_active_duration_days(self):
+        for rec in self:
+            punish = rec.decided_punishment_type or rec.punishment_type or (rec.severity_level_id and rec.severity_level_id.default_punishment_type)
+            if rec.offense_id and rec.offense_id.custom_warning_validity_months and rec.offense_id.custom_warning_validity_months > 0 and rec.offense_id.penalty_mode == 'article_override' and not rec.is_cash_shortage:
+                rec.active_duration_days = rec.offense_id.custom_warning_validity_months * 30
+            elif punish == 'verbal_warning':
+                rec.active_duration_days = 30  # 1 month per Art. 33.10.1.1
+            elif punish == 'first_warning_penalty':
+                rec.active_duration_days = 90  # 3 months per Art. 33.10.1.2 & 10.3.1
+            elif punish == 'second_warning_penalty':
+                rec.active_duration_days = 180  # 6 months per Art. 33.10.1.3 & 10.3.2
+            elif punish in ('final_warning_penalty', 'demotion'):
+                rec.active_duration_days = 365  # 1 year per Art. 33.10.1.4 & 10.3.3
+            elif rec.severity_level_id and rec.severity_level_id.active_duration_days:
+                rec.active_duration_days = rec.severity_level_id.active_duration_days
+            else:
+                rec.active_duration_days = 90
 
     @api.depends('final_decision_date', 'active_duration_days', 'state')
     def _compute_active_penalty_end_date(self):
@@ -202,6 +469,7 @@ class DisciplineCase(models.Model):
     subordinate_employee_ids = fields.Many2many(
         'hr.employee',
         compute='_compute_subordinate_employee_ids',
+        compute_sudo=True,
         string='Subordinate Employees'
     )
 
@@ -210,7 +478,7 @@ class DisciplineCase(models.Model):
         for rec in self:
             reporter = rec.reported_by_id or self.env.user.employee_id
             if reporter:
-                subs = self.env['hr.employee'].search([
+                subs = self.env['hr.employee'].sudo().search([
                     '|', '|',
                     ('id', 'child_of', reporter.id),
                     ('coach_id', '=', reporter.id),
@@ -218,7 +486,7 @@ class DisciplineCase(models.Model):
                 ])
                 rec.subordinate_employee_ids = subs
             else:
-                rec.subordinate_employee_ids = self.env['hr.employee'].search([])
+                rec.subordinate_employee_ids = self.env['hr.employee'].sudo().search([])
 
     @api.depends('offense_id', 'offense_id.line_ids')
     def _compute_allowed_severity_level_ids(self):
@@ -575,13 +843,39 @@ class DisciplineCase(models.Model):
         for vals in vals_list:
             if vals.get('name', _('New')) == _('New'):
                 vals['name'] = self.env['ir.sequence'].sudo().next_by_code('discipline.case') or _('New')
+            if vals.get('offense_id'):
+                off = self.env['discipline.offense'].browse(vals['offense_id'])
+                if not vals.get('article_id') and off.article_id:
+                    vals['article_id'] = off.article_id.id
+                if not vals.get('policy_version_id') and off.policy_version_id:
+                    vals['policy_version_id'] = off.policy_version_id.id
+                if not vals.get('severity_level_id'):
+                    severity = off.severity_level_id or (off.article_id and off.article_id.severity_level_id)
+                    if severity:
+                        vals['severity_level_id'] = severity.id
         cases = super().create(vals_list)
+        cases._compute_is_cash_shortage()
+        cases._compute_punishment_details()
+        cases._compute_legal_citation()
+        cases._compute_active_duration_days()
+        cases._compute_statutory_deadline()
         return cases
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
         if not force_write:
-            whitelisted_fields = {'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked', 'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee', 'approver_id', 'final_decision_date', 'delivery_receipt_date', 'chief_id', 'escalation_target', 'ceo_assignment_notes'}
+            whitelisted_fields = {
+                'state', 'revocation_reason', 'revocation_date', 'revoked_by_id', 'is_revoked',
+                'message_follower_ids', 'message_ids', 'activity_ids', 'is_locked_for_committee',
+                'approver_id', 'final_decision_date', 'delivery_receipt_date', 'chief_id',
+                'escalation_target', 'ceo_assignment_notes', 'occurrence_count',
+                'is_escalated_by_active_warning', 'auto_applied_rule_summary',
+                'original_punishment_type', 'original_penalty_percentage', 'original_fine_days',
+                'punishment_type', 'penalty_percentage', 'fine_days',
+                'is_punishment_modified_by_committee', 'is_cash_shortage',
+                'statutory_deadline_date', 'is_deadline_exceeded', 'active_penalty_end_date',
+                'active_duration_days', 'legal_article_display', 'legal_clause_text'
+            }
             for rec in self:
                 if rec.state in ('enforced', 'closed', 'appealed'):
                     if set(vals.keys()) - whitelisted_fields:
@@ -859,7 +1153,7 @@ class DisciplineCase(models.Model):
             })
 
             # Demotion handling (preserves basic salary while downgrading position scale/allowances)
-            if rec.punishment_type == 'demotion':
+            if rec.punishment_type == 'demotion' or rec.decided_punishment_type == 'demotion':
                 rec.action_apply_demotion()
 
             # Enqueue pending deduction records for downstream payroll processing
@@ -961,6 +1255,11 @@ class DisciplineCase(models.Model):
         for rec in self:
             if rec.new_job_id:
                 rec.employee_id.sudo().with_context(no_leave_resource_calendar_update=True).write({'job_id': rec.new_job_id.id})
+                VersionModel = self.env.get('hr.version')
+                if VersionModel:
+                    versions = VersionModel.sudo().search([('employee_id', '=', rec.employee_id.id)])
+                    if versions:
+                        versions.write({'job_id': rec.new_job_id.id})
                 rec.message_post(body=_('Demotion enforced: Reassigned to position %s. Basic wage/salary scale preserved.') % rec.new_job_id.name)
 
     def action_approve_dismissal(self):
@@ -980,7 +1279,7 @@ class DisciplineCase(models.Model):
                 write_vals['departure_date'] = rec.final_decision_date
             if 'departure_description' in emp._fields:
                 write_vals['departure_description'] = _('Dismissed under Disciplinary Case %s on %s.') % (rec.name, rec.final_decision_date)
-            emp.with_context(no_leave_resource_calendar_update=True).write(write_vals)
+            emp.sudo().with_context(no_leave_resource_calendar_update=True).write(write_vals)
             if emp.user_id:
                 emp.user_id.sudo().write({'active': False})
                 rec.message_post(body=_('System user access for user %s disabled due to dismissal.') % emp.user_id.name)

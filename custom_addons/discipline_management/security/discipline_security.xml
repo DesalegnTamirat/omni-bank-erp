@@ -24,6 +24,11 @@
             <field name="comment">Can view own disciplinary cases and submit appeals.</field>
         </record>
 
+        <!-- Automatically imply group_discipline_user for all Internal Users -->
+        <record id="base.group_user" model="res.groups">
+            <field name="implied_ids" eval="[(4, ref('discipline_management.group_discipline_user'))]"/>
+        </record>
+
         <!-- Group: Officer / Investigator -->
         <record id="group_discipline_officer" model="res.groups">
             <field name="name">Officer / Investigator</field>
@@ -117,7 +122,7 @@
     </data>
 
     <!-- Record Rules -->
-    <data noupdate="1">
+    <data noupdate="0">
 
         <!-- Employee: view own cases -->
         <record id="rule_discipline_case_employee" model="ir.rule">
@@ -165,6 +170,30 @@
             <field name="model_id" ref="discipline_management.model_discipline_appeal"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="groups" eval="[(4, ref('discipline_management.group_discipline_officer'))]"/>
+        </record>
+
+        <!-- Discipline Officers / Auditors / Managers / Directors / Admins / Employees: Bank-wide Read Access to Employees -->
+        <record id="rule_discipline_hr_employee_read" model="ir.rule">
+            <field name="name">Discipline: Bank-wide Employee Read Access</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(6, 0, [
+                ref('discipline_management.group_discipline_user'),
+                ref('discipline_management.group_discipline_officer'),
+                ref('discipline_management.group_discipline_auditor'),
+                ref('discipline_management.group_discipline_manager'),
+                ref('discipline_management.group_discipline_director'),
+                ref('discipline_management.group_discipline_pomd'),
+                ref('discipline_management.group_discipline_legal'),
+                ref('discipline_management.group_discipline_chief'),
+                ref('discipline_management.group_discipline_cpco'),
+                ref('discipline_management.group_discipline_ceo'),
+                ref('discipline_management.group_discipline_admin'),
+            ])]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
 
     </data>

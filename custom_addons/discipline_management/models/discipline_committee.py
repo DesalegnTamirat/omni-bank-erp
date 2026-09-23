@@ -10,7 +10,7 @@ class DisciplineCommitteeMeeting(models.Model):
     _order = 'meeting_date desc, id desc'
 
     name = fields.Char(string='Meeting Reference', required=True, copy=False, readonly=True, default=lambda self: _('New'))
-    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, tracking=True)
+    case_id = fields.Many2one('discipline.case', string='Disciplinary Case', required=True, ondelete='cascade', tracking=True)
     employee_id = fields.Many2one('hr.employee', string='Affected Employee', related='case_id.employee_id', store=True, readonly=True)
     meeting_date = fields.Datetime(string='Scheduled Meeting Time', required=True, tracking=True)
     meeting_end_time = fields.Datetime(string='Scheduled Meeting End Time', tracking=True)
