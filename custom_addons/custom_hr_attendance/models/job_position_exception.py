@@ -1,5 +1,5 @@
 from odoo import models, fields, api, _
-from odoo.exceptions import ValidationError, UserError
+from odoo.exceptions import ValidationError, UserError, AccessError
 import datetime
 from datetime import time, timedelta
 import logging
@@ -74,9 +74,19 @@ class JobPositionException(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
+                self.env.user.has_group('hr_attendance.group_hr_attendance_user') or
                 self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
                 self.env.is_superuser()):
-            raise UserError(_("Only Job Position Officers or Attendance Administrators can create Job Position Exceptions."))
+            raise UserError(_("Only Managers, Job Position Officers, or Attendance Administrators can create Job Position Exceptions."))
+
+        if not (self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or self.env.is_superuser()):
+            valid_team_domain = self._get_team_member_domain()
+            for vals in vals_list:
+                emp_id = vals.get('employee_id')
+                if emp_id:
+                    allowed = self.env['hr.employee'].sudo().search(valid_team_domain + [('id', '=', emp_id)], limit=1)
+                    if not allowed:
+                        raise AccessError(_("You are only allowed to assign Job Position Exceptions to members of your team/hierarchy."))
 
         today_date = fields.Date.context_today(self)
         for vals in vals_list:
@@ -109,9 +119,10 @@ class JobPositionException(models.Model):
 
     def write(self, vals):
         if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
+                self.env.user.has_group('hr_attendance.group_hr_attendance_user') or
                 self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
                 self.env.is_superuser()):
-            raise UserError(_("Only Job Position Officers or Attendance Administrators can edit Job Position Exceptions."))
+            raise UserError(_("Only Managers, Job Position Officers, or Attendance Administrators can edit Job Position Exceptions."))
 
         if 'employee_id' in vals:
             for rec in self:
@@ -241,6 +252,7 @@ class JobPositionException(models.Model):
 
     def unlink(self):
         if not (self.env.user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user') or
+                self.env.user.has_group('hr_attendance.group_hr_attendance_user') or
                 self.env.user.has_group('hr_attendance.group_hr_attendance_manager') or
                 self.env.user.has_group('base.group_system') or
                 self.env.is_superuser()):

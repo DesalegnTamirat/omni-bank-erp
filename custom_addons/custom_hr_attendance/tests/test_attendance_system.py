@@ -222,3 +222,167 @@ class TestAttendanceSystem(TransactionCase):
 
         # Cleanup
         att.with_context(force_unlink_attendance=True).unlink()
+
+    def test_09_security_auditor_global_visibility_and_restrictions(self):
+        """Test Auditor has bank-wide read visibility on all models and zero unauthorized write/create permissions."""
+        # Create auditor user & employee
+        auditor_user = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test Auditor User',
+            'login': f'test_auditor_{fields.Datetime.now().timestamp()}',
+            'email': 'test_auditor@bunnabank.com',
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref('custom_hr_attendance.group_hr_attendance_auditor').id,
+            ])],
+        })
+        auditor_emp = self.env['hr.employee'].create({
+            'name': auditor_user.name,
+            'user_id': auditor_user.id,
+            'default_operating_unit_id': self.operating_unit.id,
+        })
+
+        # 1. Auditor can search all attendances and preapprovals
+        total_attendances = self.env['hr.attendance'].sudo().search_count([])
+        auditor_attendances = self.env['hr.attendance'].with_user(auditor_user).search_count([])
+        self.assertEqual(auditor_attendances, total_attendances)
+
+        total_preapprovals = self.env['attendance.preapproval'].sudo().search_count([])
+        auditor_preapprovals = self.env['attendance.preapproval'].with_user(auditor_user).search_count([])
+        self.assertEqual(auditor_preapprovals, total_preapprovals)
+
+        # 2. Auditor can read rosters and roster lines
+        self.env['job.position.roster.exception'].with_user(auditor_user).search([])
+        self.env['job.position.roster.exception.line'].with_user(auditor_user).search([])
+
+        # 3. Auditor CANNOT create a roster
+        with self.assertRaises(UserError):
+            self.env['job.position.roster.exception'].with_user(auditor_user).create({
+                'name': 'Auditor Illegal Roster',
+                'employee_id': self.regular_emp.id,
+                'start_date': fields.Date.today(),
+                'end_date': fields.Date.today(),
+            })
+
+        # 4. Auditor CANNOT create job position exceptions
+        shift = self.env['job.shift'].search([], limit=1)
+        if not shift:
+            shift = self.env['job.shift'].create({'name': 'Test Shift 8-5', 'start_time': 8.0, 'end_time': 17.0})
+        job = self.env['hr.job'].search([], limit=1)
+        if not job:
+            job = self.env['hr.job'].create({'name': 'Test Job Pos'})
+
+        with self.assertRaises(AccessError):
+            self.env['job.position.exception'].with_user(auditor_user).create({
+                'employee_id': self.regular_emp.id,
+                'shift_id': shift.id,
+                'job_position': job.name,
+                'start_date': fields.Date.today(),
+            })
+
+    def test_10_security_manager_hierarchy_and_exceptions(self):
+        """Test Standard Manager can assign exceptions to subordinates but cannot access rosters."""
+        # 1. Manager user (group_hr_attendance_user only, not admin)
+        branch_mgr_user = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test Branch Manager Only',
+            'login': f'test_bm_{fields.Datetime.now().timestamp()}',
+            'email': 'test_bm@bunnabank.com',
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref('hr_attendance.group_hr_attendance_user').id,
+            ])],
+        })
+        branch_mgr_emp = self.env['hr.employee'].create({
+            'name': branch_mgr_user.name,
+            'user_id': branch_mgr_user.id,
+            'default_operating_unit_id': self.operating_unit.id,
+        })
+        self.regular_emp.write({'parent_id': branch_mgr_emp.id})
+        branch_mgr_user.invalidate_recordset()
+
+        # External hierarchy (Branch B)
+        other_mgr = self.env['hr.employee'].create({
+            'name': 'Other Branch Manager',
+            'default_operating_unit_id': self.operating_unit.id,
+        })
+        other_emp = self.env['hr.employee'].create({
+            'name': 'Other Branch Employee',
+            'parent_id': other_mgr.id,
+            'default_operating_unit_id': self.operating_unit.id,
+        })
+
+        shift = self.env['job.shift'].search([], limit=1)
+        if not shift:
+            shift = self.env['job.shift'].create({'name': 'Test Shift 8-5', 'start_time': 8.0, 'end_time': 17.0})
+        job = self.env['hr.job'].search([], limit=1)
+        if not job:
+            job = self.env['hr.job'].create({'name': 'Test Job Pos'})
+
+        # 2. Branch manager CAN create Job Position Exception for own subordinate
+        exc = self.env['job.position.exception'].with_user(branch_mgr_user).create({
+            'employee_id': self.regular_emp.id,
+            'shift_id': shift.id,
+            'job_position': job.name,
+            'start_date': fields.Date.today(),
+        })
+        self.assertTrue(exc.id)
+
+        # 3. Branch manager CANNOT create Job Position Exception for other employee
+        with self.assertRaises(AccessError):
+            self.env['job.position.exception'].with_user(branch_mgr_user).create({
+                'employee_id': other_emp.id,
+                'shift_id': shift.id,
+                'job_position': job.name,
+                'start_date': fields.Date.today(),
+            })
+
+        # 4. Branch manager CANNOT read or write Rotational Rosters
+        with self.assertRaises(AccessError):
+            self.env['job.position.roster.exception'].with_user(branch_mgr_user).search([])
+
+    def test_11_security_shift_manager_rosters(self):
+        """Test 24/7 Shift Manager can create and manage Rotational Rosters."""
+        shift_mgr_user = self.env['res.users'].with_context(no_reset_password=True, mail_create_nosubscribe=True, mail_create_nolog=True).create({
+            'name': 'Test 24/7 Shift Manager',
+            'login': f'test_shift_mgr_{fields.Datetime.now().timestamp()}',
+            'email': 'test_shift_mgr@bunnabank.com',
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref('custom_hr_attendance.group_hr_attendance_job_position_user').id,
+            ])],
+        })
+        shift_mgr_emp = self.env['hr.employee'].create({
+            'name': shift_mgr_user.name,
+            'user_id': shift_mgr_user.id,
+            'default_operating_unit_id': self.operating_unit.id,
+        })
+
+        shift = self.env['job.shift'].search([], limit=1)
+        if not shift:
+            shift = self.env['job.shift'].create({'name': 'Test Shift 8-5', 'start_time': 8.0, 'end_time': 17.0})
+        job = self.env['hr.job'].search([], limit=1)
+        if not job:
+            job = self.env['hr.job'].create({'name': 'Test Job Pos'})
+
+        # 24/7 Shift Manager CAN create and update Roster Exception
+        today = fields.Date.today()
+        lines = []
+        for i in range(4):
+            day_d = today + datetime.timedelta(days=i)
+            lines.append((0, 0, {
+                'employee_id': self.regular_emp.id,
+                'shift_id': shift.id,
+                'date': day_d,
+                'schedule_type': 'shift',
+            }))
+        roster = self.env['job.position.roster.exception'].with_user(shift_mgr_user).create({
+            'name': 'SOC 24/7 Roster Schedule',
+            'employee_id': self.regular_emp.id,
+            'job_position': job.name,
+            'start_date': today,
+            'end_date': today + datetime.timedelta(days=3),
+            'line_ids': lines,
+        })
+        self.assertTrue(roster.id)
+        roster.with_user(shift_mgr_user).write({'name': 'SOC 24/7 Roster Schedule Updated'})
+        self.assertEqual(roster.name, 'SOC 24/7 Roster Schedule Updated')
+
