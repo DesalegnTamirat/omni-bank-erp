@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from odoo import api, fields, models, _
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError, ValidationError, AccessError
 
 
 class CompetencyAssessmentCycle(models.Model):
@@ -21,6 +21,7 @@ class CompetencyAssessmentCycle(models.Model):
         ('in_review', 'In Review'),
         ('closed', 'Closed'),
     ], string='Status', default='draft', tracking=True)
+    active = fields.Boolean(string='Active', default=True, tracking=True)
     assessment_ids = fields.One2many('competency.assessment', 'cycle_id', string='Assessments')
     assessment_count = fields.Integer(string='Total Assessments', compute='_compute_assessment_counts')
     pending_assessment_count = fields.Integer(string='Pending Assessments', compute='_compute_assessment_counts')
@@ -70,8 +71,13 @@ class CompetencyAssessmentCycle(models.Model):
     def action_send_deadline_reminders(self):
         """Send warning/reminder notifications to all assessors with pending draft assessments for this cycle."""
         self.ensure_one()
-        pending_asms = self.assessment_ids.filtered(lambda a: a.state == 'draft')
-        if not pending_asms:
+        self.env.cr.execute("""
+            SELECT DISTINCT ca.assessor_id
+            FROM competency_assessment ca
+            WHERE ca.cycle_id = %s AND ca.state = 'draft' AND ca.active = TRUE AND ca.assessor_id IS NOT NULL;
+        """, (self.id,))
+        pending_assessor_ids = [r[0] for r in self.env.cr.fetchall()]
+        if not pending_assessor_ids:
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -83,40 +89,207 @@ class CompetencyAssessmentCycle(models.Model):
                 }
             }
 
-        assessors = pending_asms.mapped('assessor_id')
-        sent_count = 0
-        deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
+        cycle_id = self.id
+        cycle_name = self.name
+        dbname = self.env.cr.dbname
 
-        for assessor in assessors:
-            assessor_pending = pending_asms.filtered(lambda a: a.assessor_id == assessor)
-            partner = assessor.partner_id
-            if not partner:
-                continue
+        import threading
 
-            emp_names = ", ".join(assessor_pending.mapped('employee_id.name')[:5])
-            extra = _(" and %d more") % (len(assessor_pending) - 5) if len(assessor_pending) > 5 else ""
+        def _async_send_deadline_reminders():
+            import odoo
+            from odoo.modules.registry import Registry
+            import logging
+            _logger = logging.getLogger(__name__)
+            try:
+                registry = Registry(dbname)
+                with registry.cursor() as new_cr:
+                    new_env = odoo.api.Environment(new_cr, odoo.SUPERUSER_ID, {})
+                    cycle_rec = new_env['competency.assessment.cycle'].browse(cycle_id)
+                    if not cycle_rec.exists():
+                        return
 
-            msg_body = _(
-                "⚠️ <strong>Competency Assessment Deadline Warning:</strong><br/>"
-                "You have %d pending competency assessment(s) assigned to you for cycle '<strong>%s</strong>' "
-                "(Assessments for: %s%s).<br/>"
-                "The submission deadline is <strong>%s</strong>. Please complete and submit your assessments before the deadline."
-            ) % (len(assessor_pending), self.name, emp_names, extra, deadline_str)
+                    deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y') if cycle_rec.assessment_deadline else _('Not set')
 
-            self.message_post(
-                body=msg_body,
-                partner_ids=[partner.id],
-                subtype_xmlid='mail.mt_comment'
-            )
-            sent_count += 1
+                    new_cr.execute("""
+                        SELECT ca.assessor_id,
+                               count(ca.id) as pending_count,
+                               min(ca.id) as sample_assessment_id,
+                               array_agg(DISTINCT he.name) as emp_names
+                        FROM competency_assessment ca
+                        LEFT JOIN hr_employee he ON ca.employee_id = he.id
+                        WHERE ca.cycle_id = %s AND ca.state = 'draft' AND ca.active = TRUE AND ca.assessor_id IS NOT NULL
+                        GROUP BY ca.assessor_id;
+                    """, (cycle_id,))
+                    assessor_rows = new_cr.fetchall()
 
-        self.message_post(body=_("Sent deadline warning notifications to %d assessor(s) with pending draft assessments.") % sent_count)
+                    sent_count = 0
+                    for row in assessor_rows:
+                        assessor_id, pending_count, sample_asm_id, emp_names = row
+                        assessor = new_env['res.users'].browse(assessor_id)
+                        partner = assessor.partner_id
+                        if not partner:
+                            continue
+
+                        names_clean = [n for n in (emp_names or []) if n]
+                        emp_names_str = ", ".join(names_clean[:5])
+                        extra = _(" and %d more") % (len(names_clean) - 5) if len(names_clean) > 5 else ""
+
+                        msg_body = _(
+                            "⚠️ <strong>Competency Assessment Deadline Warning:</strong><br/>"
+                            "You have %d pending competency assessment(s) assigned to you for cycle '<strong>%s</strong>' "
+                            "(Assessments for: %s%s).<br/>"
+                            "The submission deadline is <strong>%s</strong>. Please complete and submit your assessments before the deadline."
+                        ) % (pending_count, cycle_name, emp_names_str, extra, deadline_str)
+
+                        summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
+                        note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
+
+                        target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
+                        target_rec._notify_user_inbox_and_activity(
+                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                        )
+                        sent_count += 1
+
+                        if sent_count % 100 == 0:
+                            new_cr.commit()
+
+                    cycle_rec.message_post(body=_("Sent deadline warning notifications to %d assessor(s) with pending draft assessments.") % sent_count)
+                    new_cr.commit()
+                    _logger.info("Delivered deadline warnings to %d assessors for cycle %s", sent_count, cycle_name)
+            except Exception as exc:
+                _logger.exception("Error sending deadline warnings for cycle %d: %s", cycle_id, exc)
+
+        thread = threading.Thread(target=_async_send_deadline_reminders, daemon=True)
+        thread.start()
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
-                'title': _('Notifications Sent'),
-                'message': _('Successfully sent deadline warning reminders to %d assessor(s) with pending assessments.') % sent_count,
+                'title': _('Deadline Warnings Queued'),
+                'message': _('Deadline warning reminders are being dispatched in the background to %d assessor(s) with pending assessments. Progress will be logged in the cycle chatter.') % len(pending_assessor_ids),
+                'type': 'success',
+                'sticky': False,
+            }
+        }
+
+    def _notify_cycle_open_to_assessors(self):
+        """Asynchronously notify all employees and evaluators who have pending assessments to fill for this cycle."""
+        self.ensure_one()
+        return self.action_notify_assessors()
+
+    def action_notify_assessors(self):
+        """Manual button action for Competency Admin to broadcast cycle opening notification to all pending assessors."""
+        self.ensure_one()
+        self.env.cr.execute("""
+            SELECT DISTINCT ca.assessor_id
+            FROM competency_assessment ca
+            WHERE ca.cycle_id = %s AND ca.state = 'draft' AND ca.active = TRUE AND ca.assessor_id IS NOT NULL;
+        """, (self.id,))
+        pending_assessor_ids = [r[0] for r in self.env.cr.fetchall()]
+        if not pending_assessor_ids:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('No Pending Assessments'),
+                    'message': _('All assessments for this cycle have already been submitted!'),
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
+
+        cycle_id = self.id
+        cycle_name = self.name
+        dbname = self.env.cr.dbname
+
+        import threading
+
+        def _async_notify_cycle_open():
+            import odoo
+            from odoo.modules.registry import Registry
+            import logging
+            _logger = logging.getLogger(__name__)
+            try:
+                registry = Registry(dbname)
+                with registry.cursor() as new_cr:
+                    new_env = odoo.api.Environment(new_cr, odoo.SUPERUSER_ID, {})
+                    cycle_rec = new_env['competency.assessment.cycle'].browse(cycle_id)
+                    if not cycle_rec.exists():
+                        return
+
+                    deadline_str = cycle_rec.assessment_deadline.strftime('%b %d, %Y') if cycle_rec.assessment_deadline else _('Not set')
+
+                    new_cr.execute("""
+                        SELECT ca.assessor_id,
+                               count(ca.id) as total_pending,
+                               min(ca.id) as sample_assessment_id,
+                               sum(CASE WHEN ca.assessment_type = 'self' THEN 1 ELSE 0 END) as self_count,
+                               sum(CASE WHEN ca.assessment_type IN ('supervisor', 'team') THEN 1 ELSE 0 END) as sup_count,
+                               sum(CASE WHEN ca.assessment_type = 'peer' THEN 1 ELSE 0 END) as peer_count,
+                               sum(CASE WHEN ca.assessment_type = 'subordinate' THEN 1 ELSE 0 END) as sub_count
+                        FROM competency_assessment ca
+                        WHERE ca.cycle_id = %s AND ca.state = 'draft' AND ca.active = TRUE AND ca.assessor_id IS NOT NULL
+                        GROUP BY ca.assessor_id;
+                    """, (cycle_id,))
+                    assessor_rows = new_cr.fetchall()
+
+                    sent_count = 0
+                    for row in assessor_rows:
+                        assessor_id, total_pending, sample_asm_id, self_cnt, sup_cnt, peer_cnt, sub_cnt = row
+                        assessor = new_env['res.users'].browse(assessor_id)
+                        if not assessor.active or not assessor.partner_id:
+                            continue
+
+                        details = []
+                        if self_cnt > 0:
+                            details.append(_("Self-Assessment"))
+                        if sup_cnt > 0:
+                            details.append(_("%d Team Member Evaluation(s)") % sup_cnt)
+                        if peer_cnt > 0:
+                            details.append(_("%d Peer Evaluation(s)") % peer_cnt)
+                        if sub_cnt > 0:
+                            details.append(_("%d Upward Evaluation(s)") % sub_cnt)
+
+                        details_str = ", ".join(details) if details else (_("%d Evaluation(s)") % total_pending)
+
+                        msg_body = _(
+                            "📢 <strong>Competency Assessment Campaign Open: %s</strong><br/>"
+                            "Assessment Cycle '<strong>%s</strong>' is now open for evaluation.<br/>"
+                            "Please navigate to <strong>Competency Management → Assessments → My Competency Assessments</strong> to complete your evaluations.<br/>"
+                            "<strong>Assigned to you:</strong> %s.<br/>"
+                            "<strong>Submission Deadline:</strong> %s."
+                        ) % (cycle_name, cycle_name, details_str, deadline_str)
+
+                        summary_str = _("Fill Competency Assessment: %s") % cycle_name
+                        note_str = _("Assessment cycle '%s' is open. Please complete your evaluations (%s) on the My Competency Assessments page by %s.") % (
+                            cycle_name, details_str, deadline_str
+                        )
+
+                        target_rec = new_env['competency.assessment'].browse(sample_asm_id) if sample_asm_id else cycle_rec
+                        target_rec._notify_user_inbox_and_activity(
+                            assessor, summary_str, note_str, msg_body, target_rec=target_rec
+                        )
+                        sent_count += 1
+
+                        if sent_count % 100 == 0:
+                            new_cr.commit()
+
+                    cycle_rec.message_post(body=_("Sent cycle opening notifications to %d employee/assessor(s).") % sent_count)
+                    new_cr.commit()
+                    _logger.info("Delivered cycle open notifications to %d assessors for cycle %s", sent_count, cycle_name)
+            except Exception as exc:
+                _logger.exception("Error broadcasting cycle open notifications for cycle %d: %s", cycle_id, exc)
+
+        thread = threading.Thread(target=_async_notify_cycle_open, daemon=True)
+        thread.start()
+
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Notifications Queued'),
+                'message': _('Cycle opening notifications are being dispatched in the background to %d employee(s)/assessor(s). Progress will be logged in the cycle chatter.') % len(pending_assessor_ids),
                 'type': 'success',
                 'sticky': False,
             }
@@ -172,6 +345,10 @@ class CompetencyAssessmentCycle(models.Model):
                 'message': _("Assessment cycle '%s' has started! 360-degree assessments are generating in the background. You can continue working.") % cycle_name,
                 'type': 'success',
                 'sticky': False,
+                'next': {
+                    'type': 'ir.actions.client',
+                    'tag': 'reload',
+                },
             }
         }
 
@@ -206,6 +383,7 @@ class CompetencyAssessmentCycle(models.Model):
         }
 
         # 1. Pre-cache metadata for all active employees in 1 pass
+        peer_cfg = self.env['competency.director.peer.config']
         emp_cache = {}
         reports_by_manager = {}
         coached_by = {}
@@ -216,9 +394,14 @@ class CompetencyAssessmentCycle(models.Model):
             c_id = coach.id if coach else False
             ou = getattr(emp, 'default_operating_unit_id', False) or (emp.department_id.operating_unit_id if emp.department_id else False)
             ou_id = ou.id if ou else False
-            job = emp.job_id or getattr(emp, 'job_position', False)
+            job = peer_cfg._get_employee_job(emp)
             j_id = job.id if job else False
-            j_name = (job.name or '').lower() if job else ''
+            j_name = (job.name or '').strip().lower() if job else ''
+
+            # Grade resolution
+            g_rec = peer_cfg._resolve_employee_grade(emp)
+            g_id = g_rec.id if g_rec else False
+            g_code = (g_rec.grade_code or g_rec.grade_name or '').strip().upper() if g_rec else ''
 
             is_dir = False
             if hasattr(emp, 'is_director_or_chief') and emp.is_director_or_chief:
@@ -226,15 +409,23 @@ class CompetencyAssessmentCycle(models.Model):
             elif hasattr(self.env['competency.assessment'], '_is_director_or_chief'):
                 is_dir = self.env['competency.assessment']._is_director_or_chief(emp)
 
+            is_chief = is_dir and ('chief' in j_name or 'president' in j_name or 'vp' in j_name)
+            is_bm = 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name
+            is_mgr = is_dir or is_bm or any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'supervisor', 'controller'])
+
             emp_cache[emp.id] = {
                 'user_id': u_id,
                 'coach_id': c_id,
                 'ou_id': ou_id,
                 'job_id': j_id,
                 'job_name': j_name,
+                'grade_id': g_id,
+                'grade_code': g_code,
+                'grade_num': peer_cfg._get_grade_number(emp),
                 'is_director': is_dir,
-                'is_bm': 'branch manager' in j_name or j_name.startswith('bm') or ' bm ' in j_name or 'bm-' in j_name,
-                'is_manager': is_dir or any(k in j_name for k in ['manager', 'head', 'lead', 'leader', 'president', 'vp', 'supervisor']),
+                'is_chief': is_chief,
+                'is_bm': is_bm,
+                'is_manager': is_mgr,
             }
             if c_id:
                 coached_by.setdefault(c_id, []).append(emp.id)
@@ -246,15 +437,13 @@ class CompetencyAssessmentCycle(models.Model):
         peer_assessor_workload = {}
         sub_assessor_workload = {}
 
-        # 2. Self, Supervisor, Team, Peer, Subordinate matching
+        # 1. Self Assessment (100% mandatory for all active employees with user account)
         for emp in active_employees:
             e_id = emp.id
             e_data = emp_cache[e_id]
             u_id = e_data['user_id']
             if not u_id:
                 continue
-
-            # Self Assessment
             pair_self = (e_id, u_id, 'self')
             if pair_self not in existing_pairs:
                 assessments_to_create.append({
@@ -265,58 +454,143 @@ class CompetencyAssessmentCycle(models.Model):
                 })
                 existing_pairs.add(pair_self)
 
-            # Supervisor Assessment
+        # 2. Team Assessment (Boss / Coach evaluates team member / direct reports, 100% mandatory, no exceptions)
+        for emp in active_employees:
+            e_id = emp.id
+            e_data = emp_cache[e_id]
             c_id = e_data['coach_id']
             if c_id and emp_cache.get(c_id, {}).get('user_id'):
                 coach_u_id = emp_cache[c_id]['user_id']
-                pair_sup = (e_id, coach_u_id, 'supervisor')
-                if pair_sup not in existing_pairs:
+                pair_team = (e_id, coach_u_id, 'team')
+                if pair_team not in existing_pairs:
                     assessments_to_create.append({
                         'cycle_id': self.id,
                         'employee_id': e_id,
                         'assessor_id': coach_u_id,
-                        'assessment_type': 'supervisor',
+                        'assessment_type': 'team',
                     })
-                    existing_pairs.add(pair_sup)
+                    existing_pairs.add(pair_team)
 
-            # Team Assessment (Direct reports assess manager)
-            for dr_id in reports_by_manager.get(e_id, []):
-                dr_u_id = emp_cache.get(dr_id, {}).get('user_id')
-                if dr_u_id:
-                    pair_team = (e_id, dr_u_id, 'team')
-                    if pair_team not in existing_pairs:
+        # 3. Subordinate Assessment (Evaluator assesses subordinate or evaluates coach/superior)
+        # Criteria:
+        # A. For Chiefs: 1. Same Coach, 2. Different Job Grade
+        # B. For Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
+        # Business Rule: Everyone assesses their subordinate following the stated corporate rules without
+        # exceeding max_subs. The evaluator does NOT have to be a formal coach.
+
+        # A. Teammates assessing their subordinates under the same coach (Higher Grade assesses Lower Grade)
+        for c_id, teammates in coached_by.items():
+            for eval_id in teammates:
+                eval_data = emp_cache.get(eval_id)
+                if not eval_data or not eval_data['user_id']:
+                    continue
+                eval_u_id = eval_data['user_id']
+                if sub_assessor_workload.get(eval_u_id, 0) >= max_subs:
+                    continue
+
+                eligible_subs = []
+                for cand_id in teammates:
+                    if cand_id == eval_id:
+                        continue
+                    cand_data = emp_cache.get(cand_id)
+                    if not cand_data or not cand_data['user_id']:
+                        continue
+
+                    # 1. Same Coach: guaranteed by teammates
+                    # 2. Different Job Grade: Evaluator has higher grade than candidate
+                    diff_grade = (eval_data['grade_num'] > cand_data['grade_num']) if (eval_data['grade_num'] and cand_data['grade_num']) else (eval_data['grade_id'] != cand_data['grade_id'])
+                    if not diff_grade:
+                        continue
+
+                    if eval_data['is_chief']:
+                        # Chiefs: 1. Same Coach, 2. Different Job Grade
+                        eligible_subs.append(cand_id)
+                    else:
+                        # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
+                        same_ou = (cand_data['ou_id'] == eval_data['ou_id']) if (cand_data['ou_id'] and eval_data['ou_id']) else True
+                        diff_job = (cand_data['job_id'] != eval_data['job_id']) if (cand_data['job_id'] and eval_data['job_id']) else True
+                        if same_ou and diff_job:
+                            eligible_subs.append(cand_id)
+
+                if not eligible_subs:
+                    continue
+
+                total_eligible_raters += len(eligible_subs)
+                slots_left = max_subs - sub_assessor_workload.get(eval_u_id, 0)
+                if slots_left > 0:
+                    s_list = sorted(eligible_subs, key=lambda sid: (sub_assessor_workload.get(emp_cache[sid]['user_id'], 0), sid))
+                    selected_subs = s_list[:slots_left]
+                    for sid in selected_subs:
+                        pair_sub = (sid, eval_u_id, 'subordinate')
+                        if pair_sub not in existing_pairs:
+                            assessments_to_create.append({
+                                'cycle_id': self.id,
+                                'employee_id': sid,
+                                'assessor_id': eval_u_id,
+                                'assessment_type': 'subordinate',
+                            })
+                            existing_pairs.add(pair_sub)
+                            sub_assessor_workload[eval_u_id] = sub_assessor_workload.get(eval_u_id, 0) + 1
+                            total_sampled_raters += 1
+
+        # B. Direct reports evaluating their coach/superior upward (When someone assesses his coach that is subordinate)
+        for m_id, dr_ids in reports_by_manager.items():
+            m_data = emp_cache.get(m_id)
+            if not m_data or not m_data['user_id']:
+                continue
+
+            eligible_subs = []
+            for r in dr_ids:
+                r_data = emp_cache.get(r)
+                if not r_data or not r_data['user_id']:
+                    continue
+
+                # 1. Same Coach: guaranteed by dr_ids
+                # 2. Different Job Grade:
+                diff_grade = (r_data['grade_num'] != m_data['grade_num']) if (r_data['grade_num'] and m_data['grade_num']) else (r_data['grade_id'] != m_data['grade_id'])
+                if not diff_grade:
+                    continue
+
+                if m_data['is_chief']:
+                    # Chiefs: 1. Same Coach, 2. Different Job Grade
+                    eligible_subs.append(r)
+                else:
+                    # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
+                    same_ou = (r_data['ou_id'] == m_data['ou_id']) if (r_data['ou_id'] and m_data['ou_id']) else True
+                    diff_job = (r_data['job_id'] != m_data['job_id']) if (r_data['job_id'] and m_data['job_id']) else True
+                    if same_ou and diff_job:
+                        eligible_subs.append(r)
+
+            if not eligible_subs:
+                continue
+
+            total_eligible_raters += len(eligible_subs)
+            for sid in eligible_subs:
+                s_u_id = emp_cache[sid]['user_id']
+                if sub_assessor_workload.get(s_u_id, 0) < max_subs:
+                    pair_sub = (m_id, s_u_id, 'subordinate')
+                    if pair_sub not in existing_pairs:
                         assessments_to_create.append({
                             'cycle_id': self.id,
-                            'employee_id': e_id,
-                            'assessor_id': dr_u_id,
-                            'assessment_type': 'team',
+                            'employee_id': m_id,
+                            'assessor_id': s_u_id,
+                            'assessment_type': 'subordinate',
                         })
-                        existing_pairs.add(pair_team)
+                        existing_pairs.add(pair_sub)
+                        sub_assessor_workload[s_u_id] = sub_assessor_workload.get(s_u_id, 0) + 1
+                        total_sampled_raters += 1
 
-            # Peer Sampling
-            if e_data['is_director']:
-                valid_peers = dir_peer_map.get(e_id, [])
-            else:
-                if c_id:
-                    pool = [p for p in coached_by.get(c_id, []) if p != e_id and emp_cache[p]['user_id']]
-                    if e_data['is_bm']:
-                        valid_peers = [p for p in pool if emp_cache[p]['job_id'] == e_data['job_id']] or pool
-                    elif e_data['is_manager']:
-                        valid_peers = [p for p in pool if emp_cache[p]['ou_id'] == e_data['ou_id']] or pool
-                    else:
-                        valid_peers = [p for p in pool if emp_cache[p]['ou_id'] == e_data['ou_id'] and emp_cache[p]['job_id'] == e_data['job_id']] or pool
-                else:
-                    valid_peers = []
-
-            total_eligible_raters += len(valid_peers)
-            target_peer_quota = min(len(valid_peers), max_peers) if max_peers > 0 else len(valid_peers)
-            if target_peer_quota > 0:
-                p_list = list(valid_peers)
-                random.shuffle(p_list)
-                p_list.sort(key=lambda pid: peer_assessor_workload.get(emp_cache[pid]['user_id'], 0))
-                selected_peers = p_list[:target_peer_quota]
-                total_sampled_raters += len(selected_peers)
-                for pid in selected_peers:
+        # 4. Peer Assessment (Strict business rules per position category)
+        # A. Director & Chief Peer Pool (Cross-directorate across bank via config)
+        dir_pool = [e_id for e_id in emp_cache if emp_cache[e_id]['is_director'] and emp_cache[e_id]['user_id']]
+        if len(dir_pool) > 1:
+            k_dir = min(len(dir_pool) - 1, max_peers) if max_peers > 0 else len(dir_pool) - 1
+            dir_pool_sorted = sorted(dir_pool)
+            d_len = len(dir_pool_sorted)
+            for i, e_id in enumerate(dir_pool_sorted):
+                total_eligible_raters += (d_len - 1)
+                for j in range(1, k_dir + 1):
+                    pid = dir_pool_sorted[(i + j) % d_len]
                     p_u_id = emp_cache[pid]['user_id']
                     pair_peer = (e_id, p_u_id, 'peer')
                     if pair_peer not in existing_pairs:
@@ -328,39 +602,65 @@ class CompetencyAssessmentCycle(models.Model):
                         })
                         existing_pairs.add(pair_peer)
                         peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
+                        total_sampled_raters += 1
 
-            # Subordinate Sampling
-            sub_candidates = [
-                r for r in reports_by_manager.get(e_id, [])
-                if emp_cache[r]['user_id'] and emp_cache[r]['job_id'] != e_data['job_id']
-            ] or [r for r in reports_by_manager.get(e_id, []) if emp_cache[r]['user_id']]
+        # B. Non-Director Peer Bucketing according to bank matrix:
+        # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
+        # Rule 2: Managerial (HO & District): 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+        # Rule 3: Branch Managers (BMs): 1. Same Coach, 2. Same Job Grade, 3. Same Job Position (BM)
+        peer_buckets = {}
+        for e_id, e_data in emp_cache.items():
+            if e_data['is_director'] or not e_data['user_id']:
+                continue
 
-            total_eligible_raters += len(sub_candidates)
-            target_sub_quota = min(len(sub_candidates), max_subs) if max_subs > 0 else len(sub_candidates)
-            if target_sub_quota > 0:
-                s_list = list(sub_candidates)
-                random.shuffle(s_list)
-                s_list.sort(key=lambda sid: sub_assessor_workload.get(emp_cache[sid]['user_id'], 0))
-                selected_subs = s_list[:target_sub_quota]
-                total_sampled_raters += len(selected_subs)
-                for sid in selected_subs:
-                    s_u_id = emp_cache[sid]['user_id']
-                    pair_sub = (e_id, s_u_id, 'subordinate')
-                    if pair_sub not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': e_id,
-                            'assessor_id': s_u_id,
-                            'assessment_type': 'subordinate',
-                        })
-                        existing_pairs.add(pair_sub)
-                        sub_assessor_workload[s_u_id] = sub_assessor_workload.get(s_u_id, 0) + 1
+            c_id = e_data['coach_id']
+            if not c_id:
+                continue
+
+            g_id = e_data['grade_id'] or 0
+            ou_id = e_data['ou_id'] or 0
+            j_id = e_data['job_id'] or 0
+
+            if e_data['is_bm']:
+                # Rule 3: Branch Managers: 1. Same Coach, 2. Same Job Grade, 3. Same Job Position
+                b_key = ('BM', c_id, g_id, 'BM_ROLE')
+            elif e_data['is_manager']:
+                # Rule 2: Managerial Positions HO & District: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit
+                b_key = ('MGR', c_id, g_id, ou_id)
+            else:
+                # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
+                b_key = ('NON_MGR', c_id, g_id, ou_id, j_id)
+
+            peer_buckets.setdefault(b_key, []).append(e_id)
+
+        # Apply circular fair matching C_n(1..K) within each peer bucket
+        for b_key, members in peer_buckets.items():
+            m_len = len(members)
+            if m_len > 1:
+                k_peer = min(m_len - 1, max_peers) if max_peers > 0 else m_len - 1
+                members_sorted = sorted(members)
+                for i, e_id in enumerate(members_sorted):
+                    total_eligible_raters += (m_len - 1)
+                    for j in range(1, k_peer + 1):
+                        pid = members_sorted[(i + j) % m_len]
+                        p_u_id = emp_cache[pid]['user_id']
+                        pair_peer = (e_id, p_u_id, 'peer')
+                        if pair_peer not in existing_pairs:
+                            assessments_to_create.append({
+                                'cycle_id': self.id,
+                                'employee_id': e_id,
+                                'assessor_id': p_u_id,
+                                'assessment_type': 'peer',
+                            })
+                            existing_pairs.add(pair_peer)
+                            peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
+                            total_sampled_raters += 1
 
         # Audit log on cycle
         self.sudo().write({
             'eligible_rater_count': total_eligible_raters,
             'selected_rater_count': total_sampled_raters,
-            'sampling_audit_log': f"360 In-Memory Fast Sampling Audit: Eligible Candidates={total_eligible_raters}, Sampled={total_sampled_raters}, Created Assessments={len(assessments_to_create)}",
+            'sampling_audit_log': f"360 Balanced Sampling Audit: Eligible Candidates={total_eligible_raters}, Sampled={total_sampled_raters}, Created Assessments={len(assessments_to_create)}",
         })
 
         if not assessments_to_create:
@@ -385,6 +685,8 @@ class CompetencyAssessmentCycle(models.Model):
             chunk = assessments_to_create[i:i + chunk_size]
             asms_chunk = AssessmentSudo.create(chunk)
             created_asms |= asms_chunk
+            # Commit each chunk immediately to persist assessments and release locks
+            self.env.cr.commit()
 
         # Post single summary announcement on Cycle Chatter
         deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
@@ -393,6 +695,7 @@ class CompetencyAssessmentCycle(models.Model):
                 "Assessment cycle <strong>%s</strong> opened. Successfully generated <strong>%d</strong> 360-degree evaluations for %d employees. Submission Deadline: <strong>%s</strong>."
             ) % (self.name, len(assessments_to_create), len(active_employees), deadline_str)
         )
+        self.env.cr.commit()
 
         return created_asms
 
@@ -414,7 +717,27 @@ class CompetencyAssessmentCycle(models.Model):
                 locked_fields = {'name', 'period_start', 'period_end', 'assessment_deadline'}
                 if set(vals.keys()) & locked_fields:
                     raise ValidationError(_("This assessment cycle (%s) is closed and cannot be edited.") % rec.name)
-        return super().write(vals)
+        res = super().write(vals)
+        if 'active' in vals and not self.env.context.get('skip_active_cascade'):
+            is_act = bool(vals['active'])
+            cycle_ids = tuple(self.ids)
+            self.env.cr.execute("""
+                UPDATE competency_assessment SET active = %s WHERE cycle_id IN %s;
+                UPDATE competency_assessment_line SET active = %s WHERE cycle_id IN %s;
+            """, (is_act, cycle_ids, is_act, cycle_ids))
+            self.invalidate_model()
+        return res
+
+    def unlink(self):
+        """Soft-delete / archive cycles instead of physical deletion to protect historical data integrity."""
+        for cycle in self:
+            cycle.with_context(skip_active_cascade=True).write({'active': False})
+            self.env.cr.execute("""
+                UPDATE competency_assessment SET active = FALSE WHERE cycle_id = %s;
+                UPDATE competency_assessment_line SET active = FALSE WHERE cycle_id = %s;
+            """, (cycle.id, cycle.id))
+        self.invalidate_model()
+        return True
 
 
 class CompetencyAssessment(models.Model):
@@ -426,6 +749,7 @@ class CompetencyAssessment(models.Model):
     _rec_name = 'name'
 
     name = fields.Char(string='Reference', readonly=True, copy=False)
+    active = fields.Boolean(string='Active', default=True)
     cycle_id = fields.Many2one(
         'competency.assessment.cycle', string='Assessment Cycle', required=True,
         domain="[('state', '=', 'open')]", ondelete='cascade', tracking=True)
@@ -456,18 +780,27 @@ class CompetencyAssessment(models.Model):
         """Complete 360-degree assessment type selection options."""
         return [
             ('self', 'Self-Assessment'),
+            ('team', 'Team Assessment'),
             ('peer', 'Peer Assessment'),
             ('subordinate', 'Subordinate Assessment'),
-            ('supervisor', 'Supervisor Assessment'),
-            ('team', 'Team Assessment'),
+            ('supervisor', 'Supervisor Assessment (Legacy)'),
         ]
 
 
 
     assessor_id = fields.Many2one('res.users', string='Assessor', default=lambda self: self.env.user, readonly=True)
+    assessor_employee_id = fields.Many2one(
+        'hr.employee', string='Assessor Employee',
+        compute='_compute_assessor_employee_id', store=True, index=True
+    )
     assessment_type = fields.Selection(
         selection='_get_assessment_type_selection', string='Assessment Type',
         required=True, tracking=True)
+
+    @api.depends('assessor_id', 'assessor_id.employee_id')
+    def _compute_assessor_employee_id(self):
+        for rec in self:
+            rec.assessor_employee_id = rec.assessor_id.employee_id if rec.assessor_id else False
 
     @api.model
     def _get_employee_ou_id(self, emp):
@@ -590,6 +923,7 @@ class CompetencyAssessment(models.Model):
 
         tokens = g_str.replace('-', ' ').replace('_', ' ').split()
         roman_map = {
+            'xx': 20, 'xix': 19, 'xviii': 18,
             'xvii': 17, 'xvi': 16, 'xv': 15, 'xiv': 14, 'xiii': 13, 'xii': 12, 'xi': 11,
             'x': 10, 'ix': 9, 'viii': 8, 'vii': 7, 'vi': 6, 'v': 5, 'iv': 4, 'iii': 3, 'ii': 2, 'i': 1
         }
@@ -605,6 +939,24 @@ class CompetencyAssessment(models.Model):
             return int(numbers[0])
 
         return 0
+
+    @api.model
+    def _parse_grade_rank(self, grade_code, grade_rec=None):
+        """Parse Roman numeral or numeric grade into integer rank (e.g. IX -> 9, XII -> 12)."""
+        roman_map = {
+            'xx': 20, 'xix': 19, 'xviii': 18,
+            'xvii': 17, 'xvi': 16, 'xv': 15, 'xiv': 14, 'xiii': 13, 'xii': 12, 'xi': 11,
+            'x': 10, 'ix': 9, 'viii': 8, 'vii': 7, 'vi': 6, 'v': 5, 'iv': 4, 'iii': 3, 'ii': 2, 'i': 1
+        }
+        if grade_code:
+            tokens = str(grade_code).lower().strip().replace('-', ' ').replace('_', ' ').split()
+            if tokens and tokens[0] in roman_map:
+                return roman_map[tokens[0]]
+            import re
+            m = re.findall(r'\d+', str(grade_code))
+            if m:
+                return int(m[0])
+        return grade_rec.id if grade_rec else 0
 
     @api.model
     def _is_director_or_chief(self, emp):
@@ -779,45 +1131,32 @@ class CompetencyAssessment(models.Model):
 
         elif self.assessment_type == 'subordinate':
             subs = self._get_eligible_subordinates_for_emp(emp)
-            emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
-            if emp_coach and emp_coach in subs:
-                self.employee_id = emp_coach.id
-            else:
-                self.employee_id = subs[0].id if subs else False
-            return {'domain': {'employee_id': [('id', 'in', subs.ids)]}}
-
-        elif self.assessment_type == 'supervisor':
-            supervisors = self.env['hr.employee']
-            if emp.parent_id:
-                supervisors |= emp.parent_id
+            bosses = self.env['hr.employee']
             if getattr(emp, 'coach_id', False) and emp.coach_id:
-                supervisors |= emp.coach_id
+                bosses |= emp.coach_id
+            if emp.parent_id:
+                bosses |= emp.parent_id
             if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.id != emp.id:
-                supervisors |= emp.department_id.manager_id
+                bosses |= emp.department_id.manager_id
+            all_subs = subs | bosses
+            self.employee_id = all_subs[0].id if all_subs else False
+            return {'domain': {'employee_id': [('id', 'in', all_subs.ids)]}}
 
-            if not supervisors and emp.department_id:
-                dept = emp.department_id.parent_id
-                while dept and not supervisors:
-                    if dept.manager_id and dept.manager_id.id != emp.id:
-                        supervisors |= dept.manager_id
-                    dept = dept.parent_id
-
-            if not supervisors:
-                supervisors = self.env['hr.employee'].search([
-                    ('id', '!=', emp.id),
-                    '|', ('job_id.name', 'ilike', 'manager'), ('job_id.name', 'ilike', 'director')
-                ], limit=30)
-
-            self.employee_id = supervisors[0].id if supervisors else False
-            return {'domain': {'employee_id': [('id', 'in', supervisors.ids)]}}
-
-        elif self.assessment_type == 'team':
-            subordinates = self.env['hr.employee'].search([('parent_id', '=', emp.id)])
-            if not subordinates and emp.department_id and emp.department_id.manager_id.id == emp.id:
-                subordinates = self.env['hr.employee'].search([('department_id', '=', emp.department_id.id), ('id', '!=', emp.id)])
-
-            self.employee_id = subordinates[0].id if subordinates else False
-            return {'domain': {'employee_id': [('id', 'in', subordinates.ids)]}}
+        elif self.assessment_type in ('team', 'supervisor'):
+            # Assessor is boss / coach evaluating their direct reports / team members
+            team_members = self.env['hr.employee'].search([
+                ('active', '=', True),
+                ('id', '!=', emp.id),
+                '|', ('coach_id', '=', emp.id), ('parent_id', '=', emp.id)
+            ])
+            if not team_members and emp.department_id and emp.department_id.manager_id.id == emp.id:
+                team_members = self.env['hr.employee'].search([
+                    ('active', '=', True),
+                    ('department_id', '=', emp.department_id.id),
+                    ('id', '!=', emp.id)
+                ])
+            self.employee_id = team_members[0].id if team_members else False
+            return {'domain': {'employee_id': [('id', 'in', team_members.ids)]}}
 
         return {'domain': {'employee_id': []}}
 
@@ -854,6 +1193,15 @@ class CompetencyAssessment(models.Model):
         help='True if current user is Competency Administrator or System Admin.'
     )
 
+    is_admin_or_officer = fields.Boolean(
+        string='Is Admin or Officer', compute='_compute_is_admin_or_officer',
+        help='True if current user has HR Officer or Competency Admin rights.'
+    )
+
+    is_override_active = fields.Boolean(string='Override Mode Active', default=False, tracking=True, copy=False)
+    override_user_id = fields.Many2one('res.users', string='Override Enabled By', readonly=True, copy=False)
+    override_date = fields.Datetime(string='Override Date', readonly=True, copy=False)
+
     @api.depends_context('uid')
     def _compute_is_admin_user(self):
         is_admin = bool(
@@ -865,27 +1213,106 @@ class CompetencyAssessment(models.Model):
         for rec in self:
             rec.is_admin_user = is_admin
 
-    can_edit_ratings = fields.Boolean(
-        string='Can Edit Ratings', compute='_compute_can_edit_ratings',
-        help='True if current user is assessor or admin, assessment is in draft, not locked, and not deadline passed.'
-    )
-
     @api.depends_context('uid')
-    def _compute_can_edit_ratings(self):
-        is_admin = bool(
-            self.env.user.has_group('competency_management.group_competency_admin')
+    def _compute_is_admin_or_officer(self):
+        is_officer_or_admin = bool(
+            self.env.user.has_group('competency_management.group_competency_officer')
+            or self.env.user.has_group('competency_management.group_competency_admin')
             or self.env.user.has_group('base.group_system')
             or self.env.su
             or self.env.is_admin()
         )
-        current_uid = self.env.user.id
         for rec in self:
+            rec.is_admin_or_officer = is_officer_or_admin
+
+    @api.model
+    def _is_elevated_evaluator(self, user=None):
+        """Check if user has elevated HR administrative role authorized to override assessments:
+        - HR / People Solution Officer (group_competency_officer)
+        - Competency Administrator (group_competency_admin)
+        - System Administrator (base.group_system)
+
+        Coaches, Supervisors, Department Leaders, and Operating Unit Leaders who do not possess
+        these HR roles CANNOT override assessments or fill ratings for other employees.
+        """
+        user = user or self.env.user
+        return bool(
+            user.has_group('competency_management.group_competency_officer')
+            or user.has_group('competency_management.group_competency_admin')
+            or user.has_group('base.group_system')
+            or self.env.su
+            or self.env.is_admin()
+        )
+
+    can_override = fields.Boolean(
+        string='Can Override', compute='_compute_can_override',
+        help='True if current user is an HR / People Solution Officer or Competency Administrator, '
+             'is neither the assessor nor the evaluated employee, and the assessment is unapproved.'
+    )
+
+    @api.depends_context('uid')
+    @api.depends('state', 'is_locked', 'cycle_id.state', 'assessor_id', 'employee_id')
+    def _compute_can_override(self):
+        user = self.env.user
+        emp = user.employee_id
+        is_elevated = self._is_elevated_evaluator(user)
+        for rec in self:
+            if not is_elevated:
+                rec.can_override = False
+                continue
+            if rec.state in ('approved', 'locked') or rec.is_locked:
+                rec.can_override = False
+                continue
+            if rec.cycle_id and rec.cycle_id.state == 'closed':
+                rec.can_override = False
+                continue
+            # Segregation of duties:
+            # 1. If assessor, must finish on My Competency Assessments (no override)
+            if rec.assessor_id and rec.assessor_id.id == user.id:
+                rec.can_override = False
+                continue
+            # 2. If assessed employee, cannot override own assessment
+            is_evaluatee = bool((emp and rec.employee_id and rec.employee_id.id == emp.id) or (rec.employee_id and rec.sudo().employee_id.user_id.id == user.id))
+            if is_evaluatee:
+                rec.can_override = False
+                continue
+            rec.can_override = True
+
+    can_edit_ratings = fields.Boolean(
+        string='Can Edit Ratings', compute='_compute_can_edit_ratings',
+        help='True if assessment inputs are currently unlocked for editing.'
+    )
+
+    @api.depends_context('uid')
+    @api.depends('state', 'is_locked', 'is_deadline_passed', 'cycle_id.state', 'assessor_id', 'employee_id', 'is_override_active')
+    def _compute_can_edit_ratings(self):
+        user = self.env.user
+        emp = user.employee_id
+        current_uid = user.id
+        is_elevated = self._is_elevated_evaluator(user)
+
+        for rec in self:
+            # 1. Approved or locked assessments can NEVER be edited by anyone
+            if rec.state in ('approved', 'locked') or rec.is_locked or (rec.cycle_id and rec.cycle_id.state == 'closed'):
+                rec.can_edit_ratings = False
+                continue
+
+            # 2. Administrative Override active for elevated evaluator (Dept/OU Leader, HR Officer/Admin)
+            # Segregation of duties: Must NOT be the assessor and NOT be the evaluatee
             is_assessor = bool(rec.assessor_id and rec.assessor_id.id == current_uid)
-            allowed_user = is_admin or is_assessor
-            not_locked = not rec.is_locked
-            valid_state = (rec.state == 'draft') or is_admin
-            deadline_ok = (not rec.is_deadline_passed) or is_admin
-            rec.can_edit_ratings = bool(allowed_user and not_locked and valid_state and deadline_ok)
+            is_evaluatee = bool((emp and rec.employee_id and rec.employee_id.id == emp.id) or (rec.employee_id and rec.sudo().employee_id.user_id.id == current_uid))
+            if rec.is_override_active and is_elevated and not is_assessor and not is_evaluatee:
+                rec.can_edit_ratings = True
+                continue
+
+            # 3. Designated Assessor editing their own draft assessment within deadline during open cycle
+            cycle_open = not rec.cycle_id or rec.cycle_id.state == 'open'
+            if is_assessor and rec.state == 'draft' and not rec.is_deadline_passed and cycle_open:
+                rec.can_edit_ratings = True
+                continue
+
+            # 4. Default: Read-only
+            rec.can_edit_ratings = False
 
     # 360 Multi-Rater extension fields (FR-COM-012, FR-ASM-002, FR-ASM-005)
     parent_assessment_id = fields.Many2one('competency.assessment', string='Parent 360 Assessment', ondelete='cascade', tracking=True)
@@ -923,15 +1350,16 @@ class CompetencyAssessment(models.Model):
         average across however many raters happened to submit.
         """
         config = self.env['competency.matrix.config'].sudo().get_active_config()
+        sup_weight = float(config.weight_supervisor or 3.0)
         weight_by_type = {
             'self': float(config.weight_self or 2.0),
             'peer': float(config.weight_peer or 1.0),
             'subordinate': float(config.weight_subordinate or 1.0),
-            'supervisor': float(config.weight_supervisor or 3.0),
-            'team': float(config.weight_team or 0.0),
+            'supervisor': sup_weight,
+            'team': sup_weight,
         }
         # Verified skills-test evidence is treated with the same authority as a supervisor rating.
-        skills_test_weight = weight_by_type['supervisor']
+        skills_test_weight = sup_weight
 
         for parent in self:
             if not parent.employee_id:
@@ -1006,25 +1434,25 @@ class CompetencyAssessment(models.Model):
             return [seq.next_by_code('competency.assessment') for _ in range(count)]
 
         try:
-            self.env.cr.execute(
-                "SELECT number_next, number_increment FROM ir_sequence WHERE id = %s FOR UPDATE",
-                (seq.id,)
-            )
-            row = self.env.cr.fetchone()
-            if not row:
-                return [seq.next_by_code('competency.assessment') for _ in range(count)]
-
-            start_num = row[0]
-            increment = row[1] or 1
-            end_num = start_num + (count * increment)
-            self.env.cr.execute(
-                "UPDATE ir_sequence SET number_next = %s WHERE id = %s",
-                (end_num, seq.id)
-            )
-            prefix = (seq.prefix or 'CMP-A/%(year)s/').replace('%(year)s', year)
-            padding = seq.padding or 5
-            format_str = f"{prefix}%0{padding}d"
-            return [format_str % (start_num + i * increment) for i in range(count)]
+            with self.env.cr.savepoint():
+                self.env.cr.execute(
+                    "SELECT number_next, number_increment FROM ir_sequence WHERE id = %s FOR UPDATE",
+                    (seq.id,)
+                )
+                row = self.env.cr.fetchone()
+                if not row:
+                    raise Exception("No sequence row")
+                start_num = row[0]
+                increment = row[1] or 1
+                end_num = start_num + (count * increment)
+                self.env.cr.execute(
+                    "UPDATE ir_sequence SET number_next = %s WHERE id = %s",
+                    (end_num, seq.id)
+                )
+                prefix = (seq.prefix or 'CMP-A/%(year)s/').replace('%(year)s', year)
+                padding = seq.padding or 5
+                format_str = f"{prefix}%0{padding}d"
+                return [format_str % (start_num + i * increment) for i in range(count)]
         except Exception:
             return [seq.next_by_code('competency.assessment') for _ in range(count)]
 
@@ -1119,9 +1547,9 @@ class CompetencyAssessment(models.Model):
         elif pillar == 'leadership': return '1'
         else: return '2'
 
-    @api.onchange('employee_id')
+    @api.onchange('employee_id', 'assessment_type')
     def _onchange_employee_id_populate_competencies(self):
-        """Automatically populate/refresh competency rating lines when employee_id changes in draft state."""
+        """Automatically populate/refresh competency rating lines when employee_id or assessment_type changes in draft state."""
         if self.state == 'draft' and self.employee_id:
             self._do_populate_lines()
 
@@ -1297,30 +1725,117 @@ class CompetencyAssessment(models.Model):
                     "Submissions are no longer accepted unless HR extends the deadline."
                 ) % (deadline_str, rec.cycle_id.name))
 
+    def action_enable_override(self):
+        """Enable administrative edit override for an unapproved assessment."""
+        self.ensure_one()
+        user = self.env.user
+        emp = user.employee_id
+        is_elevated = self._is_elevated_evaluator(user)
+        if not is_elevated:
+            raise AccessError(_("Only HR / People Solution Officers and Competency Administrators can enable administrative override."))
+
+        # Exception 1: Assessor cannot override on All Assessments; must complete on My Competency Assessments
+        if self.assessor_id and self.assessor_id.id == user.id:
+            raise UserError(_(
+                "You are the assigned assessor for this assessment. "
+                "You cannot use administrative override on your own assigned evaluation. "
+                "Please complete and submit it via 'My Competency Assessments'."
+            ))
+
+        # Exception 2: Assessed employee cannot override their own assessment
+        is_evaluatee = bool((emp and self.employee_id and self.employee_id.id == emp.id) or (self.employee_id and self.sudo().employee_id.user_id.id == user.id))
+        if is_evaluatee:
+            raise UserError(_(
+                "You cannot override an assessment where you are the evaluated employee. "
+                "Self-override is strictly prohibited to prevent conflicts of interest. "
+                "Another HR / People Solution Officer or Competency Administrator must perform this adjustment."
+            ))
+
+        if self.state in ('approved', 'locked') or self.is_locked:
+            raise UserError(_("Cannot override an approved or locked assessment. Already approved assessment results are permanently protected from modification."))
+        if self.cycle_id and self.cycle_id.state == 'closed':
+            raise UserError(_("Cannot override assessments in a closed cycle."))
+
+        self.write({
+            'is_override_active': True,
+            'override_user_id': user.id,
+            'override_date': fields.Datetime.now(),
+        })
+        self.message_post(
+            body=_(
+                "⚠️ <strong>Administrative Override Activated</strong> by %s. Rating inputs have been unlocked for authorized adjustment."
+            ) % user.name,
+            subtype_xmlid='mail.mt_comment'
+        )
+        return True
+
+    def action_disable_override(self):
+        """Lock and disable administrative edit override."""
+        self.ensure_one()
+        user = self.env.user
+        if not self._is_elevated_evaluator(user):
+            raise AccessError(_("Only HR / People Solution Officers and Competency Administrators can manage administrative override."))
+
+        self.write({
+            'is_override_active': False,
+            'override_user_id': False,
+            'override_date': False,
+        })
+        self.message_post(
+            body=_(
+                "🔒 <strong>Administrative Override Locked</strong> by %s. Rating inputs are now protected."
+            ) % user.name,
+            subtype_xmlid='mail.mt_comment'
+        )
+        return True
+
     def write(self, vals):
         force_write = self.env.context.get('force_write')
-        is_admin = bool(
-            self.env.user.has_group('competency_management.group_competency_admin')
-            or self.env.user.has_group('base.group_system')
-            or self.env.su
-            or self.env.is_admin()
-        )
+        user = self.env.user
+        emp = user.employee_id
+        is_elevated = self._is_elevated_evaluator(user)
+
         for rec in self:
-            if rec.state == 'locked' and not force_write and not self.env.su:
-                locked_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids', 'notes'}
-                if set(vals.keys()) & locked_fields:
-                    raise ValidationError(_("Assessment %s is locked. Only Competency Administrators can unlock finalized assessments using the Unlock action.") % rec.name)
+            # 1. Approved or locked assessment immutability check (cannot be modified by anyone)
+            if (rec.state in ('approved', 'locked') or rec.is_locked) and not force_write:
+                protected_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids',
+                                    'core_line_ids', 'leadership_line_ids', 'technical_line_ids', 'notes'}
+                if set(vals.keys()) & protected_fields:
+                    raise ValidationError(_("Assessment %s is approved/locked. Already approved assessment results cannot be modified by anyone.") % rec.name)
+
+            # 2. Check if modifying assessment content when user is not assessor or assessment is submitted/past deadline
+            touching_content = bool(set(vals.keys()) & {'line_ids', 'core_line_ids', 'leadership_line_ids', 'technical_line_ids', 'notes'})
+            if touching_content and not force_write:
+                is_assessor = bool(rec.assessor_id and rec.assessor_id.id == user.id)
+                is_evaluatee = bool((emp and rec.employee_id and rec.employee_id.id == emp.id) or (rec.employee_id and rec.sudo().employee_id.user_id.id == user.id))
+                is_self_draft = bool(rec.assessment_type == 'self' and is_assessor and rec.state == 'draft')
+
+                if is_evaluatee and not is_self_draft and not force_write:
+                    raise UserError(_("You cannot modify ratings on your own evaluation. Another HR / People Solution Officer or Competency Administrator must perform this adjustment."))
+
+                if not is_assessor:
+                    if not is_elevated:
+                        raise UserError(_("You are not authorized to edit this assessment. Only the assigned assessor or an authorized HR / People Solution Officer with Override can input ratings."))
+                    if not rec.is_override_active:
+                        raise UserError(_("Editing another user's assessment requires Administrative Override. Please click 'Override Ratings' first."))
+                elif rec.state != 'draft' or rec.is_deadline_passed:
+                    raise UserError(_(
+                        "You are the assigned assessor for this assessment. "
+                        "Assessments past deadline or already submitted cannot be edited by the assessor. "
+                        "An HR / People Solution Officer or Competency Administrator must review or override."
+                    ))
+
             today = fields.Date.today()
             cycle = rec.cycle_id.sudo() if rec.cycle_id else False
             dl = fields.Date.to_date(cycle.assessment_deadline) if (cycle and cycle.assessment_deadline) else False
             is_expired = rec.is_deadline_passed or bool(dl and today > dl)
-            if is_expired and rec.state == 'draft' and not force_write and not is_admin:
+            if is_expired and rec.state == 'draft' and not force_write and not (is_elevated and rec.is_override_active):
                 protected_fields = {'employee_id', 'cycle_id', 'assessment_type', 'assessor_id', 'line_ids', 'core_line_ids', 'leadership_line_ids', 'technical_line_ids', 'notes'}
                 if set(vals.keys()) & protected_fields:
                     deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
                     raise UserError(_(
                         "The submission deadline (%s) for assessment cycle '%s' has passed. "
-                        "This assessment is locked for editing and submissions are closed unless HR extends the deadline."
+                        "This assessment is locked for editing and submissions are closed unless HR extends the deadline or enables Override."
                     ) % (deadline_str, rec.cycle_id.name))
         return super(CompetencyAssessment, self).write(vals)
 
@@ -1332,38 +1847,44 @@ class CompetencyAssessment(models.Model):
         """
         if not target_user:
             return
-        rec_to_notify = target_rec or self
+        rec_to_notify = (target_rec or self).sudo()
         
         # 1. Top Header Clock Icon (Activity Badge)
-        rec_to_notify.activity_schedule(
-            'mail.mail_activity_data_todo',
-            summary=summary,
-            note=note,
-            user_id=target_user.id,
-        )
+        try:
+            rec_to_notify.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary=summary,
+                note=note,
+                user_id=target_user.id,
+            )
+        except Exception:
+            pass
 
         # 2. Document Chatter Message & In-App Notification
         if target_user.partner_id:
-            msg = rec_to_notify.message_post(
-                body=msg_text,
-                partner_ids=[target_user.partner_id.id],
-                subtype_xmlid='mail.mt_comment',
-            )
-            # Guarantee an unread in-app inbox notification entry
-            notif = self.env['mail.notification'].sudo().search([
-                ('mail_message_id', '=', msg.id),
-                ('res_partner_id', '=', target_user.partner_id.id),
-            ], limit=1)
-            if notif:
-                notif.write({'notification_type': 'inbox', 'is_read': False})
-            else:
-                self.env['mail.notification'].sudo().create({
-                    'mail_message_id': msg.id,
-                    'res_partner_id': target_user.partner_id.id,
-                    'notification_type': 'inbox',
-                    'notification_status': 'sent',
-                    'is_read': False,
-                })
+            try:
+                msg = rec_to_notify.message_post(
+                    body=msg_text,
+                    partner_ids=[target_user.partner_id.id],
+                    subtype_xmlid='mail.mt_comment',
+                )
+                # Guarantee an unread in-app inbox notification entry
+                notif = self.env['mail.notification'].sudo().search([
+                    ('mail_message_id', '=', msg.id),
+                    ('res_partner_id', '=', target_user.partner_id.id),
+                ], limit=1)
+                if notif:
+                    notif.write({'notification_type': 'inbox', 'is_read': False})
+                else:
+                    self.env['mail.notification'].sudo().create({
+                        'mail_message_id': msg.id,
+                        'res_partner_id': target_user.partner_id.id,
+                        'notification_type': 'inbox',
+                        'notification_status': 'sent',
+                        'is_read': False,
+                    })
+            except Exception:
+                pass
 
             # 3. Direct Discuss Chat Channel Popup / Window (OdooBot Direct Message)
             try:
@@ -1390,7 +1911,7 @@ class CompetencyAssessment(models.Model):
                 raise ValidationError(_('Validation Error: Please rate all competencies before submitting! %d competency(ies) remaining unrated: %s%s') % (
                     len(unrated), unrated_names, "..." if len(unrated) > 5 else ""
                 ))
-            rec.with_context(force_write=True).write({'state': 'submitted'})
+            rec.with_context(force_write=True).sudo().write({'state': 'submitted'})
             rec.line_ids._trigger_sibling_360_recompute()
             
             # Log submission source (Self vs Admin on behalf of employee)
@@ -1402,29 +1923,32 @@ class CompetencyAssessment(models.Model):
                 or self.env.su
             )
             if is_admin and assessor_user and current_user != assessor_user:
-                rec.message_post(body=_(
+                rec.sudo().message_post(body=_(
                     'Assessment %s submitted by Administrator <strong>%s</strong> on behalf of <strong>%s</strong>.'
                 ) % (rec.name, current_user.name, assessor_user.name or (rec.employee_id.name if rec.employee_id else 'Employee')))
             else:
-                rec.message_post(body=_('Assessment %s submitted for review.') % rec.name)
+                rec.sudo().message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
             # Targeted Notifications & Systray Activities on Submission
             if rec.assessment_type == 'self':
                 # Confirmation activity for employee
-                if rec.employee_id and rec.employee_id.user_id:
-                    rec.activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('Self-Assessment Submitted: %s') % rec.name,
-                        note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
-                        user_id=rec.employee_id.user_id.id,
-                    )
+                if rec.employee_id and rec.sudo().employee_id.user_id:
+                    try:
+                        rec.sudo().activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary=_('Self-Assessment Submitted: %s') % rec.name,
+                            note=_('Your competency self-assessment %s has been submitted successfully.') % rec.name,
+                            user_id=rec.sudo().employee_id.user_id.id,
+                        )
+                    except Exception:
+                        pass
 
-                coach_emp = rec.employee_id.coach_id or rec.employee_id.parent_id
+                coach_emp = rec.sudo().employee_id.coach_id or rec.sudo().employee_id.parent_id
                 coach_user = coach_emp.user_id if (coach_emp and coach_emp.user_id) else False
 
                 sup_asm = False
                 if rec.cycle_id and rec.employee_id:
-                    sup_asm = self.env['competency.assessment'].search([
+                    sup_asm = self.env['competency.assessment'].sudo().search([
                         ('cycle_id', '=', rec.cycle_id.id),
                         ('employee_id', '=', rec.employee_id.id),
                         ('assessment_type', 'in', ('supervisor', 'team')),
@@ -1444,11 +1968,11 @@ class CompetencyAssessment(models.Model):
                     rec._notify_user_inbox_and_activity(coach_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
             elif rec.assessment_type in ('supervisor', 'team'):
-                emp_user = rec.employee_id.user_id if (rec.employee_id and rec.employee_id.user_id) else False
+                emp_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
 
                 self_asm = False
                 if rec.cycle_id and rec.employee_id:
-                    self_asm = self.env['competency.assessment'].search([
+                    self_asm = self.env['competency.assessment'].sudo().search([
                         ('cycle_id', '=', rec.cycle_id.id),
                         ('employee_id', '=', rec.employee_id.id),
                         ('assessment_type', '=', 'self'),
@@ -1467,13 +1991,38 @@ class CompetencyAssessment(models.Model):
                     target_rec = self_asm or rec
                     rec._notify_user_inbox_and_activity(emp_user, summary_str, note_str, msg_text, target_rec=target_rec)
 
+            elif rec.assessment_type == 'subordinate':
+                # Employee submitted assessment for boss / coach
+                boss_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
+                if boss_user:
+                    msg_text = _("📥 A subordinate evaluation has been completed and submitted for cycle '<strong>%s</strong>'.") % (
+                        rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    summary_str = _('Subordinate Evaluation Submitted: %s') % rec.name
+                    note_str = _('A subordinate evaluation has been submitted for cycle %s.') % (
+                        rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    rec._notify_user_inbox_and_activity(boss_user, summary_str, note_str, msg_text, target_rec=rec)
+
+            elif rec.assessment_type == 'peer':
+                peer_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
+                if peer_user:
+                    msg_text = _("📥 A peer evaluation has been completed and submitted for cycle '<strong>%s</strong>'.") % (
+                        rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    summary_str = _('Peer Evaluation Submitted: %s') % rec.name
+                    note_str = _('A peer evaluation has been submitted for cycle %s.') % (
+                        rec.cycle_id.name if rec.cycle_id else ''
+                    )
+                    rec._notify_user_inbox_and_activity(peer_user, summary_str, note_str, msg_text, target_rec=rec)
+
     def compute_aggregate_360_ratings(self):
         return self.action_consolidate_multi_source()
 
     def _check_segregation_of_duties(self):
         """Segregation of duties guard: Block self-approval by subject, assessor, or creator (FR-COM-055)."""
         for rec in self:
-            subject_user = rec.employee_id.user_id if rec.employee_id else False
+            subject_user = rec.sudo().employee_id.user_id if rec.employee_id else False
             assessor_user = rec.assessor_id or False
             creator_user = rec.create_uid or False
             current_user = self.env.user
@@ -1487,16 +2036,19 @@ class CompetencyAssessment(models.Model):
     def action_supervisor_review(self):
         """Submitted -> Supervisor Review with supervisor activity notification (FR-COM-048)."""
         for rec in self:
-            rec.with_context(force_write=True).write({'state': 'supervisor_review'})
-            supervisor_user = rec.employee_id.parent_id.user_id if (rec.employee_id and rec.employee_id.parent_id) else False
+            rec.with_context(force_write=True).sudo().write({'state': 'supervisor_review'})
+            supervisor_user = rec.sudo().employee_id.parent_id.user_id if (rec.employee_id and rec.sudo().employee_id.parent_id) else False
             if supervisor_user:
-                rec.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('Supervisor Review Needed: Assessment %s') % rec.name,
-                    note=_('Please review and complete assessment for %s.') % rec.employee_id.name,
-                    user_id=supervisor_user.id,
-                    date_deadline=rec.cycle_id.assessment_deadline or fields.Date.context_today(self),
-                )
+                try:
+                    rec.sudo().activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('Supervisor Review Needed: Assessment %s') % rec.name,
+                        note=_('Please review and complete assessment for %s.') % (rec.sudo().employee_id.name or 'Employee'),
+                        user_id=supervisor_user.id,
+                        date_deadline=rec.cycle_id.assessment_deadline or fields.Date.context_today(self),
+                    )
+                except Exception:
+                    pass
 
     def action_hr_verify(self):
         for rec in self:
@@ -1563,19 +2115,23 @@ class CompetencyAssessment(models.Model):
             days_left = (asm.cycle_id.assessment_deadline - today).days
             if days_left in (7, 3, 1):
                 target_user = False
-                if asm.state in ('draft', 'submitted') and asm.employee_id.user_id:
-                    target_user = asm.employee_id.user_id
-                elif asm.state == 'supervisor_review' and asm.employee_id.parent_id and asm.employee_id.parent_id.user_id:
-                    target_user = asm.employee_id.parent_id.user_id
+                emp_sudo = asm.sudo().employee_id
+                if asm.state in ('draft', 'submitted') and emp_sudo and emp_sudo.user_id:
+                    target_user = emp_sudo.user_id
+                elif asm.state == 'supervisor_review' and emp_sudo and emp_sudo.parent_id and emp_sudo.parent_id.user_id:
+                    target_user = emp_sudo.parent_id.user_id
                     
                 if target_user:
-                    asm.activity_schedule(
-                        'mail.mail_activity_data_todo',
-                        summary=_('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name),
-                        note=_('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (asm.name, days_left, asm.cycle_id.assessment_deadline),
-                        user_id=target_user.id,
-                        date_deadline=asm.cycle_id.assessment_deadline,
-                    )
+                    try:
+                        asm.sudo().activity_schedule(
+                            'mail.mail_activity_data_todo',
+                            summary=_('UPCOMING DEADLINE (%d days left): Competency Assessment %s') % (days_left, asm.name),
+                            note=_('Reminder: Your competency assessment %s is due in %d days (Deadline: %s).') % (asm.name, days_left, asm.cycle_id.assessment_deadline),
+                            user_id=target_user.id,
+                            date_deadline=asm.cycle_id.assessment_deadline,
+                        )
+                    except Exception:
+                        pass
 
         # 2. Overdue Assessments (Deadline reached or passed)
         overdue_assessments = self.search([
@@ -1585,19 +2141,23 @@ class CompetencyAssessment(models.Model):
         ])
         for asm in overdue_assessments:
             target_user = False
-            if asm.state in ('draft', 'submitted') and asm.employee_id.user_id:
-                target_user = asm.employee_id.user_id
-            elif asm.state == 'supervisor_review' and asm.employee_id.parent_id and asm.employee_id.parent_id.user_id:
-                target_user = asm.employee_id.parent_id.user_id
+            emp_sudo = asm.sudo().employee_id
+            if asm.state in ('draft', 'submitted') and emp_sudo and emp_sudo.user_id:
+                target_user = emp_sudo.user_id
+            elif asm.state == 'supervisor_review' and emp_sudo and emp_sudo.parent_id and emp_sudo.parent_id.user_id:
+                target_user = emp_sudo.parent_id.user_id
                 
             if target_user:
-                asm.activity_schedule(
-                    'mail.mail_activity_data_todo',
-                    summary=_('OVERDUE: Competency Assessment %s') % asm.name,
-                    note=_('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (asm.name, asm.cycle_id.assessment_deadline),
-                    user_id=target_user.id,
-                    date_deadline=today,
-                )
+                try:
+                    asm.sudo().activity_schedule(
+                        'mail.mail_activity_data_todo',
+                        summary=_('OVERDUE: Competency Assessment %s') % asm.name,
+                        note=_('URGENT: Competency Assessment %s passed its deadline (%s) and is overdue for completion.') % (asm.name, asm.cycle_id.assessment_deadline),
+                        user_id=target_user.id,
+                        date_deadline=today,
+                    )
+                except Exception:
+                    pass
 
     def get_achievement_summary_sentence(self):
         """Returns plain-language alignment sentence (FR-RPT-001 / FR-GAP-007)."""
@@ -1665,7 +2225,17 @@ class CompetencyAssessmentLine(models.Model):
     state = fields.Selection(related='assessment_id.state', string='Assessment Status', store=True, readonly=True, index=True)
     is_deadline_passed = fields.Boolean(related='assessment_id.is_deadline_passed', string='Deadline Passed', readonly=True)
     is_admin_user = fields.Boolean(related='assessment_id.is_admin_user', string='Is Competency Admin', readonly=True)
-    can_edit_ratings = fields.Boolean(related='assessment_id.can_edit_ratings', string='Can Edit Ratings', readonly=True)
+    can_edit_ratings = fields.Boolean(compute='_compute_can_edit_ratings', string='Can Edit Ratings', readonly=True)
+
+    @api.depends('assessment_id.can_edit_ratings', 'assessment_id.state', 'assessment_id.is_locked')
+    def _compute_can_edit_ratings(self):
+        for line in self:
+            if line.assessment_id and (line.assessment_id.state in ('approved', 'locked') or line.assessment_id.is_locked):
+                line.can_edit_ratings = False
+            elif line.assessment_id:
+                line.can_edit_ratings = line.assessment_id.can_edit_ratings
+            else:
+                line.can_edit_ratings = False
 
     def action_open_guide(self):
         """Opens the full behavioral indicators and rating popup for this line."""
@@ -1763,6 +2333,7 @@ class CompetencyAssessmentLine(models.Model):
                 rec.indicator_level_4 = False
                 rec.behavioral_guide_html = False
 
+    active = fields.Boolean(string='Active', default=True)
     current_level = fields.Selection([
         ('1', 'Level 1 - Basic'),
         ('2', 'Level 2 - Intermediate'),
@@ -1784,7 +2355,7 @@ class CompetencyAssessmentLine(models.Model):
     self_rating = fields.Float(string='Self Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
     peer_avg = fields.Float(string='Peer Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
     subordinate_avg = fields.Float(string='Subordinate Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
-    supervisor_avg = fields.Float(string='Supervisor Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
+    supervisor_avg = fields.Float(string='Supervisor Rating', compute='_compute_360_ratings', store=True, group_operator='avg')
     team_avg = fields.Float(string='Team Avg', compute='_compute_360_ratings', store=True, group_operator='avg')
     weighted_current_level = fields.Float(string='Weighted Current Level', compute='_compute_360_ratings', store=True, group_operator='avg')
 
@@ -1828,7 +2399,7 @@ class CompetencyAssessmentLine(models.Model):
             s_val = int(self_lines[0].current_level) if (self_lines and str(self_lines[0].current_level).isdigit()) else (int(line.current_level) if (line.assessment_id.assessment_type == 'self' and line.current_level and str(line.current_level).isdigit()) else 0.0)
             p_val = round(sum(int(l.current_level) for l in peer_lines if str(l.current_level).isdigit()) / len(peer_lines), 2) if peer_lines else 0.0
             sub_val = round(sum(int(l.current_level) for l in sub_lines if str(l.current_level).isdigit()) / len(sub_lines), 2) if sub_lines else 0.0
-            sup_val = round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0
+            sup_val = int(sup_lines[0].current_level) if (len(sup_lines) == 1 and str(sup_lines[0].current_level).isdigit()) else (round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0)
             t_val = round(sum(int(l.current_level) for l in team_lines if str(l.current_level).isdigit()) / len(team_lines), 2) if team_lines else 0.0
 
             line.self_rating = float(s_val)
@@ -1884,7 +2455,7 @@ class CompetencyAssessmentLine(models.Model):
                     if asm.assessor_id and asm.assessor_id != self.env.user:
                         raise UserError(_(
                             "You are not authorized to rate or edit this assessment. "
-                            "Only the assigned assessor (%s) or a Competency Administrator can input ratings."
+                            "Only the assigned assessor (%s) or an HR / People Solution Officer with Override can input ratings."
                         ) % (asm.assessor_id.name or 'Assessor'))
         lines = super().create(vals_list)
         if not self.env.context.get('skip_360_recompute'):
@@ -1893,32 +2464,48 @@ class CompetencyAssessmentLine(models.Model):
 
     def write(self, vals):
         force_write = self.env.context.get('force_write')
-        is_admin = bool(
-            self.env.user.has_group('competency_management.group_competency_admin')
-            or self.env.user.has_group('base.group_system')
-            or self.env.su
-            or self.env.is_admin()
-        )
+        user = self.env.user
+        emp = user.employee_id
+        is_elevated = self.env['competency.assessment']._is_elevated_evaluator(user)
+        rating_fields = {'current_level', 'comments', 'evidence_attachment_ids', 'required_level'}
+        touching_ratings = bool(set(vals.keys()) & rating_fields)
+
         for line in self:
-            if not force_write and not self.env.su and line.assessment_id:
-                asm = line.assessment_id
-                if asm.state == 'locked' and not is_admin:
-                    raise ValidationError(_("Cannot modify rating lines on locked assessment %s.") % asm.name)
-                today = fields.Date.today()
-                dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
-                if (asm.is_deadline_passed or (dl and today > dl)) and asm.state == 'draft' and not is_admin:
-                    deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
-                    raise UserError(_(
-                        "The submission deadline (%s) for assessment cycle '%s' has passed. "
-                        "Rating lines cannot be added or edited after the deadline."
-                    ) % (deadline_str, asm.cycle_id.name))
-                rating_fields = {'current_level', 'comments', 'evidence_attachment_ids'}
-                if any(f in vals for f in rating_fields) and not is_admin:
-                    if asm.assessor_id and asm.assessor_id != self.env.user:
-                        raise UserError(_(
-                            "You are not authorized to rate or edit this assessment. "
-                            "Only the assigned assessor (%s) or a Competency Administrator can input ratings."
-                        ) % (asm.assessor_id.name or 'Assessor'))
+            if touching_ratings and not force_write:
+                if line.assessment_id:
+                    asm = line.assessment_id
+                    # 2. Approved or locked assessment results can NEVER be changed
+                    if asm.state in ('approved', 'locked') or asm.is_locked:
+                        raise ValidationError(_("Cannot modify rating lines on approved or locked assessment %s. Approved results are permanent.") % asm.name)
+
+                    # 3. Check authorization & override mode
+                    is_assessor = bool(asm.assessor_id and asm.assessor_id == user)
+                    is_evaluatee = bool((emp and asm.employee_id and asm.employee_id.id == emp.id) or (asm.employee_id and asm.sudo().employee_id.user_id.id == user.id))
+                    is_self_draft = bool(asm.assessment_type == 'self' and is_assessor and asm.state == 'draft')
+
+                    if is_evaluatee and not is_self_draft and not force_write:
+                        raise UserError(_("You cannot modify rating lines on an assessment where you are the evaluated employee."))
+
+                    if not is_assessor:
+                        if not is_elevated:
+                            raise UserError(_(
+                                "You are not authorized to rate or edit this assessment. "
+                                "Only the assigned assessor (%s) or an HR / People Solution Officer with Override can input ratings."
+                            ) % (asm.assessor_id.name or 'Assessor'))
+                        if not asm.is_override_active:
+                            raise UserError(_("Editing another user's assessment ratings requires Administrative Override. Please click 'Override Ratings' on the assessment first."))
+                    else:
+                        # Assessor editing own assessment
+                        if asm.state != 'draft':
+                            raise UserError(_("This assessment has already been submitted and cannot be edited by the assessor."))
+                        today = fields.Date.today()
+                        dl = fields.Date.to_date(asm.cycle_id.assessment_deadline) if (asm.cycle_id and asm.cycle_id.assessment_deadline) else False
+                        if asm.is_deadline_passed or (dl and today > dl):
+                            deadline_str = dl.strftime('%b %d, %Y') if dl else 'N/A'
+                            raise UserError(_(
+                                "The submission deadline (%s) for assessment cycle '%s' has passed. "
+                                "Rating lines cannot be edited after the deadline."
+                            ) % (deadline_str, asm.cycle_id.name))
         res = super().write(vals)
         if ('current_level' in vals or 'state' in vals) and not self.env.context.get('skip_360_recompute'):
             self._trigger_sibling_360_recompute()
@@ -1954,7 +2541,7 @@ class CompetencyAssessmentLine(models.Model):
             s_val = int(self_lines[0].current_level) if (self_lines and str(self_lines[0].current_level).isdigit()) else 0.0
             p_val = round(sum(int(l.current_level) for l in peer_lines if str(l.current_level).isdigit()) / len(peer_lines), 2) if peer_lines else 0.0
             sub_val = round(sum(int(l.current_level) for l in sub_lines if str(l.current_level).isdigit()) / len(sub_lines), 2) if sub_lines else 0.0
-            sup_val = round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0
+            sup_val = int(sup_lines[0].current_level) if (len(sup_lines) == 1 and str(sup_lines[0].current_level).isdigit()) else (round(sum(int(l.current_level) for l in sup_lines if str(l.current_level).isdigit()) / len(sup_lines), 2) if sup_lines else 0.0)
             t_val = round(sum(int(l.current_level) for l in team_lines if str(l.current_level).isdigit()) / len(team_lines), 2) if team_lines else 0.0
 
             num = 0.0
@@ -2114,7 +2701,7 @@ class CompetencyAssessmentLine(models.Model):
     def action_view_360_breakdown(self):
         """Action button to open the 360° Rater Score Breakdown pop-up modal wizard."""
         self.ensure_one()
-        if self.employee_id.user_id == self.env.user and not self.env.user.has_group('competency_management.group_competency_supervisor') and not self.env.su:
+        if self.sudo().employee_id.user_id == self.env.user and not self.env.user.has_group('competency_management.group_competency_supervisor') and not self.env.su:
             raise UserError(_("Individual multi-rater score breakdowns are restricted to Supervisors and HR Officers to maintain 360-degree feedback anonymity."))
         emp = self.employee_id
         cycle = self.cycle_id
@@ -2152,7 +2739,7 @@ class CompetencyAssessmentLine(models.Model):
 
             breakdown_lines_vals.append((0, 0, {
                 'assessor_name': r_name,
-                'rater_type': asm.assessment_type or 'self',
+                'rater_type': 'supervisor' if asm.assessment_type in ('team', 'supervisor') else (asm.assessment_type or 'self'),
                 'rating_level_str': lvl_str,
                 'rating_num': int(r_line.current_level) if str(r_line.current_level).isdigit() else 0,
                 'assessment_name': asm.name or '',

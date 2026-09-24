@@ -101,6 +101,15 @@ class LmsAssessment(models.Model):
             if incomplete:
                 raise UserError(_("You must complete all lessons before taking this exam. Incomplete: %s") % ', '.join(incomplete.mapped('name')))
 
+        # Check attempt limits first (FR-LMS-016)
+        attempts = self.env['lms.exam.session'].search([
+            ('assessment_id', '=', self.id),
+            ('employee_id', '=', emp.id),
+            ('state', 'in', ['submitted', 'passed', 'failed']),
+        ])
+        if self.max_attempts > 0 and len(attempts) >= self.max_attempts:
+            raise UserError(_('You have exhausted the maximum allowed attempts (%d) for this assessment.') % self.max_attempts)
+
         # Fix 7: Check attempt cooldown (FR-LMS-016)
         if self.cooldown_hours > 0:
             last_session = self.env['lms.exam.session'].search([
@@ -112,15 +121,6 @@ class LmsAssessment(models.Model):
                 earliest_allowed = last_session.end_time + timedelta(hours=self.cooldown_hours)
                 if fields.Datetime.now() < earliest_allowed:
                     raise UserError(_("Cooldown period active. You can retry after %s.") % earliest_allowed.strftime('%Y-%m-%d %H:%M:%S'))
-
-        # Check attempt limits (FR-LMS-016)
-        attempts = self.env['lms.exam.session'].search([
-            ('assessment_id', '=', self.id),
-            ('employee_id', '=', emp.id),
-            ('state', 'in', ['submitted', 'passed', 'failed']),
-        ])
-        if self.max_attempts > 0 and len(attempts) >= self.max_attempts:
-            raise UserError(_('You have exhausted the maximum allowed attempts (%d) for this assessment.') % self.max_attempts)
 
         # Create session
         session = self.env['lms.exam.session'].create_session_for_learner(self, emp, enrollment)

@@ -1,0 +1,274 @@
+=== 9-STEP COURSE LIFECYCLE ===
+lable." 
+FR-LMS-003 Course Assignment System shall allow assignment of courses by role, department, or 
+individual. 
+Course Creation & Management Workflow (FR-LMS-001): the following steps define the course lifecycle 
+for development reference: 
+1) Create Course Shell – the assigned content creator creates a new course entry with title, description, 
+category, and target audience. 
+2) Upload Content – uploads the video files, documents, and assessment materials that make up the 
+course. 
+3) Configure Course Settings – sets mandatory/optional status, prerequisites, estimated duration, and 
+the passing criteria for any linked assessment. 
+4) Assign to a Learning Path (optional) – links the course into a structured, ordered sequence  
+5) Save as Draft – the course remains in Draft status, visible only to the creator and reviewers, not yet 
+
+
+=== PAGE 86 ===
+Business Requirement Document for ERP Upgrading 
+ 
+80 
+ 
+visible to employees. 
+6) Submit for Review and Approval – the course is routed to a designated reviewer/approver before it can 
+go live. 
+7) Publish – once approved, the course becomes visible to its assigned audience (per FR-LMS-003) and 
+appears on employee dashboards. 
+8) Edit/Update – the Content creator can revise a published course with version-based archiving option 
+(if its minor correction, update the existing version, if its substantive change, apply version-based rule) 
+9) Retire/Archive – the Content creator can archive a course that is no longer relevant, removing it from 
+active assignment while retaining historical records  
+8.4.2. Secure Video Hosting 
+FR ID Requirement Description 
+FR-LMS-004 Internal Video 
+Hosting 
+System shall provide internal video hosting with no external dependency 
+such as YouTube. 
+FR-LMS-005 Adaptive 
+Streaming 
+System shall support adaptive streaming for low -bandwidth 
+environments. 
+FR-LMS-006 Content 
+Protection 
+System shall apply watermarking, encryption, download restriction, and 
+screen-capture restriction (where technically feasible). 
+Implementation Note: "Internal hosting" refers to a private, access -controlled video platform or a self -
+managed solution using the Bank's own cloud storage and streaming infrastructure) rather than a literal 
+on-premise media server. To meet the adaptive streaming (FR -LMS-005) and mobile low -bandwidth 
+optimization (FR-MOB-004) requirements elsewhere in this document, the selected hosting approach shall 
+include Content Delivery Network (CDN) support to ensure acceptable p layback performance across 
+branches and mobile devices. 
+8.4.3. Learning Control Mechanisms 
+FR ID Requirement Description 
+FR-LMS-007 Mandatory Completion 
+Enforcement 
+System shall enforce mandatory completion of content before 
+progression. 
+FR-LMS-008 Skip/Fast-Forward 
+Prevention 
+System shall prevent skipping or fast-forwarding in mandatory 
+modules. 
+FR-LMS-009 Resume Capability System shall support resume capability for interrupted 
+sessions. 
+
+
+=== PAGE 87 ===
+Business Requirement Document for ERP Upgrading 
+ 
+81 
+ 
+FR ID Requirement Description 
+FR-LMS-010 
+Dashboard Filtering to 
+Active/Assigned 
+Courses 
+System shall, by default, display on the employee's dashboard 
+
+
+=== SECTION 9 SYSTEM INTEGRATION ===
+9. System Integration Specifications 
+Integration Point Module Description 
+Employee Module KMS & LMS Real-time synchronization of employee data for access 
+provisioning, course assignment, certification, and reporting. 
+
+
+=== PAGE 89 ===
+Business Requirement Document for ERP Upgrading 
+ 
+83 
+ 
+Integration Point Module Description 
+Employee Development 
+(EDS) Module 
+LMS Automated data exchange for training assignment and completion 
+updates. 
+Active Directory / LDAP KMS & LMS Centralized authentication enforcement. 
+10. Non-Functional Requirements 
+Category Requirement 
+Deployment / Infrastructure Support on -premise, cloud, or hybrid deployment; optimized for low -
+bandwidth branch environments. 
+Security 
+Role-Based Access Control; Multi-Factor Authentication; Single Sign -On; 
+encryption of data at rest and in transit; secure API communication; 
+protection against unauthorized access and content leakage. 
+Audit Full audit logging and monitoring of all user activities; audit records sha ll be 
+non-editable. 
+Backup & Disaster Recovery 
+Automated scheduled backups; dedicated disaster recovery environment; 
+defined Recovery Time Objective (RTO) and Recovery Point Objective (RPO); 
+data integrity during restoration. 
+Performance Maintain ≥ 99.5% uptime; support concurrent users across all branches; fast 
+document and content retrieval; smooth video streaming with minimal 
+buffering. 
+Scalability Support scalability for increasing users and content volume across on -
+premise, cloud, or hybrid architectures. 
+Reliability & Maintainability System shall be reliable and maintainable, with minimal unplanned downtime. 
+Usability Usable across multiple devices; compatible with modern browsers and mobile 
+devices. 
+11. Mobile Access Requirements 
+The KMS  and LMS shall both be accessible on mobile devices, enabling employees and branch staff to 
+retrieve knowledge content and complete training outside of a desktop environment. Mobile access shall 
+be delivered through a responsive mobile -optimized interface and/or dedicated mobile application, 
+subject to the following requirements: 
+
+
+=== PAGE 90 ===
+Business Requirement Document for ERP Upgrading 
+ 
+84 
+ 
+FR ID Requirement Description 
+FR-MOB-001 Mobile-Responsive / 
+Native Access 
+KMS and LMS shall be accessible via a responsive mobile web 
+interface and/or a native mobile application on iOS and Android. 
+FR-MOB-002 
+Mobile 
+Authentication 
+Mobile access shall enforce the same Multi-Factor Authentication 
+(MFA) controls as desktop access, with optional biometric login 
+(fingerprint/face) where supported by the device. 
+FR-MOB-003 
+Mobile Role-Based 
+Access 
+Mobile sessions shall apply the same Role -Based Access Control 
+(RBAC) and document classification restrictions as desktop 
+access. 
+FR-MOB-004 
+Low-Bandwidth 
+Optimization 
+Mobile access shall be optimized for low -bandwidth branch and 
+field environments, including adaptive video streaming and 
+compressed document previews. 
+FR-MOB-005 
+Offline Access to 
+Assigned Courses 
+The LMS mobile application shall let an employee download an 
+assigned mandatory course onto their device while they have a 
+connection, so they can complete it (watch videos, take 
+assessments) later with no internet access at all, similar to 
+downloading a video for a flight. The app shall continue to enforce 
+mandatory sequencing (no skipping ahead) while offline. Once the 
+device reconnects to the internet, completion status and 
+assessment results shall be sent 
+
+=== SECTION 10 NON-FUNCTIONAL ===
+10. Non-Functional Requirements 
+Category Requirement 
+Deployment / Infrastructure Support on -premise, cloud, or hybrid deployment; optimized for low -
+bandwidth branch environments. 
+Security 
+Role-Based Access Control; Multi-Factor Authentication; Single Sign -On; 
+encryption of data at rest and in transit; secure API communication; 
+protection against unauthorized access and content leakage. 
+Audit Full audit logging and monitoring of all user activities; audit records sha ll be 
+non-editable. 
+Backup & Disaster Recovery 
+Automated scheduled backups; dedicated disaster recovery environment; 
+defined Recovery Time Objective (RTO) and Recovery Point Objective (RPO); 
+data integrity during restoration. 
+Performance Maintain ≥ 99.5% uptime; support concurrent users across all branches; fast 
+document and content retrieval; smooth video streaming with minimal 
+buffering. 
+Scalability Support scalability for increasing users and content volume across on -
+premise, cloud, or hybrid architectures. 
+Reliability & Maintainability System shall be reliable and maintainable, with minimal unplanned downtime. 
+Usability Usable across multiple devices; compatible with modern browsers and mobile 
+devices. 
+11. Mobile Access Requirements 
+The KMS  and LMS shall both be accessible on mobile devices, enabling employees and branch staff to 
+retrieve knowledge content and complete training outside of a desktop environment. Mobile access shall 
+be delivered through a responsive mobile -optimized interface and/or dedicated mobile application, 
+subject to the following requirements: 
+
+
+=== PAGE 90 ===
+Business Requirement Document for ERP Upgrading 
+ 
+84 
+ 
+FR ID Requirement Description 
+FR-MOB-001 Mobile-Responsive / 
+Native Access 
+KMS and LMS shall be accessible via a responsive mobile web 
+interface and/or a native mobile application on iOS and Android. 
+FR-MOB-002 
+Mobile 
+Authentication 
+Mobile access shall enforce the same Multi-Factor Authentication 
+(MFA) controls as desktop access, with optional biometric login 
+(fingerprint/face) where supported by the device. 
+FR-MOB-003 
+Mobile Role-Based 
+Access 
+Mobile sessions shall apply the same Role -Based Access Control 
+(RBAC) and document classification restrictions as desktop 
+access. 
+FR-MOB-004 
+Low-Bandwidth 
+Optimization 
+Mobile access shall be optimized for low -bandwidth branch and 
+field environments, including adaptive video streaming and 
+compressed document previews. 
+FR-MOB-005 
+Offline Access to 
+Assigned Courses 
+The LMS mobile application shall let an employee download an 
+assigned mandatory course onto their device while they have a 
+connection, so they can complete it (watch videos, take 
+assessments) later with no internet access at all, similar to 
+downloading a video for a flight. The app shall continue to enforce 
+mandatory sequencing (no skipping ahead) while offline. Once the 
+device reconnects to the internet, completion status and 
+assessment results shall be sent to the central LMS automatically, 
+with no manual step required from the employee 
+FR-MOB-006 
+Mobile Document 
+Security 
+Mobile document viewing shall retain watermarking, view-only 
+restrictions, and download controls equivalent to desktop access; 
+screen capture restriction shall apply where technically feasible. 
+FR-MOB-007 
+Mobile Push 
+Notifications 
+The mobile application shall deliver push notifications for course 
+assignments, approaching deadlines, completion alerts, and new 
+knowledge publications. 
+FR-MOB-008 Mobile Assessment 
+and Certification 
+Employees shall be able to complete timed assessments and view 
+or download issued certificates from a mobile device. 
+FR-MOB-009 
+Mobile Session 
+Security 
+Mobile sessions shall enforce automatic timeout, device -level 
+encryption of cached content, and remote session revocation 
+upon device loss or role change. 
+
+
+=== PAGE 91 ===
+Business Requirement Document for ERP Upgrading 
+ 
+85 
+ 
+12. Recognition and Gamification 
+To encourage sustained engagement with both learning and knowledge sharing, the platform shall provide 
+recognition mechanisms spanning the LMS (training performance) and KMS (knowledge contribution).  
+FR ID Requirement Description 
+FR-REC-001 Leaderboard System shall maintain a leaderboard ranking employees on training 
+performance, such as assessment scores and completion speed. 
+FR-REC-002 Best Scorer of the 
+Month (LMS) 
+System shall identify and recognize the top-performing learner(s) each 
+month based on assessment score
+

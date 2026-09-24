@@ -60,11 +60,11 @@
     <!-- Record Rules -->
     <data noupdate="0">
 
-        <!-- Assessment: employee sees only own records -->
+        <!-- Assessment: employee sees only own records where they are the assessor (self-assessment or assigned evaluations) -->
         <record id="rule_competency_assessment_employee_own" model="ir.rule">
             <field name="name">Employee Own Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
-            <field name="domain_force">['|', ('employee_id.user_id', '=', user.id), ('assessor_id', '=', user.id)]</field>
+            <field name="domain_force">[('assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -72,12 +72,28 @@
             <field name="perm_unlink" eval="False"/>
         </record>
 
-        <!-- Assessment: supervisor / manager sees own + team + assigned Operating Unit assessments -->
+        <!-- Assessment: supervisor sees assessments of team members if and only if both employee and assessor are in team, and supervisor is not the evaluatee being assessed by someone else -->
         <record id="rule_competency_assessment_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Competency Assessments</field>
             <field name="model_id" ref="competency_management.model_competency_assessment"/>
-            <field name="domain_force">['|', ('employee_id.parent_id.user_id', '=', user.id), '|', ('employee_id.coach_id.user_id', '=', user.id), '|', ('assessor_id', '=', user.id), '|', ('employee_id.default_operating_unit_id', 'in', user.assigned_operating_unit_ids.ids), ('department_id.operating_unit_id', 'in', user.assigned_operating_unit_ids.ids)]</field>
+            <field name="domain_force">['&amp;', '&amp;', ('employee_id', 'in', user.team_employee_ids.ids), ('assessor_employee_id', 'in', user.team_employee_ids.ids), '|', ('employee_id', '!=', user.employee_id.id), ('assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
+            <field name="perm_read" eval="True"/>
+            <field name="perm_write" eval="False"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
+        </record>
+
+        <!-- Assessment: employees & supervisors can only write their own assigned assessments -->
+        <record id="rule_competency_assessment_assessor_write" model="ir.rule">
+            <field name="name">Assessor Competency Assessment Write</field>
+            <field name="model_id" ref="competency_management.model_competency_assessment"/>
+            <field name="domain_force">[('assessor_id', '=', user.id)]</field>
+            <field name="groups" eval="[(4, ref('competency_management.group_competency_employee')), (4, ref('competency_management.group_competency_supervisor'))]"/>
+            <field name="perm_read" eval="False"/>
+            <field name="perm_write" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="perm_unlink" eval="False"/>
         </record>
 
         <!-- Assessment: officer & admin see all assessments -->
@@ -140,7 +156,7 @@
         <record id="rule_competency_assessment_line_employee_own" model="ir.rule">
             <field name="name">Employee Own Assessment Lines Read</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
-            <field name="domain_force">['|', ('assessment_id.employee_id.user_id', '=', user.id), ('assessment_id.assessor_id', '=', user.id)]</field>
+            <field name="domain_force">[('assessment_id.assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_employee'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
@@ -150,7 +166,7 @@
         <record id="rule_competency_assessment_line_supervisor_team" model="ir.rule">
             <field name="name">Supervisor Team Assessment Lines Read</field>
             <field name="model_id" ref="competency_management.model_competency_assessment_line"/>
-            <field name="domain_force">['|', ('assessment_id.employee_id.parent_id.user_id', '=', user.id), ('assessment_id.assessor_id', '=', user.id)]</field>
+            <field name="domain_force">['&amp;', '&amp;', ('assessment_id.employee_id', 'in', user.team_employee_ids.ids), ('assessment_id.assessor_employee_id', 'in', user.team_employee_ids.ids), '|', ('assessment_id.employee_id', '!=', user.employee_id.id), ('assessment_id.assessor_id', '=', user.id)]</field>
             <field name="groups" eval="[(4, ref('competency_management.group_competency_supervisor'))]"/>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>

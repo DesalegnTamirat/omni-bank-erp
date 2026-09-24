@@ -20,9 +20,10 @@ class LmsCategory(models.Model):
     course_count = fields.Integer(string='Courses', compute='_compute_course_count')
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'Course category code must be unique!'),
-    ]
+    _code_unique = models.Constraint(
+        'UNIQUE(code)',
+        'Course category code must be unique!'
+    )
 
     @api.depends('name', 'parent_id.complete_name')
     def _compute_complete_name(self):

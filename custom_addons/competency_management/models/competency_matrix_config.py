@@ -66,19 +66,29 @@ class CompetencyMatrixConfig(models.Model):
     self_eval_technical = fields.Boolean(string='Self: Technical Pillar', default=True)
 
     def get_allowed_pillars_for_type(self, assessment_type):
-        """Return list of allowed pillars ('core', 'leadership', 'technical') for an assessment type."""
-        self.ensure_one()
-        pillars = []
-        prefix = assessment_type if assessment_type in ('peer', 'subordinate', 'supervisor', 'team', 'self') else 'self'
-        
-        if getattr(self, f'{prefix}_eval_core', True):
-            pillars.append('core')
-        if getattr(self, f'{prefix}_eval_leadership', True):
-            pillars.append('leadership')
-        if getattr(self, f'{prefix}_eval_technical', True):
-            pillars.append('technical')
-            
-        return pillars or ['core', 'leadership', 'technical']
+        """Return list of allowed pillars ('core', 'leadership', 'technical') for an assessment type
+        based strictly on the configured boolean flags in matrix configuration.
+        """
+        config = self if self else self.get_active_config()
+        config = config[0] if config else False
+        if not config:
+            return ['core', 'leadership', 'technical']
+
+        prefix_map = {
+            'self': 'self_eval_',
+            'peer': 'peer_eval_',
+            'subordinate': 'subordinate_eval_',
+            'supervisor': 'supervisor_eval_',
+            'team': 'team_eval_',
+        }
+        prefix = prefix_map.get(assessment_type, 'self_eval_')
+        allowed = []
+        for pillar in ['core', 'leadership', 'technical']:
+            field_name = f"{prefix}{pillar}"
+            if getattr(config, field_name, True):
+                allowed.append(pillar)
+
+        return allowed
 
     grade_matrix_line_ids = fields.One2many(
         'competency.grade.matrix', 'config_id', string='Job Grade Proficiency Matrix'

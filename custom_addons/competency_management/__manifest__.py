@@ -51,6 +51,7 @@ Features:
         'web.assets_backend': [
             'competency_management/static/src/scss/competency_dashboard.scss',
             'competency_management/static/src/js/competency_dashboard.js',
+            'competency_management/static/src/js/mail_thread_patch.js',
             'competency_management/static/src/xml/competency_dashboard.xml',
         ],
     },

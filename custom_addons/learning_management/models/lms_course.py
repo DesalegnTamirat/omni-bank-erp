@@ -135,6 +135,10 @@ class LmsCourse(models.Model):
     def action_publish(self):
         for rec in self:
             rec.write({'state': 'published', 'is_latest_version': True})
+            # FR-LMS-011: Automatically retire/archive superseded version so learners cannot self-enroll/view older version
+            if rec.previous_version_id and rec.previous_version_id.state != 'archived':
+                rec.previous_version_id.write({'state': 'archived', 'is_latest_version': False})
+                rec.previous_version_id.message_post(body=_('Course superseded by new version %s (v%s) and archived from learner self-service.') % (rec.code, rec.version))
             rec.message_post(body=_('Course approved and published. Now active on learner dashboards.'))
 
     def action_return_draft(self):
@@ -233,7 +237,7 @@ class LmsLesson(models.Model):
 
     video_file = fields.Binary(string='Video File (MP4/WebM)', attachment=True)
     video_filename = fields.Char(string='Video Filename')
-    video_url = fields.Char(string='Internal Streaming Endpoint URL', placeholder='https://media.bunnabanksc.com/videos/aml_part1.mp4')
+    video_url = fields.Char(string='Internal Streaming Endpoint URL', help='https://media.bunnabanksc.com/videos/aml_part1.mp4')
     video_duration_seconds = fields.Integer(string='Video Length (Seconds)', default=600)
 
     prevent_fast_forward = fields.Boolean(
@@ -257,7 +261,7 @@ class LmsLesson(models.Model):
     # Assessment Gate Linkage (FR-LMS-012)
     assessment_id = fields.Many2one('lms.assessment', string='Linked Assessment / Quiz')
 
-    _sql_constraints = [
-        ('min_watch_percentage_range', 'CHECK(min_watch_percentage >= 0 AND min_watch_percentage <= 100)',
-         'Minimum watch percentage must be between 0% and 100%!'),
-    ]
+    _min_watch_percentage_range = models.Constraint(
+        'CHECK(min_watch_percentage >= 0 AND min_watch_percentage <= 100)',
+        'Minimum watch percentage must be between 0% and 100%!'
+    )

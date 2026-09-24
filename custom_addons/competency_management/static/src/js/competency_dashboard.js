@@ -228,9 +228,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaBelow() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'below']
+            ['achievement_status', '=', 'below'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -256,9 +258,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaMeets() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'meets']
+            ['achievement_status', '=', 'meets'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -284,9 +288,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaExceeds() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'exceeds']
+            ['achievement_status', '=', 'exceeds'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -339,6 +345,7 @@ export class CompetencyDashboard extends Component {
     }
 
     openAssessedEmployees() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const context = {
             search_default_group_by_employee: 1,
             search_default_filter_primary_reporting: 1,
@@ -348,12 +355,16 @@ export class CompetencyDashboard extends Component {
         };
         const domain = [
             ['is_primary_reporting_line', '=', true],
+            ['employee_id', 'in', fullyAssessedEmpIds],
             '|',
             ['weighted_current_level', '>', 0],
             ['achievement_status', '!=', false]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
+        }
+        if (this.state.departmentId) {
+            domain.push(['department_id', '=', parseInt(this.state.departmentId)]);
         }
         this.actionService.doAction({
             name: "Assessed Employees Competency Reporting",
@@ -366,6 +377,7 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaReport() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const context = {
             search_default_group_by_employee: 1,
             search_default_filter_primary_reporting: 1,
@@ -373,11 +385,19 @@ export class CompetencyDashboard extends Component {
             edit: false,
             delete: false,
         };
+        const domain = [
+            ['is_primary_reporting_line', '=', true],
+            ['employee_id', 'in', fullyAssessedEmpIds],
+        ];
+        if (this.state.cycleId) {
+            domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
+        }
         this.actionService.doAction({
             name: "Comprehensive TNA Report",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
             views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
+            domain: domain,
             context: context,
         });
     }
@@ -416,9 +436,11 @@ export class CompetencyDashboard extends Component {
     }
 
     onHeatmapCellClick(deptId, pillarKey) {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ["is_primary_reporting_line", "=", true],
-            ["department_id", "=", deptId]
+            ["department_id", "=", deptId],
+            ["employee_id", "in", fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(["cycle_id", "=", parseInt(this.state.cycleId)]);

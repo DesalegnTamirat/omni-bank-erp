@@ -420,7 +420,19 @@ class CompetencyReportWizard(models.TransientModel):
                 'name': _('Comprehensive Competency Performance & Gap Matrix'),
                 'res_model': 'competency.assessment.line',
                 'view_mode': 'list,pivot,graph,form',
+                'views': [
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+                ],
                 'domain': domain,
+                'context': {
+                    'search_default_filter_primary_reporting': 1,
+                    'create': False,
+                    'edit': False,
+                    'delete': False,
+                },
                 'target': 'current',
             }
 
@@ -430,10 +442,20 @@ class CompetencyReportWizard(models.TransientModel):
                 'type': 'ir.actions.act_window',
                 'name': _('Departmental & Role Competency Gap Analysis'),
                 'res_model': 'competency.assessment.line',
-                'view_mode': 'pivot,list,graph',
+                'view_mode': 'pivot,list,graph,form',
+                'views': [
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                    (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+                ],
                 'domain': domain,
                 'context': {
+                    'search_default_filter_primary_reporting': 1,
                     'group_by': ['department_id', 'job_id'],
+                    'create': False,
+                    'edit': False,
+                    'delete': False,
                 },
                 'target': 'current',
             }
@@ -522,14 +544,14 @@ class CompetencyReportWizard(models.TransientModel):
             self_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'self' and l.current_level]
             peer_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'peer' and l.current_level]
             sub_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'subordinate' and l.current_level]
-            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'supervisor' and l.current_level]
-            team_lines = [l for l in comp_lines if l.assessment_id.assessment_type == 'team' and l.current_level]
+            sup_lines = [l for l in comp_lines if l.assessment_id.assessment_type in ('supervisor', 'team') and l.current_level]
+            team_lines = []
 
             self_val = int(self_lines[0].current_level) if self_lines else None
             peer_avg = round(sum(int(l.current_level) for l in peer_lines) / len(peer_lines), 2) if peer_lines else None
             sub_avg = round(sum(int(l.current_level) for l in sub_lines) / len(sub_lines), 2) if sub_lines else None
-            sup_avg = round(sum(int(l.current_level) for l in sup_lines) / len(sup_lines), 2) if sup_lines else None
-            team_avg = round(sum(int(l.current_level) for l in team_lines) / len(team_lines), 2) if team_lines else None
+            sup_avg = int(sup_lines[0].current_level) if (len(sup_lines) == 1 and str(sup_lines[0].current_level).isdigit()) else (round(sum(int(l.current_level) for l in sup_lines) / len(sup_lines), 2) if sup_lines else None)
+            team_avg = None
 
             # Calculate Weighted Final Rating
             weighted_num = 0.0
@@ -546,9 +568,6 @@ class CompetencyReportWizard(models.TransientModel):
             if sup_avg is not None:
                 weighted_num += sup_avg * w_sup
                 weighted_den += w_sup
-            if team_avg is not None:
-                weighted_num += team_avg * w_team
-                weighted_den += w_team
 
             final_rating = round(weighted_num / weighted_den, 2) if weighted_den > 0 else (self_val or 0.0)
 

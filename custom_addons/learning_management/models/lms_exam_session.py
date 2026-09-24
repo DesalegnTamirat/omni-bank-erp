@@ -52,13 +52,33 @@ class LmsExamSession(models.Model):
             else:
                 rec.deadline_time = False
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            assessment_id = vals.get('assessment_id')
+            employee_id = vals.get('employee_id')
+            if assessment_id and employee_id:
+                assessment = self.env['lms.assessment'].browse(assessment_id)
+                if assessment.max_attempts > 0:
+                    cnt = self.search_count([
+                        ('assessment_id', '=', assessment_id),
+                        ('employee_id', '=', employee_id),
+                        ('state', 'in', ['submitted', 'passed', 'failed']),
+                    ])
+                    if cnt >= assessment.max_attempts:
+                        raise UserError(_('You have exhausted the maximum allowed attempts (%d) for this assessment.') % assessment.max_attempts)
+        return super().create(vals_list)
+
     @api.model
     def create_session_for_learner(self, assessment, employee, enrollment=None):
         """Builds randomized question snapshot for the candidate (FR-LMS-015)."""
         previous_attempts = self.search_count([
             ('assessment_id', '=', assessment.id),
             ('employee_id', '=', employee.id),
+            ('state', 'in', ['submitted', 'passed', 'failed']),
         ])
+        if assessment.max_attempts > 0 and previous_attempts >= assessment.max_attempts:
+            raise UserError(_('You have exhausted the maximum allowed attempts (%d) for this assessment.') % assessment.max_attempts)
         attempt_no = previous_attempts + 1
 
         selected_questions = []

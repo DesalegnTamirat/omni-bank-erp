@@ -12,6 +12,27 @@ class ResUsers(models.Model):
         compute_sudo=True,
     )
 
+    team_employee_ids = fields.Many2many(
+        'hr.employee',
+        string='Team Employees',
+        compute='_compute_team_employee_ids',
+        compute_sudo=True,
+    )
+
+    def _compute_team_employee_ids(self):
+        for user in self:
+            emp = user.employee_id
+            if not emp:
+                user.team_employee_ids = self.env['hr.employee']
+                continue
+            subs = self.env['hr.employee'].sudo().search([
+                '|', '|',
+                ('coach_id', '=', emp.id),
+                ('parent_id', '=', emp.id),
+                ('id', 'child_of', emp.id),
+            ])
+            user.team_employee_ids = emp | subs
+
     def _compute_allowed_role_mapping_job_ids(self):
         for user in self:
             user.allowed_role_mapping_job_ids = user._get_allowed_role_mapping_jobs()

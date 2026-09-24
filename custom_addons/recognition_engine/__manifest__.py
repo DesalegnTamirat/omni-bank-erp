@@ -11,6 +11,7 @@
         'base',
         'hr',
         'mail',
+        'hr_employee_custom',
     ],
     'data': [
         'security/recognition_security_groups.xml',

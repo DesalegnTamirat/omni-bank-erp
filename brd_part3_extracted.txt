@@ -1,0 +1,1104 @@
+=== PAGE 76 ===
+Business Requirement Document for ERP Upgrading 
+ 
+70 
+ 
+11. Conclusion 
+The Employee Development System shall provide a structured, auditable, and TNA -driven platform for 
+managing the Bank's classroom training lifecycle, from need identification through delivery, evaluation, 
+and certification. Through defined integration with the LMS, HRIS, and PMS, the EDS shall ensure a single, 
+consolidated view of each employee's development record while enforcing consistent governance, 
+approval, and reporting standards for classroom-based learning. 
+Part 3 Knowledge Management System & Learning Management System 
+1. Introduction 
+The Knowledge Management System (KMS) and Learning Management System (LMS) shall provide a 
+secure, and scalable digital platform for the centralized capture, storage, and retrieval of institutional 
+knowledge both explicit (documented) and tacit (experience-based), and for structured employee training 
+and compliance learning within Bunna Bank. The platform shall operate under People Performance & 
+Development Directorate (PPDD) governance and shall be aligned with the Bank's regulatory, security, and 
+internal control standards. 
+2. Purpose 
+The purpose of this document shall be to define the technical, functional, security, and integration 
+requirements for the implementation of a KMS and LMS within Bunna Bank. The document shall serve as 
+the single reference for  business and technical teams throughout design, development, testing, and 
+deployment. 
+3. Scope 
+The KMS and LMS platform shall cover the following core systems: 
+
+
+=== PAGE 77 ===
+Business Requirement Document for ERP Upgrading 
+ 
+71 
+ 
+System Description 
+Knowledge Management 
+System (KMS) 
+Centralized platform for institutional kn owledge- a governed Document Repository  for 
+policies, SOPs, manuals, and regulatory content; a Digital Library of e-books, whitepapers, and 
+training reference materials; and tacit knowledge capability (staff expertise, know-how, and 
+lessons learned) – with secure, role-based access, controlled download, and full-text search. 
+Learning Management 
+System (LMS) 
+Structured platform for employee training and compliance learning, including internally 
+hosted video content, mandatory completion controls, assessments, certification, and 
+reporting. 
+Both systems must operate in a secure, scalable, and fully integrated banking environment, aligned with 
+regulatory and internal security standards. 
+4. Definitions 
+Term Definition 
+KMS 
+Knowledge Management System – centralized platform for institutional knowledge storage, 
+capture, and retrieval. The KMS encompasses the Document Repository and Digital Library 
+together with access control, audit, and tacit knowledge capability described in Section 7. 
+Document 
+Repository 
+The governed document management component of the KMS, covering storage, categorization, 
+version control, approval workflow, and retrieval of Bank policies, SOPs, manuals, and regulatory 
+content. 
+Digital Library 
+The curated collection of refere nce and learning material within the KMS, such as e -books, 
+whitepapers, research articles, and training reference materials. Distinct from the Document 
+Repository, the Digital Library is browsable/consultative in nature and is not subject to the same 
+approval and version-control workflow as governed documents. 
+LMS Learning Management System – platform for structured employee training and compliance 
+learning. 
+Explicit 
+Knowledge 
+Documented knowledge that can be codified and stored, e.g., policies, SOPs, manuals, and 
+regulatory content. 
+Tacit 
+Knowledge 
+Uncodified, experience-based knowledge held by staff, e.g., expertise, know -how, and lessons 
+learned, captured through structured knowledge-sharing mechanisms. 
+
+
+=== PAGE 78 ===
+Business Requirement Document for ERP Upgrading 
+ 
+72 
+ 
+Term Definition 
+CoP Community of Practice – a structured group of practitioners who share expertise and collaborate 
+to develop institutional knowledge. 
+SOP Standard Operating Procedure – documented internal process instructions. 
+RBAC Role-Based Access Control – security mechanism restricting system access by role. 
+MFA Multi-Factor Authentication – additional identity verification beyond username/password. 
+AD / LDAP Active Directory / Lightweight Directory Access Protocol – centralized directory and 
+authentication service. 
+ERP Enterprise Resource Planning – integrated system for core business processes, e.g., EDS, HR 
+system. 
+API Application Programming Interface – interface enabling system-to-system integration. 
+SLA Service Level Agreement – defined performance and availability commitment. 
+RTO Recovery Time Objective – maximum acceptable downtime after a disruption. 
+RPO Recovery Point Objective – maximum acceptable data loss measured in time. 
+UAT User Acceptance Testing – validation of the system by end users prior to go-live. 
+5. Stakeholders 
+Stakeholder Responsibility 
+Employees Access learning content, complete assigned courses, and retrieve knowledge 
+documents. 
+Content Owners / SMEs ,KMLID Upload, categorize, version, and maintain knowledge documents and training 
+courses. 
+PPDD Governance, compliance tracking, training assignment, and reporting oversight. 
+IT Wing System administration, integration, security configuration, infrastructure 
+support, User access provisioning, RBAC configuration, and platform 
+maintenance. Compliance / Internal Audit  Regulatory compliance monitoring and audit trail review. 
+Branch Staff Access KMS/LMS content, including in low-bandwidth branch environments. 
+Senior Management / SMC Strategic oversight, reporting dashboards, and policy approval. 
+
+
+=== PAGE 79 ===
+Business Requirement Document for ERP Upgrading 
+ 
+73 
+ 
+6. Business Rules 
+The KMS and LMS shall operate under the following overarching business rules: 
+● Single Repository Principle:  All institutional knowledge and training content shall be hosted 
+internally, eliminating dependency on external platforms such as YouTube. 
+● Explicit and Tacit Knowledge Coverage:  The platform shall address both documented (explicit) 
+knowledge and undocumented, experience-based (tacit) knowledge held by staff. 
+● Version Control:  All documents and courses shall follow a defined lifecycle – Draft, Review, 
+Approved, Archived. 
+● Role-Based Access: System access shall be restricted based on defined roles, departments , and 
+branch assignment. 
+● Mandatory Completion: Learners shall not be permitted to skip or fast-forward mandatory learning 
+content. 
+● Assessment Gate:  Quiz or assessment access shall be granted only after completion of the 
+associated training content. 
+● Audit Trail: All user activity, including view, download, modify, and delete actions, shall be logged 
+and shall remain non-editable. 
+● Regulatory Compliance: All functionality shall align with applicable regulatory, data protection, and 
+internal security standards. 
+● Integration Requirement: The platform shall integrate seamlessly with HR/ERP systems and Active 
+Directory / LDAP for data exchange and authentication. 
+7. Module 1: Knowledge Management System (KMS) 
+7.1 Introduction 
+The Knowledge Management System shall provide a centralized, secure digital platform covering three 
+complementary knowledge assets. First, a governed Document Repository shall enable structured 
+storage, categorization, version control, and controlled distr ibution of Bank policies, Standard Operating 
+Procedures, manuals, and regulatory content. Second, a Digital Library shall provide a curated, browsable 
+collection of reference and learning materials, such as e -books, whitepapers, research articles, and 
+training reference materials, distinct from governed policy documents. Third, structured tacit knowledge 
+
+
+=== PAGE 80 ===
+Business Requirement Document for ERP Upgrading 
+ 
+74 
+ 
+mechanisms – including Communities of Practice, expert directories, knowledge capture sessions, and 
+lessons-learned repositories – shall surface and docume nt staff expertise and experience that would 
+otherwise remain undocumented. 
+ 
+7.2 Purpose 
+The purpose of the KMS shall be to eliminate dependency on fragmented, manual document repositories 
+by providing a single source of truth for governed institutional kn owledge, to give employees a 
+consolidated library of reference and learning material to support self -directed development, and to 
+reduce the loss of expertise arising from staff turnover, transfer, or retirement by converting tacit 
+knowledge into shared, r etrievable organizational knowledge. This shall be supported by robust access 
+control, secure download, indexed search, communities of practice, and audit capabilities. 
+7.3 Business Rules 
+● Central Repository: All policies, SOPs, manuals, and regulatory cont ent shall be stored in a single, 
+centrally managed Document Repository, subject to version control and approval workflow. 
+● Separation of Governed and Reference Content:  The Digital Library's e -books, whitepapers, and 
+reference materials shall be organized s eparately from governed policy and SOP documents, and 
+shall not be subject to the same approval/version-control workflow. 
+● Tacit Knowledge Capture: Structured mechanisms shall be provided to capture tacit knowledge 
+from staff, including Communities of Pract ice, expert interviews, and lessons -learned 
+documentation. 
+● Controlled Download:  All document downloads shall be subject to role -based permissions, 
+watermarking, and encryption. 
+● Classification-Based Access: Sensitive documents may be restricted to view-only where required. 
+● Full Auditability: All KMS user activity shall be logged and available for audit-ready reporting. 
+7.4 Functional Requirements 
+7.4.1. Document Repository 
+The Document Repository is the governed component of the KMS used for SOPs, policies, manuals, and 
+regulatory content, subject to version control and approval workflow. It is a subset of the KMS, not a 
+
+
+=== PAGE 81 ===
+Business Requirement Document for ERP Upgrading 
+ 
+75 
+ 
+replacement for it: the access control, secure download, audit, and tacit knowledge capabilities defined 
+in the subsections below are required in addition to the Document Repository for the platform to constitute 
+a complete KMS. 
+FR ID Requirement Description 
+FR-KMS-001 Central Repository System shall provide a central, governed repository for documents including 
+policies, SOPs, manuals, and regulatory content. 
+FR-KMS-002 
+Taxonomy 
+Configuration 
+System shall allow an authorized administrator to define and maintain the 
+department list, document type list, classification levels, and tag vocabulary 
+used for document categorization, including adding, editing, and retiring values 
+without requiring a system change request. 
+FR-KMS-003 Document 
+Categorization 
+System shall support document categorization by department, type, 
+classification, and tags. 
+FR-KMS-004 Version Control & 
+Lifecycle 
+System shall support version control and lifecycle management (Draft, Review, 
+Approved, Archived). 
+FR-KMS-005 Full-Text & Metadata 
+Search 
+System shall provide full-text and metadata-based search capabilities. 
+7.4.2 Digital Library 
+The Digital Library is a curated, browsable collection of reference and learning material – distinct from the 
+governed Document Repository above. Digital Library content is not subject to the same approval and 
+version-control workflow as SOPs and policies;  it exists to support employee self -directed learning and 
+reference, complementing structured training delivered through the both LMS and Classroom. 
+FR ID Requirement Description 
+FR-KMS-006 E-Book & Reference 
+Repository 
+System shall provide a repository for e -books, whitepapers, and 
+reference materials. 
+FR-KMS-007 Training Reference 
+Material Catalog 
+System shall catalog training reference and research materials, with 
+linkage to related courses. 
+FR-KMS-008 Content Curation & 
+Recommendations 
+System shall support curated collections and recommended reading lists 
+organized by topic or role. 
+FR-KMS-009 External Reference 
+Linking 
+System shall support linking to external reference sources, such as 
+regulatory publications or industry research, where permitted. 
+
+
+=== PAGE 82 ===
+Business Requirement Document for ERP Upgrading 
+ 
+76 
+ 
+ 
+7.4.3. Secure Access Control 
+FR ID Requirement Description 
+FR-KMS-010 Role-Based Access Control System shall implement Role-Based Access Control (RBAC). 
+FR-KMS-011 Department/Branch 
+Restriction 
+System shall enforce department - and branch -based access 
+restrictions. 
+FR-KMS-012 AD/LDAP Integration System shall integrate with Active Directory / LDAP for authentication. 
+FR-KMS-013 MFA System shall support Multi-Factor Authentication (MFA)  
+7.4.4. Secure Document Download 
+FR ID Requirement Description 
+FR-KMS-014 
+Role-Based 
+Download 
+Permission 
+System shall only allow a document to be downloaded if the employee's assigned role 
+has been granted download permission for that document; employees without 
+permission can still view it on screen but cannot download it. 
+FR-KMS-015 
+Automatic 
+Watermarking 
+System shall automatically stamp every downloaded document with the downloader's 
+user ID, the date and time of download, and their department, visible on the document 
+itself. Purpose: if a copy is later found outside the system, it can be traced back to the 
+person who downloaded it. 
+FR-KMS-016 
+Download 
+Encryption 
+System shall automatically lock (encrypt) every downloaded file so that only the 
+authorized recipient can open it. If the file is later copied to another device, lost, or 
+intercepted, its contents remain unreadable to anyone else. Purpose: protects what is 
+inside the file itself, separate from the watermark, which only identifies who 
+downloaded it. 
+FR-KMS-017 Download 
+Audit Logging 
+System shall automatically record, for every download, who downloaded which 
+document and when, in a log that administrators and auditors can review. Purpose: 
+provides a complete download history for compliance checks and investigations. 
+FR-KMS-018 
+View-Only 
+Restriction 
+System shall allow especially sensitive documents to be marked as view -only, which 
+lets employees read the document on screen but removes the download option for that 
+document entirely. 
+Note on FR -KMS-015 (Download Encryption): encryption here does not require the intended user to enter a 
+password or key. Decryption is intended to happen automatically for the authorized user, tied to their verified 
+identity or active session (e.g., opened through the KMS's own viewer, or on a company-managed device), so 
+it is invisible to someone with proper access. If the file ends up with anyone else, for example through loss, 
+theft, or forwarding, it simply fails to open, since their identity or device does not match.  
+
+
+=== PAGE 83 ===
+Business Requirement Document for ERP Upgrading 
+ 
+77 
+ 
+7.4.5. Search and Retrieval 
+An indexed search engine works like the index at the back of a textbook. Instead of reading every document 
+from scratch each time someone searches, the system builds a lookup table in advance, as documents are 
+uploaded, mapping words to the documents that contain them. This is the underlying technical foundation 
+that makes FR -KMS-004 (Full-Text and Metadata Search), FR -KMS-019 (Fast Document Retrieval), and FR -
+KMS-020 (Metadata Filtering) possible at speed, even as the repository grows to thousands of documents; it 
+is infrastructure rather than a separate user-facing feature. 
+FR ID Requirement Description 
+FR-KMS-019 Indexed Search Engine System shall provide an indexed search engine for fast retrieval. 
+FR-KMS-020 Fast Document Retrieval System shall support fast retrieval of documents across the 
+repository. 
+FR-KMS-021 Metadata Filtering 
+(like author, date, or category) 
+System shall enable filtering of search results by metadata and 
+classification. 
+7.4.6. Audit and Logging 
+FR ID Requirement Description 
+FR-KMS-022 Activity Logging System shall log all user activities, including view, download, modify, and 
+delete. 
+FR-KMS-023 Audit-Ready Reporting System shall provide audit-ready reporting for compliance purposes. 
+7.4.7. Storage and Scalability 
+FR ID Requirement Description 
+FR-KMS-024 Scalable Storage 
+Architecture 
+System shall support scalable storage architecture (cloud, on -premise, or 
+hybrid). 
+FR-KMS-025 High Availability & 
+Redundancy 
+System shall ensure high availability and redundancy of stored content. 
+FR-KMS-026 Large Volume Data 
+Support 
+System shall support large volumes of structured and unstructured data. 
+7.4.8. Tacit Knowledge Capture and Communities of Practice 
+A Community of  Practice (CoP) is a dedicated group space for practitioners in a shared domain (e.g., a 
+specific function or discipline) to interact on an ongoing basis – discussing problems, sharing experience, 
+
+
+=== PAGE 84 ===
+Business Requirement Document for ERP Upgrading 
+ 
+78 
+ 
+and jointly developing know -how. CoP spaces support the ong oing, collaborative process through which 
+tacit knowledge is surfaced and refined. Outputs from CoP discussions and knowledge capture sessions 
+may subsequently be formalized and published into the Document Repository or Digital Library as 
+approved knowledge assets. 
+FR ID Requirement Description 
+FR-KMS-027 Expert / Skill 
+Directory 
+System shall maintain a searchable directory of subject matter experts and their 
+areas of expertise. 
+FR-KMS-028 Communities of 
+Practice Spaces 
+System shall provide dedicated Community of Practice (CoP) spaces for 
+structured knowledge sharing and collaboration among practitioners. 
+FR-KMS-029 
+Knowledge 
+Capture Sessions 
+System shall support scheduling and recording of knowledge capture sessions, 
+such as expert interviews and debriefs, to convert tacit knowledge into 
+documented content. 
+FR-KMS-030 Lessons Learned 
+Repository 
+System shall provide a structured repository for lessons learned and post-activity 
+reviews. 
+FR-KMS-031 Mentoring & 
+Knowledge 
+Transfer Tracking 
+System shall track mentoring assignments and knowledge transfer activities 
+between experienced and new staff. 
+FR-KMS-032 Discussion 
+Forums / Q&A 
+System shall provide discussion forums or Q&A functionality to enable informal 
+knowledge exchange among employees. 
+8. Module 2: Learning Management System (LMS) 
+8.1 Introduction 
+The Learning Management System shall provide a structured, trackable platform for employee training and 
+compliance learning, with content hosted entirely within a secure internal environment, eliminating 
+dependency on external platforms such as YouTube. 
+8.2 Purpose 
+The purpose of the LMS shall be to standardize training delivery across the Bank, enforce mandatory 
+completion and assessment controls, support certification management, and provide real-time 
+compliance and engagement reporting to management. 
+
+
+=== PAGE 85 ===
+Business Requirement Document for ERP Upgrading 
+ 
+79 
+ 
+8.3 Business Rules 
+● Internal Hosting Only: All training video content shall be hosted internally with no dependency on 
+external video platforms. 
+● Mandatory Completion: Mandatory courses shall not permit skipping or fast-forwarding of content. 
+● Assessment Gating: Post a ssessments shall be accessible only after the associated training 
+content has been completed. 
+● Certification Tracking: Certificates shall be generated automatically and tracked for valid ity and 
+expiry. 
+● Reporting Requirement: Completion, compliance, and engagement status shall be reportable by 
+branch and department. 
+8.4 Functional Requirements 
+8.4.1. Course Management 
+FR ID Requirement Description 
+FR-LMS-001 Course Creation & 
+Management 
+System shall enable creation, upload, and management of training 
+courses.  
+FR-LMS-002 
+Structured Learning 
+Paths 
+System shall allow related courses to be grouped into a defined, 
+ordered sequence (a "learning path"), so that an employee 
+completes them in a set order – for example, a series of 
+onboarding courses that must each be finished before the next 
+one becomes available." 
+FR-LMS-003 Course Assignment System shall allow assignment of courses by role, department, or 
+individual. 
+Course Creation & Management Workflow (FR-LMS-001): the following steps define the course lifecycle 
+for development reference: 
+1) Create Course Shell – the assigned content creator creates a new course entry with title, description, 
+category, and target audience. 
+2) Upload Content – uploads the video files, documents, and assessment materials that make up the 
+course. 
+3) Configure Course Settings – sets mandatory/optional status, prerequisites, estimated duration, and 
+the passing criteria for any linked assessment. 
+4) Assign to a Learning Path (optional) – links the course into a structured, ordered sequence  
+5) Save as Draft – the course remains in Draft status, visible only to the creator and reviewers, not yet 
+
+
+=== PAGE 86 ===
+Business Requirement Document for ERP Upgrading 
+ 
+80 
+ 
+visible to employees. 
+6) Submit for Review and Approval – the course is routed to a designated reviewer/approver before it can 
+go live. 
+7) Publish – once approved, the course becomes visible to its assigned audience (per FR-LMS-003) and 
+appears on employee dashboards. 
+8) Edit/Update – the Content creator can revise a published course with version-based archiving option 
+(if its minor correction, update the existing version, if its substantive change, apply version-based rule) 
+9) Retire/Archive – the Content creator can archive a course that is no longer relevant, removing it from 
+active assignment while retaining historical records  
+8.4.2. Secure Video Hosting 
+FR ID Requirement Description 
+FR-LMS-004 Internal Video 
+Hosting 
+System shall provide internal video hosting with no external dependency 
+such as YouTube. 
+FR-LMS-005 Adaptive 
+Streaming 
+System shall support adaptive streaming for low -bandwidth 
+environments. 
+FR-LMS-006 Content 
+Protection 
+System shall apply watermarking, encryption, download restriction, and 
+screen-capture restriction (where technically feasible). 
+Implementation Note: "Internal hosting" refers to a private, access -controlled video platform or a self -
+managed solution using the Bank's own cloud storage and streaming infrastructure) rather than a literal 
+on-premise media server. To meet the adaptive streaming (FR -LMS-005) and mobile low -bandwidth 
+optimization (FR-MOB-004) requirements elsewhere in this document, the selected hosting approach shall 
+include Content Delivery Network (CDN) support to ensure acceptable p layback performance across 
+branches and mobile devices. 
+8.4.3. Learning Control Mechanisms 
+FR ID Requirement Description 
+FR-LMS-007 Mandatory Completion 
+Enforcement 
+System shall enforce mandatory completion of content before 
+progression. 
+FR-LMS-008 Skip/Fast-Forward 
+Prevention 
+System shall prevent skipping or fast-forwarding in mandatory 
+modules. 
+FR-LMS-009 Resume Capability System shall support resume capability for interrupted 
+sessions. 
+
+
+=== PAGE 87 ===
+Business Requirement Document for ERP Upgrading 
+ 
+81 
+ 
+FR ID Requirement Description 
+FR-LMS-010 
+Dashboard Filtering to 
+Active/Assigned 
+Courses 
+System shall, by default, display on the employee's dashboard 
+only courses that are currently assigned, in progress, or 
+recently completed; the full course catalog shall remain 
+available through a separate “Course Library” or “My Learning 
+History” view. 
+FR-LMS-011 Version-Based Content 
+Archiving 
+System shall restrict employee access to a course version 
+once it is superseded by an updated version, and shall retain 
+superseded versions in an admin-only archive for audit and 
+historical reference rather than employee self-service. 
+8.4.4. Assessment Engine 
+FR ID Requirement Description 
+FR-LMS-012 Training Completion Gate System shall require completion of training before post 
+assessment  access. 
+FR-LMS-013 Pre Assessment System shall allow pre course assessment when required 
+(Pre assessment completion before course access) 
+FR-LMS-014 Timed Assessments System shall support timed assessments. 
+FR-LMS-015 Randomized Question Pools System shall provide randomized question pools. 
+FR-LMS-016 Attempt Limits System shall enforce configurable attempt limits. 
+FR-LMS-017 Automated Grading System shall support automated grading. 
+8.4.5. Certification Management 
+FR ID Requirement Description 
+FR-LMS-018 Automatic Certificate Generation System shall generate certificates automatically 
+upon course completion. 
+FR-LMS-019 Customizable Certificate Templates System shall support customizable certificate 
+templates, including branding and signatures. 
+FR-LMS-020 Certification Validity Tracking System shall track certification validity and expiry. 
+FR-LMS-021 Certification History System shall maintain certification history per 
+employee. 
+
+
+=== PAGE 88 ===
+Business Requirement Document for ERP Upgrading 
+ 
+82 
+ 
+FR ID Requirement Description 
+FR-LMS-022 Certification linkage 
+System shall automatically route certificates to 
+employee master data to be attached to employee 
+profile 
+ 
+ 
+8.4.6. Reporting and Analytics 
+FR ID Requirement Description 
+FR-LMS-023 Management Dashboards System shall provide dashboards for management 
+reporting. 
+FR-LMS-024 Completion Tracking System shall track completion by branch and 
+department. 
+FR-LMS-025 Compliance Status Monitoring System shall monitor and report compliance status. 
+FR-LMS-026 Engagement Analytics System shall provide engagement analytics, including 
+watch time, drop-off rates, and scores. 
+8.4.7. Notifications and Automation 
+FR ID Requirement Description 
+FR-LMS-027 Automated Notifications System shall send automated notifications for course 
+assignments, progress updates, and completion alerts. 
+FR-LMS-028 Reminder Mechanism System shall provide reminder mechanisms for overdue courses 
+or tasks. 
+FR-LMS-029 Configurable Notification 
+Rules 
+System shall support configurable notification rules. 
+9. System Integration Specifications 
+Integration Point Module Description 
+Employee Module KMS & LMS Real-time synchronization of employee data for access 
+provisioning, course assignment, certification, and reporting. 
+
+
+=== PAGE 89 ===
+Business Requirement Document for ERP Upgrading 
+ 
+83 
+ 
+Integration Point Module Description 
+Employee Development 
+(EDS) Module 
+LMS Automated data exchange for training assignment and completion 
+updates. 
+Active Directory / LDAP KMS & LMS Centralized authentication enforcement. 
+10. Non-Functional Requirements 
+Category Requirement 
+Deployment / Infrastructure Support on -premise, cloud, or hybrid deployment; optimized for low -
+bandwidth branch environments. 
+Security 
+Role-Based Access Control; Multi-Factor Authentication; Single Sign -On; 
+encryption of data at rest and in transit; secure API communication; 
+protection against unauthorized access and content leakage. 
+Audit Full audit logging and monitoring of all user activities; audit records sha ll be 
+non-editable. 
+Backup & Disaster Recovery 
+Automated scheduled backups; dedicated disaster recovery environment; 
+defined Recovery Time Objective (RTO) and Recovery Point Objective (RPO); 
+data integrity during restoration. 
+Performance Maintain ≥ 99.5% uptime; support concurrent users across all branches; fast 
+document and content retrieval; smooth video streaming with minimal 
+buffering. 
+Scalability Support scalability for increasing users and content volume across on -
+premise, cloud, or hybrid architectures. 
+Reliability & Maintainability System shall be reliable and maintainable, with minimal unplanned downtime. 
+Usability Usable across multiple devices; compatible with modern browsers and mobile 
+devices. 
+11. Mobile Access Requirements 
+The KMS  and LMS shall both be accessible on mobile devices, enabling employees and branch staff to 
+retrieve knowledge content and complete training outside of a desktop environment. Mobile access shall 
+be delivered through a responsive mobile -optimized interface and/or dedicated mobile application, 
+subject to the following requirements: 
+
+
+=== PAGE 90 ===
+Business Requirement Document for ERP Upgrading 
+ 
+84 
+ 
+FR ID Requirement Description 
+FR-MOB-001 Mobile-Responsive / 
+Native Access 
+KMS and LMS shall be accessible via a responsive mobile web 
+interface and/or a native mobile application on iOS and Android. 
+FR-MOB-002 
+Mobile 
+Authentication 
+Mobile access shall enforce the same Multi-Factor Authentication 
+(MFA) controls as desktop access, with optional biometric login 
+(fingerprint/face) where supported by the device. 
+FR-MOB-003 
+Mobile Role-Based 
+Access 
+Mobile sessions shall apply the same Role -Based Access Control 
+(RBAC) and document classification restrictions as desktop 
+access. 
+FR-MOB-004 
+Low-Bandwidth 
+Optimization 
+Mobile access shall be optimized for low -bandwidth branch and 
+field environments, including adaptive video streaming and 
+compressed document previews. 
+FR-MOB-005 
+Offline Access to 
+Assigned Courses 
+The LMS mobile application shall let an employee download an 
+assigned mandatory course onto their device while they have a 
+connection, so they can complete it (watch videos, take 
+assessments) later with no internet access at all, similar to 
+downloading a video for a flight. The app shall continue to enforce 
+mandatory sequencing (no skipping ahead) while offline. Once the 
+device reconnects to the internet, completion status and 
+assessment results shall be sent to the central LMS automatically, 
+with no manual step required from the employee 
+FR-MOB-006 
+Mobile Document 
+Security 
+Mobile document viewing shall retain watermarking, view-only 
+restrictions, and download controls equivalent to desktop access; 
+screen capture restriction shall apply where technically feasible. 
+FR-MOB-007 
+Mobile Push 
+Notifications 
+The mobile application shall deliver push notifications for course 
+assignments, approaching deadlines, completion alerts, and new 
+knowledge publications. 
+FR-MOB-008 Mobile Assessment 
+and Certification 
+Employees shall be able to complete timed assessments and view 
+or download issued certificates from a mobile device. 
+FR-MOB-009 
+Mobile Session 
+Security 
+Mobile sessions shall enforce automatic timeout, device -level 
+encryption of cached content, and remote session revocation 
+upon device loss or role change. 
+
+
+=== PAGE 91 ===
+Business Requirement Document for ERP Upgrading 
+ 
+85 
+ 
+12. Recognition and Gamification 
+To encourage sustained engagement with both learning and knowledge sharing, the platform shall provide 
+recognition mechanisms spanning the LMS (training performance) and KMS (knowledge contribution).  
+FR ID Requirement Description 
+FR-REC-001 Leaderboard System shall maintain a leaderboard ranking employees on training 
+performance, such as assessment scores and completion speed. 
+FR-REC-002 Best Scorer of the 
+Month (LMS) 
+System shall identify and recognize the top-performing learner(s) each 
+month based on assessment scores and completion metrics. 
+FR-REC-003 Best Contributor of the 
+Month (KMS) 
+System shall identify and recognize the employee(s) who contributed 
+most to institutional knowledge each month, based on activity such as 
+Document Repository/Digital Library uploads, CoP participation, and 
+knowledge capture sessions. 
+FR-REC-004 Recognition Badges / 
+Achievements 
+System shall award digital badges or achievement markers for 
+milestones, such as course completions, certifications, and 
+knowledge contributions. 
+FR-REC-005 Recognition Visibility 
+System shall display current recognition (e.g., “Best Scorer”, “Best 
+Contributor”) on a recognition dashboard and on the relevant 
+employee's profile. 
+FR-REC-006 Configurable 
+Recognition Criteria 
+System shall allow PPDD/KMLID to configure recognition categories, 
+eligibility criteria, and scoring weights. 
+FR-REC-007 Recognition 
+Notification 
+System shall notify recognized employees and their supervisors when 
+an award or recognition is issued. 
+FR-REC-008 Recognition History 
+and Reporting 
+System shall maintain a historical record of recognition awarded, 
+available for HR reporting on engagement and participation. 
+15. Conclusion 
+The Knowledge Management System and Learning Management System shall provide Bunna  Bank with a 
+secure, unified platform for institutional knowledge management and employee training, accessible 
+across desktop and mobile devices. The system shall eliminate dependency on external platforms, enforce 
+robust access, audit, and content protection controls, and deliver real-time compliance and engagement 
+reporting to management. Successful implementation shall result in a single source of truth for 
+institutional knowledge, standardized and trackable learning across all branches, and a strengthened audit 
+and compliance framework. 
+
+
+=== PAGE 92 ===
+Business Requirement Document for ERP Upgrading 
+ 
+86 
+ 
+Part 4 Succession Planning & Career Path Module 
+1.  Introduction  
+1.1 Purpose 
+This document defines the business and system requirements for the Career Path and Succession 
+Planning Module to be implemented as an integrated component of Bunna Bank S.C.'s Enterprise Resource 
+Planning (ERP) platform. The module will integrate with the Performance Management System 
+(PMS/APMS), Employee Development System (EDS), Learning Management System (LMS), Employee Self-
+Service (ESS), and Core HRIS.  
+1.2 Scope 
+This document covers the functional, integration, reporting, workflow, security, and non-functional 
+requirements for the Career Path and Succession Planning Module. The solution shall enable the Bank to: 
+ Manage career frameworks, job architecture, and career pathways.  
+ Support competency-based career progression and internal mobility.  
+ Manage talent pools, critical positions, and succession pipelines.  
+ Assess employee readiness and competency gaps.  
+ Manage Individual Career Development Plans (ICDPs).  
+ Provide dashboards, reports, workflows, and analytics.  
+ Integrate with HRIS, PMS, LMS/EDS, ESS, Payroll, and other ERP modules. 
+1.3 Business Context 
+To ensure leadership continuity and develop future talent, Bunna Bank requires an integrated Career Path 
+and Succession Planning Module. The solution will provide a standardized, competency -based approach 
+to career development, internal mobility, talent management, and succession planning by integrating 
+employee, performance, competency, and learning data to support transparent, data -driven workforce 
+decisions.. 
+Business Rules: 
+o Career Paths: HR Administrators shall be responsible for defining and maintaining default career paths 
+and job progression ladders for all job codes. 
+o Visibility: Employees shall have view -only access to career paths and the required competencies for 
+roles they are not currently in. 
+
+
+=== PAGE 93 ===
+Business Requirement Document for ERP Upgrading 
+ 
+87 
+ 
+o Gap Analysis: The system shall automatically compare an employee's current skills and performance 
+data against the requirements for a selected target role. 
+o Integration: The module shall integrate seamlessly with Employee Master Data, Performance 
+Management (PMS), Employee Self-Service (ESS), and Learning Management Systems. 
+2.  Business Objectives 
+The Career Path and Succession Planning Module shall: 
+ Establish a standardized career management and succession planning framework. 
+ Support competency-based career progression and internal mobility. 
+ Identify and develop talent for critical and leadership positions. 
+ Strengthen succession planning and leadership pipeline management. 
+ Integrate career planning with performance management and learning. 
+ Support Individual Career Development Plans (ICDPs). 
+ Improve workforce planning through dashboards and analytics. 
+ Automate workflows, approvals, and governance processes. 
+ Integrate seamlessly with the Bank's ERP/HCM ecosystem. 
+3 Functional Requirements 
+3.1 Strategic Workforce Planning & Critical Position Identification 
+FR ID Requirement Description 
+FR-SWP-001 Strategic Workforce 
+Planning Inputs 
+The system shall allow PPDD to capture and maintain strategic 
+workforce planning inputs, including strategic plan review 
+outcomes, future capability requirements, workforce risks, and 
+emerging business needs, which shall be used as key inputs for 
+identifying critical positions and succession priorities. 
+FR-SWP-002 Critical Position 
+Register 
+The system shall maintain a centralized critical position register 
+containing all identified critical roles, categorized by executive 
+leadership, specialized technical, key operational management, 
+and high regulatory/business -risk positions, including business 
+impact, risk level, and justification for critical designation. 
+
+
+=== PAGE 94 ===
+Business Requirement Document for ERP Upgrading 
+ 
+88 
+ 
+FR ID Requirement Description 
+FR-SWP-003 Critical Role 
+Competency Profile 
+Management 
+The system shall provide standardized competency profile 
+templates for critical positions, enabling PPDD to define required 
+core, leadership, and functional/te chnical competencies with 
+corresponding proficiency levels, qualifications, experience 
+requirements, and behavioral expectations. 
+FR-SWP-004 Critical Position 
+Review Cycle 
+Management 
+The system shall support periodic review and validation of critical 
+positions and successor requirements based on configurable 
+review cycles, generating automated reminders and notifications 
+to responsible users before review deadlines. 
+FR-SWP-005 Critical Position 
+Approval Workflow 
+The system shall route newly identified critical positions, role 
+changes, and removal requests through configurable approval 
+workflows involving PPDD and SPMC, while tracking review status, 
+approval decisions, comments, and turnaround time. 
+FR-SWP-006 Critical Position 
+History Tracking 
+The syst em shall maintain historical records of critical positions, 
+including designation changes, review outcomes, competency 
+updates, approval records, and effective dates for governance and 
+audit purposes. 
+FR-RDY-004 Deployment 
+Prioritization & Profile 
+Update 
+The system shall prioritize, in deployment recommendations, 
+candidates meeting required competency thresholds and 
+demonstrating readiness, and shall record the final succession 
+appointment or progression decision and structured leadership -
+transition plan, automatically updating the employee's career 
+profile upon approval. 
+ 
+3.2 Talent Pool Identification & Competency Profiling 
+ 
+
+
+=== PAGE 95 ===
+Business Requirement Document for ERP Upgrading 
+ 
+89 
+ 
+FR ID Requirement Description 
+FR-TAL-001 Talent Pool Candidate 
+Identification 
+The system shall identify and recommend potential talent pool 
+candidates based on configurable criteria including performance 
+results, competency assessment outcomes, qualifications, 
+experience, career aspirations, and readiness indicators. 
+FR-TAL-002 Talent Pool 
+Management 
+The system shall allow PPDD to  create, maintain, and manage 
+structured talent pools linked to specific career paths, critical 
+positions, and future capability requirements. 
+FR-TAL-003 Succession Planning 
+Database 
+The system shall maintain a centralized succession database 
+containing s uccessor profiles, talent pool membership, 
+competency assessments, readiness levels, development plans, 
+and succession history. 
+FR-TAL-004 Vacancy-to-Candidate 
+Matching 
+The system shall automatically identify and rank potential 
+successors for vacant criti cal positions by comparing candidate 
+competency profiles, experience, qualifications, and readiness 
+status against position requirements. 
+FR-TAL-005 9-Box Talent 
+Integration 
+The system shall integrate 9 -box assessment outcomes and allow 
+high-potential employees to be identified, tagged, and linked to 
+relevant succession pools and career opportunities. 
+ 
+3.3 Successor Selection & Competency-Based Assessment 
+FR ID Requirement Description 
+FR-SEL-001 Eligible Candidate List 
+Management 
+The system shall allow authorized users to generate and maintain 
+eligible successor candidate lists containing employee profiles, 
+performance history, competency results, qualifications, and 
+experience information. 
+
+
+=== PAGE 96 ===
+Business Requirement Document for ERP Upgrading 
+ 
+90 
+ 
+FR ID Requirement Description 
+FR-SEL-002 Competency-Based 
+Assessment 
+Management 
+The system shall support multiple successor assessment 
+methods including structured interviews, assessment centers, 
+simulations, examinations, and 180/360-degree feedback against 
+predefined competency requirements. 
+FR-SEL-003 Internal Talent 
+Assessment Workflow 
+The system shall support workflow -based review and evaluation 
+of successor candidates by responsible managers, PPDD, and 
+SPMC members based on defined assessment criteria. 
+FR-SEL-004 Successor Selection 
+Decision Recording 
+The system shall record successor selection decisions, including 
+assessment results, approval status, justification, development 
+requirements, and confirmation of employee participation in the 
+succession program. 
+FR-SEL-005 Readiness Status 
+Classification 
+The system shall classify successor readiness levels as Ready 
+Now, Ready Soon (1–2 years), or Ready Later (3–5 years) based on 
+competency achievement, performance consistency, and 
+development progress. 
+FR-RDY-005 POMD Placement 
+Notification 
+The system shall notify the Director – People Operations 
+Management Directorate (POMD) upon an approved succession 
+appointment to action the placement, and shall log the outcome 
+against the succession planning database. 
+FR-RDY-003 Deployment/Progression 
+Approval Workflow 
+The system shall trigge r a structured deployment -review 
+workflow upon notification of a leadership vacancy, or an 
+eligibility/approval workflow upon nomination for career 
+progression: reviewing the candidate list, evaluating readiness 
+and capability, and routing for approval thr ough Line Manager → 
+Principal Officer → PPD Director → SPMC (critical/leadership 
+
+
+=== PAGE 97 ===
+Business Requirement Document for ERP Upgrading 
+ 
+91 
+ 
+FR ID Requirement Description 
+roles), recording the outcome (approved / deferred / rejected) 
+with justification. 
+ 
+3.4 Successor Development Planning 
+FR ID Requirement Description 
+FR-SDP-001 Competency-Based 
+Skills Gap Analysis 
+The system shall support competency -based gap analysis for 
+succession candidates by comparing current employee 
+competency levels against required competencies for target 
+critical roles, career levels, or successor positions. 
+FR-SDP-002 Successor 
+Development Plan 
+Management 
+The system shall enable PPDD and managers to create structured 
+successor development plans linked to identified competency 
+gaps, readiness levels, and future role requirements. 
+FR-SDP-003 Development 
+Intervention 
+Management 
+The system shall support planning and tracking of development 
+interventions including coaching, mentoring, job rotation, stretch 
+assignments, leadership programs, professional certifications, and 
+formal training. 
+FR-SDP-004 Critical Role 
+Development 
+Prioritization 
+The system shall allow PPDD to prioritize development 
+interventions for critical and leadership roles based on business 
+impact, succession risk, and capability gaps. 
+FR-SDP-005 Annual Development 
+Plan Integration 
+The system shall integrate successor development requirements 
+with the annual learning and development plan and budget process, 
+enabling consolidation of organizational capability requirements. 
+
+
+=== PAGE 98 ===
+Business Requirement Document for ERP Upgrading 
+ 
+92 
+ 
+FR ID Requirement Description 
+FR-SDP-006 Development Progress 
+Monitoring 
+The system shall monit or completion of successor development 
+activities, competency improvement, readiness progression, and 
+remaining development requirements. 
+3.5 Career Framework & Job Architecture 
+FR ID Requirement Description 
+FR-CFW-001 Bank-Wide Career 
+Framework 
+Management 
+The system shall maintain a centralized career framework covering 
+all job families, sub -families, roles, career levels, and progression 
+pathways across the Bank. 
+FR-CFW-002 Job Family and Role 
+Hierarchy 
+Management 
+The system shall maintain Job Family, Sub-Family, Role, Grade, and 
+Position hierarchy synchronized with the Bank’s organizational 
+structure and HR master data. 
+FR-CFW-003 Career Track 
+Management 
+The system shall support multiple career tracks including 
+managerial/leadership, professio nal/technical specialist, and 
+project/value-stream career pathways. 
+FR-CFW-004 Vertical and Lateral 
+Career Path 
+Management 
+The system shall support both upward career progression and 
+lateral/cross-functional career movement between related roles 
+and job families (Dual Career Path) 
+FR-CFW-005 Role Competency 
+Mapping 
+The system shall map required core, leadership, and 
+functional/technical competencies with proficiency levels for each 
+role and career level. 
+FR-CFW-006 Career Level 
+Progression Criteria 
+The system shall maintain progression requirements for each 
+career level including minimum tenure, performance history, 
+competency achievement, qualifications, and experience 
+requirements. 
+
+
+=== PAGE 99 ===
+Business Requirement Document for ERP Upgrading 
+ 
+93 
+ 
+FR ID Requirement Description 
+FR-CFW-007 Job Grade and 
+Compensation Linkage 
+The system shall link career levels with job grades, salary bands, and 
+job descriptions maintained within the HRIS. 
+FR-CFW-008 Career Framework 
+Version Control 
+The system shall maintain version history of career frameworks, 
+including effective dates, modification details, approv al records, 
+and previous versions. 
+FR-CFW-009 Career Path 
+Publication 
+The system shall allow PPDD to publish approved career paths and 
+role information through Employee Self -Service and manager 
+portals. 
+FR-CFW-009 Job Family/Role 
+Hierarchy & Path 
+Mapping 
+The system shall maintain a Job Family / Sub -Family / Role 
+hierarchy synchronized with the Bank's organizational structure and 
+TOM, and shall allow each role to be mapped to one or more career 
+paths to support vertical and lateral/cross-functional movement.  
+FR-CFW-010 Unmapped Role 
+Flagging 
+The system shall flag roles with no defined career path or no active 
+successor pipeline for PPDD review.  
+FR-CFW-012 Comprehensive Role 
+Information Display 
+The system shall display comprehensive information for each job 
+role, including job description, required competencies, technical 
+and behavioral skills, qualifications, certifications, experience 
+requirements, grade, and organizational placement.  
+FR-CFW-005 Three Parallel Career 
+Tracks 
+The system shall maintain three parallel career tracks 
+(managerial/leadership, professional/technical, value -
+stream/project) with defined progression steps, competency 
+requirements, and performance benchmarks per track, ensuring 
+parity in grading, compensation visibility, recogniti on, and access 
+to development programs. 
+
+
+=== PAGE 100 ===
+Business Requirement Document for ERP Upgrading 
+ 
+94 
+ 
+FR ID Requirement Description 
+FR-CFW-004 Value-Stream-Based 
+Job Grading (TOM 
+Roles) 
+The system shall support value -stream-based job grading for 
+Target Operating Model (TOM) roles (SAT Leaders, ToT Leaders, 
+Value Stream Managers, Product Owners, Functional Leads), 
+capturing contribution to customer value, cross -functional 
+collaboration, innovation/agility, and accountability for measurable 
+outcomes. 
+FR-CFW-002 Role Competency & 
+Progression Criteria 
+The system shall record, for each role, defined competency 
+requirements, proficiency levels, and progression criteria, 
+supporting transparent and consistent standardized career paths. 
+FR-CFW-003 Competency 
+Categorization & Role 
+Mapping 
+The system shall categorize competencies into Core, Leadership, 
+and Functional/Technical, each with defined proficiency levels and 
+behavioral indicators, and shall map required 
+competencies/proficiency levels to each role for use in career-path 
+and development planning. 
+FR-RDY-006 Automated 
+Progression Eligibility 
+Check 
+The system shall run an automated eligibility check when an 
+employee is nominated for career progression, validating minimum 
+tenure, performance -rating history, and competency -proficiency 
+thresholds against the target career level 
+3.6 Talent & Competency Assessment (Career) 
+ 
+FR ID Requirement Description 
+FR-TCA-001 Standardized Career -
+Readiness 
+Assessment 
+The system shall support standardized, competency -based 
+assessment tools to determine career -advancement readiness, 
+using performance outcomes, competency assessments, and 
+potential indicators. 
+
+

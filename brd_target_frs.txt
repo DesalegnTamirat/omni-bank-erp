@@ -1,0 +1,156 @@
+FR-KMS-001: Central Repository System shall provide a central, governed repository for documents including policies, SOPs, manuals, and regulatory content.
+
+FR-KMS-002: Taxonomy Configuration System shall allow an authorized administrator to define and maintain the department list, document type list, classification levels, and tag vocabulary used for document categorization, including adding, editing, and retiring values without requiring a system change request.
+
+FR-KMS-003: Document Categorization System shall support document categorization by department, type, classification, and tags.
+
+FR-KMS-004: Version Control & Lifecycle System shall support version control and lifecycle management (Draft, Review, Approved, Archived).
+
+FR-KMS-005: Full-Text & Metadata Search System shall provide full-text and metadata-based search capabilities. 7.4.2 Digital Library The Digital Library is a curated, browsable collection of reference and learning material – distinct from the governed Document Repository above. Digital Library content is not subject to the same approval and version-control workflow as SOPs and policies; it exists to support employee self -directed learning and reference, complementing structured training delivered through the both LMS and Classroom.
+
+FR-KMS-006: E-Book & Reference Repository System shall provide a repository for e -books, whitepapers, and reference materials.
+
+FR-KMS-007: Training Reference Material Catalog System shall catalog training reference and research materials, with linkage to related courses.
+
+FR-KMS-008: Content Curation & Recommendations System shall support curated collections and recommended reading lists organized by topic or role.
+
+FR-KMS-009: External Reference Linking System shall support linking to external reference sources, such as regulatory publications or industry research, where permitted.
+
+FR-KMS-010: Role-Based Access Control System shall implement Role-Based Access Control (RBAC).
+
+FR-KMS-011: Department/Branch Restriction System shall enforce department - and branch -based access restrictions.
+
+FR-KMS-012: AD/LDAP Integration System shall integrate with Active Directory / LDAP for authentication.
+
+FR-KMS-013: MFA System shall support Multi-Factor Authentication (MFA) 7.4.4. Secure Document Download
+
+FR-KMS-014: Role-Based Download Permission System shall only allow a document to be downloaded if the employee's assigned role has been granted download permission for that document; employees without permission can still view it on screen but cannot download it.
+
+FR-KMS-015: Automatic Watermarking System shall automatically stamp every downloaded document with the downloader's user ID, the date and time of download, and their department, visible on the document itself. Purpose: if a copy is later found outside the system, it can be traced back to the person who downloaded it.
+
+FR-KMS-016: Download Encryption System shall automatically lock (encrypt) every downloaded file so that only the authorized recipient can open it. If the file is later copied to another device, lost, or intercepted, its contents remain unreadable to anyone else. Purpose: protects what is inside the file itself, separate from the watermark, which only identifies who downloaded it.
+
+FR-KMS-017: Download Audit Logging System shall automatically record, for every download, who downloaded which document and when, in a log that administrators and auditors can review. Purpose: provides a complete download history for compliance checks and investigations.
+
+FR-KMS-018: View-Only Restriction System shall allow especially sensitive documents to be marked as view -only, which lets employees read the document on screen but removes the download option for that document entirely. Note on FR -KMS-015 (Download Encryption): encryption here does not require the intended user to enter a password or key. Decryption is intended to happen automatically for the authorized user, tied to their verified identity or active session (e.g., opened through the KMS's own viewer, or on a company-managed device), so it is invisible to someone with proper access. If the file ends up with anyone else, for example through loss, theft, or forwarding, it simply fails to open, since their identity or device does not match.
+
+FR-KMS-019: Indexed Search Engine System shall provide an indexed search engine for fast retrieval.
+
+FR-KMS-020: Fast Document Retrieval System shall support fast retrieval of documents across the repository.
+
+FR-KMS-021: Metadata Filtering (like author, date, or category) System shall enable filtering of search results by metadata and classification. 7.4.6. Audit and Logging
+
+FR-KMS-022: Activity Logging System shall log all user activities, including view, download, modify, and delete.
+
+FR-KMS-023: Audit-Ready Reporting System shall provide audit-ready reporting for compliance purposes. 7.4.7. Storage and Scalability
+
+FR-KMS-024: Scalable Storage Architecture System shall support scalable storage architecture (cloud, on -premise, or hybrid).
+
+FR-KMS-025: High Availability & Redundancy System shall ensure high availability and redundancy of stored content.
+
+FR-KMS-026: Large Volume Data Support System shall support large volumes of structured and unstructured data. 7.4.8. Tacit Knowledge Capture and Communities of Practice A Community of Practice (CoP) is a dedicated group space for practitioners in a shared domain (e.g., a specific function or discipline) to interact on an ongoing basis – discussing problems, sharing experience,
+
+FR-KMS-027: Expert / Skill Directory System shall maintain a searchable directory of subject matter experts and their areas of expertise.
+
+FR-KMS-028: Communities of Practice Spaces System shall provide dedicated Community of Practice (CoP) spaces for structured knowledge sharing and collaboration among practitioners.
+
+FR-KMS-029: Knowledge Capture Sessions System shall support scheduling and recording of knowledge capture sessions, such as expert interviews and debriefs, to convert tacit knowledge into documented content.
+
+FR-KMS-030: Lessons Learned Repository System shall provide a structured repository for lessons learned and post-activity reviews.
+
+FR-KMS-031: Mentoring & Knowledge Transfer Tracking System shall track mentoring assignments and knowledge transfer activities between experienced and new staff.
+
+FR-KMS-032: Discussion Forums / Q&A System shall provide discussion forums or Q&A functionality to enable informal knowledge exchange among employees.
+
+FR-LMS-001: Course Creation & Management System shall enable creation, upload, and management of training courses.
+
+FR-LMS-002: Structured Learning Paths System shall allow related courses to be grouped into a defined, ordered sequence (a "learning path"), so that an employee completes them in a set order – for example, a series of onboarding courses that must each be finished before the next one becomes available."
+
+FR-LMS-003: Course Assignment System shall allow assignment of courses by role, department, or individual. Course Creation & Management Workflow (FR-LMS-001): the following steps define the course lifecycle for development reference: 1) Create Course Shell – the assigned content creator creates a new course entry with title, description, category, and target audience. 2) Upload Content – uploads the video files, documents, and assessment materials that make up the course. 3) Configure Course Settings – sets mandatory/optional status, prerequisites, estimated duration, and the passing criteria for any linked assessment. 4) Assign to a Learning Path (optional) – links the course into a structured, ordered sequence 5) Save as Draft – the course remains in Draft status, visible only to the creator and reviewers, not yet
+
+FR-LMS-004: Internal Video Hosting System shall provide internal video hosting with no external dependency such as YouTube.
+
+FR-LMS-005: Adaptive Streaming System shall support adaptive streaming for low -bandwidth environments.
+
+FR-LMS-006: Content Protection System shall apply watermarking, encryption, download restriction, and screen-capture restriction (where technically feasible). Implementation Note: "Internal hosting" refers to a private, access -controlled video platform or a self - managed solution using the Bank's own cloud storage and streaming infrastructure) rather than a literal on-premise media server. To meet the adaptive streaming (FR -LMS-005) and mobile low -bandwidth optimization (FR-MOB-004) requirements elsewhere in this document, the selected hosting approach shall include Content Delivery Network (CDN) support to ensure acceptable p layback performance across branches and mobile devices. 8.4.3. Learning Control Mechanisms
+
+FR-LMS-007: Mandatory Completion Enforcement System shall enforce mandatory completion of content before progression.
+
+FR-LMS-008: Skip/Fast-Forward Prevention System shall prevent skipping or fast-forwarding in mandatory modules.
+
+FR-LMS-009: Resume Capability System shall support resume capability for interrupted sessions.
+
+FR-LMS-010: Dashboard Filtering to Active/Assigned Courses System shall, by default, display on the employee's dashboard only courses that are currently assigned, in progress, or recently completed; the full course catalog shall remain available through a separate “Course Library” or “My Learning History” view.
+
+FR-LMS-011: Version-Based Content Archiving System shall restrict employee access to a course version once it is superseded by an updated version, and shall retain superseded versions in an admin-only archive for audit and historical reference rather than employee self-service. 8.4.4. Assessment Engine
+
+FR-LMS-012: Training Completion Gate System shall require completion of training before post assessment access.
+
+FR-LMS-013: Pre Assessment System shall allow pre course assessment when required (Pre assessment completion before course access)
+
+FR-LMS-014: Timed Assessments System shall support timed assessments.
+
+FR-LMS-015: Randomized Question Pools System shall provide randomized question pools.
+
+FR-LMS-016: Attempt Limits System shall enforce configurable attempt limits.
+
+FR-LMS-017: Automated Grading System shall support automated grading. 8.4.5. Certification Management
+
+FR-LMS-018: Automatic Certificate Generation System shall generate certificates automatically upon course completion.
+
+FR-LMS-019: Customizable Certificate Templates System shall support customizable certificate templates, including branding and signatures.
+
+FR-LMS-020: Certification Validity Tracking System shall track certification validity and expiry.
+
+FR-LMS-021: Certification History System shall maintain certification history per employee.
+
+FR-LMS-022: Certification linkage System shall automatically route certificates to employee master data to be attached to employee profile 8.4.6. Reporting and Analytics
+
+FR-LMS-023: Management Dashboards System shall provide dashboards for management reporting.
+
+FR-LMS-024: Completion Tracking System shall track completion by branch and department.
+
+FR-LMS-025: Compliance Status Monitoring System shall monitor and report compliance status.
+
+FR-LMS-026: Engagement Analytics System shall provide engagement analytics, including watch time, drop-off rates, and scores. 8.4.7. Notifications and Automation
+
+FR-LMS-027: Automated Notifications System shall send automated notifications for course assignments, progress updates, and completion alerts.
+
+FR-LMS-028: Reminder Mechanism System shall provide reminder mechanisms for overdue courses or tasks.
+
+FR-LMS-029: Configurable Notification Rules System shall support configurable notification rules.
+
+FR-MOB-001: Mobile-Responsive / Native Access KMS and LMS shall be accessible via a responsive mobile web interface and/or a native mobile application on iOS and Android.
+
+FR-MOB-002: Mobile Authentication Mobile access shall enforce the same Multi-Factor Authentication (MFA) controls as desktop access, with optional biometric login (fingerprint/face) where supported by the device.
+
+FR-MOB-003: Mobile Role-Based Access Mobile sessions shall apply the same Role -Based Access Control (RBAC) and document classification restrictions as desktop access.
+
+FR-MOB-004: Low-Bandwidth Optimization Mobile access shall be optimized for low -bandwidth branch and field environments, including adaptive video streaming and compressed document previews.
+
+FR-MOB-005: Offline Access to Assigned Courses The LMS mobile application shall let an employee download an assigned mandatory course onto their device while they have a connection, so they can complete it (watch videos, take assessments) later with no internet access at all, similar to downloading a video for a flight. The app shall continue to enforce mandatory sequencing (no skipping ahead) while offline. Once the device reconnects to the internet, completion status and assessment results shall be sent to the central LMS automatically, with no manual step required from the employee
+
+FR-MOB-006: Mobile Document Security Mobile document viewing shall retain watermarking, view-only restrictions, and download controls equivalent to desktop access; screen capture restriction shall apply where technically feasible.
+
+FR-MOB-007: Mobile Push Notifications The mobile application shall deliver push notifications for course assignments, approaching deadlines, completion alerts, and new knowledge publications.
+
+FR-MOB-008: Mobile Assessment and Certification Employees shall be able to complete timed assessments and view or download issued certificates from a mobile device.
+
+FR-MOB-009: Mobile Session Security Mobile sessions shall enforce automatic timeout, device -level encryption of cached content, and remote session revocation upon device loss or role change.
+
+FR-REC-001: Leaderboard System shall maintain a leaderboard ranking employees on training performance, such as assessment scores and completion speed.
+
+FR-REC-002: Best Scorer of the Month (LMS) System shall identify and recognize the top-performing learner(s) each month based on assessment scores and completion metrics.
+
+FR-REC-003: Best Contributor of the Month (KMS) System shall identify and recognize the employee(s) who contributed most to institutional knowledge each month, based on activity such as Document Repository/Digital Library uploads, CoP participation, and knowledge capture sessions.
+
+FR-REC-004: Recognition Badges / Achievements System shall award digital badges or achievement markers for milestones, such as course completions, certifications, and knowledge contributions.
+
+FR-REC-005: Recognition Visibility System shall display current recognition (e.g., “Best Scorer”, “Best Contributor”) on a recognition dashboard and on the relevant employee's profile.
+
+FR-REC-006: Configurable Recognition Criteria System shall allow PPDD/KMLID to configure recognition categories, eligibility criteria, and scoring weights.
+
+FR-REC-007: Recognition Notification System shall notify recognized employees and their supervisors when an award or recognition is issued.
+
+FR-REC-008: Recognition History and Reporting System shall maintain a historical record of recognition awarded, available for HR reporting on engagement and participation. 15. Conclusion The Knowledge Management System and Learning Management System shall provide Bunna Bank with a secure, unified platform for institutional knowledge management and employee training, accessible across desktop and mobile devices. The system shall eliminate dependency on external platforms, enforce robust access, audit, and content protection controls, and deliver real-time compliance and engagement reporting to management. Successful implementation shall result in a single source of truth for institutional knowledge, standardized and trackable learning across all branches, and a strengthened audit and compliance framework.
+

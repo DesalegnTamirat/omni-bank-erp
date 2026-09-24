@@ -66,8 +66,8 @@ class TestKmsPhase4Functional(TransactionCase):
             'department_id': cls.dept_fin.id,
         })
 
-        cls.category = cls.KmsCategory.create({'name': 'Governance Docs', 'code': 'GOV'})
-        cls.doc_type = cls.KmsDocType.create({'name': 'Standard Operating Procedure', 'code': 'SOP'})
+        cls.category = cls.KmsCategory.create({'name': 'Governance Docs', 'code': 'GOV-TEST-P4'})
+        cls.doc_type = cls.env.ref('knowledge_management.kms_type_sop', raise_if_not_found=False) or cls.KmsDocType.search([('code', '=', 'SOP')], limit=1) or cls.KmsDocType.create({'name': 'Standard Operating Procedure', 'code': 'SOP-TEST-P4'})
         cls.class_pub = cls.env.ref('knowledge_management.kms_class_public')
 
     def test_11_encrypted_download_and_non_pdf_protection(self):

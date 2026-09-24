@@ -22,9 +22,10 @@ class KmsCategory(models.Model):
 
     document_count = fields.Integer(string='Documents Count', compute='_compute_document_count')
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'The category code must be unique!'),
-    ]
+    _code_unique = models.Constraint(
+        'UNIQUE(code)',
+        'The category code must be unique!'
+    )
 
     @api.depends('name', 'parent_id.complete_name')
     def _compute_complete_name(self):
@@ -58,9 +59,10 @@ class KmsDocumentType(models.Model):
     requires_approval = fields.Boolean(string='Requires Multi-level Approval', default=True)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'The document type code must be unique!'),
-    ]
+    _code_unique = models.Constraint(
+        'UNIQUE(code)',
+        'The document type code must be unique!'
+    )
 
 
 class KmsClassification(models.Model):
@@ -101,10 +103,14 @@ class KmsClassification(models.Model):
     description = fields.Text(string='Classification Policy Description')
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'Classification code must be unique!'),
-        ('security_level_unique', 'unique(security_level)', 'Security level rank must be unique!'),
-    ]
+    _code_unique = models.Constraint(
+        'UNIQUE(code)',
+        'Classification code must be unique!'
+    )
+    _security_level_unique = models.Constraint(
+        'UNIQUE(security_level)',
+        'Security level rank must be unique!'
+    )
 
 
 class KmsTag(models.Model):
@@ -117,6 +123,7 @@ class KmsTag(models.Model):
     color = fields.Integer(string='Color Index', default=1)
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('name_unique', 'unique(name)', 'Tag name must be unique!'),
-    ]
+    _name_unique = models.Constraint(
+        'UNIQUE(name)',
+        'Tag name must be unique!'
+    )

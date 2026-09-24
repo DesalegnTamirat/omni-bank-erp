@@ -25,8 +25,10 @@
             <field name="arch" type="xml">
                 <form string="Role Competency Requirements &amp; Behavioral Guidance">
                     <sheet>
+                        <field name="mapping_state" invisible="1"/>
+                        <field name="mapping_id" invisible="1"/>
                         <div class="oe_title" style="margin-bottom: 15px;">
-                            <h1 style="color: #541718;"><field name="competency_id" readonly="mapping_id.state != 'draft'"/></h1>
+                            <h1 style="color: #541718;"><field name="competency_id" readonly="1"/></h1>
                             <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
                         </div>
                         
@@ -73,11 +75,11 @@
                             <group>
                                 <field name="is_matrix_configured" invisible="1"/>
                                 <field name="default_proficiency" readonly="1"/>
-                                <field name="override_default"/>
-                                <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>
+                                <field name="override_default" readonly="mapping_state != 'draft'"/>
+                                <field name="required_proficiency" readonly="mapping_state != 'draft' or (is_matrix_configured and not override_default)"/>
                             </group>
                             <group>
-                                <field name="weight"/>
+                                <field name="weight" readonly="mapping_state != 'draft'"/>
                             </group>
                         </group>
                     </sheet>
@@ -144,6 +146,7 @@
                                     <field name="indicator_level_3" column_invisible="True"/>
                                     <field name="indicator_level_4" column_invisible="True"/>
                                     <field name="competency_id"/>
+                                    <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
                                     <field name="pillar" widget="badge" readonly="1"/>
                                     <field name="override_default"/>
                                     <field name="required_proficiency" readonly="is_matrix_configured and not override_default"/>

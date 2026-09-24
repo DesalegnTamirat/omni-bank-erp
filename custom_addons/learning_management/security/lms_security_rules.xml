@@ -39,7 +39,7 @@
             <field name="name">Learner View Published Courses</field>
             <field name="model_id" ref="learning_management.model_lms_course"/>
             <field name="groups" eval="[(4, ref('learning_management.group_lms_learner'))]"/>
-            <field name="domain_force">['|', ('state', '=', 'published'), ('instructor_id.user_id', '=', user.id)]</field>
+            <field name="domain_force">['|', '&amp;', ('state', '=', 'published'), ('is_latest_version', '=', True), ('instructor_id.user_id', '=', user.id)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>

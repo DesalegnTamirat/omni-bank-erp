@@ -29,9 +29,10 @@ class LmsLearningPath(models.Model):
 
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('code_unique', 'unique(code)', 'Learning path code must be unique!'),
-    ]
+    _code_unique = models.Constraint(
+        'UNIQUE(code)',
+        'Learning path code must be unique!'
+    )
 
     @api.depends('path_course_ids', 'path_course_ids.course_id.estimated_duration_hours')
     def _compute_path_stats(self):
@@ -60,8 +61,7 @@ class LmsLearningPathCourse(models.Model):
     )
     branch_group_code = fields.Char(
         string='Elective Group Identifier',
-        placeholder='e.g. ELECTIVE_BRANCH_A',
-        help='Group identifier if the learner must pick 1 of N elective courses in this branch.'
+        help='Group identifier if the learner must pick 1 of N elective courses in this branch, e.g. ELECTIVE_BRANCH_A.'
     )
     prerequisite_course_ids = fields.Many2many(
         'lms.course',
@@ -73,6 +73,7 @@ class LmsLearningPathCourse(models.Model):
     )
     stage_notes = fields.Char(string='Stage Instructions / Prerequisites Guidance')
 
-    _sql_constraints = [
-        ('path_course_unique', 'unique(path_id, course_id)', 'This course is already added to this learning path!'),
-    ]
+    _path_course_unique = models.Constraint(
+        'UNIQUE(path_id, course_id)',
+        'This course is already added to this learning path!'
+    )

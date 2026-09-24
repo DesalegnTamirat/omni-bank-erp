@@ -144,7 +144,7 @@ class KmsLessonLearned(models.Model):
         ('archived', 'Archived'),
     ], string='Status', default='draft', tracking=True, index=True)
 
-    vote_ids = fields.One2many('kms.lesson.learned.vote', 'lesson_id', string='Helpful Votes')
+    vote_ids = fields.One2many('kms.lesson.learned.vote', 'lesson_id', string='Votes')
     helpful_votes = fields.Integer(string='Helpful Votes', compute='_compute_helpful_votes', store=True)
 
     @api.depends('vote_ids')

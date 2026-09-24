@@ -79,8 +79,9 @@ class KmsDocumentController(http.Controller):
                 _logger.error("Error applying watermark to doc %s: %s", doc.id, e)
 
         # Apply Session-Bound Symmetric Encryption (FR-KMS-016 & FR-KMS-015 non-PDF protection)
-        # Non-PDF files are encrypted so they cannot be released unprotected; PDF files are encrypted if require_encryption is True or requested.
-        is_encrypted = doc.require_encryption or (not doc.is_pdf) or (kwargs.get('encrypt') == '1')
+        # Non-PDF files are always encrypted so they cannot be released unprotected;
+        # PDF files are encrypted if require_encryption is True, if classification is confidential/restricted, or requested.
+        is_encrypted = doc.require_encryption or (not doc.is_pdf) or (doc.classification in ('confidential', 'restricted')) or (kwargs.get('encrypt') == '1')
         if is_encrypted:
             raw_bytes = encrypt_document_data(raw_bytes, doc.id, user.id)
             if not filename.endswith('.enc'):

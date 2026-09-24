@@ -141,7 +141,12 @@ class CompetencyDashboard(models.TransientModel):
             'type': 'ir.actions.act_window',
             'name': 'Underqualified Competency Lines (Training Needed)',
             'res_model': 'competency.assessment.line',
-            'views': [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']],
+            'views': [
+                (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+            ],
             'view_mode': 'list,graph,pivot,form',
             'domain': domain,
             'context': ctx,
@@ -164,7 +169,12 @@ class CompetencyDashboard(models.TransientModel):
             'type': 'ir.actions.act_window',
             'name': 'Fit / Qualified Competency Lines',
             'res_model': 'competency.assessment.line',
-            'views': [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']],
+            'views': [
+                (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+            ],
             'view_mode': 'list,graph,pivot,form',
             'domain': domain,
             'context': ctx,
@@ -187,7 +197,12 @@ class CompetencyDashboard(models.TransientModel):
             'type': 'ir.actions.act_window',
             'name': 'Overqualified Competency Lines',
             'res_model': 'competency.assessment.line',
-            'views': [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']],
+            'views': [
+                (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+            ],
             'view_mode': 'list,graph,pivot,form',
             'domain': domain,
             'context': ctx,
@@ -225,6 +240,48 @@ class CompetencyDashboard(models.TransientModel):
             'target': 'current',
         }
 
+    @api.model
+    def _get_fully_assessed_employee_ids(self, cycle_id=False, asm_domain=None):
+        """Return the set of employee IDs who have evaluations assigned in the cycle AND where
+        ALL persons assigned to evaluate them have submitted their results (state != 'draft').
+        If any assigned evaluator has not submitted yet (state == 'draft'), the employee is excluded.
+        """
+        if not cycle_id and not asm_domain:
+            return set()
+        domain = list(asm_domain) if asm_domain else [('cycle_id', '=', cycle_id)]
+        candidate_asms = self.env['competency.assessment'].sudo().search_read(
+            domain, ['employee_id']
+        )
+        candidate_emp_ids = {a['employee_id'][0] for a in candidate_asms if a.get('employee_id')}
+        if not candidate_emp_ids:
+            return set()
+
+        cid = cycle_id
+        if not cid:
+            for item in domain:
+                if isinstance(item, (list, tuple)) and len(item) == 3 and item[0] == 'cycle_id' and item[1] == '=':
+                    cid = item[2]
+                    break
+
+        all_asm_domain = [('employee_id', 'in', list(candidate_emp_ids))]
+        if cid:
+            all_asm_domain.append(('cycle_id', '=', cid))
+
+        all_emp_asms = self.env['competency.assessment'].sudo().search_read(
+            all_asm_domain, ['employee_id', 'state']
+        )
+
+        emp_asms_map = {}
+        for a in all_emp_asms:
+            eid = a['employee_id'][0] if a.get('employee_id') else False
+            if eid:
+                emp_asms_map.setdefault(eid, []).append(a['state'])
+
+        return {
+            eid for eid, states in emp_asms_map.items()
+            if states and all(s != 'draft' for s in states)
+        }
+
     def action_open_tna_analytics_all(self):
         """Open full TNA Analytics and Assessment Line Report grouped by employee."""
         self.ensure_one()
@@ -237,15 +294,63 @@ class CompetencyDashboard(models.TransientModel):
         domain = [('is_primary_reporting_line', '=', True), '|', ('weighted_current_level', '>', 0), ('achievement_status', '!=', False)]
         if self.cycle_id:
             domain.append(('cycle_id', '=', self.cycle_id.id))
+            fully_assessed_ids = self._get_fully_assessed_employee_ids(cycle_id=self.cycle_id.id)
+            domain.append(('employee_id', 'in', list(fully_assessed_ids)))
         return {
             'type': 'ir.actions.act_window',
             'name': 'Assessed Employees Competency Reporting',
             'res_model': 'competency.assessment.line',
             'search_view_id': [self.env.ref('competency_management.view_competency_assessment_line_report_search').id, 'search'],
-            'views': [[False, 'list'], [False, 'graph'], [False, 'pivot'], [False, 'form']],
+            'views': [
+                (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+            ],
             'view_mode': 'list,graph,pivot,form',
             'domain': domain,
             'context': ctx,
+            'target': 'current',
+        }
+
+    @api.model
+    def action_open_assessed_employees(self, cycle_id=False, department_id=False, operating_unit_id=False):
+        """Open Assessed Employees Competency Reporting, strictly scoped to employees
+        where all assigned evaluations are submitted."""
+        domain = [('is_primary_reporting_line', '=', True), '|', ('weighted_current_level', '>', 0), ('achievement_status', '!=', False)]
+        if cycle_id:
+            domain.append(('cycle_id', '=', int(cycle_id)))
+            fully_assessed_ids = self._get_fully_assessed_employee_ids(cycle_id=int(cycle_id))
+            domain.append(('employee_id', 'in', list(fully_assessed_ids)))
+        if department_id:
+            domain.append(('department_id', '=', int(department_id)))
+        if operating_unit_id:
+            ou_emp_ids = self.env['hr.employee'].sudo().search([
+                '|', ('default_operating_unit_id', '=', int(operating_unit_id)),
+                '|', ('operating_unit_id', '=', int(operating_unit_id)),
+                ('department_id.operating_unit_id', '=', int(operating_unit_id))
+            ]).ids
+            domain.append(('employee_id', 'in', ou_emp_ids))
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Assessed Employees Competency Reporting',
+            'res_model': 'competency.assessment.line',
+            'search_view_id': [self.env.ref('competency_management.view_competency_assessment_line_report_search').id, 'search'],
+            'views': [
+                (self.env.ref('competency_management.view_competency_assessment_line_report_list').id, 'list'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_graph').id, 'graph'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_pivot').id, 'pivot'),
+                (self.env.ref('competency_management.view_competency_assessment_line_report_form').id, 'form'),
+            ],
+            'view_mode': 'list,graph,pivot,form',
+            'domain': domain,
+            'context': {
+                'search_default_group_by_employee': 1,
+                'search_default_filter_primary_reporting': 1,
+                'create': False,
+                'edit': False,
+                'delete': False,
+            },
             'target': 'current',
         }
 
@@ -372,10 +477,28 @@ class CompetencyDashboard(models.TransientModel):
             or is_dept_manager
         )
 
+        # Check if user is an Operating Unit Leader
+        emp_ou = False
+        if emp:
+            emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
+        if not emp_ou and user.default_operating_unit_id:
+            emp_ou = user.default_operating_unit_id
+
+        is_ou_leader = False
+        if emp and emp_ou and emp_ou.manager_id and emp_ou.manager_id.id == emp.id:
+            has_superior_in_ou = bool(
+                (emp.parent_id and (emp.parent_id.default_operating_unit_id == emp_ou or emp.parent_id.operating_unit_id == emp_ou)) or
+                (emp.coach_id and (emp.coach_id.default_operating_unit_id == emp_ou or emp.coach_id.operating_unit_id == emp_ou))
+            )
+            if not has_superior_in_ou:
+                is_ou_leader = True
+
         # Access & Scoping rules:
         # If admin: can select department and operating unit. Persona = executive.
         # If leader of one department: department is readonly (fixed to managed dept), can select operating unit. Persona = manager.
-        # If not: both department and operating unit are fixed. Persona = manager if supervisor, else employee.
+        # If leader of operating unit: operating unit is fixed, can select department within OU. Persona = manager.
+        # If subordinate coach: both department and operating unit are fixed. Persona = manager. Restricted strictly to team.
+        # If employee: both department and operating unit are fixed. Persona = employee. Restricted strictly to self.
         if is_admin:
             is_dept_readonly = False
             is_ou_readonly = False
@@ -405,6 +528,19 @@ class CompetencyDashboard(models.TransientModel):
             ou_from_emps = dept_emps.mapped('default_operating_unit_id') | dept_emps.mapped('operating_unit_id')
             allowed_ous = (ou_direct | ou_from_dept | ou_from_emps).filtered(lambda u: u.id)
             all_operating_units = [{'id': u.id, 'name': u.name} for u in allowed_ous]
+        elif is_ou_leader and emp_ou:
+            is_dept_readonly = False
+            is_ou_readonly = True
+            persona = 'manager'
+            operating_unit_id = emp_ou.id
+            all_operating_units = [{'id': emp_ou.id, 'name': emp_ou.name}]
+            ou_emps = self.env['hr.employee'].sudo().search([
+                '|', ('default_operating_unit_id', '=', emp_ou.id),
+                '|', ('operating_unit_id', '=', emp_ou.id),
+                ('department_id.operating_unit_id', '=', emp_ou.id)
+            ])
+            ou_depts = ou_emps.mapped('department_id').filtered(lambda d: d.id)
+            all_departments = [{'id': d.id, 'name': d.name} for d in ou_depts]
         else:
             is_dept_readonly = True
             is_ou_readonly = True
@@ -412,12 +548,6 @@ class CompetencyDashboard(models.TransientModel):
             user_dept = emp.department_id if emp else False
             department_id = user_dept.id if user_dept else False
             all_departments = [{'id': user_dept.id, 'name': user_dept.name}] if user_dept else []
-
-            emp_ou = False
-            if emp:
-                emp_ou = getattr(emp, 'default_operating_unit_id', False) or getattr(emp, 'operating_unit_id', False) or getattr(emp.department_id, 'operating_unit_id', False)
-            if not emp_ou and user.default_operating_unit_id:
-                emp_ou = user.default_operating_unit_id
             operating_unit_id = emp_ou.id if emp_ou else False
             all_operating_units = [{'id': emp_ou.id, 'name': emp_ou.name}] if emp_ou else []
 
@@ -475,21 +605,31 @@ class CompetencyDashboard(models.TransientModel):
         asm_domain = [('cycle_id', '=', cycle.id)] if cycle else []
 
         # Persona-based & Role-based employee scoping
-        if persona == 'employee' and emp:
-            scoped_emp_ids = [emp.id]
-        elif persona == 'manager' and emp:
+        subordinate_emp_ids = []
+        if emp and is_supervisor:
             subordinate_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('id', 'child_of', emp.id),
                 '|', ('parent_id', '=', emp.id),
                 ('coach_id', '=', emp.id)
             ]).ids
+
+        if persona == 'employee' and emp:
+            scoped_emp_ids = [emp.id]
+        elif persona == 'manager' and emp:
             if is_dept_manager and managed_depts:
                 dept_emp_ids = self.env['hr.employee'].sudo().search([('department_id', 'in', managed_depts.ids)]).ids
-            elif emp.department_id:
-                dept_emp_ids = self.env['hr.employee'].sudo().search([('department_id', 'child_of', emp.department_id.id)]).ids
+                scoped_emp_ids = list(set(subordinate_emp_ids + dept_emp_ids + [emp.id]))
+            elif is_ou_leader and emp_ou:
+                ou_emp_ids = self.env['hr.employee'].sudo().search([
+                    '|', ('default_operating_unit_id', '=', emp_ou.id),
+                    '|', ('operating_unit_id', '=', emp_ou.id),
+                    ('department_id.operating_unit_id', '=', emp_ou.id)
+                ]).ids
+                scoped_emp_ids = list(set(subordinate_emp_ids + ou_emp_ids + [emp.id]))
             else:
-                dept_emp_ids = []
-            scoped_emp_ids = list(set(subordinate_emp_ids + dept_emp_ids + [emp.id]))
+                # Subordinate coach: only their direct/indirect subordinates and themselves.
+                # Strictly prevents viewing OU total data, department peers, or their boss's assessment data.
+                scoped_emp_ids = list(set(subordinate_emp_ids + [emp.id]))
         else:
             scoped_emp_ids = False
 
@@ -497,11 +637,13 @@ class CompetencyDashboard(models.TransientModel):
             line_domain.append(('employee_id', 'in', scoped_emp_ids))
             asm_domain.append(('employee_id', 'in', scoped_emp_ids))
 
-        if department_id:
+        # Only apply global department_id filter if admin or dept manager with multiple depts or ou leader
+        if department_id and (is_admin or (is_dept_manager and len(managed_depts) > 1) or is_ou_leader):
             line_domain.append(('department_id', '=', int(department_id)))
             asm_domain.append(('department_id', '=', int(department_id)))
 
-        if operating_unit_id:
+        # Only apply global operating_unit_id filter if admin or dept manager
+        if operating_unit_id and (is_admin or is_dept_manager):
             ou_emp_ids = self.env['hr.employee'].sudo().search([
                 '|', ('default_operating_unit_id', '=', int(operating_unit_id)),
                 '|', ('operating_unit_id', '=', int(operating_unit_id)),
@@ -510,20 +652,24 @@ class CompetencyDashboard(models.TransientModel):
             line_domain.append(('employee_id', 'in', ou_emp_ids))
             asm_domain.append(('employee_id', 'in', ou_emp_ids))
 
-        # 360 Primary reporting lines for capability & gap metrics
-        primary_line_domain = list(line_domain) + [
-            ('is_primary_reporting_line', '=', True),
-            '|', ('weighted_current_level', '>', 0), ('achievement_status', '!=', False)
-        ]
+        # Fully Assessed Employees: Only employees where ALL assigned raters (self, supervisor, peers, subordinates)
+        # have submitted their results in this cycle. If any evaluation is still in 'draft', the employee is NOT counted.
+        fully_assessed_emp_ids = self._get_fully_assessed_employee_ids(
+            cycle_id=cycle.id if cycle else False,
+            asm_domain=asm_domain
+        )
 
-        lines = self.env['competency.assessment.line'].sudo().search(primary_line_domain)
+        if fully_assessed_emp_ids:
+            primary_line_domain = list(line_domain) + [
+                ('is_primary_reporting_line', '=', True),
+                ('employee_id', 'in', list(fully_assessed_emp_ids)),
+                '|', ('weighted_current_level', '>', 0), ('achievement_status', '!=', False)
+            ]
+            lines = self.env['competency.assessment.line'].sudo().search(primary_line_domain)
+        else:
+            lines = self.env['competency.assessment.line'].sudo().browse([])
 
-        # Fallback to all primary lines if none rated yet
-        if not lines:
-            lines = self.env['competency.assessment.line'].sudo().search(list(line_domain) + [('is_primary_reporting_line', '=', True)])
-
-        assessed_emp_ids = set(lines.filtered(lambda l: (l.weighted_current_level or 0) > 0 or l.achievement_status).mapped('employee_id.id'))
-        asms_total = len(assessed_emp_ids)
+        asms_total = len(fully_assessed_emp_ids)
         has_real_data = bool(lines and asms_total > 0)
 
         below_cnt = len(lines.filtered(lambda l: l.achievement_status == 'below'))
@@ -628,27 +774,35 @@ class CompetencyDashboard(models.TransientModel):
 
                 for sub in subordinates:
                     sub_p_lines = t_lines.filtered(lambda l: l.employee_id.id == sub.id)
-                    submitted_asms = self.env['competency.assessment'].sudo().search([
+                    all_sub_asms = self.env['competency.assessment'].sudo().search([
                         ('employee_id', '=', sub.id),
                         ('cycle_id', '=', cycle.id if cycle else 0),
-                        ('state', 'in', ['submitted', 'supervisor_review', 'hr_verified', 'approved', 'locked'])
                     ])
-                    has_submitted = bool(submitted_asms or any((l.weighted_current_level or 0) > 0 for l in sub_p_lines))
-                    status_str = _('Submitted (%d raters)') % len(submitted_asms) if submitted_asms else (_('In Progress') if sub_p_lines else _('Not Started'))
+                    submitted_asms = all_sub_asms.filtered(lambda a: a.state != 'draft')
+                    is_sub_fully_assessed = bool(all_sub_asms and len(submitted_asms) == len(all_sub_asms))
+
+                    if is_sub_fully_assessed:
+                        status_str = _('Fully Assessed (%d/%d raters)') % (len(submitted_asms), len(all_sub_asms))
+                    elif submitted_asms:
+                        status_str = _('In Progress (%d/%d raters submitted)') % (len(submitted_asms), len(all_sub_asms))
+                    elif all_sub_asms:
+                        status_str = _('Pending (%d raters assigned)') % len(all_sub_asms)
+                    else:
+                        status_str = _('Not Started')
 
                     top_gaps = sub_p_lines.filtered(lambda l: l.achievement_status == 'below').sorted(key=lambda l: l.gap or 0, reverse=True)[:2]
                     team_roster.append({
                         'id': sub.id,
                         'name': sub.name,
                         'job': sub.job_id.name if sub.job_id else 'N/A',
-                'assessment_id': submitted_asms[0].id if submitted_asms else (sub_p_lines[0].assessment_id.id if sub_p_lines else False),
+                        'assessment_id': submitted_asms[0].id if submitted_asms else (sub_p_lines[0].assessment_id.id if sub_p_lines else False),
                         'status': status_str,
-                        'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if top_gaps else ('Fit / Qualified' if has_submitted else 'Awaiting Assessment')
+                        'top_gaps': ", ".join([l.competency_id.name for l in top_gaps]) if (is_sub_fully_assessed and top_gaps) else ('Fit / Qualified' if is_sub_fully_assessed else ('Awaiting Evaluation' if all_sub_asms else 'Not Assigned'))
                     })
 
         # Department Heatmap Data Matrix (Fix 5: Single-pass in-memory grouping)
         heatmap_rows = []
-        if has_real_data and lines:
+        if persona != 'employee' and has_real_data and lines:
             dept_lines_map = {}
             for l in lines:
                 if l.department_id and l.gap is not None and l.gap is not False:
@@ -682,6 +836,7 @@ class CompetencyDashboard(models.TransientModel):
             'selected_operating_unit_id': int(operating_unit_id) if operating_unit_id else False,
             'all_departments': all_departments,
             'all_operating_units': all_operating_units,
+            'fully_assessed_emp_ids': list(fully_assessed_emp_ids),
             'user': {
                 'name': user.name,
                 'is_admin': is_admin,

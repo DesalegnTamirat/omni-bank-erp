@@ -451,6 +451,7 @@
                                         <th style="padding: 5px; text-align: left;">Competency</th>
                                         <th style="padding: 5px; text-align: center;">Self</th>
                                         <th style="padding: 5px; text-align: center;">Peer</th>
+                                        <th style="padding: 5px; text-align: center;">Subordinate</th>
                                         <th style="padding: 5px; text-align: center;">Supervisor</th>
                                         <th style="padding: 5px; text-align: center;">Weighted</th>
                                         <th style="padding: 5px; text-align: center;">Required</th>
@@ -466,6 +467,7 @@
                                             <td style="padding: 4px;"><t t-out="r['competency_name']"/></td>
                                             <td style="padding: 4px; text-align: center;"><t t-out="r['self_rating']"/></td>
                                             <td style="padding: 4px; text-align: center;"><t t-out="r['peer_avg']"/></td>
+                                            <td style="padding: 4px; text-align: center;"><t t-out="r['subordinate_avg']"/></td>
                                             <td style="padding: 4px; text-align: center;"><t t-out="r['supervisor_avg']"/></td>
                                             <td style="padding: 4px; text-align: center; font-weight: 700;"><t t-out="r['weighted_rating']"/></td>
                                             <td style="padding: 4px; text-align: center;"><t t-out="r['required_level']"/></td>

@@ -22,9 +22,13 @@
     '|',
         '&amp;',
             ('classification', '=', 'confidential'),
-            '|',
-                ('department_id', '=', False),
-                ('department_id', '=', user.employee_id.department_id.id),
+            '&amp;',
+                '|',
+                    ('department_id', '=', False),
+                    ('department_id', '=', user.employee_id.department_id.id),
+                '|',
+                    ('operating_unit_id', '=', False),
+                    ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id),
         '&amp;',
             ('classification', '=', 'restricted'),
             ('authorized_employee_ids.user_id', '=', user.id)
@@ -52,7 +56,7 @@
             <field name="name">Reviewer Manage Department Documents</field>
             <field name="model_id" ref="knowledge_management.model_kms_document"/>
             <field name="groups" eval="[(4, ref('knowledge_management.group_kms_reviewer'))]"/>
-            <field name="domain_force">['|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id)]</field>
+            <field name="domain_force">['&amp;', '|', ('department_id', '=', False), ('department_id', '=', user.employee_id.department_id.id), '|', ('operating_unit_id', '=', False), ('operating_unit_id', '=', user.employee_id.default_operating_unit_id.id)]</field>
             <field name="perm_read" eval="True"/>
             <field name="perm_write" eval="True"/>
             <field name="perm_create" eval="True"/>

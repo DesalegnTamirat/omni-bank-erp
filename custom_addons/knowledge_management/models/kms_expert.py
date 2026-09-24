@@ -64,9 +64,10 @@ class KmsExpert(models.Model):
 
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        ('employee_unique', 'unique(employee_id)', 'An expert directory profile already exists for this employee!'),
-    ]
+    _employee_unique = models.Constraint(
+        'UNIQUE(employee_id)',
+        'An expert directory profile already exists for this employee!'
+    )
 
     @api.depends('employee_id')
     def _compute_name(self):

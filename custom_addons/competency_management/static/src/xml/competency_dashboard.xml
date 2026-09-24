@@ -204,13 +204,23 @@
                     <!-- ── 5 KPI Cards Row ── -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
                         <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #541718;">
-                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Bank Avg Gap</div>
-                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.bank_avg_gap"/> pts</div>
+                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                <t t-if="state.persona === 'executive'">Bank Avg Gap</t>
+                                <t t-elif="state.persona === 'manager'">Team Avg Gap</t>
+                                <t t-else="">My Avg Gap</t>
+                            </div>
+                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;">
+                                <t t-if="state.persona === 'employee'"><t t-out="state.data.stats.my_avg_gap"/> pts</t>
+                                <t t-elif="state.persona === 'manager'"><t t-out="state.data.stats.team_avg_gap"/> pts</t>
+                                <t t-else=""><t t-out="state.data.stats.bank_avg_gap"/> pts</t>
+                            </div>
                         </div>
-                        <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; cursor: pointer;" t-on-click="openAssessedEmployees">
-                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Assessed Employees</div>
-                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
-                        </div>
+                        <t t-if="state.persona !== 'employee'">
+                            <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; cursor: pointer;" t-on-click="openAssessedEmployees">
+                                <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Assessed Employees</div>
+                                <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
+                            </div>
+                        </t>
                         <div style="background: #fdf2f2; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(84,23,24,0.08); border: 1px solid #f87171; border-top: 4px solid #541718; cursor: pointer;" t-on-click="openTnaBelow">
                             <div style="font-size: 12px; color: #541718; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Underqualified</div>
                             <div style="font-size: 26px; font-weight: 900; color: #541718;"><t t-out="state.data.stats.below_cnt"/></div>
@@ -268,55 +278,57 @@
                     </div>
 
                     <!-- ── Bottom Card: Department by Pillar Competency Gap Heatmap ── -->
-                    <div style="background: #ffffff; border-radius: 10px; padding: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <span style="font-size: 16px; font-weight: 700; color: #1d2b32;">Department by pillar competency gap heatmap</span>
-                        </div>
-                        
-                        <div class="o_competency_scroll table-responsive">
-                            <table class="table table-bordered align-middle mb-0" style="font-size: 13px; border-collapse: collapse;">
-                                <thead style="background-color: #f8fafc; color: #1d2b32;">
-                                    <tr>
-                                        <th style="padding: 10px 14px; text-align: left; border: 1px solid #e2e8f0; font-weight: 600;">Department</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Core</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Leadership</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Technical</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-if="!state.data.heatmap_rows || !state.data.heatmap_rows.length">
+                    <t t-if="state.persona !== 'employee'">
+                        <div style="background: #ffffff; border-radius: 10px; padding: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span style="font-size: 16px; font-weight: 700; color: #1d2b32;">Department by pillar competency gap heatmap</span>
+                            </div>
+                            
+                            <div class="o_competency_scroll table-responsive">
+                                <table class="table table-bordered align-middle mb-0" style="font-size: 13px; border-collapse: collapse;">
+                                    <thead style="background-color: #f8fafc; color: #1d2b32;">
                                         <tr>
-                                            <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8; border: 1px solid #e2e8f0;">
-                                                No departmental data available for this selection yet.
-                                            </td>
+                                            <th style="padding: 10px 14px; text-align: left; border: 1px solid #e2e8f0; font-weight: 600;">Department</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Core</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Leadership</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Technical</th>
                                         </tr>
-                                    </t>
-                                    <t t-foreach="state.data.heatmap_rows" t-as="row" t-key="row.dept_id">
-                                        <tr>
-                                            <td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-weight: 700; color: #1d2b32;">
-                                                <t t-out="row.dept_name"/>
-                                            </td>
-                                            <!-- Core Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &gt; 1.0 ? '#541718' : (row.core &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'core')">
-                                                <t t-out="row.core !== null ? row.core : 0"/>
-                                            </td>
-                                            <!-- Leadership Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &gt; 1.0 ? '#541718' : (row.leadership &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'leadership')">
-                                                <t t-out="row.leadership !== null ? row.leadership : 0"/>
-                                            </td>
-                                            <!-- Technical Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &gt; 1.0 ? '#541718' : (row.technical &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'technical')">
-                                                <t t-out="row.technical !== null ? row.technical : 0"/>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="!state.data.heatmap_rows || !state.data.heatmap_rows.length">
+                                            <tr>
+                                                <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8; border: 1px solid #e2e8f0;">
+                                                    No departmental data available for this selection yet.
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="state.data.heatmap_rows" t-as="row" t-key="row.dept_id">
+                                            <tr>
+                                                <td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-weight: 700; color: #1d2b32;">
+                                                    <t t-out="row.dept_name"/>
+                                                </td>
+                                                <!-- Core Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &gt; 1.0 ? '#541718' : (row.core &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'core')">
+                                                    <t t-out="row.core !== null ? row.core : 0"/>
+                                                </td>
+                                                <!-- Leadership Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &gt; 1.0 ? '#541718' : (row.leadership &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'leadership')">
+                                                    <t t-out="row.leadership !== null ? row.leadership : 0"/>
+                                                </td>
+                                                <!-- Technical Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &gt; 1.0 ? '#541718' : (row.technical &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'technical')">
+                                                    <t t-out="row.technical !== null ? row.technical : 0"/>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    </t>
 
                 </div>
             </t>

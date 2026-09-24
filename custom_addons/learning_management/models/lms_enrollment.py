@@ -39,7 +39,7 @@ class LmsEnrollment(models.Model):
     ], string='Status', default='enrolled', tracking=True, required=True, index=True)
 
     progress_percentage = fields.Float(string='Course Progress (%)', compute='_compute_progress', store=True)
-    completed_lessons_count = fields.Integer(string='Completed Lessons', compute='_compute_progress', store=True)
+    completed_lessons_count = fields.Integer(string='Completed Lessons Count', compute='_compute_progress', store=True)
     total_lessons_count = fields.Integer(string='Total Lessons', compute='_compute_progress', store=True)
 
     # Assessment Gates
@@ -62,9 +62,10 @@ class LmsEnrollment(models.Model):
 
     lesson_progress_ids = fields.One2many('lms.lesson.progress', 'enrollment_id', string='Lesson Progress Logs')
 
-    _sql_constraints = [
-        ('emp_course_uniq', 'unique(employee_id, course_id)', 'Employee is already enrolled in this course!'),
-    ]
+    _emp_course_uniq = models.Constraint(
+        'UNIQUE(employee_id, course_id)',
+        'Employee is already enrolled in this course!'
+    )
 
     @api.depends('employee_id', 'course_id')
     def _compute_name(self):
@@ -197,6 +198,56 @@ class LmsEnrollment(models.Model):
                     description=f'Completed course: {rec.course_id.name} ({score_pct:.1f}%)'
                 )
 
+    @api.model
+    def cron_send_overdue_reminders(self):
+        """
+        Automated daily cron to send notifications for overdue or nearing-deadline mandatory courses (FR-LMS-028).
+        Notifies learner and their direct manager via chatter/activity.
+        """
+        today = fields.Date.context_today(self)
+        active_enrollments = self.search([
+            ('is_mandatory', '=', True),
+            ('state', 'in', ['enrolled', 'in_progress']),
+            ('due_date', '!=', False),
+        ])
+
+        for enrollment in active_enrollments:
+            emp = enrollment.employee_id
+            mgr = emp.parent_id
+            course_name = enrollment.course_id.name
+
+            if enrollment.due_date < today:
+                days_overdue = (today - enrollment.due_date).days
+                body = _(
+                    "MANDATORY TRAINING OVERDUE: '%(course)s' was due on %(due)s (%(days)d days overdue). "
+                    "Please complete immediately to maintain regulatory compliance."
+                ) % {
+                    'course': course_name,
+                    'due': enrollment.due_date,
+                    'days': days_overdue,
+                }
+                partner_ids = [p.id for p in [emp.user_id.partner_id, mgr.user_id.partner_id] if p]
+                enrollment.message_post(
+                    body=body,
+                    subject=_("Mandatory Course Overdue: %s") % course_name,
+                    partner_ids=partner_ids,
+                )
+            elif (enrollment.due_date - today).days <= 3:
+                days_left = (enrollment.due_date - today).days
+                body = _(
+                    "UPCOMING DEADLINE: Mandatory course '%(course)s' is due in %(days)d day(s) (deadline: %(due)s)."
+                ) % {
+                    'course': course_name,
+                    'days': days_left,
+                    'due': enrollment.due_date,
+                }
+                partner_ids = [emp.user_id.partner_id.id] if emp.user_id.partner_id else []
+                enrollment.message_post(
+                    body=body,
+                    subject=_("Reminder: Mandatory Course Due Soon - %s") % course_name,
+                    partner_ids=partner_ids,
+                )
+
 
 class LmsLessonProgress(models.Model):
     """
@@ -225,9 +276,10 @@ class LmsLessonProgress(models.Model):
 
     date_completed = fields.Datetime(string='Completion Timestamp', readonly=True)
 
-    _sql_constraints = [
-        ('enroll_lesson_uniq', 'unique(enrollment_id, lesson_id)', 'Lesson progress record must be unique per enrollment!'),
-    ]
+    _enroll_lesson_uniq = models.Constraint(
+        'UNIQUE(enrollment_id, lesson_id)',
+        'Lesson progress record must be unique per enrollment!'
+    )
 
     @api.depends('max_watched_seconds', 'lesson_id.video_duration_seconds')
     def _compute_watch_percentage(self):

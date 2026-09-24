@@ -343,6 +343,21 @@ class CompetencyRoleMappingLine(models.Model):
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     pillar = fields.Selection(related='competency_id.pillar', string='Pillar', store=True, readonly=True)
     competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', store=True, readonly=True)
+    mapping_state = fields.Selection(related='mapping_id.state', string='Mapping State', readonly=True)
+
+    def action_open_guide(self):
+        """Opens the full behavioral indicators and requirements popup for this role mapping line."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Behavioral Indicators & Guidance: %s') % (self.competency_id.name if self.competency_id else ''),
+            'res_model': 'competency.role.mapping.line',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('competency_management.view_competency_role_mapping_line_form').id, 'form')],
+            'target': 'new',
+            'context': self.env.context,
+        }
 
     indicator_level_1 = fields.Text(string='Level 1 Indicator', compute='_compute_level_indicators')
     indicator_level_2 = fields.Text(string='Level 2 Indicator', compute='_compute_level_indicators')

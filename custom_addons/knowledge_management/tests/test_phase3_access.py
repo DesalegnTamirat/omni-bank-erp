@@ -53,7 +53,7 @@ class TestKmsPhase3Access(TransactionCase):
 
         # Category and DocType
         cls.category = cls.KmsCategory.create({'name': 'Policy Test Category', 'code': 'POL-TEST'})
-        cls.doc_type = cls.KmsDocType.create({'name': 'Internal Policy', 'code': 'POL'})
+        cls.doc_type = cls.env.ref('knowledge_management.kms_type_policy', raise_if_not_found=False) or cls.KmsDocType.search([('code', '=', 'POL')], limit=1) or cls.KmsDocType.create({'name': 'Internal Policy', 'code': 'POL-TEST-P3'})
 
         cls.class_pub = cls.env.ref('knowledge_management.kms_class_public')
         cls.class_conf = cls.env.ref('knowledge_management.kms_class_confidential')
@@ -214,3 +214,33 @@ class TestKmsPhase3Access(TransactionCase):
                 self.fail("Duplicate vote on lesson learned should raise constraint violation")
             except (IntegrityError, ValidationError):
                 pass
+
+    def test_11_operating_unit_branch_isolation(self):
+        """FR-KMS-011: Confidential documents restricted to an operating unit/branch can only be read by employees in that branch."""
+        OperatingUnit = self.env.get('operating.unit')
+        if not OperatingUnit:
+            return
+        ou_bole = OperatingUnit.create({'name': 'Bole Branch Test', 'code': 'BOLE_TEST'})
+        ou_arada = OperatingUnit.create({'name': 'Arada Branch Test', 'code': 'ARADA_TEST'})
+
+        self.emp_hr.write({'default_operating_unit_id': ou_bole.id})
+        self.emp_fin.write({'default_operating_unit_id': ou_arada.id})
+
+        # Document restricted to Bole branch
+        doc_bole = self.KmsDocument.create({
+            'name': 'Bole Branch Cash Handling SOP',
+            'category_id': self.category.id,
+            'doc_type_id': self.doc_type.id,
+            'classification_id': self.class_conf.id,
+            'owner_id': self.emp_hr.id,
+            'department_id': False,
+            'operating_unit_id': ou_bole.id,
+            'state': 'approved',
+        })
+
+        # HR employee in Bole can read
+        self.assertTrue(doc_bole.with_user(self.user_hr).read(['name']))
+        # Finance employee in Arada cannot read
+        with self.assertRaises(AccessError):
+            doc_bole.with_user(self.user_fin).read(['name'])
+

@@ -363,3 +363,135 @@ class TestLmsPhase2Gates(TransactionCase):
         self.assertEqual(course.state, 'published')
         course.with_user(self.manager_user).write({'state': 'archived'})
         self.assertEqual(course.state, 'archived')
+
+    def test_10_assessment_max_attempts_enforcement(self):
+        """FR-LMS-016: Server-side enforcement of assessment max attempts limit."""
+        course = self.LmsCourse.create({
+            'name': 'Max Attempts Test Course',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'state': 'published',
+            'description': '<p>Description</p>',
+        })
+        assessment = self.LmsAssessment.create({
+            'name': 'Strict 1-Attempt Exam',
+            'course_id': course.id,
+            'assessment_type': 'post_course',
+            'max_attempts': 1,
+            'cooldown_hours': 0.0,
+            'pass_score_percentage': 80.0,
+            'instructions': '<p>1 attempt only</p>',
+        })
+        q = self.LmsQuestion.create({
+            'name': 'Q-Strict',
+            'question_text': '<p>Question text</p>',
+            'points': 10.0,
+            'question_type': 'single_choice',
+        })
+        self.LmsQuestionAnswer.create({
+            'question_id': q.id,
+            'answer_text': 'Right Answer',
+            'is_correct': True,
+        })
+        assessment.write({'fixed_question_ids': [(4, q.id)]})
+
+        enrollment = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id,
+            'course_id': course.id,
+        })
+
+        # Attempt 1 succeeds
+        action1 = assessment.with_user(self.learner_user).action_start_exam()
+        sess1 = self.LmsExamSession.browse(action1['res_id'])
+        sess1.action_submit_and_grade()
+        self.assertIn(sess1.state, ['passed', 'failed'])
+
+        # Attempt 2 via action_start_exam -> must raise UserError
+        with self.assertRaises(UserError) as cm:
+            assessment.with_user(self.learner_user).action_start_exam()
+        self.assertIn("exhausted the maximum allowed attempts", str(cm.exception))
+
+        # Attempt 2 via create_session_for_learner -> must raise UserError
+        with self.assertRaises(UserError):
+            self.LmsExamSession.create_session_for_learner(assessment, self.learner_employee, enrollment)
+
+        # Attempt 2 via direct ORM create -> must raise UserError
+        with self.assertRaises(UserError):
+            self.LmsExamSession.create({
+                'assessment_id': assessment.id,
+                'employee_id': self.learner_employee.id,
+                'enrollment_id': enrollment.id,
+            })
+
+    def test_11_course_version_archiving_and_visibility(self):
+        """FR-LMS-011: Publishing a new course version auto-archives predecessor and hides from learner catalog."""
+        course_v1 = self.LmsCourse.create({
+            'name': 'Risk Management Course',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'state': 'draft',
+            'version': '1.0',
+            'description': '<p>V1 syllabus</p>',
+        })
+        self.LmsLesson.create({
+            'name': 'Intro to Risk',
+            'course_id': course_v1.id,
+            'lesson_type': 'document',
+            'html_content': '<p>Content</p>',
+        })
+        # Publish v1
+        course_v1.with_user(self.manager_user).action_publish()
+        self.assertEqual(course_v1.state, 'published')
+        self.assertTrue(course_v1.is_latest_version)
+
+        # Learner can see v1
+        published_for_learner = self.LmsCourse.with_user(self.learner_user).search([('id', '=', course_v1.id)])
+        self.assertTrue(published_for_learner)
+
+        # Create v2
+        rev_action = course_v1.with_user(self.manager_user).action_create_new_version()
+        course_v2 = self.LmsCourse.browse(rev_action['res_id'])
+        self.assertEqual(course_v2.version, '1.1')
+        self.assertEqual(course_v2.previous_version_id.id, course_v1.id)
+
+        # Publish v2
+        course_v2.with_user(self.manager_user).action_publish()
+        self.assertEqual(course_v2.state, 'published')
+        self.assertTrue(course_v2.is_latest_version)
+
+        # v1 must be automatically archived and is_latest_version=False
+        course_v1.invalidate_recordset(['state', 'is_latest_version'])
+        self.assertEqual(course_v1.state, 'archived')
+        self.assertFalse(course_v1.is_latest_version)
+
+        # Learner search catalog must find v2, but NOT v1
+        catalog = self.LmsCourse.with_user(self.learner_user).search([('id', 'in', [course_v1.id, course_v2.id])])
+        self.assertIn(course_v2, catalog)
+        self.assertNotIn(course_v1, catalog)
+
+    def test_12_cron_send_overdue_reminders(self):
+        """FR-LMS-028: Daily automated notifications for overdue and approaching-deadline mandatory courses."""
+        today = fields.Date.context_today(self)
+        course = self.LmsCourse.create({
+            'name': 'Mandatory AML Compliance',
+            'category_id': self.category.id,
+            'instructor_id': self.instructor_employee.id,
+            'state': 'published',
+            'is_mandatory': True,
+            'description': '<p>AML compliance syllabus</p>',
+        })
+        enrollment_overdue = self.LmsEnrollment.create({
+            'employee_id': self.learner_employee.id,
+            'course_id': course.id,
+            'is_mandatory': True,
+            'due_date': today - timedelta(days=5),
+            'state': 'in_progress',
+        })
+
+        # Run cron
+        self.env['lms.enrollment'].cron_send_overdue_reminders()
+
+        # Check chatter on overdue enrollment
+        messages = enrollment_overdue.message_ids
+        overdue_notif = messages.filtered(lambda m: "MANDATORY TRAINING OVERDUE" in (m.body or ''))
+        self.assertTrue(overdue_notif, "Overdue warning message should be posted to chatter")
