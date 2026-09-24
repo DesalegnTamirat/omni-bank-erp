@@ -45,6 +45,13 @@ class DisciplinePayrollPenalty(models.Model):
     )
 
     effective_date = fields.Date(string='Effective Penalty Date', required=True, default=fields.Date.context_today, tracking=True)
+    payroll_month = fields.Selection(
+        related='case_id.payroll_month',
+        string='Target Payroll Month',
+        store=True,
+        readonly=False,
+        tracking=True
+    )
     state = fields.Selection([
         ('pending', 'Pending Transmission'),
         ('transferred', 'Transmitted to Payroll'),

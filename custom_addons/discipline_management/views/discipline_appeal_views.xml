@@ -25,11 +25,9 @@
                         <button name="action_submit_appeal" string="Submit Appeal" type="object" class="btn-primary"
                                 invisible="state != 'draft'"/>
                         <button name="action_start_review" string="Start Appeal Review" type="object" class="btn-info"
-                                invisible="state != 'submitted' or not can_user_review_current_stage"
-                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                                invisible="state != 'submitted' or not can_user_review_current_stage"/>
                         <button name="action_render_decision" string="Render Final Decision" type="object" class="btn-success"
-                                invisible="state != 'under_review' or not can_user_review_current_stage"
-                                groups="discipline_management.group_discipline_director,discipline_management.group_discipline_pomd,discipline_management.group_discipline_chief,discipline_management.group_discipline_cpco,discipline_management.group_discipline_ceo,discipline_management.group_discipline_admin"/>
+                                invisible="state != 'under_review' or not can_user_review_current_stage"/>
                         <button name="action_create_next_appeal" string="Submit Escalated Appeal" type="object" class="btn-warning"
                                 invisible="not can_submit_next_appeal"
                                 help="Submit an appeal escalation to the next designated higher authority."/>
@@ -45,7 +43,7 @@
                         <group>
                             <group string="Appeal Information &amp; Stage">
                                 <field name="name" readonly="1"/>
-                                <field name="case_id" readonly="state not in ('draft', 'submitted')"
+                                <field name="case_id" readonly="state != 'draft'"
                                        domain="[('state', 'in', ['enforced', 'closed'])]"/>
                                 <field name="employee_id" readonly="1"/>
                                 <field name="appeal_level" readonly="1"/>
@@ -55,24 +53,24 @@
                                 <field name="appeal_target_authority" readonly="1"/>
                             </group>
                             <group string="Appeal Submission &amp; Authority">
-                                <field name="submission_date" readonly="state not in ('draft', 'submitted')"/>
+                                <field name="submission_date" readonly="state != 'draft'"/>
                                 <field name="is_submitted_on_behalf"
                                        groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
                                        invisible="not is_submitted_on_behalf and not is_appeal_reviewer_or_admin"
-                                       readonly="state not in ('draft', 'submitted')"/>
+                                       readonly="state != 'draft'"/>
                                 <field name="submitted_by_id"
                                        groups="discipline_management.group_discipline_pomd,discipline_management.group_discipline_admin"
                                        invisible="not is_submitted_on_behalf"
                                        readonly="1"/>
                                 <field name="reviewer_id" invisible="state in ('draft', 'submitted')" readonly="1"/>
                                 <field name="review_date" invisible="state in ('draft', 'submitted')" readonly="1"/>
-                                <field name="supporting_document" filename="document_filename" readonly="state not in ('draft', 'submitted')"/>
+                                <field name="supporting_document" filename="document_filename" readonly="state != 'draft'"/>
                                 <field name="document_filename" invisible="1"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Appeal Grounds">
-                                <field name="appeal_grounds" readonly="state not in ('draft', 'submitted')" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
+                                <field name="appeal_grounds" readonly="state != 'draft'" placeholder="Explain grounds for appeal, new evidence, or mitigating circumstances..."/>
                             </page>
                             <page string="Decision Outcome &amp; Revised Actions" invisible="state in ('draft', 'submitted')">
                                 <group>

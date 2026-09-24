@@ -98,8 +98,35 @@ class DisciplineCase(models.Model):
     is_cash_shortage = fields.Boolean(string='Is Cash Shortage Misconduct', compute='_compute_is_cash_shortage', store=True)
     is_statutory_mitigation_applied = fields.Boolean(string='Apply Statutory Mitigation (-1 Grade)', tracking=True)
     mitigation_justification = fields.Text(string='Mitigation Legal Justification', tracking=True)
+    payroll_month = fields.Selection([
+        ('1', 'January'),
+        ('2', 'February'),
+        ('3', 'March'),
+        ('4', 'April'),
+        ('5', 'May'),
+        ('6', 'June'),
+        ('7', 'July'),
+        ('8', 'August'),
+        ('9', 'September'),
+        ('10', 'October'),
+        ('11', 'November'),
+        ('12', 'December'),
+    ], string='Payroll Deduction Month', default=lambda self: str(fields.Date.context_today(self).month), tracking=True, help="Target payroll cycle / month in which salary penalty deductions shall be executed.")
+    is_payroll_deductible = fields.Boolean(string='Has Payroll Deduction', compute='_compute_is_payroll_deductible', store=True, help="Indicates whether this disciplinary sanction incurs a salary fine or percentage deduction.")
     statutory_deadline_date = fields.Date(string='Statutory Decision Deadline', compute='_compute_statutory_deadline', store=True)
     is_deadline_exceeded = fields.Boolean(string='Statutory SLA Exceeded', compute='_compute_statutory_deadline', store=True)
+
+    @api.depends('punishment_type', 'penalty_percentage', 'fine_days', 'decided_punishment_type', 'decided_penalty_percentage', 'decided_fine_days')
+    def _compute_is_payroll_deductible(self):
+        for rec in self:
+            eff_pct = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else rec.penalty_percentage
+            eff_days = rec.decided_fine_days if rec.decided_fine_days > 0 else rec.fine_days
+            eff_punish = rec.decided_punishment_type or rec.punishment_type
+            rec.is_payroll_deductible = bool(
+                eff_pct > 0.0 or
+                eff_days > 0.0 or
+                eff_punish in ['first_warning_penalty', 'second_warning_penalty', 'final_warning_penalty', 'fine', 'suspension_without_pay']
+            )
 
     @api.depends('offense_id', 'article_id', 'cash_shortage_amount')
     def _compute_is_cash_shortage(self):
@@ -1238,6 +1265,19 @@ class DisciplineCase(models.Model):
                 rec.action_apply_demotion()
 
             # Enqueue pending deduction records for downstream payroll processing
+            today_date = rec.final_decision_date or fields.Date.context_today(rec)
+            if rec.payroll_month:
+                try:
+                    from datetime import date
+                    deduction_date = date(today_date.year, int(rec.payroll_month), 1)
+                except Exception:
+                    deduction_date = today_date
+            else:
+                deduction_date = today_date
+
+            month_dict = dict(rec._fields['payroll_month'].selection) if 'payroll_month' in rec._fields else {}
+            month_display = month_dict.get(rec.payroll_month, str(rec.payroll_month or ''))
+
             # 1. Percentage deduction for non-managerial employees
             if not rec.is_managerial and rec.penalty_percentage > 0.0:
                 self.env['discipline.payroll.penalty'].create({
@@ -1245,9 +1285,11 @@ class DisciplineCase(models.Model):
                     'employee_id': rec.employee_id.id,
                     'penalty_type': 'percentage',
                     'penalty_percentage': rec.penalty_percentage,
-                    'effective_date': rec.final_decision_date,
+                    'effective_date': deduction_date,
                     'state': 'pending',
-                    'notes': _('Automatic percentage penalty of %s%% from Case %s.') % (rec.penalty_percentage, rec.name)
+                    'notes': _('Automatic percentage penalty of %s%% from Case %s (Target Payroll Month: %s).') % (
+                        rec.penalty_percentage, rec.name, month_display
+                    )
                 })
             # 2. Daily wage unit deduction for managerial staff
             elif rec.is_managerial and rec.fine_days > 0.0:
@@ -1256,9 +1298,11 @@ class DisciplineCase(models.Model):
                     'employee_id': rec.employee_id.id,
                     'penalty_type': 'managerial',
                     'managerial_days': int(rec.fine_days),
-                    'effective_date': rec.final_decision_date,
+                    'effective_date': deduction_date,
                     'state': 'pending',
-                    'notes': _('Automatic managerial penalty of %d day(s) from Case %s.') % (int(rec.fine_days), rec.name)
+                    'notes': _('Automatic managerial penalty of %d day(s) from Case %s (Target Payroll Month: %s).') % (
+                        int(rec.fine_days), rec.name, month_display
+                    )
                 })
 
             # Suspension without-pay deduction for active suspensions
@@ -1272,9 +1316,11 @@ class DisciplineCase(models.Model):
                     'penalty_type': 'suspension_without_pay',
                     'suspension_id': susp.id,
                     'suspension_days': susp.working_days_count,
-                    'effective_date': rec.final_decision_date,
+                    'effective_date': deduction_date,
                     'state': 'pending',
-                    'notes': _('Without-pay suspension deduction for %d days from Suspension %s.') % (susp.working_days_count, susp.name)
+                    'notes': _('Without-pay suspension deduction for %d days from Suspension %s (Target Payroll Month: %s).') % (
+                        susp.working_days_count, susp.name, month_display
+                    )
                 })
 
             # Dismissal Handling & Separation Workflow

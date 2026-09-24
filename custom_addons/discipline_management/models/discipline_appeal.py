@@ -251,6 +251,8 @@ class DisciplineAppeal(models.Model):
 
     def _compute_is_appeal_reviewer_or_admin(self):
         user = self.env.user
+        emp = user.employee_id
+        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
         is_reviewer = (
             user.has_group('discipline_management.group_discipline_director') or
             user.has_group('discipline_management.group_discipline_pomd') or
@@ -258,12 +260,13 @@ class DisciplineAppeal(models.Model):
             user.has_group('discipline_management.group_discipline_cpco') or
             user.has_group('discipline_management.group_discipline_ceo') or
             user.has_group('discipline_management.group_discipline_admin') or
-            user.has_group('base.group_system')
+            user.has_group('base.group_system') or
+            any(kw in job_name for kw in ['director', 'chief', 'ceo', 'president', 'head', 'vp'])
         )
         for rec in self:
             rec.is_appeal_reviewer_or_admin = is_reviewer
 
-    @api.depends('appeal_target_authority', 'appeal_level', 'case_origin_type')
+    @api.depends('appeal_target_authority', 'appeal_level', 'case_origin_type', 'case_id', 'case_id.reported_by_id', 'case_id.employee_id')
     def _compute_can_user_review_current_stage(self):
         user = self.env.user
         is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
@@ -271,18 +274,38 @@ class DisciplineAppeal(models.Model):
         is_chief = user.has_group('discipline_management.group_discipline_chief') or user.has_group('discipline_management.group_discipline_cpco')
         is_director = user.has_group('discipline_management.group_discipline_director')
         is_pomd = user.has_group('discipline_management.group_discipline_pomd')
+        emp = user.employee_id
+        job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
 
         for rec in self:
             target = rec.appeal_target_authority
             can_review = False
+            case = rec.case_id
+
+            initiator_emp = case.reported_by_id.employee_id if case and case.reported_by_id else False
+            if not initiator_emp and case and case.employee_id:
+                initiator_emp = case.employee_id.parent_id or case.employee_id.coach_id
+
+            is_coach_of_initiator = bool(
+                emp and initiator_emp and (
+                    initiator_emp.parent_id.id == emp.id or
+                    initiator_emp.coach_id.id == emp.id or
+                    (initiator_emp.department_id and initiator_emp.department_id.manager_id.id == emp.id)
+                )
+            )
+
+            is_director_role = is_director or 'director' in job_name or is_coach_of_initiator
+            is_chief_role = is_chief or 'chief' in job_name or 'cpco' in job_name
+            is_ceo_role = is_ceo or 'ceo' in job_name or 'president' in job_name
+
             if target == 'directorate':
-                can_review = is_director or is_admin
+                can_review = is_director_role or is_chief_role or is_ceo_role or is_admin
             elif target == 'chief':
-                can_review = is_chief or is_admin
+                can_review = is_chief_role or is_ceo_role or is_admin
             elif target == 'secretary':
                 can_review = is_pomd or is_admin
             elif target == 'ceo':
-                can_review = is_ceo or is_admin
+                can_review = is_ceo_role or is_admin
             else:
                 can_review = is_admin
             rec.can_user_review_current_stage = can_review

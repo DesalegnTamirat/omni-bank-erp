@@ -14,6 +14,7 @@
                     <field name="suspension_days"/>
                     <field name="daily_rate"/>
                     <field name="calculated_amount"/>
+                    <field name="payroll_month"/>
                     <field name="effective_date"/>
                     <field name="state" widget="badge"/>
                 </list>
@@ -55,6 +56,7 @@
                         <group>
                             <group string="Deduction Amounts &amp; Dates">
                                 <field name="calculated_amount" readonly="1"/>
+                                <field name="payroll_month" string="Target Payroll Month"/>
                                 <field name="effective_date"/>
                                 <field name="payslip_reference"/>
                             </group>

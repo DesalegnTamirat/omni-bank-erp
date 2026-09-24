@@ -183,6 +183,7 @@
                                 <field name="case_action_track" string="Action Pathway" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'initiated')" invisible="not is_director_user and not is_hr_admin"/>
                                 <field name="allowed_severity_level_ids" invisible="1"/>
                                 <field name="is_cash_shortage" invisible="1"/>
+                                <field name="is_payroll_deductible" invisible="1"/>
                                 <field name="severity_level" invisible="1"/>
                                 <field name="incident_date" string="Misconduct Incident Date" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="article_id" invisible="1"/>
@@ -198,6 +199,7 @@
                                 <field name="punishment_type" string="Prescribed Disciplinary Measure" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="penalty_percentage" string="Salary Deduction Rate (%)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="fine_days" string="Salary Fine (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="payroll_month" string="Payroll Deduction Month" invisible="not is_payroll_deductible" required="is_payroll_deductible" readonly="state in ('enforced', 'closed', 'revoked')"/>
                                 <field name="active_duration_days" string="Warning Active Validity (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
                                 <field name="property_repair_cost" string="Property Damage / Repair Cost (ETB)" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
                             </group>
@@ -291,7 +293,7 @@
                                     </list>
                                 </field>
                             </page>
-                            <page string="Payroll Deductions">
+                            <page string="Payroll Deductions" invisible="not is_payroll_deductible and not payroll_penalty_ids">
                                 <field name="payroll_penalty_ids" readonly="1">
                                     <list string="Payroll Penalties">
                                         <field name="name"/>
