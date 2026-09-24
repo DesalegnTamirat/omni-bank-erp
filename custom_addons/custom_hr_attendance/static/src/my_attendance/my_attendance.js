@@ -363,6 +363,31 @@ export class MyAttendance extends Component {
                 lateness_hours_violation_threshold: this.timeStrToFloat(s.lateness_hours_violation_threshold_str !== undefined ? s.lateness_hours_violation_threshold_str : s.lateness_hours_violation_threshold),
             };
 
+            // Client-side quick check
+            if (payload.morning_time >= payload.exit_time) {
+                this.notification.add(
+                    _t("Morning Start Time must be earlier than Shift Exit Time."),
+                    { title: _t("Validation Error"), type: "danger" }
+                );
+                return;
+            }
+            if (payload.enable_lunch_break) {
+                if (payload.lunch_out_time <= payload.morning_time) {
+                    this.notification.add(
+                        _t("Lunch Start Time must be strictly after Morning Start Time."),
+                        { title: _t("Validation Error"), type: "danger" }
+                    );
+                    return;
+                }
+                if (payload.lunch_out_time + payload.lunch_duration >= payload.exit_time) {
+                    this.notification.add(
+                        _t("Lunch break must end before the Shift Exit Time."),
+                        { title: _t("Validation Error"), type: "danger" }
+                    );
+                    return;
+                }
+            }
+
             const res = await rpc("/custom_hr_attendance/save_settings", {
                 settings: payload,
             });
@@ -374,11 +399,12 @@ export class MyAttendance extends Component {
                 Object.assign(this.state.settings, payload);
                 this.state.showSettings = false;
             } else {
-                throw new Error(res ? res.error : "Failed to save settings");
+                const errMsg = (res && res.error) ? res.error : _t("Failed to save settings.");
+                this.notification.add(errMsg, { title: _t("Invalid Configuration"), type: "danger" });
             }
         } catch (e) {
             this.notification.add(
-                _t("Failed to save settings. Check your permissions."),
+                e.message || _t("Failed to save settings. Check your permissions."),
                 { title: _t("Error"), type: "danger" }
             );
         } finally {

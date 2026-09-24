@@ -24,6 +24,7 @@ class DisciplineOffense(models.Model):
     _description = 'Disciplinary Offense Definition'
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'article_number, sub_article_code, severity_level, name'
+    _rec_names_search = ['name', 'sub_article_code', 'article_number', 'description']
 
     name = fields.Char(string='Offense Title', required=True, tracking=True)
     category_id = fields.Many2one('discipline.offense.category', string='Offense Category', required=True, tracking=True)

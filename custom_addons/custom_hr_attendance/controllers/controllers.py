@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 import pytz
-from odoo import http, fields
+from odoo import http, fields, _
 from odoo.http import request
 
 from odoo.addons.hr_attendance.controllers.main import HrAttendance
@@ -383,8 +383,14 @@ class BunnaMyAttendance(http.Controller):
             m_cutoff = m_start + checkin_grace + dead_time
             a_cutoff = a_start + dead_time
 
+            def _att_in_hour(a):
+                if not a.check_in:
+                    return 0.0
+                ts = fields.Datetime.context_timestamp(employee, a.check_in)
+                return ts.hour + ts.minute / 60.0 + ts.second / 3600.0
+
             # Morning Session Check
-            m_att = today_atts.filtered(lambda a: (a.shift_end_float and a.shift_end_float <= (m_end + 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour < int(m_end)))
+            m_att = today_atts.filtered(lambda a: (a.shift_end_float and a.shift_end_float <= (m_end + 0.1)) or (a.check_in and _att_in_hour(a) < (m_end - 0.01)))
             if m_att:
                 m_att = m_att[0]
                 if m_att.check_out:
@@ -419,7 +425,11 @@ class BunnaMyAttendance(http.Controller):
                         m_badge = "Absent (Missed)"
 
             # Afternoon Session Check
-            a_att = today_atts.filtered(lambda a: (a.shift_start_float and a.shift_start_float >= (m_end - 0.1)) or (a.check_in and fields.Datetime.context_timestamp(employee, a.check_in).hour >= int(m_end)))
+            lunch_gap = max(0.0, a_start - m_end)
+            max_buf = min(checkin_buffer, lunch_gap / 2.0 if lunch_gap > 0 else 0.0)
+            a_buffer_start = max(m_end, a_start - max_buf)
+
+            a_att = today_atts.filtered(lambda a: (a.shift_start_float and a.shift_start_float >= (m_end - 0.1)) or (a.check_in and _att_in_hour(a) >= (m_end - 0.01)))
             if a_att:
                 a_att = a_att[0]
                 if a_att.check_out:
@@ -429,21 +439,18 @@ class BunnaMyAttendance(http.Controller):
                     a_status = 'active'
                     a_badge = "Active (Live)"
             else:
-                if not enable_checkin_restriction:
-                    if current_float < (a_start - 0.25):
-                        a_status = 'upcoming'
-                        a_badge = "Upcoming"
-                    elif current_float >= a_end:
+                if current_float < a_buffer_start or m_status == 'active':
+                    a_status = 'upcoming'
+                    a_badge = "Upcoming"
+                elif not enable_checkin_restriction:
+                    if current_float >= a_end:
                         a_status = 'absent'
                         a_badge = "Absent (Missed)"
                     else:
                         a_status = 'ready'
                         a_badge = "Ready to Check In"
                 else:
-                    if current_float < (a_start - 0.25):
-                        a_status = 'upcoming'
-                        a_badge = "Upcoming"
-                    elif current_float <= a_cutoff:
+                    if current_float <= a_cutoff:
                         a_status = 'ready'
                         a_badge = "Ready to Check In"
                     elif current_float > a_cutoff and current_float < a_end:
@@ -677,14 +684,142 @@ class BunnaMyAttendance(http.Controller):
         }
 
     @http.route('/custom_hr_attendance/save_settings', type='jsonrpc', auth='user')
-    def save_settings(self, settings=None):
-        """Persist attendance config parameters. Attendance Manager or Admin."""
-        if not (request.env.user.has_group('hr_attendance.group_hr_attendance_manager') or request.env.user.has_group('base.group_system')):
-            return {'error': 'Permission denied'}
+    def save_settings(self, settings=None, env=None):
+        """Persist attendance config parameters with strict business validation. Attendance Manager or Admin."""
+        if not env:
+            try:
+                env = request.env
+            except Exception:
+                env = None
+
+        if not env:
+            return {'error': 'No environment context'}
+
+        if not (env.user.has_group('hr_attendance.group_hr_attendance_manager') or env.user.has_group('base.group_system') or env.is_superuser()):
+            return {'error': env._('Permission denied: Only Attendance Administrators can modify system configuration.')}
 
         if not settings:
-            return {'error': 'No settings provided'}
-        params = request.env['ir.config_parameter'].sudo()
+            return {'error': env._('No settings provided.')}
+
+        params = env['ir.config_parameter'].sudo()
+
+        def _fmt_time(flt):
+            total_sec = int(round(float(flt) * 3600.0))
+            h = (total_sec % 86400) // 3600
+            m = (total_sec % 3600) // 60
+            am_pm = 'AM' if (h % 24) < 12 else 'PM'
+            h12 = (h % 24) % 12
+            if h12 == 0:
+                h12 = 12
+            return f"{h12:02d}:{m:02d} {am_pm}"
+
+        # Extract current or proposed values for cross-validation
+        def _get_val(key, default, val_type=float):
+            if key in settings:
+                try:
+                    return val_type(settings[key])
+                except Exception:
+                    return default
+            raw = params.get_param(f'hr_attendance.{key}')
+            if raw is None or raw is False:
+                return default
+            if val_type == bool:
+                return str(raw).lower() in ('true', '1', 'yes')
+            try:
+                return val_type(raw)
+            except Exception:
+                return default
+
+        morning_time = _get_val('morning_time', 8.00, float)
+        exit_time = _get_val('exit_time', 17.00, float)
+        saturday_exit_time = _get_val('saturday_exit_time', 12.00, float)
+        lunch_out_time = _get_val('lunch_out_time', 12.00, float)
+        lunch_duration = _get_val('lunch_duration', 1.00, float)
+        checkin_grace_period = _get_val('checkin_grace_period', 0.25, float)
+        dead_time = _get_val('dead_time', 0.33, float)
+        checkin_buffer = _get_val('checkin_buffer', 0.50, float)
+
+        enable_checkin_grace = _get_val('enable_checkin_grace', True, bool)
+        enable_checkin_restriction = _get_val('enable_checkin_restriction', True, bool)
+        enable_lunch_break = _get_val('enable_lunch_break', False, bool)
+        enable_saturday_halfday = _get_val('enable_saturday_halfday', True, bool)
+
+        # 1. Non-negative validation
+        for label, val in [
+            ('Morning Time', morning_time),
+            ('Exit Time', exit_time),
+            ('Saturday Exit Time', saturday_exit_time),
+            ('Lunch Start Time', lunch_out_time),
+            ('Lunch Duration', lunch_duration),
+            ('Check-In Grace Period', checkin_grace_period),
+            ('Dead Time (Late Tolerance)', dead_time),
+            ('Check-In Buffer', checkin_buffer),
+        ]:
+            if val < 0:
+                return {'error': env._("Negative values are not allowed for %s.") % label}
+
+        # 2. Shift bounds
+        if morning_time >= exit_time:
+            return {
+                'error': env._("Morning Start Time (%s) must be earlier than Shift Exit Time (%s).") % (
+                    _fmt_time(morning_time), _fmt_time(exit_time)
+                )
+            }
+
+        grace = checkin_grace_period if enable_checkin_grace else 0.0
+        dead = dead_time if enable_checkin_restriction else 0.0
+        late_cutoff = morning_time + grace + dead
+
+        if late_cutoff >= exit_time:
+            return {
+                'error': env._(
+                    "Check-In Cutoff window (%s) cannot be equal to or greater than Shift Exit Time (%s)."
+                ) % (_fmt_time(late_cutoff), _fmt_time(exit_time))
+            }
+
+        # 3. Lunch Break Validations
+        if enable_lunch_break:
+            if lunch_duration <= 0:
+                return {'error': env._("Lunch break duration must be greater than 0.")}
+
+            if lunch_out_time <= morning_time:
+                return {
+                    'error': env._(
+                        "Lunch Start Time (%s) must be strictly after Morning Start Time (%s)."
+                    ) % (_fmt_time(lunch_out_time), _fmt_time(morning_time))
+                }
+
+            lunch_end_time = lunch_out_time + lunch_duration
+            if lunch_end_time >= exit_time:
+                return {
+                    'error': env._(
+                        "Lunch End Time (%s) must be before Shift Exit Time (%s)."
+                    ) % (_fmt_time(lunch_end_time), _fmt_time(exit_time))
+                }
+
+            if late_cutoff >= lunch_out_time:
+                return {
+                    'error': env._(
+                        "Morning Check-in Cutoff window (%s) cannot reach or exceed Lunch Start Time (%s). "
+                        "Please adjust Morning Start Time, Grace/Tolerance, or Lunch Start Time."
+                    ) % (_fmt_time(late_cutoff), _fmt_time(lunch_out_time))
+                }
+
+        # 4. Saturday Shift Validations
+        if enable_saturday_halfday:
+            if saturday_exit_time <= morning_time:
+                return {
+                    'error': env._(
+                        "Saturday Exit Time (%s) must be after Morning Start Time (%s)."
+                    ) % (_fmt_time(saturday_exit_time), _fmt_time(morning_time))
+                }
+            if late_cutoff >= saturday_exit_time:
+                return {
+                    'error': env._(
+                        "Saturday Check-in Cutoff window (%s) cannot reach or exceed Saturday Exit Time (%s)."
+                    ) % (_fmt_time(late_cutoff), _fmt_time(saturday_exit_time))
+                }
+
         bool_keys = [
             'enable_checkin_restriction', 'enable_checkin_grace', 'enable_checkout_restriction',
             'enable_saturday_halfday', 'saturday_halfday_district',

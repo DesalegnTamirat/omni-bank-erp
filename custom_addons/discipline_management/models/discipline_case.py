@@ -96,7 +96,7 @@ class DisciplineCase(models.Model):
 
     cash_shortage_amount = fields.Float(string='Cash Shortage Amount (ETB)', tracking=True)
     is_cash_shortage = fields.Boolean(string='Is Cash Shortage Misconduct', compute='_compute_is_cash_shortage', store=True)
-    is_statutory_mitigation_applied = fields.Boolean(string='Apply Article 33.13 Statutory Mitigation (-1 Grade)', tracking=True)
+    is_statutory_mitigation_applied = fields.Boolean(string='Apply Statutory Mitigation (-1 Grade)', tracking=True)
     mitigation_justification = fields.Text(string='Mitigation Legal Justification', tracking=True)
     statutory_deadline_date = fields.Date(string='Statutory Decision Deadline', compute='_compute_statutory_deadline', store=True)
     is_deadline_exceeded = fields.Boolean(string='Statutory SLA Exceeded', compute='_compute_statutory_deadline', store=True)
@@ -323,18 +323,67 @@ class DisciplineCase(models.Model):
             rec.penalty_percentage = rec.decided_penalty_percentage if rec.decided_penalty_percentage > 0 else pct
             rec.fine_days = rec.decided_fine_days if rec.decided_fine_days > 0 else days
 
-    @api.onchange('employee_id')
+    @api.onchange('employee_id', 'case_action_track')
     def _onchange_employee_id_filter_regulations(self):
         if self.employee_id:
-            is_mgr = self.employee_id.is_managerial
+            emp = self.employee_id
+            job_name = (emp.job_id.name or '').lower() if emp.job_id else ''
+            is_mgr = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
             cat = 'managerial' if is_mgr else 'non_managerial'
+            self.staff_category = cat
+            self.staff_category_display = _('Managerial Staff') if is_mgr else _('Non-Managerial Staff')
+            if self.article_id and self.article_id.staff_category not in [cat, 'all']:
+                self.article_id = False
+                self.offense_id = False
+                self.severity_level_id = False
+            if self.offense_id and self.offense_id.staff_category not in [cat, 'all']:
+                self.offense_id = False
+                self.severity_level_id = False
+
+            offense_domain = [('staff_category', 'in', [cat, 'all'])]
+            if self.case_action_track == 'direct_enforce':
+                # Direct managers cannot initiate or enforce Level 1 Dismissal
+                offense_domain.append(('severity_level', '!=', 'level_1'))
+
             return {
                 'domain': {
                     'policy_version_id': [('staff_category', 'in', [cat, 'all'])],
                     'article_id': [('staff_category', 'in', [cat, 'all'])],
-                    'offense_id': [('staff_category', 'in', [cat, 'all'])],
+                    'offense_id': offense_domain,
                 }
             }
+
+    @api.onchange('severity_level_id')
+    def _onchange_severity_level_id(self):
+        cat = self.staff_category or 'non_managerial'
+        res = {'domain': {}}
+        if self.severity_level_id:
+            if self.offense_id and self.offense_id.severity_level_id and self.offense_id.severity_level_id != self.severity_level_id:
+                self.offense_id = False
+            matching_article = self.env['discipline.article'].search([
+                ('severity_level_id', '=', self.severity_level_id.id),
+                ('staff_category', 'in', [cat, 'all']),
+            ], limit=1)
+            if matching_article:
+                self.article_id = matching_article
+                if not self.policy_version_id:
+                    self.policy_version_id = matching_article.policy_version_id
+            offense_domain = [
+                '|',
+                ('severity_level_id', '=', self.severity_level_id.id),
+                ('article_id.severity_level_id', '=', self.severity_level_id.id),
+                ('staff_category', 'in', [cat, 'all'])
+            ]
+            if self.case_action_track == 'direct_enforce':
+                offense_domain.append(('severity_level', '!=', 'level_1'))
+            res['domain']['offense_id'] = offense_domain
+        else:
+            offense_domain = [('staff_category', 'in', [cat, 'all'])]
+            if self.case_action_track == 'direct_enforce':
+                offense_domain.append(('severity_level', '!=', 'level_1'))
+            res['domain']['offense_id'] = offense_domain
+        self._compute_punishment_details()
+        return res
 
     @api.onchange('article_id')
     def _onchange_article_id(self):
@@ -358,7 +407,18 @@ class DisciplineCase(models.Model):
                     self.policy_version_id = self.offense_id.article_id.policy_version_id
             if self.offense_id.severity_level_id:
                 self.severity_level_id = self.offense_id.severity_level_id
-            self._compute_punishment_details()
+            elif self.offense_id.article_id and self.offense_id.article_id.severity_level_id:
+                self.severity_level_id = self.offense_id.article_id.severity_level_id
+            # If Level 5 (Verbal Warning), reset statutory mitigation since it is already the minimum sanction
+            if self.severity_level_id and self.severity_level_id.code == 'level_5':
+                self.is_statutory_mitigation_applied = False
+                self.mitigation_justification = False
+        else:
+            self.severity_level_id = False
+            self.article_id = False
+            self.is_statutory_mitigation_applied = False
+            self.mitigation_justification = False
+        self._compute_punishment_details()
 
     @api.onchange('severity_level_id', 'offense_id', 'employee_id', 'cash_shortage_amount', 'is_statutory_mitigation_applied')
     def _onchange_offense_severity_resolve_rules(self):
@@ -369,7 +429,28 @@ class DisciplineCase(models.Model):
     fine_days = fields.Float(string='Salary Fine (Days)', compute='_compute_punishment_details', store=True, readonly=True, tracking=True)
     property_repair_cost = fields.Float(string='Property Repair / Replacement Cost (ETB)', tracking=True)
     is_managerial = fields.Boolean(string='Is Managerial Employee', related='employee_id.is_managerial', store=True, readonly=True)
-    staff_category_display = fields.Char(string='Staff Category', compute='_compute_staff_category_display', store=True)
+    staff_category = fields.Selection([
+        ('non_managerial', 'Non-Managerial Staff'),
+        ('managerial', 'Managerial Staff'),
+    ], string='Staff Category', compute='_compute_staff_category', store=True)
+    staff_category_display = fields.Char(string='Staff Category', compute='_compute_staff_category', store=True)
+
+    @api.depends('employee_id', 'employee_id.is_managerial', 'employee_id.job_id')
+    def _compute_staff_category(self):
+        for rec in self:
+            emp = rec.employee_id
+            if not emp:
+                rec.staff_category = 'non_managerial'
+                rec.staff_category_display = _('Non-Managerial Staff')
+                continue
+            job_name = (emp.job_id.name or '').lower() if emp.job_id else ''
+            is_mgr = getattr(emp, 'is_managerial', False) or any(kw in job_name for kw in ['manager', 'director', 'chief', 'head', 'vp', 'supervisor'])
+            if is_mgr:
+                rec.staff_category = 'managerial'
+                rec.staff_category_display = _('Managerial Staff')
+            else:
+                rec.staff_category = 'non_managerial'
+                rec.staff_category_display = _('Non-Managerial Staff')
 
     def _default_initiator_type(self):
         user = self.env.user

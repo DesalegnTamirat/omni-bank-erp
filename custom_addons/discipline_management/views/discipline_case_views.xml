@@ -168,37 +168,38 @@
                             <strong>Internal Audit Case:</strong> This case will follow the Disciplinary Committee workflow for investigation, voting, and final decision.
                         </div>
                         <group>
-                            <group string="Employee Information">
+                            <group string="Employee &amp; Organizational Profile">
                                 <field name="subordinate_employee_ids" invisible="1"/>
-                                <field name="employee_id" domain="[('id', 'in', subordinate_employee_ids)] if (case_action_track == 'direct_enforce' and not is_hr_admin) else []" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="reported_by_id" readonly="1"/>
-                                <field name="department_id"/>
-                                <field name="job_id"/>
-                                <field name="work_location_id"/>
+                                <field name="staff_category" invisible="1"/>
+                                <field name="employee_id" string="Subject Employee" domain="[('id', 'in', subordinate_employee_ids)] if (case_action_track == 'direct_enforce' and not is_hr_admin) else []" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="reported_by_id" string="Reporting Manager / Initiator" readonly="1"/>
+                                <field name="department_id" string="Department / Branch Unit"/>
+                                <field name="job_id" string="Job Title"/>
+                                <field name="work_location_id" string="Work Location"/>
+                                <field name="staff_category_display" string="Employment Category" readonly="1"/>
                                 <field name="company_id" groups="base.group_multi_company"/>
                             </group>
                             <group string="Misconduct &amp; Statutory Legal Provision">
-                                <field name="case_action_track" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'initiated')" invisible="not is_director_user and not is_hr_admin"/>
+                                <field name="case_action_track" string="Action Pathway" widget="radio" options="{'horizontal': true}" readonly="state not in ('draft', 'initiated')" invisible="not is_director_user and not is_hr_admin"/>
                                 <field name="allowed_severity_level_ids" invisible="1"/>
                                 <field name="is_cash_shortage" invisible="1"/>
-                                <field name="policy_version_id" invisible="1"/>
-                                <field name="staff_category_display" readonly="1"/>
-                                <field name="article_id" string="Regulatory Article" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="offense_id" string="Offense / Clause" domain="[('article_id', '=?', article_id)]" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="cash_shortage_amount" invisible="not is_cash_shortage" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="legal_article_display" string="Statutory Citation" readonly="1"/>
-                                <field name="occurrence_count" string="Recurrence Level" readonly="1"/>
+                                <field name="severity_level" invisible="1"/>
+                                <field name="incident_date" string="Misconduct Incident Date" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="article_id" invisible="1"/>
+                                <field name="offense_id" string="Misconduct Clause / Offense Definition" domain="[('staff_category', 'in', [staff_category, 'all']), ('severity_level', '!=', 'level_1')] if case_action_track == 'direct_enforce' else [('staff_category', 'in', [staff_category, 'all'])]" options="{'no_create': True, 'no_open': True}" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="severity_level_id" string="Severity Classification" options="{'no_create': True, 'no_open': True}" readonly="1" force_save="1"/>
+                                <field name="cash_shortage_amount" string="Cash Shortage Discrepancy (ETB)" invisible="not is_cash_shortage" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="legal_article_display" string="Formal Legal Citation" readonly="1"/>
+                                <field name="occurrence_count" string="Breach Occurrence (Tier)" readonly="1"/>
                                 <field name="is_escalated_by_active_warning" invisible="1"/>
-                                <field name="is_statutory_mitigation_applied" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="mitigation_justification" invisible="not is_statutory_mitigation_applied" required="is_statutory_mitigation_applied" readonly="state in ('enforced', 'closed', 'revoked')" placeholder="State reasons pursuant to Article 33.13 (e.g. Clean record, 95%+ performance rating, good faith)..."/>
+                                <field name="is_statutory_mitigation_applied" string="Apply Statutory Mitigation (-1 Grade)" invisible="severity_level == 'level_5' or punishment_type == 'verbal_warning' or not severity_level_id" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="mitigation_justification" string="Mitigation Grounds &amp; Justification" invisible="not is_statutory_mitigation_applied or severity_level == 'level_5' or punishment_type == 'verbal_warning'" required="is_statutory_mitigation_applied" readonly="state in ('enforced', 'closed', 'revoked')" placeholder="State statutory reasons (e.g. clean employment record, exemplary performance rating, prompt self-reporting in good faith)..."/>
                                 <field name="offense_category_id" invisible="1"/>
-                                <field name="severity_level_id" domain="[('id', 'in', allowed_severity_level_ids)]" readonly="state in ('enforced', 'closed', 'revoked')" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="punishment_type" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="penalty_percentage" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="fine_days" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="active_duration_days" string="Validity Duration (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
-                                <field name="property_repair_cost" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
-                                <field name="incident_date" readonly="state in ('enforced', 'closed', 'revoked')"/>
+                                <field name="punishment_type" string="Prescribed Disciplinary Measure" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="penalty_percentage" string="Salary Deduction Rate (%)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="fine_days" string="Salary Fine (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="active_duration_days" string="Warning Active Validity (Days)" readonly="1" invisible="case_action_track == 'committee_escalation' and state in ('draft', 'initiated', 'submitted_chief', 'ceo_review', 'investigating')"/>
+                                <field name="property_repair_cost" string="Property Damage / Repair Cost (ETB)" invisible="not offense_id or offense_category_id != 'PRP'" readonly="state in ('enforced', 'closed', 'revoked')"/>
                             </group>
                         </group>
                         <group invisible="state in ('draft', 'initiated')">

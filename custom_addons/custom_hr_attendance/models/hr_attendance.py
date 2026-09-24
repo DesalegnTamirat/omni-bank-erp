@@ -266,13 +266,10 @@ class HrAttendance(models.Model):
                         shift_end = saturday_exit_time
 
             # 2. Build Shift Start & Shift End Datetimes in Local Time
-            start_hour = int(shift_start)
-            start_min = int(round((shift_start - start_hour) * 60))
-            end_hour = int(shift_end)
-            end_min = int(round((shift_end - end_hour) * 60))
-
-            shift_start_dt = check_in_local.replace(hour=start_hour, minute=start_min, second=0, microsecond=0)
-            shift_end_dt = check_in_local.replace(hour=end_hour, minute=end_min, second=0, microsecond=0)
+            start_secs = int(round(float(shift_start) * 3600.0))
+            end_secs = int(round(float(shift_end) * 3600.0))
+            shift_start_dt = check_in_local.replace(hour=(start_secs % 86400) // 3600, minute=((start_secs % 3600) // 60), second=start_secs % 60, microsecond=0)
+            shift_end_dt = check_in_local.replace(hour=(end_secs % 86400) // 3600, minute=((end_secs % 3600) // 60), second=end_secs % 60, microsecond=0)
             if shift_end < shift_start:
                 shift_end_dt += datetime.timedelta(days=1)
 
@@ -591,6 +588,8 @@ class HrAttendance(models.Model):
     # ----------------------------------------------------------
     def _can_acknowledge(self, user):
         """Centralized permission check"""
+        if not user:
+            return False
         return any([
             user.has_group('custom_hr_attendance.group_hr_attendance_job_position_user'),
             user.has_group('custom_hr_attendance.group_hr_attendance_it_driver_user'),
@@ -818,7 +817,7 @@ class HrAttendance(models.Model):
         # Trigger logic if reason or times change
         if any(f in vals for f in ['attendance_reason_ids', 'check_in', 'check_out']):
             for rec in self:
-                if rec.attendance_reason_ids:
+                if rec.sudo().attendance_reason_ids:
                     rec._compute_reason_type()
                     rec._apply_manager_logic()
 
@@ -829,7 +828,7 @@ class HrAttendance(models.Model):
                 if emp_user and emp_user.partner_id:
                     from markupsafe import Markup
                     mgr_name = self.env.user.name
-                    reasons_str = ", ".join(rec.attendance_reason_ids.mapped('name')) if rec.attendance_reason_ids else "N/A"
+                    reasons_str = ", ".join(rec.sudo().attendance_reason_ids.mapped('name')) if rec.sudo().attendance_reason_ids else "N/A"
                     c_date_str = rec.check_in.strftime('%Y-%m-%d') if rec.check_in else ''
                     body = Markup(
                         f"ℹ️ <b>Attendance Exception Acknowledged</b><br/>"

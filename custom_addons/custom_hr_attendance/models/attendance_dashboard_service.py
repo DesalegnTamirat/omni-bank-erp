@@ -652,12 +652,10 @@ class HrAttendanceDashboardService(models.Model):
             l_dur = sh.get('lunch_duration', 1.0) if has_l else 0.0
             l_end = l_out + l_dur
 
-            start_h = int(s_s)
-            start_m = int(round((s_s - start_h) * 60))
-            end_h = int(s_e)
-            end_m = int(round((s_e - end_h) * 60))
-            s_start_dt = dt_in_loc.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
-            s_end_dt = dt_in_loc.replace(hour=end_h, minute=end_m, second=0, microsecond=0)
+            start_secs = int(round(float(s_s) * 3600.0))
+            end_secs = int(round(float(s_e) * 3600.0))
+            s_start_dt = dt_in_loc.replace(hour=(start_secs % 86400) // 3600, minute=((start_secs % 3600) // 60), second=start_secs % 60, microsecond=0)
+            s_end_dt = dt_in_loc.replace(hour=(end_secs % 86400) // 3600, minute=((end_secs % 3600) // 60), second=end_secs % 60, microsecond=0)
             if s_e < s_s:
                 s_end_dt += datetime.timedelta(days=1)
 
@@ -749,12 +747,18 @@ class HrAttendanceDashboardService(models.Model):
                 m_end = d_shift.get('lunch_out_time', 12.0) if d_shift else 12.0
                 a_end = d_shift.get('end_time', 17.0) if d_shift else 17.0
 
+                def _att_dt_float(dt_val):
+                    if not dt_val:
+                        return 0.0
+                    ts = pytz.utc.localize(dt_val).astimezone(local_tz) if dt_val.tzinfo is None else dt_val.astimezone(local_tz)
+                    return ts.hour + ts.minute / 60.0 + ts.second / 3600.0
+
                 if cur_d < today:
                     if not d_atts:
                         full_day_absent += 1
                     elif d_shift and d_shift.get('has_lunch_break'):
-                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
-                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and _att_dt_float(a.check_in) < (m_end - 0.01)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and _att_dt_float(a.check_in) >= (m_end - 0.01)) for a in d_atts if a.check_in)
                         if not has_morning: missed_sessions_count += 1
                         if not has_afternoon: missed_sessions_count += 1
                 elif cur_d == today:
@@ -765,8 +769,8 @@ class HrAttendanceDashboardService(models.Model):
                         elif d_shift and d_shift.get('has_lunch_break') and current_float >= m_end:
                             missed_sessions_count += 1
                     elif d_shift and d_shift.get('has_lunch_break'):
-                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour < int(m_end)) for a in d_atts if a.check_in)
-                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and pytz.utc.localize(a.check_in).astimezone(local_tz).hour >= int(m_end)) for a in d_atts if a.check_in)
+                        has_morning = any(a.shift_end_float <= (m_end + 0.1) or (a.check_in and _att_dt_float(a.check_in) < (m_end - 0.01)) for a in d_atts if a.check_in)
+                        has_afternoon = any(a.shift_start_float >= (m_end - 0.1) or (a.check_in and _att_dt_float(a.check_in) >= (m_end - 0.01)) for a in d_atts if a.check_in)
                         if not has_morning and current_float >= m_end: missed_sessions_count += 1
                         if not has_afternoon and current_float >= a_end: missed_sessions_count += 1
 

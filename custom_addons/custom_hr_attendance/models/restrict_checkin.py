@@ -134,7 +134,7 @@ class HrEmployeePrivate(models.Model):
                 }
 
         # 1. Roster Exception (Date-Based)
-        roster_exceptions = self.env['job.position.roster.exception'].search([
+        roster_exceptions = self.env['job.position.roster.exception'].sudo().search([
             ('employee_id', '=', self.id),
             ('status', '=', 'active'),
             ('active', '=', True),
@@ -172,7 +172,7 @@ class HrEmployeePrivate(models.Model):
                     }
 
         # 2. Job Position Exception (Static)
-        job_exceptions = self.env['job.position.exception'].search([
+        job_exceptions = self.env['job.position.exception'].sudo().search([
             ('employee_id', '=', self.id), ('status', '=', 'active'),
             ('active', '=', True),
             ('start_date', '<=', target_date),
@@ -201,7 +201,7 @@ class HrEmployeePrivate(models.Model):
             ou_ids = [self.default_operating_unit_id.id]
             if hasattr(self.default_operating_unit_id, 'parent_unit') and self.default_operating_unit_id.parent_unit:
                 ou_ids.append(self.default_operating_unit_id.parent_unit.id)
-            location_exceptions = self.env['location.based.exception'].search([
+            location_exceptions = self.env['location.based.exception'].sudo().search([
                 '|', ('operating_unit_ids', 'in', ou_ids),
                      ('operating_unit', 'in', ou_ids),
                 ('active', '=', True),
@@ -556,7 +556,8 @@ class HrEmployeePrivate(models.Model):
             morning_e = sched['lunch_start']
             afternoon_s = sched['lunch_end']
             afternoon_e = sched['shift_end']
-            afternoon_buffer_start = afternoon_s - 0.25  # Fixed 15 min buffer before afternoon start
+            lunch_gap = max(0.0, afternoon_s - morning_e)
+            afternoon_buffer_start = max(morning_e, afternoon_s - min(0.25, lunch_gap / 2.0))
 
             if current_float >= afternoon_e:
                 if enable_checkin_restriction and not is_manager:
@@ -678,7 +679,7 @@ class HrEmployeePrivate(models.Model):
             local_tz = pytz.timezone(tz_name)
         except Exception:
             local_tz = pytz.timezone('Africa/Addis_Ababa')
-        utc_dt = fields.Datetime.now()
+        utc_dt = self.env.context.get('mock_now_utc') or fields.Datetime.now()
         local_dt = pytz.utc.localize(utc_dt).astimezone(local_tz)
         current_float = local_dt.hour + (local_dt.minute / 60.0) + (local_dt.second / 3600.0)
         return local_dt, current_float, local_dt.date()
@@ -728,18 +729,16 @@ class HrEmployeePrivate(models.Model):
             local_tz = pytz.timezone(tz_name)
         except Exception:
             local_tz = pytz.timezone('Africa/Addis_Ababa')
-        h = int(float_hour)
-        m = int(round((float_hour - h) * 60))
-        s = int(round(((float_hour - h) * 60 - m) * 60))
-        if s >= 60:
-            m += 1
-            s = 0
-        if m >= 60:
-            h += 1
-            m = 0
+        total_seconds = int(round(float(float_hour) * 3600.0))
+        days = total_seconds // 86400
+        rem_seconds = total_seconds % 86400
+        h = rem_seconds // 3600
+        m = (rem_seconds % 3600) // 60
+        s = rem_seconds % 60
         local_target = local_dt.replace(hour=h, minute=m, second=s, microsecond=0)
-        if is_next_day:
-            local_target += datetime.timedelta(days=1)
+        extra_days = (1 if is_next_day else 0) + days
+        if extra_days:
+            local_target += datetime.timedelta(days=extra_days)
         utc_target = local_tz.localize(local_target.replace(tzinfo=None)).astimezone(pytz.utc)
         return utc_target.replace(tzinfo=None)
 
@@ -770,7 +769,7 @@ class HrEmployeePrivate(models.Model):
         predefined_late, predefined_early_exit = self._get_predefined_attendance(today_date, current_float)
         min_work_hour = self._get_min_work_hour()
 
-        utc_naive_dt = fields.Datetime.now()
+        utc_naive_dt = self.env.context.get('mock_now_utc') or fields.Datetime.now()
         sched = self._resolve_employee_full_schedule(current_float=current_float, target_date=today_date)
 
         open_attendance = self.env['hr.attendance'].search([
@@ -830,15 +829,22 @@ class HrEmployeePrivate(models.Model):
         if open_attendance:
             attendance = open_attendance
 
+            def _att_in_hour(a):
+                if not a.check_in:
+                    return 0.0
+                ts = fields.Datetime.context_timestamp(self, a.check_in)
+                return ts.hour + ts.minute / 60.0 + ts.second / 3600.0
+
             # Check if this open attendance is a Morning Session of a lunch-split shift
             is_morning_session = sched['has_lunch'] and (
                 (attendance.shift_end_float and attendance.shift_end_float <= (sched['lunch_start'] + 0.1)) or
-                (attendance.check_in and fields.Datetime.context_timestamp(self, attendance.check_in).hour < int(sched['lunch_start']))
+                (attendance.check_in and _att_in_hour(attendance) < (sched['lunch_start'] - 0.01))
             )
             if is_morning_session:
                 lunch_start = sched['lunch_start']
                 afternoon_start = sched['lunch_end']
-                afternoon_buffer_start = afternoon_start - 0.25  # 15 min buffer before afternoon start
+                lunch_gap = max(0.0, afternoon_start - lunch_start)
+                afternoon_buffer_start = max(lunch_start, afternoon_start - min(0.25, lunch_gap / 2.0))
                 afternoon_late_cutoff = afternoon_start + dead_time
 
                 if current_float < (lunch_start - 0.05):
@@ -965,9 +971,11 @@ class HrEmployeePrivate(models.Model):
             )
             is_night = (shift_end <= shift_start)
             shift_start_utc = self._float_to_utc_datetime(shift_start, local_dt)
-            shift_end_utc = self._float_to_utc_datetime(shift_end, local_dt, is_next_day=is_night)
-
-            is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= (sched['lunch_end'] - 0.25))
+            lunch_start_val = sched.get('lunch_start', 12.0)
+            lunch_end_val = sched.get('lunch_end', 13.0)
+            lunch_gap = max(0.0, lunch_end_val - lunch_start_val)
+            afternoon_buf_start = max(lunch_start_val, lunch_end_val - min(0.25, lunch_gap / 2.0))
+            is_afternoon_checkin = bool(sched['has_lunch'] and current_float >= afternoon_buf_start)
 
             status, late_time, ot, pre_late = self._evaluate_checkin_status(
                 current_float, shift_start, dead_time, predefined_late,
@@ -996,7 +1004,8 @@ class HrEmployeePrivate(models.Model):
                 tracking_disable=True,
                 mail_create_nosubscribe=True,
                 mail_create_nolog=True,
-                mail_notrack=True
+                mail_notrack=True,
+                skip_duplicate_check=True,
             )
             attendance = fast_att_env.create(vals)
             attendance._enqueue_attendance_side_effects()

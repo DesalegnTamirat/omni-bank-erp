@@ -98,9 +98,7 @@ class HrAttendance(models.Model):
 
                 existing = self.env['discipline.case'].search([
                     ('employee_id', '=', emp.id),
-                    ('offense_id', '=', offense.id),
                     ('state', 'in', ['draft', 'initiated']),
-                    ('is_system_generated', '=', True)
                 ], limit=1)
 
                 if not existing:
