@@ -78,12 +78,23 @@ class KmsDocumentController(http.Controller):
             except Exception as e:
                 _logger.error("Error applying watermark to doc %s: %s", doc.id, e)
 
+        # Determine active session ID or explicit token for session-binding (FR-KMS-016)
+        session_id = None
+        if hasattr(request, 'session') and request.session:
+            session_id = getattr(request.session, 'sid', None)
+        req_headers = getattr(request.httprequest, 'headers', None)
+        header_token = req_headers.get('X-KMS-Token') if hasattr(req_headers, 'get') else None
+        token = kwargs.get('token') or header_token or session_id
+
         # Apply Session-Bound Symmetric Encryption (FR-KMS-016 & FR-KMS-015 non-PDF protection)
-        # Non-PDF files are always encrypted so they cannot be released unprotected;
-        # PDF files are encrypted if require_encryption is True, if classification is confidential/restricted, or requested.
+        # Note on office document watermarking (FR-KMS-015):
+        # Dynamic visual watermarking operates on PDF vector streams via reportlab/pypdf.
+        # For non-PDF binary office files (.docx, .xlsx, .pptx), full session-bound encryption
+        # is strictly enforced (is_encrypted = True) so that office binaries can never leave the bank
+        # server in an unprotected raw state.
         is_encrypted = doc.require_encryption or (not doc.is_pdf) or (doc.classification in ('confidential', 'restricted')) or (kwargs.get('encrypt') == '1')
         if is_encrypted:
-            raw_bytes = encrypt_document_data(raw_bytes, doc.id, user.id)
+            raw_bytes = encrypt_document_data(raw_bytes, doc.id, user.id, session_id=token, env=request.env)
             if not filename.endswith('.enc'):
                 filename = f"{filename}.enc"
             mimetype = 'application/octet-stream'
@@ -124,8 +135,17 @@ class KmsDocumentController(http.Controller):
 
         # If an encrypted payload was sent to the viewer or decrypt route was requested
         if request.httprequest.data:
+            session_id = None
+            if hasattr(request, 'session') and request.session:
+                session_id = getattr(request.session, 'sid', None)
+            req_headers = getattr(request.httprequest, 'headers', None)
+            header_token = req_headers.get('X-KMS-Token') if hasattr(req_headers, 'get') else None
+            token = kwargs.get('token') or header_token or session_id
             try:
-                raw_bytes = decrypt_document_data(request.httprequest.data, doc.id, user.id)
+                raw_bytes = decrypt_document_data(
+                    request.httprequest.data, doc.id, user.id,
+                    session_id=token, env=request.env
+                )
             except Exception as e:
                 _logger.warning("Failed to decrypt user-supplied payload: %s", e)
                 return request.render('http_routing.403', {'message': _('Decryption failed: Token invalid or session mismatch.')})

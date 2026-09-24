@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -187,8 +188,8 @@ class CompetencyProficiencyLevel(models.Model):
                     })
                     if rec.competency_id:
                         rec.competency_id.message_post(
-                            body=_("Proficiency Level %s definition updated by %s.<br/><b>Old:</b> %s<br/><b>New:</b> %s") % (
-                                rec.level, self.env.user.name, old_def, new_def
+                            body=Markup(_("Proficiency Level %s definition updated by %s.<br/><b>Old:</b> %s<br/><b>New:</b> %s")) % (
+                                escape(str(rec.level or '')), escape(self.env.user.name or ''), escape(old_def or ''), escape(new_def or '')
                             )
                         )
         return super().write(vals)
@@ -476,18 +477,18 @@ class Competency(models.Model):
                     'state': 'retired',
                     'active': False,
                 })
-                old.message_post(body=_(
+                old.message_post(body=Markup(_(
                     "Superseded and retired by new approved version <b>%s</b> on %s."
-                ) % (rec.version, fields.Date.today()))
+                )) % (escape(rec.version or ''), escape(str(fields.Date.today()))))
 
             rec.write({'state': 'approved', 'active': True})
             if old_versions:
-                rec.message_post(body=_(
+                rec.message_post(body=Markup(_(
                     "Approved as active version <b>%s</b>, superseding previous version(s) (%s). "
                     "All active role mappings and clusters have been migrated to this version."
-                ) % (rec.version, ", ".join(old_versions.mapped('version'))))
+                )) % (escape(rec.version or ''), escape(", ".join(old_versions.mapped('version')))))
             else:
-                rec.message_post(body=_("Competency approved as active version <b>%s</b>.") % rec.version)
+                rec.message_post(body=Markup(_("Competency approved as active version <b>%s</b>.")) % escape(rec.version or ''))
 
     def action_retire(self):
         """Retire/inactivate competency and auto-disappear from clusters & job mappings."""

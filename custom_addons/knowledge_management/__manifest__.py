@@ -54,4 +54,5 @@ Operationalizes BRD Part 3 Module 1 requirements for institutional knowledge man
     'installable': True,
     'application': True,
     'auto_install': False,
+    'post_init_hook': '_kms_post_init_hook',
 }

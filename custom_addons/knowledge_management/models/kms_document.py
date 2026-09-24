@@ -264,9 +264,10 @@ class KmsDocument(models.Model):
             rec.message_post(body=_('Document approved and published to the active repository.'))
             rec._log_audit_action('approve', f'Approved version {rec.version}')
             # Award points to content owner
-            if rec.owner_id and rec.owner_id.user_id:
+            owner = rec.sudo().owner_id
+            if owner and owner.user_id:
                 self.env['kms.contributor.point'].award_points(
-                    rec.owner_id.user_id,
+                    owner.user_id,
                     points=20,
                     source='document_publish',
                     description=f'Published approved document: {rec.name} ({rec.code})'

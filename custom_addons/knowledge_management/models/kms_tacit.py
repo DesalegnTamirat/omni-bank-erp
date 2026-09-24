@@ -268,9 +268,10 @@ class KmsMentoringTrack(models.Model):
                 'actual_end_date': fields.Date.context_today(self),
             })
             rec.message_post(body=_('Mentoring and knowledge transfer cycle successfully concluded and signed off.'))
-            if rec.mentor_id and rec.mentor_id.user_id:
+            mentor = rec.sudo().mentor_id
+            if mentor and mentor.user_id:
                 self.env['kms.contributor.point'].award_points(
-                    rec.mentor_id.user_id,
+                    mentor.user_id,
                     points=25,
                     source='mentoring_signoff',
                     description=f'Completed knowledge transfer mentoring for {rec.mentee_id.name}'

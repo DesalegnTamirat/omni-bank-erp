@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 
 
@@ -29,11 +30,11 @@ class CompetencyDataValidator(models.Model):
         if unmapped_jobs:
             admin_group = self.env.ref('competency_management.group_competency_admin', raise_if_not_found=False)
             admins = admin_group.user_ids if admin_group else self.env['res.users']
-            body = _(
+            body = Markup(_(
                 "<b>Competency Data Quality Audit Report</b><br/>"
                 "• Active Roles Missing Approved Mapping (%s): %s"
-            ) % (
-                len(unmapped_jobs), ", ".join(unmapped_jobs[:10]) or "None"
+            )) % (
+                len(unmapped_jobs), escape(", ".join(unmapped_jobs[:10]) or "None")
             )
             for admin in admins:
                 self.env['mail.thread'].message_notify(

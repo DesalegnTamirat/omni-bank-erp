@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError, AccessError
 
@@ -134,12 +135,12 @@ class CompetencyAssessmentCycle(models.Model):
                         emp_names_str = ", ".join(names_clean[:5])
                         extra = _(" and %d more") % (len(names_clean) - 5) if len(names_clean) > 5 else ""
 
-                        msg_body = _(
-                            "⚠️ <strong>Competency Assessment Deadline Warning:</strong><br/>"
-                            "You have %d pending competency assessment(s) assigned to you for cycle '<strong>%s</strong>' "
+                        msg_body = Markup(_(
+                            "⚠️ <b>Competency Assessment Deadline Warning:</b><br/>"
+                            "You have %d pending competency assessment(s) assigned to you for cycle '<b>%s</b>' "
                             "(Assessments for: %s%s).<br/>"
-                            "The submission deadline is <strong>%s</strong>. Please complete and submit your assessments before the deadline."
-                        ) % (pending_count, cycle_name, emp_names_str, extra, deadline_str)
+                            "The submission deadline is <b>%s</b>. Please complete and submit your assessments before the deadline."
+                        )) % (pending_count, escape(cycle_name or ''), escape(emp_names_str or ''), escape(extra or ''), escape(deadline_str or ''))
 
                         summary_str = _("URGENT: %d Pending Assessment(s) Due %s") % (pending_count, deadline_str)
                         note_str = _("You have %d pending assessment(s) for cycle '%s'. Deadline: %s.") % (pending_count, cycle_name, deadline_str)
@@ -253,13 +254,13 @@ class CompetencyAssessmentCycle(models.Model):
 
                         details_str = ", ".join(details) if details else (_("%d Evaluation(s)") % total_pending)
 
-                        msg_body = _(
-                            "📢 <strong>Competency Assessment Campaign Open: %s</strong><br/>"
-                            "Assessment Cycle '<strong>%s</strong>' is now open for evaluation.<br/>"
-                            "Please navigate to <strong>Competency Management → Assessments → My Competency Assessments</strong> to complete your evaluations.<br/>"
-                            "<strong>Assigned to you:</strong> %s.<br/>"
-                            "<strong>Submission Deadline:</strong> %s."
-                        ) % (cycle_name, cycle_name, details_str, deadline_str)
+                        msg_body = Markup(_(
+                            "📢 <b>Competency Assessment Campaign Open: %s</b><br/>"
+                            "Assessment Cycle '<b>%s</b>' is now open for evaluation.<br/>"
+                            "Please navigate to <b>Competency Management → Assessments → My Competency Assessments</b> to complete your evaluations.<br/>"
+                            "<b>Assigned to you:</b> %s.<br/>"
+                            "<b>Submission Deadline:</b> %s."
+                        )) % (escape(cycle_name or ''), escape(cycle_name or ''), escape(details_str or ''), escape(deadline_str or ''))
 
                         summary_str = _("Fill Competency Assessment: %s") % cycle_name
                         note_str = _("Assessment cycle '%s' is open. Please complete your evaluations (%s) on the My Competency Assessments page by %s.") % (
@@ -691,9 +692,9 @@ class CompetencyAssessmentCycle(models.Model):
         # Post single summary announcement on Cycle Chatter
         deadline_str = self.assessment_deadline.strftime('%b %d, %Y') if self.assessment_deadline else _('Not set')
         self.message_post(
-            body=_(
-                "Assessment cycle <strong>%s</strong> opened. Successfully generated <strong>%d</strong> 360-degree evaluations for %d employees. Submission Deadline: <strong>%s</strong>."
-            ) % (self.name, len(assessments_to_create), len(active_employees), deadline_str)
+            body=Markup(_(
+                "Assessment cycle <b>%s</b> opened. Successfully generated <b>%d</b> 360-degree evaluations for %d employees. Submission Deadline: <b>%s</b>."
+            )) % (escape(self.name or ''), len(assessments_to_create), len(active_employees), escape(deadline_str or ''))
         )
         self.env.cr.commit()
 
@@ -1762,9 +1763,9 @@ class CompetencyAssessment(models.Model):
             'override_date': fields.Datetime.now(),
         })
         self.message_post(
-            body=_(
-                "⚠️ <strong>Administrative Override Activated</strong> by %s. Rating inputs have been unlocked for authorized adjustment."
-            ) % user.name,
+            body=Markup(_(
+                "⚠️ <b>Administrative Override Activated</b> by %s. Rating inputs have been unlocked for authorized adjustment."
+            )) % escape(user.name or ''),
             subtype_xmlid='mail.mt_comment'
         )
         return True
@@ -1782,9 +1783,9 @@ class CompetencyAssessment(models.Model):
             'override_date': False,
         })
         self.message_post(
-            body=_(
-                "🔒 <strong>Administrative Override Locked</strong> by %s. Rating inputs are now protected."
-            ) % user.name,
+            body=Markup(_(
+                "🔒 <b>Administrative Override Locked</b> by %s. Rating inputs are now protected."
+            )) % escape(user.name or ''),
             subtype_xmlid='mail.mt_comment'
         )
         return True
@@ -1923,9 +1924,9 @@ class CompetencyAssessment(models.Model):
                 or self.env.su
             )
             if is_admin and assessor_user and current_user != assessor_user:
-                rec.sudo().message_post(body=_(
-                    'Assessment %s submitted by Administrator <strong>%s</strong> on behalf of <strong>%s</strong>.'
-                ) % (rec.name, current_user.name, assessor_user.name or (rec.employee_id.name if rec.employee_id else 'Employee')))
+                rec.sudo().message_post(body=Markup(_(
+                    'Assessment %s submitted by Administrator <b>%s</b> on behalf of <b>%s</b>.'
+                )) % (escape(rec.name or ''), escape(current_user.name or ''), escape(assessor_user.name or (rec.employee_id.name if rec.employee_id else 'Employee'))))
             else:
                 rec.sudo().message_post(body=_('Assessment %s submitted for review.') % rec.name)
 
@@ -1957,8 +1958,8 @@ class CompetencyAssessment(models.Model):
                         coach_user = sup_asm.assessor_id
 
                 if coach_user:
-                    msg_text = _("📥 Subordinate Employee <strong>%s</strong> has completed and submitted their Self-Assessment for cycle '<strong>%s</strong>'.") % (
-                        rec.employee_id.name, rec.cycle_id.name if rec.cycle_id else ''
+                    msg_text = Markup(_("📥 Subordinate Employee <b>%s</b> has completed and submitted their Self-Assessment for cycle '<b>%s</b>'.")) % (
+                        escape(rec.employee_id.name or ''), escape(rec.cycle_id.name if rec.cycle_id else '')
                     )
                     summary_str = _('Subordinate Self-Assessment Submitted: %s') % rec.employee_id.name
                     note_str = _('Employee %s has submitted their self-assessment for cycle %s. You may now evaluate.') % (
@@ -1979,8 +1980,8 @@ class CompetencyAssessment(models.Model):
                     ], limit=1)
 
                 coach_name = rec.assessor_id.name if rec.assessor_id else _("Supervisor/Coach")
-                msg_text = _("✅ Your supervisor/coach (<strong>%s</strong>) has completed and submitted your competency assessment for cycle '<strong>%s</strong>'.") % (
-                    coach_name, rec.cycle_id.name if rec.cycle_id else ''
+                msg_text = Markup(_("✅ Your supervisor/coach (<b>%s</b>) has completed and submitted your competency assessment for cycle '<b>%s</b>'.")) % (
+                    escape(coach_name or ''), escape(rec.cycle_id.name if rec.cycle_id else '')
                 )
                 summary_str = _('Supervisor Assessment Completed: %s') % coach_name
                 note_str = _('Your supervisor/coach (%s) has completed and submitted your competency assessment for cycle \'%s\'.') % (
@@ -1995,8 +1996,8 @@ class CompetencyAssessment(models.Model):
                 # Employee submitted assessment for boss / coach
                 boss_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if boss_user:
-                    msg_text = _("📥 A subordinate evaluation has been completed and submitted for cycle '<strong>%s</strong>'.") % (
-                        rec.cycle_id.name if rec.cycle_id else ''
+                    msg_text = Markup(_("📥 A subordinate evaluation has been completed and submitted for cycle '<b>%s</b>'.")) % (
+                        escape(rec.cycle_id.name if rec.cycle_id else '')
                     )
                     summary_str = _('Subordinate Evaluation Submitted: %s') % rec.name
                     note_str = _('A subordinate evaluation has been submitted for cycle %s.') % (
@@ -2007,8 +2008,8 @@ class CompetencyAssessment(models.Model):
             elif rec.assessment_type == 'peer':
                 peer_user = rec.sudo().employee_id.user_id if (rec.employee_id and rec.sudo().employee_id.user_id) else False
                 if peer_user:
-                    msg_text = _("📥 A peer evaluation has been completed and submitted for cycle '<strong>%s</strong>'.") % (
-                        rec.cycle_id.name if rec.cycle_id else ''
+                    msg_text = Markup(_("📥 A peer evaluation has been completed and submitted for cycle '<b>%s</b>'.")) % (
+                        escape(rec.cycle_id.name if rec.cycle_id else '')
                     )
                     summary_str = _('Peer Evaluation Submitted: %s') % rec.name
                     note_str = _('A peer evaluation has been submitted for cycle %s.') % (

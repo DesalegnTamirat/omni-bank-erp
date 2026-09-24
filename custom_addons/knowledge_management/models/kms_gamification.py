@@ -22,6 +22,7 @@ class KmsContributorPoint(models.Model):
         ('lesson_learned', 'Validated Lesson Learned Contributed (+10)'),
         ('accepted_answer', 'Accepted Forum Solution (+10)'),
         ('answer_upvote', 'Peer Upvote on Knowledge Answer (+1)'),
+        ('mentoring_signoff', 'Mentoring Cycle Concluded (+25)'),
         ('manual_award', 'Special Recognition Award'),
     ], string='Contribution Event', required=True)
     description = fields.Char(string='Activity Description')
@@ -96,22 +97,25 @@ class KmsMonthlyRecognition(models.Model):
         first_day_prev_month = (today - relativedelta(months=1)).replace(day=1)
         last_day_prev_month = today.replace(day=1) - relativedelta(days=1)
 
-        # Query point sums for prev month
-        points = self.env['kms.contributor.point'].read_group(
-            [('date_earned', '>=', first_day_prev_month), ('date_earned', '<=', last_day_prev_month)],
-            ['employee_id', 'points:sum'],
-            ['employee_id'],
-            orderby='points desc',
+        domain = [
+            ('date_earned', '>=', first_day_prev_month),
+            ('date_earned', '<=', last_day_prev_month),
+            ('employee_id', '!=', False)
+        ]
+        groups = self.env['kms.contributor.point']._read_group(
+            domain=domain,
+            groupby=['employee_id'],
+            aggregates=['points:sum'],
+            order='points:sum desc',
             limit=1
         )
-        if points and points[0].get('employee_id'):
-            emp_id = points[0]['employee_id'][0]
-            total_pts = points[0]['points']
-            emp = self.env['hr.employee'].browse(emp_id)
-            self.create({
-                'period_date': first_day_prev_month,
-                'employee_id': emp_id,
-                'points_total': total_pts,
-                'citation': _('Awarded Best Contributor of the Month for outstanding contributions to Bunna Bank institutional knowledge base with %d points.') % total_pts,
-                'badge': 'gold',
-            })
+        if groups:
+            employee, total_pts = groups[0]
+            if employee:
+                self.create({
+                    'period_date': first_day_prev_month,
+                    'employee_id': employee.id,
+                    'points_total': int(total_pts or 0),
+                    'citation': _('Awarded Best Contributor of the Month for outstanding contributions to Bunna Bank institutional knowledge base with %d points.') % int(total_pts or 0),
+                    'badge': 'gold',
+                })

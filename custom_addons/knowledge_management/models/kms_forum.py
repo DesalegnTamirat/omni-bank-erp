@@ -123,9 +123,10 @@ class KmsForumPost(models.Model):
             except Exception:
                 pass
             # Award points to author of accepted answer
-            if rec.author_id and rec.author_id.user_id:
+            author = rec.sudo().author_id
+            if author and author.user_id:
                 self.env['kms.contributor.point'].award_points(
-                    rec.author_id.user_id,
+                    author.user_id,
                     points=10,
                     source='accepted_answer',
                     description=f'Provided accepted solution on topic: {rec.topic_id.name}'
