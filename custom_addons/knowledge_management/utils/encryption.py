@@ -58,7 +58,6 @@ def encrypt_document_data(raw_bytes, doc_id, user_id, secret=None, session_id=No
     """
     secret = secret or get_kms_server_secret(env)
     key = derive_symmetric_key(doc_id, user_id, secret, session_id, env=env)
-    print(f"[KMS_SEC_DEBUG] ENCRYPT doc_id={doc_id} user_id={user_id} session_id={session_id} secret={secret[:8]}... key={key}")
     fernet = Fernet(key)
     return fernet.encrypt(raw_bytes)
 
@@ -71,7 +70,6 @@ def decrypt_document_data(encrypted_bytes, doc_id, user_id, secret=None, session
     """
     secret = secret or get_kms_server_secret(env)
     key = derive_symmetric_key(doc_id, user_id, secret, session_id, env=env)
-    print(f"[KMS_SEC_DEBUG] DECRYPT doc_id={doc_id} user_id={user_id} session_id={session_id} secret={secret[:8]}... key={key}")
     fernet = Fernet(key)
     # Fernet.decrypt(token, ttl=...) verifies token timestamp <= max_age_seconds
     return fernet.decrypt(encrypted_bytes, ttl=max_age_seconds)

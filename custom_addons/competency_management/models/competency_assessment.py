@@ -1473,7 +1473,16 @@ class CompetencyAssessment(models.Model):
                     rec.sudo()._do_populate_lines()
                 except Exception:
                     pass
-        return super().web_read(specification)
+
+        # Enforce competency.assessment's own row-level rules first (assessor_id = user,
+        # supervisor/team rules, officer-sees-all) — unchanged, still blocks anyone not
+        # entitled to view this specific assessment.
+        self.check_access_rule('read')
+
+        # Only once that passes: read with elevated rights so a linked boss/peer
+        # employee_id (or any other hr.employee-linked field on this assessment) can be
+        # displayed, without widening hr.employee access anywhere else in the system.
+        return super(CompetencyAssessment, self.sudo()).web_read(specification)
 
 
     @api.model
@@ -2726,7 +2735,7 @@ class CompetencyAssessmentLine(models.Model):
             if asm.is_anonymous and asm.assessment_type in ('peer', 'subordinate'):
                 r_name = _("Anonymous 360 Rater (%s)") % asm.assessment_type.capitalize()
             elif assessor_emp:
-                r_name = assessor_emp.name
+                r_name = assessor_emp.sudo().name
             elif assessor:
                 r_name = assessor.name
             else:

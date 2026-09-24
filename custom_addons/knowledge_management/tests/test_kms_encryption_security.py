@@ -61,9 +61,13 @@ class TestKmsEncryptionSecurity(TransactionCase):
             ])],
         })
 
-        cls.category = cls.KmsCategory.create({'name': 'Security Policies', 'code': 'SEC-POL'})
-        cls.doc_type = cls.KmsDocType.create({'name': 'Security SOP', 'code': 'SOP-SEC'})
-        cls.class_confidential = cls.KmsClassification.create({'name': 'Confidential', 'code': 'CONF', 'level': 3})
+        cls.category = cls.KmsCategory.search([('code', '=', 'SEC-POL')], limit=1) or cls.KmsCategory.create({'name': 'Security Policies', 'code': 'SEC-POL'})
+        cls.doc_type = cls.KmsDocType.search([('code', '=', 'SOP-SEC')], limit=1) or cls.KmsDocType.create({'name': 'Security SOP', 'code': 'SOP-SEC'})
+        cls.class_confidential = cls.KmsClassification.search([('code', '=', 'CONF')], limit=1)
+        if not cls.class_confidential:
+            cls.class_confidential = cls.KmsClassification.create({'name': 'Confidential', 'code': 'CONF', 'security_level': 3})
+        else:
+            cls.class_confidential.write({'security_level': 3, 'watermark_mandatory': True})
 
     def test_01_ir_config_parameter_secret_generation_and_persistence(self):
         """FR-KMS-016: Server secret is read from ir.config_parameter and never hardcoded in source."""

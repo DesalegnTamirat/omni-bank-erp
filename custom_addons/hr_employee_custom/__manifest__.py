@@ -145,6 +145,7 @@
     'assets': {
         'web.assets_backend': [
             'hr_employee_custom/static/src/css/hr_employee_custom.css',
+            'hr_employee_custom/static/src/js/idle_logout.js',
         ],
     },
     'installable': True,

@@ -70,7 +70,18 @@
             <field name="name">HR Employee: Strict Hierarchy Access</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
             <field name="groups" eval="[(4, ref('base.group_user'))]"/>
-            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('id', 'child_of', user.employee_id.id), ('coach_id', '=', user.employee_id.id), ('parent_id', '=', user.employee_id.id), ('id', 'in', user.employee_id._get_delegated_subordinate_ids())]</field>
+            <field name="domain_force">[('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_public_visible_via_delegation" model="ir.rule">
+            <field name="name">HR Employee Public: Strict Hierarchy Access</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
             <field name="perm_read" eval="1"/>
             <field name="perm_write" eval="0"/>
             <field name="perm_create" eval="0"/>

@@ -1160,12 +1160,5 @@
             </field>
         </record>
 
-        <!-- ================================================================
-             Restrict Employee Directory to Self and Reporting Hierarchy
-        ================================================================ -->
-        <record id="hr.open_view_employee_list_my" model="ir.actions.act_window">
-            <field name="domain">['|', '|', '|', '|', '|', '|', '|', ('user_id', '=', uid), ('parent_id.user_id', '=', uid), ('coach_id.user_id', '=', uid), ('parent_id.parent_id.user_id', '=', uid), ('coach_id.coach_id.user_id', '=', uid), ('parent_id.coach_id.user_id', '=', uid), ('coach_id.parent_id.user_id', '=', uid), ('parent_id.parent_id.parent_id.user_id', '=', uid)]</field>
-        </record>
-
     </data>
 </odoo>

@@ -33,9 +33,9 @@
      ====================================================== -->
 
      <!-- Restore "No" placeholder so standard employees show "No" / empty selection -->
-     <record id="hr.res_groups_privilege_employees" model="res.groups.privilege">
-         <field name="placeholder">No</field>
-     </record>
+<!--     <record id="hr.res_groups_privilege_employees" model="res.groups.privilege">-->
+<!--         <field name="placeholder">No</field>-->
+<!--     </record>-->
 
      <!-- Ensure group_hr_employee_user has no privilege_id so it is removed from the Employees dropdown -->
      <record id="group_hr_employee_user" model="res.groups">

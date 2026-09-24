@@ -76,7 +76,7 @@ class HrEmployeeDelegationCancelWizard(models.TransientModel):
             'tag': 'display_notification',
             'params': {
                 'title': _("Delegation Cancelled"),
-                'message': _("Delegation %s has been cancelled and notifications sent to the delegate and stakeholders.") % delegation.name,
+                'message': _("Delegation %s has been cancelled and notifications sent to the delegate and notified employees.") % delegation.name,
                 'type': 'warning',
                 'sticky': False,
                 'next': {'type': 'ir.actions.client', 'tag': 'soft_reload'},

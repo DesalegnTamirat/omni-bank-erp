@@ -134,7 +134,7 @@
             <field name="perm_write" eval="False"/>
             <field name="perm_create" eval="False"/>
             <field name="perm_unlink" eval="False"/>
-            <field name="active" eval="True"/>
+            <field name="active" eval="False"/>
         </record>
 
         <!-- Dashboard Snapshot: supervisor / manager sees own Operating Unit snapshots -->

@@ -25,7 +25,18 @@
             <field name="name">Hr Employee: User - Self, Coached and Subordinates</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
             <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
-            <field name="domain_force">['|', '|', '|', '|', ('user_id', '=', user.id), ('id', '=', user.employee_id.id), ('coach_id', '=', user.employee_id.id), ('parent_id', '=', user.employee_id.id), ('parent_id', 'child_of', [user.employee_id.id])]</field>
+            <field name="domain_force">[('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_self_coach_subordinate" model="ir.rule">
+            <field name="name">HR Employee: Self, Coached and Subordinates Only</field>
+            <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+            <field name="domain_force">[('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
             <field name="perm_read" eval="1"/>
             <field name="perm_write" eval="0"/>
             <field name="perm_create" eval="0"/>
@@ -46,6 +57,40 @@
         <record id="rule_hr_employee_admin_all" model="ir.rule">
             <field name="name">Hr Employee: Administrator - Bank-wide (Full Access)</field>
             <field name="model_id" ref="hr.model_hr_employee"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+
+        <!-- HR EMPLOYEE PUBLIC (Kanban & Directory Views) -->
+        <record id="rule_hr_employee_public_user" model="ir.rule">
+            <field name="name">Hr Employee Public: User - Self, Coached and Subordinates</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
+            <field name="groups" eval="[(4, ref('hr_employee_custom.group_hr_employee_user'))]"/>
+            <field name="domain_force">[('id', 'in', user.env['hr.employee']._get_delegation_visible_employee_ids())]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="0"/>
+            <field name="perm_create" eval="0"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_public_officer_all" model="ir.rule">
+            <field name="name">Hr Employee Public: Officer - Bank-wide Access</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
+            <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="0"/>
+        </record>
+
+        <record id="rule_hr_employee_public_admin_all" model="ir.rule">
+            <field name="name">Hr Employee Public: Administrator - Bank-wide Access</field>
+            <field name="model_id" ref="hr.model_hr_employee_public"/>
             <field name="groups" eval="[(4, ref('hr.group_hr_manager'))]"/>
             <field name="domain_force">[(1, '=', 1)]</field>
             <field name="perm_read" eval="1"/>

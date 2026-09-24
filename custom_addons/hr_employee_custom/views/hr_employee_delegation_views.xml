@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
 
@@ -29,12 +29,15 @@
             <field name="arch" type="xml">
                 <form string="Manager Employee Delegation">
                     <header>
-                        <button name="action_submit" string="Submit Delegation" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                        <button name="action_submit" string="Submit Delegation" type="object" class="btn-primary" invisible="state != 'draft' or not is_manager_coach"/>
                         <button name="action_cancel_delegation" string="Cancel Delegation" type="object" class="btn-secondary" invisible="state == 'cancelled'"/>
                         <button name="action_delete_draft" string="Delete Draft" type="object" class="btn-outline-danger" invisible="state != 'draft'"/>
                         <field name="state" widget="statusbar" statusbar_visible="draft,submitted,cancelled"/>
                     </header>
                     <sheet>
+                        <div class="alert alert-warning mb-3" role="alert" invisible="is_manager_coach">
+                            <strong>Notice:</strong> You are not currently listed as a direct coach or manager of any staff members. Only managerial employees with reporting staff can create or submit delegation requests.
+                        </div>
                         <div class="oe_button_box" name="button_box">
                             <button name="action_view_delegated_approvals" type="object" class="oe_stat_button" icon="fa-check-square-o" invisible="state != 'submitted'">
                                 <field name="delegated_approval_count" widget="statinfo" string="Pending Approvals"/>
@@ -48,7 +51,7 @@
                         </div>
                         <group>
                             <group string="Manager / Delegator Information">
-                                <field name="employee_id" readonly="state != 'draft'"/>
+                                <field name="employee_id" readonly="1" force_save="1"/>
                                 <field name="manager_job_id"/>
                                 <field name="manager_department_id"/>
                                 <field name="absence_reason" readonly="state != 'draft'"/>
@@ -71,25 +74,24 @@
                             <group>
                                 <field name="delegate_id" readonly="state != 'draft'"/>
                                 <field name="delegate_job_id"/>
-                                <field name="delegate_coach_name"/>
+                                <field name="delegate_coach_name" invisible="not include_sub_level_staff"/>
                             </group>
                         </group>
                         <notebook>
-                            <page string="Stakeholders to Notify" name="stakeholders_page">
+                            <page string="Employees to Notify" name="stakeholders_page">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <p class="text-muted mb-0">
-                                        These stakeholders and supervisors will be notified automatically via email, in-app activity, and Discuss direct messages upon submission.
+                                        These employees and supervisors will be notified automatically via email, in-app activity, and Discuss direct messages upon submission.
                                     </p>
                                     <button name="action_reset_default_recipients" string="Reset to Default Recipients" type="object" class="btn btn-sm btn-outline-secondary" invisible="state != 'draft'"/>
                                 </div>
                                 <field name="stakeholder_ids" readonly="state != 'draft'">
-                                    <list editable="bottom">
-                                        <field name="employee_id" string="Employee Reference"/>
-                                        <field name="name" string="Stakeholder Name"/>
-                                        <field name="work_email" string="Work Email"/>
-                                        <field name="department_name" string="Department"/>
-                                        <field name="job_name" string="Job Position"/>
-                                        <field name="category" string="Role / Category"/>
+                                    <list editable="bottom" create="false" delete="true">
+                                        <field name="name" string="Employee Name" readonly="1"/>
+                                        <field name="work_email" string="Work Email" readonly="1"/>
+                                        <field name="department_name" string="Department" readonly="1"/>
+                                        <field name="job_name" string="Job Position" readonly="1"/>
+                                        <field name="category" string="Role / Category" readonly="1"/>
                                     </list>
                                 </field>
                                 <field name="notification_recipient_ids" invisible="1"/>
