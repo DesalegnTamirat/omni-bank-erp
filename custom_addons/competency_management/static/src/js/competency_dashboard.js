@@ -18,18 +18,22 @@ export class CompetencyDashboard extends Component {
         this.trendCanvasRef = useRef("trendChart");
 
         this.state = useState({
-            persona: "executive", // 'executive' | 'supervisor' | 'employee'
+            persona: "executive",
             cycleId: false,
             departmentId: false,
+            operatingUnitId: false,
             loading: true,
             error: false,
             alertDismissed: false,
             radarHasData: false,
             data: {
+                is_dept_readonly: false,
+                is_ou_readonly: false,
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
                 all_cycles: [],
                 all_departments: [],
+                all_operating_units: [],
                 stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
                 charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
                 team_roster: [],
@@ -56,7 +60,7 @@ export class CompetencyDashboard extends Component {
                     this.renderCharts();
                 }
             },
-            () => [this.state.loading, this.state.persona, this.state.cycleId]
+            () => [this.state.loading, this.state.cycleId, this.state.departmentId, this.state.operatingUnitId]
         );
     }
 
@@ -71,13 +75,20 @@ export class CompetencyDashboard extends Component {
                 {
                     cycle_id: this.state.cycleId || false,
                     department_id: this.state.departmentId || false,
-                    persona: this.state.persona,
+                    operating_unit_id: this.state.operatingUnitId || false,
                 }
             );
 
             this.state.data = result;
+            this.state.persona = result.persona || "executive";
             if (!this.state.cycleId && result.cycle && result.cycle.id) {
                 this.state.cycleId = result.cycle.id;
+            }
+            if (result.is_dept_readonly || (!this.state.departmentId && result.selected_department_id)) {
+                this.state.departmentId = result.selected_department_id;
+            }
+            if (result.is_ou_readonly || (!this.state.operatingUnitId && result.selected_operating_unit_id)) {
+                this.state.operatingUnitId = result.selected_operating_unit_id;
             }
 
             this.state.loading = false;
@@ -86,10 +97,13 @@ export class CompetencyDashboard extends Component {
             this.state.error = true;
             this.state.loading = false;
             this.state.data = {
+                is_dept_readonly: false,
+                is_ou_readonly: false,
                 user: { name: "", is_admin: false, is_supervisor: false },
                 cycle: { id: false, name: "", deadline: "" },
                 all_cycles: [],
                 all_departments: [],
+                all_operating_units: [],
                 stats: { has_data: false, bank_avg_gap: 0.0, total_assessments: 0, below_cnt: 0, meets_cnt: 0, exceeds_cnt: 0 },
                 charts: { tna_donut: {}, pillar_bar: {}, employee_radar: {}, employee_trend: {} },
                 team_roster: [],
@@ -98,18 +112,19 @@ export class CompetencyDashboard extends Component {
         }
     }
 
-    onPersonaChange(newPersona) {
-        this.state.persona = newPersona;
-        this.loadData();
-    }
-
     onCycleChange(ev) {
-        this.state.cycleId = ev.target.value;
+        this.state.cycleId = ev.target.value ? parseInt(ev.target.value) : false;
         this.loadData();
     }
 
     onDepartmentChange(ev) {
-        this.state.departmentId = ev.target.value;
+        this.state.departmentId = ev.target.value ? parseInt(ev.target.value) : false;
+        this.state.operatingUnitId = false;
+        this.loadData();
+    }
+
+    onOperatingUnitChange(ev) {
+        this.state.operatingUnitId = ev.target.value ? parseInt(ev.target.value) : false;
         this.loadData();
     }
 
@@ -213,9 +228,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaBelow() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'below']
+            ['achievement_status', '=', 'below'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -241,9 +258,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaMeets() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'meets']
+            ['achievement_status', '=', 'meets'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -269,9 +288,11 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaExceeds() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ['is_primary_reporting_line', '=', true],
-            ['achievement_status', '=', 'exceeds']
+            ['achievement_status', '=', 'exceeds'],
+            ['employee_id', 'in', fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
@@ -314,17 +335,17 @@ export class CompetencyDashboard extends Component {
         this.actionService.doAction(action);
     }
 
-    openMatrixConfig() {
-        this.actionService.doAction({
-            name: "Proficiency Matrix Configuration",
-            type: "ir.actions.act_window",
-            res_model: "competency.matrix.config",
-            views: [[false, "form"]],
-            res_id: 1,
-        });
+    async openMatrixConfig() {
+        const action = await this.orm.call(
+            "competency.dashboard",
+            "action_open_matrix_config",
+            []
+        );
+        this.actionService.doAction(action);
     }
 
     openAssessedEmployees() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const context = {
             search_default_group_by_employee: 1,
             search_default_filter_primary_reporting: 1,
@@ -334,12 +355,16 @@ export class CompetencyDashboard extends Component {
         };
         const domain = [
             ['is_primary_reporting_line', '=', true],
+            ['employee_id', 'in', fullyAssessedEmpIds],
             '|',
             ['weighted_current_level', '>', 0],
             ['achievement_status', '!=', false]
         ];
         if (this.state.cycleId) {
             domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
+        }
+        if (this.state.departmentId) {
+            domain.push(['department_id', '=', parseInt(this.state.departmentId)]);
         }
         this.actionService.doAction({
             name: "Assessed Employees Competency Reporting",
@@ -352,6 +377,7 @@ export class CompetencyDashboard extends Component {
     }
 
     openTnaReport() {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const context = {
             search_default_group_by_employee: 1,
             search_default_filter_primary_reporting: 1,
@@ -359,11 +385,19 @@ export class CompetencyDashboard extends Component {
             edit: false,
             delete: false,
         };
+        const domain = [
+            ['is_primary_reporting_line', '=', true],
+            ['employee_id', 'in', fullyAssessedEmpIds],
+        ];
+        if (this.state.cycleId) {
+            domain.push(['cycle_id', '=', parseInt(this.state.cycleId)]);
+        }
         this.actionService.doAction({
             name: "Comprehensive TNA Report",
             type: "ir.actions.act_window",
             res_model: "competency.assessment.line",
             views: [[false, "list"], [false, "graph"], [false, "pivot"], [false, "form"]],
+            domain: domain,
             context: context,
         });
     }
@@ -402,9 +436,11 @@ export class CompetencyDashboard extends Component {
     }
 
     onHeatmapCellClick(deptId, pillarKey) {
+        const fullyAssessedEmpIds = (this.state.data && this.state.data.fully_assessed_emp_ids) || [];
         const domain = [
             ["is_primary_reporting_line", "=", true],
-            ["department_id", "=", deptId]
+            ["department_id", "=", deptId],
+            ["employee_id", "in", fullyAssessedEmpIds]
         ];
         if (this.state.cycleId) {
             domain.push(["cycle_id", "=", parseInt(this.state.cycleId)]);

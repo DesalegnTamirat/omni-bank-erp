@@ -14,15 +14,42 @@ class RecruitmentQualifications(models.Model):
 
     display_name = fields.Char(string="Qualification", compute="_compute_display_name", store=True)
 
+    def _auto_init(self):
+        res = super()._auto_init()
+        try:
+            with self.env.cr.savepoint():
+                self.env.cr.execute("""
+                    UPDATE recruitment_qualification 
+                    SET display_name = COALESCE(
+                        NULLIF(TRIM(
+                            CASE 
+                                WHEN qualification IS NOT NULL AND qualification != '' AND specialization IS NOT NULL AND specialization != '' 
+                                THEN qualification || ' - ' || specialization
+                                WHEN qualification IS NOT NULL AND qualification != '' 
+                                THEN qualification
+                                WHEN specialization IS NOT NULL AND specialization != '' 
+                                THEN specialization
+                                ELSE NULL
+                            END
+                        ), ''), 'Qualification'
+                    )
+                    WHERE display_name IS NULL OR display_name = '' OR display_name = 'New Qualification';
+                """)
+        except Exception as e:
+            pass
+        return res
+
     @api.depends('qualification', 'specialization')
     def _compute_display_name(self):
         for rec in self:
-            if rec.qualification and rec.specialization:
-                rec.display_name = f"{rec.qualification} - {rec.specialization}"
-            elif rec.qualification:
-                rec.display_name = rec.qualification
-            elif rec.specialization:
-                rec.display_name = rec.specialization
+            q_str = (rec.qualification or "").strip()
+            s_str = (rec.specialization or "").strip()
+            if q_str and s_str:
+                rec.display_name = f"{q_str} - {s_str}"
+            elif q_str:
+                rec.display_name = q_str
+            elif s_str:
+                rec.display_name = s_str
             else:
-                rec.display_name = _("New Qualification")
+                rec.display_name = _("Qualification")
 

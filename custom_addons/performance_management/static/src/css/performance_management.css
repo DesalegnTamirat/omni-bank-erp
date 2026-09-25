@@ -1,10 +1,265 @@
-/* Appraisal Period banner colors - Tier 2 Scorecard */
+/* ========================================================= */
+/* Bunna Bank Brand Performance Management Palette            */
+/* ========================================================= */
+/* #425727 - Forest Olive Green                             */
+/* #541718 - Burgundy Coffee Wine                            */
+/* #1d2b32 - Dark Slate Navy                                 */
+/* #c17540 - Warm Terracotta                                 */
+/* #726732 - Muted Ochre / Gold                              */
+/* ========================================================= */
+
 .period-banner-h1 {
-    background-color: #D2B48C !important;
+    background: linear-gradient(135deg, #425727 0%, #2f3e1b 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
 }
+
 .period-banner-h2 {
-    background-color: #D2B48C !important;
+    background: linear-gradient(135deg, #c17540 0%, #9e5b2c 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
 }
+
 .period-banner-default {
+    background: linear-gradient(135deg, #1d2b32 0%, #111a1f 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* Force all text inside period banners to pure white / crisp white */
+.period-banner-h1,
+.period-banner-h1 *,
+.period-banner-h2,
+.period-banner-h2 *,
+.period-banner-default,
+.period-banner-default * {
+    color: #ffffff !important;
+}
+
+.period-banner-h1 .banner-period-label,
+.period-banner-h2 .banner-period-label,
+.period-banner-default .banner-period-label {
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+}
+
+.period-banner-h1 .banner-period-val,
+.period-banner-h2 .banner-period-val,
+.period-banner-default .banner-period-val,
+.period-banner-h1 .banner-period-val *,
+.period-banner-h2 .banner-period-val *,
+.period-banner-default .banner-period-val * {
+    color: #ffffff !important;
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+}
+
+/* Avatar inside Period Banner */
+.period-banner-avatar {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    max-width: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    border: 2.5px solid rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    background-color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+}
+
+.period-banner-avatar .o_field_image {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.period-banner-avatar .o_field_image img,
+.period-banner-avatar img {
+    width: 56px !important;
+    height: 56px !important;
+    max-width: 56px !important;
+    max-height: 56px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+}
+
+.o_scorecard_kanban_card {
+    border-left: 5px solid #425727 !important;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_scorecard_kanban_card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.o_appraisal_kanban_card {
+    border-left: 5px solid #541718 !important;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_appraisal_kanban_card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Perspective Badges (Strategic Objectives Palette) */
+.badge-perspective-financial {
+    background-color: #425727 !important;
+    color: #ffffff !important;
+}
+
+.badge-perspective-stakeholder {
+    background-color: #c17540 !important;
+    color: #ffffff !important;
+}
+
+.badge-perspective-process {
     background-color: #1d2b32 !important;
+    color: #ffffff !important;
+}
+
+.badge-perspective-learning {
+    background-color: #726732 !important;
+    color: #ffffff !important;
+}
+
+/* ========================================================= */
+/* Performance Dashboard Specialized Styles                  */
+/* ========================================================= */
+
+.o_performance_dashboard_container {
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    flex: 1 1 auto !important;
+    display: block !important;
+    scroll-behavior: smooth;
+}
+
+/* Filter Input Elements High Contrast */
+.pms-filter-label {
+    color: #cbd5e1 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    margin-bottom: 3px !important;
+}
+
+.pms-filter-select {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border: 1.5px solid #cbd5e1 !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    padding: 4px 10px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    min-height: 32px !important;
+    cursor: pointer !important;
+}
+
+.pms-filter-select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+    outline: none !important;
+}
+
+.pms-filter-select option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-weight: 500 !important;
+    padding: 6px 10px !important;
+}
+
+/* Tier Governance Section */
+.pms-hub-header-planning {
+    background: linear-gradient(135deg, #24353f 0%, #1e293b 100%) !important;
+    color: #ffffff !important;
+    border-left: 5px solid #0288d1 !important;
+}
+
+.pms-hub-header-hr {
+    background: linear-gradient(135deg, #3d2426 0%, #29181a 100%) !important;
+    color: #ffffff !important;
+    border-left: 5px solid #c17540 !important;
+}
+
+.pms-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    border: 1px solid transparent;
+    user-select: none;
+}
+
+.pms-status-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.pms-chip-draft {
+    background-color: #f1f5f9;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.pms-chip-notified {
+    background-color: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+
+.pms-chip-accepted {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+
+.pms-chip-confirmed {
+    background-color: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.pms-chip-rejected {
+    background-color: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.pms-chip-total {
+    background-color: #f8fafc;
+    color: #0f172a;
+    border-color: #94a3b8;
+    font-weight: 700;
 }

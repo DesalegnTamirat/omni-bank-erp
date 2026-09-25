@@ -28,30 +28,46 @@ class HrJobCompetency(models.Model):
         Mapping = self.env['competency.role.mapping']
         
         # 1. Search for position-specific mappings first (Job Position governs)
-        mappings = Mapping.search([('job_position_id', '=', self.id)])
+        mappings = Mapping.search([('job_position_id', '=', self.id), ('state', '=', 'approved')])
+        if not mappings:
+            mappings = Mapping.search([('job_position_id', '=', self.id)])
         governance_type = 'job_position'
 
-        # 2. Fallback to Job Grade if position mappings are empty and grade_id is supplied
-        if not mappings and grade_id:
-            grade_obj = self.env['employee.grade'].browse(grade_id) if isinstance(grade_id, int) else grade_id
+        # 2. Fallback to Job Grade if position mappings are empty
+        if not mappings:
+            grade_obj = False
+            if grade_id:
+                grade_obj = self.env['employee.grade'].browse(grade_id) if isinstance(grade_id, int) else grade_id
+            if not grade_obj or not grade_obj.exists():
+                grade_obj = Mapping._resolve_job_grade(self)
+
             if grade_obj and grade_obj.exists():
-                mappings = Mapping.search([('grade_id', '=', grade_obj.id)])
+                mappings = Mapping.search([('grade_id', '=', grade_obj.id), ('state', '=', 'approved')])
+                if not mappings:
+                    mappings = Mapping.search([('grade_id', '=', grade_obj.id)])
                 governance_type = 'job_grade'
 
         result = []
         for m in mappings:
-            lvl = m.required_proficiency_level_id
-            result.append({
-                'mapping_id': m.id,
-                'competency_id': m.competency_id.id if m.competency_id else False,
-                'competency_name': m.competency_id.name if m.competency_id else '',
-                'competency_code': getattr(m.competency_id, 'code', '') or '',
-                'cluster_id': m.competency_id.cluster_id.id if m.competency_id and m.competency_id.cluster_id else False,
-                'cluster_name': m.competency_id.cluster_id.name if m.competency_id and m.competency_id.cluster_id else '',
-                'required_level_id': lvl.id if lvl else False,
-                'required_level_name': lvl.name if lvl else '',
-                'required_level_code': getattr(lvl, 'level_code', '') or '',
-                'required_level_score': getattr(lvl, 'level_score', 0.0) or 0.0,
-                'governance': governance_type,
-            })
+            for line in m.line_ids:
+                comp = line.competency_id
+                if not comp:
+                    continue
+                lvl_val = line.required_proficiency or '2'
+                selection_dict = dict(line._fields['required_proficiency'].selection) if 'required_proficiency' in line._fields else {}
+                cluster = self.env['competency.cluster'].search([('competency_ids', 'in', [comp.id])], limit=1)
+                result.append({
+                    'mapping_id': m.id,
+                    'line_id': line.id,
+                    'competency_id': comp.id,
+                    'competency_name': comp.name or '',
+                    'competency_code': getattr(comp, 'code', '') or '',
+                    'cluster_id': cluster.id if cluster else False,
+                    'cluster_name': cluster.name if cluster else '',
+                    'pillar': comp.pillar or '',
+                    'required_proficiency': lvl_val,
+                    'required_level_name': selection_dict.get(lvl_val, f"Level {lvl_val}"),
+                    'weight': line.weight,
+                    'governance': governance_type,
+                })
         return result

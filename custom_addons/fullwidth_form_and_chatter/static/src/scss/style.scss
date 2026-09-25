@@ -1,1 +1,44 @@
-.o_form_renderer:has(.o_form_sheet_bg):has(.o-mail-ChatterContainer) { display: block !important; .o_form_sheet_bg { min-width: 100%; } .o-mail-ChatterContainer, .o-mail-Form-chatter { &.o-aside { width: 100%; padding: map-get($spacers, 2); } } }
+/* Full Width Form Views, Form Sheets, Chatter, and Action Containers */
+.o_form_view,
+.o_form_sheet_bg,
+.o_form_sheet,
+.o_content,
+.o_view_controller,
+.o_action_manager {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.o_form_sheet_bg {
+    min-width: 100% !important;
+    max-width: 100% !important;
+    width: 100% !important;
+
+    .o_form_sheet {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+.o_form_renderer:has(.o_form_sheet_bg):has(.o-mail-ChatterContainer) {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+
+    .o_form_sheet_bg {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .o-mail-ChatterContainer, .o-mail-Form-chatter {
+        &.o-aside {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: map-get($spacers, 2);
+        }
+    }
+}

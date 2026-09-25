@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _get_ip(env):
+def _get_ip(_env=None):
     try:
         from odoo.http import request
         if request and request.httprequest:
@@ -52,10 +52,14 @@ def _field_to_str(record, fname):
 
 
 def _get_active_rule(env, model_name):
-    """Return audit.rule record or None. Skips audit models themselves."""
+    """Return audit.rule record or None. Skips audit models themselves and checks global master toggle."""
     if model_name in ('audit.log', 'audit.rule'):
         return None
     try:
+        # Check global master switch — if disabled, immediately short-circuit with zero logging overhead
+        enabled = env['ir.config_parameter'].sudo().get_param('audit_trail.enabled', 'True')
+        if str(enabled).strip().lower() in ('false', '0', 'off', 'no'):
+            return None
         return env['audit.rule'].sudo().search(
             [('model_name', '=', model_name), ('active', '=', True)], limit=1
         ) or None
@@ -91,27 +95,6 @@ _ORIGINAL_UNLINK = models.BaseModel.unlink
 
 _PATCHED = False  # guard against double-patching
 
-
-# def _patched_create(self, vals_list):
-#     records = _ORIGINAL_CREATE(self, vals_list)
-#     rule = _get_active_rule(self.env, self._name)
-#     if rule and rule.log_create:
-#         try:
-#             mctx = _model_ctx(self.env, self._name)
-#             uctx = _user_ctx(self.env)
-#             logs = [{
-#                 **mctx, **uctx,
-#                 'res_id': r.id,
-#                 'res_name': r.display_name if hasattr(r, 'display_name') else str(r.id),
-#                 'operation': 'create',
-#                 'field_id': False, 'field_name': False,
-#                 'field_description': False, 'field_type': False,
-#                 'old_value': False, 'new_value': 'Record created',
-#             } for r in records]
-#             _write_logs(self.env, logs)
-#         except Exception as e:
-#             _logger.error('Audit create failed [%s]: %s', self._name, e)
-#     return records
 
 def _patched_create(self, vals_list):
     records = _ORIGINAL_CREATE(self, vals_list)
@@ -230,16 +213,6 @@ def _patched_unlink(self):
 
     return result
 
-
-# def apply_patch():
-#     global _PATCHED
-#     if _PATCHED:
-#         return
-#     models.BaseModel.create = _patched_create
-#     models.BaseModel.write  = _patched_write
-#     models.BaseModel.unlink = _patched_unlink
-#     _PATCHED = True
-#     _logger.info('audit_trail: ORM patch applied (create/write/unlink)')
 
 def apply_patch():
     global _PATCHED

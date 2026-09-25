@@ -4,47 +4,44 @@
     <!-- ════════════════════════════════════════════════════════════════
          SECURITY GROUPS
 
-         Privilege ladder (mutually exclusive selection in UI):
-           No Access → Manager → Clearance Officer → POMD Officer
-                     → HR Manager → Administrator
+         All internal employees (base.group_user) automatically have
+         access to the Resignation module — no separate "User" group
+         or privilege ladder needed.
 
-         The implied_ids chain grants cumulative permissions upward.
-
-         Menu visibility uses MARKER groups (group_menu_*) that are
-         assigned to exactly the target privilege level and are NOT
-         inherited by higher levels. This lets us show "My Team's
-         Resignations" ONLY to Managers and "My Clearance Tasks" ONLY
-         to Clearance Officers, regardless of the implied hierarchy.
+         Roles above base user:
+           Manager → Clearance Officer → POMD Officer
+                   → HR Manager → Administrator
     ════════════════════════════════════════════════════════════════ -->
 
-    <record model="ir.module.category" id="module_category_hr_resignation">
-        <field name="name">Resignation and Clearance</field>
-        <field name="description">Access levels for the Resignation and Clearance process.</field>
-        <field name="sequence">15</field>
+    <!-- CATEGORY -->
+    <record id="module_category_resignation" model="ir.module.category">
+        <field name="name">Resignation</field>
+        <field name="description">Manage employee resignations and clearances.</field>
+        <field name="sequence">25</field>
     </record>
 
+    <!-- Odoo 19: groups use privilege_id referencing res.groups.privilege -->
     <record model="res.groups.privilege" id="privilege_hr_resignation">
-        <field name="name">Resignation Access</field>
-        <field name="category_id" ref="module_category_hr_resignation"/>
+        <field name="name">Resignation</field>
+        <field name="category_id" ref="module_category_resignation"/>
+        <field name="placeholder">User</field>
     </record>
 
-    <!-- Make all employees (Internal Users) automatically get Resignation User rights -->
-    <record id="base.group_user" model="res.groups">
-        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-    </record>
-
-    <!-- ── Privilege levels ───────────────────────────────────────── -->
-
-    <!-- User: base user who can submit and track their own requests -->
+    <!-- ── Kept for DB compatibility — no privilege_id so it does NOT appear
+         in the user settings dropdown. All employees get access via
+         base.group_user directly through the model access CSV. ─────── -->
     <record id="group_resignation_user" model="res.groups">
-        <field name="name">User</field>
-        <field name="privilege_id" ref="privilege_hr_resignation"/>
+        <field name="name">User (Legacy)</field>
+        <field name="privilege_id" eval="False"/>
         <field name="implied_ids" eval="[
             (4, ref('base.group_user')),
         ]"/>
     </record>
 
-    <!-- Manager: only base_user + hr_manager. No higher groups implied. -->
+    <!-- ── Roles ─────────────────────────────────────────────────── -->
+
+
+    <!-- Manager: sees their direct reports' requests -->
     <record id="group_resignation_manager" model="res.groups">
         <field name="name">Manager</field>
         <field name="privilege_id" ref="privilege_hr_resignation"/>
@@ -53,57 +50,44 @@
         ]"/>
     </record>
 
-    <!-- Clearance Officer: stands alone — does NOT imply group_resignation_manager.
-         Record rules and model access give the necessary permissions directly. -->
+    <!-- Clearance Officer: stands alone — does NOT imply group_resignation_manager. -->
     <record id="group_clearance_officer" model="res.groups">
         <field name="name">Clearance Officer</field>
         <field name="privilege_id" ref="privilege_hr_resignation"/>
         <field name="implied_ids" eval="[
-            (3, ref('hr_resignation.group_resignation_manager')),
             (4, ref('base.group_user')),
         ]"/>
     </record>
 
-    <!-- POMD Officer: stands alone — does NOT imply group_clearance_officer. -->
+    <!-- POMD Officer -->
     <record id="group_pomd_officer" model="res.groups">
         <field name="name">POMD Officer</field>
         <field name="privilege_id" ref="privilege_hr_resignation"/>
         <field name="implied_ids" eval="[
-            (3, ref('hr_resignation.group_resignation_manager')),
-            (3, ref('hr_resignation.group_clearance_officer')),
             (4, ref('base.group_user')),
             (4, ref('hr.group_hr_manager')),
         ]"/>
     </record>
 
+    <!-- HR Manager -->
     <record id="group_resignation_hr_manager" model="res.groups">
         <field name="name">HR Manager</field>
         <field name="privilege_id" ref="privilege_hr_resignation"/>
         <field name="implied_ids" eval="[
-            (3, ref('hr_resignation.group_resignation_manager')),
-            (3, ref('hr_resignation.group_clearance_officer')),
-            (3, ref('hr_resignation.group_pomd_officer')),
             (4, ref('base.group_user')),
             (4, ref('hr.group_hr_manager')),
         ]"/>
     </record>
 
+    <!-- Administrator -->
     <record id="group_resignation_admin" model="res.groups">
         <field name="name">Administrator</field>
         <field name="privilege_id" ref="privilege_hr_resignation"/>
         <field name="implied_ids" eval="[
-            (3, ref('hr_resignation.group_resignation_manager')),
-            (3, ref('hr_resignation.group_clearance_officer')),
-            (3, ref('hr_resignation.group_pomd_officer')),
-            (4, ref('hr_resignation.group_resignation_hr_manager')), 
-            (4, ref('base.group_system'))
+            (4, ref('hr_resignation.group_resignation_hr_manager')),
+            (4, ref('base.group_system')),
         ]"/>
     </record>
-
-    <!-- ── Marker groups (NOT part of the privilege ladder) ──────────
-         No longer needed — privileges are now non-hierarchical so each
-         group is mutually exclusive and can be used directly on menus.
-    ─────────────────────────────────────────────────────────────── -->
 
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -117,11 +101,11 @@
          │ submitted           │    ✓     │    ✓    │      │      │
          │ manager_reviewed /  │    ✓     │    ✓    │  ✓   │  ✓   │
          │   manager_rejected  │          │         │      │      │
-         │ hr_approved → done  │    ✓     │    ✓    │  ✓   │  ✓   │
+         │ approved → done     │    ✓     │    ✓    │  ✓   │  ✓   │
          └─────────────────────┴──────────┴─────────┴──────┴──────┘
 
          Key rule: while state = 'submitted', ONLY the direct manager
-         (manager_id.user_id) can see the record. HR and POMD are
+         (coach_id.user_id) can see the record. HR and POMD are
          excluded until the manager acts (approves or rejects).
 
          Rules on different groups are evaluated independently with OR
@@ -169,7 +153,7 @@
     <record id="hr_resignation_rule_manager" model="ir.rule">
         <field name="name">Resignation: Manager sees team requests and managed clearance</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">['|', ('manager_id.user_id', '=', user.id), ('clearance_line_ids.work_unit_id.manager_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">['|', ('coach_id.user_id', '=', user.id), ('clearance_line_ids.work_unit_id.manager_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -186,7 +170,7 @@
     <record id="hr_resignation_rule_pomd" model="ir.rule">
         <field name="name">Resignation: POMD sees all records</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
@@ -198,7 +182,7 @@
     <record id="hr_resignation_rule_hr_manager_team" model="ir.rule">
         <field name="name">Resignation: HR Manager sees own direct reports at all states</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation"/>
-        <field name="domain_force">[('manager_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">[('coach_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_hr_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -214,7 +198,6 @@
         <field name="domain_force">[('state', '!=', 'draft')]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_hr_manager'))]"/>
     </record>
-
 
     <!-- ════════════════════════════════════════════════════════════════
          RECORD RULES — hr.resignation.clearance (runtime lines)
@@ -247,7 +230,7 @@
     <record id="hr_clearance_rule_manager" model="ir.rule">
         <field name="name">Clearance Line: Manager sees team's lines OR lines they manage</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
-        <field name="domain_force">['|', ('resignation_id.manager_id.user_id', '=', user.id), ('work_unit_id.manager_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">['|', ('resignation_id.coach_id.user_id', '=', user.id), ('work_unit_id.manager_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -275,7 +258,7 @@
     <record id="hr_clearance_rule_pomd" model="ir.rule">
         <field name="name">Clearance Line: POMD sees all lines</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
@@ -283,7 +266,7 @@
     <record id="hr_clearance_rule_hr" model="ir.rule">
         <field name="name">Clearance Line: HR sees all lines</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
     </record>
 
@@ -299,7 +282,7 @@
     <record id="hr_clearance_template_rule_officer" model="ir.rule">
         <field name="name">Clearance Template: Officer read-only</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_template"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_clearance_officer'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="False"/>
@@ -310,14 +293,14 @@
     <record id="hr_clearance_template_rule_pomd" model="ir.rule">
         <field name="name">Clearance Template: POMD full access</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_template"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
     <record id="hr_clearance_template_rule_hr" model="ir.rule">
         <field name="name">Clearance Template: HR full access</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_template"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
     </record>
 
@@ -341,7 +324,7 @@
     <record id="hr_clearance_item_rule_manager" model="ir.rule">
         <field name="name">Clearance Item: Manager sees team's items OR items they manage</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
-        <field name="domain_force">['|', ('clearance_line_id.resignation_id.manager_id.user_id', '=', user.id), ('clearance_line_id.work_unit_id.manager_id.user_id', '=', user.id)]</field>
+        <field name="domain_force">['|', ('clearance_line_id.resignation_id.coach_id.user_id', '=', user.id), ('clearance_line_id.work_unit_id.manager_id.user_id', '=', user.id)]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_resignation_manager'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -370,14 +353,14 @@
     <record id="hr_clearance_item_rule_pomd" model="ir.rule">
         <field name="name">Clearance Item: POMD sees all</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
     </record>
 
     <record id="hr_clearance_item_rule_hr" model="ir.rule">
         <field name="name">Clearance Item: HR sees all</field>
         <field name="model_id" ref="hr_resignation.model_hr_resignation_clearance_line_item"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
     </record>
 
@@ -403,7 +386,7 @@
     <record id="hr_exit_interview_rule_pomd" model="ir.rule">
         <field name="name">Exit Interview: POMD sees all</field>
         <field name="model_id" ref="hr_resignation.model_hr_exit_interview"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr_resignation.group_pomd_officer'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>
@@ -416,7 +399,7 @@
     <record id="hr_exit_interview_rule_hr" model="ir.rule">
         <field name="name">Exit Interview: HR sees all</field>
         <field name="model_id" ref="hr_resignation.model_hr_exit_interview"/>
-        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="domain_force">[]</field>
         <field name="groups" eval="[(4, ref('hr.group_hr_user'))]"/>
         <field name="perm_read"   eval="True"/>
         <field name="perm_write"  eval="True"/>

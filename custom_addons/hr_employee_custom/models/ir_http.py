@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
-from odoo import models, SUPERUSER_ID
+from odoo import models, api, SUPERUSER_ID
 from odoo.http import request
 
 _logger = logging.getLogger(__name__)
@@ -95,3 +95,11 @@ class IrHttp(models.AbstractModel):
                 response.headers['Pragma'] = 'no-cache'
                 response.headers['Expires'] = '0'
         return response
+
+    @api.model
+    def session_info(self):
+        result = super().session_info()
+        from odoo.tools import config
+        result['idle_logout_timeout'] = int(config.get('idle_logout_timeout', 420))
+        result['idle_logout_warning'] = int(config.get('idle_logout_warning', 30))
+        return result

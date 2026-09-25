@@ -13,6 +13,9 @@
                         <field name="is_ou_readonly" invisible="1"/>
                         <field name="is_emp_readonly" invisible="1"/>
                         <field name="is_status_readonly" invisible="1"/>
+                        <field name="competency_domain" invisible="1"/>
+                        <field name="operating_unit_domain" invisible="1"/>
+                        <field name="employee_domain" invisible="1"/>
 
                         <div style="background-color: #e0f2fe; color: #0369a1; padding: 14px 18px; border-radius: 6px; margin-bottom: 18px; border: 1px solid #bae6fd;">
                             <div style="font-size: 13px; font-weight: 500;">
@@ -33,7 +36,7 @@
                                 <field name="required_level" string="Required Proficiency Levels"/>
                                 <field name="current_level" string="Current Rating Level"/>
                                 <field name="pillar" string="Competency Pillars / Categories"/>
-                                <field name="competency_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select Competencies..."/>
+                                <field name="competency_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="Select Competencies..." domain="competency_domain"/>
                             </group>
                         </group>
 
@@ -41,10 +44,10 @@
                             <page string="Organizational Filters" name="org_filters">
                                 <group>
                                     <field name="department_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_dept_readonly" placeholder="All Departments"/>
-                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_ou_readonly" placeholder="All Workunits / Branches"/>
+                                    <field name="operating_unit_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_ou_readonly" placeholder="All Workunits / Branches" domain="operating_unit_domain"/>
                                     <field name="job_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Roles / Positions"/>
                                     <field name="grade_ids" widget="many2many_tags" options="{'no_create': True}" placeholder="All Job Grades"/>
-                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_emp_readonly" placeholder="All Employees"/>
+                                    <field name="employee_ids" widget="many2many_tags" options="{'no_create': True}" readonly="is_emp_readonly" placeholder="All Employees" domain="employee_domain"/>
                                 </group>
                             </page>
                         </notebook>

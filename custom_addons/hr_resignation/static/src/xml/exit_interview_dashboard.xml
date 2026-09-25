@@ -131,7 +131,7 @@
 
                         <!-- KPIs -->
                         <div class="kpi-row">
-                            <div class="kpi" style="cursor:pointer" t-on-click="() => this.openRecords([['state', '=', 'done']], 'Completed Exit Interviews')">
+                            <div class="kpi" style="cursor:pointer" t-on-click="() => this.openRecords([['state', '=', 'completed']], 'Completed Exit Interviews')">
                                 <div class="val"><t t-esc="state.data.meta.total"/></div>
                                 <div class="lbl">Exit interviews completed</div>
                             </div>

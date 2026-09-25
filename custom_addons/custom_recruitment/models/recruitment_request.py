@@ -714,7 +714,7 @@ class RecruitmentRequest(models.Model):
         """Verify that the current user belongs to Recruitment Officer or Manager group."""
         user = self.env.user
         if user.id in (1, 2) or self.env.is_admin():
-            return True
+            return
 
         has_manager_group = (
             user.has_group("custom_recruitment.group_recruitment_manager") or
@@ -727,7 +727,7 @@ class RecruitmentRequest(models.Model):
                 raise UserError(_(
                     "Access Denied: Only members of the Recruitment Manager group (group_recruitment_manager) are authorized to approve recruitment requests."
                 ))
-            return True
+            return
 
         has_hr_group = has_manager_group or (
             user.has_group("custom_recruitment.group_recruitment_officer") or
@@ -740,7 +740,6 @@ class RecruitmentRequest(models.Model):
             raise UserError(_(
                 "Access Denied: Only members of the HR / Recruitment team are authorized to review or manage recruitment requests."
             ))
-        return True
 
 
 

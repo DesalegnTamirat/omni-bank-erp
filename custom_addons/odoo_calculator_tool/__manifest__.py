@@ -32,11 +32,11 @@
     'website': 'https://www.cybrosys.com',
     'depends': ['base'],
     'assets': {
-        'web.assets_backend': [
+        'web.assets_backend': {
             'odoo_calculator_tool/static/src/css/calculator.css',
             'odoo_calculator_tool/static/src/xml/calculator.xml',
             'odoo_calculator_tool/static/src/js/calculator.js',
-        ],
+        },
     },
     'images': ['static/description/banner.jpg'],
     'license': "LGPL-3",

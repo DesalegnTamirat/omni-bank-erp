@@ -22,7 +22,7 @@
         <field name="arch" type="xml">
             <list string="Resignation Requests"
                   decoration-danger="state in ('manager_rejected','hr_rejected')"
-                  decoration-success="state == 'done'"
+                  decoration-success="state == 'completed'"
                   decoration-muted="state == 'draft'">
                 <field name="name"/>
                 <field name="employee_id"/>
@@ -36,8 +36,8 @@
                 <field name="clearance_progress"/>
                 <field name="state" widget="badge"
                        decoration-info="state in ('draft','submitted')"
-                       decoration-warning="state in ('manager_reviewed','hr_approved','last_day_recorded','exit_interviewed')"
-                       decoration-success="state in ('cleared','settled','done')"
+                       decoration-warning="state in ('manager_reviewed','approved','last_day_recorded','exit_interviewed')"
+                       decoration-success="state in ('cleared','settled','completed')"
                        decoration-danger="state in ('manager_rejected','hr_rejected')"/>
             </list>
         </field>
@@ -69,7 +69,7 @@
 
                     <button string="Set Release Date" type="object" name="action_set_release_date"
                             class="btn-primary"
-                            invisible="state != 'hr_approved' or not is_current_manager"/>
+                            invisible="state != 'approved' or not is_current_manager"/>
                             
                     <button string="Complete Handover" type="object" name="action_complete_handover"
                             class="btn-primary"
@@ -80,17 +80,17 @@
                             
                     <button string="Waive Exit Interview" type="object" name="action_waive_exit_interview"
                             class="btn-secondary" groups="hr_resignation.group_resignation_hr_manager"
-                            invisible="state not in ('hr_approved', 'release_date_set', 'clearance') or exit_interview_waived or exit_interview_state == 'done'"/>
+                            invisible="state not in ('approved', 'release_date_set', 'clearance_in_progress') or exit_interview_waived or exit_interview_state == 'completed'"/>
 
                     <button string="Mark as Cleared" type="object"
                             name="action_complete_clearance"
                             class="btn-success" groups="hr_resignation.group_resignation_hr_manager"
-                            invisible="state != 'clearance' or not is_fully_cleared"/>
+                            invisible="state != 'clearance_in_progress' or not is_fully_cleared"/>
 
                     <button string="Regenerate Clearance Lines" type="object"
                             name="action_regenerate_clearance_lines"
                             class="btn-secondary" groups="hr_resignation.group_resignation_hr_manager"
-                            invisible="state not in ('hr_approved', 'release_date_set', 'clearance') or clearance_count != 0"
+                            invisible="state not in ('approved', 'release_date_set', 'clearance_in_progress') or clearance_count != 0"
                             confirm="This will delete existing clearance lines and recreate them from the current template. Continue?"/>
 
                     <field name="settlement_id" invisible="1"/>
@@ -105,9 +105,9 @@
                     <button string="Print / Download Certificate of Release"
                             type="object" name="action_download_certificate"
                             class="btn-primary" icon="fa-print"
-                            invisible="state != 'done'"/>
+                            invisible="state != 'completed'"/>
 
-                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,hr_approved,release_date_set,clearance,cleared"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,submitted,approved,release_date_set,clearance,cleared"/>
                 </header>
                 <sheet>
                     <field name="is_allowed_to_see_warnings" invisible="1"/>
@@ -151,6 +151,11 @@
                             <!-- HR: can select any employee while in draft. Employee: locked to self always -->
                             <field name="initiated_by" groups="hr.group_hr_user" readonly="state != 'draft'"/>
                             <field name="initiated_by" readonly="1" groups="!hr.group_hr_user"/>
+                            <field name="initiated_by_user_id"
+                                   readonly="1"
+                                   invisible="initiated_by != 'company'"
+                                   groups="hr.group_hr_user"
+                                   string="Creator (POMD/HR)"/>
                             <field name="employee_id" options="{'no_open': True}"
                                    groups="hr.group_hr_user" readonly="state != 'draft'"/>
                             <!-- Employee can only see their own record, field is readonly -->
@@ -162,8 +167,9 @@
                             <field name="basic_salary" string="Basic Salary"/>
                             <field name="total_accrued_leave" string="Total Accrued Leave"/>
                             <field name="total_scheduled_leave" string="Total Scheduled Leave"/>
-                            <field name="rssa" string="RSSA"/>
-                               <field name="manager_id" options="{'no_open': True}" force_save="1" readonly="1"/>
+                            <field name="rssa" string="RSSA (Total Loan Taken)"/>
+                            <field name="rssa_od_guarantier" string="RSSA/OD Guarantier"/>
+                               <field name="coach_id" options="{'no_open': True}" force_save="1" readonly="1"/>
                                <field name="operating_unit_id" force_save="1" readonly="1"/>
                         </group>
                         <group string="Dates">
@@ -179,10 +185,10 @@
                             <field name="show_release_date_to_employee" invisible="1"/>
                             <field name="release_date" string="Release Date"
                                    invisible="not show_release_date_to_employee"
-                                   readonly="state != 'hr_approved'"/>
+                                   readonly="state != 'approved'"/>
                             <field name="release_date_justification"
                                    invisible="not release_date or release_date == expected_last_day"
-                                   readonly="state != 'hr_approved'"
+                                   readonly="state != 'approved'"
                                    placeholder="Mandatory: justify why the release date differs from the expected date..."/>
                             <!-- Notice period override (FR-SEP-011) -->
                             <field name="notice_override_justification"
@@ -205,6 +211,7 @@
                             <field name="resignation_type_id" string="Separation Type"
                                    options="{'no_open': True}"
                                    readonly="state != 'draft'"
+                                   domain="[('is_company_terminated', '=', False)] if initiated_by == 'employee' else [('is_company_terminated', '=', True)]"
                                    style="max-width: 350px;"/>
                         </group>
                     </group>
@@ -298,7 +305,7 @@
 
                             <!-- Info banner shown to manager for handover -->
                             <div class="alert alert-info mb-3" role="alert"
-                                 invisible="not can_edit_handover or state == 'clearance'">
+                                 invisible="not can_edit_handover or state == 'clearance_in_progress'">
                                 <i class="fa fa-info-circle me-2"/>
                                 <strong>Action required:</strong>
                                 Fill in the handover details below — who takes over,
@@ -308,7 +315,7 @@
 
                             <!-- Read-only banner once past manager step -->
                             <div class="alert alert-success mb-3" role="alert"
-                                 invisible="state in ('hr_approved', 'release_date_set')">
+                                 invisible="state in ('approved', 'release_date_set')">
                                 <i class="fa fa-check-circle me-2"/>
                                 Handover notes recorded by supervisor.
                             </div>
@@ -328,8 +335,8 @@
                         </page>
 
                         <!-- CLEARANCE TAB -->
-                        <page string="Separation check list" name="clearance"
-                              invisible="state not in ('hr_approved','clearance','last_day_recorded','exit_interviewed','cleared','settled','done')">
+                        <page string="Separation check list" name="clearance_in_progress"
+                              invisible="state not in ('approved','clearance_in_progress','last_day_recorded','exit_interviewed','cleared','settled','completed')">
 
                             <!-- Progress header bar -->
                             <div class="row mb-3 align-items-center">
@@ -358,7 +365,7 @@
                                             class="btn-sm btn-outline-secondary"
                                             icon="fa-refresh"
                                             groups="hr.group_hr_user"
-                                            invisible="state in ('cleared','settled','done')"
+                                            invisible="state in ('cleared','settled','completed')"
                                             confirm="This will delete ALL existing clearance lines and recreate them from the current template. Any recorded approvals will be lost. Continue?"/>
                                 </div>
                             </div>
@@ -411,16 +418,16 @@
 
                         <!-- EXIT INTERVIEW TAB -->
                         <page string="Exit Interview" name="exit_interview"
-                              invisible="state not in ('hr_approved','release_date_set','clearance','exit_interviewed','cleared','settled','done') or not can_view_exit_interview">
+                              invisible="state not in ('approved','release_date_set','clearance_in_progress','exit_interviewed','cleared','settled','completed') or not can_view_exit_interview">
                             <div class="mb-3">
                                 <button string="Open Exit Interview" type="object"
                                         name="action_complete_exit_interview"
                                         class="btn-primary"
-                                        invisible="exit_interview_state == 'done' or not can_view_exit_interview"/>
+                                        invisible="exit_interview_state == 'completed' or not can_view_exit_interview"/>
                                 <button string="View Exit Interview" type="object"
                                         name="action_complete_exit_interview"
                                         class="btn-secondary"
-                                        invisible="exit_interview_state != 'done' or not can_view_exit_interview"/>
+                                        invisible="exit_interview_state != 'completed' or not can_view_exit_interview"/>
                             </div>
                             <group invisible="not exit_interview_id">
                                 <group string="Interview Details">
@@ -439,7 +446,7 @@
 
                         <!-- SETTLEMENT TAB (Mockup matched) -->
                         <page string="Full Final Settlement" name="settlement"
-                              invisible="state not in ('cleared','settled','done')">
+                              invisible="state not in ('cleared','settled','completed')">
                             
                             <!-- Before Settlement is Created -->
                             <div class="alert alert-info text-center mt-4" role="alert" invisible="settlement_id">
@@ -547,14 +554,15 @@
 
     <!--
         Team view for managers: domain filters to only direct reports
-        of the currently logged-in user via manager_id.user_id = uid.
+        of the currently logged-in user via coach_id.user_id = uid.
         This works for both group_resignation_manager and hr.group_hr_manager
         users without needing a separate record rule per group.
     -->
-    <record id="action_hr_resignation_team" model="ir.actions.act_window">        <field name="name">My Team's Resignations</field>
+    <record id="action_hr_resignation_team" model="ir.actions.act_window">
+        <field name="name">My Team's Resignations</field>
         <field name="res_model">hr.resignation</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('manager_id.user_id', '=', uid)]</field>
+        <field name="domain">[('coach_id.user_id', '=', uid)]</field>
     </record>
 
     <record id="action_hr_resignation_all" model="ir.actions.act_window">
@@ -574,7 +582,7 @@
         <field name="name">Approved Resignations</field>
         <field name="res_model">hr.resignation</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('state', 'in', ('hr_approved','last_day_recorded','exit_interviewed','cleared','settled','done'))]</field>
+        <field name="domain">[('state', 'in', ('approved','last_day_recorded','exit_interviewed','cleared','settled','completed'))]</field>
     </record>
 
 </odoo>

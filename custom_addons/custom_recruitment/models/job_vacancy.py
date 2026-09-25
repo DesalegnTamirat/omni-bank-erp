@@ -766,6 +766,7 @@ class JobVacancy(models.Model):
     interview_scheduled = fields.Selection([('Yes', 'Yes'), ('No', 'No')], string="Interview Scheduled", default='No')
     panel_notified = fields.Boolean(string="Panel Notified", default=False)
     selection_notified = fields.Boolean(string="Selection Notified", default=False)
+    supervisor_rec_requested = fields.Boolean(string="Supervisor Recommendation Requested", default=False, copy=False)
     show_reschedule_button = fields.Boolean(compute="_compute_show_reschedule_button_unified")
     total_candidates_count = fields.Integer(compute="_compute_candidate_counts", string="Applicants")
     selected_candidates_count = fields.Integer(compute="_compute_candidate_counts", string="Selected")
@@ -832,7 +833,7 @@ class JobVacancy(models.Model):
     @api.depends('shortlist_done', 'candidate_notified', 'exam_notified',
                  'exam_scores_fetched', 'panel_notified', 'interview_notified', 'interview_scores_fetched',
                  'scores_computed', 'committee_notified', 'minute_signed',
-                 'selection_notified', 'employees_promoted', 'eligible_employee_ids', 'ext_rec_sel', 'sourcing_type', 'has_written_exam', 'transfer_eval_mode')
+                 'selection_notified', 'supervisor_rec_requested', 'employees_promoted', 'eligible_employee_ids', 'ext_rec_sel', 'sourcing_type', 'has_written_exam', 'transfer_eval_mode')
     def _compute_recruitment_step(self):
         for rec in self:
             is_internal = rec.sourcing_type in ('internal', 'both') or 'INT' in (rec.reference or '').upper() or 'LAT' in (rec.reference or '').upper()
@@ -845,7 +846,7 @@ class JobVacancy(models.Model):
                     rec.recruitment_step = 'notify_selection'
                 elif rec.scores_computed:
                     rec.recruitment_step = 'notify_committee'
-                elif rec.candidate_notified or rec.shortlist_done or (is_internal and rec.eligible_employee_ids and len(rec.eligible_employee_ids) > 0):
+                elif rec.supervisor_rec_requested or rec.candidate_notified or rec.shortlist_done or (is_internal and rec.eligible_employee_ids and len(rec.eligible_employee_ids) > 0):
                     rec.recruitment_step = 'compute_rank'
                 else:
                     rec.recruitment_step = 'shortlist'
@@ -898,6 +899,7 @@ class JobVacancy(models.Model):
             rec.ext_selected_recruitment_id = ext_rec
 
     def _inverse_recruitment_step(self):
+        # Intentionally blank inverse method to allow user-editable computed recruitment_step field
         pass
 
     @api.depends('reference')
@@ -2121,7 +2123,7 @@ class JobVacancy(models.Model):
                 if ActivityType:
                     HrTask.sudo().create({
                         'activity_type_id': ActivityType.id,
-                        'note': _("Action Required: Please submit the Supervisor Recommendation Score (0-100%) for employee <b>%s</b> for vacancy <b>%s</b>.") % (emp.name, self.reference),
+                        'note': _("Action Required: Please submit the Supervisor Recommendation Score (0-100%%) for employee <b>%s</b> for vacancy <b>%s</b>.") % (emp.name, self.reference),
                         'res_id': existing.id,
                         'res_model_id': self.env['ir.model']._get('transfer.assessment.record').id,
                         'user_id': coach.user_id.id,
@@ -2129,6 +2131,7 @@ class JobVacancy(models.Model):
                     })
                 count += 1
 
+        self.supervisor_rec_requested = True
         self.recruitment_step = 'compute_rank'
         return {
             'type': 'ir.actions.client',
@@ -2138,6 +2141,7 @@ class JobVacancy(models.Model):
                 'message': _('Successfully sent recommendation requests to %s candidate supervisors.') % count,
                 'type': 'success',
                 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
             }
         }
 
@@ -2616,7 +2620,7 @@ class JobVacancy(models.Model):
     def _compute_hierarchy_type_recruitment(self):
         """Determine the approval hierarchy category based on Grade and Operating Unit."""
         self.ensure_one()
-        grade = self.job_grade_id or (self.job_position.job_grade_id if self.job_position else False)
+        grade = getattr(self, 'job_grade', False) or getattr(self, 'job_grade_id', False) or (getattr(self.job_position, 'grade', False) if self.job_position else False)
         op_unit = self.operating_unit_id
         category = self.employee_category if hasattr(self, 'employee_category') else False
 
@@ -2719,19 +2723,44 @@ class PanelMembers(models.Model):
         string='Eligible Panel Employees'
     )
 
-    @api.depends('panl_memb_vac', 'panl_memb_vac.operating_unit_id')
+    def _get_allowed_operating_unit_ids(self):
+        """
+        Returns a list of operating unit IDs allowed for panel members:
+        - Hiring Work Unit (vacancy.operating_unit_id)
+        - Vacancy Creator / Responsible Officer Work Unit (vacancy.responsible or create_uid.employee_id)
+        """
+        allowed_ous = set()
+        vac = self.panl_memb_vac
+
+        # 1. Hiring OU
+        if vac and vac.operating_unit_id:
+            allowed_ous.add(vac.operating_unit_id.id)
+        elif self.env.context.get('parent_operating_unit_id'):
+            p_ou = self.env.context.get('parent_operating_unit_id')
+            ou_id = p_ou if isinstance(p_ou, int) else getattr(p_ou, 'id', False)
+            if ou_id:
+                allowed_ous.add(ou_id)
+
+        # 2. Responsible / Creator OU
+        if vac and vac.responsible and vac.responsible.default_operating_unit_id:
+            allowed_ous.add(vac.responsible.default_operating_unit_id.id)
+        elif vac and vac.create_uid and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
+            allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
+        elif self.env.context.get('parent_responsible_id'):
+            r_id = self.env.context.get('parent_responsible_id')
+            emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+            if emp and getattr(emp, 'default_operating_unit_id', False):
+                allowed_ous.add(emp.default_operating_unit_id.id)
+
+        return list(allowed_ous)
+
+    @api.depends('panl_memb_vac', 'panl_memb_vac.operating_unit_id', 'panl_memb_vac.responsible', 'panl_memb_vac.responsible.default_operating_unit_id')
     def _compute_eligible_employee_ids(self):
         for rec in self:
-            hiring_ou = False
-            if rec.panl_memb_vac and rec.panl_memb_vac.operating_unit_id:
-                hiring_ou = rec.panl_memb_vac.operating_unit_id.id
-            elif self.env.context.get('parent_operating_unit_id'):
-                p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-
-            if hiring_ou:
+            allowed_ous = rec._get_allowed_operating_unit_ids()
+            if allowed_ous:
                 rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('default_operating_unit_id', 'in', allowed_ous),
                     ('active', '=', True)
                 ])
             else:
@@ -2739,16 +2768,10 @@ class PanelMembers(models.Model):
 
     @api.onchange('panl_memb_vac', 'role', 'panel_type')
     def _onchange_panl_memb_vac_domain(self):
-        """Filter panel members strictly to the Vacancy's Hiring Work Unit."""
-        hiring_ou = False
-        if self.panl_memb_vac and self.panl_memb_vac.operating_unit_id:
-            hiring_ou = self.panl_memb_vac.operating_unit_id.id
-        elif self.env.context.get('parent_operating_unit_id'):
-            p_ou = self.env.context.get('parent_operating_unit_id')
-            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-
-        if hiring_ou:
-            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
+        """Filter panel members to Hiring Work Unit AND Vacancy Creator/Responsible Officer Work Unit."""
+        allowed_ous = self._get_allowed_operating_unit_ids()
+        if allowed_ous:
+            domain = [('default_operating_unit_id', 'in', allowed_ous), ('active', '=', True)]
             self.eligible_employee_ids = self.env['hr.employee'].search(domain)
             if self.employee_id and self.employee_id.id not in self.eligible_employee_ids.ids:
                 self.employee_id = False
@@ -3086,18 +3109,30 @@ class VacancyDelegation(models.Model):
         role_val = role or self.role or 'panel_member'
         vac = self.vac_del_id
 
-        # 1. Panel Member: Strictly from Vacancy's Hiring Work Unit
+        # 1. Panel Member: Employees from Hiring Work Unit OR Responsible/Creator Work Unit
         if role_val == 'panel_member':
-            hiring_ou = False
-            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                hiring_ou = vac.operating_unit_id.id
+            allowed_ous = set()
+            if vac and getattr(vac, 'operating_unit_id', False):
+                allowed_ous.add(vac.operating_unit_id.id)
             elif self.env.context.get('parent_operating_unit_id'):
                 p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+                ou_id = p_ou if isinstance(p_ou, int) else getattr(p_ou, 'id', False)
+                if ou_id:
+                    allowed_ous.add(ou_id)
 
-            if hiring_ou:
+            if vac and getattr(vac, 'responsible', False) and vac.responsible.default_operating_unit_id:
+                allowed_ous.add(vac.responsible.default_operating_unit_id.id)
+            elif vac and getattr(vac, 'create_uid', False) and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
+                allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
+            elif self.env.context.get('parent_responsible_id'):
+                r_id = self.env.context.get('parent_responsible_id')
+                emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+                if emp and getattr(emp, 'default_operating_unit_id', False):
+                    allowed_ous.add(emp.default_operating_unit_id.id)
+
+            if allowed_ous:
                 employees = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
+                    ('default_operating_unit_id', 'in', list(allowed_ous)),
                     ('active', '=', True),
                     ('user_id', '!=', False)
                 ])

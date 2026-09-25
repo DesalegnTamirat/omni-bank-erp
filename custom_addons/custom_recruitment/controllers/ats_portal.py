@@ -48,6 +48,215 @@ import base64
 from odoo import http, fields, _
 from odoo.http import request, content_disposition
 
+ETHIOPIAN_FIELDS_OF_STUDY = [
+    'Accounting',
+    'Accounting & Finance',
+    'Agribusiness Management',
+    'Agricultural Economics',
+    'Agricultural Engineering',
+    'Agriculture / Agronomy',
+    'Animal Science / Animal Production',
+    'Applied Chemistry',
+    'Applied Geology',
+    'Applied Mathematics',
+    'Applied Physics',
+    'Architecture & Urban Planning',
+    'Automotive Technology / Engineering',
+    'Banking & Finance',
+    'Biochemistry',
+    'Biology / Biological Sciences',
+    'Biomedical Engineering',
+    'Biotechnology',
+    'Business Administration (BBA / MBA)',
+    'Business Education',
+    'Chemical Engineering',
+    'Chemistry',
+    'Civil Engineering',
+    'Computer Engineering',
+    'Computer Science',
+    'Construction Technology & Management',
+    'Cooperative Accounting / Management',
+    'Cotton & Textile Engineering',
+    'Crop Science / Protection',
+    'Data Science / Analytics',
+    'Dental Medicine / Dentistry',
+    'Development Economics',
+    'Disaster Risk Management',
+    'Economics',
+    'Educational Planning & Management',
+    'Electrical & Computer Engineering',
+    'Electromechanical Engineering',
+    'Environmental Engineering',
+    'Environmental Health',
+    'Environmental Science',
+    'Fashion Design & Garment Engineering',
+    'Finance / Financial Management',
+    'Food Engineering / Science & Technology',
+    'Forestry / Agroforestry',
+    'General Nursing',
+    'Geography & Environmental Studies',
+    'Geology / Earth Sciences',
+    'Geotechnical Engineering',
+    'Governance & Development Studies',
+    'Graphic Design & Multimedia',
+    'Hardware / Network Engineering',
+    'Healthcare / Health Service Management',
+    'History & Heritage Management',
+    'Horticulture',
+    'Hotel & Tourism Management',
+    'Human Resource Management (HRM)',
+    'Hydraulic & Water Resources Engineering',
+    'Industrial Chemistry',
+    'Industrial Engineering',
+    'Information Systems / MIS',
+    'Information Technology (IT)',
+    'Instrumentation Engineering',
+    'Internal Audit / Auditing',
+    'International Relations & Diplomacy',
+    'Journalism & Communication',
+    'Laboratory Technology / Medical Lab Science',
+    'Law (LLB / LLM)',
+    'Leadership & Organisational Management',
+    'Library & Information Science',
+    'Logistics & Supply Chain Management',
+    'Management',
+    'Management Information Systems (MIS)',
+    'Manufacturing Engineering',
+    'Marketing Management',
+    'Materials Science & Engineering',
+    'Mathematical Modeling',
+    'Mathematics',
+    'Mechanical Engineering',
+    'Medical Laboratory Technology',
+    'Medicine / MD / MBBS',
+    'Midwifery',
+    'Mining Engineering',
+    'Music & Performing Arts',
+    'Natural Resource Management',
+    'Neonatal Nursing',
+    'Nursing',
+    'Occupational Health & Safety',
+    'Ophthalmology / Optometry',
+    'Parasitology / Microbiology',
+    'Petroleum Engineering',
+    'Pharmacy / Pharmaceutical Sciences',
+    'Philosophy',
+    'Physical Education & Sports Science',
+    'Physics',
+    'Plant Sciences',
+    'Political Science & International Relations',
+    'Power & Control Engineering',
+    'Procurement & Asset Management',
+    'Procurement & Supply Chain Management',
+    'Public Administration',
+    'Public Health (MPH)',
+    'Radiography / Radiologic Technology',
+    'Real Estate & Land Administration',
+    'Record & Archives Management',
+    'Rural Development & Agricultural Extension',
+    'Software Engineering',
+    'Soil Science',
+    'Sociology & Social Work',
+    'Special Needs Education',
+    'Statistics',
+    'Structural Engineering',
+    'Supply Chain & Operations Management',
+    'Surveying & Geomatics Engineering',
+    'System & Network Administration',
+    'Tax & Customs Administration',
+    'Telecommunication Engineering',
+    'Textile & Apparel Engineering',
+    'Urban Planning & Design',
+    'Veterinary Medicine (DVM)',
+    'Veterinary Science',
+    'Water Supply & Environmental Engineering',
+    'Wildlife & Eco-Tourism',
+    'Wood Science & Technology',
+    'Zoology',
+    'Other'
+]
+
+ETHIOPIAN_INSTITUTIONS = [
+    'AASTU (Addis Ababa Science & Technology University)',
+    'Adama Science and Technology University (ASTU)',
+    'Addis Ababa University (AAU)',
+    'Admas University',
+    'Alpha University College',
+    'Ambo University',
+    'Arba Minch University',
+    'Arsi University',
+    'Assosa University',
+    'Atlas College',
+    'Axum University',
+    'Bahir Dar University',
+    'Beshale University College',
+    'Borana University',
+    'Bule Hora University',
+    'CPU College',
+    'Debre Berhan University',
+    'Debre Markos University',
+    'Debre Tabor University',
+    'Defense University',
+    'Dembi Dolo University',
+    'Densu University College',
+    'Dilla University',
+    'Dire Dawa University',
+    'Ethio-China TVET Institute',
+    'Ethiopian Aviation University (EAU)',
+    'Ethiopian Civil Service University (ECSU)',
+    'Ethiopian Police University',
+    'Gage College',
+    'Gambella University',
+    'Grace College',
+    'Harambee University',
+    'Haramaya University',
+    'Hawassa University',
+    'HiLCoE School of Computer Science & Technology',
+    'Hope Enterprise University College',
+    'Injibara University',
+    'Jigjiga University',
+    'Jinka University',
+    'Jimma University',
+    'Kebri Dehar University',
+    'Kotebe Education University (KEU)',
+    'Leadstar University College',
+    'Madda Walabu University',
+    'Mekelle University',
+    'Mettu University',
+    'Micro Business College',
+    'Microlink Information Technology College',
+    'National Aviation College',
+    'New Generation University College',
+    'Nile College',
+    'Oasis College',
+    'Oda Bultum University',
+    'Paradigm College',
+    'Paramount College',
+    'Princess Zenebework Nursing College',
+    'Queen\'s College',
+    'Raya University',
+    'Rift Valley College',
+    'Rift Valley University',
+    'Royal College',
+    'Salale University',
+    'Santex College',
+    'Semera University',
+    'St. Mary\'s University',
+    'Tropical College of Medicine',
+    'Unity University',
+    'Universal College',
+    'Universal Medical College',
+    'University of Gondar',
+    'Wachamo University',
+    'Werabe University',
+    'Wolaita Sodo University',
+    'Woldia University',
+    'Wollo University',
+    'Yanet College',
+    'Yardstick International College',
+    'Other'
+]
+
 
 class ATSPortalController(http.Controller):
 
@@ -62,20 +271,34 @@ class ATSPortalController(http.Controller):
         return bool(candidate.cv_file and candidate.education_ids and candidate.experience_ids and candidate.phone)
 
     def _get_candidate_profile(self):
-        """Get or create the candidate profile for the current logged-in user."""
+        """Get or create the candidate profile for the current logged-in user with phone auto-sync."""
         user = request.env.user
         if user._is_public():
             return False
         
+        user_phone = getattr(user, 'phone', '') or (user.partner_id and user.partner_id.phone) or (user.partner_id and getattr(user.partner_id, 'mobile', '')) or ''
+        
         profile = request.env['candidate.profile'].sudo().search([('partner_id', '=', user.partner_id.id)], limit=1)
+        if not profile:
+            profile = request.env['candidate.profile'].sudo().search([('user_id', '=', user.id)], limit=1)
         if not profile:
             profile = request.env['candidate.profile'].sudo().create({
                 'partner_id': user.partner_id.id,
                 'user_id': user.id,
                 'name': user.name or user.partner_id.name,
                 'email': user.email or user.login,
-                'phone': user.phone or user.partner_id.phone or '',
+                'phone': user_phone,
             })
+        
+        effective_phone = profile.phone or user_phone
+        if effective_phone:
+            if not profile.phone:
+                profile.sudo().write({'phone': effective_phone})
+            if user.partner_id and user.partner_id.phone != effective_phone:
+                user.partner_id.sudo().write({'phone': effective_phone, 'mobile': effective_phone})
+            if hasattr(user, 'phone') and getattr(user, 'phone', False) != effective_phone:
+                user.sudo().write({'phone': effective_phone})
+
         return profile
 
     def _is_recruitment_admin(self):
@@ -876,6 +1099,117 @@ class ATSPortalController(http.Controller):
         return request.redirect('/my/candidate/offers')
 
     # ---------------------------------------------------------------
+    # Internal Employee Promotion & Transfer Response Routes
+    # ---------------------------------------------------------------
+    @http.route(['/my/promotion/respond/<int:cand_id>'], type='http', auth='user', website=True, methods=['GET'])
+    def internal_promotion_respond_page(self, cand_id, **kwargs):
+        """Displays the employee promotion response form."""
+        cand = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(cand_id)
+        if not cand.exists():
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Candidate selection record not found.')})
+
+        user = request.env.user
+        cand_emp = cand.emp_name
+        is_owner = (cand_emp and cand_emp.user_id and cand_emp.user_id.id == user.id) or (cand_emp and cand_emp.id == getattr(user.employee_id, 'id', False))
+        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
+
+        if not (is_owner or is_hr):
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized: This promotion offer is assigned to another employee.')})
+
+        job_name = cand.new_int_sel_cand.job_position.name if (cand.new_int_sel_cand and cand.new_int_sel_cand.job_position) else (cand.emp_position or _('Promoted Position'))
+        work_unit = cand.current_work_unit or ''
+
+        return request.render('custom_recruitment.internal_offer_response_page', {
+            'candidate_name': cand.emp_name.name if cand.emp_name else _('Employee'),
+            'job_title': job_name,
+            'work_unit': work_unit,
+            'acceptance_status': cand.acceptance_status or 'pending',
+            'submit_url': f'/my/promotion/respond/{cand.id}/submit',
+        })
+
+    @http.route(['/my/promotion/respond/<int:cand_id>/submit'], type='http', auth='user', website=True, methods=['POST'])
+    def internal_promotion_respond_submit(self, cand_id, decision='accept', reason='', **kwargs):
+        """Processes promotion acceptance/rejection from employee response portal."""
+        cand = request.env['new.internal.recruitment.selected.candidates'].sudo().browse(cand_id)
+        if not cand.exists():
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Candidate record not found.')})
+
+        user = request.env.user
+        cand_emp = cand.emp_name
+        is_owner = (cand_emp and cand_emp.user_id and cand_emp.user_id.id == user.id) or (cand_emp and cand_emp.id == getattr(user.employee_id, 'id', False))
+        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
+
+        if not (is_owner or is_hr):
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized access.')})
+
+        if decision == 'accept':
+            cand.sudo().action_accept_promotion()
+            msg = _("Thank you! Your ACCEPTANCE of the promotion offer has been recorded.")
+        else:
+            if not reason or not reason.strip():
+                reason = _("Declined by employee via response portal.")
+            cand.sudo().confirm_decline_promotion(reason.strip())
+            msg = _("Your DECLINE of the promotion offer has been recorded.")
+
+        return request.render('custom_recruitment.internal_offer_response_page', {
+            'success': msg,
+        })
+
+    @http.route(['/my/transfer/respond/<int:req_id>'], type='http', auth='user', website=True, methods=['GET'])
+    def internal_transfer_respond_page(self, req_id, **kwargs):
+        """Displays the employee transfer response form."""
+        tr = request.env['employee.transfer.request'].sudo().browse(req_id)
+        if not tr.exists():
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Transfer request record not found.')})
+
+        user = request.env.user
+        tr_emp = tr.employee_id
+        is_owner = (tr_emp and tr_emp.user_id and tr_emp.user_id.id == user.id) or (tr_emp and tr_emp.id == getattr(user.employee_id, 'id', False))
+        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
+
+        if not (is_owner or is_hr):
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized: This transfer offer is assigned to another employee.')})
+
+        job_name = tr.target_job_position_id.name if tr.target_job_position_id else (tr.current_job_position_id.name if tr.current_job_position_id else _('Lateral Transfer'))
+        work_unit = tr.requested_operating_unit_id.name if tr.requested_operating_unit_id else ''
+
+        return request.render('custom_recruitment.internal_offer_response_page', {
+            'candidate_name': tr.employee_id.name if tr.employee_id else _('Employee'),
+            'job_title': job_name,
+            'work_unit': work_unit,
+            'acceptance_status': tr.acceptance_status or 'pending',
+            'submit_url': f'/my/transfer/respond/{tr.id}/submit',
+        })
+
+    @http.route(['/my/transfer/respond/<int:req_id>/submit'], type='http', auth='user', website=True, methods=['POST'])
+    def internal_transfer_respond_submit(self, req_id, decision='accept', reason='', **kwargs):
+        """Processes transfer acceptance/rejection from employee response portal."""
+        tr = request.env['employee.transfer.request'].sudo().browse(req_id)
+        if not tr.exists():
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Transfer record not found.')})
+
+        user = request.env.user
+        tr_emp = tr.employee_id
+        is_owner = (tr_emp and tr_emp.user_id and tr_emp.user_id.id == user.id) or (tr_emp and tr_emp.id == getattr(user.employee_id, 'id', False))
+        is_hr = user.has_group('custom_recruitment.group_recruitment_officer') or user.has_group('custom_recruitment.group_recruitment_manager') or user.has_group('base.group_system')
+
+        if not (is_owner or is_hr):
+            return request.render('custom_recruitment.internal_offer_response_page', {'error': _('Unauthorized access.')})
+
+        if decision == 'accept':
+            tr.sudo().action_accept_transfer()
+            msg = _("Thank you! Your ACCEPTANCE of the transfer offer has been recorded.")
+        else:
+            if not reason or not reason.strip():
+                reason = _("Declined by employee via response portal.")
+            tr.sudo().confirm_decline_transfer(reason.strip())
+            msg = _("Your DECLINE of the transfer offer has been recorded.")
+
+        return request.render('custom_recruitment.internal_offer_response_page', {
+            'success': msg,
+        })
+
+    # ---------------------------------------------------------------
     # Master Electronic CV Profile Builder (7 Tabs)
     # ---------------------------------------------------------------
     @http.route('/my/candidate/profile', type='http', auth='user', website=True, methods=['GET', 'POST'])
@@ -895,10 +1229,11 @@ class ATSPortalController(http.Controller):
                 last_name = kwargs.get('last_name', '').strip()
                 full_name = f"{first_name} {middle_name} {last_name}".strip()
 
+                new_phone = kwargs.get('phone', candidate.phone)
                 candidate.sudo().write({
                     'name': full_name or candidate.name,
                     'gender': kwargs.get('gender', candidate.gender),
-                    'phone': kwargs.get('phone', candidate.phone),
+                    'phone': new_phone,
                     'national_id': kwargs.get('national_id', candidate.national_id),
                     'secondary_id_type': kwargs.get('secondary_id_type', candidate.secondary_id_type),
                     'secondary_id_number': kwargs.get('secondary_id_number', candidate.secondary_id_number),
@@ -907,6 +1242,11 @@ class ATSPortalController(http.Controller):
                     'city': kwargs.get('city', candidate.city),
                     'address': kwargs.get('address', candidate.address),
                 })
+
+                if new_phone and candidate.partner_id:
+                    candidate.partner_id.sudo().write({'phone': new_phone, 'mobile': new_phone})
+                if new_phone and candidate.user_id and hasattr(candidate.user_id, 'phone'):
+                    candidate.user_id.sudo().write({'phone': new_phone})
                 return request.redirect('/my/candidate/profile?step=3')
 
             elif step == 3:
@@ -1263,6 +1603,8 @@ class ATSPortalController(http.Controller):
             'edit_cert': request.env['candidate.certification'].sudo().browse(int(kwargs.get('edit_cert_id'))) if kwargs.get('edit_cert_id') else False,
             'edit_lang': request.env['candidate.language'].sudo().browse(int(kwargs.get('edit_lang_id'))) if kwargs.get('edit_lang_id') else False,
             'error_msg': kwargs.get('error') or kwargs.get('error_msg') or False,
+            'ethiopian_fields_of_study': ETHIOPIAN_FIELDS_OF_STUDY,
+            'ethiopian_institutions': ETHIOPIAN_INSTITUTIONS,
         }
         return request.render('custom_recruitment.ats_candidate_profile_template', values)
 

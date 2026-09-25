@@ -18,6 +18,13 @@ class CompetencyRoleMapping(models.Model):
     mapping_name = fields.Char(
         string='Role Mapping', compute='_compute_mapping_name', store=True)
     job_position_id = fields.Many2one('hr.job', string='Job Position', required=True, tracking=True)
+    department_id = fields.Many2one(
+        related='job_position_id.department_id',
+        string='Department',
+        store=True,
+        readonly=True,
+        index=True
+    )
     grade_id = fields.Many2one('employee.grade', string='Job Grade', compute='_compute_grade_id', store=True, readonly=True)
     line_ids = fields.One2many('competency.role.mapping.line', 'mapping_id', string='Competency Lines')
     cluster_ids = fields.Many2many('competency.cluster', string='Competency Clusters')
@@ -45,14 +52,53 @@ class CompetencyRoleMapping(models.Model):
         'operating.unit', string='Specific Operating Units', tracking=True
     )
 
+    @api.model
+    def _resolve_job_grade(self, job):
+        """Resolves employee.grade for a job position via operating unit job position, active contracts, or matching."""
+        if not job:
+            return self.env['employee.grade']
+
+        # 1. Look up operating.unit.job.position
+        if 'operating.unit.job.position' in self.env:
+            pos = self.env['operating.unit.job.position'].search([
+                ('job_position_id', '=', job.id)
+            ], limit=1)
+            if pos and pos.job_grade_id and getattr(pos.job_grade_id, '_name', '') == 'employee.grade':
+                return pos.job_grade_id
+
+        # 2. Look up active hr.version contract for this job
+        if 'hr.version' in self.env:
+            contract = self.env['hr.version'].search([
+                ('job_id', '=', job.id),
+                ('state', 'in', ['open', 'probation', 'draft'])
+            ], order='id desc', limit=1)
+            if contract and getattr(contract, 'job_grade', False):
+                g = contract.job_grade
+                if getattr(g, '_name', '') == 'employee.grade':
+                    return g
+
+        # 3. Direct attributes on job (with model safety check and code/name fallback)
+        g = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
+        if g:
+            if getattr(g, '_name', '') == 'employee.grade':
+                return g
+            code = getattr(g, 'code', False) or getattr(g, 'grade_code', False)
+            name = getattr(g, 'name', False) or getattr(g, 'grade_name', False)
+            if code:
+                found = self.env['employee.grade'].search([('grade_code', '=ilike', str(code).strip())], limit=1)
+                if found:
+                    return found
+            if name:
+                found = self.env['employee.grade'].search(['|', ('grade_name', '=ilike', str(name).strip()), ('grade_code', '=ilike', str(name).strip())], limit=1)
+                if found:
+                    return found
+
+        return self.env['employee.grade']
+
     @api.depends('job_position_id')
     def _compute_grade_id(self):
         for rec in self:
-            if rec.job_position_id:
-                job = rec.job_position_id
-                rec.grade_id = getattr(job, 'grade', False) or getattr(job, 'grade_id', False)
-            else:
-                rec.grade_id = False
+            rec.grade_id = self._resolve_job_grade(rec.job_position_id)
 
     @api.model
     def get_competencies_for_job_and_grade(self, job_id, grade_id=None):
@@ -297,6 +343,21 @@ class CompetencyRoleMappingLine(models.Model):
         domain="[('state', '=', 'approved'), ('status', '=', 'active')]")
     pillar = fields.Selection(related='competency_id.pillar', string='Pillar', store=True, readonly=True)
     competency_definition = fields.Text(related='competency_id.definition', string='Competency Definition', store=True, readonly=True)
+    mapping_state = fields.Selection(related='mapping_id.state', string='Mapping State', readonly=True)
+
+    def action_open_guide(self):
+        """Opens the full behavioral indicators and requirements popup for this role mapping line."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Behavioral Indicators & Guidance: %s') % (self.competency_id.name if self.competency_id else ''),
+            'res_model': 'competency.role.mapping.line',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('competency_management.view_competency_role_mapping_line_form').id, 'form')],
+            'target': 'new',
+            'context': self.env.context,
+        }
 
     indicator_level_1 = fields.Text(string='Level 1 Indicator', compute='_compute_level_indicators')
     indicator_level_2 = fields.Text(string='Level 2 Indicator', compute='_compute_level_indicators')

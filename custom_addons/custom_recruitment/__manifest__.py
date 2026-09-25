@@ -150,6 +150,7 @@ dependency, so they were intentionally left in place.
         'wizards/blacklist_import_wizard.xml',
         'wizards/panel_member_response_wizard.xml',
         'wizards/reschedule_interview_wizard.xml',
+        'wizards/internal_selection_decline_wizard_views.xml',
 
         # -- Menus (must load AFTER wizards so action refs resolve) --
         'views/menu_recruitment.xml',

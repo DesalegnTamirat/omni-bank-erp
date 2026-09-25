@@ -16,6 +16,7 @@
             ('before', 'web/static/src/scss/primary_variables.scss',
              'bunna_custom_web_page/static/src/scss/primary_variables.scss'),
             'bunna_custom_web_page/static/src/scss/website_overrides.scss',
+            'bunna_custom_web_page/static/src/xml/navbar_custom.xml',
         ],
         'web.assets_frontend': [
             ('before', 'website/static/src/scss/primary_variables.scss',

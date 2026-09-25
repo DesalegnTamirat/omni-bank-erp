@@ -146,7 +146,7 @@
               name="Transfer Assessments"
               parent="menu_assessment_root"
               action="action_transfer_assessment_records"
-              groups="group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
+              groups="base.group_user,group_assessment_officer,group_assessment_manager,group_assessment_administrator,custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"
               sequence="30"/>
 
     <!-- ============================================ -->

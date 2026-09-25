@@ -1337,49 +1337,13 @@ class InternalRecruitmentPanel(models.Model):
         string='Eligible Panel Employees'
     )
 
-    @api.depends('ext_panel', 'ext_panel.vacancy_id', 'ext_panel.workunit_id')
-    def _compute_eligible_employee_ids(self):
-        for rec in self:
-            sel = rec.ext_panel
-            vac = False
-            if sel:
-                vac_id = getattr(sel, 'vacancy_id', False)
-                if isinstance(vac_id, int) and vac_id > 0:
-                    vac = self.env['job.vacancy'].browse(vac_id)
-                elif hasattr(vac_id, 'operating_unit_id') and vac_id:
-                    vac = vac_id
-                if not vac and getattr(sel, 'vacancy_reference', False):
-                    vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
-
-            hiring_ou = False
-            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                hiring_ou = vac.operating_unit_id.id
-            elif sel and getattr(sel, 'workunit_id', False):
-                w_id = sel.workunit_id
-                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
-            elif sel and getattr(sel, 'job_location', False):
-                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
-                if ou:
-                    hiring_ou = ou.id
-
-            elif self.env.context.get('parent_operating_unit_id'):
-                p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-            elif self.env.context.get('parent_workunit_id'):
-                p_wu = self.env.context.get('parent_workunit_id')
-                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
-
-            if hiring_ou:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
-                    ('active', '=', True)
-                ])
-            else:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
-
-    @api.onchange('ext_panel', 'selection_criteria')
-    def _onchange_ext_panel_domain(self):
-        """Filter panel members strictly to the Hiring Work Unit."""
+    def _get_allowed_operating_unit_ids(self):
+        """
+        Returns allowed operating unit IDs for panel members:
+        - Hiring Work Unit
+        - Vacancy Creator / Responsible Officer Work Unit
+        """
+        allowed_ous = set()
         sel = self.ext_panel
         vac = False
         if sel:
@@ -1391,25 +1355,60 @@ class InternalRecruitmentPanel(models.Model):
             if not vac and getattr(sel, 'vacancy_reference', False):
                 vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
 
-        hiring_ou = False
-        if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-            hiring_ou = vac.operating_unit_id.id
+        # 1. Hiring OU
+        if vac and getattr(vac, 'operating_unit_id', False):
+            allowed_ous.add(vac.operating_unit_id.id)
         elif sel and getattr(sel, 'workunit_id', False):
             w_id = sel.workunit_id
-            hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            ou_id = w_id.id if hasattr(w_id, 'id') else w_id
+            if ou_id:
+                allowed_ous.add(ou_id)
         elif sel and getattr(sel, 'job_location', False):
             ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
             if ou:
-                hiring_ou = ou.id
+                allowed_ous.add(ou.id)
         elif self.env.context.get('parent_operating_unit_id'):
             p_ou = self.env.context.get('parent_operating_unit_id')
-            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            ou_id = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            if ou_id:
+                allowed_ous.add(ou_id)
         elif self.env.context.get('parent_workunit_id'):
             p_wu = self.env.context.get('parent_workunit_id')
-            hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+            ou_id = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+            if ou_id:
+                allowed_ous.add(ou_id)
 
-        if hiring_ou:
-            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
+        # 2. Responsible Officer / Vacancy Creator OU
+        if vac and getattr(vac, 'responsible', False) and vac.responsible.default_operating_unit_id:
+            allowed_ous.add(vac.responsible.default_operating_unit_id.id)
+        elif vac and getattr(vac, 'create_uid', False) and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
+            allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
+        elif self.env.context.get('parent_responsible_id'):
+            r_id = self.env.context.get('parent_responsible_id')
+            emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+            if emp and getattr(emp, 'default_operating_unit_id', False):
+                allowed_ous.add(emp.default_operating_unit_id.id)
+
+        return list(allowed_ous)
+
+    @api.depends('ext_panel', 'ext_panel.vacancy_id', 'ext_panel.workunit_id')
+    def _compute_eligible_employee_ids(self):
+        for rec in self:
+            allowed_ous = rec._get_allowed_operating_unit_ids()
+            if allowed_ous:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', 'in', allowed_ous),
+                    ('active', '=', True)
+                ])
+            else:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
+
+    @api.onchange('ext_panel', 'selection_criteria')
+    def _onchange_ext_panel_domain(self):
+        """Filter panel members to Hiring Work Unit AND Vacancy Creator/Responsible Officer Work Unit."""
+        allowed_ous = self._get_allowed_operating_unit_ids()
+        if allowed_ous:
+            domain = [('default_operating_unit_id', 'in', allowed_ous), ('active', '=', True)]
             self.eligible_employee_ids = self.env['hr.employee'].search(domain)
             if self.emp_name and self.emp_name.id not in self.eligible_employee_ids.ids:
                 self.emp_name = False

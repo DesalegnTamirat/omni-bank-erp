@@ -47,11 +47,10 @@ class PopulateT3ScorecardWizard(models.TransientModel):
                 'Position combinations. Check employee assignments.'
             )
 
-        planning_name = 'Corporate Scorecard %s %s' % (self.fiscal_year_id.name, self.appraisal_period_id.name)
-
         existing = self.env['t3.scorecard'].search([
             ('employee_id', 'in', employees.ids),
-            ('planning_name', '=', planning_name),
+            ('appraisal_period_id', '=', self.appraisal_period_id.id),
+            ('fiscal_year_id', '=', self.fiscal_year_id.id),
         ])
         draft_existing = existing.filtered(lambda r: r.state == 'draft')
         locked_existing = existing - draft_existing
@@ -65,9 +64,15 @@ class PopulateT3ScorecardWizard(models.TransientModel):
         for emp in employees:
             if emp.id in locked_employee_ids:
                 continue
+
+            planning_name = '%s Scorecard Plan %s %s' % (
+                emp.name, self.fiscal_year_id.name, self.appraisal_period_id.name
+            )
+
             vals_list.append({
                 'employee_id': emp.id,
                 'planning_name': planning_name,
+                'fiscal_year_id': self.fiscal_year_id.id,
                 'appraisal_period_id': self.appraisal_period_id.id,
                 'start_date': fyl.date_start,
                 'end_date': fyl.date_end,

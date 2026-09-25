@@ -1406,17 +1406,26 @@ class NewInternalRecruitmentSelected(models.Model):
         return self.action_compute_and_rank()
 
     def notify_selection(self):
+        base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '')
         for val in self.new_int_rec_sel:
             if val.emp_name and (val.select_flag or val.select_flag is None):
                 usr = self._get_partner_for_employee(val.emp_name)
                 if usr:
+                    is_transfer = False
+                    if self.vacancy_id:
+                        vac = self.env['job.vacancy'].browse(self.vacancy_id)
+                        if vac.exists() and (vac.transfer_eval_mode == 'transfer_matrix_only' or 'LAT' in (vac.reference or '').upper() or 'TRA' in (vac.reference or '').upper()):
+                            is_transfer = True
+                    move_type = _("transfer") if is_transfer else _("promotion")
+
                     if val.selection_type in ['selected', 'Selected']:
+                        cand_link = f"{base_url}/my/promotion/respond/{val.id}"
                         msg1 = _("We are pleased to inform you that you have been Selected for the position of ")
-                        msg2 = _("\n\nPlease indicate your acceptance of promotion in the system.\n\nCongratulations!")
+                        msg2 = f'<br/><br/>Please indicate your acceptance or decline of the <b>{move_type}</b> by clicking the link below:<br/>👉 <a href="{cand_link}" target="_blank" style="font-weight: bold; color: #007bff; text-decoration: underline;">{cand_link}</a><br/><br/>Congratulations!'
                         self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
                     elif val.selection_type in ['reserve', 'reserved', 'Reserve', 'Reserved']:
                         msg1 = _("We are pleased to inform you that you have been placed in the Reserve Pool for the position of ")
-                        msg2 = _("\n\nYour status is valid for 6 months.")
+                        msg2 = _("<br/><br/>Your status is valid for 6 months.")
                         self.mail_channel_msgs_selection(usr.id, val.emp_name.name, msg1, self.job_position.name if self.job_position else '', msg2)
                     val.decision_notified = 'Yes'
         try:
@@ -1439,7 +1448,7 @@ class NewInternalRecruitmentSelected(models.Model):
     
     def mail_channel_msgs_selection(self, rec_id, emp, msg1, position, msg2):
         channel = self.env['discuss.channel']._get_or_create_chat(partners_to=[rec_id])
-        message = f"Dear {emp},\n\n{msg1}{position}.{msg2}"
+        message = f"<p>Dear <b>{emp}</b>,</p><p>{msg1}<b>{position}</b>.{msg2}</p>"
         channel.message_post(
             body=message,
             message_type='comment',
@@ -1715,6 +1724,96 @@ class InternalRecruitmentSelectedCandidates(models.Model):
         ('pending', 'Pending Handover')
     ], string="Handover Status")
 
+    acceptance_status = fields.Selection([
+        ('pending', 'Pending Acceptance'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected / Declined'),
+    ], string="Offer Acceptance Status", default='pending')
+    acceptance_date = fields.Datetime(string="Acceptance / Response Date", readonly=True)
+    rejection_reason = fields.Text(string="Rejection / Decline Reason")
+
+    def action_accept_promotion(self):
+        """Candidate or HR accepts the promotion or transfer offer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            is_transfer = False
+            vac = rec.vacancy_id or (rec.new_int_sel_cand.vacancy_id if rec.new_int_sel_cand else False)
+            if vac and hasattr(vac, 'transfer_eval_mode') and (vac.transfer_eval_mode == 'transfer_matrix_only' or 'LAT' in (vac.reference or '').upper() or 'TRA' in (vac.reference or '').upper()):
+                is_transfer = True
+            
+            offer_type = _("Transfer offer") if is_transfer else _("Promotion offer")
+
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': now,
+                'remarks': _("%s ACCEPTED on %s") % (offer_type, fields.Date.today())
+            })
+            if rec.new_int_sel_cand:
+                job_name = rec.new_int_sel_cand.job_position.name if rec.new_int_sel_cand.job_position else ''
+                rec.new_int_sel_cand.message_post(
+                    body=_("Employee <b>%s</b> ACCEPTED the %s for position <b>%s</b> on %s.") % (
+                        rec.emp_name.name if rec.emp_name else _("Candidate"),
+                        offer_type.lower(),
+                        job_name,
+                        now
+                    )
+                )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Offer Accepted'),
+                'message': _('Selection offer has been successfully marked as ACCEPTED.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_decline_promotion(self):
+        """Opens the decline wizard to capture reason for declining offer."""
+        self.ensure_one()
+        return {
+            'name': _('Decline Selection Offer'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'internal.selection.decline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_candidate_id': self.id,
+            }
+        }
+
+    def confirm_decline_promotion(self, reason):
+        """Executed by the decline wizard when candidate/HR declines the offer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            is_transfer = False
+            vac = rec.vacancy_id or (rec.new_int_sel_cand.vacancy_id if rec.new_int_sel_cand else False)
+            if vac and hasattr(vac, 'transfer_eval_mode') and (vac.transfer_eval_mode == 'transfer_matrix_only' or 'LAT' in (vac.reference or '').upper() or 'TRA' in (vac.reference or '').upper()):
+                is_transfer = True
+
+            offer_type = _("Transfer offer") if is_transfer else _("Promotion offer")
+
+            rec.write({
+                'acceptance_status': 'rejected',
+                'selection_type': 'rejected',
+                'acceptance_date': now,
+                'rejection_reason': reason,
+                'remarks': _("%s DECLINED on %s: %s") % (offer_type, fields.Date.today(), reason)
+            })
+            if rec.new_int_sel_cand:
+                job_name = rec.new_int_sel_cand.job_position.name if rec.new_int_sel_cand.job_position else ''
+                rec.new_int_sel_cand.message_post(
+                    body=_("Employee <b>%s</b> DECLINED the %s for position <b>%s</b>.<br/><b>Reason:</b> %s") % (
+                        rec.emp_name.name if rec.emp_name else _("Candidate"),
+                        offer_type.lower(),
+                        job_name,
+                        reason
+                    )
+                )
+        return True
+
     # ── Promotion Letter Fields (Official Bunna Bank Stationery) ──────────
     promotion_ref_no = fields.Char(string="Promotion Reference No", copy=False, readonly=True)
     salutation = fields.Selection([
@@ -1971,6 +2070,10 @@ class InternalRecruitmentSelectedCandidates(models.Model):
         for rec in self:
             cand_unit = (rec.current_work_unit or '').strip().lower()
             vacancy_unit = (rec.new_int_sel_cand.job_location or '').strip().lower() if rec.new_int_sel_cand else ''
+            if not vacancy_unit and rec.vacancy_id:
+                vac = self.env['job.vacancy'].browse(rec.vacancy_id)
+                if vac.exists():
+                    vacancy_unit = (getattr(vac, 'place_of_assignment', False) or getattr(vac.operating_unit_id, 'name', False) or '').strip().lower()
             pref_unit = (rec.preferred_location or '').strip().lower()
 
             target_unit = pref_unit or vacancy_unit
@@ -2140,49 +2243,13 @@ class InternalRecruitmentPanel(models.Model):
         string='Eligible Panel Employees'
     )
 
-    @api.depends('new_int_panel', 'new_int_panel.vacancy_id', 'new_int_panel.workunit_id')
-    def _compute_eligible_employee_ids(self):
-        for rec in self:
-            sel = rec.new_int_panel
-            vac = False
-            if sel:
-                vac_id = getattr(sel, 'vacancy_id', False)
-                if isinstance(vac_id, int) and vac_id > 0:
-                    vac = self.env['job.vacancy'].browse(vac_id)
-                elif hasattr(vac_id, 'operating_unit_id') and vac_id:
-                    vac = vac_id
-                if not vac and getattr(sel, 'vacancy_reference', False):
-                    vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
-
-            hiring_ou = False
-            if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-                hiring_ou = vac.operating_unit_id.id
-            elif sel and getattr(sel, 'workunit_id', False):
-                w_id = sel.workunit_id
-                hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
-            elif sel and getattr(sel, 'job_location', False):
-                ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
-                if ou:
-                    hiring_ou = ou.id
-
-            elif self.env.context.get('parent_operating_unit_id'):
-                p_ou = self.env.context.get('parent_operating_unit_id')
-                hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
-            elif self.env.context.get('parent_workunit_id'):
-                p_wu = self.env.context.get('parent_workunit_id')
-                hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
-
-            if hiring_ou:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([
-                    ('default_operating_unit_id', '=', hiring_ou),
-                    ('active', '=', True)
-                ])
-            else:
-                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
-
-    @api.onchange('new_int_panel', 'selection_criteria')
-    def _onchange_new_int_panel_domain(self):
-        """Filter panel members strictly to the Hiring Work Unit."""
+    def _get_allowed_operating_unit_ids(self):
+        """
+        Returns allowed operating unit IDs for panel members:
+        - Hiring Work Unit
+        - Vacancy Creator / Responsible Officer Work Unit
+        """
+        allowed_ous = set()
         sel = self.new_int_panel
         vac = False
         if sel:
@@ -2194,25 +2261,60 @@ class InternalRecruitmentPanel(models.Model):
             if not vac and getattr(sel, 'vacancy_reference', False):
                 vac = self.env['job.vacancy'].search([('reference', '=', sel.vacancy_reference)], limit=1)
 
-        hiring_ou = False
-        if vac and hasattr(vac, 'operating_unit_id') and vac.operating_unit_id:
-            hiring_ou = vac.operating_unit_id.id
+        # 1. Hiring OU
+        if vac and getattr(vac, 'operating_unit_id', False):
+            allowed_ous.add(vac.operating_unit_id.id)
         elif sel and getattr(sel, 'workunit_id', False):
             w_id = sel.workunit_id
-            hiring_ou = w_id.id if hasattr(w_id, 'id') else w_id
+            ou_id = w_id.id if hasattr(w_id, 'id') else w_id
+            if ou_id:
+                allowed_ous.add(ou_id)
         elif sel and getattr(sel, 'job_location', False):
             ou = self.env['operating.unit'].search([('name', '=ilike', str(sel.job_location).strip())], limit=1)
             if ou:
-                hiring_ou = ou.id
+                allowed_ous.add(ou.id)
         elif self.env.context.get('parent_operating_unit_id'):
             p_ou = self.env.context.get('parent_operating_unit_id')
-            hiring_ou = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            ou_id = p_ou if isinstance(p_ou, int) else (p_ou.id if hasattr(p_ou, 'id') else False)
+            if ou_id:
+                allowed_ous.add(ou_id)
         elif self.env.context.get('parent_workunit_id'):
             p_wu = self.env.context.get('parent_workunit_id')
-            hiring_ou = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+            ou_id = p_wu if isinstance(p_wu, int) else (p_wu.id if hasattr(p_wu, 'id') else False)
+            if ou_id:
+                allowed_ous.add(ou_id)
 
-        if hiring_ou:
-            domain = [('default_operating_unit_id', '=', hiring_ou), ('active', '=', True)]
+        # 2. Responsible Officer / Vacancy Creator OU
+        if vac and getattr(vac, 'responsible', False) and vac.responsible.default_operating_unit_id:
+            allowed_ous.add(vac.responsible.default_operating_unit_id.id)
+        elif vac and getattr(vac, 'create_uid', False) and vac.create_uid.employee_id and vac.create_uid.employee_id.default_operating_unit_id:
+            allowed_ous.add(vac.create_uid.employee_id.default_operating_unit_id.id)
+        elif self.env.context.get('parent_responsible_id'):
+            r_id = self.env.context.get('parent_responsible_id')
+            emp = self.env['hr.employee'].browse(r_id) if isinstance(r_id, int) else r_id
+            if emp and getattr(emp, 'default_operating_unit_id', False):
+                allowed_ous.add(emp.default_operating_unit_id.id)
+
+        return list(allowed_ous)
+
+    @api.depends('new_int_panel', 'new_int_panel.vacancy_id', 'new_int_panel.workunit_id')
+    def _compute_eligible_employee_ids(self):
+        for rec in self:
+            allowed_ous = rec._get_allowed_operating_unit_ids()
+            if allowed_ous:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([
+                    ('default_operating_unit_id', 'in', allowed_ous),
+                    ('active', '=', True)
+                ])
+            else:
+                rec.eligible_employee_ids = self.env['hr.employee'].search([('active', '=', True)])
+
+    @api.onchange('new_int_panel', 'selection_criteria')
+    def _onchange_new_int_panel_domain(self):
+        """Filter panel members to Hiring Work Unit AND Vacancy Creator/Responsible Officer Work Unit."""
+        allowed_ous = self._get_allowed_operating_unit_ids()
+        if allowed_ous:
+            domain = [('default_operating_unit_id', 'in', allowed_ous), ('active', '=', True)]
             self.eligible_employee_ids = self.env['hr.employee'].search(domain)
             if self.emp_name and self.emp_name.id not in self.eligible_employee_ids.ids:
                 self.emp_name = False

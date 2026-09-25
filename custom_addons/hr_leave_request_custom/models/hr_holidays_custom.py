@@ -2,7 +2,6 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_round
-from markupsafe import Markup
 import logging
 import math
 from datetime import date, timedelta
@@ -18,12 +17,8 @@ class HrLeaveInheritCustom(models.Model):
     def default_get(self, fields_list):
         defaults = super().default_get(fields_list)
         ctx = self.env.context
-        user = self.env.user
-        # HR/Suspense HR users can request on behalf of other employees
-        # (e.g. Suspense Leave). Do NOT lock them to their own employee record.
-        is_hr_user = user.has_group('hr_leave_request_custom.group_hr_leave_suspense_hr')
         employee = self._get_current_employee()
-        if employee and not is_hr_user:
+        if employee:
             defaults['employee_id'] = employee.id
             try:
                 fetch_vals = self._get_employee_fetch_values(employee)
@@ -189,7 +184,6 @@ class HrLeaveInheritCustom(models.Model):
     show_edit_btn = fields.Boolean(string='Show Edit', compute='_compute_button_visibility')
     show_notify_btn = fields.Boolean(string='Show Notify', compute='_compute_button_visibility')
     show_approve_btn = fields.Boolean(string='Show Approve', compute='_compute_button_visibility')
-    show_refuse_btn = fields.Boolean(string='Show Refuse', compute='_compute_button_visibility')
     show_cancel_btn = fields.Boolean(string='Show Cancel', compute='_compute_button_visibility')
     show_compute_btn = fields.Boolean(string='Show Compute', compute='_compute_button_visibility')
 
@@ -198,145 +192,10 @@ class HrLeaveInheritCustom(models.Model):
         compute='_compute_employee_id_readonly',
     )
 
-    employee_gender = fields.Selection(
-        selection=[
-            ('male', 'Male'),
-            ('female', 'Female'),
-            ('other', 'Other'),
-        ],
-        string='Employee Gender',
-        compute='_compute_employee_gender',
-        store=True,
-        readonly=True,
-    )
-    is_hr_user = fields.Boolean(
-        string='Is HR User',
-        compute='_compute_is_hr_user',
-        readonly=True,
-    )
-    holiday_status_domain = fields.Binary(
-        string='Leave Reason Domain',
-        compute='_compute_holiday_status_domain',
-        readonly=True,
-    )
-
     is_suspense_leave_hr = fields.Boolean(
         string='Is Suspense Leave HR',
         compute='_compute_is_suspense_leave_hr',
     )
-    notified_date = fields.Datetime(
-        string='Notified Date',
-        copy=False,
-        help="Timestamp when the leave request was notified to the approver."
-    )
-
-    def _get_leave_approver(self):
-        self.ensure_one()
-        employee = self.employee_id.sudo() if self.employee_id else False
-        if not employee:
-            return False
-        # Priority 1: Coach with linked user
-        if employee.coach_id:
-            coach = employee.coach_id.sudo()
-            if coach.user_id:
-                return coach
-            coach_user = self.env['res.users'].sudo().search([('employee_ids', 'in', [coach.id])], limit=1)
-            if coach_user:
-                return coach
-            return coach
-        # Priority 2: Direct Manager with linked user
-        if employee.parent_id:
-            parent = employee.parent_id.sudo()
-            if parent.user_id:
-                return parent
-            parent_user = self.env['res.users'].sudo().search([('employee_ids', 'in', [parent.id])], limit=1)
-            if parent_user:
-                return parent
-            return parent
-        # Priority 3: Leave Manager
-        if employee.leave_manager_id:
-            lm_user = employee.leave_manager_id.sudo()
-            if lm_user.employee_id:
-                return lm_user.employee_id.sudo()
-            return employee
-        # Priority 4: Fallback to any active Time Off Officer/Manager
-        officers = self.env.ref('hr_holidays.group_hr_holidays_user', raise_if_not_found=False)
-        if officers and officers.sudo().users:
-            for u in officers.sudo().users:
-                if u.sudo().employee_id and u != self.env.user:
-                    return u.sudo().employee_id
-        return False
-
-    @api.depends('employee_id', 'employee_id.gender')
-    def _compute_employee_gender(self):
-        for record in self:
-            record.employee_gender = record.employee_id.gender if record.employee_id else False
-
-    def _get_user_leave_roles(self):
-        user = self.env.user
-        is_admin = (
-            self.env.is_superuser() or
-            user.has_group('base.group_system') or
-            user.has_group('base.group_erp_manager') or
-            user.has_group('hr_holidays.group_hr_holidays_manager')
-        )
-        is_hr = (
-            user.has_group('hr_holidays.group_hr_holidays_user') or
-            user.has_group('hr_leave_request_custom.group_hr_leave_suspense_hr') or
-            user.has_group('hr.group_hr_manager')
-        )
-        emp = (user.employee_id or self.env['hr.employee'].sudo().search([('user_id', '=', user.id)], limit=1)).sudo() if user else False
-        is_manager = is_hr or is_admin or (
-            user.has_group('hr_leave_request_custom.group_hr_holidays_manager_approver') or
-            user.has_group('hr_holidays.group_hr_holidays_responsible') or
-            bool(emp and emp.child_ids)
-        )
-        return {
-            'is_admin': is_admin,
-            'is_hr': is_hr,
-            'is_manager': is_manager,
-            'is_employee': True,
-        }
-
-    def _compute_is_hr_user(self):
-        roles = self._get_user_leave_roles()
-        for record in self:
-            record.is_hr_user = roles['is_hr']
-
-    @api.depends('employee_id', 'employee_id.gender')
-    def _compute_holiday_status_domain(self):
-        roles = self._get_user_leave_roles()
-        is_admin = roles['is_admin']
-        is_hr = roles['is_hr']
-        is_manager = roles['is_manager']
-
-        for record in self:
-            domain = []
-
-            # 1. Role / Group Filtering:
-            if is_admin:
-                pass  # Admins can see all leave types
-            elif is_hr:
-                domain.extend(['|', ('allowed_group', '=', False), ('allowed_group', 'in', ['all', 'manager', 'hr'])])
-            elif is_manager:
-                domain.extend(['|', ('allowed_group', '=', False), ('allowed_group', 'in', ['all', 'manager'])])
-                domain.append(('name', 'not ilike', 'suspense leave'))
-            else:
-                # Regular employee
-                domain.extend(['|', ('allowed_group', '=', False), ('allowed_group', '=', 'all')])
-                domain.append(('hr_only', '=', False))
-                domain.append(('name', 'not ilike', 'suspense leave'))
-
-            # 2. Gender Filtering:
-            gender = record.employee_id.gender if record.employee_id else False
-            if gender == 'female':
-                domain.extend(['|', ('gender_rule', '=', False), ('gender_rule', 'in', ['all', 'female'])])
-            elif gender == 'male':
-                domain.extend(['|', ('gender_rule', '=', False), ('gender_rule', 'in', ['all', 'male'])])
-            else:
-                domain.extend(['|', ('gender_rule', '=', False), ('gender_rule', '=', 'all')])
-
-            record.holiday_status_domain = domain
 
     @api.depends('date_from', 'date_to', 'resource_calendar_id', 'holiday_status_id.request_unit')
     def _compute_duration(self):
@@ -386,33 +245,18 @@ class HrLeaveInheritCustom(models.Model):
 
     @api.depends('custom_saved', 'is_edit_mode', 'leave_request_status', 'state')
     def _compute_button_visibility(self):
-        user = self.env.user
-        roles = self._get_user_leave_roles()
-        is_admin = roles['is_admin']
-        is_hr = roles['is_hr']
-        is_manager = roles['is_manager']
-
+        is_admin = (
+            self.env.user.has_group('hr_holidays.group_hr_holidays_manager') or
+            self.env.user.has_group('hr_holidays.group_hr_holidays_user')
+        )
         for record in self:
             saved = record.custom_saved
             editing = record.is_edit_mode
             status = record.leave_request_status
             state = record.state
+            is_submitted = (status == 'notify' or state in ('confirm', 'validate', 'validate1'))
 
-            # Check if this is the user's own leave request
-            is_own_request = bool(record.employee_id and record.employee_id.user_id == user)
-
-            approver = record._get_leave_approver() if record.employee_id else False
-            is_approver = bool(approver and approver.user_id == user)
-            is_coach = bool(record.employee_id and record.employee_id.sudo().coach_id and record.employee_id.sudo().coach_id.user_id == user)
-            is_manager_rel = bool(record.employee_id and record.employee_id.sudo().parent_id and record.employee_id.sudo().parent_id.user_id == user)
-
-            # Neither Manager nor HR can approve their own leave request!
-            if is_own_request and not self.env.is_superuser():
-                is_can_approve = False
-            else:
-                is_can_approve = is_admin or is_hr or is_approver or is_coach or is_manager_rel
-
-            record.is_hr_admin = is_admin or is_hr
+            record.is_hr_admin = is_admin
             record.show_compute_btn = False
 
             if not saved:
@@ -422,9 +266,8 @@ class HrLeaveInheritCustom(models.Model):
                 record.show_discard_btn = True
                 record.show_edit_btn = False
                 record.show_approve_btn = False
-                record.show_refuse_btn = False
                 record.show_cancel_btn = False
-            elif status in ('draft', 'fetch') and not (state in ('confirm', 'validate', 'validate1', 'refuse')):
+            elif status == 'draft':
                 if editing:
                     record.fields_readonly = False
                     record.show_save_btn = True
@@ -432,7 +275,6 @@ class HrLeaveInheritCustom(models.Model):
                     record.show_discard_btn = True
                     record.show_edit_btn = False
                     record.show_approve_btn = False
-                    record.show_refuse_btn = False
                     record.show_cancel_btn = False
                 else:
                     record.fields_readonly = True
@@ -441,67 +283,33 @@ class HrLeaveInheritCustom(models.Model):
                     record.show_discard_btn = True
                     record.show_edit_btn = True
                     record.show_approve_btn = False
-                    record.show_refuse_btn = False
                     record.show_cancel_btn = False
-            elif status == 'notify' or state == 'confirm':
-                # Submitted / To Approve stage
-                if editing and (is_admin or is_hr):
-                    record.fields_readonly = False
-                    record.show_save_btn = False
-                    record.show_notify_btn = False
-                    record.show_discard_btn = True
-                    record.show_edit_btn = False
-                    record.show_approve_btn = is_can_approve
-                    record.show_refuse_btn = is_can_approve
-                    record.show_cancel_btn = False
-                else:
+            elif is_submitted:
+                if not is_admin:
                     record.fields_readonly = True
                     record.show_save_btn = False
                     record.show_notify_btn = False
                     record.show_discard_btn = False
-                    record.show_edit_btn = is_admin or is_hr
-                    record.show_approve_btn = is_can_approve
-                    record.show_refuse_btn = is_can_approve
-                    record.show_cancel_btn = False
-            elif status == 'approved' or state in ('validate', 'validate1'):
-                # Approved stage
-                record.fields_readonly = True
-                record.show_save_btn = False
-                record.show_notify_btn = False
-                record.show_discard_btn = False
-                record.show_edit_btn = is_admin
-                record.show_approve_btn = False
-                record.show_refuse_btn = False
-                record.show_cancel_btn = is_admin or is_hr
-            elif status == 'refused' or state == 'refuse':
-                # Refused stage: employee / requester can edit and re-save/re-notify
-                if editing:
-                    record.fields_readonly = False
-                    record.show_save_btn = True
-                    record.show_notify_btn = True
-                    record.show_discard_btn = True
                     record.show_edit_btn = False
                     record.show_approve_btn = False
-                    record.show_refuse_btn = False
                     record.show_cancel_btn = False
                 else:
-                    record.fields_readonly = True
-                    record.show_save_btn = False
-                    record.show_notify_btn = False
-                    record.show_discard_btn = False
-                    record.show_edit_btn = True  # Employee or Admin can click Edit
-                    record.show_approve_btn = False
-                    record.show_refuse_btn = False
-                    record.show_cancel_btn = False
-            else:
-                record.fields_readonly = True
-                record.show_save_btn = False
-                record.show_notify_btn = False
-                record.show_discard_btn = False
-                record.show_edit_btn = is_admin
-                record.show_approve_btn = False
-                record.show_refuse_btn = False
-                record.show_cancel_btn = False
+                    if editing:
+                        record.fields_readonly = False
+                        record.show_approve_btn = True
+                        record.show_discard_btn = True
+                        record.show_save_btn = False
+                        record.show_notify_btn = False
+                        record.show_edit_btn = False
+                        record.show_cancel_btn = False
+                    else:
+                        record.fields_readonly = True
+                        record.show_edit_btn = True
+                        record.show_approve_btn = (status == 'notify' and state != 'validate')
+                        record.show_cancel_btn = (state == 'validate')
+                        record.show_save_btn = False
+                        record.show_notify_btn = False
+                        record.show_discard_btn = False
 
     def _is_suspense_leave_type(self, leave_type):
         """Match by name rather than a dedicated boolean field, per current
@@ -511,11 +319,11 @@ class HrLeaveInheritCustom(models.Model):
 
     @api.depends_context('uid')
     def _compute_is_suspense_leave_hr(self):
-        """Only users with the HR Suspense Leave Authorized role can request
-        Suspense Leave on behalf of other employees.
-        Administrators and Managers cannot request Suspense Leave on behalf of others."""
-        user = self.env.user
-        is_hr = user.has_group('hr_leave_request_custom.group_hr_leave_suspense_hr')
+        """Dedicated HR group for the Suspense Leave workflow - deliberately
+        separate from is_hr_admin (Time Off Administrator/Officer), since
+        that group is about the Time Off app in general and may not be held
+        by the same people who count as 'HR' for this specific rule."""
+        is_hr = self.env.user.has_group('hr_leave_request_custom.group_hr_leave_suspense_hr')
         for record in self:
             record.is_suspense_leave_hr = is_hr
 
@@ -562,11 +370,9 @@ class HrLeaveInheritCustom(models.Model):
     leave_request_status = fields.Selection([
         ('draft', 'Draft'),
         ('fetch', 'Fetch'),
+        ('check_leave_balance', 'Check Leave Balance'),
         ('notify', 'Notify'),
-        ('approved', 'Approved'),
-        ('refused', 'Refused'),
-        ('cancel', 'Cancelled'),
-    ], default='fetch', string='Leave Status', readonly=True)
+    ], default='fetch', string='Leave Balance Status', readonly=True)
 
     def _sync_datetime_fields(self):
         if not self.leave_start_date:
@@ -617,7 +423,6 @@ class HrLeaveInheritCustom(models.Model):
     def _get_employee_department(self, employee):
         if not employee:
             return False
-        employee = employee.sudo()
         ou = False
         if hasattr(self, 'operating_unit') and self.operating_unit:
             ou = self.operating_unit
@@ -639,7 +444,6 @@ class HrLeaveInheritCustom(models.Model):
     def _get_employee_work_unit_type(self, employee):
         if not employee:
             return False
-        employee = employee.sudo()
 
         ou = False
         if hasattr(self, 'operating_unit') and self.operating_unit:
@@ -665,8 +469,7 @@ class HrLeaveInheritCustom(models.Model):
         return False
 
     def _is_ho_employee(self):
-        emp = self.employee_id.sudo() if self.employee_id else False
-        wut = self._get_employee_work_unit_type(emp)
+        wut = self._get_employee_work_unit_type(self.employee_id)
         return wut == 'head_office'
 
     def _get_day_weight_from_holidays(self, date_val):
@@ -675,13 +478,12 @@ class HrLeaveInheritCustom(models.Model):
         if not self.holiday_status_id or not self.holiday_status_id.include_public_holidays_in_duration:
             return False, 1.0
 
-        emp = self.employee_id.sudo() if self.employee_id else False
-        emp_wut = self._get_employee_work_unit_type(emp)
+        emp_wut = self._get_employee_work_unit_type(self.employee_id)
         wut_domain = ['|', ('work_unit_type', '=', False), ('work_unit_type', '=', emp_wut)] if emp_wut else [
             ('work_unit_type', '=', False)]
         weekday_str = str(date_val.weekday())
 
-        calendar = self.resource_calendar_id or (emp and emp.resource_calendar_id)
+        calendar = self.resource_calendar_id or (self.employee_id and self.employee_id.resource_calendar_id)
         calendar_domain = ['|', ('calendar_id', '=', False), ('calendar_id', '=', calendar.id)] if calendar else []
 
         try:
@@ -876,68 +678,6 @@ class HrLeaveInheritCustom(models.Model):
 
     @api.onchange('holiday_status_id')
     def _onchange_holiday_status_id(self):
-        if self.holiday_status_id and self.employee_id:
-            employee = self.employee_id.sudo()
-            gender = employee.gender if employee else False
-            gender_rule = getattr(self.holiday_status_id, 'gender_rule', 'all') or 'all'
-            if gender_rule == 'female' and gender != 'female':
-                lt_name = self.holiday_status_id.name
-                self.holiday_status_id = False
-                return {
-                    'warning': {
-                        'title': _('Gender Restriction'),
-                        'message': _("Leave Reason '%s' is only applicable to Female employees.") % lt_name,
-                    }
-                }
-            if gender_rule == 'male' and gender != 'male':
-                lt_name = self.holiday_status_id.name
-                self.holiday_status_id = False
-                return {
-                    'warning': {
-                        'title': _('Gender Restriction'),
-                        'message': _("Leave Reason '%s' is only applicable to Male employees.") % lt_name,
-                    }
-                }
-
-            # Check role permissions
-            roles = self._get_user_leave_roles()
-            is_admin = roles['is_admin']
-            is_hr = roles['is_hr']
-            is_manager = roles['is_manager']
-            allowed_group = getattr(self.holiday_status_id, 'allowed_group', 'all') or 'all'
-            if getattr(self.holiday_status_id, 'hr_only', False):
-                allowed_group = 'hr'
-
-            if allowed_group == 'admin' and not is_admin:
-                lt_name = self.holiday_status_id.name
-                self.holiday_status_id = False
-                return {
-                    'warning': {
-                        'title': _('Restricted Leave Reason'),
-                        'message': _("Leave Reason '%s' is restricted and can only be requested by System Administrators.") % lt_name,
-                    }
-                }
-
-            if (allowed_group == 'hr' or self._is_suspense_leave_type(self.holiday_status_id)) and not is_hr:
-                lt_name = self.holiday_status_id.name
-                self.holiday_status_id = False
-                return {
-                    'warning': {
-                        'title': _('Restricted Leave Reason'),
-                        'message': _("Leave Reason '%s' is restricted and can only be requested by HR Officers / Administrators.") % lt_name,
-                    }
-                }
-
-            if allowed_group == 'manager' and not is_manager:
-                lt_name = self.holiday_status_id.name
-                self.holiday_status_id = False
-                return {
-                    'warning': {
-                        'title': _('Restricted Leave Reason'),
-                        'message': _("Leave Reason '%s' is restricted and can only be requested by Managers, HR, or Administrators.") % lt_name,
-                    }
-                }
-
         if self.holiday_status_id:
             is_exact = bool(self.holiday_status_id.is_exact_days or self.holiday_status_id.exact_days > 0)
             if is_exact:
@@ -1091,60 +831,8 @@ class HrLeaveInheritCustom(models.Model):
         if self.employee_id:
             for field_name, value in self._get_employee_fetch_values(self.employee_id).items():
                 setattr(self, field_name, value)
-            self._compute_holiday_status_domain()
-            if self.holiday_status_id:
-                gender = self.employee_id.gender
-                gender_rule = getattr(self.holiday_status_id, 'gender_rule', 'all') or 'all'
-                if (gender_rule == 'female' and gender != 'female') or (gender_rule == 'male' and gender != 'male'):
-                    self.holiday_status_id = False
         else:
             self.fetch_status = 'not_fetched'
-            self._compute_holiday_status_domain()
-
-    @api.constrains('holiday_status_id', 'employee_id')
-    def _check_leave_type_gender_and_hr_rules(self):
-        roles = self._get_user_leave_roles()
-        is_admin = roles['is_admin']
-        is_hr = roles['is_hr']
-        is_manager = roles['is_manager']
-
-        for record in self:
-            if not record.holiday_status_id or not record.employee_id:
-                continue
-
-            leave_type = record.holiday_status_id
-            gender = record.employee_id.gender
-            gender_rule = getattr(leave_type, 'gender_rule', 'all') or 'all'
-
-            if gender_rule == 'female' and gender != 'female':
-                raise ValidationError(_(
-                    "Leave Reason '%s' is only applicable to Female employees. Employee '%s' is registered as %s."
-                ) % (leave_type.name, record.employee_id.name, (gender.capitalize() if gender else 'Unspecified')))
-
-            if gender_rule == 'male' and gender != 'male':
-                raise ValidationError(_(
-                    "Leave Reason '%s' is only applicable to Male employees. Employee '%s' is registered as %s."
-                ) % (leave_type.name, record.employee_id.name, (gender.capitalize() if gender else 'Unspecified')))
-
-            # Check role permissions
-            allowed_group = getattr(leave_type, 'allowed_group', 'all') or 'all'
-            if getattr(leave_type, 'hr_only', False):
-                allowed_group = 'hr'
-
-            if allowed_group == 'admin' and not is_admin:
-                raise ValidationError(_(
-                    "Leave Reason '%s' is restricted and can only be requested by System Administrators."
-                ) % leave_type.name)
-
-            if (allowed_group == 'hr' or record._is_suspense_leave_type(leave_type)) and not is_hr:
-                raise ValidationError(_(
-                    "Leave Reason '%s' is restricted and can only be requested by HR Officers / Administrators."
-                ) % leave_type.name)
-
-            if allowed_group == 'manager' and not is_manager:
-                raise ValidationError(_(
-                    "Leave Reason '%s' is restricted and can only be requested by Managers, HR, or Administrators."
-                ) % leave_type.name)
 
     def _check_validity(self):
         """NOTE: this method only covers leave-balance/allocation validation
@@ -1330,27 +1018,9 @@ class HrLeaveInheritCustom(models.Model):
             if not leave_type:
                 continue
 
-            roles = record._get_user_leave_roles()
-            is_admin = roles['is_admin']
-            is_hr = roles['is_hr']
-            is_manager = roles['is_manager']
-            allowed_group = getattr(leave_type, 'allowed_group', 'all') or 'all'
-            if getattr(leave_type, 'hr_only', False):
-                allowed_group = 'hr'
-
-            if allowed_group == 'admin' and not is_admin:
+            if record._is_suspense_leave_type(leave_type) and not record.is_suspense_leave_hr:
                 raise UserError(_(
-                    "Leave Reason '%s' is restricted to System Administrators only."
-                ) % leave_type.name)
-
-            if (allowed_group == 'hr' or record._is_suspense_leave_type(leave_type)) and not is_hr:
-                raise UserError(_(
-                    "Leave Reason '%s' can only be requested by HR Officers / Administrators."
-                ) % leave_type.name)
-
-            if allowed_group == 'manager' and not is_manager:
-                raise UserError(_(
-                    "Leave Reason '%s' is restricted to Managers, HR, and Administrators."
+                    "Leave Reason '%s' can only be requested by HR."
                 ) % leave_type.name)
 
             days = record.computed_leave or record.number_of_days
@@ -1496,12 +1166,12 @@ class HrLeaveInheritCustom(models.Model):
             if record.state != 'confirm':
                 vals['state'] = 'confirm'
 
-            record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
+            record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
 
             # Refresh balances on the record so UI shows updated values
             try:
                 balances = record._get_leave_balances(record.employee_id)
-                record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
+                record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
                     'accrued_leave_balance': balances.get('accrued', 0.0),
                     'scheduled_leave_balance': balances.get('scheduled', 0.0),
                 })
@@ -1517,8 +1187,6 @@ class HrLeaveInheritCustom(models.Model):
 
     def action_admin_approve_edit(self):
         for record in self:
-            if record.employee_id and record.employee_id.user_id == self.env.user and not self.env.is_superuser():
-                raise UserError(_("You cannot approve your own leave request."))
             record = record.with_context(leave_skip_state_check=True, leave_skip_date_check=True)
             if not record.holiday_status_id:
                 raise UserError(_("Please select a Leave Reason."))
@@ -1564,84 +1232,21 @@ class HrLeaveInheritCustom(models.Model):
                 'is_computed': True,
                 'custom_saved': True,
                 'is_edit_mode': False,
-                'leave_request_status': 'approved',
+                'leave_request_status': 'notify',
             }
             if record.state != 'validate':
                 vals['state'] = 'validate'
 
-            record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
-
-            # Mark pending approval activities done
-            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-            activities = record.activity_ids.filtered(lambda a: (activity_type and a.activity_type_id == activity_type) or (a.summary and 'Approval' in a.summary))
-            if activities:
-                try:
-                    activities.sudo().action_feedback(feedback=_("Leave request approved by %s.") % self.env.user.name)
-                except Exception as e:
-                    _logger.warning(f"Could not complete activity on approve: {e}")
-
-            # Notify the employee in Odoo
-            record._assign_leave_reference()
-            ref_no = record.leave_reference or (f"LR-{record.id:06d}" if record.id else "LR-Approved")
-            emp_user = record.employee_id.user_id
-            if emp_user and emp_user.partner_id:
-                approved_body = f"""
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1d2b32; background: #f6fbf7; border: 1px solid #d4edd9; border-left: 5px solid #28a745; border-radius: 8px; padding: 16px 20px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #d4edd9; padding-bottom: 8px;">
-        <span style="font-size: 15px; font-weight: bold; color: #155724;">
-            ✅ Leave Request Approved
-        </span>
-        <span style="background-color: #28a745; color: #ffffff; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">
-            {ref_no}
-        </span>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-            <td style="padding: 5px 0; color: #555; width: 130px; font-weight: 600;">Reference No:</td>
-            <td style="padding: 5px 0; color: #155724; font-weight: bold;">{ref_no}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Employee:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: 600;">{record.employee_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Leave Reason:</td>
-            <td style="padding: 5px 0; color: #155724; font-weight: 600;">{record.holiday_status_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Duration:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: bold;">{record.number_of_days} Day(s)</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Dates:</td>
-            <td style="padding: 5px 0; color: #1d2b32;">{record.leave_start_date} &rarr; {record.leave_end_date or record.leave_start_date}</td>
-        </tr>
-    </table>
-    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #c3e6cb; font-size: 12px; color: #155724;">
-        Approved by <b>{self.env.user.name}</b>.
-    </div>
-</div>
-"""
-                try:
-                    record.sudo().message_post(
-                        body=Markup(approved_body),
-                        subject=_("[%s] Leave Request Approved: %s") % (ref_no, record.holiday_status_id.name),
-                        partner_ids=[emp_user.partner_id.id],
-                        message_type='comment',
-                        subtype_xmlid='mail.mt_comment',
-                    )
-                except Exception as e:
-                    _logger.warning(f"Could not post approve chatter: {e}")
+            record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
 
             # Refresh balances on the record so UI shows updated values
             try:
                 balances = record._get_leave_balances(record.employee_id)
-                record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
+                record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
                     'accrued_leave_balance': balances.get('accrued', 0.0),
                     'scheduled_leave_balance': balances.get('scheduled', 0.0),
                 })
             except Exception as e:
-                _logger.warning(f"Could not refresh leave balances after approve: {e}")
                 _logger.warning(f"Could not refresh leave balances after approve edit: {e}")
 
         return True
@@ -1719,404 +1324,30 @@ class HrLeaveInheritCustom(models.Model):
                 'custom_saved': True,
                 'is_edit_mode': False,
                 'leave_request_status': 'notify',
-                'notified_date': fields.Datetime.now(),
             }
             if record.state != 'confirm':
                 vals['state'] = 'confirm'
 
-            record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
-            record._assign_leave_reference()
-            ref_no = record.leave_reference or (f"LR-{record.id:06d}" if record.id else "LR-Pending")
+            record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write(vals)
 
             # Refresh balances on the record so UI shows updated values
             try:
                 balances = record._get_leave_balances(record.employee_id)
-                record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
+                record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
                     'accrued_leave_balance': balances.get('accrued', 0.0),
                     'scheduled_leave_balance': balances.get('scheduled', 0.0),
                 })
             except Exception as e:
                 _logger.warning(f"Could not refresh leave balances after notify: {e}")
 
-            # Notify Approver (Coach/Manager)
-            try:
-                approver = record._get_leave_approver()
-                if approver and approver.user_id:
-                    # Schedule To-Do activity
-                    activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-                    if activity_type:
-                        try:
-                            record.sudo().activity_ids.filtered(
-                                lambda a: a.activity_type_id == activity_type or (a.summary and 'Approval' in a.summary)
-                            ).unlink()
-                            record.sudo().activity_schedule(
-                                activity_type_id=activity_type.id,
-                                summary=_("[%s] Leave Request Approval: %s - %s") % (ref_no, record.employee_id.name, record.holiday_status_id.name),
-                                note=_(
-                                    "Leave Request Reference: <b>%s</b><br/>"
-                                    "Employee <b>%s</b> has submitted a Leave Request for <b>%s</b> (%s day(s) from %s to %s).<br/>"
-                                    "Please review and approve or refuse."
-                                ) % (
-                                    ref_no,
-                                    record.employee_id.name,
-                                    record.holiday_status_id.name,
-                                    record.number_of_days,
-                                    record.leave_start_date,
-                                    record.leave_end_date or record.leave_start_date,
-                                ),
-                                user_id=approver.user_id.id,
-                            )
-                        except Exception as act_err:
-                            _logger.warning(f"Could not schedule activity: {act_err}")
-
-                    # Post formatted message on chatter with direct link button
-                    base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url', '').rstrip('/')
-                    record_url = f"{base_url}/odoo/time-off/{record.id}" if base_url else f"/odoo/time-off/{record.id}"
-                    partner_id = approver.user_id.partner_id.id if approver.user_id.partner_id else False
-                    desc_html = f'<tr><td style="padding: 5px 0; color: #726732; font-weight: 600;">Description:</td><td style="padding: 5px 0; color: #555;">{record.leave_request_description}</td></tr>' if record.leave_request_description else ''
-                    notify_body = f"""
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1d2b32; background: #fffcf9; border: 1px solid #ebdcd0; border-left: 5px solid #c17540; border-radius: 8px; padding: 16px 20px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f0e6dd; padding-bottom: 8px;">
-        <span style="font-size: 15px; font-weight: bold; color: #541718;">
-            📋 Leave Request Submitted for Approval
-        </span>
-        <span style="background-color: #c17540; color: #ffffff; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">
-            {ref_no}
-        </span>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-            <td style="padding: 5px 0; color: #726732; width: 130px; font-weight: 600;">Reference No:</td>
-            <td style="padding: 5px 0; color: #541718; font-weight: bold;">{ref_no}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Requester:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: 600;">{record.employee_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Leave Reason:</td>
-            <td style="padding: 5px 0; color: #541718; font-weight: 600;">{record.holiday_status_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Duration:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: bold;">{record.number_of_days} Day(s)</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Dates:</td>
-            <td style="padding: 5px 0; color: #1d2b32;">{record.leave_start_date} &rarr; {record.leave_end_date or record.leave_start_date}</td>
-        </tr>
-        {desc_html}
-    </table>
-    <div style="margin-top: 15px; text-align: center;">
-        <a href="{record_url}" style="background-color: #541718; color: #ffffff; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
-            👉 Review &amp; Approve Leave Request ({ref_no})
-        </a>
-    </div>
-    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2d2c5; font-size: 12px; color: #726732;">
-        Notified to approver <b>{approver.name}</b> for review and approval.
-    </div>
-</div>
-"""
-                    try:
-                        record.sudo().message_post(
-                            body=Markup(notify_body),
-                            subject=_("[%s] Leave Request Submitted: %s - %s") % (ref_no, record.employee_id.name, record.holiday_status_id.name),
-                            partner_ids=[partner_id] if partner_id else [],
-                            message_type='comment',
-                            subtype_xmlid='mail.mt_comment',
-                        )
-                    except Exception as post_err:
-                        _logger.warning(f"Could not post chatter notification: {post_err}")
-            except Exception as approver_err:
-                _logger.warning(f"Could not resolve or notify approver: {approver_err}")
-
-    def _get_next_states_by_state(self):
-        state_result = super()._get_next_states_by_state()
-        user = self.env.user
-        for leave in self:
-            is_coach = bool(leave.employee_id and (
-                (leave.employee_id.sudo().coach_id and leave.employee_id.sudo().coach_id.user_id == user) or
-                (leave.employee_id.sudo().coach_id and leave.employee_id.sudo().coach_id.id in user.employee_ids.ids)
-            ))
-            is_parent = bool(leave.employee_id and (
-                (leave.employee_id.sudo().parent_id and leave.employee_id.sudo().parent_id.user_id == user) or
-                (leave.employee_id.sudo().parent_id and leave.employee_id.sudo().parent_id.id in user.employee_ids.ids)
-            ))
-            is_manager_group = user.has_group('hr_leave_request_custom.group_hr_holidays_manager_approver')
-            is_own = bool(leave.employee_id and leave.employee_id.user_id == user)
-
-            if (is_coach or is_parent or is_manager_group) and not (is_own and not self.env.is_superuser()):
-                state_result['confirm'].update({'validate', 'refuse', 'validate1'})
-                state_result['validate1'].update({'validate', 'refuse'})
-                state_result['refuse'].update({'confirm', 'validate'})
-        return state_result
-
-    def _check_approval_update(self, state, raise_if_not_possible=True):
-        if self.env.is_superuser():
-            return True
-        user = self.env.user
-        for leave in self:
-            is_own = bool(leave.employee_id and leave.employee_id.user_id == user)
-            if is_own and not self.env.is_superuser() and state in ('validate', 'validate1', 'refuse'):
-                if raise_if_not_possible:
-                    raise UserError(_("You cannot approve or refuse your own leave request."))
-                return False
-            is_coach = bool(leave.employee_id and (
-                (leave.employee_id.sudo().coach_id and leave.employee_id.sudo().coach_id.user_id == user) or
-                (leave.employee_id.sudo().coach_id and leave.employee_id.sudo().coach_id.id in user.employee_ids.ids)
-            ))
-            is_parent = bool(leave.employee_id and (
-                (leave.employee_id.sudo().parent_id and leave.employee_id.sudo().parent_id.user_id == user) or
-                (leave.employee_id.sudo().parent_id and leave.employee_id.sudo().parent_id.id in user.employee_ids.ids)
-            ))
-            is_manager_group = user.has_group('hr_leave_request_custom.group_hr_holidays_manager_approver')
-            if (is_coach or is_parent or is_manager_group) and state in ('validate', 'validate1', 'refuse'):
-                return True
-        return super()._check_approval_update(state, raise_if_not_possible=raise_if_not_possible)
-
-    def unlink(self):
-        for record in self:
-            if record.state in ('validate', 'validate1') or record.leave_request_status == 'approved':
-                raise UserError(_(
-                    "Approved leave request '%s' (%s) cannot be deleted. "
-                    "It must be refused before it can be deleted."
-                ) % (
-                    record.leave_reference or record.name or record.display_name,
-                    record.employee_id.name if record.employee_id else ''
-                ))
-        return super().unlink()
-
-    def action_approve(self, check_state=True):
-        for record in self:
-            if record.employee_id and record.employee_id.user_id == self.env.user and not self.env.is_superuser():
-                raise UserError(_("You cannot approve your own leave request."))
-        res = super().action_approve(check_state=check_state)
-        for record in self:
-            record._assign_leave_reference()
-            ref_no = record.leave_reference or (f"LR-{record.id:06d}" if record.id else "LR-Approved")
-            # Mark pending approval activities done
-            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-            activities = record.activity_ids.filtered(lambda a: (activity_type and a.activity_type_id == activity_type) or (a.summary and 'Approval' in a.summary))
-            if activities:
+            template = self.env.ref('hr_holidays.mail_template_leave_approval', raise_if_not_found=False)
+            if template:
                 try:
-                    activities.sudo().action_feedback(feedback=_("[%s] Leave request approved by %s.") % (ref_no, self.env.user.name))
+                    template.send_mail(record.id, force_send=True)
                 except Exception as e:
-                    _logger.warning(f"Could not complete activity on approve: {e}")
+                    _logger.warning(f"Could not send email notification: {str(e)}")
 
-            # Notify the employee
-            emp_user = record.employee_id.user_id
-            if emp_user and emp_user.partner_id:
-                approved_body = f"""
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1d2b32; background: #f6fbf7; border: 1px solid #d4edd9; border-left: 5px solid #28a745; border-radius: 8px; padding: 16px 20px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #d4edd9; padding-bottom: 8px;">
-        <span style="font-size: 15px; font-weight: bold; color: #155724;">
-            ✅ Leave Request Approved
-        </span>
-        <span style="background-color: #28a745; color: #ffffff; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">
-            {ref_no}
-        </span>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-            <td style="padding: 5px 0; color: #555; width: 130px; font-weight: 600;">Reference No:</td>
-            <td style="padding: 5px 0; color: #155724; font-weight: bold;">{ref_no}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Employee:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: 600;">{record.employee_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Leave Reason:</td>
-            <td style="padding: 5px 0; color: #155724; font-weight: 600;">{record.holiday_status_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Duration:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: bold;">{record.number_of_days} Day(s)</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Dates:</td>
-            <td style="padding: 5px 0; color: #1d2b32;">{record.leave_start_date} &rarr; {record.leave_end_date or record.leave_start_date}</td>
-        </tr>
-    </table>
-    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #c3e6cb; font-size: 12px; color: #155724;">
-        Approved by <b>{self.env.user.name}</b>.
-    </div>
-</div>
-"""
-                try:
-                    record.sudo().message_post(
-                        body=Markup(approved_body),
-                        subject=_("[%s] Leave Request Approved: %s") % (ref_no, record.holiday_status_id.name),
-                        partner_ids=[emp_user.partner_id.id],
-                        message_type='comment',
-                        subtype_xmlid='mail.mt_comment',
-                    )
-                except Exception as e:
-                    _logger.warning(f"Could not post approve chatter: {e}")
-            # Refresh balances & status
-            try:
-                balances = record._get_leave_balances(record.employee_id)
-                record.sudo().with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
-                    'leave_request_status': 'approved',
-                    'accrued_leave_balance': balances.get('accrued', 0.0),
-                    'scheduled_leave_balance': balances.get('scheduled', 0.0),
-                })
-            except Exception as e:
-                _logger.warning(f"Could not refresh leave balances after approve: {e}")
-        return res
-
-    def action_refuse(self):
-        for record in self:
-            if record.employee_id and record.employee_id.user_id == self.env.user and not self.env.is_superuser():
-                raise UserError(_("You cannot refuse your own leave request."))
-        res = super().action_refuse()
-        for record in self:
-            record._assign_leave_reference()
-            ref_no = record.leave_reference or (f"LR-{record.id:06d}" if record.id else "LR-Refused")
-            # Mark pending approval activities done
-            activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
-            activities = record.activity_ids.filtered(lambda a: (activity_type and a.activity_type_id == activity_type) or (a.summary and 'Approval' in a.summary))
-            if activities:
-                try:
-                    activities.sudo().action_feedback(feedback=_("[%s] Leave request refused by %s.") % (ref_no, self.env.user.name))
-                except Exception as e:
-                    _logger.warning(f"Could not complete activity on refuse: {e}")
-
-            # Notify the employee
-            emp_user = record.employee_id.user_id
-            if emp_user and emp_user.partner_id:
-                refused_body = f"""
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1d2b32; background: #fdf7f7; border: 1px solid #f5c6cb; border-left: 5px solid #dc3545; border-radius: 8px; padding: 16px 20px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #f5c6cb; padding-bottom: 8px;">
-        <span style="font-size: 15px; font-weight: bold; color: #721c24;">
-            ❌ Leave Request Refused
-        </span>
-        <span style="background-color: #dc3545; color: #ffffff; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">
-            {ref_no}
-        </span>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-            <td style="padding: 5px 0; color: #555; width: 130px; font-weight: 600;">Reference No:</td>
-            <td style="padding: 5px 0; color: #721c24; font-weight: bold;">{ref_no}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Employee:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: 600;">{record.employee_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Leave Reason:</td>
-            <td style="padding: 5px 0; color: #721c24; font-weight: 600;">{record.holiday_status_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Duration:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: bold;">{record.number_of_days} Day(s)</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #555; font-weight: 600;">Dates:</td>
-            <td style="padding: 5px 0; color: #1d2b32;">{record.leave_start_date} &rarr; {record.leave_end_date or record.leave_start_date}</td>
-        </tr>
-    </table>
-    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #f5c6cb; font-size: 12px; color: #721c24;">
-        Refused by <b>{self.env.user.name}</b>.
-    </div>
-</div>
-"""
-                try:
-                    record.sudo().message_post(
-                        body=Markup(refused_body),
-                        subject=_("[%s] Leave Request Refused: %s") % (ref_no, record.holiday_status_id.name),
-                        partner_ids=[emp_user.partner_id.id],
-                        message_type='comment',
-                        subtype_xmlid='mail.mt_comment',
-                    )
-                except Exception as e:
-                    _logger.warning(f"Could not post refuse chatter: {e}")
-            # Refresh balances & status
-            try:
-                balances = record._get_leave_balances(record.employee_id)
-                record.with_context(leave_skip_state_check=True, leave_skip_date_check=True).write({
-                    'leave_request_status': 'refused',
-                    'accrued_leave_balance': balances.get('accrued', 0.0),
-                    'scheduled_leave_balance': balances.get('scheduled', 0.0),
-                })
-            except Exception as e:
-                _logger.warning(f"Could not refresh leave balances after refuse: {e}")
-        return res
-
-    @api.model
-    def _cron_remind_pending_leave_approvals(self):
-        """Finds leave requests that have been in 'confirm' (To Approve) state
-        for 3 or more days and sends daily reminder notifications to the approver (coach_id).
-        """
-        now = fields.Datetime.now()
-        three_days_ago = now - timedelta(days=3)
-        pending_leaves = self.search([
-            ('state', '=', 'confirm'),
-            ('custom_saved', '=', True),
-            '|',
-            ('notified_date', '<=', three_days_ago),
-            '&',
-            ('notified_date', '=', False),
-            ('write_date', '<=', three_days_ago),
-        ])
-
-        for leave in pending_leaves:
-            ref_date = leave.notified_date or leave.write_date or leave.create_date
-            pending_days = (now.date() - fields.Date.to_date(ref_date)).days if ref_date else 3
-            if pending_days < 3:
-                continue
-
-            leave._assign_leave_reference()
-            ref_no = leave.leave_reference or (f"LR-{leave.id:06d}" if leave.id else "LR-Pending")
-
-            approver = leave._get_leave_approver()
-            if approver and approver.user_id:
-                partner_id = approver.user_id.partner_id.id if approver.user_id.partner_id else False
-                reminder_body = f"""
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1d2b32; background: #fffdf5; border: 1px solid #faebcc; border-left: 5px solid #d97706; border-radius: 8px; padding: 16px 20px; margin: 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid #faebcc; padding-bottom: 8px;">
-        <span style="font-size: 15px; font-weight: bold; color: #92400e;">
-            ⏰ Approval Reminder: Pending {pending_days} Days
-        </span>
-        <span style="background-color: #d97706; color: #ffffff; padding: 3px 12px; border-radius: 12px; font-weight: bold; font-size: 12px; letter-spacing: 0.5px;">
-            {ref_no}
-        </span>
-    </div>
-    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-        <tr>
-            <td style="padding: 5px 0; color: #726732; width: 130px; font-weight: 600;">Reference No:</td>
-            <td style="padding: 5px 0; color: #92400e; font-weight: bold;">{ref_no}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Requester:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: 600;">{leave.employee_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Leave Reason:</td>
-            <td style="padding: 5px 0; color: #541718; font-weight: 600;">{leave.holiday_status_id.name or ''}</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Duration:</td>
-            <td style="padding: 5px 0; color: #1d2b32; font-weight: bold;">{leave.number_of_days} Day(s)</td>
-        </tr>
-        <tr>
-            <td style="padding: 5px 0; color: #726732; font-weight: 600;">Dates:</td>
-            <td style="padding: 5px 0; color: #1d2b32;">{leave.leave_start_date} &rarr; {leave.leave_end_date or leave.leave_start_date}</td>
-        </tr>
-    </table>
-    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #faebcc; font-size: 12px; color: #92400e;">
-        This leave request has been awaiting approval for <b>{pending_days} days</b>. Please review and <b>Approve</b> or <b>Refuse</b> it.
-    </div>
-</div>
-"""
-                leave.message_post(
-                    body=Markup(reminder_body),
-                    subject=_("[%s] Approval Reminder: Pending Leave Request for %s (%s days)") % (ref_no, leave.employee_id.name, leave.number_of_days),
-                    partner_ids=[partner_id] if partner_id else [],
-                    message_type='comment',
-                    subtype_xmlid='mail.mt_comment',
-                )
+        return True
 
     # -------------------------------------------------------------------------
     # ACCRUAL & WATERFALL CALCULATION LOGIC
@@ -2253,20 +1484,12 @@ class HrLeaveInheritCustom(models.Model):
 
         opening_balance_leave = 0.0
         try:
-            # Search for Opening Balance allocations by name / description / holiday_status_id (case-insensitive)
             ob_allocs = self.env['hr.leave.allocation'].sudo().search([
                 ('employee_id', '=', employee.id),
                 ('state', '=', 'validate'),
-                '|', '|', '|',
-                ('name', '=ilike', opening_balance_name),
-                ('name', 'ilike', opening_balance_name),
-                ('holiday_status_id.name', '=ilike', opening_balance_name),
-                ('holiday_status_id.name', 'ilike', opening_balance_name),
+                ('name', '=', opening_balance_name),
             ])
             opening_balance_leave = sum(a.number_of_days for a in ob_allocs)
-            if opening_balance_leave:
-                _logger.info("Found Opening Balance Load allocation of %s days for employee %s",
-                             opening_balance_leave, employee.name)
         except Exception as e:
             _logger.warning(f"Could not fetch opening balance: {e}")
 
@@ -2280,6 +1503,7 @@ class HrLeaveInheritCustom(models.Model):
 
         if hire_date > policy_opening_date:
             accrual_start_date = hire_date
+            opening_balance_leave = 0.0
         else:
             accrual_start_date = policy_opening_date + timedelta(days=1)
             if not opening_balance_leave:
@@ -2392,22 +1616,24 @@ class HrLeaveInheritCustom(models.Model):
                 last_completed_entitlement = entitlement
             accrual_start_date = next_anniversary
 
-        # Opening Balance is folded into the "completed" bucket since it represents
-        # leave already banked as of the policy cutover.
+        # Opening Balance is folded into the "completed" bucket (same as
+        # before) since it represents leave already banked as of the policy
+        # cutover, and is therefore subject to the same carryover cap as
+        # fully-completed accrual years.
         gross_accrued_completed = accrued_completed + opening_balance_leave
 
         # Calculate the maximum total balance allowed by category. This cap
-        # is anchored on the LAST COMPLETED accrual year's entitlement.
-        # If no year completed within the post-cutover loop, derive anchor from
-        # the employee's seniority (completed years of service as of as_of_date).
-        if last_completed_entitlement is not None:
-            anchor_entitlement = last_completed_entitlement
-        elif hire_date:
-            years_service = relativedelta(as_of_date, hire_date).years
-            completed_offset = max(0, years_service - 1) if years_service >= 1 else 0
-            anchor_entitlement = base_entitlement + completed_offset
-        else:
-            anchor_entitlement = base_entitlement
+        # is anchored on the LAST COMPLETED accrual year's entitlement, not
+        # the current in-progress year's entitlement - the current year
+        # hasn't finished accruing yet, so using its (higher) entitlement as
+        # the anchor overstated the cap. If no year has completed yet
+        # (employee is within their first accrual year), fall back to the
+        # base entitlement.
+        anchor_entitlement = (
+            last_completed_entitlement
+            if last_completed_entitlement is not None
+            else base_entitlement
+        )
 
         if str(employee_category).lower() == 'managerial':
             cap_years = managerial_cap_years
@@ -2419,11 +1645,49 @@ class HrLeaveInheritCustom(models.Model):
             for yr in range(cap_years)
         )
 
-        # Enforce maximum balance ceiling (carryover cap) on completed years.
-        # Note: An explicit Opening Balance Load approved by HR represents the verified baseline
-        # starting balance at policy cutover, so the cap on completed years cannot be lower than
-        # the approved opening balance itself.
-        maximum_eligible_accrual = max(max_allowed_carryover, opening_balance_leave)
+        # Find Scheduled Leave Type(s) - by is_scheduled_leave flag or fallback by name
+        scheduled_types = self.env['hr.leave.type'].sudo().search([
+            '|',
+            ('is_scheduled_leave', '=', True),
+            ('name', '=ilike', 'Schedule%Leave%'),
+        ])
+        scheduled_type_ids = scheduled_types.ids
+
+        accrual_types = self.env['hr.leave.type'].sudo().search([
+            '|',
+            ('check_accrual_balance', '=', True),
+            ('name', '=ilike', 'Annual%'),
+            ('id', 'not in', scheduled_type_ids),
+        ])
+        accrual_type_ids = [tid for tid in accrual_types.ids if tid not in scheduled_type_ids]
+
+        current_rec_id = (
+            self.id
+            if hasattr(self, 'id') and self.id and isinstance(self.id, int)
+            else False
+        )
+
+        total_leave_consumed = 0.0
+        if accrual_type_ids:
+            actual_domain = [
+                ('employee_id', '=', employee.id),
+                ('state', 'in', ['confirm', 'validate', 'validate1']),
+                ('holiday_status_id', 'in', accrual_type_ids),
+                ('custom_saved', '=', True),
+            ]
+            if current_rec_id:
+                actual_domain.append(('id', '!=', current_rec_id))
+
+            actual_leaves = self.env['hr.leave'].sudo().search(
+                actual_domain,
+                order='date_from asc, id asc',
+            )
+            total_leave_consumed = sum(
+                lv.number_of_days for lv in actual_leaves
+            )
+
+        # Enforce maximum balance ceiling (carryover cap) on completed years
+        maximum_eligible_accrual = max_allowed_carryover
 
         eligible_completed = min(
             gross_accrued_completed,
@@ -2431,7 +1695,9 @@ class HrLeaveInheritCustom(models.Model):
         )
 
         # The current, still-in-progress accrual year is added on top of the
-        # capped completed-years total, uncapped for now.
+        # capped completed-years total, uncapped for now - it hasn't had a
+        # chance to be measured against a full year's entitlement yet, and
+        # will fall under its own completed-year cap check once it finishes.
         eligible = eligible_completed + accrued_current_partial
 
         return float_round(
@@ -2468,12 +1734,12 @@ class HrLeaveInheritCustom(models.Model):
 
         current_rec_id = self.id if (hasattr(self, 'id') and self.id and isinstance(self.id, int)) else False
 
-        # 1. Total Scheduled Leave Days Booked (Validated / Approved Only)
+        # 1. Total Scheduled Leave Days Booked (Confirmed or Validated)
         total_scheduled_booked = 0.0
         if scheduled_type_ids:
             sched_domain = [
                 ('employee_id', '=', employee.id),
-                ('state', 'in', ['validate', 'validate1']),
+                ('state', 'in', ['confirm', 'validate', 'validate1']),
                 ('holiday_status_id', 'in', scheduled_type_ids),
                 ('custom_saved', '=', True),
             ]
@@ -2483,10 +1749,10 @@ class HrLeaveInheritCustom(models.Model):
             sched_leaves = self.env['hr.leave'].sudo().search(sched_domain)
             total_scheduled_booked = sum(lv.number_of_days for lv in sched_leaves)
 
-        # 2. Chronological Waterfall Deduction by Actual Leaves (Validated / Approved Only)
+        # 2. Chronological Waterfall Deduction by Actual Leaves
         actual_domain = [
             ('employee_id', '=', employee.id),
-            ('state', 'in', ['validate', 'validate1']),
+            ('state', 'in', ['confirm', 'validate', 'validate1']),
             ('holiday_status_id', 'in', accrual_type_ids),
             ('custom_saved', '=', True),
         ]
@@ -2516,119 +1782,6 @@ class HrLeaveInheritCustom(models.Model):
             'accrued': float_round(net_accrued, precision_digits=2),
             'scheduled': float_round(net_scheduled, precision_digits=2),
         }
-
-    @api.model
-    def get_dashboard_balances(self, employee_id=None):
-        """Public RPC endpoint to fetch accrued and scheduled leave balances,
-        daily accrual rate, maximum carryover cap, and live accrual status for the dashboard."""
-        employee = None
-        if employee_id:
-            try:
-                employee = self.env['hr.employee'].browse(int(employee_id)).exists()
-            except Exception:
-                employee = None
-
-        if not employee:
-            employee = self._get_current_employee()
-
-        if not employee:
-            employee = self.env.user.employee_id or self.env['hr.employee'].sudo().search(
-                [('user_id', '=', self.env.user.id)], limit=1
-            )
-
-        if not employee:
-            return {
-                'accrued': 0.0,
-                'scheduled': 0.0,
-                'daily_rate': 0.0,
-                'annual_entitlement': 0.0,
-                'max_cap': 0.0,
-                'remaining_to_cap': 0.0,
-                'cap_percentage': 0.0,
-                'accrual_status': 'active',
-                'accrual_status_label': 'Actively Accruing',
-                'employee_category': '',
-            }
-
-        try:
-            balances = self._get_leave_balances(employee)
-            accrued = round(float(balances.get('accrued', 0.0)), 2)
-            scheduled = round(float(balances.get('scheduled', 0.0)), 2)
-
-            # Compute Accrual Metrics & Maximum Carryover Cap
-            config = self._get_accrual_config()
-            base_entitlement = config['base_entitlement']
-            managerial_cap_years = config['managerial_cap_years']
-            non_managerial_cap_years = config['non_managerial_cap_years']
-
-            hire_date = self._get_employee_hire_date(employee)
-            category = self._get_employee_category(employee)
-            is_managerial = str(category).lower() == 'managerial'
-            cap_years = managerial_cap_years if is_managerial else non_managerial_cap_years
-
-            today = fields.Date.today()
-            if hire_date:
-                year_offset = relativedelta(today, hire_date).years
-                annual_entitlement = base_entitlement + max(0, year_offset)
-                # Anchor entitlement for max carryover cap
-                anchor_entitlement = base_entitlement + max(0, year_offset - 1) if year_offset >= 1 else base_entitlement
-            else:
-                annual_entitlement = base_entitlement
-                anchor_entitlement = base_entitlement
-
-            max_cap = float(sum(max(0, anchor_entitlement - yr) for yr in range(cap_years)))
-            daily_rate = round(float(annual_entitlement) / 365.0, 4) if annual_entitlement else 0.0438
-
-            # Total Earned / Active Leave against the Maximum Carryover Cap
-            total_earned = round(accrued + scheduled, 2)
-
-            remaining_to_cap = max(0.0, round(max_cap - total_earned, 2)) if max_cap > 0 else 0.0
-            cap_percentage = min(100.0, round((total_earned / max_cap) * 100.0, 1)) if max_cap > 0 else 0.0
-
-            # Determine Accrual Status based on total_earned
-            if max_cap > 0 and total_earned >= max_cap:
-                accrual_status = 'capped'
-                accrual_status_label = 'Accrual Paused (Max Cap Reached)'
-            elif max_cap > 0 and total_earned >= (max_cap * 0.85):
-                accrual_status = 'near_cap'
-                accrual_status_label = f'Approaching Cap ({remaining_to_cap}d left)'
-            else:
-                accrual_status = 'active'
-                accrual_status_label = 'Actively Accruing'
-
-            _logger.info(
-                "HrLeave.get_dashboard_balances: Employee %s (#%s) -> Accrued: %s, Sched: %s, Total: %s, MaxCap: %s, DailyRate: %s, Status: %s",
-                employee.name, employee.id, accrued, scheduled, total_earned, max_cap, daily_rate, accrual_status
-            )
-            return {
-                'accrued': accrued,
-                'scheduled': scheduled,
-                'total_earned': total_earned,
-                'daily_rate': daily_rate,
-                'annual_entitlement': annual_entitlement,
-                'max_cap': max_cap,
-                'remaining_to_cap': remaining_to_cap,
-                'cap_percentage': cap_percentage,
-                'accrual_status': accrual_status,
-                'accrual_status_label': accrual_status_label,
-                'employee_category': category or ('Managerial' if is_managerial else 'Non Managerial'),
-                'employee_id': employee.id,
-                'employee_name': employee.name,
-            }
-        except Exception as e:
-            _logger.exception("Error computing leave balances in get_dashboard_balances: %s", e)
-            return {
-                'accrued': 0.0,
-                'scheduled': 0.0,
-                'daily_rate': 0.0,
-                'annual_entitlement': 0.0,
-                'max_cap': 0.0,
-                'remaining_to_cap': 0.0,
-                'cap_percentage': 0.0,
-                'accrual_status': 'active',
-                'accrual_status_label': 'Actively Accruing',
-                'employee_category': '',
-            }
 
 
 class ResourceCalendarLeavesCustom(models.Model):

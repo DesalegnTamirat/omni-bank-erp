@@ -79,7 +79,7 @@ class TransferCommitteeMinutes(models.Model):
         for rec in self:
             req = rec.transfer_request_ids[:1]
             if not req and rec.target_vacancy_id:
-                grade = rec.target_vacancy_id.job_grade_id
+                grade = getattr(rec.target_vacancy_id, 'job_grade', False) or getattr(rec.target_vacancy_id, 'job_grade_id', False) or (getattr(rec.target_vacancy_id.job_position, 'grade', False) if rec.target_vacancy_id.job_position else False)
                 op_unit = rec.target_vacancy_id.operating_unit_id
                 category = rec.target_vacancy_id.employee_category
             elif req:

@@ -111,7 +111,7 @@
               parent="menu_pbms_review"
               action="action_pbms_consolidation"
               sequence="70"
-              groups="bunna_pbms.group_pbms_ho_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
+              groups="bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
     <!-- Configuration -->
     <menuitem id="menu_pbms_config"

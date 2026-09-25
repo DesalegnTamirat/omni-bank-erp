@@ -31,6 +31,18 @@
         <field name="arch" type="xml">
             <form string="Lateral Transfer Letter">
                 <header>
+                    <button name="action_accept_transfer"
+                            string="Accept Transfer"
+                            type="object"
+                            class="btn-success"
+                            icon="fa-check-circle"
+                            invisible="state == 'cancelled' or acceptance_status == 'accepted'"/>
+                    <button name="action_decline_transfer"
+                            string="Decline / Refuse Transfer"
+                            type="object"
+                            class="btn-danger"
+                            icon="fa-times-circle"
+                            invisible="state == 'cancelled' or acceptance_status == 'rejected'"/>
                     <button name="action_send_transfer_letter"
                             string="Send Transfer Letter"
                             type="object"
@@ -80,6 +92,12 @@
                             <field name="signatory_title" readonly="state == 'sent'"/>
                             <field name="signatory_company" readonly="state == 'sent'"/>
                             <field name="cc_extra_work_units" readonly="state == 'sent'"/>
+                            <field name="acceptance_status" widget="badge"
+                                   decoration-success="acceptance_status == 'accepted'"
+                                   decoration-danger="acceptance_status == 'rejected'"
+                                   decoration-warning="acceptance_status == 'pending'"/>
+                            <field name="acceptance_date" readonly="1"/>
+                            <field name="rejection_reason" invisible="acceptance_status != 'rejected'" readonly="1"/>
                         </group>
                     </group>
                     <group>

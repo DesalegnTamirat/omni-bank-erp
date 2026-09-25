@@ -18,7 +18,7 @@ class HrResignationClearanceLineItem(models.Model):
     sequence     = fields.Integer(default=10)
     name         = fields.Char(required=True, string='Task')
     is_mandatory = fields.Boolean(default=True)
-    is_done      = fields.Boolean(default=False, string='Done')
+    is_done      = fields.Boolean(default=False, string='completed')
     can_clear    = fields.Boolean(compute='_compute_can_clear', string='Can Clear')
 
     @api.depends_context('uid')
@@ -53,7 +53,7 @@ class HrResignationClearanceLineItem(models.Model):
 
     def action_toggle_done(self):
         for rec in self:
-            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+            if rec.clearance_line_id.resignation_id.state not in ('clearance_in_progress', 'cleared', 'settled', 'completed'):
                 raise UserError(_('You cannot mark tasks as cleared until the Release Date is set and Handover is completed.'))
             if rec.is_done:
                 rec.write({'is_done': False})
@@ -62,7 +62,7 @@ class HrResignationClearanceLineItem(models.Model):
 
     def action_mark_done(self):
         for rec in self:
-            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+            if rec.clearance_line_id.resignation_id.state not in ('clearance_in_progress', 'cleared', 'settled', 'completed'):
                 raise UserError(_('You cannot mark tasks as cleared until the Release Date is set and Handover is completed.'))
             if not rec.can_clear:
                 raise UserError(_('You are not authorized to clear this task. Only the assigned responsible user (with Clearance Officer role), the work unit manager, or Admin can clear tasks.'))
@@ -70,7 +70,7 @@ class HrResignationClearanceLineItem(models.Model):
 
     def action_unmark_done(self):
         for rec in self:
-            if rec.clearance_line_id.resignation_id.state not in ('clearance', 'cleared', 'settled', 'done'):
+            if rec.clearance_line_id.resignation_id.state not in ('clearance_in_progress', 'cleared', 'settled', 'completed'):
                 raise UserError(_('You cannot unmark tasks until the Release Date is set and Handover is completed.'))
             if not rec.can_clear:
                 raise UserError(_('You are not authorized to unmark this task. Only the assigned responsible user, work unit manager, or Admin can unmark tasks.'))
@@ -189,7 +189,7 @@ class HrResignationClearance(models.Model):
         'hr.resignation.clearance.line.item', 'clearance_line_id',
         string='Checklist Items')
     items_total        = fields.Integer(compute='_compute_item_counts', string='Items')
-    items_done         = fields.Integer(compute='_compute_item_counts', string='Done')
+    items_done         = fields.Integer(compute='_compute_item_counts', string='completed')
     items_progress     = fields.Char(compute='_compute_item_counts', string='Item Progress')
     mandatory_items_ok = fields.Boolean(
         compute='_compute_mandatory_items_ok', store=True,
@@ -280,10 +280,10 @@ class HrResignationClearance(models.Model):
                     partner_ids=list(notify_partners),
                     subject=_('Clearance Completed: %s — %s') % (
                         rec.resignation_id.employee_id.sudo().name,
-                        rec.work_unit_id.name or _('Clearance'),
+                        rec.work_unit_id.name or _('clearance_in_progress'),
                     ),
                     body=_('Clearance item <strong>%s</strong> has been cleared by %s for %s (%s).') % (
-                        rec.work_unit_id.name or _('Clearance'),
+                        rec.work_unit_id.name or _('clearance_in_progress'),
                         self.env.user.name,
                         rec.resignation_id.employee_id.sudo().name,
                         rec.resignation_id.name,

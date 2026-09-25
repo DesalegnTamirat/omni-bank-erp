@@ -67,7 +67,7 @@
                             type="object"
                             class="btn-primary"
                             icon="fa-envelope"
-                            invisible="vacancy_status != 'published' or transfer_eval_mode != 'transfer_matrix_only' or shortlist_done == False"/>
+                            invisible="vacancy_status != 'published' or transfer_eval_mode != 'transfer_matrix_only' or shortlist_done == False or supervisor_rec_requested == True or recruitment_step in ('compute_rank', 'notify_committee', 'notify_selection', 'promote', 'done')"/>
 
                     <!-- 8. Compute and Rank -->
                     <button name="action_compute_and_rank"
@@ -94,21 +94,36 @@
                             icon="fa-trophy"
                             invisible="vacancy_status != 'published' or recruitment_step != 'notify_selection'"/>
 
-                    <!-- 12. Promote Selected Candidate -->
+                    <!-- 12. Promote / Transfer Selected Candidate -->
+                    <button name="action_promote_selected_employees"
+                            string="Complete Transfer"
+                            type="object"
+                            class="btn-success"
+                            style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
+                            icon="fa-exchange"
+                            invisible="vacancy_status != 'published' or recruitment_step != 'promote' or transfer_eval_mode != 'transfer_matrix_only'"/>
+
                     <button name="action_promote_selected_employees"
                             string="Promote Selected Candidate"
                             type="object"
                             class="btn-success"
                             style="background-color: #4A2E1A; border-color: #4A2E1A; color: #ffffff;"
                             icon="fa-rocket"
-                            invisible="vacancy_status != 'published' or recruitment_step != 'promote'"/>
+                            invisible="vacancy_status != 'published' or recruitment_step != 'promote' or transfer_eval_mode == 'transfer_matrix_only'"/>
+
+                    <button name="action_print_all_promotion_letters"
+                            string="📄 Transfer Letters"
+                            type="object"
+                            class="btn-secondary"
+                            icon="fa-print"
+                            invisible="not employees_promoted or sourcing_type == 'external' or transfer_eval_mode != 'transfer_matrix_only'"/>
 
                     <button name="action_print_all_promotion_letters"
                             string="📄 Promotion Letters"
                             type="object"
                             class="btn-secondary"
                             icon="fa-print"
-                            invisible="not employees_promoted or sourcing_type == 'external'"/>
+                            invisible="not employees_promoted or sourcing_type == 'external' or transfer_eval_mode == 'transfer_matrix_only'"/>
 
                     <button name="notify"
                             invisible="status in ('notify', 'evaluate') or vacancy_status != 'draft'"
@@ -167,6 +182,9 @@
                     <field name="status" invisible="1"/>
                     <field name="vacancy_status" invisible="1"/>
                     <field name="recruitment_step" invisible="1"/>
+                    <field name="shortlist_done" invisible="1"/>
+                    <field name="supervisor_rec_requested" invisible="1"/>
+                    <field name="selection_notified" invisible="1"/>
 
                     <!-- Main two-column group — mirrors Odoo 14 layout -->
                     <group>
@@ -366,8 +384,8 @@
                                     <field name="weighted_score" readonly="1" class="fw-bold"/>
                                     <field name="rank" readonly="1"/>
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
-                                     <field name="promotion_type" readonly="1" optional="show"/>
-                                     <field name="promotion_status" readonly="1" optional="show"/>
+                                     <field name="promotion_type" string="Movement Type" readonly="1" optional="show"/>
+                                     <field name="promotion_status" string="Movement Status" readonly="1" optional="show"/>
                                      <field name="promoted_salary" optional="show" string="Salary (ETB)"/>
                                      <field name="promotion_ref_no" readonly="1" optional="show" string="Ref No"/>
                                      <button name="action_print_promotion_letter" string="📄 Letter" type="object" class="btn-secondary btn-sm" invisible="selection_type not in ('selected', 'Selected') or promotion_status == 'draft'"/>

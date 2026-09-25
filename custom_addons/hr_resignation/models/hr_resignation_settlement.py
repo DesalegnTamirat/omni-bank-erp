@@ -80,8 +80,12 @@ class HrResignationSettlement(models.Model):
 
     # Salary Parameters
     basic_salary = fields.Float(string='Basic Salary', related='resignation_id.basic_salary', readonly=True, digits=(16, 2))
-    worked_days_final_month = fields.Integer(string='Worked Days in Final Month')
-    total_days_in_month = fields.Integer(string='Total Days in Month', default=31)
+    worked_days_final_month = fields.Integer(
+        string='Worked Days in Final Month',
+        compute='_compute_worked_days_default', store=True, readonly=False,
+        help="Auto-filled from the employee's release date. POMD can override this value."
+    )
+    total_days_in_month = fields.Integer(string='Total Days in Month', default=30)  # kept for DB compatibility, not shown in view
     years_for_severance = fields.Float(string='Years for Severance', digits=(16, 2))
 
     # Provident Fund
@@ -101,6 +105,18 @@ class HrResignationSettlement(models.Model):
     # Financial Fields
     remaining_salary = fields.Float(string='Remaining Salary', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
     remaining_salary_notes = fields.Char(string='Remaining Salary Notes', compute='_compute_remaining_salary', store=True)
+    remaining_housing_allowance = fields.Float(string='Remaining Housing Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_representation_allowance = fields.Float(string='Remaining Representation Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_special_car_allowance = fields.Float(string='Remaining Special Car Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_fuel_allowance = fields.Float(string='Remaining Fuel Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_transportation_allowance = fields.Float(string='Remaining Transportation Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_cash_indemnity = fields.Float(string='Remaining Cash Indemnity', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_hardship_allowance = fields.Float(string='Remaining Hardship Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_mobile_allowance = fields.Float(string='Remaining Mobile Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_acting_allowance = fields.Float(string='Remaining Acting Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_disturbance_allowance = fields.Float(string='Remaining Disturbance Allowance', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_total_tax_exemption = fields.Float(string='Remaining Tax Exemption', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
+    remaining_cash_indemnity_bank = fields.Float(string='Remaining Cash Indemnity Bank', compute='_compute_remaining_salary', store=True, readonly=False, digits=(16, 2))
     accrued_leave_notes = fields.Char(string='Accrued Leave Notes')
     rssa_payment = fields.Float(string='RSSA Payment', digits=(16, 2))
     other_benefits = fields.Float(string='Other Benefits', default=0.0, digits=(16, 2))
@@ -208,7 +224,7 @@ class HrResignationSettlement(models.Model):
             rec.is_misconduct_dismissal = bool(sep and getattr(sep, 'is_misconduct_dismissal', False))
             rec.has_disciplinary_case   = False
             if emp and 'hr.disciplinary.action' in self.env:
-                rec.has_disciplinary_case = bool(self.env['hr.disciplinary.action'].search([('employee_name', '=', emp.id), ('state', 'not in', ('cancel', 'done'))], limit=1))
+                rec.has_disciplinary_case = bool(self.env['hr.disciplinary.action'].search([('employee_name', '=', emp.id), ('state', 'not in', ('cancel', 'completed'))], limit=1))
 
     @api.depends('service_years', 'is_company_terminated', 'is_misconduct_dismissal', 'employee_id', 'resignation_id.resignation_type_id')
     def _compute_pf_eligible(self):
@@ -355,25 +371,80 @@ class HrResignationSettlement(models.Model):
             
             rec.income_tax_leave = total_tax
 
-    @api.depends('basic_salary', 'resignation_id.release_date')
-    def _compute_remaining_salary(self):
-        import calendar
+    @api.depends('resignation_id.release_date')
+    def _compute_worked_days_default(self):
+        """Auto-fill worked days from release date day. POMD can override the stored value."""
         for rec in self:
             release_date = rec.resignation_id.release_date
-            if not release_date or rec.basic_salary <= 0:
-                rec.remaining_salary = 0.0
-                rec.remaining_salary_notes = 'No release date or salary found.'
+            if release_date:
+                rec.worked_days_final_month = release_date.day
             else:
-                days_in_month = calendar.monthrange(release_date.year, release_date.month)[1]
-                proportion = release_date.day / days_in_month
-                rec.remaining_salary = rec.basic_salary * proportion
-                rec.remaining_salary_notes = f"Prorated: {release_date.day}/{days_in_month} days"
+                rec.worked_days_final_month = 0
 
-    @api.depends('remaining_salary')
+    @api.depends('basic_salary', 'worked_days_final_month', 'resignation_id.current_version_id')
+    def _compute_remaining_salary(self):
+        for rec in self:
+            worked_days = rec.worked_days_final_month
+            basic = rec.basic_salary
+
+            if not worked_days or basic <= 0:
+                proportion = 0.0
+                rec.remaining_salary = 0.0
+                rec.remaining_salary_notes = 'No worked days or salary entered.'
+            else:
+                # Fixed 30-day month basis
+                daily_rate = basic / 30.0
+                rec.remaining_salary = daily_rate * worked_days
+                proportion = worked_days / 30.0
+                rec.remaining_salary_notes = f"{worked_days} days × (51,402 ÷ 30) = {rec.remaining_salary:,.2f}"
+
+            contract = rec.resignation_id.current_version_id
+            if contract and proportion > 0:
+                def get_prorated(field):
+                    return getattr(contract, field, 0.0) * proportion
+
+                rec.remaining_housing_allowance = get_prorated('housing_allowance')
+                rec.remaining_representation_allowance = get_prorated('representation_allowance')
+                rec.remaining_special_car_allowance = get_prorated('special_car_allowance')
+                rec.remaining_fuel_allowance = get_prorated('fuel_allowance')
+                rec.remaining_transportation_allowance = get_prorated('transportation_allowance')
+                rec.remaining_cash_indemnity = get_prorated('cash_indemnity')
+                rec.remaining_hardship_allowance = get_prorated('hardship_allowance')
+                rec.remaining_mobile_allowance = get_prorated('mobile_allowance')
+                rec.remaining_acting_allowance = get_prorated('acting_allowance')
+                rec.remaining_disturbance_allowance = get_prorated('disturbance_allowance')
+                rec.remaining_total_tax_exemption = get_prorated('total_tax_exemption') if hasattr(contract, 'total_tax_exemption') else 0.0
+                rec.remaining_cash_indemnity_bank = get_prorated('cash_indemnity_bank')
+            else:
+                rec.remaining_housing_allowance = 0.0
+                rec.remaining_representation_allowance = 0.0
+                rec.remaining_special_car_allowance = 0.0
+                rec.remaining_fuel_allowance = 0.0
+                rec.remaining_transportation_allowance = 0.0
+                rec.remaining_cash_indemnity = 0.0
+                rec.remaining_hardship_allowance = 0.0
+                rec.remaining_mobile_allowance = 0.0
+                rec.remaining_acting_allowance = 0.0
+                rec.remaining_disturbance_allowance = 0.0
+                rec.remaining_total_tax_exemption = 0.0
+                rec.remaining_cash_indemnity_bank = 0.0
+
+    @api.depends('remaining_salary', 'remaining_housing_allowance', 'remaining_representation_allowance',
+                 'remaining_special_car_allowance', 'remaining_fuel_allowance', 'remaining_transportation_allowance',
+                 'remaining_cash_indemnity', 'remaining_hardship_allowance', 'remaining_mobile_allowance',
+                 'remaining_acting_allowance', 'remaining_disturbance_allowance', 'remaining_cash_indemnity_bank',
+                 'remaining_total_tax_exemption')
     def _compute_salary_deductions(self):
         for rec in self:
-            if rec.remaining_salary > 0:
-                rec.income_tax_deduction = rec._calculate_tax_for_amount(rec.remaining_salary)
+            gross = (rec.remaining_salary + rec.remaining_housing_allowance +
+                     rec.remaining_representation_allowance + rec.remaining_special_car_allowance +
+                     rec.remaining_fuel_allowance + rec.remaining_transportation_allowance +
+                     rec.remaining_cash_indemnity + rec.remaining_hardship_allowance +
+                     rec.remaining_mobile_allowance + rec.remaining_acting_allowance +
+                     rec.remaining_disturbance_allowance + rec.remaining_cash_indemnity_bank +
+                     rec.remaining_total_tax_exemption)
+            if gross > 0:
+                rec.income_tax_deduction = rec._calculate_tax_for_amount(gross)
                 # Standard Ethiopian employee pension deduction is 7%
                 rec.pension_deduction = rec.remaining_salary * 0.07
             else:
@@ -460,7 +531,19 @@ class HrResignationSettlement(models.Model):
                     lines.append((0, 0, {'name': 'Severance Income Tax', 'line_type': 'tax', 'is_taxable': False, 'amount': rec.income_tax_severance, 'resignation_id': rec.resignation_id.id}))
             
             # --- OTHER STANDARD LINES ---
-            lines.append((0, 0, {'name': 'Remaining Salary', 'line_type': 'earning', 'is_taxable': True, 'amount': rec.remaining_salary, 'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Remaining Salary',           'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_salary,                   'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Housing Allowance',          'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_housing_allowance,          'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Representation Allowance',   'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_representation_allowance,   'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Special Car Allowance',      'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_special_car_allowance,      'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Fuel Allowance',             'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_fuel_allowance,             'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Transportation Allowance',   'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_transportation_allowance,   'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Cash Indemnity',             'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_cash_indemnity,             'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Hardship Allowance',         'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_hardship_allowance,         'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Mobile Allowance',           'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_mobile_allowance,           'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Acting Allowance',           'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_acting_allowance,           'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Disturbance Allowance',      'line_type': 'earning', 'is_taxable': True,  'amount': rec.remaining_disturbance_allowance,      'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Total Tax Exemption',        'line_type': 'earning', 'is_taxable': True, 'amount': rec.remaining_total_tax_exemption,        'resignation_id': rec.resignation_id.id}))
+            lines.append((0, 0, {'name': 'Cash Indemnity Bank',        'line_type': 'earning', 'is_taxable': True, 'amount': rec.remaining_cash_indemnity_bank,        'resignation_id': rec.resignation_id.id}))
             lines.append((0, 0, {'name': 'Accrued Leave Pay', 'line_type': 'earning', 'is_taxable': True, 'amount': rec.accrued_leave_pay, 'resignation_id': rec.resignation_id.id}))
             if rec.income_tax_leave > 0:
                 lines.append((0, 0, {'name': 'Leave Income Tax', 'line_type': 'tax', 'is_taxable': False, 'amount': rec.income_tax_leave, 'resignation_id': rec.resignation_id.id}))
@@ -469,8 +552,8 @@ class HrResignationSettlement(models.Model):
             lines.append((0, 0, {'name': 'Income Tax (Salary)', 'line_type': 'tax', 'is_taxable': False, 'amount': rec.income_tax_deduction, 'resignation_id': rec.resignation_id.id}))
             lines.append((0, 0, {'name': 'Pension Deduction', 'line_type': 'deduction', 'is_taxable': False, 'amount': rec.pension_deduction, 'resignation_id': rec.resignation_id.id}))
                 
-            if rec.notice_period_accepted == 'no' and rec.resignation_id.notice_period > 0:
-                lines.append((0, 0, {'name': 'Notice Period Liability (1 Month Salary)', 'line_type': 'deduction', 'is_taxable': False, 'amount': rec.basic_salary, 'resignation_id': rec.resignation_id.id}))
+            liability_amount = rec.resignation_id.liability or 0.0
+            lines.append((0, 0, {'name': 'Notice Period Liability (1 Month Salary)' if liability_amount > 0 else 'Notice Period Liability', 'line_type': 'deduction', 'is_taxable': False, 'amount': liability_amount, 'resignation_id': rec.resignation_id.id}))
 
             if rec.outstanding_debt_deduction and rec.settlement_authorized:
                 lines.append((0, 0, {'name': 'Outstanding Debts', 'line_type': 'deduction', 'is_taxable': False, 'amount': rec.outstanding_debt_deduction, 'resignation_id': rec.resignation_id.id}))
@@ -540,6 +623,19 @@ class HrResignationSettlement(models.Model):
             rec.confirmed_by_id = False
             rec.confirmed_date = False
             rec.paid_by_id = False
+
+    def action_reset_lines(self):
+        """Clear all generated lines and reset is_processed so POMD can regenerate."""
+        is_hr = (
+            self.env.user.has_group('hr_resignation.group_pomd_officer')
+            or self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
+            or self.env.user.has_group('base.group_system')
+        )
+        if not is_hr:
+            raise UserError(_('Only POMD or HR Manager can reset settlement lines.'))
+        for rec in self:
+            rec.line_ids.unlink()
+            rec.is_processed = False
             rec.paid_date = False
 
     def action_confirm_settlement(self):

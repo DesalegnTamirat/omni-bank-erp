@@ -35,6 +35,14 @@ class HrResignation(models.Model):
         help='Employee: the employee requested to leave.\n'
              'Company: the company is ending the employment.')
 
+    initiated_by_user_id = fields.Many2one(
+        'res.users',
+        string='Initiated By (User)',
+        readonly=True,
+        copy=False,
+        help='The POMD/HR user who created this company-initiated resignation.'
+    )
+
     resignation_type_id = fields.Many2one(
         'hr.separation.type',
         string='Separation Type',
@@ -52,7 +60,7 @@ class HrResignation(models.Model):
                                     compute='_compute_employee_info')
     job_id = fields.Many2one('hr.job', string='Job Position', readonly=True, store=True,
                              compute='_compute_employee_info')
-    manager_id = fields.Many2one('hr.employee', string='Direct Manager', readonly=True, store=True,
+    coach_id = fields.Many2one('hr.employee', string='Coach', readonly=True, store=True,
                                  compute='_compute_employee_info')
     is_current_manager = fields.Boolean(compute='_compute_is_current_manager')
     operating_unit_id = fields.Many2one('operating.unit', readonly=True, store=True,
@@ -65,7 +73,8 @@ class HrResignation(models.Model):
     basic_salary = fields.Float(string='Basic Salary', compute='_compute_employee_info', store=True, readonly=True)
     total_accrued_leave = fields.Float(string='Total Accrued Leave', compute='_compute_employee_info', store=True, readonly=True)
     total_scheduled_leave = fields.Float(string='Total Scheduled Leave', compute='_compute_employee_info', store=True, readonly=True)
-    rssa = fields.Float(string='RSSA')
+    rssa = fields.Float(string='RSSA (Total Loan Taken)', compute='_compute_rssa_info', store=True)
+    rssa_od_guarantier = fields.Char(string='RSSA/OD Guarantier', compute='_compute_rssa_info', store=True)
     liability = fields.Float(
         string='Notice Period Liability', 
         compute='_compute_liability', 
@@ -94,7 +103,7 @@ class HrResignation(models.Model):
             if not emp:
                 rec.department_id = False
                 rec.job_id = False
-                rec.manager_id = False
+                rec.coach_id = False
                 rec.operating_unit_id = False
                 rec.current_version_id = False
                 rec.basic_salary = 0.0
@@ -104,7 +113,7 @@ class HrResignation(models.Model):
                 continue
             rec.department_id = emp.department_id
             rec.job_id = emp.job_position
-            rec.manager_id = emp.parent_id
+            rec.coach_id = emp.coach_id
             rec.operating_unit_id = emp.operating_unit_id if 'operating_unit_id' in emp._fields else False
             # Forcefully search for the active contract in hr.version to guarantee we find it
             domain = [('employee_id', '=', emp._origin.id if hasattr(emp, '_origin') and emp._origin else emp.id), ('state', 'in', ['open', 'probation'])]
@@ -127,6 +136,34 @@ class HrResignation(models.Model):
             balances = self.env['hr.leave']._get_leave_balances(active_emp)
             rec.total_accrued_leave = balances.get('accrued', 0.0)
             rec.total_scheduled_leave = balances.get('scheduled', 0.0)
+
+    @api.depends('employee_id')
+    def _compute_rssa_info(self):
+        for rec in self:
+            if not rec.employee_id:
+                rec.rssa = 0.0
+                rec.rssa_od_guarantier = ''
+                continue
+
+            # Fetch RSSA (Total Loan Taken)
+            Loan = self.env['resl.loan']
+            total_taken = Loan._employee_total_disbursed(rec.employee_id)
+            rec.rssa = total_taken
+            
+            # Fetch Guarantors for this employee's loans
+            my_loans = self.env['resl.loan'].search([
+                ('employee_id', '=', rec.employee_id.id),
+                ('status', 'not in', ['rejected'])
+            ])
+            my_guarantors = my_loans.mapped('guarantor_line_ids').filtered(
+                lambda l: l.state in ['pending', 'accepted']
+            ).mapped('guarantor_id.name')
+            
+            info = []
+            if my_guarantors:
+                info.extend(my_guarantors)
+                
+            rec.rssa_od_guarantier = ', '.join(set(info)) if info else 'None'
 
     @api.depends('employee_id')
     def _compute_joined_date(self):
@@ -186,7 +223,7 @@ class HrResignation(models.Model):
             active_resignation = self.env['hr.resignation'].search([
                 ('employee_id', '=', rec.employee_id.id),
                 ('id', '!=', rec.id),
-                ('state', 'not in', ('manager_rejected', 'hr_rejected', 'done', 'settled'))
+                ('state', 'not in', ('manager_rejected', 'hr_rejected', 'completed', 'settled'))
             ], limit=1)
             if active_resignation:
                 raise ValidationError(_("This employee already has an active resignation request. You cannot create another one until the current request is finished or rejected."))
@@ -239,13 +276,13 @@ class HrResignation(models.Model):
     state = fields.Selection([
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
-        ('hr_approved', 'HR Approved'),
+        ('approved', 'Approved'),
         ('release_date_set', 'Release Date Set'),
         ('handover_completed', 'Handover Completed'),
-        ('clearance', 'Clearance'),
+        ('clearance_in_progress', 'Clearance In Progress'),
         ('cleared', 'Cleared'),
         ('settled', 'Settled'),
-        ('done', 'Completed'),
+        ('completed', 'Completed'),
         ('returned', 'Returned'),
         ('revoked', 'Revoked'),
     ], default='draft', copy=False)
@@ -285,11 +322,11 @@ class HrResignation(models.Model):
         for rec in self:
             is_hr = self.env.user.has_group('hr_resignation.group_resignation_hr_manager')
             is_admin = self.env.user.has_group('base.group_system')
-            is_manager = rec.manager_id and rec.manager_id.user_id == self.env.user
+            is_manager = rec.coach_id and rec.coach_id.user_id == self.env.user
             
             if rec.state in ('draft', 'submitted', 'manager_reviewed'):
                 rec.show_release_date_to_employee = False
-            elif rec.state == 'hr_approved':
+            elif rec.state == 'approved':
                 rec.show_release_date_to_employee = bool(is_hr or is_admin or is_manager)
             else:
                 rec.show_release_date_to_employee = True
@@ -300,17 +337,17 @@ class HrResignation(models.Model):
     @api.depends('state')
     def _compute_show_handover_tab(self):
         for rec in self:
-            if rec.state in ('draft', 'submitted', 'hr_approved'):
+            if rec.state in ('draft', 'submitted', 'approved'):
                 rec.show_handover_tab = False
             else:
                 rec.show_handover_tab = True
 
     def _compute_can_edit_handover(self):
         for rec in self:
-            is_manager = (rec.manager_id and rec.manager_id.user_id == self.env.user)
+            is_manager = (rec.coach_id and rec.coach_id.user_id == self.env.user)
             is_hr = self.env.user.has_group('hr.group_hr_user')
             is_admin = self.env.user.has_group('base.group_system')
-            rec.can_edit_handover = (rec.state in ('hr_approved', 'release_date_set')) and (is_manager or is_hr or is_admin)
+            rec.can_edit_handover = (rec.state in ('approved', 'release_date_set')) and (is_manager or is_hr or is_admin)
 
     # ── Related fields from settlement (inline display on form) ──────
     settlement_service_years = fields.Float(related='settlement_id.service_years', readonly=True)
@@ -435,7 +472,8 @@ class HrResignation(models.Model):
         from datetime import timedelta
         for rec in self:
             if rec.application_date and rec.notice_period:
-                rec.expected_last_day = rec.application_date + timedelta(days=rec.notice_period)
+                # Subtract 1 day so that the application date is counted as day 1
+                rec.expected_last_day = rec.application_date + timedelta(days=rec.notice_period - 1)
             else:
                 rec.expected_last_day = rec.application_date
 
@@ -481,12 +519,12 @@ class HrResignation(models.Model):
     is_allowed_to_see_warnings = fields.Boolean(compute='_compute_is_allowed_to_see_warnings', default=False)
 
     @api.depends_context('uid')
-    @api.depends('employee_id', 'employee_id.parent_id')
+    @api.depends('employee_id', 'employee_id.coach_id')
     def _compute_is_allowed_to_see_warnings(self):
         for rec in self:
             is_hr = self.env.user.has_group('hr.group_hr_user')
             is_self = rec.employee_id and rec.employee_id.user_id == self.env.user
-            is_manager = rec.employee_id and rec.employee_id.parent_id and rec.employee_id.parent_id.user_id == self.env.user
+            is_manager = rec.employee_id and rec.employee_id.coach_id and rec.employee_id.coach_id.user_id == self.env.user
             
             # Explicitly block the employee and their direct manager from seeing the warnings, 
             # even if they happen to have HR rights in the system for other reasons.
@@ -555,10 +593,13 @@ class HrResignation(models.Model):
                 employee = self.env['hr.employee'].search(
                     [('user_id', '=', self.env.uid)], limit=1)
                 if employee:
-                    if self.search([('employee_id', '=', employee.id), ('state', '!=', 'done')], limit=1):
+                    if self.search([('employee_id', '=', employee.id), ('state', '!=', 'completed')], limit=1):
                         raise UserError(_('An active resignation request already exists for this employee.'))
                     vals['employee_id'] = employee.id
                 vals['initiated_by'] = 'employee'
+            # Capture who created the resignation when company-initiated
+            if vals.get('initiated_by') == 'company' and not vals.get('initiated_by_user_id'):
+                vals['initiated_by_user_id'] = self.env.uid
             if 'release_date' in vals:
                 is_hr = self.env.user.has_group('hr.group_hr_user')
                 is_manager = self.env.user.has_group('hr.group_hr_manager')
@@ -596,10 +637,10 @@ class HrResignation(models.Model):
     # ==================================================================
 
 
-    @api.depends('manager_id')
+    @api.depends('coach_id')
     def _compute_is_current_manager(self):
         for rec in self:
-            rec.is_current_manager = (rec.manager_id.user_id == self.env.user)
+            rec.is_current_manager = (rec.coach_id.user_id == self.env.user)
 
     def action_submit(self):
         for rec in self:
@@ -647,7 +688,7 @@ class HrResignation(models.Model):
             rec.state = 'submitted'
 
             # Notify Manager, HR Officers, HR Manager
-            manager = rec.manager_id.sudo()
+            manager = rec.coach_id.sudo()
             if manager and manager.user_id:
                 rec._send_notification(
                     partner_ids=manager.user_id.partner_id.ids,
@@ -772,7 +813,7 @@ class HrResignation(models.Model):
                             "Please evaluate or adjust their probation status first."
                         ))
 
-            rec.state = 'hr_approved'
+            rec.state = 'approved'
             rec._create_clearance_lines()
 
             # Assign exit interview
@@ -822,7 +863,7 @@ class HrResignation(models.Model):
                 )
 
             # Notify the direct manager
-            manager_user = rec.manager_id.sudo().user_id
+            manager_user = rec.coach_id.sudo().user_id
             if manager_user and manager_user.active:
                 rec._send_notification(
                     partner_ids=manager_user.partner_id.ids,
@@ -849,7 +890,7 @@ class HrResignation(models.Model):
 
     def action_set_release_date(self):
         for rec in self:
-            if rec.state != 'hr_approved':
+            if rec.state != 'approved':
                 raise UserError(_('Can only set Release Date after HR approval.'))
             if not rec.release_date:
                 raise UserError(_('Please specify the Release Date before confirming.'))
@@ -901,7 +942,7 @@ class HrResignation(models.Model):
                 raise UserError(_('Release Date must be set before handover.'))
             
             # Validation for exit interview
-            if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'done'):
+            if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'completed'):
                 raise UserError(_('The employee must complete the exit interview before handover tasks can be completed.'))
                 
             # Just require the text field to have something in it (strip HTML tags)
@@ -909,7 +950,7 @@ class HrResignation(models.Model):
             if not rec.handover_notes or not html2plaintext(rec.handover_notes).strip():
                 raise UserError(_('Handover Notes are required.'))
             
-            rec.state = 'clearance'
+            rec.state = 'clearance_in_progress'
 
     def action_complete_exit_interview(self):
         self.ensure_one()
@@ -927,7 +968,7 @@ class HrResignation(models.Model):
 
     def action_mark_exit_interviewed(self):
         for rec in self:
-            if rec.state != 'hr_approved':
+            if rec.state != 'approved':
                 raise UserError(_('Please wait for HR Approval first.'))
             rec._check_and_advance_cleared()
         return self._show_success_message(_('Exit interview marked as completed.'))
@@ -936,7 +977,7 @@ class HrResignation(models.Model):
         if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
             raise UserError(_('Only a POMD Officer or HR Manager can waive the exit interview.'))
         for rec in self:
-            if rec.state not in ('hr_approved', 'release_date_set', 'clearance'):
+            if rec.state not in ('approved', 'release_date_set', 'clearance_in_progress'):
                 raise UserError(_('Please wait for HR Approval first before waiving exit interview.'))
             rec.exit_interview_waived = True
             rec.message_post(body=_("Exit Interview has been waived."))
@@ -948,7 +989,7 @@ class HrResignation(models.Model):
         if not self.env.user.has_group('hr_resignation.group_pomd_officer') and not self.env.user.has_group('hr_resignation.group_resignation_hr_manager') and not self.env.user.has_group('base.group_system'):
             raise UserError(_('Only a POMD Officer or HR Manager can complete clearance.'))
         for rec in self:
-            if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'done'):
+            if not rec.exit_interview_waived and (not rec.exit_interview_id or rec.exit_interview_id.state != 'completed'):
                 raise UserError(_('The Exit Interview has to be processed first, unless waived by authorized HR or POMD personnel.'))
             mandatory = rec.clearance_line_ids.filtered('is_mandatory')
             if not mandatory:
@@ -1019,7 +1060,7 @@ class HrResignation(models.Model):
                 raise UserError(_(
                     'Cannot close case. The following mandatory clearance lines '
                     'are still rejected and must be resolved first:\n• %s') % units)
-            rec.state = 'done'
+            rec.state = 'completed'
             rec._trigger_access_revocation()
         return self.env.ref(
             'hr_resignation.action_report_certificate_of_release').report_action(self)
@@ -1027,7 +1068,7 @@ class HrResignation(models.Model):
     def action_download_certificate(self):
         """Download certificate for a completed resignation."""
         self.ensure_one()
-        if self.state != 'done':
+        if self.state != 'completed':
             raise UserError(_('Certificate is only available after the resignation is completed.'))
         return self.env.ref('hr_resignation.action_report_certificate_of_release').report_action(self)
 
@@ -1060,7 +1101,7 @@ class HrResignation(models.Model):
     def action_regenerate_clearance_lines(self):
 
         for rec in self:
-            if rec.state in ('cleared', 'settled', 'done'):
+            if rec.state in ('cleared', 'settled', 'completed'):
                 raise UserError(_(
                     'Clearance lines cannot be regenerated after the case '
                     'has been cleared or closed.'))
@@ -1121,7 +1162,7 @@ class HrResignation(models.Model):
 
     def _check_and_advance_cleared(self):
         for rec in self:
-            if rec.state not in ('clearance', 'handover_completed'):
+            if rec.state not in ('clearance_in_progress', 'handover_completed'):
                 continue
             mandatory = rec.clearance_line_ids.filtered('is_mandatory')
             if not mandatory:
@@ -1232,7 +1273,7 @@ class HrResignation(models.Model):
 
         today = fields.Date.today()
         completed_resignations = self.search([
-            ('state', '=', 'done'),
+            ('state', '=', 'completed'),
             ('release_date', '<=', today),
             ('employee_id.active', '=', True)
         ])

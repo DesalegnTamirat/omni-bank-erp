@@ -29,7 +29,7 @@
                                 Drag and drop using the handles on the left to change their order.
                             </p>
                             <field name="question_ids" nolabel="1">
-                                <list editable="bottom">
+                                <list delete="0">
                                     <field name="sequence" widget="handle"/>
                                     <field name="section" string="Section" optional="show"/>
                                     <field name="name" string="Question Text" style="width:40%;"/>
@@ -80,11 +80,15 @@
         <field name="model">hr.exit.interview.question</field>
         <field name="arch" type="xml">
             <form string="Exit Interview Question">
+                <header>
+                    <button name="action_delete_question" string="Delete Question" type="object" class="btn-danger" confirm="Are you sure you want to delete this question?"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="name" string="Question Text"/>
                         <field name="section" string="Section"/>
                         <field name="question_type" string="Type"/>
+                        <field name="is_mandatory" widget="boolean_toggle"/>
                         <field name="sequence" invisible="1"/>
                     </group>
                     <notebook invisible="question_type not in ['custom','checkbox']">
@@ -249,7 +253,7 @@
         <field name="model">hr.exit.interview</field>
         <field name="arch" type="xml">
             <list string="Exit Interviews"
-                  decoration-success="state == 'done'"
+                  decoration-success="state == 'completed'"
                   decoration-muted="state == 'draft'">
                 <field name="employee_id"/>
                 <field name="template_id"    string="Template"/>
@@ -257,7 +261,7 @@
                 <field name="interviewer_id" string="Conducted By" optional="show"/>
                 <field name="state" widget="badge"
                        decoration-info="state == 'draft'"
-                       decoration-success="state == 'done'"/>
+                       decoration-success="state == 'completed'"/>
             </list>
         </field>
     </record>

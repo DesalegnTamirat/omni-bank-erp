@@ -1,6 +1,6 @@
 {
     'name': 'HR Leave Request Custom',
-    'version': '19.0.1.0.31',
+    'version': '19.0.1.0.4',
     'summary': 'Custom Leave Request extension for hr.holidays (Time Off)',
     'description': """
         Extends the standard Time Off (hr.holidays) module with additional
@@ -23,11 +23,6 @@
         'views/res_config_settings_views.xml',
         'views/hr_leave_dashboard_views.xml',
     ],
-    'assets': {
-        'web.assets_backend': [
-            'hr_leave_request_custom/static/src/**/*',
-        ],
-    },
     'installable': True,
     'application': False,
     'license': 'LGPL-3',

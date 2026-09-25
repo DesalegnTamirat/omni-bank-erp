@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Knowledge Article Form View -->
+    <record id="view_helpdesk_knowledge_article_form" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.form</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <form string="Knowledge Article / SOP">
+                <header>
+                    <button name="action_approve" type="object" string="Approve" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_publish" type="object" string="Publish" class="btn-success" invisible="state != 'approved'"/>
+                    <button name="action_set_obsolete" type="object" string="Set Obsolete" invisible="state in ('draft', 'obsolete')"/>
+                    <button name="action_reset_draft" type="object" string="Reset to Draft" invisible="state == 'draft'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,approved,published,obsolete"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Article Title / SOP Subject..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="service_family_id"/>
+                            <field name="category_id"/>
+                            <field name="work_unit_id"/>
+                        </group>
+                        <group>
+                            <field name="author_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Article Content &amp; Solution Guide" name="content">
+                            <field name="content" placeholder="Enter detailed troubleshooting steps, SOP guidance, or FAQ response..."/>
+                        </page>
+                        <page string="Attachments" name="attachments">
+                            <field name="attachment_ids" widget="many2many_binary"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Knowledge Article Tree View -->
+    <record id="view_helpdesk_knowledge_article_tree" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.list</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <list string="Knowledge Articles &amp; SOPs">
+                <field name="name"/>
+                <field name="service_family_id"/>
+                <field name="category_id"/>
+                <field name="work_unit_id"/>
+                <field name="author_id"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'approved'" decoration-success="state == 'published'" decoration-muted="state == 'obsolete'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Knowledge Article Search View -->
+    <record id="view_helpdesk_knowledge_article_search" model="ir.ui.view">
+        <field name="name">helpdesk.knowledge.article.search</field>
+        <field name="model">helpdesk.knowledge.article</field>
+        <field name="arch" type="xml">
+            <search string="Search Knowledge Base">
+                <field name="name"/>
+                <field name="service_family_id"/>
+                <field name="category_id"/>
+                <field name="work_unit_id"/>
+                <filter string="Published" name="published" domain="[('state', '=', 'published')]"/>
+                <filter string="Draft" name="draft" domain="[('state', '=', 'draft')]"/>
+                <group>
+                    <filter string="Service Family" name="group_service_family" context="{'group_by': 'service_family_id'}"/>
+                    <filter string="Category" name="group_category" context="{'group_by': 'category_id'}"/>
+                    <filter string="Work Unit" name="group_work_unit" context="{'group_by': 'work_unit_id'}"/>
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Knowledge Article Action -->
+    <record id="action_helpdesk_knowledge_article" model="ir.actions.act_window">
+        <field name="name">Knowledge Base &amp; SOPs</field>
+        <field name="res_model">helpdesk.knowledge.article</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_helpdesk_knowledge_article_search"/>
+        <field name="context">{'search_default_published': 1}</field>
+    </record>
+</odoo>

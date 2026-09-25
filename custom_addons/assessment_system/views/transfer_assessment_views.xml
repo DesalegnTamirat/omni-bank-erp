@@ -8,8 +8,8 @@
         <field name="arch" type="xml">
             <form string="Employee Transfer Assessment">
                 <header>
-                    <button name="action_evaluate" string="Compute Composite Scores" type="object" invisible="state != 'draft'" class="btn-primary"/>
-                    <button name="action_approve_transfer_assessment" string="HR Approve &amp; Push to Ranking" type="object" invisible="state != 'evaluated'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator"/>
+                    <button name="action_evaluate" string="Compute Composite Scores" type="object" invisible="state != 'draft'" class="btn-primary" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
+                    <button name="action_approve_transfer_assessment" string="HR Approve &amp; Push to Ranking" type="object" invisible="state != 'evaluated'" class="btn-success" groups="custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,evaluated,approved"/>
                 </header>
                 <sheet>
@@ -30,24 +30,24 @@
                         </group>
                     </group>
                     <group string="Transfer Weight Scoring Matrix">
-                        <group string="1. PMS Rating (30%)">
+                        <group string="1. PMS Rating (30%)" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
                             <field name="pms_score"/>
                             <field name="pms_weight" readonly="1"/>
                             <field name="pms_weighted_score"/>
                         </group>
-                        <group string="2. Application Date Seniority (20%)">
+                        <group string="2. Application Date Seniority (20%)" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
                             <field name="application_date"/>
                             <field name="application_date_score"/>
                             <field name="application_date_weight" readonly="1"/>
                             <field name="application_date_weighted_score"/>
                         </group>
-                        <group string="3. Total Experience (20%)">
+                        <group string="3. Total Experience (20%)" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
                             <field name="total_experience_years"/>
                             <field name="total_experience_score"/>
                             <field name="total_experience_weight" readonly="1"/>
                             <field name="total_experience_weighted_score"/>
                         </group>
-                        <group string="4. Service in Current Location (20%)">
+                        <group string="4. Service in Current Location (20%)" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
                             <field name="service_years_in_location"/>
                             <field name="service_location_score"/>
                             <field name="service_location_weight" readonly="1"/>
@@ -60,7 +60,7 @@
                             <field name="recommendation_notes"/>
                         </group>
                     </group>
-                    <group string="Transfer Final Composite Score">
+                    <group string="Transfer Final Composite Score" groups="custom_recruitment.group_recruitment_officer,custom_recruitment.group_recruitment_manager,custom_recruitment.group_recruitment_administrator,assessment_system.group_assessment_officer,assessment_system.group_assessment_manager,assessment_system.group_assessment_administrator">
                         <group>
                             <field name="total_transfer_score"/>
                         </group>

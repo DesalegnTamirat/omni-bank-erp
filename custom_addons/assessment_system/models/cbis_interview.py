@@ -248,11 +248,7 @@ class CBISInterviewSession(models.Model):
                         continue
                     exam_score = cand.written_exam_score or 0.0
                     is_disqualified = False
-                    if cand.select_flag is False:
-                        is_disqualified = True
-                    elif cand.selection_type == 'rejected':
-                        is_disqualified = True
-                    elif has_exam and exam_score < 50.0:
+                    if (cand.select_flag is False) or (cand.selection_type == 'rejected') or (has_exam and exam_score < 50.0):
                         is_disqualified = True
 
                     if is_disqualified:
@@ -386,9 +382,10 @@ class CBISInterviewSession(models.Model):
 
             # 1. Unlink candidates who no longer qualify / failed written exam (<50%) and have no submitted evaluations
             invalid_lines = rec.candidate_line_ids.filtered(
-                lambda l: ((l.employee_id and l.employee_id.id not in valid_emp_ids) or
-                           (l.applicant_id and l.applicant_id.id not in valid_app_ids)) and
-                          (not l.submitted_eval_count or l.submitted_eval_count == 0)
+                lambda l, v_emp=valid_emp_ids, v_app=valid_app_ids: (
+                    (l.employee_id and l.employee_id.id not in v_emp) or
+                    (l.applicant_id and l.applicant_id.id not in v_app)
+                ) and (not l.submitted_eval_count or l.submitted_eval_count == 0)
             )
             if invalid_lines:
                 invalid_lines.unlink()

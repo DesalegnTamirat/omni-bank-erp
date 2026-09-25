@@ -120,7 +120,7 @@
         <field name="name">Release Form</field>
         <field name="res_model">new.internal.recruitment.selected.candidates</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('selection_type', '=', 'selected'), ('promotion_type', '=', 'diff_unit')]</field>
+        <field name="domain">[('selection_type', 'in', ['selected', 'Selected']), ('promotion_type', '=', 'diff_unit')]</field>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_candidate_release_form_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_candidate_release_form_view')})]"/>

@@ -63,13 +63,12 @@ QUARTER_LABELS = {
 
 class HrEmployeeGrade(models.Model):
     _inherit = "employee.grade"
+    _rec_name = "grade_code"
 
     @api.depends("grade_code", "grade_name")
     def _compute_display_name(self):
         for rec in self:
-            if rec.grade_code and rec.grade_name:
-                rec.display_name = f"{rec.grade_code} - {rec.grade_name}"
-            elif rec.grade_code:
+            if rec.grade_code:
                 rec.display_name = rec.grade_code
             elif rec.grade_name:
                 rec.display_name = rec.grade_name
@@ -1146,12 +1145,16 @@ class PbmsPlanCategoryLine(models.Model):
     def _default_position_type_id(self):
         return self.env["pbms.position.type"].search([("code", "=", "new")], limit=1)
 
-    @api.depends("position_type_id", "position_type_id.code", "position_type_id.is_new_position")
+    @api.depends("position_type_id", "position_type_id.code", "position_type_id.name", "position_type_id.is_new_position")
     def _compute_position_type_code(self):
         for line in self:
             if line.position_type_id:
                 if line.position_type_id.is_new_position or line.position_type_id.code in ("new", "new_position"):
                     line.position_type = "new"
+                elif line.position_type_id.code == "additional" or (line.position_type_id.name and line.position_type_id.name.strip().lower() == "additional position"):
+                    line.position_type = "additional"
+                elif line.position_type_id.code in dict(self._fields["position_type"].selection):
+                    line.position_type = line.position_type_id.code
                 else:
                     line.position_type = "additional"
             elif not line.position_type:
@@ -1178,8 +1181,13 @@ class PbmsPlanCategoryLine(models.Model):
         if self.position_type_id:
             if self.position_type_id.is_new_position or self.position_type_id.code in ("new", "new_position"):
                 self.position_type = "new"
+            elif self.position_type_id.code == "additional" or (self.position_type_id.name and self.position_type_id.name.strip().lower() == "additional position"):
+                self.position_type = "additional"
+            elif self.position_type_id.code in dict(self._fields["position_type"].selection):
+                self.position_type = self.position_type_id.code
             else:
                 self.position_type = "additional"
+
             if self.position_type_id.is_new_position or self.position_type == "new":
                 self.job_id = False
                 self.job_grade_id = False
@@ -1657,35 +1665,58 @@ class PbmsPlanCategoryLine(models.Model):
             if total <= 0:
                 raise ValidationError(_("At least one quarter must have a quantity greater than zero for Fixed Asset lines."))
 
-    @api.depends("position_type_id", "position_type", "plan_id", "plan_id.org_unit_id", "plan_id.manpower_line_ids.job_id", "plan_id.manpower_line_ids.position_type_id")
+    def _is_additional_position_type(self):
+        """Returns True only when the position type is strictly code 'additional'
+        or request type 'Additional Position', requiring operating unit eligible positions."""
+        self.ensure_one()
+        p_code = (self.position_type_id.code or "").strip().lower() if self.position_type_id else (self.position_type or "").strip().lower()
+        p_name = (self.position_type_id.name or "").strip().lower() if self.position_type_id else ""
+        return p_code == "additional" or p_name == "additional position"
+
+    def _get_operating_unit_job_ids(self, org_unit):
+        """Returns set of hr.job IDs eligible in the given operating unit."""
+        unit_job_ids = set()
+        if not org_unit:
+            return unit_job_ids
+        if "operating.unit.job.position" in self.env:
+            ou_positions = self.env["operating.unit.job.position"].search([
+                ("operating_unit_id", "=", org_unit.id),
+                ("active", "=", True),
+            ])
+            unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
+        if "hr.employee" in self.env:
+            emp_domain = [
+                ("active", "=", True),
+                "|",
+                ("operating_unit_ids", "in", [org_unit.id]),
+                ("default_operating_unit_id", "=", org_unit.id),
+            ]
+            employees = self.env["hr.employee"].search(emp_domain)
+            for emp in employees:
+                j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
+                if j:
+                    unit_job_ids.add(j.id)
+        return unit_job_ids
+
+    @api.depends(
+        "position_type_id",
+        "position_type_id.code",
+        "position_type_id.name",
+        "position_type",
+        "plan_id",
+        "plan_id.org_unit_id",
+        "plan_id.manpower_line_ids.job_id",
+        "plan_id.manpower_line_ids.position_type_id",
+        "plan_id.manpower_line_ids.position_type",
+    )
     def _compute_job_id_domain(self):
         import json
         for line in self:
             domain = [("active", "=", True)]
             if line.line_type == "manpower" and line.plan_id:
                 plan = line.plan_id
-                unit_job_ids = set()
-                if plan.org_unit_id:
-                    if "operating.unit.job.position" in self.env:
-                        ou_positions = self.env["operating.unit.job.position"].search([
-                            ("operating_unit_id", "=", plan.org_unit_id.id),
-                            ("active", "=", True),
-                        ])
-                        unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
-                    if "hr.employee" in self.env:
-                        emp_domain = [
-                            ("active", "=", True),
-                            "|",
-                            ("operating_unit_ids", "in", [plan.org_unit_id.id]),
-                            ("default_operating_unit_id", "=", plan.org_unit_id.id),
-                        ]
-                        employees = self.env["hr.employee"].search(emp_domain)
-                        for emp in employees:
-                            j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
-                            if j:
-                                unit_job_ids.add(j.id)
-
-                if unit_job_ids:
+                if line._is_additional_position_type() and plan.org_unit_id:
+                    unit_job_ids = line._get_operating_unit_job_ids(plan.org_unit_id)
                     domain.append(("id", "in", list(unit_job_ids)))
 
                 other_lines = plan.manpower_line_ids.filtered(
@@ -1705,31 +1736,15 @@ class PbmsPlanCategoryLine(models.Model):
         domain = [("active", "=", True)]
         if self.line_type == "manpower" and self.plan_id:
             plan = self.plan_id
-            unit_job_ids = set()
-            if plan.org_unit_id:
-                if "operating.unit.job.position" in self.env:
-                    ou_positions = self.env["operating.unit.job.position"].search([
-                        ("operating_unit_id", "=", plan.org_unit_id.id),
-                        ("active", "=", True),
-                    ])
-                    unit_job_ids.update(ou_positions.mapped("job_position_id.id"))
-                if "hr.employee" in self.env:
-                    emp_domain = [
-                        ("active", "=", True),
-                        "|",
-                        ("operating_unit_ids", "in", [plan.org_unit_id.id]),
-                        ("default_operating_unit_id", "=", plan.org_unit_id.id),
-                    ]
-                    employees = self.env["hr.employee"].search(emp_domain)
-                    for emp in employees:
-                        j = getattr(emp, "job_position", False) or getattr(emp, "job_id", False)
-                        if j:
-                            unit_job_ids.add(j.id)
-
-            if unit_job_ids:
+            if self._is_additional_position_type() and plan.org_unit_id:
+                unit_job_ids = self._get_operating_unit_job_ids(plan.org_unit_id)
                 domain.append(("id", "in", list(unit_job_ids)))
+                if self.job_id and unit_job_ids and self.job_id.id not in unit_job_ids:
+                    self.job_id = False
+                    self.job_grade_id = False
+                    self.base_salary = 0.0
 
-            other_lines = self.plan_id.manpower_line_ids.filtered(
+            other_lines = plan.manpower_line_ids.filtered(
                 lambda l: not self._is_same_line(l) and l.job_id and (
                     (l.position_type_id and self.position_type_id and l.position_type_id == self.position_type_id)
                     or (l.position_type == self.position_type)
@@ -4651,7 +4666,7 @@ class PbmsPlanningCategory(models.Model):
             if is_manpower_applicable:
                 rec.existing_total_authorized = sum(rec.existing_manpower_summary_ids.mapped("approved_plan_count"))
                 rec.existing_total_active = sum(rec.existing_manpower_summary_ids.mapped("active_employee_count"))
-                rec.existing_total_vacancies = sum(rec.existing_manpower_summary_ids.mapped("vacant_position_count"))
+                rec.existing_total_vacancies = max(0, sum(rec.existing_manpower_summary_ids.mapped("vacant_position_count")))
                 rec.existing_total_monthly_salary = sum(rec.existing_manpower_summary_ids.mapped("monthly_salary"))
                 annual = sum(rec.existing_manpower_summary_ids.mapped("annual_salary"))
                 rec.existing_total_annual_salary = annual
@@ -4814,7 +4829,7 @@ class PbmsPlanningCategory(models.Model):
                 active_count = len(job_emps)
                 ou_pos = p_info.get("ou_pos")
                 approved_count = p_info.get("approved_count", 0)
-                vacant_count = getattr(ou_pos, "vacant_position_count", False) if ou_pos else max(0, approved_count - active_count)
+                vacant_count = max(0, getattr(ou_pos, "vacant_position_count", 0) or 0) if ou_pos else max(0, approved_count - active_count)
                 if vacant_count is False:
                     vacant_count = max(0, approved_count - active_count)
 
@@ -5962,6 +5977,12 @@ class PbmsPlanningCategory(models.Model):
                     )),
                 ]
                 domain = expression.AND([domain, chief_domain])
+            elif user.has_group("bunna_pbms.group_pbms_budget_hiring_committee"):
+                # Budget Hiring Committee: only see Workforce, General Expense, and Fixed Asset plans
+                bhc_domain = [
+                    ("category", "in", ("manpower", "general_expense", "fixed_asset")),
+                ]
+                domain = expression.AND([domain, bhc_domain])
 
         return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
 
@@ -6002,13 +6023,28 @@ class PbmsPlanningCategory(models.Model):
         """Open or create the active planning request for the current user's operating unit,
         opening the dedicated multi-tab Planning Request form with all category tabs."""
         user = self.env.user
-        unit_ids = user._pbms_operating_unit_ids()
         org_unit = False
-        if unit_ids:
-            org_unit = self.env["operating.unit"].browse(unit_ids[0])
-        elif hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
+
+        # 1. Employee's own directly-assigned operating unit (most specific — unique per employee)
+        if hasattr(user, "employee_id") and user.employee_id:
+            emp = user.employee_id.sudo()
+            if hasattr(emp, "operating_unit_id") and emp.operating_unit_id:
+                org_unit = emp.operating_unit_id
+            elif hasattr(emp, "default_operating_unit_id") and emp.default_operating_unit_id:
+                org_unit = emp.default_operating_unit_id
+
+        # 2. User's own default operating unit
+        if not org_unit and hasattr(user, "default_operating_unit_id") and user.default_operating_unit_id:
             org_unit = user.default_operating_unit_id
-        else:
+
+        # 3. First entry from the access-permission list (may be shared across HO users)
+        if not org_unit:
+            unit_ids = user._pbms_operating_unit_ids()
+            if unit_ids:
+                org_unit = self.env["operating.unit"].browse(unit_ids[0])
+
+        # 4. Last resort: any unit
+        if not org_unit:
             org_unit = self.env["operating.unit"].search([], limit=1)
 
         cycle = self.env["pbms.planning.cycle"].search([("state", "=", "open")], limit=1)
@@ -6488,13 +6524,19 @@ class PbmsPlanningCategory(models.Model):
             return sol_id, unit_name, district_name, broad_cat
 
         def get_banner_unit_title(plans, default_text="District and Head Office"):
-            if len(plans) == 1 and plans[0].org_unit_type in ("branch", "sub_branch", "service_center"):
-                return plans[0].org_unit_id.name or "Branch Plan"
+            if len(plans) == 1:
+                utype = plans[0].org_unit_type
+                uname = plans[0].org_unit_id.name or ""
+                if utype in ("branch", "sub_branch", "service_center"):
+                    return uname or "Branch Plan"
+                elif utype == "district_office":
+                    return uname or "District Office Plan"
+                elif utype in ("head_office", "regional_office"):
+                    return uname or "Head Office Plan"
             return default_text
 
-        # Target records: prioritize district/HO records if selected, otherwise export all selected plans (including branch plans)
-        consolidated_records = records.filtered(lambda p: p.org_unit_type in ("district_office", "head_office", "regional_office"))
-        target_records = consolidated_records if consolidated_records else records
+        # Export exactly the selected records — no filtering to district/HO only
+        target_records = records
 
         # Group plans by category
         plans_by_cat = {}
@@ -6506,12 +6548,14 @@ class PbmsPlanningCategory(models.Model):
 
         for cat, cat_plans in plans_by_cat.items():
             if cat == "fixed_asset":
+                is_approved_fa = any(p.state == "approved" for p in cat_plans)
                 ws = wb.add_worksheet("Fixed Asset (BB-APF-27)")
                 ws.freeze_panes(6, 4)
-                ws.merge_range(0, 0, 0, 10, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 10, "Property and Equipment", fmt_doc_title)
-                ws.merge_range(2, 0, 2, 10, f"For the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 10, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                fa_last_col = 12 if is_approved_fa else 10
+                ws.merge_range(0, 0, 0, fa_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, fa_last_col, "Property and Equipment", fmt_doc_title)
+                ws.merge_range(2, 0, 2, fa_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, fa_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
                 ws.write(4, 0, "BB-APF-27", fmt_form_code)
 
                 headers = [
@@ -6519,6 +6563,8 @@ class PbmsPlanningCategory(models.Model):
                     "Fixed Asset Category*", "Item Description*", "Users Position or Purpose of the Item",
                     "Qty", "Estimated Unit Price", "Estimated Total Price"
                 ]
+                if is_approved_fa:
+                    headers += ["Approved Qty", "Approved Total Price"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
@@ -6546,6 +6592,11 @@ class PbmsPlanningCategory(models.Model):
                         ws.write(row_cur, 8, qty, fmt_cell_int)
                         ws.write(row_cur, 9, unit_price, fmt_cell_num_no_dec)
                         ws.write(row_cur, 10, tot_price, fmt_cell_num_no_dec)
+                        if is_approved_fa:
+                            appr_qty = int(round(l.approved_annual_total or 0))
+                            appr_price = float(l.approved_annual_total or 0.0) * unit_price
+                            ws.write(row_cur, 11, appr_qty, fmt_cell_int)
+                            ws.write(row_cur, 12, appr_price, fmt_cell_num_no_dec)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
@@ -6555,10 +6606,16 @@ class PbmsPlanningCategory(models.Model):
                     ws.write_formula(row_cur, 8, f"=SUM(I7:I{row_cur})", fmt_tot_int)
                     ws.write(row_cur, 9, "", fmt_tot_label)
                     ws.write_formula(row_cur, 10, f"=SUM(K7:K{row_cur})", fmt_tot_num)
+                    if is_approved_fa:
+                        ws.write_formula(row_cur, 11, f"=SUM(L7:L{row_cur})", fmt_tot_int)
+                        ws.write_formula(row_cur, 12, f"=SUM(M7:M{row_cur})", fmt_tot_num)
                 else:
                     ws.write(row_cur, 8, 0, fmt_tot_int)
                     ws.write(row_cur, 9, "", fmt_tot_label)
                     ws.write(row_cur, 10, 0.0, fmt_tot_num)
+                    if is_approved_fa:
+                        ws.write(row_cur, 11, 0, fmt_tot_int)
+                        ws.write(row_cur, 12, 0.0, fmt_tot_num)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 26)
@@ -6571,20 +6628,30 @@ class PbmsPlanningCategory(models.Model):
                 ws.set_column(8, 8, 10)
                 ws.set_column(9, 9, 18)
                 ws.set_column(10, 10, 20)
+                if is_approved_fa:
+                    ws.set_column(11, 11, 14)
+                    ws.set_column(12, 12, 20)
+
 
             elif cat == "general_expense":
+                is_approved_ge = any(p.state == "approved" for p in cat_plans)
+                ge_last_col = 19 if is_approved_ge else 18
                 ws = wb.add_worksheet("Expense (BB-APF-21)")
                 ws.freeze_panes(6, 5)
-                ws.merge_range(0, 0, 0, 18, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 18, "General Expense Budget", fmt_doc_title)
-                ws.merge_range(2, 0, 2, 18, f"for the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 18, get_banner_unit_title(cat_plans, "District and Head Office (HO-DO)"), fmt_work_units_title)
+                ws.merge_range(0, 0, 0, ge_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, ge_last_col, "General Expense Budget", fmt_doc_title)
+                ws.merge_range(2, 0, 2, ge_last_col, f"for the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, ge_last_col, get_banner_unit_title(cat_plans, "District and Head Office (HO-DO)"), fmt_work_units_title)
                 ws.write(4, 0, "BB-APF-21", fmt_form_code)
 
-                headers = ["Sol ID", "Work Units Name", "Districts Name", "Broad Category", "Description"] + month_headers + ["Annual", "Remark"]
+                headers = ["Sol ID", "Work Units Name", "Districts Name", "Broad Category", "Description"] + month_headers + ["Annual"]
+                if is_approved_ge:
+                    headers += ["Approved Target"]
+                headers += ["Remark"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
+                remark_col = 19 if is_approved_ge else 18
                 row_cur = 6
                 for p in cat_plans:
                     lines = p.expense_line_ids or p.line_ids.filtered(lambda l: l.line_type == "general_expense")
@@ -6604,7 +6671,10 @@ class PbmsPlanningCategory(models.Model):
                         for mi, mv in enumerate(m_vals):
                             ws.write(row_cur, 5 + mi, mv, fmt_cell_num_acc)
                         ws.write(row_cur, 17, ann, fmt_tot_num if ann > 0 else fmt_cell_num_acc)
-                        ws.write(row_cur, 18, rem, fmt_cell_text)
+                        if is_approved_ge:
+                            appr_ann = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 18, appr_ann, fmt_tot_num if appr_ann > 0 else fmt_cell_num_acc)
+                        ws.write(row_cur, remark_col, rem, fmt_cell_text)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
@@ -6614,10 +6684,15 @@ class PbmsPlanningCategory(models.Model):
                     for ci in range(5, 18):
                         c_letter = xlsxwriter.utility.xl_col_to_name(ci)
                         ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_ge:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(18)
+                        ws.write_formula(row_cur, 18, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
                 else:
                     for ci in range(5, 18):
                         ws.write(row_cur, ci, 0.0, fmt_tot_num)
-                ws.write(row_cur, 18, "", fmt_tot_label)
+                    if is_approved_ge:
+                        ws.write(row_cur, 18, 0.0, fmt_tot_num)
+                ws.write(row_cur, remark_col, "", fmt_tot_label)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 24)
@@ -6627,7 +6702,12 @@ class PbmsPlanningCategory(models.Model):
                 for ci in range(5, 17):
                     ws.set_column(ci, ci, 13)
                 ws.set_column(17, 17, 16)
-                ws.set_column(18, 18, 22)
+                if is_approved_ge:
+                    ws.set_column(18, 18, 16)
+                    ws.set_column(19, 19, 22)
+                else:
+                    ws.set_column(18, 18, 22)
+
 
             elif cat == "manpower":
                 ws = wb.add_worksheet("Manpower (BB-APF-19)")
@@ -6785,13 +6865,31 @@ class PbmsPlanningCategory(models.Model):
                     ws.set_column(ci, ci, w)
 
             elif cat in ("deposit", "customer_base"):
-                title = f"Deposit Plan by District and Deposit Type for the FY {clean_fy}" if cat == "deposit" else f"Customer Base Plan by District and Customer Type for the FY {clean_fy}"
+                is_approved_dc = any(p.state == "approved" for p in cat_plans)
+                # Determine title based on unit type of the plans being exported
+                if len(cat_plans) == 1:
+                    utype = cat_plans[0].org_unit_type
+                    if utype in ("branch", "sub_branch", "service_center"):
+                        group_label = "Branch"
+                    elif utype == "district_office":
+                        group_label = "District"
+                    else:
+                        group_label = "Head Office"
+                else:
+                    group_label = "District"
+                if cat == "deposit":
+                    title = f"Deposit Plan by {group_label} and Deposit Type for the FY {clean_fy}"
+                else:
+                    title = f"Customer Base Plan by {group_label} and Customer Type for the FY {clean_fy}"
                 sheet_name = "Deposit by District" if cat == "deposit" else "Customer Base by District"
                 ws = wb.add_worksheet(sheet_name)
                 ws.freeze_panes(2, 1)
-                ws.merge_range(0, 0, 0, 13, title, fmt_banner_sage)
+                dc_last_col = 14 if is_approved_dc else 13
+                ws.merge_range(0, 0, 0, dc_last_col, title, fmt_banner_sage)
 
                 headers = ["Row Labels"] + month_headers + ["Annual Target"]
+                if is_approved_dc:
+                    headers += ["Approved Target"]
                 for ci, h in enumerate(headers):
                     ws.write(1, ci, h, fmt_th)
 
@@ -6805,27 +6903,43 @@ class PbmsPlanningCategory(models.Model):
                     all_lines = cat_plans.mapped("line_ids").filtered(lambda l: l.line_type == cat)
 
                 dist_dict = {}
+                dist_approved = {}
                 for l in all_lines:
-                    dist = l.district_id or l.plan_id.district_id or (l.source_unit_id.parent_unit if l.source_unit_id else False) or l.org_unit_id
-                    dist_sol = dist.sol_id if dist and hasattr(dist, "sol_id") and dist.sol_id else (l.sol_id or 900)
-                    dist_name = dist.name if dist else "General District"
-                    dist_key = (dist_sol, dist_name)
+                    # Group by the plan's own org unit (branch, district, or HO)
+                    plan_rec = l.plan_id if hasattr(l, "plan_id") and l.plan_id else False
+                    if plan_rec and hasattr(plan_rec, "org_unit_id") and plan_rec.org_unit_id:
+                        plan_unit = plan_rec.org_unit_id
+                    elif hasattr(l, "source_unit_id") and l.source_unit_id:
+                        plan_unit = l.source_unit_id
+                    elif hasattr(l, "org_unit_id") and l.org_unit_id:
+                        plan_unit = l.org_unit_id
+                    else:
+                        plan_unit = False
+                    if plan_unit:
+                        g_sol = plan_unit.sol_id if hasattr(plan_unit, "sol_id") and plan_unit.sol_id else (l.sol_id or 900)
+                        g_name = plan_unit.name or "General Unit"
+                    else:
+                        g_sol = l.sol_id or 900
+                        g_name = "General Unit"
+                    dist_key = (g_sol, g_name)
                     if dist_key not in dist_dict:
                         dist_dict[dist_key] = {}
+                        dist_approved[dist_key] = {}
 
                     dtype = l.deposit_type_id
-                    raw_name = dtype.name or ""
-                    if (dtype and dtype.is_ifb) or "IFB" in raw_name.upper():
+                    raw_name = dtype.name or "" if dtype else ""
+                    if dtype and (dtype.is_ifb if hasattr(dtype, "is_ifb") else False) or "IFB" in raw_name.upper():
                         prod = "IFB"
-                    elif "DEMAND" in raw_name.upper() or (dtype and dtype.code == "DEM"):
+                    elif "DEMAND" in raw_name.upper() or (dtype and getattr(dtype, "code", "") == "DEM"):
                         prod = "Demand"
-                    elif "SAVING" in raw_name.upper() or (dtype and dtype.code == "SAV"):
+                    elif "SAVING" in raw_name.upper() or (dtype and getattr(dtype, "code", "") == "SAV"):
                         prod = "Saving"
                     else:
                         prod = raw_name or "Demand"
 
                     if prod not in dist_dict[dist_key]:
                         dist_dict[dist_key][prod] = [0.0] * 12
+                        dist_approved[dist_key][prod] = 0.0
 
                     dist_dict[dist_key][prod][0] += (l.m01 or 0.0)
                     dist_dict[dist_key][prod][1] += (l.m02 or 0.0)
@@ -6839,19 +6953,24 @@ class PbmsPlanningCategory(models.Model):
                     dist_dict[dist_key][prod][9] += (l.m10 or 0.0)
                     dist_dict[dist_key][prod][10] += (l.m11 or 0.0)
                     dist_dict[dist_key][prod][11] += (l.m12 or 0.0)
+                    if is_approved_dc:
+                        dist_approved[dist_key][prod] += (l.approved_annual_total or 0.0)
 
                 row_cur = 2
                 std_prods = ["Demand", "IFB", "Saving"]
                 grand_months = [0.0] * 12
                 grand_annual = 0.0
+                grand_approved = 0.0
 
                 for (dsol, dname) in sorted(dist_dict.keys(), key=lambda x: (x[0], x[1])):
                     prod_data = dist_dict[(dsol, dname)]
+                    appr_data = dist_approved.get((dsol, dname), {})
                     dist_months = [0.0] * 12
                     for p_name, p_vals in prod_data.items():
                         for mi in range(12):
                             dist_months[mi] += p_vals[mi]
                     dist_annual = sum(dist_months)
+                    dist_appr_total = sum(appr_data.values())
 
                     ws.write(row_cur, 0, f"[-] {dsol} {dname.upper()}", fmt_dist_subtotal_label)
                     for mi in range(12):
@@ -6859,6 +6978,9 @@ class PbmsPlanningCategory(models.Model):
                         grand_months[mi] += dist_months[mi]
                     ws.write(row_cur, 13, dist_annual, dist_val_fmt)
                     grand_annual += dist_annual
+                    if is_approved_dc:
+                        ws.write(row_cur, 14, dist_appr_total, dist_val_fmt)
+                        grand_approved += dist_appr_total
                     row_cur += 1
 
                     sorted_prods = [p for p in std_prods if p in prod_data] + [p for p in prod_data if p not in std_prods]
@@ -6869,30 +6991,40 @@ class PbmsPlanningCategory(models.Model):
                         for mi in range(12):
                             ws.write(row_cur, 1 + mi, p_vals[mi], val_fmt)
                         ws.write(row_cur, 13, p_annual, val_fmt)
+                        if is_approved_dc:
+                            ws.write(row_cur, 14, appr_data.get(p, 0.0), val_fmt)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "Total", fmt_tot_label)
                 for mi in range(12):
                     ws.write(row_cur, 1 + mi, grand_months[mi], tot_val_fmt)
                 ws.write(row_cur, 13, grand_annual, tot_val_fmt)
+                if is_approved_dc:
+                    ws.write(row_cur, 14, grand_approved, tot_val_fmt)
 
                 ws.set_column(0, 0, 32)
                 for ci in range(1, 13):
                     ws.set_column(ci, ci, 14 if cat == "deposit" else 12)
                 ws.set_column(13, 13, 18 if cat == "deposit" else 16)
+                if is_approved_dc:
+                    ws.set_column(14, 14, 18 if cat == "deposit" else 16)
 
             else:
                 # FX or Digital Banking
+                is_approved_fx = any(p.state == "approved" for p in cat_plans)
                 cat_title = "FX Mobilization" if cat == "fx" else "Digital Banking"
                 ws = wb.add_worksheet(cat_title)
                 ws.freeze_panes(6, 4)
-                ws.merge_range(0, 0, 0, 16, "Bunna Bank", fmt_bank_title)
-                ws.merge_range(1, 0, 1, 16, cat_title, fmt_doc_title)
-                ws.merge_range(2, 0, 2, 16, f"For the FY {clean_fy}", fmt_fy_title)
-                ws.merge_range(3, 0, 3, 16, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
+                fx_last_col = 18 if is_approved_fx else 17
+                ws.merge_range(0, 0, 0, fx_last_col, "Bunna Bank", fmt_bank_title)
+                ws.merge_range(1, 0, 1, fx_last_col, cat_title, fmt_doc_title)
+                ws.merge_range(2, 0, 2, fx_last_col, f"For the FY {clean_fy}", fmt_fy_title)
+                ws.merge_range(3, 0, 3, fx_last_col, get_banner_unit_title(cat_plans, "District and Head Office"), fmt_work_units_title)
 
                 item_label = "FX Source" if cat == "fx" else "Digital Channel"
                 headers = ["Sol ID", "Work Unit Name", "Districts Name", "Broad Category", item_label] + month_headers + ["Annual Target"]
+                if is_approved_fx:
+                    headers += ["Approved Target"]
                 for ci, h in enumerate(headers):
                     ws.write(5, ci, h, fmt_th)
 
@@ -6914,6 +7046,9 @@ class PbmsPlanningCategory(models.Model):
                         for mi, mv in enumerate(m_vals):
                             ws.write(row_cur, 5 + mi, mv, fmt_cell_num)
                         ws.write(row_cur, 17, ann, fmt_tot_num)
+                        if is_approved_fx:
+                            appr_val = l.approved_annual_total or 0.0
+                            ws.write(row_cur, 18, appr_val, fmt_tot_num)
                         row_cur += 1
 
                 ws.write(row_cur, 0, "TOTAL", fmt_tot_label)
@@ -6923,9 +7058,14 @@ class PbmsPlanningCategory(models.Model):
                     for ci in range(5, 18):
                         c_letter = xlsxwriter.utility.xl_col_to_name(ci)
                         ws.write_formula(row_cur, ci, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
+                    if is_approved_fx:
+                        c_letter = xlsxwriter.utility.xl_col_to_name(18)
+                        ws.write_formula(row_cur, 18, f"=SUM({c_letter}7:{c_letter}{row_cur})", fmt_tot_num)
                 else:
                     for ci in range(5, 18):
                         ws.write(row_cur, ci, 0.0, fmt_tot_num)
+                    if is_approved_fx:
+                        ws.write(row_cur, 18, 0.0, fmt_tot_num)
 
                 ws.set_column(0, 0, 10)
                 ws.set_column(1, 1, 24)
@@ -6935,6 +7075,8 @@ class PbmsPlanningCategory(models.Model):
                 for ci in range(5, 17):
                     ws.set_column(ci, ci, 13)
                 ws.set_column(17, 17, 16)
+                if is_approved_fx:
+                    ws.set_column(18, 18, 16)
 
         wb.close()
         output.seek(0)

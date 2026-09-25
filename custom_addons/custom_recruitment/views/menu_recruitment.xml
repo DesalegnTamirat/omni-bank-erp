@@ -345,6 +345,14 @@
                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
                 />
 
+        <menuitem id="menu_recruitment_signatory_config"
+                  name="Authorized Signatories &amp; Stamps"
+                  parent="hr_recruitment.menu_hr_recruitment_configuration"
+                  action="action_recruitment_signatory_config"
+                  sequence="60"
+                  groups="group_recruitment_officer,group_recruitment_manager,group_recruitment_administrator,base.group_user"
+                />
+
         <!-- ============================================ -->
         <!-- WIZARD MENUS - Manager & Administrator only -->
         <!-- ============================================ -->

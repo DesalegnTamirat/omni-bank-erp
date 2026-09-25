@@ -231,6 +231,67 @@ class EmployeeTransferRequest(models.Model):
     refusal_reason = fields.Text(string="Refusal Reason")
     hr_notified_on_refusal = fields.Datetime(string="HR Notified On", readonly=True, copy=False)
 
+    acceptance_status = fields.Selection([
+        ('pending', 'Pending Acceptance'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Refused / Declined'),
+    ], string="Transfer Acceptance Status", default='pending')
+    acceptance_date = fields.Datetime(string="Acceptance / Response Date", readonly=True)
+
+    def action_accept_transfer(self):
+        """Requesting employee or HR accepts the transfer offer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'accepted',
+                'acceptance_date': now,
+            })
+            rec.message_post(
+                body=_("Employee transfer offer ACCEPTED on %s.") % fields.Date.today()
+            )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Transfer Accepted'),
+                'message': _('Transfer offer has been marked as ACCEPTED.'),
+                'type': 'success',
+                'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            }
+        }
+
+    def action_decline_transfer(self):
+        """Opens the decline wizard to capture refusal reason for transfer."""
+        self.ensure_one()
+        return {
+            'name': _('Decline / Refuse Transfer Offer'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'internal.selection.decline.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_transfer_request_id': self.id,
+            }
+        }
+
+    def confirm_decline_transfer(self, reason):
+        """Executed by decline wizard to refuse transfer."""
+        for rec in self:
+            now = fields.Datetime.now()
+            rec.write({
+                'acceptance_status': 'rejected',
+                'acceptance_date': now,
+                'state': 'refused',
+                'refusal_reason': reason,
+                'is_flagged_for_hr': True,
+                'hr_notified_on_refusal': now,
+            })
+            rec.message_post(
+                body=_("Employee DECLINED / REFUSED transfer offer.<br/><b>Reason:</b> %s") % reason
+            )
+        return True
+
     submitted_by_user_id = fields.Many2one("res.users", string="Submitted By User", readonly=True, copy=False)
     reviewed_by_user_id = fields.Many2one("res.users", string="Reviewer User (Started Review)", readonly=True, copy=False, tracking=True)
     approved_by_user_id = fields.Many2one("res.users", string="Approved By User", readonly=True, copy=False, tracking=True)

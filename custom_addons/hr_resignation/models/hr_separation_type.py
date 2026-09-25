@@ -75,6 +75,31 @@ class HrSeparationType(models.Model):
         'unique(name)', 'Separation Type name must be unique.'
     )
 
+    @api.model
+    def _load_records(self, data_list, update=False):
+        for data in data_list:
+            xml_id = data.get('xml_id')
+            values = data.get('values', {})
+            code = values.get('code')
+            if xml_id and code:
+                mod, _, name = xml_id.partition('.')
+                imd = self.env['ir.model.data'].sudo().search([
+                    ('module', '=', mod),
+                    ('name', '=', name)
+                ], limit=1)
+                if not imd:
+                    existing = self.search([('code', '=', code)], limit=1)
+                    if existing:
+                        self.env['ir.model.data'].sudo().create({
+                            'module': mod,
+                            'name': name,
+                            'model': self._name,
+                            'res_id': existing.id,
+                            'noupdate': data.get('noupdate', True),
+                        })
+        return super()._load_records(data_list, update=update)
+
+
 
 class HrSeparationSeveranceRule(models.Model):
     _name = 'hr.separation.severance.rule'

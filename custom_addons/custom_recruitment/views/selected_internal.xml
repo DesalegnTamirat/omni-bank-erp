@@ -35,6 +35,40 @@
         </field>
     </record>
 
+    <record id="new_internal_recruit_select_cand_form_view" model="ir.ui.view">
+        <field name="name">new.internal.recruitment.selected.candidates.form</field>
+        <field name="model">new.internal.recruitment.selected.candidates</field>
+        <field name="arch" type="xml">
+            <form string="Internal Candidate Selection Response">
+                <header>
+                    <button name="action_accept_promotion" string="Accept Promotion Offer" type="object" class="btn-success" icon="fa-check-circle" invisible="acceptance_status == 'accepted'"/>
+                    <button name="action_decline_promotion" string="Decline / Reject Promotion Offer" type="object" class="btn-danger" icon="fa-times-circle" invisible="acceptance_status == 'rejected'"/>
+                    <field name="acceptance_status" widget="statusbar" statusbar_visible="pending,accepted,rejected"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Accepted" bg_color="text-bg-success" invisible="acceptance_status != 'accepted'"/>
+                    <widget name="web_ribbon" title="Declined" bg_color="text-bg-danger" invisible="acceptance_status != 'rejected'"/>
+                    <group>
+                        <group string="Employee &amp; Selection Details">
+                            <field name="emp_name" readonly="1"/>
+                            <field name="emp_position" readonly="1"/>
+                            <field name="current_work_unit" readonly="1"/>
+                            <field name="selection_type" string="Selection Result" readonly="1"/>
+                            <field name="rank" readonly="1"/>
+                            <field name="weighted_score" readonly="1"/>
+                        </group>
+                        <group string="Offer Response &amp; Status">
+                            <field name="acceptance_status" widget="badge" decoration-success="acceptance_status == 'accepted'" decoration-danger="acceptance_status == 'rejected'" decoration-warning="acceptance_status == 'pending'"/>
+                            <field name="acceptance_date" readonly="1"/>
+                            <field name="rejection_reason" invisible="acceptance_status != 'rejected'" readonly="1"/>
+                            <field name="remarks" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <record id="action_new_internal_recruitment_selected" model="ir.actions.act_window">
         <field name="name">Internal Recruitment Process Selected Candidates</field>
         <field name="type">ir.actions.act_window</field>
@@ -143,6 +177,9 @@
                                     <field name="weighted_score" readonly="1" class="fw-bold"/>
                                     <field name="rank" readonly="1"/>
                                     <field name="selection_type" string="Result" readonly="parent.scores_computed == True"/>
+                                    <field name="acceptance_status" widget="badge" decoration-success="acceptance_status == 'accepted'" decoration-danger="acceptance_status == 'rejected'" decoration-warning="acceptance_status == 'pending'" optional="show"/>
+                                    <button name="action_accept_promotion" string="Accept" type="object" class="btn-success btn-sm" icon="fa-check" invisible="selection_type not in ('selected', 'Selected') or acceptance_status == 'accepted'"/>
+                                    <button name="action_decline_promotion" string="Decline" type="object" class="btn-danger btn-sm" icon="fa-times" invisible="selection_type not in ('selected', 'Selected') or acceptance_status == 'rejected'"/>
                                     <field name="promotion_type" readonly="1" optional="show"/>
                                     <field name="promotion_status" readonly="1" optional="show"/>
                                     <field name="promoted_salary" optional="show" string="Salary (ETB)"/>

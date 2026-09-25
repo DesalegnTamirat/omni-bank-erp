@@ -1,0 +1,64 @@
+<!-- Copyright (C) 2019 Konos
+     License LGPL-3.0 or later (http://www.gnu.org/licenses/lgpl). -->
+<odoo>
+    <record id="view_helpdesk_ticket_form_type" model="ir.ui.view">
+        <field name="name">Add Type on Helpdesk</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="custom_helpdesk.ticket_view_form" />
+        <field name="arch" type="xml">
+            <field name="team_id" position="before">
+                <field name="type_id" />
+            </field>
+            <xpath expr="//field[@name='team_id']" position="attributes">
+                <attribute name="domain">
+                    [('type_ids', 'in', type_id)]
+                </attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="helpdesk_ticket_view_search_type" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.search.type</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="custom_helpdesk.ticket_view_search" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='category_id']" position="after">
+                <field name="type_id" />
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter
+                    string="Case Type"
+                    name="group_type"
+                    domain="[]"
+                    context="{'group_by':'type_id'}"
+                />
+            </xpath>
+        </field>
+    </record>
+
+    <record id="ticket_view_tree_type" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.view.tree.type</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="custom_helpdesk.ticket_view_tree" />
+        <field name="arch" type="xml">
+            <field name="priority" position="before">
+                <field name="type_id" optional="show" />
+            </field>
+        </field>
+    </record>
+
+    <record id="view_helpdesk_ticket_kanban_type" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.kanban.type</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="inherit_id" ref="custom_helpdesk.ticket_view_kanban" />
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='number']" position="after">
+                <small class="o_kanban_record_subtitle">
+                    <i>
+                        <field name="type_id" />
+                    </i>
+                </small>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -13,12 +13,17 @@
                     <!-- Step 1: POMD clicks this FIRST. Hidden once already processed. -->
                     <button string="Process Settlement" type="object" name="action_generate_lines"
                             class="oe_highlight" invisible="state != 'draft' or is_processed"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
+
+                    <!-- Recalculate: re-runs generate lines when already processed -->
+                    <button string="Recalculate" type="object" name="action_generate_lines"
+                            class="btn-secondary" invisible="state != 'draft' or not is_processed"
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
 
                     <!-- Step 2: Only appears AFTER Process Settlement has been clicked -->
                     <button string="Submit for Approval" type="object" name="action_confirm_settlement"
                             class="oe_highlight" invisible="state != 'draft' or not is_processed"
-                            groups="hr.group_hr_user,hr_resignation.group_pomd_officer,base.group_system"/>
+                            groups="hr_resignation.group_pomd_officer,base.group_system"/>
                     <button string="Approve" type="object" name="action_approve_settlement"
                             class="oe_highlight" invisible="state != 'waiting_approval'"
                             groups="hr_resignation.group_resignation_hr_manager"/>
@@ -28,6 +33,17 @@
                     <button string="Pay" type="object" name="action_mark_paid"
                             class="oe_highlight" invisible="state != 'confirmed'"
                             groups="hr_resignation.group_pomd_officer"/>
+
+                    <!-- Reset to Draft: allows regenerating lines -->
+                    <button string="Reset to Draft" type="object" name="action_set_draft"
+                            class="btn-secondary"
+                            invisible="state == 'draft' or state == 'paid'"
+                            groups="hr_resignation.group_resignation_hr_manager,base.group_system"/>
+
+                    <!-- Reset to Draft when in draft but already processed (to clear lines) -->
+                    <button string="Reset Lines" type="object" name="action_reset_lines"
+                            class="btn-secondary" invisible="state != 'draft' or not is_processed"
+                            groups="hr_resignation.group_pomd_officer,hr_resignation.group_resignation_hr_manager,base.group_system"/>
 
                     <field name="state" widget="statusbar" statusbar_visible="draft,waiting_approval,confirmed,paid"/>
                 </header>
@@ -53,8 +69,8 @@
                         </group>
                         <group string="SALARY PARAMETERS">
                             <field name="basic_salary" readonly="state != 'draft'"/>
-                            <field name="worked_days_final_month" readonly="state != 'draft'"/>
-                            <field name="total_days_in_month" readonly="state != 'draft'"/>
+                            <field name="worked_days_final_month" readonly="state != 'draft'"
+                                   help="Auto-filled from release date. You can edit this if needed."/>
                         </group>
                     </group>
                     <group>

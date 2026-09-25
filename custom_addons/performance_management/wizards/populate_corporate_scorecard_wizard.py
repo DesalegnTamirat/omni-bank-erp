@@ -56,7 +56,7 @@ class PopulateCorporateScorecardWizard(models.TransientModel):
             existing.unlink()
 
         scorecard = self.env['corporate.scorecard'].create({
-            'name': 'Corporate Scorecard %s %s' % (self.fiscal_year_id.name, self.appraisal_period_id.name),
+            'name': 'Corporate Scorecard Plan %s %s' % (self.fiscal_year_id.name, self.appraisal_period_id.name),
             'fiscal_year_id': self.fiscal_year_id.id,
             'appraisal_period_id': self.appraisal_period_id.id,
             'employee_id': employee.id,

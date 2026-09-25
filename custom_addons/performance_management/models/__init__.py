@@ -4,8 +4,12 @@ from . import performance_measure
 from . import performance_fiscal_year
 from . import appraisal_period
 from . import corporate_scorecard
+from . import corporate_appraisal
 from . import pms_ranking
 from . import operating_unit
 from . import t2_scorecard
+from . import t2_appraisal
 from . import performance_job_objective
 from . import t3_scorecard
+from . import t3_appraisal
+from . import performance_dashboard

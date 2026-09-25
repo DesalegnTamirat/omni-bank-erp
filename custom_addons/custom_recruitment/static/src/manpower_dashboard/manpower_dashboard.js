@@ -102,11 +102,14 @@ export class ManpowerDashboard extends Component {
             this.state.summary = res.summary || this.state.summary;
             this.state.tableRows = res.tableRows || [];
             this.state.currentPage = 1;
+            this.state.loading = false;
 
-            this._renderCharts(res.charts);
+            // Render Chart.js on mounted canvas DOM elements
+            setTimeout(() => {
+                this._renderCharts(res.charts);
+            }, 50);
         } catch (err) {
             console.error("Failed to load dashboard metrics:", err);
-        } finally {
             this.state.loading = false;
         }
     }

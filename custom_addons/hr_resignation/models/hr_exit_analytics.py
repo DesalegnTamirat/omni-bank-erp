@@ -39,6 +39,6 @@ class HrExitAnalytics(models.Model):
                 JOIN hr_exit_interview i ON i.id = l.interview_id
                 JOIN hr_resignation r ON r.id = i.resignation_id
                 JOIN hr_employee e ON e.id = r.employee_id
-                WHERE i.state = 'done'
+                WHERE i.state = 'completed'
             )
         """ % self._table)

@@ -7,6 +7,14 @@ class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
     # Disciplinary History Smart Fields
+    executive_level = fields.Selection([
+        ('ceo', 'Chief Executive Officer (CEO)'),
+        ('chief', 'Chief Officer / CPCO'),
+        ('director', 'Directorate Director'),
+        ('manager', 'Division / Branch Manager'),
+        ('employee', 'Non-Managerial / Specialist Employee'),
+    ], string='Organizational Tier Level', compute='_compute_executive_level', store=True)
+
     is_managerial = fields.Boolean(
         string='Is Managerial Staff',
         compute='_compute_is_managerial',
@@ -115,6 +123,33 @@ class HrEmployee(models.Model):
                     'is_ineligible_for_promotion_transfer': False,
                     'active_disciplinary_action': False,
                 })
+
+    @api.depends('job_id', 'job_id.name', 'is_managerial')
+    def _compute_executive_level(self):
+        for emp in self:
+            job_name = (emp.job_id.name or '').lower() if emp and emp.job_id else ''
+            if any(kw in job_name for kw in ['ceo', 'chief executive officer', 'president']):
+                emp.executive_level = 'ceo'
+            elif any(kw in job_name for kw in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                emp.executive_level = 'chief'
+            elif any(kw in job_name for kw in ['director', 'directorate']):
+                emp.executive_level = 'director'
+            elif emp.is_managerial or any(kw in job_name for kw in ['manager', 'head', 'supervisor', 'division', 'branch manager']):
+                emp.executive_level = 'manager'
+            else:
+                emp.executive_level = 'employee'
+
+    def get_supervisor_chain(self):
+        """Return ordered list of supervisor hr.employee records from direct coach/manager up to CEO."""
+        self.ensure_one()
+        chain = []
+        current = self.coach_id or self.parent_id
+        visited = set()
+        while current and current.id not in visited:
+            visited.add(current.id)
+            chain.append(current)
+            current = current.coach_id or current.parent_id
+        return chain
 
     @api.depends('job_id', 'job_id.name')
     def _compute_is_managerial(self):

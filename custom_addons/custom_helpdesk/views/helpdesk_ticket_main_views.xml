@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Base Ticket Form View (Full BRD 40 Core Functionalities + 14 Custom Modules) -->
+    <record id="ticket_view_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.form</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <form string="Helpdesk Ticket">
+                <header>
+                    <field name="is_escalated" invisible="1"/>
+                    <field name="closed" invisible="1"/>
+                    <field name="approval_state" invisible="1"/>
+                    <button name="action_assign_to_me" type="object" string="Assign to Me" class="btn-primary" invisible="user_id != False or closed"/>
+                    <button name="action_escalate" type="object" string="Escalate to 2nd Level" class="btn-warning" invisible="closed or is_escalated"/>
+                    <button name="action_detect_duplicates" type="object" string="Check Duplicates" class="btn-info" invisible="closed"/>
+                    <button name="action_split_ticket" type="object" string="Split Ticket" class="btn-secondary" invisible="closed"/>
+                    <button name="action_reset_to_draft" type="object" string="Reset to Draft" class="btn-secondary" invisible="not is_escalated and not closed"/>
+                    <button name="action_reopen" type="object" string="Reopen Ticket" class="btn-secondary" invisible="not closed"/>
+                    <button name="action_approve_ticket" type="object" string="Approve" class="btn-success" invisible="approval_state != 'pending'"/>
+                    <button name="action_reject_ticket" type="object" string="Reject" class="btn-danger" invisible="approval_state != 'pending'"/>
+                    <field name="stage_id" widget="statusbar" options="{'fold_field': 'fold'}" clickable="True"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_customer_tickets" class="oe_stat_button" icon="fa-history" type="object">
+                            <field name="customer_ticket_count" widget="statinfo" string="Customer History"/>
+                        </button>
+                        <button name="action_lookup_knowledge_base" class="oe_stat_button" icon="fa-book" type="object">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">SOP Knowledge</span>
+                                <span class="o_stat_text">Lookup</span>
+                            </div>
+                        </button>
+                        <button name="action_get_attachment_tree_view" class="oe_stat_button" icon="fa-paperclip" type="object">
+                            <field name="attachment_number" widget="statinfo" string="Attachments"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="number" readonly="1"/>
+                        </h1>
+                        <h2>
+                            <field name="name" placeholder="Ticket Title / Customer Inquiry Formulation..." required="1"/>
+                        </h2>
+                    </div>
+                    <group>
+                        <group string="Customer Identification &amp; Contact">
+                            <field name="partner_id"/>
+                            <field name="partner_name"/>
+                            <field name="partner_email"/>
+                            <field name="cif_number"/>
+                            <field name="account_number"/>
+                            <field name="national_id"/>
+                            <field name="digital_banking_id"/>
+                            <field name="customer_type"/>
+                            <field name="customer_segment"/>
+                            <field name="language_tag"/>
+                        </group>
+                        <group string="Ticket Classification &amp; Work Unit Queue">
+                            <field name="service_family_id"/>
+                            <field name="category_id"/>
+                            <field name="sub_category_id"/>
+                            <field name="case_type"/>
+                            <field name="incident_class"/>
+                            <field name="priority" widget="priority"/>
+                            <field name="user_id"/>
+                            <field name="team_id"/>
+                            <field name="work_unit_id"/>
+                            <field name="branch_id"/>
+                            <field name="district_id"/>
+                            <field name="channel_id"/>
+                            <field name="sla_deadline" readonly="1"/>
+                            <field name="sla_expired" readonly="1"/>
+                            <field name="tag_ids" widget="many2many_tags"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Description &amp; Customer Query" name="description">
+                            <field name="description" placeholder="Add detailed customer request, transcribed voice notes, or inquiry formulation..."/>
+                        </page>
+                        <page string="Internal Agent Notes" name="internal_notes">
+                            <field name="internal_notes" placeholder="Private notes for internal agent collaboration not visible to portal customers..."/>
+                        </page>
+                        <page string="Resolution &amp; Root Cause Analysis" name="resolution_info">
+                            <group>
+                                <group string="Resolution Details">
+                                    <field name="fcr" widget="boolean_toggle"/>
+                                    <field name="root_cause" placeholder="Identify the root cause of the incident or service request..."/>
+                                </group>
+                                <group string="Action Items">
+                                    <field name="corrective_action" placeholder="Immediate corrective action taken to resolve ticket..."/>
+                                    <field name="preventive_action" placeholder="Preventive measures to avoid recurring incident..."/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="NBE Complaint &amp; Ethics Investigation" name="complaint_info" invisible="not is_complaint">
+                            <group>
+                                <group>
+                                    <field name="is_complaint"/>
+                                    <field name="regulatory_tracking_number"/>
+                                    <field name="ethics_officer_id"/>
+                                </group>
+                                <group>
+                                    <field name="ethics_investigation" placeholder="Ethics team investigation findings and compliance notes..."/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Sub-Tasks &amp; Master Problem Linkage" name="parent_child">
+                            <group>
+                                <group>
+                                    <field name="is_problem"/>
+                                    <field name="parent_id" domain="[('is_problem', '=', True)]"/>
+                                </group>
+                                <group>
+                                    <field name="approval_state"/>
+                                    <field name="reopen_count"/>
+                                    <field name="reopen_date"/>
+                                </group>
+                            </group>
+                            <field name="child_ids">
+                                <list string="Child Sub-Tasks &amp; Incidents" editable="bottom">
+                                    <field name="number"/>
+                                    <field name="name"/>
+                                    <field name="user_id"/>
+                                    <field name="stage_id"/>
+                                    <field name="priority" widget="priority"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Ticket List View -->
+    <record id="ticket_view_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.list</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <list string="Helpdesk Tickets" decoration-danger="priority == '3'" decoration-warning="is_complaint == True">
+                <field name="number"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="cif_number"/>
+                <field name="account_number"/>
+                <field name="service_family_id"/>
+                <field name="category_id"/>
+                <field name="case_type"/>
+                <field name="is_complaint" widget="boolean_toggle"/>
+                <field name="user_id"/>
+                <field name="team_id"/>
+                <field name="stage_id"/>
+                <field name="priority" widget="priority"/>
+                <field name="fcr"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Ticket Kanban View -->
+    <record id="ticket_view_kanban" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.kanban</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="stage_id" class="o_kanban_small_column">
+                <field name="number"/>
+                <field name="name"/>
+                <field name="stage_id"/>
+                <field name="user_id"/>
+                <field name="priority"/>
+                <field name="is_complaint"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong><field name="number"/></strong>
+                                <field name="priority" widget="priority"/>
+                            </div>
+                            <div><field name="name"/></div>
+                            <div class="text-muted"><field name="partner_id"/></div>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <span t-if="record.is_complaint.raw_value" class="badge text-bg-warning">NBE Complaint</span>
+                                <field name="user_id" widget="many2one_avatar_user"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+
+    <!-- Ticket Search View -->
+    <record id="ticket_view_search" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.search</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <search string="Search Helpdesk Tickets">
+                <field name="number"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="cif_number"/>
+                <field name="account_number"/>
+                <field name="national_id"/>
+                <field name="regulatory_tracking_number"/>
+                <field name="service_family_id"/>
+                <field name="category_id"/>
+                <field name="user_id"/>
+                <field name="team_id"/>
+                <field name="work_unit_id"/>
+                <filter string="My Tickets" name="my_tickets" domain="[('user_id', '=', uid)]"/>
+                <filter string="Unassigned" name="unassigned" domain="[('user_id', '=', False)]"/>
+                <filter string="NBE Complaints" name="nbe_complaints" domain="[('is_complaint', '=', True)]"/>
+                <filter string="VIP Customers" name="vip_customers" domain="[('customer_segment', '=', 'vip')]"/>
+                <filter string="Critical Priority" name="critical_priority" domain="[('priority', '=', '3')]"/>
+                <filter string="First Contact Resolution (FCR)" name="fcr_tickets" domain="[('fcr', '=', True)]"/>
+                <group>
+                    <filter string="Service Family" name="group_service_family" context="{'group_by': 'service_family_id'}"/>
+                    <filter string="Category" name="group_category" context="{'group_by': 'category_id'}"/>
+                    <filter string="Stage" name="group_stage" context="{'group_by': 'stage_id'}"/>
+                    <filter string="Assignee" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Team" name="group_team" context="{'group_by': 'team_id'}"/>
+                    <filter string="Customer Segment" name="group_segment" context="{'group_by': 'customer_segment'}"/>
+                    <filter string="Case Type" name="group_case_type" context="{'group_by': 'case_type'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Base Stage List View -->
+    <record id="view_helpdesk_stage_tree" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.stage.list</field>
+        <field name="model">helpdesk.ticket.stage</field>
+        <field name="arch" type="xml">
+            <list string="Helpdesk Stages">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="mail_template_id" optional="show"/>
+                <field name="unattended"/>
+                <field name="closed"/>
+                <field name="fold"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Base Team Form View -->
+    <record id="view_helpdesk_team_form" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.team.form</field>
+        <field name="model">helpdesk.ticket.team</field>
+        <field name="arch" type="xml">
+            <form string="Helpdesk Team">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Team Name..."/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group name="left">
+                            <field name="user_id"/>
+                            <field name="support_level"/>
+                            <field name="work_unit_id"/>
+                            <field name="assign_method"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="show_in_portal"/>
+                        </group>
+                        <group name="right">
+                            <field name="user_ids" widget="many2many_tags"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Base Ticket Search View (Queue Filters & Groupbys) -->
+    <record id="ticket_view_search" model="ir.ui.view">
+        <field name="name">helpdesk.ticket.search</field>
+        <field name="model">helpdesk.ticket</field>
+        <field name="arch" type="xml">
+            <search string="Search Helpdesk Tickets">
+                <field name="number"/>
+                <field name="name"/>
+                <field name="partner_name"/>
+                <field name="cif_number"/>
+                <field name="account_number"/>
+                <field name="user_id"/>
+                <field name="team_id"/>
+                <field name="work_unit_id"/>
+                <field name="service_family_id"/>
+                <field name="category_id"/>
+                <separator/>
+                <filter string="My Tickets" name="my_tickets" domain="[('user_id', '=', uid)]"/>
+                <filter string="Unassigned" name="unassigned" domain="[('user_id', '=', False)]"/>
+                <filter string="Escalated to 2nd Level" name="escalated" domain="[('is_escalated', '=', True)]"/>
+                <filter string="NBE Complaints" name="complaints" domain="[('is_complaint', '=', True)]"/>
+                <filter string="SLA Expired" name="sla_expired" domain="[('sla_expired', '=', True)]"/>
+                <group>
+                    <filter string="Stage" name="group_by_stage" context="{'group_by': 'stage_id'}"/>
+                    <filter string="Assigned User" name="group_by_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Helpdesk Team" name="group_by_team" context="{'group_by': 'team_id'}"/>
+                    <filter string="Product / Service Family" name="group_by_service_family" context="{'group_by': 'service_family_id'}"/>
+                    <filter string="Work Unit (2nd Level)" name="group_by_work_unit" context="{'group_by': 'work_unit_id'}"/>
+                    <filter string="Language Tag" name="group_by_language" context="{'group_by': 'language_tag'}"/>
+                    <filter string="Priority" name="group_by_priority" context="{'group_by': 'priority'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+</odoo>

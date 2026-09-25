@@ -98,6 +98,8 @@ class DisciplineAppeal(models.Model):
 
     case_origin_type = fields.Selection([
         ('manager', 'Appeal on Line Manager / Coach Decision'),
+        ('director', 'Appeal on Directorate Director Decision'),
+        ('chief', 'Appeal on Chief Officer Decision'),
         ('committee', 'Appeal on Disciplinary Committee Decision'),
     ], string='Decision Source', compute='_compute_case_origin_type', store=True)
 
@@ -115,13 +117,36 @@ class DisciplineAppeal(models.Model):
     )
     submitted_by_id = fields.Many2one('res.users', string='Submitted By', default=lambda self: self.env.user, tracking=True)
 
-    @api.depends('case_id', 'case_id.initiator_type')
+    @api.depends('case_id', 'case_id.initiator_type', 'case_id.case_action_track', 'case_id.reported_by_id', 'case_id.employee_id')
     def _compute_case_origin_type(self):
         for rec in self:
-            if rec.case_id and rec.case_id.initiator_type == 'manager':
+            case = rec.case_id
+            if not case:
                 rec.case_origin_type = 'manager'
-            else:
+                continue
+            if case.initiator_type == 'audit' or case.case_action_track == 'committee_escalation':
                 rec.case_origin_type = 'committee'
+            else:
+                initiator_emp = case.reported_by_id.employee_id if case.reported_by_id else False
+                if not initiator_emp and case.employee_id:
+                    initiator_emp = case.employee_id.coach_id or case.employee_id.parent_id
+                
+                level = getattr(initiator_emp, 'executive_level', False) if initiator_emp else False
+                if not level and initiator_emp:
+                    job_name = (initiator_emp.job_id.name or '').lower() if initiator_emp.job_id else ''
+                    if any(k in job_name for k in ['chief', 'cpco', 'cfo', 'cio', 'cdo', 'coo', 'vp']):
+                        level = 'chief'
+                    elif any(k in job_name for k in ['director', 'directorate']):
+                        level = 'director'
+                    else:
+                        level = 'manager'
+                
+                if level == 'chief':
+                    rec.case_origin_type = 'chief'
+                elif level == 'director':
+                    rec.case_origin_type = 'director'
+                else:
+                    rec.case_origin_type = 'manager'
 
     @api.depends('case_origin_type', 'appeal_level')
     def _compute_appeal_target_authority(self):
@@ -133,6 +158,13 @@ class DisciplineAppeal(models.Model):
                     rec.appeal_target_authority = 'chief'
                 else:
                     rec.appeal_target_authority = 'ceo'
+            elif rec.case_origin_type == 'director':
+                if rec.appeal_level == 'first':
+                    rec.appeal_target_authority = 'chief'
+                else:
+                    rec.appeal_target_authority = 'ceo'
+            elif rec.case_origin_type == 'chief':
+                rec.appeal_target_authority = 'ceo'
             else:
                 if rec.appeal_level == 'first':
                     rec.appeal_target_authority = 'secretary'
@@ -374,11 +406,17 @@ class DisciplineAppeal(models.Model):
             if rec.case_origin_type == 'manager':
                 if rec.appeal_level == 'first':
                     has_next_level = True
-                    label = _('Submit 2nd Level Appeal (To Chief Officer)')
+                    label = _('Submit 2nd Level Appeal (To Chief Officer / CPCO)')
                 elif rec.appeal_level == 'second':
                     has_next_level = True
                     label = _('Submit 3rd Level Appeal (To CEO)')
-            else:
+            elif rec.case_origin_type == 'director':
+                if rec.appeal_level == 'first':
+                    has_next_level = True
+                    label = _('Submit 2nd Level Appeal (To CEO)')
+            elif rec.case_origin_type == 'chief':
+                has_next_level = False
+            else: # committee
                 if rec.appeal_level == 'first':
                     has_next_level = True
                     label = _('Submit 2nd Level Appeal (To CEO)')
@@ -729,13 +767,21 @@ class DisciplineAppeal(models.Model):
         if self.case_origin_type == 'manager':
             if self.appeal_level == 'first':
                 next_level = 'second'
-                next_title = _('Submit 2nd Level Appeal (To Chief Officer) for Case %s') % self.case_id.name
+                next_title = _('Submit 2nd Level Appeal (To Chief Officer / CPCO) for Case %s') % self.case_id.name
             elif self.appeal_level == 'second':
                 next_level = 'third'
                 next_title = _('Submit 3rd Level Appeal (To CEO) for Case %s') % self.case_id.name
             else:
                 raise UserError(_('This record is already at the final 3rd level appeal stage (CEO).'))
-        else:
+        elif self.case_origin_type == 'director':
+            if self.appeal_level == 'first':
+                next_level = 'second'
+                next_title = _('Submit 2nd Level Appeal (To CEO) for Case %s') % self.case_id.name
+            else:
+                raise UserError(_('This record is already at the final 2nd level appeal stage (CEO).'))
+        elif self.case_origin_type == 'chief':
+            raise UserError(_('Decisions by Chief Officers directly escalate to CEO at 1st level and cannot be appealed further.'))
+        else: # committee
             if self.appeal_level == 'first':
                 next_level = 'second'
                 next_title = _('Submit 2nd Level Appeal (To CEO) for Case %s') % self.case_id.name

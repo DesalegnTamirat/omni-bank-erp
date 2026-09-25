@@ -12,5 +12,7 @@ from . import competency_dashboard
 from . import competency_dashboard_snapshot
 from . import competency_matrix_config
 from . import competency_director_peer_config
+from . import res_users
 from ..wizards import competency_role_mapping_clone_wizard
+
 

@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="pms_ranking_outstanding" model="pms.ranking">
+            <field name="score_from">90.00</field>
+            <field name="score_to">100.00</field>
+            <field name="ranking">outstanding</field>
+        </record>
+
+        <record id="pms_ranking_excellent" model="pms.ranking">
+            <field name="score_from">80.00</field>
+            <field name="score_to">89.99</field>
+            <field name="ranking">excellent</field>
+        </record>
+
+        <record id="pms_ranking_satisfactory" model="pms.ranking">
+            <field name="score_from">60.00</field>
+            <field name="score_to">79.99</field>
+            <field name="ranking">satisfactory</field>
+        </record>
+
+        <record id="pms_ranking_unsatisfactory" model="pms.ranking">
+            <field name="score_from">0.00</field>
+            <field name="score_to">59.99</field>
+            <field name="ranking">unsatisfactory</field>
+        </record>
+    </data>
+</odoo>

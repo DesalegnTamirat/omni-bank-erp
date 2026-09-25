@@ -10,4 +10,6 @@ from . import ats_bulk_communication_wizard
 from . import blacklist_import_wizard
 from . import panel_member_response_wizard
 from . import reschedule_interview_wizard
+from . import internal_selection_decline_wizard
+
 

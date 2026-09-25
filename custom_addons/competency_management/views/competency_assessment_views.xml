@@ -27,9 +27,11 @@
                     <header>
                         <button name="action_start" string="Start Cycle"
                                 type="object" class="oe_highlight" invisible="state != 'draft'"/>
+                        <button name="action_notify_assessors" string="📢 Notify Employees to Fill Assessments"
+                                type="object" class="btn-primary" invisible="state not in ('open','in_review') or pending_assessment_count == 0"/>
                         <button name="action_start_review" string="Start Review"
                                 type="object" invisible="state != 'open'"/>
-                        <button name="action_send_deadline_reminders" string="📢 Send Warning to Pending Assessors"
+                        <button name="action_send_deadline_reminders" string="⚠️ Send Deadline Warning to Pending Assessors"
                                 type="object" class="btn-warning" invisible="state not in ('open','in_review') or pending_assessment_count == 0"/>
                         <button name="action_close" string="Close Cycle"
                                 type="object" invisible="state not in ('open','in_review')"/>
@@ -82,10 +84,28 @@
             </field>
         </record>
 
+        <!-- Assessment Cycle Search -->
+        <record id="view_competency_assessment_cycle_search" model="ir.ui.view">
+            <field name="name">competency.assessment.cycle.search</field>
+            <field name="model">competency.assessment.cycle</field>
+            <field name="arch" type="xml">
+                <search>
+                    <field name="name"/>
+                    <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
+                    <filter string="Open" name="state_open" domain="[('state','=','open')]"/>
+                    <filter string="In Review" name="state_in_review" domain="[('state','=','in_review')]"/>
+                    <filter string="Closed" name="state_closed" domain="[('state','=','closed')]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
+                </search>
+            </field>
+        </record>
+
         <record id="action_competency_assessment_cycle" model="ir.actions.act_window">
             <field name="name">Assessment Cycles</field>
             <field name="res_model">competency.assessment.cycle</field>
             <field name="view_mode">list,form</field>
+            <field name="search_view_id" ref="view_competency_assessment_cycle_search"/>
         </record>
 
         <!-- Assessment Tree (Readonly Reporting Overview for All Competency Assessments) -->
@@ -109,9 +129,11 @@
         <record id="view_competency_assessment_line_form" model="ir.ui.view">
             <field name="name">competency.assessment.line.form</field>
             <field name="model">competency.assessment.line</field>
+            <field name="priority" eval="20"/>
             <field name="arch" type="xml">
                 <form string="Competency Behavioral Guidance &amp; Rating">
                     <sheet>
+                        <field name="is_primary_reporting_line" invisible="1"/>
                         <div class="oe_title" style="margin-bottom: 15px;">
                             <h1 style="color: #541718;"><field name="competency_id" readonly="1"/></h1>
                             <h4 class="text-muted"><field name="pillar" widget="badge" readonly="1"/></h4>
@@ -158,23 +180,27 @@
 
                         <field name="is_deadline_passed" invisible="1"/>
                         <field name="state" invisible="1"/>
+                        <field name="is_admin_user" invisible="1"/>
+                        <field name="can_edit_ratings" invisible="1"/>
+
+
 
                         <!-- Deadline Warning Callout Banner in Modal View -->
-                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
+                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft' or is_admin_user">
                             <i class="fa fa-exclamation-triangle me-2"/> 
                             <strong>Deadline Passed:</strong> Rating inputs are read-only because the submission deadline for this cycle has passed.
                         </div>
 
-                        <group string="Your Self-Rating &amp; Supporting Remarks" style="margin-top: 20px;">
+                        <group string="Proficiency Rating &amp; Supporting Remarks" style="margin-top: 20px;">
                             <group>
-                                <field name="required_level" readonly="1"/>
-                                <field name="current_level" string="Select Current Proficiency Level" required="1" readonly="state != 'draft' or is_deadline_passed"/>
-                                <field name="gap" readonly="1"/>
-                                <field name="achievement_status" widget="badge" readonly="1"/>
+                                <field name="required_level" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
+                                <field name="current_level" string="Select Current Proficiency Level" required="1" readonly="not can_edit_ratings"/>
+                                <field name="gap" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
+                                <field name="achievement_status" widget="badge" readonly="1" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
                             </group>
                             <group>
-                                <field name="comments" placeholder="Enter remarks or justification for your rating..." readonly="state != 'draft' or is_deadline_passed"/>
-                                <field name="evidence_attachment_ids" widget="many2many_binary" readonly="state != 'draft' or is_deadline_passed"/>
+                                <field name="comments" placeholder="Enter remarks or justification for your rating..." readonly="not can_edit_ratings"/>
+                                <field name="evidence_attachment_ids" widget="many2many_binary" readonly="not can_edit_ratings"/>
                             </group>
                         </group>
                     </sheet>
@@ -182,38 +208,51 @@
             </field>
         </record>
 
-        <!-- Assessment Form (Readonly Reporting & Detailed Data Display) -->
+        <!-- Assessment Form (Interactive Rating & Reporting Display) -->
         <record id="view_competency_assessment_form" model="ir.ui.view">
             <field name="name">competency.assessment.form</field>
             <field name="model">competency.assessment</field>
             <field name="arch" type="xml">
-                <form create="false" edit="false" delete="false">
+                <form create="false" delete="false">
                     <header>
                         <button name="action_populate_competencies" string="Populate Competencies"
-                                type="object" class="oe_highlight" invisible="state != 'draft' or is_deadline_passed" icon="fa-list-ol"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft' or (is_deadline_passed and not is_admin_or_officer) or not can_edit_ratings" icon="fa-list-ol"/>
                         <button name="action_submit" string="Submit"
-                                type="object" class="oe_highlight" invisible="state != 'draft' or is_deadline_passed"/>
-                        <button name="action_supervisor_review" string="Supervisor Review"
-                                type="object" invisible="state != 'submitted'"/>
-                        <button name="action_hr_verify" string="HR Verify"
-                                type="object" invisible="state != 'supervisor_review'"/>
-                        <button name="action_approve" string="Approve"
-                                type="object" class="oe_highlight" invisible="state != 'hr_verified'"/>
-                        <button name="action_lock" string="Lock"
-                                type="object" invisible="state != 'approved'"/>
-                        <button name="action_unlock" string="Unlock"
-                                type="object" invisible="state != 'locked'"/>
+                                type="object" class="oe_highlight" invisible="state != 'draft' or (is_deadline_passed and not is_admin_or_officer) or not can_edit_ratings"/>
+                        <button name="action_submit" string="Admin Submit (Override Deadline)"
+                                type="object" class="btn-warning" invisible="state != 'draft' or not is_deadline_passed or not is_admin_or_officer or is_override_active"/>
+                        <button name="action_enable_override" string="Override Ratings"
+                                type="object" class="btn-warning"
+                                invisible="not can_override or is_override_active"
+                                icon="fa-unlock"/>
+                        <button name="action_disable_override" string="Lock Override"
+                                type="object" class="btn-secondary"
+                                invisible="not can_override or not is_override_active"
+                                icon="fa-lock"/>
                         <field name="state" widget="statusbar"
-                               statusbar_visible="draft,submitted,supervisor_review,hr_verified,approved,locked"/>
+                                statusbar_visible="draft,submitted"/>
                     </header>
                     <sheet>
                         <field name="is_deadline_passed" invisible="1"/>
                         <field name="cycle_deadline" invisible="1"/>
+                        <field name="is_admin_user" invisible="1"/>
+                        <field name="is_admin_or_officer" invisible="1"/>
+                        <field name="is_override_active" invisible="1"/>
+                        <field name="can_edit_ratings" invisible="1"/>
+                        <field name="can_override" invisible="1"/>
+
+                        <!-- Administrative Override Active Warning Alert Banner -->
+                        <div class="alert alert-warning text-center" role="alert" invisible="not is_override_active">
+                            <i class="fa fa-exclamation-triangle me-2"/> 
+                            <strong>Administrative Override Active:</strong> Ratings editing is unlocked by HR/Administrator. All changes are recorded in the audit log. Click <strong>Lock Override</strong> when finished.
+                        </div>
+
+
 
                         <!-- Deadline Passed Warning Alert Banner -->
-                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft'">
+                        <div class="alert alert-danger text-center" role="alert" invisible="not is_deadline_passed or state != 'draft' or is_override_active">
                             <i class="fa fa-exclamation-triangle me-2"/> 
-                            <strong>Submission Deadline Passed:</strong> The submission deadline (<field name="cycle_deadline"/>) for this assessment cycle has passed. Submissions are closed and ratings are locked unless HR extends the deadline.
+                            <strong>Submission Deadline Passed:</strong> The submission deadline (<field name="cycle_deadline"/>) for this assessment cycle has passed. Standard submissions are closed. (Competency Administrators retain override permissions).
                         </div>
 
                         <group>
@@ -225,55 +264,61 @@
                             </group>
                             <group>
                                 <field name="assessor_id" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True}"/>
-                                <field name="average_gap"/>
+                                <field name="average_gap" invisible="state in ('draft', 'submitted', 'supervisor_review')"/>
                                 <field name="is_locked"/>
                             </group>
                         </group>
                         <notebook>
-                            <page string="Core Competencies" icon="fa-star">
-                                <field name="core_line_ids" readonly="1">
-                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                            <page string="Core Competencies" icon="fa-star" invisible="not core_line_ids">
+                                <field name="core_line_ids" readonly="not can_edit_ratings">
+                                    <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
+                                        <field name="state" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Core Competency"/>
-                                        <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1"/>
-                                        <field name="achievement_status" widget="badge" readonly="1"/>
-                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
-                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
+                                        <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="current_level" required="1"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="comments" string="Remarks / Comments"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Leadership Competencies" icon="fa-users">
-                                <field name="leadership_line_ids" readonly="1">
-                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                            <page string="Leadership Competencies" icon="fa-users" invisible="not leadership_line_ids">
+                                <field name="leadership_line_ids" readonly="not can_edit_ratings">
+                                    <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
+                                        <field name="state" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Leadership Competency"/>
-                                        <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1"/>
-                                        <field name="achievement_status" widget="badge" readonly="1"/>
-                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
-                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
+                                        <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="current_level" required="1"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="comments" string="Remarks / Comments"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
                                 </field>
                             </page>
-                            <page string="Technical Competencies" icon="fa-cogs">
-                                <field name="technical_line_ids" readonly="1">
-                                    <list create="false" edit="false" delete="false" decoration-success="current_level != False" decoration-warning="not current_level">
+                            <page string="Technical Competencies" icon="fa-cogs" invisible="not technical_line_ids">
+                                <field name="technical_line_ids" readonly="not can_edit_ratings">
+                                    <list create="false" delete="false" editable="bottom" decoration-success="current_level != False" decoration-warning="not current_level">
                                         <field name="competency_definition" column_invisible="True"/>
+                                        <field name="state" column_invisible="True"/>
                                         <field name="competency_id" readonly="1" string="Technical Competency"/>
-                                        <field name="required_level" readonly="1"/>
-                                        <field name="current_level" readonly="1"/>
-                                        <field name="gap" readonly="1"/>
-                                        <field name="achievement_status" widget="badge" readonly="1"/>
-                                        <field name="comments" string="Remarks / Comments" readonly="1"/>
-                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents" readonly="1"/>
+                                        <button name="action_open_guide" type="object" icon="fa-info-circle" title="View Behavioral Indicators &amp; Level Guidance" class="btn-link"/>
+                                        <field name="required_level" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="current_level" required="1"/>
+                                        <field name="gap" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="achievement_status" widget="badge" readonly="1" column_invisible="parent.state in ('draft', 'submitted', 'supervisor_review')"/>
+                                        <field name="comments" string="Remarks / Comments"/>
+                                        <field name="evidence_attachment_ids" widget="many2many_binary" string="Supporting Documents"/>
                                     </list>
                                 </field>
                             </page>
                             <page string="Notes">
-                                <field name="notes" readonly="1"/>
+                                <field name="notes" readonly="not can_edit_ratings"/>
                             </page>
                         </notebook>
                     </sheet>
@@ -313,6 +358,13 @@
                     <filter string="Draft" name="state_draft" domain="[('state','=','draft')]"/>
                     <filter string="Submitted" name="state_submitted" domain="[('state','=','submitted')]"/>
                     <filter string="Approved" name="state_approved" domain="[('state','=','approved')]"/>
+                    <separator/>
+                    <filter string="Self Assessments" name="type_self" domain="[('assessment_type','=','self')]"/>
+                    <filter string="Team Assessments" name="type_team" domain="[('assessment_type','=','team')]"/>
+                    <filter string="Peer Assessments" name="type_peer" domain="[('assessment_type','=','peer')]"/>
+                    <filter string="Subordinate Assessments" name="type_subordinate" domain="[('assessment_type','=','subordinate')]"/>
+                    <separator/>
+                    <filter string="Archived" name="inactive" domain="[('active','=',False)]"/>
                     <group>
                         <filter string="Cycle" name="group_cycle" context="{'group_by':'cycle_id'}"/>
                         <filter string="Assessment Type" name="group_type" context="{'group_by':'assessment_type'}"/>
@@ -459,6 +511,7 @@
         <record id="view_competency_assessment_line_report_form" model="ir.ui.view">
             <field name="name">competency.assessment.line.report.form</field>
             <field name="model">competency.assessment.line</field>
+            <field name="priority" eval="10"/>
             <field name="arch" type="xml">
                 <form string="Competency Evaluation Line Details" create="false" edit="false" delete="false">
                     <header>

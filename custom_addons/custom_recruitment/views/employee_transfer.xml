@@ -136,6 +136,12 @@
                     <button name="action_reconfirm_interest" string="Re-confirm Interest" type="object"
                             class="oe_highlight" invisible="not pending_expiry_notified or state not in ('submitted', 'under_review')"
                             help="Re-confirm your continued interest in this transfer request to prevent automated 7-day withdrawal."/>
+                    <button name="action_accept_transfer" string="Accept Transfer" type="object"
+                            class="btn-success" icon="fa-check-circle"
+                            invisible="state != 'approved' or acceptance_status == 'accepted'"/>
+                    <button name="action_decline_transfer" string="Decline Transfer" type="object"
+                            class="btn-danger" icon="fa-times-circle"
+                            invisible="state != 'approved' or acceptance_status == 'rejected'"/>
                     <button name="action_refuse_transfer" string="Refuse Transfer" type="object"
                             invisible="state != 'approved'"
                             confirm="Are you sure you wish to refuse this approved transfer? A 12-month ineligibility penalty will be applied and HR will be notified."/>
@@ -255,6 +261,11 @@
                             <field name="target_job_level" readonly="1"
                                    invisible="current_job_category != 'Non Managerial'"/>
                             <field name="target_operating_unit_id" readonly="1"/>
+                            <field name="acceptance_status" widget="badge"
+                                   decoration-success="acceptance_status == 'accepted'"
+                                   decoration-danger="acceptance_status == 'rejected'"
+                                   decoration-warning="acceptance_status == 'pending'"/>
+                            <field name="acceptance_date" readonly="1"/>
                             <field name="grade_restriction_ok" readonly="1" widget="boolean"
                                    decoration-danger="not grade_restriction_ok"/>
                             <field name="eligibility_status" readonly="1" widget="badge"

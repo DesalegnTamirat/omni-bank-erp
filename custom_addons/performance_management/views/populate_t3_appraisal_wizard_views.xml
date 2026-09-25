@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_populate_t3_appraisal_wizard_form" model="ir.ui.view">
+        <field name="name">populate.t3.appraisal.wizard.form</field>
+        <field name="model">populate.t3.appraisal.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Populate Tier 3 Appraisal">
+                <group>
+                    <field name="fiscal_year_id" options="{'no_create': True}"/>
+                    <field name="appraisal_period_id" options="{'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_populate" string="Populate" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_populate_t3_appraisal_wizard" model="ir.actions.act_window">
+        <field name="name">Populate Tier 3 Appraisal</field>
+        <field name="res_model">populate.t3.appraisal.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

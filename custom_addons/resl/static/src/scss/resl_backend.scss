@@ -1,0 +1,83 @@
+// ── OD Staff Loan — form polish ──────────────────────────────────────────
+// Keeps everything native Odoo (no custom widgets, no layout hacks) — just
+// a soft highlight on the balance summary and a tidier title block, so the
+// form reads a bit more like a designed document and less like a plain
+// field grid.
+
+.o_form_view {
+    .oe_title {
+        margin-bottom: 12px;
+
+        h1 {
+            font-weight: 600;
+        }
+    }
+
+    // The "Your RSSA Balance" group, called out with class="o_resl_balance_panel"
+    // in resl_loan_views.xml — the number the borrower cares about most gets
+    // a summary-card treatment instead of blending into the rest of the form.
+    .o_resl_balance_panel {
+        background: linear-gradient(135deg, rgba(113, 75, 103, 0.07), rgba(113, 75, 103, 0.02));
+        border: 1px solid rgba(113, 75, 103, 0.18);
+        border-radius: 8px;
+        padding: 12px 16px 4px 16px;
+        margin-bottom: 16px;
+
+        .o_horizontal_separator {
+            display: none;
+        }
+    }
+
+    // Plain, clearly-separated info cards (Borrower / Loan Term & Amount),
+    // wrapped as class="o_resl_card" around a <div class="o_resl_card_title">
+    // + <group> in resl_loan_views.xml.
+    .o_resl_card {
+        background: #fff;
+        border: 1px solid rgba(113, 75, 103, 0.45);
+        border-radius: 10px;
+        padding: 14px 18px 6px 18px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+        .o_resl_card_title {
+            font-weight: 700;
+            font-size: 0.78rem;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            color: rgba(0, 0, 0, 0.6);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        // Field labels (Eligible Ceiling, Requested Loan Amount, etc.) read
+        // as bold captions rather than plain form-label grey text.
+        .o_form_label {
+            font-weight: 700;
+        }
+
+        // Groups inside a card shouldn't repeat the native horizontal
+        // separator/margins meant for a bare form-level group.
+        .o_horizontal_separator {
+            display: none;
+        }
+        > .o_group {
+            margin-bottom: 0;
+        }
+    }
+
+    // Give the header status bar a touch more breathing room from the
+    // action buttons on narrower headers.
+    .o_statusbar_status {
+        margin-inline-start: auto;
+    }
+
+    // Core Banking Disbursement wizard — field labels (Employee, Approved
+    // Loan Amount, Bank Account Number) read as bold, brand-purple captions
+    // instead of plain/red form-label text.
+    .o_resl_disbursement_wizard {
+        .o_form_label {
+            font-weight: 700;
+            color: #714B67;
+        }
+    }
+}

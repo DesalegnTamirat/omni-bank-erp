@@ -4,20 +4,20 @@
         <div class="o_competency_dashboard_owl" style="background-color: #fcfbfa; height: 100%; overflow-y: auto; overflow-x: hidden; padding-bottom: 60px; font-family: system-ui, -apple-system, sans-serif;">
             
             <!-- ── Top Maroon Header Bar (#541718) ── -->
-            <div style="background-color: #541718; color: #ffffff; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
-                <div style="display: flex; align-items: center; gap: 14px;">
-                    <div style="background-color: #c17540; color: #ffffff; font-weight: 900; font-size: 18px; width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <div style="background-color: #541718; color: #ffffff; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-wrap: nowrap;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                    <div style="background-color: #c17540; color: #ffffff; font-weight: 900; font-size: 16px; width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
                         B
                     </div>
-                    <span style="font-size: 17px; font-weight: 700; color: #ffffff;">Bunna Bank</span>
-                    <span style="color: rgba(255,255,255,0.4); font-size: 18px;">|</span>
-                    <span style="font-size: 16px; font-weight: 600; color: #ffffff;">Competency &amp; TNA Decision Support Dashboard</span>
+                    <span style="font-size: 16px; font-weight: 700; color: #ffffff; white-space: nowrap;">Bunna Bank</span>
+                    <span style="color: rgba(255,255,255,0.4); font-size: 16px;">|</span>
+                    <span style="font-size: 14px; font-weight: 600; color: #ffffff; white-space: nowrap;">Competency &amp; TNA Dashboard</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
                     <!-- Cycle Selector Dropdown -->
-                    <select class="form-select form-select-sm" style="min-width: 190px; background: #ffffff; color: #1d2b32; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px;"
+                    <select class="form-select form-select-sm" style="width: 150px; max-width: 160px; height: 32px; background: #ffffff; color: #1d2b32; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 8px; text-overflow: ellipsis;"
                             t-on-change="onCycleChange">
-                        <option value="">All Assessment Cycles</option>
+                        <option value="">All Cycles</option>
                         <t t-foreach="state.data.all_cycles" t-as="cyc" t-key="cyc.id">
                             <option t-att-value="cyc.id" t-att-selected="state.cycleId == cyc.id">
                                 <t t-out="cyc.name"/>
@@ -25,47 +25,81 @@
                         </t>
                     </select>
 
-                    <!-- Department / Unit Filter Dropdown -->
-                    <select class="form-select form-select-sm" style="min-width: 190px; background: #ffffff; color: #1d2b32; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px;"
-                            t-on-change="onDepartmentChange">
-                        <option value="">All Departments / Units</option>
-                        <t t-foreach="state.data.all_departments" t-as="dept" t-key="dept.id">
-                            <option t-att-value="dept.id" t-att-selected="state.departmentId == dept.id">
-                                <t t-out="dept.name"/>
-                            </option>
-                        </t>
-                    </select>
+                    <!-- Department Filter Dropdown / Read-only Indicator -->
+                    <t t-if="state.data.is_dept_readonly">
+                        <div style="max-width: 165px; height: 32px; background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Department is locked to your assigned department">
+                            <span>🏛️</span>
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <t t-if="state.data.all_departments &amp;&amp; state.data.all_departments.length">
+                                    <t t-out="state.data.all_departments[0].name"/>
+                                </t>
+                                <t t-else="">
+                                    <span>My Department</span>
+                                </t>
+                            </span>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <select class="form-select form-select-sm" style="width: 165px; max-width: 175px; height: 32px; background: #ffffff; color: #1d2b32; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 8px; text-overflow: ellipsis;"
+                                t-on-change="onDepartmentChange">
+                            <option value="">All Departments</option>
+                            <t t-foreach="state.data.all_departments" t-as="dept" t-key="dept.id">
+                                <option t-att-value="dept.id" t-att-selected="state.departmentId == dept.id">
+                                    <t t-out="dept.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </t>
+
+                    <!-- Operating Unit Filter Dropdown / Read-only Indicator -->
+                    <t t-if="state.data.is_ou_readonly">
+                        <div style="max-width: 165px; height: 32px; background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Operating Unit is locked to your assigned branch / work unit">
+                            <span>🏢</span>
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <t t-if="state.data.all_operating_units &amp;&amp; state.data.all_operating_units.length">
+                                    <t t-out="state.data.all_operating_units[0].name"/>
+                                </t>
+                                <t t-else="">
+                                    <span>My Workunit</span>
+                                </t>
+                            </span>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <select class="form-select form-select-sm" style="width: 165px; max-width: 175px; height: 32px; background: #ffffff; color: #1d2b32; font-size: 12px; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 8px; text-overflow: ellipsis;"
+                                t-on-change="onOperatingUnitChange">
+                            <option value="">All Workunits / Branches</option>
+                            <t t-foreach="state.data.all_operating_units" t-as="ou" t-key="ou.id">
+                                <option t-att-value="ou.id" t-att-selected="state.operatingUnitId == ou.id">
+                                    <t t-out="ou.name"/>
+                                </option>
+                            </t>
+                        </select>
+                    </t>
                 </div>
             </div>
 
-            <!-- ── Sub-Header Row with Persona Toggle Pills ── -->
+            <!-- ── Sub-Header Row with Role Badge (No Persona Switcher Pills) ── -->
             <div style="padding: 20px 28px 12px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
                 <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #1d2b32;">
                     Bunna Bank Talent Capability &amp; Competency Management
                 </h2>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 13px; font-weight: 600; color: #726732;">Persona</span>
-                    <div style="background-color: #e2e8f0; border-radius: 6px; padding: 3px; display: flex; gap: 4px;">
-                        <t t-if="state.data.user &amp;&amp; state.data.user.is_admin">
-                            <button t-attf-class="btn btn-sm"
-                                    t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'executive' ? '#541718' : 'transparent'}; color: #{state.persona === 'executive' ? '#ffffff' : '#1d2b32'};"
-                                    t-on-click="() => this.onPersonaChange('executive')">
-                                Executive
-                            </button>
-                        </t>
-                        <t t-if="state.data.user &amp;&amp; (state.data.user.is_admin || state.data.user.is_supervisor || state.data.user.has_subordinates)">
-                            <button t-attf-class="btn btn-sm"
-                                    t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'supervisor' ? '#541718' : 'transparent'}; color: #{state.persona === 'supervisor' ? '#ffffff' : '#1d2b32'};"
-                                    t-on-click="() => this.onPersonaChange('supervisor')">
-                                Manager
-                            </button>
-                        </t>
-                        <button t-attf-class="btn btn-sm"
-                                t-attf-style="font-size: 12px; border-radius: 4px; padding: 5px 14px; font-weight: 600; border: none; background-color: #{state.persona === 'employee' ? '#541718' : 'transparent'}; color: #{state.persona === 'employee' ? '#ffffff' : '#1d2b32'};"
-                                t-on-click="() => this.onPersonaChange('employee')">
-                            Employee
-                        </button>
-                    </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <t t-if="state.persona === 'executive'">
+                        <span class="badge" style="background-color: #541718; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                            🏛️ Executive Overview
+                        </span>
+                    </t>
+                    <t t-elif="state.persona === 'manager'">
+                        <span class="badge" style="background-color: #c17540; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                            👥 Manager / Team Overview
+                        </span>
+                    </t>
+                    <t t-else="">
+                        <span class="badge" style="background-color: #726732; color: #ffffff; font-size: 12px; padding: 6px 14px; font-weight: 600; border-radius: 6px;">
+                            👤 Employee Self-Service
+                        </span>
+                    </t>
                 </div>
             </div>
 
@@ -170,13 +204,23 @@
                     <!-- ── 5 KPI Cards Row ── -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
                         <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #541718;">
-                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Bank Avg Gap</div>
-                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.bank_avg_gap"/> pts</div>
+                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                                <t t-if="state.persona === 'executive'">Bank Avg Gap</t>
+                                <t t-elif="state.persona === 'manager'">Team Avg Gap</t>
+                                <t t-else="">My Avg Gap</t>
+                            </div>
+                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;">
+                                <t t-if="state.persona === 'employee'"><t t-out="state.data.stats.my_avg_gap"/> pts</t>
+                                <t t-elif="state.persona === 'manager'"><t t-out="state.data.stats.team_avg_gap"/> pts</t>
+                                <t t-else=""><t t-out="state.data.stats.bank_avg_gap"/> pts</t>
+                            </div>
                         </div>
-                        <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; cursor: pointer;" t-on-click="openAssessedEmployees">
-                            <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Assessed Employees</div>
-                            <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
-                        </div>
+                        <t t-if="state.persona !== 'employee'">
+                            <div style="background: #ffffff; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-top: 4px solid #1d2b32; cursor: pointer;" t-on-click="openAssessedEmployees">
+                                <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Assessed Employees</div>
+                                <div style="font-size: 26px; font-weight: 800; color: #1d2b32;"><t t-out="state.data.stats.total_assessments"/></div>
+                            </div>
+                        </t>
                         <div style="background: #fdf2f2; border-radius: 10px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(84,23,24,0.08); border: 1px solid #f87171; border-top: 4px solid #541718; cursor: pointer;" t-on-click="openTnaBelow">
                             <div style="font-size: 12px; color: #541718; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Underqualified</div>
                             <div style="font-size: 26px; font-weight: 900; color: #541718;"><t t-out="state.data.stats.below_cnt"/></div>
@@ -234,55 +278,57 @@
                     </div>
 
                     <!-- ── Bottom Card: Department by Pillar Competency Gap Heatmap ── -->
-                    <div style="background: #ffffff; border-radius: 10px; padding: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 24px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                            <span style="font-size: 16px; font-weight: 700; color: #1d2b32;">Department by pillar competency gap heatmap</span>
-                        </div>
-                        
-                        <div class="o_competency_scroll table-responsive">
-                            <table class="table table-bordered align-middle mb-0" style="font-size: 13px; border-collapse: collapse;">
-                                <thead style="background-color: #f8fafc; color: #1d2b32;">
-                                    <tr>
-                                        <th style="padding: 10px 14px; text-align: left; border: 1px solid #e2e8f0; font-weight: 600;">Department</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Core</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Leadership</th>
-                                        <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Technical</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-if="!state.data.heatmap_rows || !state.data.heatmap_rows.length">
+                    <t t-if="state.persona !== 'employee'">
+                        <div style="background: #ffffff; border-radius: 10px; padding: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                <span style="font-size: 16px; font-weight: 700; color: #1d2b32;">Department by pillar competency gap heatmap</span>
+                            </div>
+                            
+                            <div class="o_competency_scroll table-responsive">
+                                <table class="table table-bordered align-middle mb-0" style="font-size: 13px; border-collapse: collapse;">
+                                    <thead style="background-color: #f8fafc; color: #1d2b32;">
                                         <tr>
-                                            <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8; border: 1px solid #e2e8f0;">
-                                                No departmental data available for this selection yet.
-                                            </td>
+                                            <th style="padding: 10px 14px; text-align: left; border: 1px solid #e2e8f0; font-weight: 600;">Department</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Core</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Leadership</th>
+                                            <th style="padding: 10px 14px; text-align: center; border: 1px solid #e2e8f0; font-weight: 600; width: 25%;">Technical</th>
                                         </tr>
-                                    </t>
-                                    <t t-foreach="state.data.heatmap_rows" t-as="row" t-key="row.dept_id">
-                                        <tr>
-                                            <td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-weight: 700; color: #1d2b32;">
-                                                <t t-out="row.dept_name"/>
-                                            </td>
-                                            <!-- Core Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &gt; 1.0 ? '#541718' : (row.core &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'core')">
-                                                <t t-out="row.core !== null ? row.core : 0"/>
-                                            </td>
-                                            <!-- Leadership Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &gt; 1.0 ? '#541718' : (row.leadership &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'leadership')">
-                                                <t t-out="row.leadership !== null ? row.leadership : 0"/>
-                                            </td>
-                                            <!-- Technical Cell -->
-                                            <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &gt; 1.0 ? '#541718' : (row.technical &gt; 0.0 ? '#c17540' : '#726732')}"
-                                                t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'technical')">
-                                                <t t-out="row.technical !== null ? row.technical : 0"/>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        <t t-if="!state.data.heatmap_rows || !state.data.heatmap_rows.length">
+                                            <tr>
+                                                <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8; border: 1px solid #e2e8f0;">
+                                                    No departmental data available for this selection yet.
+                                                </td>
+                                            </tr>
+                                        </t>
+                                        <t t-foreach="state.data.heatmap_rows" t-as="row" t-key="row.dept_id">
+                                            <tr>
+                                                <td style="padding: 10px 14px; border: 1px solid #e2e8f0; font-weight: 700; color: #1d2b32;">
+                                                    <t t-out="row.dept_name"/>
+                                                </td>
+                                                <!-- Core Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.core &gt; 1.0 ? '#541718' : (row.core &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'core')">
+                                                    <t t-out="row.core !== null ? row.core : 0"/>
+                                                </td>
+                                                <!-- Leadership Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.leadership &gt; 1.0 ? '#541718' : (row.leadership &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'leadership')">
+                                                    <t t-out="row.leadership !== null ? row.leadership : 0"/>
+                                                </td>
+                                                <!-- Technical Cell -->
+                                                <td class="o_competency_heatmap_cell" t-attf-style="padding: 10px; text-align: center; font-weight: 700; color: #ffffff; border: 1px solid #ffffff; background-color: #{row.technical &gt; 1.0 ? '#541718' : (row.technical &gt; 0.0 ? '#c17540' : '#726732')}"
+                                                    t-on-click="() => this.onHeatmapCellClick(row.dept_id, 'technical')">
+                                                    <t t-out="row.technical !== null ? row.technical : 0"/>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    </t>
 
                 </div>
             </t>

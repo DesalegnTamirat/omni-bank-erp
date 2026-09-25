@@ -437,15 +437,15 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Vacancies">
-                            <field name="hr_new_department_ids">
-                                <list editable="bottom">
-                                    <field name="work_unit" required="1"/>
-                                    <field name="number_of_vacancies"/>
-                                    <field name="response"/>
-                                </list>
-                            </field>
-                        </page>
+<!--                        <page string="Vacancies">-->
+<!--                            <field name="hr_new_department_ids">-->
+<!--                                <list editable="bottom">-->
+<!--                                    <field name="work_unit" required="1"/>-->
+<!--                                    <field name="number_of_vacancies"/>-->
+<!--                                    <field name="response"/>-->
+<!--                                </list>-->
+<!--                            </field>-->
+<!--                        </page>-->
                         <page string="HR Policies">
                             <group>
                                 <group>

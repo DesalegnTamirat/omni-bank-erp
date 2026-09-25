@@ -38,15 +38,27 @@ class CustomWebController(http.Controller):
             return request.redirect("/jobs/login")
 
         user = request.env.user
-        candidate = request.env['candidate.profile'].sudo().search([('partner_id', '=', user.partner_id.id)], limit=1)
+        candidate = request.env['candidate.profile'].sudo().search(['|', ('partner_id', '=', user.partner_id.id), ('user_id', '=', user.id)], limit=1)
+        
+        user_phone = getattr(user, 'phone', '') or (user.partner_id and user.partner_id.phone) or (user.partner_id and getattr(user.partner_id, 'mobile', '')) or ''
+        
         if not candidate:
             candidate = request.env['candidate.profile'].sudo().create({
                 'partner_id': user.partner_id.id,
                 'user_id': user.id,
                 'name': user.name,
                 'email': user.email or user.login,
-                'phone': user.phone or '',
+                'phone': user_phone,
             })
+        
+        effective_phone = candidate.phone or user_phone
+        if effective_phone:
+            if not candidate.phone:
+                candidate.sudo().write({'phone': effective_phone})
+            if user.partner_id and user.partner_id.phone != effective_phone:
+                user.partner_id.sudo().write({'phone': effective_phone, 'mobile': effective_phone})
+            if hasattr(user, 'phone') and getattr(user, 'phone', False) != effective_phone:
+                user.sudo().write({'phone': effective_phone})
 
         is_admin = not user.share and not user._is_public() and (
             user.has_group('custom_recruitment.group_recruitment_administrator') or
@@ -335,13 +347,23 @@ class CustomWebController(http.Controller):
             })
 
         try:
-            new_user = Users.create({
+            user_vals = {
                 'name': full_name,
                 'login': email,
                 'email': email,
                 'password': password,
                 'active': True,
-            })
+            }
+            if hasattr(Users, 'phone'):
+                user_vals['phone'] = phone
+
+            new_user = Users.create(user_vals)
+
+            if new_user.partner_id:
+                new_user.partner_id.sudo().write({
+                    'phone': phone,
+                    'mobile': phone,
+                })
 
             candidate = Candidates.create({
                 'partner_id': new_user.partner_id.id,

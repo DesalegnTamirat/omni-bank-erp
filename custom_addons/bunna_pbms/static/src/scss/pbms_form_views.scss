@@ -350,6 +350,33 @@ $bunna-light: #F4F6F7;
             margin-top: 0.25rem;
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Section Separators & Group Titles in Forms & Configs
+    // -------------------------------------------------------------------------
+    .o_horizontal_separator,
+    .o_group .o_group_header {
+        color: #541718 !important;
+        font-weight: 700 !important;
+        border-bottom: 2px solid #541718 !important;
+        padding-bottom: 4px;
+        margin-top: 1rem;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        font-size: 0.88rem;
+        letter-spacing: 0.5px;
+    }
+
+    // Form Overview Numbers Contrast
+    .o_field_widget {
+        &.fs-6 {
+            font-size: 0.95rem !important;
+        }
+
+        &.fs-5 {
+            font-size: 1.15rem !important;
+        }
+    }
 }
 
 /* ========================================================================= */
@@ -634,34 +661,6 @@ td.text-info {
     }
 }
 
-// -------------------------------------------------------------------------
-// 4. Section Separators & Group Titles in Forms & Configs
-// -------------------------------------------------------------------------
-.o_form_view {
-    .o_horizontal_separator,
-    .o_group .o_group_header {
-        color: #541718 !important;
-        font-weight: 700 !important;
-        border-bottom: 2px solid #541718 !important;
-        padding-bottom: 4px;
-        margin-top: 1rem;
-        margin-bottom: 0.75rem;
-        text-transform: uppercase;
-        font-size: 0.88rem;
-        letter-spacing: 0.5px;
-    }
-
-    // Form Overview Numbers Contrast
-    .o_field_widget {
-        &.fs-6 {
-            font-size: 0.95rem !important;
-        }
-
-        &.fs-5 {
-            font-size: 1.15rem !important;
-        }
-    }
-}
 
 // -------------------------------------------------------------------------
 // 5. List View Table Headers & Aggregation Footers

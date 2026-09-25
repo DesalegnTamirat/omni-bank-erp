@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="view_employee_form_resl_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.form.resl</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_form"/>
+            <field name="arch" type="xml">
+
+                <!-- Smart buttons in header -->
+                <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
+                    <button name="%(resl.action_resl_loan_tree)d" type="action"
+                        class="oe_stat_button" icon="fa-credit-card"
+                        groups="resl.group_resl_employee,resl.group_resl_hr,resl.group_resl_manager,resl.group_resl_head_office,resl.group_resl_pomd">
+                        <field name="loan_ids" widget="statinfo" string="Loans"/>
+                    </button>
+                    <button name="%(resl.action_resl_my_guarantees)d" type="action"
+                        class="oe_stat_button" icon="fa-user-shield"
+                        groups="resl.group_resl_employee,resl.group_resl_hr,resl.group_resl_manager,resl.group_resl_head_office,resl.group_resl_pomd">
+                        <field name="guarantee_count" widget="statinfo" string="Guarantees"/>
+                    </button>
+                    <button name="%(resl.action_resl_loans_replacement_needed)d" type="action"
+                        class="oe_stat_button btn-danger" icon="fa-exclamation-triangle"
+                        groups="resl.group_resl_hr">
+                        <field name="loan_ids" widget="statinfo" string="Replacement Needed"/>
+                    </button>
+                </xpath>
+
+                <!-- RESL info tab inside the notebook -->
+                <!-- Inserted before the last existing page, not appended at
+                     the very end of the notebook: Odoo's tab bar collapses
+                     trailing tabs it can't fit into a "..." dropdown, in
+                     arch order. Appending with position="inside" on
+                     //notebook put this page after that whole dropdown
+                     group. Anchoring on (//page)[last()] with
+                     position="before" instead places it right before
+                     whatever page is currently last (from other modules'
+                     inherited views applied earlier), which keeps RESL
+                     Loans out of the overflow and visible as its own tab. -->
+                <xpath expr="(//page)[last()]" position="before">
+                    <page string="RESL Loans" name="resl_loans"
+                        groups="resl.group_resl_employee,resl.group_resl_hr,resl.group_resl_manager,resl.group_resl_head_office,resl.group_resl_pomd">
+                        <group>
+                            <field name="guarantee_count" readonly="1"/>
+                            <field name="months_of_service" readonly="1"/>
+                        </group>
+                        <field name="loan_ids" context="{'default_employee_id': id}">
+                            <list>
+                                <field name="name"/>
+                                <field name="loan_amount"/>
+                                <field name="status"/>
+                                <field name="needs_guarantor_replacement"/>
+                            </list>
+                        </field>
+                        <field name="guaranteed_loan_ids" string="Loans Guaranteed">
+                            <list>
+                                <field name="loan_id" string="Loan"/>
+                                <field name="loan_employee_id" string="Borrower"/>
+                                <field name="state" string="Status"/>
+                            </list>
+                        </field>
+                    </page>
+                </xpath>
+
+            </field>
+        </record>
+
+        <record id="view_employee_tree_resl_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.list.resl</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_tree"/>
+            <field name="arch" type="xml">
+                <xpath expr="//list" position="inside">
+                    <field name="months_of_service"/>
+                    <field name="guarantee_count"/>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="view_employee_search_resl_inherit" model="ir.ui.view">
+            <field name="name">hr.employee.search.resl</field>
+            <field name="model">hr.employee</field>
+            <field name="inherit_id" ref="hr.view_employee_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//search" position="inside">
+                    <filter string="Less than 3 Months Service" name="less_than_3_months"
+                        domain="[('months_of_service','&lt;',3)]"/>
+                    <filter string="2+ Active Guarantees" name="too_many_guarantees"
+                        domain="[('guarantee_count','&gt;=',2)]"/>
+                </xpath>
+            </field>
+        </record>
+
+    </data>
+</odoo>

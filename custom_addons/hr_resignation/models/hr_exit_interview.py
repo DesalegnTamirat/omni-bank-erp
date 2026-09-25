@@ -45,6 +45,13 @@ class HrExitInterviewQuestion(models.Model):
         'hr.exit.interview.question.option', 'question_id',
         string='Options',
         help='Define selectable options for Custom/Multiple Choice types.')
+    is_mandatory = fields.Boolean(string='Mandatory', default=False)
+    active = fields.Boolean(string='Active', default=True)
+
+    def action_delete_question(self):
+        self.ensure_one()
+        self.write({'active': False})
+        return {'type': 'ir.actions.act_window_close'}
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -110,7 +117,7 @@ class HrExitInterview(models.Model):
 
     state = fields.Selection([
         ('draft', 'Draft'),
-        ('done',  'Submitted'),
+        ('completed',  'Submitted'),
     ], default='draft', tracking=True)
 
     can_edit = fields.Boolean(compute='_compute_can_edit')
@@ -132,6 +139,7 @@ class HrExitInterview(models.Model):
                     'question_name': question.name,
                     'question_type': question.question_type,
                     'section': question.section,
+                    'is_mandatory': question.is_mandatory,
                 }))
             self.line_ids = [(5, 0, 0)] + lines
 
@@ -148,6 +156,7 @@ class HrExitInterview(models.Model):
                         'question_name': question.name,
                         'question_type': question.question_type,
                         'section': question.section,
+                        'is_mandatory': question.is_mandatory,
                     }))
                 vals['line_ids'] = lines
         return super().create(vals_list)
@@ -163,6 +172,7 @@ class HrExitInterview(models.Model):
                     'question_name': question.name,
                     'question_type': question.question_type,
                     'section': question.section,
+                    'is_mandatory': question.is_mandatory,
                 }))
             vals['line_ids'] = lines
         return super().write(vals)
@@ -301,7 +311,13 @@ class HrExitInterview(models.Model):
         for rec in self:
             if rec.state != 'draft':
                 raise UserError(_('This interview has already been submitted.'))
-            rec.state = 'done'
+            
+            unanswered_mandatory = rec.line_ids.filtered(lambda l: l.is_mandatory and not l.answer)
+            if unanswered_mandatory:
+                questions = ', '.join(unanswered_mandatory.mapped('question_name'))
+                raise UserError(_('Please answer the following mandatory questions:\n\n%s') % questions)
+                
+            rec.state = 'completed'
             if rec.resignation_id and rec.resignation_id.state == 'last_day_recorded':
                 rec.resignation_id.state = 'exit_interviewed'
                 rec.resignation_id._check_and_advance_cleared()
@@ -358,7 +374,7 @@ class HrExitInterview(models.Model):
         import re
         from collections import Counter
 
-        interviews_done = self.env['hr.exit.interview'].search([('state', '=', 'done')])
+        interviews_done = self.env['hr.exit.interview'].search([('state', '=', 'completed')])
         lines = self.env['hr.exit.interview.line'].search([('interview_id', 'in', interviews_done.ids)])
 
         total = len(interviews_done)
@@ -492,6 +508,7 @@ class HrExitInterviewLine(models.Model):
     sequence = fields.Integer(string='Sequence', default=10)
     section = fields.Char(string='Section')
     question_name = fields.Char(string='Question', required=True)
+    is_mandatory = fields.Boolean(string='Mandatory', default=False)
     question_type = fields.Selection([
         ('rating',       'Rating'),
         ('satisfaction', 'Satisfaction'),

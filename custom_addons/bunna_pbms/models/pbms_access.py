@@ -325,8 +325,6 @@ class ResUsers(models.Model):
             if ConfigModel is not None:
                 cats = ConfigModel.get_user_authorized_categories(self)
                 if cats:
-                    if "manpower" not in cats:
-                        cats.append("manpower")
                     return cats
 
             # 2. Fallback Heuristic matching
@@ -337,7 +335,6 @@ class ResUsers(models.Model):
             user_ous = [ou.name for ou in self.operating_unit_ids if ou.name]
             combined = f"{dept_name} {' '.join(emp_ous + emp_def_ou + user_ous)}".lower()
 
-            cats.add("manpower")
             if self.has_group("hr.group_hr_user") or self.has_group("hr.group_hr_manager") or any(w in combined for w in ("hr", "human", "manpower", "recruitment", "people")):
                 cats.add("manpower")
             if any(w in combined for w in ("retail", "operation", "deposit", "branch", "customer")):
@@ -430,4 +427,82 @@ def send_pbms_inbox_notification(env, doc, recipients, subject, body):
                 )
             except Exception as e:
                 _logger.debug("Bus send failed for user %s: %s", user.id, e)
+
+
+class IrUiMenu(models.Model):
+    _inherit = "ir.ui.menu"
+
+    def _filter_visible_menus(self):
+        visible = super()._filter_visible_menus()
+        user = self.env.user
+        # Admins, SPPMD approvers, and SPPMD managers see all review menus
+        if user._pbms_is_sppmd_admin() or user._pbms_is_sppmd_approver() or self.env.is_admin() or self.env.su:
+            return visible
+
+        # District Reviewers see all branch category review menus
+        is_district = bool(user._pbms_is_district_reviewer())
+
+        has_workforce_role = bool(
+            user.has_group("bunna_pbms.group_pbms_people_solutions")
+            or user.has_group("bunna_pbms.group_pbms_cpco")
+            or user.has_group("bunna_pbms.group_pbms_people_operations")
+            or user.has_group("bunna_pbms.group_pbms_respective_chief")
+            or user.has_group("bunna_pbms.group_pbms_ceo")
+        )
+        has_bhc_role = bool(user.has_group("bunna_pbms.group_pbms_budget_hiring_committee"))
+
+        allowed_cats = set(user._pbms_allowed_categories()) if hasattr(user, "_pbms_allowed_categories") else set()
+        is_ho = bool(user.has_group("bunna_pbms.group_pbms_ho_reviewer"))
+
+        menu_category_map = {
+            "bunna_pbms.menu_pbms_review_retail": {"deposit", "customer_base"},
+            "bunna_pbms.menu_pbms_review_workforce": {"manpower"},
+            "bunna_pbms.menu_pbms_review_fx": {"fx"},
+            "bunna_pbms.menu_pbms_review_digital": {"digital_banking"},
+            "bunna_pbms.menu_pbms_review_expense": {"general_expense"},
+            "bunna_pbms.menu_pbms_review_fixed_asset": {"fixed_asset"},
+            "bunna_pbms.menu_pbms_consolidation": set(),
+        }
+
+        menus_to_hide = self.env["ir.ui.menu"]
+        for xmlid, cats in menu_category_map.items():
+            menu = self.env.ref(xmlid, raise_if_not_found=False)
+            if not menu or menu not in visible:
+                continue
+
+            # Bank-wide consolidation is strictly for SPPMD Approver & Admin
+            if xmlid == "bunna_pbms.menu_pbms_consolidation":
+                menus_to_hide |= menu
+                continue
+
+            allowed = False
+            # HO Reviewer: must be authorized for that category
+            if is_ho and cats and (cats & allowed_cats):
+                allowed = True
+            elif is_district:
+                allowed = True
+            elif has_bhc_role and xmlid in (
+                "bunna_pbms.menu_pbms_review_workforce",
+                "bunna_pbms.menu_pbms_review_expense",
+                "bunna_pbms.menu_pbms_review_fixed_asset",
+            ):
+                allowed = True
+            elif has_workforce_role and xmlid == "bunna_pbms.menu_pbms_review_workforce":
+                allowed = True
+
+            if not allowed:
+                menus_to_hide |= menu
+
+        if menus_to_hide:
+            visible -= menus_to_hide
+
+        # If parent Review & Consolidation menu has no visible children, hide parent as well
+        parent_review = self.env.ref("bunna_pbms.menu_pbms_review", raise_if_not_found=False)
+        if parent_review and parent_review in visible:
+            review_children = visible.filtered(lambda m: m.parent_id == parent_review)
+            if not review_children:
+                visible -= parent_review
+
+        return visible
+
 

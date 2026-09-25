@@ -349,6 +349,7 @@ class Hr_contact_Fields(models.Model):
     fuel_exempted_1 = fields.Integer(string="Fuel Exempted 1")
 
     def start_survey(self):
+        # Placeholder method for view button compatibility; survey integration managed via recruitment module
         pass
 
     def _compute_job_categoryy(self):

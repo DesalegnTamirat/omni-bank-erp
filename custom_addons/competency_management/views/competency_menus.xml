@@ -71,47 +71,34 @@
             sequence="30"
             groups="competency_management.group_competency_officer" />
 
-        <!-- 3. Reporting Category -->
+        <!-- 3. Reporting Category: strictly accessible only to Officer and Administrator -->
         <menuitem id="menu_competency_reports_categ"
             name="Reporting"
             parent="menu_competency_management_root"
             sequence="40"
-            groups="competency_management.group_competency_supervisor" />
+            groups="competency_management.group_competency_officer" />
 
         <menuitem id="menu_competency_report_wizard"
             name="Competency Report Generator"
             parent="menu_competency_reports_categ"
             action="action_competency_report_wizard"
             sequence="1"
-            groups="competency_management.group_competency_supervisor" />
+            groups="competency_management.group_competency_officer" />
 
         <menuitem id="menu_competency_tna_analytics_report"
             name="Competency &amp; TNA Analytics Report"
             parent="menu_competency_reports_categ"
             action="action_competency_tna_analytics_report"
             sequence="5"
-            groups="competency_management.group_competency_supervisor" />
-
-        <menuitem id="menu_competency_coverage_report"
-            name="Competency Coverage Report"
-            parent="menu_competency_reports_categ"
-            action="action_competency_coverage_report"
-            sequence="10"
-            groups="competency_management.group_competency_supervisor" />
-
-        <menuitem id="menu_competency_team_gap_dashboard"
-            name="Team Competency Gap Dashboard"
-            parent="menu_competency_reports_categ"
-            action="action_competency_team_gap_dashboard"
-            sequence="15"
-            groups="competency_management.group_competency_supervisor" />
+            groups="competency_management.group_competency_officer" />
 
         <menuitem id="menu_competency_dashboard_snapshot"
             name="Multi-Cycle Trend Snapshots"
             parent="menu_competency_reports_categ"
             action="action_competency_dashboard_snapshot"
-            sequence="20"
-            groups="competency_management.group_competency_supervisor" />
+            sequence="10"
+            groups="competency_management.group_competency_officer" />
+
 
         <!-- 4. Configuration Category -->
         <menuitem id="menu_competency_config_categ"
@@ -123,13 +110,13 @@
         <menuitem id="menu_competency_matrix_config"
             name="Proficiency Matrix Guidelines"
             parent="menu_competency_config_categ"
-            action="action_competency_matrix_guidelines_config"
+            action="action_competency_matrix_guidelines_server"
             sequence="10"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_360_config"
             name="Behavioral &amp; 360° Assessment Rules"
             parent="menu_competency_config_categ"
-            action="action_competency_360_config"
+            action="action_competency_360_config_server"
             sequence="15"
             groups="competency_management.group_competency_officer" />
         <menuitem id="menu_competency_director_peer_config"

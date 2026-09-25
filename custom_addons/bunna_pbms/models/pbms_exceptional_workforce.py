@@ -1154,18 +1154,33 @@ class PbmsExceptionalWorkforceRequest(models.Model):
                     if default_dept:
                         dept_id = default_dept.id
 
+                if self.job_grade_id:
+                    target_job_grade_id = self.job_grade_id.id
+                elif hasattr(self.job_id, "grade") and self.job_id.grade:
+                    target_job_grade_id = self.job_id.grade.id
+                else:
+                    target_job_grade_id = False
+
+                if self.justification_category_id:
+                    if self.justification:
+                        justification_detail = f"{self.justification_category_id.name}: {self.justification}"
+                    else:
+                        justification_detail = self.justification_category_id.name
+                else:
+                    justification_detail = self.justification or ""
+
                 vals = {
                     "request_type": "unplanned",
                     "operating_unit_id": self.operating_unit_id.id,
                     "department_id": dept_id,
                     "job_position_id": self.job_id.id,
-                    "job_grade_id": self.job_grade_id.id if self.job_grade_id else (self.job_id.grade.id if hasattr(self.job_id, "grade") and self.job_id.grade else False),
+                    "job_grade_id": target_job_grade_id,
                     "required_headcount": self.headcount,
                     "employment_type": self.employment_type,
                     "sourcing_type": self.sourcing_type,
                     "justification": _("[Exceptional Request %s] %s") % (
                         self.name,
-                        (f"{self.justification_category_id.name}: {self.justification}" if self.justification else self.justification_category_id.name) if self.justification_category_id else (self.justification or "")
+                        justification_detail,
                     ),
                     "requested_by": requested_by,
                     "state": "under_review",

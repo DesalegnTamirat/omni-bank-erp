@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="custom_helpdesk.HelpdeskDashboard">
+        <div class="o_helpdesk_dashboard">
+
+            <!-- ── Header ── -->
+            <div class="o_dashboard_header d-flex align-items-center justify-content-between mb-3 px-4 pt-4 flex-wrap gap-2">
+                <h2 class="o_dashboard_title mb-0">Helpdesk Dashboard</h2>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <!-- 1. Timeline Period filter -->
+                    <select class="form-select o_period_select" style="width:130px;"
+                            t-att-value="state.period"
+                            t-on-change="onPeriodChange">
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                        <option value="year">This Year</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+
+                    <!-- 2. Filter Dimension Selection (By Team, By Individual, By Work Unit, By Status) -->
+                    <select class="form-select o_period_select" style="width:160px;"
+                            t-att-value="state.filterDimension"
+                            t-on-change="onDimensionChange">
+                        <option value="team">By Team</option>
+                        <option value="user">By Individual</option>
+                        <option value="work_unit">By Work Unit</option>
+                        <option value="stage">By Status</option>
+                    </select>
+
+                    <!-- 3. Dynamic Value Selector (Populated based on selected dimension) -->
+                    <select class="form-select o_period_select" style="width:180px;"
+                            t-att-value="state.selectedValue"
+                            t-on-change="onValueChange">
+                        <t t-foreach="valueOptions" t-as="opt" t-key="opt.id">
+                            <option t-att-value="opt.id"><t t-esc="opt.name"/></option>
+                        </t>
+                    </select>
+
+                    <!-- Custom date inputs (only when period === 'custom') -->
+                    <div t-if="state.period === 'custom'" class="d-flex align-items-center gap-2">
+                        <input type="date" class="form-control" style="width:130px;"
+                               t-att-value="state.dateFrom"
+                               t-on-change="onDateFromChange"/>
+                        <span class="text-muted fw-bold">–</span>
+                        <input type="date" class="form-control" style="width:130px;"
+                               t-att-value="state.dateTo"
+                               t-on-change="onDateToChange"/>
+                        <button class="btn btn-primary btn-sm" t-on-click="applyCustomRange">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <div t-if="state.loading" class="text-center py-5">
+                <i class="fa fa-spinner fa-spin fa-2x" style="color:#425727;"/>
+            </div>
+
+            <div t-else="" class="px-4 pb-4">
+
+                <!-- ── SECTION 1: Tickets Overview Stat Cards ── -->
+                <div class="o_dashboard_section_title mb-2">Helpdesk Tickets Overview</div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_total" t-on-click="openTickets" data-filter="total">
+                            <div class="o_stat_label">Total</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.stats.total"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_warning" t-on-click="openTickets" data-filter="unattended">
+                            <div class="o_stat_label">Unattended</div>
+                            <div class="o_stat_value v-unattended"><t t-esc="state.stats.unattended"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openTickets" data-filter="open">
+                            <div class="o_stat_label">In Progress (Open)</div>
+                            <div class="o_stat_value v-open"><t t-esc="state.stats.open"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openTickets" data-filter="unassigned">
+                            <div class="o_stat_label">Unassigned</div>
+                            <div class="o_stat_value v-unassigned"><t t-esc="state.stats.unassigned"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_danger" t-on-click="openTickets" data-filter="high_priority">
+                            <div class="o_stat_label">High Priority</div>
+                            <div class="o_stat_value v-high"><t t-esc="state.stats.high_priority"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_positive" t-on-click="openTickets" data-filter="closed">
+                            <div class="o_stat_label">Closed</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.stats.closed"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_danger" t-on-click="openTickets" data-filter="sla_failed">
+                            <div class="o_stat_label">SLA Overdue</div>
+                            <div class="o_stat_value v-overdue"><t t-esc="state.stats.sla_failed"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_warning" t-on-click="openTickets" data-filter="complaints">
+                            <div class="o_stat_label">NBE Complaints</div>
+                            <div class="o_stat_value v-high"><t t-esc="state.stats.complaints_count"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_total" t-on-click="openTickets" data-filter="vip">
+                            <div class="o_stat_label">VIP Tickets</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.stats.vip_tickets"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card" t-on-click="openTickets" data-filter="internal">
+                            <div class="o_stat_label">Internal Staff</div>
+                            <div class="o_stat_value v-open"><t t-esc="state.stats.internal_tickets"/></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_positive">
+                            <div class="o_stat_label">FCR Rate</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.stats.fcr_rate"/>%</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_total">
+                            <div class="o_stat_label">Avg Res. Time (ART)</div>
+                            <div class="o_stat_value v-total"><t t-esc="state.stats.art_hours"/>h</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-4 col-md-3 col-xl">
+                        <div class="o_stat_card o_stat_positive" t-on-click="openRatings">
+                            <div class="o_stat_label">CSAT Satisfaction</div>
+                            <div class="o_stat_value v-closed"><t t-esc="state.stats.csat_score"/>%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 2: SLA & Channel Performance ── -->
+                <div class="row g-3 mb-4">
+                    <!-- SLA Management -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">SLA Performance</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_total" t-on-click="openSLAStatus" data-sla="">
+                                    <div class="o_stat_label">Total SLA</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.sla_total"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openSLAStatus" data-sla="reached">
+                                    <div class="o_stat_label">SLA Met</div>
+                                    <div class="o_stat_value v-open"><t t-esc="state.stats.sla_reached"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_danger" t-on-click="openSLAStatus" data-sla="failed">
+                                    <div class="o_stat_label">SLA Failed</div>
+                                    <div class="o_stat_value v-high"><t t-esc="state.stats.sla_failed"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Channel & Feedback -->
+                    <div class="col-12 col-md-6">
+                        <div class="o_dashboard_section_title mb-2">Channel &amp; Feedback Activity</div>
+                        <div class="row g-3">
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openTickets" data-filter="web">
+                                    <div class="o_stat_label">Web Tickets</div>
+                                    <div class="o_stat_value v-total"><t t-esc="state.stats.web_tickets"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card" t-on-click="openTickets" data-filter="email">
+                                    <div class="o_stat_label">Email Tickets</div>
+                                    <div class="o_stat_value v-open"><t t-esc="state.stats.email_tickets"/></div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="o_stat_card o_stat_positive" t-on-click="openRatings">
+                                    <div class="o_stat_label">Customer Ratings</div>
+                                    <div class="o_stat_value v-closed"><t t-esc="state.stats.ratings_count"/></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── SECTION 3: Visual Charts ── -->
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Category Distribution</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="helpdeskPieChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Stage Comparison</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="helpdeskBarChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="o_chart_card">
+                            <div class="o_chart_title">Ticket Trend</div>
+                            <div style="position:relative; height:280px; width:100%;">
+                                <canvas id="helpdeskTrendChart" style="display:block;"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </t>
+</templates>

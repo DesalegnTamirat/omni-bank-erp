@@ -631,6 +631,29 @@ class PbmsWorkflowMixin(models.AbstractModel):
 
         return False
 
+    def _is_ho_functional_reviewer_plan(self, category):
+        """Check if this plan is being planned by the Head Office Functional Reviewer
+        for the given category (own unit plan)."""
+        self.ensure_one()
+        user = self.env.user
+        if not (user.has_group("bunna_pbms.group_pbms_ho_reviewer") or user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
+            return False
+
+        ConfigModel = self.env.get("pbms.planning.config")
+        if ConfigModel is not None:
+            info = ConfigModel.sudo().get_category_review_info(category, self.org_unit_id)
+            if user in info.get("users", self.env["res.users"]):
+                return True
+            if info.get("ou") and (info["ou"].id in user._pbms_operating_unit_ids() or (self.org_unit_id and info["ou"].id == self.org_unit_id.id)):
+                return True
+            if info.get("dept") and user.employee_id and user.employee_id.department_id and user.employee_id.department_id.id == info["dept"].id:
+                return True
+
+        if hasattr(user, "_pbms_allowed_categories") and category in user._pbms_allowed_categories():
+            return True
+
+        return user.has_group("bunna_pbms.group_pbms_ho_reviewer")
+
     def _is_child_operating_unit_plan(self):
         """True when the plan's operating unit belongs to the user's district or parent operating unit."""
         self.ensure_one()
@@ -1941,8 +1964,28 @@ class PbmsWorkflowMixin(models.AbstractModel):
         old_states = {p.id: p.state for p in all_plans}
         for line in all_plans:
             target_cat = getattr(line, "category", False)
-            if target_cat == "manpower" and line._is_people_solutions_plan():
-                # For People Solutions Directorate workforce plan: submitted directly to People Solutions Review
+            if target_cat == "manpower" and line.org_unit_type == "head_office" and line._is_people_solutions_plan():
+                # People Solutions Directorate's own workforce plan: skip Chief and People Solutions review,
+                # go directly to CPCO review.
+                line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
+                    "state": "cpco_review",
+                    "submitted_by": self.env.uid,
+                    "submitted_date": fields.Datetime.now(),
+                })
+                line._log_audit_action("submit", old_states.get(line.id, "draft"), "cpco_review", _("People Solutions Directorate workforce plan submitted directly to CPCO Review."))
+                line._notify_pending_approval("cpco_review", _("CPCO Review"))
+            elif target_cat == "manpower" and line.org_unit_type == "head_office":
+                # All other Head Office operating unit workforce plans go to Respective Chief first.
+                # Chief then escalates to People Solutions Directorate.
+                line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
+                    "state": "chief_review",
+                    "submitted_by": self.env.uid,
+                    "submitted_date": fields.Datetime.now(),
+                })
+                line._log_audit_action("submit", old_states.get(line.id, "draft"), "chief_review", _("Workforce plan submitted to Respective Chief for review."))
+                line._notify_pending_approval("chief_review", _("Respective Chief Review"))
+            elif target_cat == "manpower" and line._is_people_solutions_plan():
+                # Non-HO plan from People Solutions directorate (edge case): goes directly to People Solutions Review
                 line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
                     "state": "people_solutions_review",
                     "submitted_by": self.env.uid,
@@ -1950,20 +1993,9 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 })
                 line._log_audit_action("submit", old_states.get(line.id, "draft"), "people_solutions_review", _("Workforce plan submitted directly to People Solutions Review."))
                 line._notify_pending_approval("people_solutions_review", _("People Solutions Directorate Review"))
-            elif target_cat == "manpower" and line.org_unit_type == "head_office":
-                # For other Head Office workforce plans: no district review needed, submitted directly to Respective Chief
-                line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
-                    "state": "chief_review",
-                    "submitted_by": self.env.uid,
-                    "submitted_date": fields.Datetime.now(),
-                })
-                line._log_audit_action("submit", old_states.get(line.id, "draft"), "chief_review", _("Workforce plan submitted directly to Respective Chief."))
-                line._notify_pending_approval("chief_review", _("Respective Chief Review"))
-            elif target_cat in ("general_expense", "fixed_asset") and (
-                line.org_unit_type == "head_office"
-                or self.env.user.has_group("bunna_pbms.group_pbms_ho_reviewer")
-            ):
-                # For Head Office general expense and fixed asset plans: no district review, submitted directly to Budget Hiring Committee Review
+            elif target_cat in ("general_expense", "fixed_asset") and line.org_unit_type == "head_office" and line._is_ho_functional_reviewer_plan(target_cat):
+                # When the Head Office Functional Reviewer plans their own General Expense or Fixed Asset:
+                # submitted directly to Budget Hiring Committee Review
                 line.sudo().with_context(bypass_plan_lock=True, skip_sync_category_records=True, skip_split_mixed_lines=True).write({
                     "state": "committee_review",
                     "submitted_by": self.env.uid,
@@ -2213,7 +2245,7 @@ class PbmsWorkflowMixin(models.AbstractModel):
                 raise UserError(_("This action is only applicable to General Expense and Fixed Asset categories."))
             if not (line._pbms_can_ho_review_plan() or self.env.user._pbms_is_sppmd_admin() or self.env.is_admin() or self.env.su):
                 raise AccessError(_("Only authorized Head Office Functional Reviewers or Administrators can submit to the Review Committee."))
-            if line.org_unit_type not in ("head_office", "district_office") and line.state not in ("district_approved", "district_endorsed", "submitted"):
+            if line.org_unit_type not in ("head_office", "district_office") and line.state not in ("district_approved", "district_endorsed"):
                 raise UserError(_("Branch plans must be approved by the District Reviewer before submitting to the Review Committee."))
             if line.state not in ("district_approved", "district_endorsed", "submitted", "draft", "returned", "info_requested", "ho_reviewed"):
                 continue

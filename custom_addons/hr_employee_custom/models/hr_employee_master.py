@@ -14,9 +14,48 @@ class HrEmployee(models.Model):
     # Identification
     # ------------------------------------------------------------------
     identification_id = fields.Char(string="Employee Identification")
-    # Kept distinct from identification_id above - different field, used by
-    # the legacy hr_employee_view.xml (see module docstring above).
-    employee_identification = fields.Char(string="Employee Identification", help="Employee Id")
+    employee_identification = fields.Char(
+        string="Employee Identification",
+        help="Employee Id",
+        compute="_compute_employee_identification",
+        inverse="_inverse_employee_identification",
+        store=True,
+        readonly=False,
+    )
+
+    @api.depends('identification_id')
+    def _compute_employee_identification(self):
+        for emp in self:
+            emp.employee_identification = emp.identification_id
+
+    def _inverse_employee_identification(self):
+        for emp in self:
+            if emp.identification_id != emp.employee_identification:
+                emp.identification_id = emp.employee_identification
+
+    @api.onchange('identification_id')
+    def _onchange_identification_id_sync(self):
+        if self.identification_id != self.employee_identification:
+            self.employee_identification = self.identification_id
+
+    @api.onchange('employee_identification')
+    def _onchange_employee_identification_sync(self):
+        if self.employee_identification != self.identification_id:
+            self.identification_id = self.employee_identification
+
+    def _auto_init(self):
+        res = super()._auto_init()
+        self.env.cr.execute("""
+            UPDATE hr_employee
+            SET identification_id = employee_identification
+            WHERE (identification_id IS NULL OR identification_id = '')
+              AND employee_identification IS NOT NULL AND employee_identification != '';
+            UPDATE hr_employee
+            SET employee_identification = identification_id
+            WHERE (employee_identification IS NULL OR employee_identification = '')
+              AND identification_id IS NOT NULL AND identification_id != '';
+        """)
+        return res
 
     # ------------------------------------------------------------------
     # Contact info
@@ -296,7 +335,18 @@ class HrEmployee(models.Model):
     # ------------------------------------------------------------------
     # Recruitment Criteria Synchronization
     # ------------------------------------------------------------------
+    def _sync_identification_vals(self, vals):
+        if 'identification_id' in vals and 'employee_identification' not in vals:
+            vals['employee_identification'] = vals['identification_id']
+        elif 'employee_identification' in vals and 'identification_id' not in vals:
+            vals['identification_id'] = vals['employee_identification']
+        elif 'identification_id' in vals and 'employee_identification' in vals:
+            val = vals.get('identification_id') or vals.get('employee_identification')
+            vals['identification_id'] = val
+            vals['employee_identification'] = val
+
     def _sync_hierarchy_vals(self, vals):
+        self._sync_identification_vals(vals)
         if 'parent_id' in vals and vals['parent_id']:
             vals['coach_id'] = vals['parent_id']
             vals['planning_parent_id'] = vals['parent_id']

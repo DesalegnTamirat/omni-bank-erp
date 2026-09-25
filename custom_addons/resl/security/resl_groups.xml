@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- ── Module Category (groups in Settings → Users) ────────────────── -->
+        <record id="module_category_resl" model="ir.module.category">
+            <field name="name">RESL Staff Loan</field>
+            <field name="sequence">100</field>
+        </record>
+
+        <!-- ── Privilege (Odoo 19: groups are clustered via res.groups.privilege) -->
+        <record model="res.groups.privilege" id="res_groups_privilege_resl">
+            <field name="name">Staff Loan (RESL)</field>
+            <field name="category_id" ref="module_category_resl"/>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- ── Groups ─────────────────────────────────────────────────────── -->
+
+        <!-- Base employee group: can create and view own loans -->
+        <record id="group_resl_employee" model="res.groups">
+            <field name="name">Employee</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">10</field>
+            <field name="comment">Can create and track own loan requests and act as guarantor.</field>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Loan Manager: can approve/reject loans -->
+        <record id="group_resl_manager" model="res.groups">
+            <field name="name">Loan Manager</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">20</field>
+            <field name="comment">Can review and approve/reject loan requests.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_employee'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- HR Officer: full access including replacement and cross-OU approval -->
+        <record id="group_resl_hr" model="res.groups">
+            <field name="name">HR Officer</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">30</field>
+            <field name="comment">Full access: approval, replacement management, disbursement, and settlement.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+        <!-- Head Office: cross-OU exception -->
+        <record id="group_resl_head_office" model="res.groups">
+            <field name="name">Head Office</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">40</field>
+            <field name="comment">Cross-branch exception access for head-office staff.</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_manager'))]"/>
+        </record>
+
+        <!-- POMD / People & Organizational Management Directorate (FR-RESL-016) -->
+        <record id="group_resl_pomd" model="res.groups">
+            <field name="name">POMD (Organization-Wide Monitor)</field>
+            <field name="privilege_id" ref="res_groups_privilege_resl"/>
+            <field name="sequence">50</field>
+            <field name="comment">Organization-wide monitoring of all loans (POMD / FR-RESL-016).</field>
+            <field name="implied_ids" eval="[(4, ref('group_resl_hr'))]"/>
+            <field name="user_ids" eval="[(4, ref('base.user_admin'))]"/>
+        </record>
+
+    </data>
+</odoo>

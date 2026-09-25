@@ -11,7 +11,7 @@ class HrExitInterviewDashboard(models.AbstractModel):
     @api.model
     def get_dashboard_data(self):
         # Base domain for completed interviews
-        domain = [('state', '=', 'done')]
+        domain = [('state', '=', 'completed')]
         interviews = self.env['hr.exit.interview'].search(domain)
         
         total_responses = len(interviews)

@@ -68,6 +68,20 @@ class DisciplineCommitteeMeeting(models.Model):
     )
     director_signoff_date = fields.Date(string='Director Sign-off Date', tracking=True)
     director_signoff_by_id = fields.Many2one('res.users', string='Signed Off By (Director)', tracking=True)
+    can_director_signoff = fields.Boolean(compute='_compute_can_director_signoff', string='Can Director Signoff')
+
+    def _compute_can_director_signoff(self):
+        user = self.env.user
+        is_admin = user.has_group('discipline_management.group_discipline_admin') or user.has_group('base.group_system')
+        for rec in self:
+            is_resp_dir = bool(rec.respective_director_id and rec.respective_director_id.id == user.id)
+            is_dir_role = (
+                is_resp_dir or
+                user.has_group('discipline_management.group_discipline_director') or
+                (user.employee_id and user.employee_id.executive_level in ('director', 'chief', 'ceo')) or
+                is_admin
+            )
+            rec.can_director_signoff = is_dir_role
 
     @api.depends('member_ids', 'present_members_count', 'required_quorum_percentage')
     def _compute_quorum(self):
@@ -88,33 +102,58 @@ class DisciplineCommitteeMeeting(models.Model):
 
     @api.onchange('case_id')
     def _onchange_case_id_populate_committee(self):
-        """Auto-populate mandatory committee roles (Chair, Director, Legal, Secretary)."""
+        """Auto-populate mandatory committee roles (Chair: CPCO, Secretary: POMD Director, Legal: Legal Director, Respective Director)."""
         if self.case_id and self.case_id.employee_id:
             emp = self.case_id.employee_id
             
             # 1. Chairperson: Chief People and Culture Officer (CPCO)
-            cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
-            cpco_users = (cpco_group.all_user_ids or cpco_group.user_ids) if cpco_group else self.env['res.users']
-            cpco_user = cpco_users[0] if cpco_users else self.env['res.users'].search([('name', 'ilike', 'Chief People')], limit=1)
-            self.committee_chair_id = cpco_user or self.env.user
-
-            # 2. Member: Director of Respective Office
-            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
-                self.respective_director_id = emp.department_id.manager_id.user_id
+            cpco_emp = self.env['hr.employee'].search([
+                '|', ('job_id.name', 'ilike', 'Chief People'),
+                ('job_id.name', 'ilike', 'CPCO')
+            ], limit=1)
+            if cpco_emp and cpco_emp.user_id:
+                self.committee_chair_id = cpco_emp.user_id
             else:
-                self.respective_director_id = False
+                cpco_group = self.env.ref('discipline_management.group_discipline_cpco', raise_if_not_found=False)
+                cpco_users = (cpco_group.all_user_ids or cpco_group.user_ids) if cpco_group else self.env['res.users']
+                self.committee_chair_id = cpco_users[0] if cpco_users else self.env.user
 
-            # 3. Member: Legal Director
-            legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
-            legal_users = (legal_group.all_user_ids or legal_group.user_ids) if legal_group else self.env['res.users']
-            legal_user = legal_users[0] if legal_users else self.env['res.users'].search([('name', 'ilike', 'Legal')], limit=1)
-            self.legal_director_id = legal_user or False
+            # 2. Member: Respective Directorate Director
+            resp_dir_user = False
+            if emp.department_id and emp.department_id.manager_id and emp.department_id.manager_id.user_id:
+                resp_dir_user = emp.department_id.manager_id.user_id
+            else:
+                for sup in emp.get_supervisor_chain():
+                    if sup.executive_level in ('director', 'chief', 'ceo') and sup.user_id:
+                        resp_dir_user = sup.user_id
+                        break
+            self.respective_director_id = resp_dir_user or False
 
-            # 4. Member & Secretary: People Operation Director
-            pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
-            pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
-            pomd_user = pomd_users[0] if pomd_users else self.env['res.users'].search([('name', 'ilike', 'Operation')], limit=1)
-            self.pomd_secretary_id = pomd_user or self.env.user
+            # 3. Member: Legal Director (Director of Legal Directorate)
+            legal_emp = self.env['hr.employee'].search([
+                '|', ('job_id.name', 'ilike', 'Legal Director'),
+                ('job_id.name', 'ilike', 'Legal Services Director')
+            ], limit=1)
+            if not legal_emp:
+                legal_emp = self.env['hr.employee'].search([('job_id.name', 'ilike', 'Legal')], limit=1)
+            if legal_emp and legal_emp.user_id:
+                self.legal_director_id = legal_emp.user_id
+            else:
+                legal_group = self.env.ref('discipline_management.group_discipline_legal', raise_if_not_found=False)
+                legal_users = (legal_group.all_user_ids or legal_group.user_ids) if legal_group else self.env['res.users']
+                self.legal_director_id = legal_users[0] if legal_users else False
+
+            # 4. Member & Secretary: People Operations Management Director (POMD)
+            pomd_emp = self.env['hr.employee'].search([
+                '|', ('job_id.name', 'ilike', 'People Operations Management Director'),
+                ('job_id.name', 'ilike', 'People Operation')
+            ], limit=1)
+            if pomd_emp and pomd_emp.user_id:
+                self.pomd_secretary_id = pomd_emp.user_id
+            else:
+                pomd_group = self.env.ref('discipline_management.group_discipline_pomd', raise_if_not_found=False)
+                pomd_users = (pomd_group.all_user_ids or pomd_group.user_ids) if pomd_group else self.env['res.users']
+                self.pomd_secretary_id = pomd_users[0] if pomd_users else self.env.user
 
             # Assemble full member set
             members = set()
@@ -167,6 +206,8 @@ class DisciplineCommitteeMeeting(models.Model):
         for rec in self:
             if rec.state != 'director_review':
                 raise UserError(_('This action is only valid when pending Director Review.'))
+            if not rec.can_director_signoff:
+                raise UserError(_('Permission Denied: Only the Respective Directorate Director or HR Administrator can execute director sign-off.'))
             rec.write({
                 'state': 'voting',
                 'director_signed_off': True,

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_audit" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.audit.trail</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="90"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Audit Trail" string="Audit Trail" name="audit_trail">
+                    <block title="Audit Trail Configuration" name="audit_trail_setting_block">
+                        <setting id="audit_trail_master_toggle"
+                                 title="Master Audit Trail Switch"
+                                 help="Enable or disable audit trail logging globally across all models to optimize system performance and manage resource usage.">
+                            <field name="audit_trail_enabled"/>
+                            <div class="content-group mt-2">
+                                <button name="action_sync_audit_models"
+                                        type="object"
+                                        string="🔄 Sync Business Models Now"
+                                        class="btn-primary btn-sm"
+                                        icon="fa-refresh"/>
+                                <span class="text-muted ms-2">Auto-discover and create audit rules for all business models.</span>
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_audit_config_settings" model="ir.actions.act_window">
+        <field name="name">Audit Trail Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module': 'audit_trail', 'bin_size': False}</field>
+    </record>
+</odoo>

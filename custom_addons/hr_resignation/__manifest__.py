@@ -16,6 +16,7 @@
         'hr_employee_custom',
         'hr_leave_request_custom',
         'mail',
+        'resl',
     ],
     'data': [
         # ── 1. Security groups ────────────────────────────────────────────────

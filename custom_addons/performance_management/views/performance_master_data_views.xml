@@ -285,15 +285,31 @@
         <field name="name">pms.ranking.list</field>
         <field name="model">pms.ranking</field>
         <field name="arch" type="xml">
-            <list string="Pms Ranking" editable="bottom">
+            <list string="PMS Ranking" editable="bottom">
                 <field name="score_from"/>
                 <field name="score_to"/>
-                <field name="ranking" widget="badge"
-                       decoration-success="ranking == 'outstanding'"
-                       decoration-info="ranking == 'excellent'"
-                       decoration-warning="ranking == 'satisfactory'"
-                       decoration-danger="ranking == 'unsatisfactory'"/>
+                <field name="ranking"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_performance_pms_ranking_form" model="ir.ui.view">
+        <field name="name">pms.ranking.form</field>
+        <field name="model">pms.ranking</field>
+        <field name="arch" type="xml">
+            <form string="PMS Ranking">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="score_from"/>
+                            <field name="score_to"/>
+                        </group>
+                        <group>
+                            <field name="ranking"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 
@@ -415,18 +431,21 @@
     <menuitem id="menu_config_appraisal_period"
               name="Appraisal Period"
               parent="menu_scorecard_config"
-              action= "action_appraisal_period"
+              action="action_appraisal_period"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="20"/>
     <menuitem id="menu_config_fiscal_year"
               name="Fiscal Years"
               parent="menu_scorecard_config"
               action="action_performance_fiscal_year"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="30"/>
 
     <menuitem id="menu_config_perspective"
               name="Perspectives"
               parent="menu_scorecard_config"
               action="action_performance_perspective"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="40"/>
 
     <menuitem id="menu_config_strategic_objective"
@@ -438,6 +457,7 @@
               name="Performance Measure"
               parent="menu_scorecard_config"
               action="action_performance_measure"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="60"/>
     <menuitem id="menu_tier3_job_objective"
           name="Job Position Measures"
@@ -453,11 +473,13 @@
     <menuitem id="menu_appraisal_config"
               name="Appraisal Configurations"
               parent="menu_configuration"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="10"/>
     <menuitem id="menu_config_pms_ranking"
               name="PMS Ranking"
-              parent= "menu_appraisal_config"
+              parent="menu_appraisal_config"
               action="action_performance_pms_ranking"
+              groups="performance_management.group_performance_planning,performance_management.group_performance_hr,performance_management.group_performance_admin"
               sequence="20"/>
 
 <!--    <menuitem id="menu_performance_tier2_objectives"-->

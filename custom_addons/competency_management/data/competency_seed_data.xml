@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+        Seed data: only the 4-Point Rating Model.
+
+        NOTE: This file uses noupdate="1" — records will NOT be overwritten on upgrade
+        but WILL be recreated if manually deleted from the DB. To prevent re-creation
+        after deletion, the 4-scale model is also guarded in hooks.py (search-or-create).
+        On a fresh install both paths run; on upgrade only the hook runs (idempotent).
+
+        The 5-scale model has been intentionally removed per business requirements.
+        The competency.matrix.config singleton is created by hooks.py — not seeded here.
+    -->
     <data noupdate="1">
 
         <!-- Default 4-point rating model -->
@@ -13,21 +24,6 @@
                 (0, 0, {'level': '2', 'name': 'Level 2 - Intermediate', 'sequence': 20}),
                 (0, 0, {'level': '3', 'name': 'Level 3 - Advanced', 'sequence': 30}),
                 (0, 0, {'level': '4', 'name': 'Level 4 - Expert', 'sequence': 40}),
-            ]"/>
-        </record>
-
-        <!-- 5-point rating model -->
-        <record id="rating_model_5_scale" model="competency.rating.model">
-            <field name="name">5-Point Proficiency Scale</field>
-            <field name="code">5SCALE</field>
-            <field name="max_rating">5</field>
-            <field name="description">5-Level proficiency scale (Level 1, Level 2, Level 3, Level 4, Level 5)</field>
-            <field name="line_ids" eval="[
-                (0, 0, {'level': '1', 'name': 'Level 1', 'sequence': 10}),
-                (0, 0, {'level': '2', 'name': 'Level 2', 'sequence': 20}),
-                (0, 0, {'level': '3', 'name': 'Level 3', 'sequence': 30}),
-                (0, 0, {'level': '4', 'name': 'Level 4', 'sequence': 40}),
-                (0, 0, {'level': '5', 'name': 'Level 5', 'sequence': 50}),
             ]"/>
         </record>
 

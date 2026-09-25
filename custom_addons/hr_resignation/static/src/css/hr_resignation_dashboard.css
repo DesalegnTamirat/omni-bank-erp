@@ -1,6 +1,8 @@
 .o_resignation_dashboard {
     background-color: #f8f9fa;
-    min-height: 100vh;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 .o_resignation_header {
     border-bottom: 2px solid #e9ecef;
@@ -51,3 +53,11 @@
     margin-top: 0.5rem;
 }
 .o_stat_card { cursor: pointer; }
+
+/* Ensure the Odoo client action container allows scrolling */
+.o_action_manager .o_action:has(.o_resignation_dashboard),
+.o_client_action_container:has(.o_resignation_dashboard) {
+    overflow-y: auto !important;
+    height: 100%;
+}
+

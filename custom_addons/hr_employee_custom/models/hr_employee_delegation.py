@@ -43,7 +43,7 @@ class HrEmployee(models.Model):
         if emp:
             visible_ids.add(emp.id)
 
-            # Direct and recursive indirect subordinates of own employee
+            # Direct and recursive indirect subordinates/coachees of own employee
             direct_and_indirect = self.env['hr.employee'].sudo().search([
                 '|',
                 ('coach_id', '=', emp.id),
@@ -51,7 +51,7 @@ class HrEmployee(models.Model):
             ])
             visible_ids.update(direct_and_indirect.ids)
 
-            # Recursive subordinates traversing hierarchy
+            # Recursive subordinates traversing hierarchy downward
             current_level = direct_and_indirect
             visited = set(direct_and_indirect.ids)
             visited.add(emp.id)
@@ -68,22 +68,7 @@ class HrEmployee(models.Model):
                 visited.update(new_subs.ids)
                 current_level = new_subs
 
-            # Immediate coach and parent
-            if emp.coach_id:
-                visible_ids.add(emp.coach_id.id)
-                # Higher leadership (coach of coach)
-                if emp.coach_id.coach_id:
-                    visible_ids.add(emp.coach_id.coach_id.id)
-                if emp.coach_id.parent_id:
-                    visible_ids.add(emp.coach_id.parent_id.id)
-            if emp.parent_id:
-                visible_ids.add(emp.parent_id.id)
-                if emp.parent_id.parent_id:
-                    visible_ids.add(emp.parent_id.parent_id.id)
-                if emp.parent_id.coach_id:
-                    visible_ids.add(emp.parent_id.coach_id.id)
-
-            # Active delegations where this employee is the delegate
+            # Active delegations where this employee is acting as delegate
             today = fields.Date.today()
             active_as_delegate = Delegation.search([
                 ('delegate_id', '=', emp.id),
@@ -101,6 +86,7 @@ class HrEmployee(models.Model):
                     ('parent_id', 'in', delegating_managers.ids)
                 ])
                 visible_ids.update(delegated_subs.ids)
+
         visible_ids.discard(False)
         return list(visible_ids)
 
@@ -607,7 +593,6 @@ class HrEmployeeDelegation(models.Model):
         if emp and 'stakeholder_ids' in fields_list:
             lines = self._get_default_stakeholder_lines(emp)
             res['stakeholder_ids'] = [(0, 0, l) for l in lines]
-            res['notification_recipient_ids'] = [(6, 0, [l['employee_id'] for l in lines if l.get('employee_id')])]
         return res
 
     def _default_employee_id(self):
@@ -797,6 +782,11 @@ class HrEmployeeDelegation(models.Model):
         manager = manager_employee.sudo()
         lines = []
 
+        # Fetch visible/accessible employee IDs for the current user environment
+        accessible_emp_ids = set()
+        if self.env.user and self.env.user.employee_id:
+            accessible_emp_ids = set(self.env.user.employee_id._get_delegation_visible_employee_ids())
+
         def _emp_job_name(e):
             if not e:
                 return ''
@@ -816,8 +806,9 @@ class HrEmployeeDelegation(models.Model):
         # 1. Immediate Coach / Manager
         imm_coach = manager.coach_id or manager.parent_id
         if imm_coach and imm_coach.id != manager.id:
+            emp_ref = imm_coach.id if imm_coach.id in accessible_emp_ids else False
             lines.append({
-                'employee_id': imm_coach.id,
+                'employee_id': emp_ref,
                 'name': imm_coach.name or _('Direct Manager / Coach'),
                 'work_email': imm_coach.work_email or '',
                 'department_name': _emp_dept_name(imm_coach),
@@ -828,8 +819,9 @@ class HrEmployeeDelegation(models.Model):
             # 2. Coach of Coach (Higher Leadership)
             coach_of_coach = imm_coach.coach_id or imm_coach.parent_id
             if coach_of_coach and coach_of_coach.id not in [manager.id, imm_coach.id]:
+                emp_ref2 = coach_of_coach.id if coach_of_coach.id in accessible_emp_ids else False
                 lines.append({
-                    'employee_id': coach_of_coach.id,
+                    'employee_id': emp_ref2,
                     'name': coach_of_coach.name or _('Higher Leadership'),
                     'work_email': coach_of_coach.work_email or '',
                     'department_name': _emp_dept_name(coach_of_coach),
@@ -843,8 +835,9 @@ class HrEmployeeDelegation(models.Model):
             ('id', '!=', manager.id)
         ])
         for st in direct_staff:
+            emp_ref_st = st.id if st.id in accessible_emp_ids else False
             lines.append({
-                'employee_id': st.id,
+                'employee_id': emp_ref_st,
                 'name': st.name or _('Direct Staff'),
                 'work_email': st.work_email or '',
                 'department_name': _emp_dept_name(st),
@@ -861,8 +854,9 @@ class HrEmployeeDelegation(models.Model):
             ('job_name', 'ilike', 'Talent Management')
         ])
         for tm in talent_mgmt:
+            emp_ref_tm = tm.id if tm.id in accessible_emp_ids else False
             lines.append({
-                'employee_id': tm.id,
+                'employee_id': emp_ref_tm,
                 'name': tm.name or _('Director - Talent Management Directorate'),
                 'work_email': tm.work_email or '',
                 'department_name': _emp_dept_name(tm),
@@ -877,8 +871,9 @@ class HrEmployeeDelegation(models.Model):
             ('job_name', 'ilike', 'Chief People and Culture')
         ])
         for c in cpc:
+            emp_ref_c = c.id if c.id in accessible_emp_ids else False
             lines.append({
-                'employee_id': c.id,
+                'employee_id': emp_ref_c,
                 'name': c.name or _('Chief People and Culture Officer'),
                 'work_email': c.work_email or '',
                 'department_name': _emp_dept_name(c),
@@ -886,16 +881,13 @@ class HrEmployeeDelegation(models.Model):
                 'category': 'Corporate HR Leadership',
             })
 
-        # Deduplicate lines by employee_id
-        seen_emp_ids = set()
+        # Deduplicate lines by work_email or name + category
+        seen_keys = set()
         unique_lines = []
         for l in lines:
-            emp_id = l.get('employee_id')
-            if emp_id:
-                if emp_id not in seen_emp_ids:
-                    seen_emp_ids.add(emp_id)
-                    unique_lines.append(l)
-            else:
+            key = (l.get('employee_id'), (l.get('work_email') or '').strip().lower(), (l.get('name') or '').strip())
+            if key not in seen_keys:
+                seen_keys.add(key)
                 unique_lines.append(l)
         return unique_lines
 
@@ -1116,19 +1108,49 @@ class HrEmployeeDelegation(models.Model):
             if rec.state != 'submitted':
                 continue
 
-            recip_employees = rec.notification_recipient_ids
-            if rec.delegate_id and rec.delegate_id not in recip_employees:
-                recip_employees |= rec.delegate_id
+            recip_tuples = []  # list of (emp_record_or_False, partner_record, display_name)
+            seen_partner_ids = set()
 
-            if not recip_employees:
+            # Always notify delegate
+            if rec.delegate_id:
+                d_emp = rec.delegate_id.sudo()
+                if d_emp.user_id and d_emp.user_id.partner_id:
+                    p = d_emp.user_id.partner_id
+                    seen_partner_ids.add(p.id)
+                    recip_tuples.append((d_emp, p, d_emp.name))
+
+            # Process stakeholder lines
+            for st in rec.stakeholder_ids:
+                emp = False
+                partner = False
+                display_name = st.name or _('Employee')
+                if st.employee_id:
+                    emp = st.employee_id.sudo()
+                    display_name = emp.name
+                    if emp.user_id and emp.user_id.partner_id:
+                        partner = emp.user_id.partner_id
+                elif st.work_email:
+                    email_str = st.work_email.strip()
+                    emp = self.env['hr.employee'].sudo().search([('work_email', '=ilike', email_str)], limit=1)
+                    if emp:
+                        display_name = emp.name
+                        if emp.user_id and emp.user_id.partner_id:
+                            partner = emp.user_id.partner_id
+                    if not partner:
+                        partner = self.env['res.partner'].sudo().search([('email', '=ilike', email_str)], limit=1)
+
+                if partner and partner.id not in seen_partner_ids:
+                    seen_partner_ids.add(partner.id)
+                    recip_tuples.append((emp, partner, display_name))
+
+            if not recip_tuples:
                 continue
 
-
-            partners = recip_employees.sudo().mapped('user_id.partner_id').filtered(lambda p: p)
+            all_partners = self.env['res.partner'].sudo().browse(list(seen_partner_ids))
 
             # Subscribe recipient partners as followers
-            if partners:
-                rec.sudo().message_subscribe(partner_ids=partners.ids)
+            if all_partners:
+                rec.sudo().message_subscribe(partner_ids=all_partners.ids)
 
             body = _(
                 "<strong>Managerial Delegation Notice</strong><br/>"
@@ -1144,20 +1166,15 @@ class HrEmployeeDelegation(models.Model):
                 'reason': rec.absence_reason or _('N/A'),
             }
 
-            if partners:
-                rec.sudo().message_post(
-                    body=Markup(body),
-                    partner_ids=partners.ids,
-                    message_type='comment',
-                    subtype_xmlid='mail.mt_comment'
-                )
+            rec.sudo().message_post(
+                body=Markup(body),
+                partner_ids=all_partners.ids,
+                message_type='comment',
+                subtype_xmlid='mail.mt_comment'
+            )
 
             # Send Direct 1-on-1 Discuss Channel message per recipient
-            for emp in recip_employees:
-                partner = emp.user_id.partner_id if emp.user_id else False
-                if not partner:
-                    continue
-
+            for emp, partner, display_name in recip_tuples:
                 channel = rec._get_or_create_delegation_dm_channel(partner)
                 if not channel:
                     _logger.error(
@@ -1167,10 +1184,10 @@ class HrEmployeeDelegation(models.Model):
                     )
                     continue
 
-                if rec.delegate_id and emp.id == rec.delegate_id.id:
+                if rec.delegate_id and emp and emp.id == rec.delegate_id.id:
                     # Specific Template for Delegated Employee
                     msg_body = f"""
-                        <p>Dear {emp.name},</p>
+                        <p>Dear {display_name},</p>
                         <p><b>{rec.employee_id.name}</b> has officially delegated you from <b>{rec.start_date}</b> to <b>{rec.end_date}</b>.</p>
                         <p><b>Delegation Details:</b></p>
                         <ul>
@@ -1186,7 +1203,7 @@ class HrEmployeeDelegation(models.Model):
                 else:
                     # Specific Template for Notified Persons (Coaches, Directorate, Staff)
                     msg_body = f"""
-                        <p>Dear {emp.name},</p>
+                        <p>Dear {display_name},</p>
                         <p>Please be informed that <b>{rec.employee_id.name}</b> has officially delegated <b>{rec.delegate_id.name if rec.delegate_id else 'N/A'}</b> from <b>{rec.start_date}</b> to <b>{rec.end_date}</b>.</p>
                         <p><b>Delegation Details:</b></p>
                         <ul>

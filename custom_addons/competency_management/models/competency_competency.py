@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from markupsafe import Markup, escape
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -135,18 +136,28 @@ class CompetencyProficiencyLevel(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        force_write = self.env.context.get('force_write')
         for vals in vals_list:
             comp_id = vals.get('competency_id')
-            if comp_id:
+            if comp_id and not force_write and not self.env.su:
                 comp = self.env['competency.competency'].browse(comp_id)
-                if comp.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
+                if comp.state == 'approved':
+                    raise ValidationError(_("Cannot add proficiency levels to an approved competency (%s - Version %s). Please create a new version.") % (comp.name, comp.version))
+                if comp.status == 'retired' or comp.state == 'retired':
                     raise ValidationError(_("Cannot add proficiency levels to a retired competency (%s).") % comp.name)
         return super().create(vals_list)
 
     def write(self, vals):
+        force_write = self.env.context.get('force_write')
         for rec in self:
-            if rec.competency_id and rec.competency_id.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_("Cannot modify proficiency levels on a retired competency (%s).") % rec.competency_id.name)
+            if rec.competency_id and not force_write and not self.env.su:
+                if rec.competency_id.state == 'approved':
+                    raise ValidationError(_(
+                        "Proficiency levels and behavioral indicators of approved competency '%s' (Version %s) "
+                        "are strictly immutable. Please click 'Create New Version' on the competency to make changes."
+                    ) % (rec.competency_id.name, rec.competency_id.version))
+                if rec.competency_id.status == 'retired' or rec.competency_id.state == 'retired':
+                    raise ValidationError(_("Cannot modify proficiency levels on a retired competency (%s).") % rec.competency_id.name)
                 
         if 'definition' in vals:
             for rec in self:
@@ -177,17 +188,21 @@ class CompetencyProficiencyLevel(models.Model):
                     })
                     if rec.competency_id:
                         rec.competency_id.message_post(
-                            body=_("Proficiency Level %s definition updated by %s.<br/><b>Old:</b> %s<br/><b>New:</b> %s") % (
-                                rec.level, self.env.user.name, old_def, new_def
+                            body=Markup(_("Proficiency Level %s definition updated by %s.<br/><b>Old:</b> %s<br/><b>New:</b> %s")) % (
+                                escape(str(rec.level or '')), escape(self.env.user.name or ''), escape(old_def or ''), escape(new_def or '')
                             )
                         )
         return super().write(vals)
 
     @api.ondelete(at_uninstall=False)
-    def _prevent_unlink_on_retired(self):
+    def _prevent_unlink_on_retired_or_approved(self):
+        force_write = self.env.context.get('force_write')
         for rec in self:
-            if rec.competency_id and rec.competency_id.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_("Cannot delete proficiency levels from a retired competency (%s).") % rec.competency_id.name)
+            if rec.competency_id and not force_write and not self.env.su:
+                if rec.competency_id.state == 'approved':
+                    raise ValidationError(_("Cannot delete proficiency levels from an approved competency (%s - Version %s). Please create a new version.") % (rec.competency_id.name, rec.competency_id.version))
+                if rec.competency_id.status == 'retired' or rec.competency_id.state == 'retired':
+                    raise ValidationError(_("Cannot delete proficiency levels from a retired competency (%s).") % rec.competency_id.name)
 
 
 
@@ -200,10 +215,24 @@ class Competency(models.Model):
     _name = 'competency.competency'
     _description = 'Competency'
     _inherit = ['mail.thread']
-    _order = 'pillar, code'
+    _order = 'pillar, code, version desc'
 
     name = fields.Char(string='Competency Name', required=True, tracking=True)
     code = fields.Char(string='Competency Code', required=True, tracking=True)
+    version = fields.Char(string='Version', default='v1.0', required=True, tracking=True)
+    parent_competency_id = fields.Many2one(
+        'competency.competency', string='Base Competency', index=True, readonly=True, ondelete='set null')
+    previous_version_id = fields.Many2one(
+        'competency.competency', string='Previous Version', index=True, readonly=True, ondelete='set null')
+    child_version_ids = fields.One2many(
+        'competency.competency', 'previous_version_id', string='Successor Versions')
+    version_count = fields.Integer(
+        compute='_compute_version_count', string='Total Versions')
+    change_description = fields.Text(
+        string='Version Change Description', tracking=True)
+    version_history_ids = fields.Many2many(
+        'competency.competency', compute='_compute_version_history',
+        string='Version History', context={'active_test': False})
     pillar = fields.Selection([
         ('core', 'Core Competencies'),
         ('leadership', 'Leadership Competencies'),
@@ -228,7 +257,7 @@ class Competency(models.Model):
         for rec in self:
             rec.is_rating_model_readonly = is_ro
     proficiency_level_ids = fields.One2many(
-        'competency.proficiency.level', 'competency_id', string='Proficiency Levels')
+        'competency.proficiency.level', 'competency_id', string='Proficiency Levels', copy=False)
     applicable_job_ids = fields.Many2many(
         'hr.job', string='Applicable Job Positions',
         compute='_compute_applicable_job_ids', store=True)
@@ -294,6 +323,121 @@ class Competency(models.Model):
 
             rec.proficiency_level_ids = [(5, 0, 0)] + new_lines
 
+    @api.depends('name', 'version')
+    def _compute_display_name(self):
+        for rec in self:
+            if rec.version:
+                rec.display_name = f"{rec.name} ({rec.version})"
+            else:
+                rec.display_name = rec.name or ''
+
+    @api.depends('parent_competency_id')
+    def _compute_version_count(self):
+        for rec in self:
+            root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
+            rec.version_count = self.with_context(active_test=False).search_count([
+                '|', ('id', '=', root_id), ('parent_competency_id', '=', root_id)
+            ])
+
+    def _compute_version_history(self):
+        for rec in self:
+            root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
+            rec.version_history_ids = self.with_context(active_test=False).search([
+                '|', ('id', '=', root_id), ('parent_competency_id', '=', root_id)
+            ], order='id desc')
+
+    def action_view_versions(self):
+        self.ensure_one()
+        root_id = self.parent_competency_id.id if self.parent_competency_id else self.id
+        return {
+            'name': _("Versions of %s") % self.name,
+            'type': 'ir.actions.act_window',
+            'res_model': 'competency.competency',
+            'view_mode': 'list,form',
+            'domain': ['|', ('id', '=', root_id), ('parent_competency_id', '=', root_id)],
+            'context': {'active_test': False, 'default_parent_competency_id': root_id},
+        }
+
+    @staticmethod
+    def _bump_version(version):
+        if not version:
+            return 'v2.0'
+        try:
+            clean = version.lower().lstrip('v')
+            if '.' in clean:
+                parts = clean.split('.')
+                major = int(parts[0])
+                return f"v{major + 1}.0"
+            else:
+                return f"v{int(clean) + 1}.0"
+        except Exception:
+            return 'v2.0'
+
+    def action_create_new_version(self):
+        self.ensure_one()
+        if self.state != 'approved':
+            raise ValidationError(_("Only approved competencies can be versioned."))
+            
+        root = self.parent_competency_id or self
+        
+        # Check if there is already a draft or submitted version in this lineage
+        existing_pending = self.with_context(active_test=False).search([
+            ('id', '!=', self.id),
+            '|', ('id', '=', root.id), ('parent_competency_id', '=', root.id),
+            ('state', 'in', ('draft', 'submitted'))
+        ], limit=1)
+        if existing_pending:
+            raise UserError(_(
+                "A pending version (%s - Version %s, State: %s) already exists for this competency. "
+                "Please finalize or discard the existing pending version before creating another one."
+            ) % (existing_pending.name, existing_pending.version, existing_pending.state))
+
+        # Determine next version string
+        all_versions = self.with_context(active_test=False).search([
+            '|', ('id', '=', root.id), ('parent_competency_id', '=', root.id)
+        ])
+        new_version_str = self._bump_version(self.version)
+        existing_v_strs = set(all_versions.mapped('version'))
+        counter = 1
+        while new_version_str in existing_v_strs:
+            new_version_str = f"v{len(all_versions) + counter}.0"
+            counter += 1
+
+        level_vals = []
+        for pl in self.proficiency_level_ids:
+            level_vals.append((0, 0, {
+                'level': pl.level,
+                'name': pl.name,
+                'definition': pl.definition,
+                'behavioral_indicators': pl.behavioral_indicators,
+            }))
+
+        new_comp = self.copy(default={
+            'name': self.name,
+            'code': self.code,
+            'version': new_version_str,
+            'state': 'draft',
+            'status': 'inactive',
+            'active': True,
+            'parent_competency_id': root.id,
+            'previous_version_id': self.id,
+            'change_description': _("New version branched from %s.") % self.version,
+            'definition': self.definition,
+            'proficiency_level_ids': level_vals,
+        })
+
+        self.message_post(body=_("New draft version %s (ID %s) created from this version.") % (new_comp.version, new_comp.id))
+        new_comp.message_post(body=_("Version %s created from approved version %s (ID %s).") % (new_comp.version, self.version, self.id))
+
+        return {
+            'name': _("Competency: %s (%s)") % (new_comp.name, new_comp.version),
+            'type': 'ir.actions.act_window',
+            'res_model': 'competency.competency',
+            'res_id': new_comp.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }
+
     def action_submit(self):
         for rec in self:
             req_count = rec.rating_model_id.max_rating if rec.rating_model_id else 4
@@ -305,7 +449,46 @@ class Competency(models.Model):
         if not self.env.user.has_group('competency_management.group_competency_admin') and not self.env.su:
             raise UserError(_("Only Competency Administrators can approve competency dictionary entries."))
         for rec in self:
+            root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
+            old_versions = self.with_context(active_test=False).search([
+                ('id', '!=', rec.id),
+                '|', ('id', '=', root_id), ('parent_competency_id', '=', root_id),
+                ('state', '=', 'approved')
+            ])
+            for old in old_versions:
+                # 1. Update active role mapping lines pointing to old to now point to rec
+                mapping_lines = self.env['competency.role.mapping.line'].search([('competency_id', '=', old.id)])
+                if mapping_lines:
+                    mapping_lines.write({'competency_id': rec.id})
+                
+                # 2. Update clusters pointing to old to point to rec
+                clusters = self.env['competency.cluster'].search([('competency_ids', 'in', [old.id])])
+                for cluster in clusters:
+                    cluster.write({'competency_ids': [(3, old.id), (4, rec.id)]})
+
+                # 3. Update frameworks if applicable
+                if 'competency.framework.line' in self.env:
+                    fw_lines = self.env['competency.framework.line'].search([('competency_id', '=', old.id)])
+                    if fw_lines:
+                        fw_lines.write({'competency_id': rec.id})
+
+                # 4. Retire / supersede old version
+                old.with_context(force_write=True).write({
+                    'state': 'retired',
+                    'active': False,
+                })
+                old.message_post(body=Markup(_(
+                    "Superseded and retired by new approved version <b>%s</b> on %s."
+                )) % (escape(rec.version or ''), escape(str(fields.Date.today()))))
+
             rec.write({'state': 'approved', 'active': True})
+            if old_versions:
+                rec.message_post(body=Markup(_(
+                    "Approved as active version <b>%s</b>, superseding previous version(s) (%s). "
+                    "All active role mappings and clusters have been migrated to this version."
+                )) % (escape(rec.version or ''), escape(", ".join(old_versions.mapped('version')))))
+            else:
+                rec.message_post(body=Markup(_("Competency approved as active version <b>%s</b>.")) % escape(rec.version or ''))
 
     def action_retire(self):
         """Retire/inactivate competency and auto-disappear from clusters & job mappings."""
@@ -320,21 +503,44 @@ class Competency(models.Model):
 
     def action_reset_draft(self):
         for rec in self:
+            if rec.state == 'approved':
+                raise UserError(_("Approved competencies cannot be reset to draft. Use 'Create New Version' to make changes."))
+            if rec.child_version_ids.filtered(lambda c: c.state == 'approved'):
+                raise UserError(_("This version has been superseded by a newer approved version and cannot be reset to draft."))
             rec.write({'state': 'draft', 'active': True})
 
-    @api.constrains('name')
+    @api.constrains('name', 'parent_competency_id', 'previous_version_id')
     def _check_unique_name_case_insensitive(self):
         for rec in self:
-            if rec.name:
-                duplicate = self.search([
-                    ('id', '!=', rec.id),
-                    ('name', '=ilike', rec.name.strip())
-                ], limit=1)
-                if duplicate:
-                    raise ValidationError(_("A competency with the name '%s' already exists (Code: %s). Competency names must be unique.") % (rec.name.strip(), duplicate.code))
+            if not rec.name:
+                continue
+            rec_root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
+            duplicates = self.with_context(active_test=False).search([
+                ('id', '!=', rec.id),
+                ('name', '=ilike', rec.name.strip())
+            ])
+            for dup in duplicates:
+                dup_root_id = dup.parent_competency_id.id if dup.parent_competency_id else dup.id
+                if rec_root_id != dup_root_id:
+                    raise ValidationError(_("A competency with the name '%s' already exists (Code: %s). Competency names must be unique across different competencies.") % (rec.name.strip(), dup.code))
+
+    @api.constrains('code', 'parent_competency_id', 'previous_version_id')
+    def _check_unique_code_lineage(self):
+        for rec in self:
+            if not rec.code:
+                continue
+            rec_root_id = rec.parent_competency_id.id if rec.parent_competency_id else rec.id
+            duplicates = self.with_context(active_test=False).search([
+                ('id', '!=', rec.id),
+                ('code', '=ilike', rec.code.strip())
+            ])
+            for dup in duplicates:
+                dup_root_id = dup.parent_competency_id.id if dup.parent_competency_id else dup.id
+                if rec_root_id != dup_root_id:
+                    raise ValidationError(_("A competency with the code '%s' already exists for a different competency (%s). Code must be unique across different competencies.") % (rec.code.strip(), dup.name))
 
     _sql_constraints = [
-        ('code_uniq', 'unique(code)', 'The Competency Code must be unique!'),
+        ('code_version_uniq', 'unique(code, version)', 'The Competency Code and Version combination must be unique!'),
     ]
 
     @api.constrains('proficiency_level_ids', 'rating_model_id')
@@ -360,6 +566,8 @@ class Competency(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if not vals.get('version'):
+                vals['version'] = 'v1.0'
             if not vals.get('proficiency_level_ids'):
                 rating_model_id = vals.get('rating_model_id')
                 if not rating_model_id:
@@ -401,7 +609,20 @@ class Competency(models.Model):
                 if set(vals.keys()) - {'status', 'active'}:
                     raise ValidationError(_("This competency (%s) is retired and cannot be edited. Reactivate the competency or use an Admin override instead.") % rec.name)
             
-            # 2. Governed-edit check for name or pillar on approved framework
+            # 2. Approved immutability lock (definition, levels, and identity fields cannot be modified on approved competencies)
+            if rec.state == 'approved' and not force_write and not self.env.su:
+                immutable_fields = {'name', 'code', 'pillar', 'functional_domain', 'rating_model_id', 'definition', 'proficiency_level_ids'}
+                changed_fields = {k for k in vals.keys() if k in immutable_fields and vals[k] != getattr(rec, k, False)}
+                if 'proficiency_level_ids' in vals:
+                    changed_fields.add('proficiency_level_ids')
+                if changed_fields:
+                    raise ValidationError(_(
+                        "Competency '%s' (Version %s) is approved and strictly immutable. "
+                        "Neither the definition nor proficiency levels/behavioral indicators can be edited. "
+                        "Please use 'Create New Version' to introduce changes."
+                    ) % (rec.name, rec.version))
+
+            # 3. Governed-edit check for name or pillar on approved framework
             if ('name' in vals or 'pillar' in vals) and not force_write and not allow_def_edit and not self.env.su:
                 new_name = vals.get('name', rec.name)
                 new_pillar = vals.get('pillar', rec.pillar)
@@ -421,9 +642,13 @@ class Competency(models.Model):
         return super().write(vals)
 
     def unlink(self):
+        force_write = self.env.context.get('force_write')
         for rec in self:
-            if rec.status == 'retired' and not self.env.context.get('force_write') and not self.env.su:
-                raise ValidationError(_('Retired competencies cannot be deleted.'))
+            if not force_write and not self.env.su:
+                if rec.state == 'approved':
+                    raise ValidationError(_("Approved competencies cannot be deleted (%s - Version %s). You must retire the competency or supersede it with a new version.") % (rec.name, rec.version))
+                if rec.status == 'retired' or rec.state == 'retired':
+                    raise ValidationError(_('Retired competencies cannot be deleted.'))
         return super().unlink()
 
     @api.model
@@ -737,42 +962,6 @@ class Competency(models.Model):
                     'approval_date': fields.Datetime.now(),
                 })
             mapping_count += 1
-
-        # Seed default Job Position Matrix lines
-        for job in self.env['hr.job'].search([]):
-            j_line = self.env['competency.job.matrix'].search([
-                ('config_id', '=', matrix_config.id),
-                ('job_id', '=', job.id)
-            ], limit=1)
-            if not j_line:
-                core_l = self.env['competency.assessment']._get_matrix_required_level('core', job_name=job.name)
-                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', job_name=job.name)
-                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', job_name=job.name)
-                self.env['competency.job.matrix'].create({
-                    'config_id': matrix_config.id,
-                    'job_id': job.id,
-                    'required_core_level': core_l,
-                    'required_leadership_level': lead_l,
-                    'required_technical_level': tech_l,
-                })
-
-        # Seed default Job Grade Matrix lines
-        for grade in self.env['employee.grade'].search([]):
-            g_line = self.env['competency.grade.matrix'].search([
-                ('config_id', '=', matrix_config.id),
-                ('grade_id', '=', grade.id)
-            ], limit=1)
-            if not g_line:
-                core_l = self.env['competency.assessment']._get_matrix_required_level('core', grade=grade)
-                lead_l = self.env['competency.assessment']._get_matrix_required_level('leadership', grade=grade)
-                tech_l = self.env['competency.assessment']._get_matrix_required_level('technical', grade=grade)
-                self.env['competency.grade.matrix'].create({
-                    'config_id': matrix_config.id,
-                    'grade_id': grade.id,
-                    'required_core_level': core_l,
-                    'required_leadership_level': lead_l,
-                    'required_technical_level': tech_l,
-                })
 
         return {
             'type': 'ir.actions.client',

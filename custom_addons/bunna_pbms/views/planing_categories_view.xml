@@ -1113,7 +1113,7 @@
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_manager"/>
 
                     <button name="action_district_approve" type="object" string="Endorse to Head Office" icon="fa-send"
-                            invisible="org_unit_type != 'district_office' or state not in ('submitted', 'info_requested')" class="btn-primary"
+                            invisible="category == 'manpower' or org_unit_type != 'district_office' or state not in ('submitted', 'info_requested')" class="btn-primary"
                             groups="bunna_pbms.group_pbms_district_reviewer,bunna_pbms.group_pbms_approver,bunna_pbms.group_pbms_manager"/>
 
                     <button name="%(bunna_pbms.action_pbms_target_cascade_district_wizard)d" type="action"
