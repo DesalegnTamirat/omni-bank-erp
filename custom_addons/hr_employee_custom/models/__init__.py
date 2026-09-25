@@ -74,3 +74,5 @@ from . import res_config_settings
 from . import ir_http
 from . import ir_ui_menu
 from . import discuss_channel_custom
+from . import employee_profile_photo
+from . import employee_profile
