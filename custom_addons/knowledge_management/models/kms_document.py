@@ -118,6 +118,12 @@ class KmsDocument(models.Model):
 
     summary = fields.Text(string='Executive Summary / Scope', tracking=True)
     content_text = fields.Text(string='Full Content Text / Extracted Text', help='Used for deep full-text indexed searches.')
+    fts_query = fields.Char(
+        string='Full-Text Search',
+        store=False,
+        search='_search_fts',
+        help='Indexed PostgreSQL tsvector full-text search across Title, Summary, and Content.'
+    )
 
     # Security & Protection Controls (FR-KMS-014, FR-KMS-015, FR-KMS-016, FR-KMS-018)
     is_view_only = fields.Boolean(
@@ -369,3 +375,82 @@ class KmsDocument(models.Model):
                 })
             except Exception as e:
                 _logger.warning("Could not log KMS audit entry: %s", e)
+
+    def init(self):
+        super().init()
+        self.env.cr.execute("""
+            CREATE INDEX IF NOT EXISTS kms_document_fts_gin_idx ON kms_document 
+            USING gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')));
+        """)
+
+    def _search_fts(self, operator, value):
+        if not value or not isinstance(value, str):
+            return []
+        query = value.strip()
+        if not query:
+            return []
+        try:
+            self.env.cr.execute("""
+                SELECT id FROM kms_document
+                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
+                      @@ websearch_to_tsquery('english', %s)
+            """, (query,))
+            ids = [r[0] for r in self.env.cr.fetchall()]
+        except Exception:
+            self.env.cr.execute("""
+                SELECT id FROM kms_document
+                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
+                      @@ plainto_tsquery('english', %s)
+            """, (query,))
+            ids = [r[0] for r in self.env.cr.fetchall()]
+        if operator in ('not in', '!=', 'not like', 'not ilike'):
+            return [('id', 'not in', ids)]
+        return [('id', 'in', ids)]
+
+    @api.model
+    def _search_fulltext(self, query, extra_domain=None, limit=80):
+        """
+        FR-KMS-006: Ranked full-text search across Title, Summary, and Content using tsvector and GIN index.
+        Returns recordset ordered by ts_rank DESC.
+        """
+        if not query or not str(query).strip():
+            return self.search(extra_domain or [], limit=limit)
+        q = str(query).strip()
+        try:
+            sql = """
+                SELECT id, ts_rank(
+                    to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')),
+                    websearch_to_tsquery('english', %s)
+                ) AS rank
+                FROM kms_document
+                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
+                      @@ websearch_to_tsquery('english', %s)
+                ORDER BY rank DESC, id DESC
+                LIMIT %s
+            """
+            self.env.cr.execute(sql, (q, q, limit))
+            rows = self.env.cr.fetchall()
+        except Exception:
+            sql_fallback = """
+                SELECT id, ts_rank(
+                    to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, '')),
+                    plainto_tsquery('english', %s)
+                ) AS rank
+                FROM kms_document
+                WHERE to_tsvector('english', coalesce(name, '') || ' ' || coalesce(summary, '') || ' ' || coalesce(content_text, ''))
+                      @@ plainto_tsquery('english', %s)
+                ORDER BY rank DESC, id DESC
+                LIMIT %s
+            """
+            self.env.cr.execute(sql_fallback, (q, q, limit))
+            rows = self.env.cr.fetchall()
+
+        ids = [r[0] for r in rows]
+        if not ids:
+            return self.browse()
+        base_domain = [('id', 'in', ids)]
+        if extra_domain:
+            base_domain = ['&'] + base_domain + extra_domain
+        records = self.search(base_domain)
+        id_map = {rec.id: rec for rec in records}
+        return self.browse([i for i in ids if i in id_map])

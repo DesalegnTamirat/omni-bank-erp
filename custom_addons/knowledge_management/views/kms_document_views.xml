@@ -201,6 +201,7 @@
             <field name="model">kms.document</field>
             <field name="arch" type="xml">
                 <search string="Search Governed Documents">
+                    <field name="fts_query" string="Full-Text Search (Indexed)" filter_domain="[('fts_query', '=', self)]"/>
                     <field name="name" string="Document Title / Code" filter_domain="['|', ('name', 'ilike', self), ('code', 'ilike', self)]"/>
                     <field name="category_id"/>
                     <field name="doc_type_id"/>

@@ -843,7 +843,7 @@ class CompetencyDashboard(models.TransientModel):
                 'is_supervisor': is_supervisor,
                 'has_subordinates': bool(emp and self.env['hr.employee'].search_count([('parent_id', '=', emp.id)])),
                 'employee_name': emp.name if emp else user.name,
-                'job_name': emp.job_id.name if emp and emp.job_id else 'N/A',
+                'job_name': (getattr(emp, 'job_position', False) or emp.job_id).name if (emp and (getattr(emp, 'job_position', False) or emp.job_id)) else 'N/A',
             },
             'cycle': {
                 'id': cycle.id if cycle else False,

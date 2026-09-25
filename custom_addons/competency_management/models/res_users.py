@@ -60,6 +60,9 @@ class ResUsers(models.Model):
         allowed_job_ids = set()
 
         # Own job position is always visible
+        own_pos = getattr(emp, 'job_position', False)
+        if own_pos:
+            allowed_job_ids.add(own_pos.id)
         if emp.job_id:
             allowed_job_ids.add(emp.job_id.id)
 

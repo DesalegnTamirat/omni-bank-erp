@@ -572,8 +572,9 @@ class CompetencyReportWizard(models.TransientModel):
             final_rating = round(weighted_num / weighted_den, 2) if weighted_den > 0 else (self_val or 0.0)
 
             # Authoritative Role-Mapping required level lookup (Item 10)
+            emp_job = getattr(emp, 'job_position', False) or emp.job_id
             role_map = self.env['competency.role.mapping'].sudo().search([
-                ('job_position_id', '=', emp.job_id.id if emp.job_id else 0),
+                ('job_position_id', '=', emp_job.id if emp_job else 0),
                 ('state', '=', 'approved')
             ], limit=1)
             req_val = None
@@ -605,7 +606,7 @@ class CompetencyReportWizard(models.TransientModel):
                 'emp_name': emp.name,
                 'operating_unit_name': ou_obj.name if ou_obj else 'N/A',
                 'department_name': emp.department_id.name if emp.department_id else 'N/A',
-                'job_name': emp.job_id.name if emp.job_id else 'N/A',
+                'job_name': emp_job.name if emp_job else 'N/A',
                 'grade_name': (getattr(grade_obj, 'grade_name', False) or getattr(grade_obj, 'name', False) or 'N/A') if grade_obj else 'N/A',
                 'competency_name': comp.name,
                 'pillar_name': dict(comp._fields['pillar'].selection).get(comp.pillar, comp.pillar),

@@ -229,12 +229,6 @@
                                 type="object" class="btn-secondary"
                                 invisible="not can_override or not is_override_active"
                                 icon="fa-lock"/>
-                        <button name="action_approve" string="Approve"
-                                type="object" class="oe_highlight" invisible="state != 'submitted' or not is_admin_or_officer"/>
-                        <button name="action_lock" string="Lock"
-                                type="object" invisible="state not in ('submitted', 'approved') or not is_admin_or_officer"/>
-                        <button name="action_unlock" string="Unlock"
-                                type="object" invisible="state != 'locked' or not is_admin_or_officer"/>
                         <field name="state" widget="statusbar"
                                 statusbar_visible="draft,submitted"/>
                     </header>

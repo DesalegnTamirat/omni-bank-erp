@@ -125,10 +125,10 @@ class CompetencyDirectorPeerConfig(models.Model):
 
     @api.model
     def _get_employee_job(self, emp):
-        """Safely fetch job position for an employee, supporting both standard job_id and custom job_position."""
+        """Safely fetch job position for an employee, prioritizing substantive custom job_position over version job_id."""
         if not emp:
             return self.env['hr.job']
-        return emp.job_id or getattr(emp, 'job_position', self.env['hr.job'])
+        return getattr(emp, 'job_position', False) or emp.job_id or self.env['hr.job']
 
     @api.depends('director_id', 'director_id.job_id')
     def _compute_job_id(self):

@@ -476,25 +476,24 @@ class CompetencyAssessmentCycle(models.Model):
         # Criteria:
         # A. For Chiefs: 1. Same Coach, 2. Different Job Grade
         # B. For Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
-        # Business Rule: Everyone assesses their subordinate following the stated corporate rules without
-        # exceeding max_subs. The evaluator does NOT have to be a formal coach.
+        # Quota Rule: Every assessed employee/manager receives min(len(eligible_raters), max_subs) subordinate assessments.
+        # If eligible raters < max_subs (e.g. 3, 2, 1), they are assessed by all of them.
+        # Evaluators with lower current workload are prioritized to balance assessor assignments.
 
         # A. Teammates assessing their subordinates under the same coach (Higher Grade assesses Lower Grade)
+        sub_candidates = {}
         for c_id, teammates in coached_by.items():
-            for eval_id in teammates:
-                eval_data = emp_cache.get(eval_id)
-                if not eval_data or not eval_data['user_id']:
-                    continue
-                eval_u_id = eval_data['user_id']
-                if sub_assessor_workload.get(eval_u_id, 0) >= max_subs:
+            for cand_id in teammates:
+                cand_data = emp_cache.get(cand_id)
+                if not cand_data or not cand_data['user_id']:
                     continue
 
-                eligible_subs = []
-                for cand_id in teammates:
-                    if cand_id == eval_id:
+                eligible_evaluators = []
+                for eval_id in teammates:
+                    if eval_id == cand_id:
                         continue
-                    cand_data = emp_cache.get(cand_id)
-                    if not cand_data or not cand_data['user_id']:
+                    eval_data = emp_cache.get(eval_id)
+                    if not eval_data or not eval_data['user_id']:
                         continue
 
                     # 1. Same Coach: guaranteed by teammates
@@ -505,34 +504,38 @@ class CompetencyAssessmentCycle(models.Model):
 
                     if eval_data['is_chief']:
                         # Chiefs: 1. Same Coach, 2. Different Job Grade
-                        eligible_subs.append(cand_id)
+                        eligible_evaluators.append(eval_id)
                     else:
                         # Non-Managerial & Managerial: 1. Same Coach, 2. Different Job Grade, 3. Same Work Unit, 4. Different Job Position
                         same_ou = (cand_data['ou_id'] == eval_data['ou_id']) if (cand_data['ou_id'] and eval_data['ou_id']) else True
                         diff_job = (cand_data['job_id'] != eval_data['job_id']) if (cand_data['job_id'] and eval_data['job_id']) else True
                         if same_ou and diff_job:
-                            eligible_subs.append(cand_id)
+                            eligible_evaluators.append(eval_id)
 
-                if not eligible_subs:
-                    continue
+                if eligible_evaluators:
+                    sub_candidates[cand_id] = eligible_evaluators
 
-                total_eligible_raters += len(eligible_subs)
-                slots_left = max_subs - sub_assessor_workload.get(eval_u_id, 0)
-                if slots_left > 0:
-                    s_list = sorted(eligible_subs, key=lambda sid: (sub_assessor_workload.get(emp_cache[sid]['user_id'], 0), sid))
-                    selected_subs = s_list[:slots_left]
-                    for sid in selected_subs:
-                        pair_sub = (sid, eval_u_id, 'subordinate')
-                        if pair_sub not in existing_pairs:
-                            assessments_to_create.append({
-                                'cycle_id': self.id,
-                                'employee_id': sid,
-                                'assessor_id': eval_u_id,
-                                'assessment_type': 'subordinate',
-                            })
-                            existing_pairs.add(pair_sub)
-                            sub_assessor_workload[eval_u_id] = sub_assessor_workload.get(eval_u_id, 0) + 1
-                            total_sampled_raters += 1
+        for cand_id, eligible_evals in sub_candidates.items():
+            k_sub = min(len(eligible_evals), max_subs) if max_subs > 0 else len(eligible_evals)
+            total_eligible_raters += len(eligible_evals)
+            sorted_evals = sorted(eligible_evals, key=lambda eid: (sub_assessor_workload.get(emp_cache[eid]['user_id'], 0), eid))
+            chosen = 0
+            for eval_id in sorted_evals:
+                eval_u_id = emp_cache[eval_id]['user_id']
+                pair_sub = (cand_id, eval_u_id, 'subordinate')
+                if pair_sub not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': cand_id,
+                        'assessor_id': eval_u_id,
+                        'assessment_type': 'subordinate',
+                    })
+                    existing_pairs.add(pair_sub)
+                    sub_assessor_workload[eval_u_id] = sub_assessor_workload.get(eval_u_id, 0) + 1
+                    total_sampled_raters += 1
+                    chosen += 1
+                    if chosen >= k_sub:
+                        break
 
         # B. Direct reports evaluating their coach/superior upward (When someone assesses his coach that is subordinate)
         for m_id, dr_ids in reports_by_manager.items():
@@ -565,33 +568,45 @@ class CompetencyAssessmentCycle(models.Model):
             if not eligible_subs:
                 continue
 
+            k_sub = min(len(eligible_subs), max_subs) if max_subs > 0 else len(eligible_subs)
             total_eligible_raters += len(eligible_subs)
-            for sid in eligible_subs:
+            sorted_subs = sorted(eligible_subs, key=lambda sid: (sub_assessor_workload.get(emp_cache[sid]['user_id'], 0), sid))
+            chosen = 0
+            for sid in sorted_subs:
                 s_u_id = emp_cache[sid]['user_id']
-                if sub_assessor_workload.get(s_u_id, 0) < max_subs:
-                    pair_sub = (m_id, s_u_id, 'subordinate')
-                    if pair_sub not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': m_id,
-                            'assessor_id': s_u_id,
-                            'assessment_type': 'subordinate',
-                        })
-                        existing_pairs.add(pair_sub)
-                        sub_assessor_workload[s_u_id] = sub_assessor_workload.get(s_u_id, 0) + 1
-                        total_sampled_raters += 1
+                pair_sub = (m_id, s_u_id, 'subordinate')
+                if pair_sub not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': m_id,
+                        'assessor_id': s_u_id,
+                        'assessment_type': 'subordinate',
+                    })
+                    existing_pairs.add(pair_sub)
+                    sub_assessor_workload[s_u_id] = sub_assessor_workload.get(s_u_id, 0) + 1
+                    total_sampled_raters += 1
+                    chosen += 1
+                    if chosen >= k_sub:
+                        break
 
         # 4. Peer Assessment (Strict business rules per position category)
-        # A. Director & Chief Peer Pool (Cross-directorate across bank via config)
+        # Quota Rule: Every employee receives min(len(eligible_peers), max_peers) peer assessments.
+        # If eligible peers < max_peers (e.g. 3, 2, 1), they are assessed by all of them.
+        # Evaluators with lower current workload are prioritized to balance assessor assignments.
+
+        # A. Director & Chief Peer Pool (Cross-directorate across bank via config or director pool)
         dir_pool = [e_id for e_id in emp_cache if emp_cache[e_id]['is_director'] and emp_cache[e_id]['user_id']]
         if len(dir_pool) > 1:
-            k_dir = min(len(dir_pool) - 1, max_peers) if max_peers > 0 else len(dir_pool) - 1
-            dir_pool_sorted = sorted(dir_pool)
-            d_len = len(dir_pool_sorted)
-            for i, e_id in enumerate(dir_pool_sorted):
-                total_eligible_raters += (d_len - 1)
-                for j in range(1, k_dir + 1):
-                    pid = dir_pool_sorted[(i + j) % d_len]
+            for e_id in sorted(dir_pool):
+                manual_peers = [p for p in dir_peer_map.get(e_id, []) if p != e_id and emp_cache.get(p, {}).get('user_id')]
+                candidate_pool = manual_peers if manual_peers else [p for p in dir_pool if p != e_id]
+                if not candidate_pool:
+                    continue
+                k_dir = min(len(candidate_pool), max_peers) if max_peers > 0 else len(candidate_pool)
+                total_eligible_raters += len(candidate_pool)
+                sorted_candidates = sorted(candidate_pool, key=lambda pid: (peer_assessor_workload.get(emp_cache[pid]['user_id'], 0), pid))
+                chosen = 0
+                for pid in sorted_candidates:
                     p_u_id = emp_cache[pid]['user_id']
                     pair_peer = (e_id, p_u_id, 'peer')
                     if pair_peer not in existing_pairs:
@@ -604,6 +619,9 @@ class CompetencyAssessmentCycle(models.Model):
                         existing_pairs.add(pair_peer)
                         peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
                         total_sampled_raters += 1
+                        chosen += 1
+                        if chosen >= k_dir:
+                            break
 
         # B. Non-Director Peer Bucketing according to bank matrix:
         # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
@@ -634,7 +652,7 @@ class CompetencyAssessmentCycle(models.Model):
 
             peer_buckets.setdefault(b_key, []).append(e_id)
 
-        # Apply circular fair matching C_n(1..K) within each peer bucket
+        # Apply fair matching within each peer bucket
         for b_key, members in peer_buckets.items():
             m_len = len(members)
             if m_len > 1:
@@ -642,8 +660,12 @@ class CompetencyAssessmentCycle(models.Model):
                 members_sorted = sorted(members)
                 for i, e_id in enumerate(members_sorted):
                     total_eligible_raters += (m_len - 1)
-                    for j in range(1, k_peer + 1):
-                        pid = members_sorted[(i + j) % m_len]
+                    # Candidate peers in circular order starting from the member after e_id
+                    candidate_peers = [members_sorted[(i + j) % m_len] for j in range(1, m_len)]
+                    # Sort candidates by current peer workload to balance assessor load
+                    sorted_candidates = sorted(candidate_peers, key=lambda pid: (peer_assessor_workload.get(emp_cache[pid]['user_id'], 0), pid))
+                    chosen = 0
+                    for pid in sorted_candidates:
                         p_u_id = emp_cache[pid]['user_id']
                         pair_peer = (e_id, p_u_id, 'peer')
                         if pair_peer not in existing_pairs:
@@ -656,6 +678,9 @@ class CompetencyAssessmentCycle(models.Model):
                             existing_pairs.add(pair_peer)
                             peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
                             total_sampled_raters += 1
+                            chosen += 1
+                            if chosen >= k_peer:
+                                break
 
         # Audit log on cycle
         self.sudo().write({
@@ -761,10 +786,10 @@ class CompetencyAssessment(models.Model):
 
     @api.model
     def _get_employee_job(self, emp):
-        """Safely fetch job position for an employee, supporting both standard job_id and custom job_position."""
+        """Safely fetch job position for an employee, prioritizing substantive custom job_position over version job_id."""
         if not emp:
             return self.env['hr.job']
-        return emp.job_id or getattr(emp, 'job_position', self.env['hr.job'])
+        return getattr(emp, 'job_position', False) or emp.job_id or self.env['hr.job']
 
     @api.depends('employee_id', 'employee_id.job_id')
     def _compute_job_id(self):
@@ -1261,7 +1286,7 @@ class CompetencyAssessment(models.Model):
             if not is_elevated:
                 rec.can_override = False
                 continue
-            if rec.state in ('approved', 'locked') or rec.is_locked:
+            if rec.state == 'locked' or rec.is_locked:
                 rec.can_override = False
                 continue
             if rec.cycle_id and rec.cycle_id.state == 'closed':
@@ -1761,8 +1786,8 @@ class CompetencyAssessment(models.Model):
                 "Another HR / People Solution Officer or Competency Administrator must perform this adjustment."
             ))
 
-        if self.state in ('approved', 'locked') or self.is_locked:
-            raise UserError(_("Cannot override an approved or locked assessment. Already approved assessment results are permanently protected from modification."))
+        if self.state == 'locked' or self.is_locked:
+            raise UserError(_("Cannot override a locked assessment. Locked assessment results are permanently protected from modification."))
         if self.cycle_id and self.cycle_id.state == 'closed':
             raise UserError(_("Cannot override assessments in a closed cycle."))
 
