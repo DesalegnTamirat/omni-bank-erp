@@ -39,7 +39,8 @@
                         </group>
                         <notebook>
                             <page string="Assigned 360° Peers" name="peers">
-                                <field name="peer_ids" widget="many2many_tags" domain="[('is_director_or_chief', '=', True), ('active', '=', True)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peer Directors or Chiefs..."/>
+                                <field name="candidate_peer_ids" invisible="1"/>
+                                <field name="peer_ids" widget="many2many_tags" domain="[('id', 'in', candidate_peer_ids)]" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}" context="{'competency_employee_select': True, 'competency_peer_select': True}" placeholder="Select peer Directors or Chiefs..."/>
                             </page>
                         </notebook>
 
@@ -56,10 +57,18 @@
                 <list string="Executive Peer Configurations">
                     <header>
                         <button name="action_generate_director_records"
-                                string="Scan Executives (Chiefs &amp; Directors)"
+                                string="Scan Executives"
+                                type="object"
+                                class="btn-secondary"
+                                display="always"
+                                icon="fa-users"
+                                groups="competency_management.group_competency_admin"/>
+                        <button name="action_sync_all_cycle_peers"
+                                string="Sync All Peers"
                                 type="object"
                                 class="btn-primary"
-                                icon="fa-users"
+                                display="always"
+                                icon="fa-refresh"
                                 groups="competency_management.group_competency_admin"/>
                     </header>
                     <field name="has_open_cycle" column_invisible="True"/>
@@ -123,6 +132,32 @@
             <field name="state">code</field>
             <field name="code">
                 action = model.action_open_director_peer_config()
+            </field>
+        </record>
+
+        <!-- Action / Gear ⚙ Menu Action to Scan Executives directly from list or form view -->
+        <record id="action_server_sync_executives" model="ir.actions.server">
+            <field name="name">Scan &amp; Discover Executives (Chiefs &amp; Directors)</field>
+            <field name="model_id" ref="model_competency_director_peer_config"/>
+            <field name="binding_model_id" ref="model_competency_director_peer_config"/>
+            <field name="binding_view_types">list,form</field>
+            <field name="state">code</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="code">
+                action = model.action_generate_director_records()
+            </field>
+        </record>
+
+        <!-- Action / Gear ⚙ Menu Action to Batch Sync All Peers directly from list or form view -->
+        <record id="action_server_batch_sync_peers" model="ir.actions.server">
+            <field name="name">Sync All Peers with Open Cycle (Batch)</field>
+            <field name="model_id" ref="model_competency_director_peer_config"/>
+            <field name="binding_model_id" ref="model_competency_director_peer_config"/>
+            <field name="binding_view_types">list,form</field>
+            <field name="state">code</field>
+            <field name="group_ids" eval="[(4, ref('competency_management.group_competency_admin'))]"/>
+            <field name="code">
+                action = model.action_sync_all_cycle_peers()
             </field>
         </record>
 

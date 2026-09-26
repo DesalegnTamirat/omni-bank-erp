@@ -2,6 +2,7 @@
 import base64
 import re
 import logging
+from datetime import datetime
 from odoo import http, _
 from odoo.http import request, Response
 
@@ -108,6 +109,97 @@ class LmsController(http.Controller):
             ('Accept-Ranges', 'bytes'),
         ]
         return Response(raw_data, status=200, headers=headers)
+
+    @http.route(['/lms/video/<int:lesson_id>/manifest.m3u8'], type='http', auth='user', cors='*')
+    def get_video_manifest(self, lesson_id, **kwargs):
+        """
+        Adaptive HLS Streaming Manifest (FR-LMS-004, FR-LMS-005, NFR Performance/Mobile).
+        Generates standard HLS VOD playlist with byte ranges for seamless streaming.
+        """
+        authorized, result, enrollment = self._check_video_access(lesson_id)
+        if not authorized:
+            return result
+        lesson = result
+
+        if lesson.video_source_type == 'url' and lesson.video_url:
+            return request.redirect(lesson.video_url)
+
+        if not lesson.video_file:
+            return request.not_found()
+
+        raw_data = base64.b64decode(lesson.video_file)
+        file_size = len(raw_data)
+        duration = float(lesson.duration or 60.0)
+        target_duration = 10
+        num_segments = max(1, int(duration // target_duration))
+        chunk_size = max(1024, file_size // num_segments)
+        seg_dur = duration / num_segments
+
+        base_url = request.httprequest.url_root.rstrip('/')
+        stream_url = f"{base_url}/lms/video/{lesson.id}/stream"
+
+        lines = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:4",
+            f"#EXT-X-TARGETDURATION:{int(target_duration) + 1}",
+            "#EXT-X-MEDIA-SEQUENCE:0",
+            "#EXT-X-PLAYLIST-TYPE:VOD",
+            "#EXT-X-INDEPENDENT-SEGMENTS",
+        ]
+
+        for i in range(num_segments):
+            offset = i * chunk_size
+            length = chunk_size if i < num_segments - 1 else (file_size - offset)
+            lines.append(f"#EXTINF:{seg_dur:.2f},")
+            lines.append(f"#EXT-X-BYTERANGE:{length}@{offset}")
+            lines.append(stream_url)
+
+        lines.append("#EXT-X-ENDLIST\n")
+        manifest_content = "\n".join(lines)
+
+        headers = [
+            ('Content-Type', 'application/vnd.apple.mpegurl'),
+            ('Content-Disposition', f'inline; filename="lesson_{lesson.id}_manifest.m3u8"'),
+            ('Cache-Control', 'no-cache, no-store, must-revalidate'),
+        ]
+        return Response(manifest_content, status=200, headers=headers)
+
+    @http.route(['/lms/video/<int:lesson_id>/player'], type='http', auth='user', website=True)
+    def render_video_player(self, lesson_id, **kwargs):
+        """
+        Secure Video Player with Anti-Cheat & Dynamic Watermark Overlay (FR-LMS-004, FR-LMS-007, FR-LMS-008).
+        """
+        authorized, result, enrollment = self._check_video_access(lesson_id)
+        if not authorized:
+            return result
+        lesson = result
+
+        user = request.env.user
+        emp = user.employee_id
+        user_ip = request.httprequest.remote_addr or '127.0.0.1'
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        progress = request.env['lms.lesson.progress'].sudo().search([
+            ('enrollment_id', '=', enrollment.id if enrollment else 0),
+            ('lesson_id', '=', lesson.id),
+        ], limit=1)
+
+        last_pos = progress.last_position_seconds if progress else 0.0
+
+        values = {
+            'lesson': lesson,
+            'course': lesson.course_id,
+            'enrollment': enrollment,
+            'user_name': user.name,
+            'user_login': user.login,
+            'emp_code': getattr(emp, 'registration_number', '') or getattr(emp, 'identification_id', '') or str(user.id),
+            'user_ip': user_ip,
+            'timestamp': timestamp,
+            'last_position': last_pos,
+            'manifest_url': f"/lms/video/{lesson.id}/manifest.m3u8",
+            'stream_url': f"/lms/video/{lesson.id}/stream",
+        }
+        return request.render('learning_management.lesson_video_player', values)
 
     @http.route(['/lms/video/heartbeat'], type='jsonrpc', auth='user')
     def video_heartbeat(self, lesson_id, current_time, duration):

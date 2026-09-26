@@ -641,34 +641,28 @@ class CompetencyAssessmentCycle(models.Model):
         # If eligible peers < max_peers (e.g. 3, 2, 1), they are assessed by all of them.
         # Evaluators with lower current workload are prioritized to balance assessor assignments.
 
-        # A. Director & Chief Peer Pool (Cross-directorate across bank via config or director pool)
-        dir_pool = [e_id for e_id in emp_cache if emp_cache[e_id]['is_director'] and emp_cache[e_id]['user_id']]
-        if len(dir_pool) > 1:
-            for e_id in sorted(dir_pool):
-                manual_peers = [p for p in dir_peer_map.get(e_id, []) if p != e_id and emp_cache.get(p, {}).get('user_id')]
-                candidate_pool = manual_peers if manual_peers else [p for p in dir_pool if p != e_id]
-                if not candidate_pool:
+        # A. Director & Chief Peer Pool (Strictly manual assignment via competency.director.peer.config)
+        # Unidirectional: The configured Director/Chief evaluates each peer in their assigned peer_ids.
+        # No automatic reciprocal peering: Derese does not evaluate Abayneh unless configured on Derese's own record.
+        # No random fallback: If an executive has no peers assigned in their config, they evaluate 0 peers.
+        for d_id, p_ids in dir_peer_map.items():
+            d_u_id = emp_cache.get(d_id, {}).get('user_id')
+            if not d_u_id or not p_ids:
+                continue
+            for p_id in p_ids:
+                if p_id == d_id or p_id not in emp_cache:
                     continue
-                k_dir = min(len(candidate_pool), max_peers) if max_peers > 0 else len(candidate_pool)
-                total_eligible_raters += len(candidate_pool)
-                sorted_candidates = sorted(candidate_pool, key=lambda pid: (peer_assessor_workload.get(emp_cache[pid]['user_id'], 0), pid))
-                chosen = 0
-                for pid in sorted_candidates:
-                    p_u_id = emp_cache[pid]['user_id']
-                    pair_peer = (e_id, p_u_id, 'peer')
-                    if pair_peer not in existing_pairs:
-                        assessments_to_create.append({
-                            'cycle_id': self.id,
-                            'employee_id': e_id,
-                            'assessor_id': p_u_id,
-                            'assessment_type': 'peer',
-                        })
-                        existing_pairs.add(pair_peer)
-                        peer_assessor_workload[p_u_id] = peer_assessor_workload.get(p_u_id, 0) + 1
-                        total_sampled_raters += 1
-                        chosen += 1
-                        if chosen >= k_dir:
-                            break
+                pair_peer = (p_id, d_u_id, 'peer')
+                if pair_peer not in existing_pairs:
+                    assessments_to_create.append({
+                        'cycle_id': self.id,
+                        'employee_id': p_id,
+                        'assessor_id': d_u_id,
+                        'assessment_type': 'peer',
+                    })
+                    existing_pairs.add(pair_peer)
+                    peer_assessor_workload[d_u_id] = peer_assessor_workload.get(d_u_id, 0) + 1
+                    total_sampled_raters += 1
 
         # B. Non-Director Peer Bucketing according to bank matrix:
         # Rule 1: Non-Managerial: 1. Same Coach, 2. Same Job Grade, 3. Same Work Unit, 4. Same Job Position
@@ -823,6 +817,30 @@ class CompetencyAssessment(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'id desc'
     _rec_name = 'name'
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    @api.model
+    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._read_group(domain, groupby=groupby, aggregates=aggregates, having=having, offset=offset, limit=limit, order=order)
+
+    @api.model
+    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
 
     name = fields.Char(string='Reference', readonly=True, copy=False)
     active = fields.Boolean(string='Active', default=True)
@@ -1129,10 +1147,7 @@ class CompetencyAssessment(models.Model):
             config = self.env['competency.director.peer.config'].search([('director_id', '=', emp.id)], limit=1)
             if config and config.peer_ids:
                 peers |= config.peer_ids.filtered(lambda p: p.active and p.id != emp.id)
-            other_configs = self.env['competency.director.peer.config'].search([('peer_ids', 'in', [emp.id])])
-            if other_configs:
-                peers |= other_configs.mapped('director_id').filtered(lambda d: d.active and d.id != emp.id)
-            # Returns manually assigned peers ONLY (no random auto-assignment if unassigned)
+            # Returns manually assigned peers ONLY (strictly unidirectional: no reverse peering, no auto-assignment if unassigned)
             return peers
 
         emp_coach = getattr(emp, 'coach_id', False) or emp.parent_id
@@ -2323,6 +2338,30 @@ class CompetencyAssessmentLine(models.Model):
     """One competency rating inside an assessment (FR-ASM-006, FR-GAP-005)."""
     _name = 'competency.assessment.line'
     _description = 'Competency Assessment Line'
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    @api.model
+    def web_search_read(self, domain=None, specification=None, offset=0, limit=None, order=None, count_limit=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().web_search_read(domain=domain, specification=specification, offset=offset, limit=limit, order=order, count_limit=count_limit)
+
+    @api.model
+    def _read_group(self, domain, groupby=(), aggregates=(), having=(), offset=0, limit=None, order=None):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super()._read_group(domain, groupby=groupby, aggregates=aggregates, having=having, offset=offset, limit=limit, order=order)
+
+    @api.model
+    def read_group(self, domain, fields, groupby, offset=0, limit=None, orderby=False, lazy=True):
+        if not self.env.context.get('competency_employee_select'):
+            self = self.with_context(competency_employee_select=True)
+        return super().read_group(domain, fields, groupby, offset=offset, limit=limit, orderby=orderby, lazy=lazy)
 
     assessment_id = fields.Many2one(
         'competency.assessment', string='Assessment', required=True, ondelete='cascade')

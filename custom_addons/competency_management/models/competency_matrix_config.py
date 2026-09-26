@@ -106,14 +106,14 @@ class CompetencyMatrixConfig(models.Model):
 
     def action_view_job_matrix(self):
         self.ensure_one()
-        action = self.env.ref('competency_management.action_competency_job_matrix').read()[0]
+        action = self.env['ir.actions.act_window']._for_xml_id('competency_management.action_competency_job_matrix')
         action['domain'] = [('config_id', '=', self.id)]
         action['context'] = {'default_config_id': self.id}
         return action
 
     def action_view_grade_matrix(self):
         self.ensure_one()
-        action = self.env.ref('competency_management.action_competency_grade_matrix').read()[0]
+        action = self.env['ir.actions.act_window']._for_xml_id('competency_management.action_competency_grade_matrix')
         action['domain'] = [('config_id', '=', self.id)]
         action['context'] = {'default_config_id': self.id}
         return action

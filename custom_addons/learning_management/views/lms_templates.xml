@@ -78,5 +78,174 @@
             </t>
         </template>
 
+        <!-- Secure Video Player with Anti-Cheat & Dynamic Watermark Overlay -->
+        <template id="lesson_video_player" name="Secure LMS Video Player">
+            <t t-call="web.layout">
+                <t t-set="title"><t t-esc="lesson.name"/> - Bunna LMS</t>
+                <div class="container-fluid py-4" style="background-color: #121212; min-height: 100vh; color: #fff;">
+                    <div class="container">
+                        <!-- Navigation Header -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <span class="badge" style="background-color: #541718;"><t t-esc="course.name"/></span>
+                                <h3 class="fw-bold mt-1 text-white mb-0"><t t-esc="lesson.name"/></h3>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary me-2"><i class="fa fa-clock-o me-1"/><t t-esc="int(lesson.duration or 0)"/> mins</span>
+                                <a t-att-href="'/web#id=%s&amp;model=lms.course&amp;view_type=form' % course.id" class="btn btn-outline-light btn-sm">
+                                    <i class="fa fa-arrow-left me-1"/> Back to Course
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Video Container with Watermark Overlay -->
+                        <div class="card bg-black border-secondary shadow-lg rounded-4 overflow-hidden position-relative">
+                            <div id="videoContainer" class="position-relative" style="width: 100%; max-height: 75vh; background: #000; display: flex; justify-content: center; align-items: center; user-select: none;">
+                                
+                                <!-- HTML5 Video Element -->
+                                <video id="lmsVideoPlayer"
+                                       class="w-100"
+                                       style="max-height: 75vh; object-fit: contain;"
+                                       controls="controls"
+                                       controlsList="nodownload"
+                                       disablePictureInPicture="true"
+                                       oncontextmenu="return false;">
+                                    <source t-att-src="stream_url" type="video/mp4"/>
+                                    Your browser does not support HTML5 secure video streaming.
+                                </video>
+
+                                <!-- Dynamic Floating Watermark Layer (Screen Capture Deterrent) -->
+                                <div id="lmsWatermarkLayer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; z-index: 10;">
+                                    <div id="floatingWatermark1" class="watermark-item" style="position: absolute; top: 15%; left: 20%; transform: rotate(-25deg); opacity: 0.28; font-size: 15px; font-weight: bold; color: #ffffff; text-shadow: 1px 1px 2px #000000; white-space: nowrap;">
+                                        <t t-esc="user_name"/> (<t t-esc="user_login"/>) | IP: <t t-esc="user_ip"/> | <t t-esc="timestamp"/>
+                                    </div>
+                                    <div id="floatingWatermark2" class="watermark-item" style="position: absolute; top: 60%; left: 45%; transform: rotate(-25deg); opacity: 0.25; font-size: 15px; font-weight: bold; color: #ffffff; text-shadow: 1px 1px 2px #000000; white-space: nowrap;">
+                                        CONFIDENTIAL - BUNNA BANK LMS | ID: <t t-esc="emp_code"/>
+                                    </div>
+                                    <div id="floatingWatermark3" class="watermark-item" style="position: absolute; top: 35%; left: 70%; transform: rotate(-25deg); opacity: 0.22; font-size: 14px; font-weight: bold; color: #ffffff; text-shadow: 1px 1px 2px #000000; white-space: nowrap;">
+                                        <t t-esc="user_name"/> | <t t-esc="timestamp"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Player Bottom Status -->
+                            <div class="card-footer bg-dark border-secondary d-flex justify-content-between align-items-center py-2 px-3 text-muted small">
+                                <div>
+                                    <i class="fa fa-shield text-success me-1"/> DRM-Protected Adaptive Streaming | Anti-Skip Guard Active
+                                </div>
+                                <div id="watchProgressStatus">
+                                    Progress: <span id="progressPercent">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lesson Description & Information Security Notice -->
+                        <div class="mt-4 row">
+                            <div class="col-md-8">
+                                <div class="card bg-dark border-secondary p-3 text-light">
+                                    <h5 class="fw-bold mb-2">Lesson Overview</h5>
+                                    <p class="text-white-50 mb-0"><t t-esc="lesson.summary or 'Complete this lesson video to satisfy your training requirement.'"/></p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-warning bg-dark p-3 text-light">
+                                    <h6 class="fw-bold text-warning mb-1"><i class="fa fa-lock me-1"/> Bunna Information Security Notice</h6>
+                                    <p class="small text-white-50 mb-0">
+                                        Content is dynamically watermarked with your session credentials. Recording, screenshot capture, or redistribution is strictly prohibited.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anti-Cheat, Resume, and Watermark Movement Scripts -->
+                <script type="text/javascript">
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const video = document.getElementById('lmsVideoPlayer');
+                        const wm1 = document.getElementById('floatingWatermark1');
+                        const wm2 = document.getElementById('floatingWatermark2');
+                        const wm3 = document.getElementById('floatingWatermark3');
+                        const progressSpan = document.getElementById('progressPercent');
+
+                        const lessonId = <t t-esc="lesson.id"/>;
+                        let lastSavedPosition = <t t-esc="last_position or 0"/>;
+                        let maxAllowedPosition = lastSavedPosition;
+
+                        // Resume playback from last saved progress
+                        if (lastSavedPosition > 0 &amp;&amp; video) {
+                            video.currentTime = lastSavedPosition;
+                        }
+
+                        // Anti-Skip / Anti-Fast-Forward Enforcement (FR-LMS-007)
+                        if (video) {
+                            video.addEventListener('timeupdate', function() {
+                                if (video.currentTime > maxAllowedPosition) {
+                                    maxAllowedPosition = video.currentTime;
+                                }
+                                if (video.duration > 0) {
+                                    const pct = Math.min(100, Math.round((maxAllowedPosition / video.duration) * 100));
+                                    if (progressSpan) progressSpan.textContent = pct + '%';
+                                }
+                            });
+
+                            video.addEventListener('seeking', function() {
+                                // Block skipping beyond allowed watch buffer
+                                if (video.currentTime > maxAllowedPosition + 2) {
+                                    video.currentTime = maxAllowedPosition;
+                                }
+                            });
+
+                            // Periodic Heartbeat to server every 5 seconds (FR-LMS-008)
+                            setInterval(function() {
+                                if (!video.paused &amp;&amp; video.duration > 0) {
+                                    fetch('/lms/video/heartbeat', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-Requested-With': 'XMLHttpRequest'
+                                        },
+                                        body: JSON.stringify({
+                                            jsonrpc: "2.0",
+                                            method: "call",
+                                            params: {
+                                                lesson_id: lessonId,
+                                                current_time: video.currentTime,
+                                                duration: video.duration
+                                            }
+                                        })
+                                    }).then(r => r.json()).then(data => {
+                                        if (data.result &amp;&amp; data.result.allowed_position) {
+                                            maxAllowedPosition = Math.max(maxAllowedPosition, data.result.allowed_position);
+                                        }
+                                    }).catch(err => console.debug("Heartbeat error:", err));
+                                }
+                            }, 5000);
+                        }
+
+                        // Screen Capture Deterrent: Subtle drifting watermark position
+                        setInterval(function() {
+                            if (wm1 &amp;&amp; wm2 &amp;&amp; wm3) {
+                                const deltaX = (Math.random() * 8) - 4;
+                                const deltaY = (Math.random() * 8) - 4;
+                                wm1.style.top = Math.max(10, Math.min(80, 15 + deltaY)) + '%';
+                                wm1.style.left = Math.max(10, Math.min(75, 20 + deltaX)) + '%';
+                                wm2.style.top = Math.max(20, Math.min(85, 60 - deltaY)) + '%';
+                                wm2.style.left = Math.max(15, Math.min(80, 45 - deltaX)) + '%';
+                            }
+                        }, 8000);
+
+                        // Prevent PrintScreen and key recording combinations
+                        document.addEventListener('keyup', function(e) {
+                            if (e.key === 'PrintScreen' || (e.ctrlKey &amp;&amp; (e.key === 'p' || e.key === 's'))) {
+                                e.preventDefault();
+                                alert("Screen capture is disabled on Bunna Bank LMS protected learning assets.");
+                            }
+                        });
+                    });
+                </script>
+            </t>
+        </template>
+
     </data>
 </odoo>

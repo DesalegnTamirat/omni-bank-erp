@@ -37,11 +37,21 @@ class HrEmployeeCompetency(models.Model):
     )
 
     def _search_is_director_or_chief(self, operator, value):
-        peer_config_model = self.env['competency.director.peer.config']
-        all_active = self.env['hr.employee'].search([('active', '=', True)])
+        peer_config_model = self.env['competency.director.peer.config'].sudo()
+        all_active = self.env['hr.employee'].sudo().search([('active', '=', True)])
         matched_ids = [e.id for e in all_active if peer_config_model._is_director_or_chief(e)]
 
-        is_true = (operator in ('=', '==') and bool(value)) or (operator in ('!=', '<>') and not bool(value))
+        if operator in ('=', '=='):
+            is_true = bool(value)
+        elif operator in ('!=', '<>'):
+            is_true = not bool(value)
+        elif operator == 'in':
+            is_true = any(bool(v) for v in value)
+        elif operator == 'not in':
+            is_true = not any(bool(v) for v in value)
+        else:
+            is_true = True
+
         if is_true:
             return [('id', 'in', matched_ids)]
         else:
@@ -49,17 +59,22 @@ class HrEmployeeCompetency(models.Model):
 
     @api.depends('job_grade', 'grade_id', 'job_id', 'active')
     def _compute_is_director_or_chief(self):
-        peer_config_model = self.env['competency.director.peer.config']
+        peer_config_model = self.env['competency.director.peer.config'].sudo()
         for emp in self:
-            emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp)
+            emp.is_director_or_chief = peer_config_model._is_director_or_chief(emp.sudo())
 
     def _is_competency_scoped_context(self):
         ctx = self.env.context
+        active_model = str(ctx.get('active_model') or '')
+        params_model = str((ctx.get('params') or {}).get('model') or '')
+        params_active_model = str((ctx.get('params') or {}).get('active_model') or '')
+
         is_competency_ctx = bool(
             ctx.get('competency_employee_select')
             or ctx.get('competency_peer_select')
-            or ctx.get('active_model') in ('competency.director.peer.config', 'competency.report.wizard', 'competency.assessment', 'competency.assessment.line', 'competency.assessment.cycle')
-            or (ctx.get('params') and ctx.get('params').get('model') in ('competency.director.peer.config', 'competency.report.wizard', 'competency.assessment', 'competency.assessment.line', 'competency.assessment.cycle'))
+            or active_model.startswith('competency.')
+            or params_model.startswith('competency.')
+            or params_active_model.startswith('competency.')
         )
         if not is_competency_ctx:
             return False
@@ -72,6 +87,16 @@ class HrEmployeeCompetency(models.Model):
             or self.env.is_admin()
         )
 
+    def _check_access(self, operation: str):
+        if operation == 'read' and self._is_competency_scoped_context():
+            return None
+        return super()._check_access(operation)
+
+    def check_access(self, operation: str) -> None:
+        if operation == 'read' and self._is_competency_scoped_context():
+            return None
+        return super().check_access(operation)
+
     def check_access_rule(self, operation):
         if operation == 'read' and self._is_competency_scoped_context():
             return None
@@ -81,6 +106,22 @@ class HrEmployeeCompetency(models.Model):
         if operation == 'read' and self._is_competency_scoped_context():
             return self
         return super()._filter_access_rules_python(operation=operation)
+
+    @api.model
+    def _search(self, domain, offset=0, limit=None, order=None, *, active_test=True, bypass_access=False):
+        if self._is_competency_scoped_context():
+            bypass_access = True
+        return super()._search(domain, offset=offset, limit=limit, order=order, active_test=active_test, bypass_access=bypass_access)
+
+    def web_read(self, specification):
+        if self._is_competency_scoped_context():
+            return super(HrEmployeeCompetency, self.sudo()).web_read(specification)
+        return super().web_read(specification)
+
+    def read(self, fields=None, load='_classic_read'):
+        if self._is_competency_scoped_context():
+            return super(HrEmployeeCompetency, self.sudo()).read(fields=fields, load=load)
+        return super().read(fields=fields, load=load)
 
     @api.model
     def name_search(self, name='', domain=None, operator='ilike', limit=100, **kwargs):

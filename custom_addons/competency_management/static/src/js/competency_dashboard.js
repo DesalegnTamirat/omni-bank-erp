@@ -26,6 +26,9 @@ export class CompetencyDashboard extends Component {
             error: false,
             alertDismissed: false,
             radarHasData: false,
+            radarPillarFilter: "all",
+            radarFilteredCount: 0,
+            radarPillarCounts: { all: 0, core: 0, leadership: 0, technical: 0 },
             data: {
                 is_dept_readonly: false,
                 is_ou_readonly: false,
@@ -62,6 +65,15 @@ export class CompetencyDashboard extends Component {
             },
             () => [this.state.loading, this.state.cycleId, this.state.departmentId, this.state.operatingUnitId]
         );
+
+        useEffect(
+            () => {
+                if (!this.state.loading && !this.state.error) {
+                    this.renderRadarChart();
+                }
+            },
+            () => [this.state.radarPillarFilter]
+        );
     }
 
     async loadData() {
@@ -94,10 +106,12 @@ export class CompetencyDashboard extends Component {
             }
 
             this.state.loading = false;
+            this._updateRadarState();
         } catch (e) {
             console.error("Failed to load competency dashboard data:", e);
             this.state.error = true;
             this.state.loading = false;
+            this._updateRadarState();
             this.state.data = {
                 is_dept_readonly: false,
                 is_ou_readonly: false,
@@ -115,17 +129,29 @@ export class CompetencyDashboard extends Component {
     }
 
     onCycleChange(ev) {
+        if (this.radarChartInstance) {
+            try { this.radarChartInstance.destroy(); } catch (e) {}
+            this.radarChartInstance = null;
+        }
         this.state.cycleId = ev.target.value ? parseInt(ev.target.value) : (this.state.data.all_cycles && this.state.data.all_cycles[0] ? this.state.data.all_cycles[0].id : false);
         this.loadData();
     }
 
     onDepartmentChange(ev) {
+        if (this.radarChartInstance) {
+            try { this.radarChartInstance.destroy(); } catch (e) {}
+            this.radarChartInstance = null;
+        }
         this.state.departmentId = ev.target.value ? parseInt(ev.target.value) : false;
         this.state.operatingUnitId = false;
         this.loadData();
     }
 
     onOperatingUnitChange(ev) {
+        if (this.radarChartInstance) {
+            try { this.radarChartInstance.destroy(); } catch (e) {}
+            this.radarChartInstance = null;
+        }
         this.state.operatingUnitId = ev.target.value ? parseInt(ev.target.value) : false;
         this.loadData();
     }
@@ -190,43 +216,190 @@ export class CompetencyDashboard extends Component {
         }
 
         // 3. Radar Chart (Spider/Radar) — real per-competency data only, never fabricated samples.
-        const radarCanvas = document.getElementById("competencyRadarChart");
-        if (radarCanvas) {
-            if (this.radarChartInstance) this.radarChartInstance.destroy();
-            const rdata = (this.state.data.charts && this.state.data.charts.employee_radar) || {};
-            const hasRadarData = !!rdata.has_data && Array.isArray(rdata.labels) && rdata.labels.length > 0;
-            this.state.radarHasData = hasRadarData;
-            if (hasRadarData) {
-                this.radarChartInstance = new ChartLib(radarCanvas, {
-                    type: 'radar',
-                    data: {
-                        labels: rdata.labels,
-                        datasets: [
-                            {
-                                label: 'My Assessed Level',
-                                data: rdata.assessed,
-                                backgroundColor: 'rgba(84, 23, 24, 0.2)',
-                                borderColor: '#541718',
-                                pointBackgroundColor: '#541718',
-                            },
-                            {
-                                label: 'Required Level',
-                                data: rdata.required,
-                                backgroundColor: 'rgba(193, 117, 64, 0.1)',
-                                borderColor: '#c17540',
-                                borderDash: [5, 5],
-                                pointBackgroundColor: '#c17540',
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: { r: { beginAtZero: true, max: 5 } }
-                    }
-                });
+        this.renderRadarChart();
+    }
+
+    _updateRadarState() {
+        const rdata = (this.state.data && this.state.data.charts && this.state.data.charts.employee_radar) || {};
+        const rawLabels = (rdata.labels && Array.isArray(rdata.labels)) ? rdata.labels : [];
+        const rawPillars = (rdata.pillars && Array.isArray(rdata.pillars)) ? rdata.pillars : [];
+        const hasRadarData = !!rdata.has_data && rawLabels.length > 0;
+        this.state.radarHasData = hasRadarData;
+
+        const pillarCounts = { all: rawLabels.length, core: 0, leadership: 0, technical: 0 };
+        for (let i = 0; i < rawLabels.length; i++) {
+            const p = (rawPillars[i] || 'core').toLowerCase();
+            if (pillarCounts[p] !== undefined) {
+                pillarCounts[p]++;
             }
         }
+        this.state.radarPillarCounts = pillarCounts;
+
+        const currentFilter = (this.state.radarPillarFilter || 'all').toLowerCase();
+        let filteredCount = 0;
+        for (let i = 0; i < rawLabels.length; i++) {
+            const p = (rawPillars[i] || 'core').toLowerCase();
+            if (currentFilter === 'all' || p === currentFilter) {
+                filteredCount++;
+            }
+        }
+        this.state.radarFilteredCount = filteredCount;
+    }
+
+    setRadarPillarFilter(pillar) {
+        this.state.radarPillarFilter = pillar;
+        this._updateRadarState();
+    }
+
+    renderRadarChart() {
+        const ChartLib = window.Chart;
+        if (!ChartLib) return;
+
+        const rdata = (this.state.data && this.state.data.charts && this.state.data.charts.employee_radar) || {};
+        const rawLabels = (rdata.labels && Array.isArray(rdata.labels)) ? rdata.labels : [];
+        const rawAssessed = (rdata.assessed && Array.isArray(rdata.assessed)) ? rdata.assessed : [];
+        const rawRequired = (rdata.required && Array.isArray(rdata.required)) ? rdata.required : [];
+        const rawPillars = (rdata.pillars && Array.isArray(rdata.pillars)) ? rdata.pillars : [];
+
+        if (!this.state.radarHasData || rawLabels.length === 0) {
+            if (this.radarChartInstance) {
+                try { this.radarChartInstance.destroy(); } catch (e) {}
+                this.radarChartInstance = null;
+            }
+            return;
+        }
+
+        const currentFilter = (this.state.radarPillarFilter || 'all').toLowerCase();
+        const filteredIndices = [];
+        for (let i = 0; i < rawLabels.length; i++) {
+            const p = (rawPillars[i] || 'core').toLowerCase();
+            if (currentFilter === 'all' || p === currentFilter) {
+                filteredIndices.push(i);
+            }
+        }
+
+        const radarCanvas = document.getElementById("competencyRadarChart");
+        if (!radarCanvas) return;
+
+        if (filteredIndices.length === 0) {
+            if (this.radarChartInstance) {
+                try { this.radarChartInstance.destroy(); } catch (e) {}
+                this.radarChartInstance = null;
+            }
+            return;
+        }
+
+        const labels = filteredIndices.map(i => rawLabels[i]);
+        const assessed = filteredIndices.map(i => rawAssessed[i]);
+        const required = filteredIndices.map(i => rawRequired[i]);
+
+        // Smoothly update existing Chart instance if canvas is still attached
+        if (this.radarChartInstance && ChartLib.getChart(radarCanvas) === this.radarChartInstance) {
+            this.radarChartInstance.data.labels = labels;
+            this.radarChartInstance.data.datasets[0].data = assessed;
+            this.radarChartInstance.data.datasets[1].data = required;
+            this.radarChartInstance.update();
+            return;
+        }
+
+        // Clean up any stale chart on this canvas before new instantiation
+        const existingChart = ChartLib.getChart(radarCanvas);
+        if (existingChart) {
+            try { existingChart.destroy(); } catch (e) {}
+        }
+        if (this.radarChartInstance) {
+            try { this.radarChartInstance.destroy(); } catch (e) {}
+            this.radarChartInstance = null;
+        }
+
+        this.radarChartInstance = new ChartLib(radarCanvas, {
+            type: 'radar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'My Assessed Level',
+                        data: assessed,
+                        backgroundColor: 'rgba(84, 23, 24, 0.2)',
+                        borderColor: '#541718',
+                        pointBackgroundColor: '#541718',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                    },
+                    {
+                        label: 'Required Level',
+                        data: required,
+                        backgroundColor: 'rgba(193, 117, 64, 0.1)',
+                        borderColor: '#c17540',
+                        borderDash: [5, 5],
+                        pointBackgroundColor: '#c17540',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 5,
+                        ticks: {
+                            stepSize: 1,
+                            font: { size: 10 }
+                        },
+                        pointLabels: {
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            },
+                            callback: function(label) {
+                                if (typeof label === 'string' && label.length > 12) {
+                                    return label.substring(0, 10) + '...';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11 } }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleFont: { size: 12, weight: 'bold' },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        callbacks: {
+                            title: function(items) {
+                                if (!items || !items.length) return '';
+                                const idx = items[0].dataIndex;
+                                return labels[idx] || items[0].label || '';
+                            },
+                            label: function(item) {
+                                const datasetLabel = item.dataset.label || '';
+                                const val = item.raw !== undefined ? item.raw : item.formattedValue;
+                                return `${datasetLabel}: Level ${val}`;
+                            },
+                            afterBody: function(items) {
+                                if (!items || !items.length) return [];
+                                const idx = items[0].dataIndex;
+                                const aVal = assessed[idx] || 0;
+                                const rVal = required[idx] || 0;
+                                const gap = aVal - rVal;
+                                const status = gap >= 0 ? (gap > 0 ? "Exceeds Target" : "Meets Target") : `Gap (${gap})`;
+                                return [
+                                    `Gap: ${gap > 0 ? '+' : ''}${gap} (${status})`
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
     openTnaBelow() {

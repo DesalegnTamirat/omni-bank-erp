@@ -411,6 +411,9 @@ class CompetencyRoleMappingLine(models.Model):
         ('4', 'Level 4 - Expert'),
     ], string='Required Proficiency', required=True, default='2', store=True)
 
+    required_level = fields.Selection(
+        related='required_proficiency', string='Required Level (Alias)', readonly=True)
+
     weight = fields.Float(
         string='Weight', default=1.0,
         help='Relative importance of this competency for the role.')
